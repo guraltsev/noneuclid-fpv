@@ -62,6 +62,15 @@ beginning of the mathematics.
 Treat the experience as a laboratory. 
 A useful session starts with one small question, gives students time to gather evidence, and ends with a conversation or written explanation. 
 
+## Source and upstream
+
+The canonical source is **[guraltsev/noneuclid-fpv](https://github.com/guraltsev/noneuclid-fpv)**
+(the *upstream* repository). Report problems and propose changes there. To run
+your own copy, fork it and follow the
+[deployment guide](_docs/DEPLOYMENT.md); the activity links above point at one
+example deployment, so replace them with your own site's address if you publish
+a copy.
+
 ## Credits and reuse
 
 The project’s source code is available under the [MIT License](LICENSE).
