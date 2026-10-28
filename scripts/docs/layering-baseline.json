@@ -1,0 +1,16 @@
+{
+  "comment": "Known layering violations. Remove entries as they are fixed; never add new ones.",
+  "edges": [
+    "world-objects/geodesicMarmot.ts -> render/three/buildDecorationMesh.ts",
+    "world-objects/geodesicMarmot.ts -> render/three/debugCollisionWireframes.ts",
+    "world-objects/geodesicMarmot.ts -> render/three/preloadWorldAssets.ts",
+    "world-objects/geodesicMarmot.ts -> render/three/runtimeDiagnostics.ts",
+    "world-objects/geodesicMarmot.ts -> render/three/worldAxes.ts",
+    "world-objects/geodesicMarmot.ts -> runtime/worldGeometryDeformations.ts",
+    "world-objects/simpleGeoCreature.ts -> render/three/debugCollisionWireframes.ts",
+    "world-objects/simpleGeoCreature.ts -> render/three/preloadWorldAssets.ts",
+    "world-objects/simpleGeoCreature.ts -> render/three/runtimeDiagnostics.ts",
+    "world-objects/simpleGeoCreature.ts -> render/three/worldAxes.ts",
+    "world-objects/simpleGeoCreature.ts -> runtime/worldGeometryDeformations.ts"
+  ]
+}
