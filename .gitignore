@@ -6,6 +6,7 @@ digest.txt
 # Private key material (see _issues/35)
 *.pfx
 *.pem
+*.cer
 *.key
 
 # Raw/source texture material is huge and never loaded at runtime; only runtime/*.ktx2 (and the README) are tracked (see _issues/34)
