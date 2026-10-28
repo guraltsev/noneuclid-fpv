@@ -14,22 +14,20 @@ build an explanation.
 
 ## Start an activity
 
-These two short activities open in a browser. They are examples of a particular
-classroom deployment; the project itself is called **NonEuclidean FPV** and is
-not tied to one school year or deployment name.
+These activities open in a browser from the project's own GitHub Pages site.
 
-- [Activity 1: cube-world exploration](https://guraltsev.github.io/camp-2026-VR/?config=001)
-- [Activity 2: tetrahedron-world exploration](https://guraltsev.github.io/camp-2026-VR/?config=002)
-- [Activity 3: flat torus](https://guraltsev.github.io/camp-2026-VR/?config=003)
-- [Activity 4: genus-2 torus](https://guraltsev.github.io/camp-2026-VR/?config=004)
-- [Activity 5: torus moduli](https://guraltsev.github.io/camp-2026-VR/?config=005)
+- [Activity 1: cube-world exploration](https://guraltsev.github.io/noneuclid-fpv/?config=001)
+- [Activity 2: tetrahedron-world exploration](https://guraltsev.github.io/noneuclid-fpv/?config=002)
+- [Activity 3: flat torus](https://guraltsev.github.io/noneuclid-fpv/?config=003)
+- [Activity 4: genus-2 torus](https://guraltsev.github.io/noneuclid-fpv/?config=004)
+- [Activity 5: torus moduli](https://guraltsev.github.io/noneuclid-fpv/?config=005)
 
 ### Unrestricted mode (teachers and developers)
 
 The activity links above are locked down. This link opens every menu and tool,
 including world selection and the debug menu:
 
-- [Unrestricted: all worlds, tools, and debug menu](https://guraltsev.github.io/camp-2026-VR/?config=full)
+- [Unrestricted: all worlds, tools, and debug menu](https://guraltsev.github.io/noneuclid-fpv/?config=full)
 
 Debug features start switched off. For verbose logging and the on-screen
 overlay, add `&debugLevel=verbose&debugOverlay=1`; use `&world=<id>` to pick a
@@ -65,11 +63,11 @@ A useful session starts with one small question, gives students time to gather e
 ## Source and upstream
 
 The canonical source is **[guraltsev/noneuclid-fpv](https://github.com/guraltsev/noneuclid-fpv)**
-(the *upstream* repository). Report problems and propose changes there. To run
-your own copy, fork it and follow the
-[deployment guide](_docs/DEPLOYMENT.md); the activity links above point at one
-example deployment, so replace them with your own site's address if you publish
-a copy.
+(the *upstream* repository), which publishes the activities above at
+<https://guraltsev.github.io/noneuclid-fpv/>. Report problems and propose
+changes there. To run your own copy, fork it and follow the
+[deployment guide](_docs/DEPLOYMENT.md); a fork publishes to
+`https://<you>.github.io/<repo>/`, so point the links above at that address.
 
 ## Credits and reuse
 
