@@ -65,9 +65,8 @@ A useful session starts with one small question, gives students time to gather e
 The canonical source is **[guraltsev/noneuclid-fpv](https://github.com/guraltsev/noneuclid-fpv)**
 (the *upstream* repository), which publishes the activities above at
 <https://guraltsev.github.io/noneuclid-fpv/>. Report problems and propose
-changes there. To run your own copy, fork it and follow the
-[deployment guide](_docs/DEPLOYMENT.md); a fork publishes to
-`https://<you>.github.io/<repo>/`, so point the links above at that address.
+changes there. Maintainer instructions for publishing are in the
+[deployment guide](_docs/DEPLOYMENT.md).
 
 ## Credits and reuse
 

@@ -5,87 +5,66 @@ from the main README so students and educators can focus on the mathematics.
 
 ## GitHub Pages
 
-Upstream is [guraltsev/noneuclid-fpv](https://github.com/guraltsev/noneuclid-fpv).
-A deployment is simply a copy of it (a fork, or a new repository you push the
-code to) with GitHub Pages switched on. The checked-in
-[Pages workflow](../.github/workflows/deploy-pages.yml) installs dependencies,
-runs the tests, builds `dist/`, adds `.nojekyll`, and publishes the result.
+The site is published from [guraltsev/noneuclid-fpv](https://github.com/guraltsev/noneuclid-fpv)
+at **https://guraltsev.github.io/noneuclid-fpv/**. Publishing is automatic: every
+push to `main` runs the [Pages workflow](../.github/workflows/deploy-pages.yml),
+which installs dependencies, runs the tests, builds the site and deploys it.
+Nothing needs to be run by hand.
 
-### One-time setup
+### One-time setup (about two minutes)
 
-1. **Get your own repository.** Either fork upstream on GitHub (Fork button), or
-   create an empty repository and push the code to it:
+1. Open the repository on GitHub, then **Settings → Pages**.
+2. Under **Build and deployment → Source**, choose **GitHub Actions** (not
+   "Deploy from a branch").
+3. Open the **Actions** tab. Find the latest "Deploy GitHub Pages" run; if none
+   exists, choose it on the left and press **Run workflow**.
+4. Wait for both jobs (`build`, then `deploy`) to turn green. If asked, approve
+   the `github-pages` environment.
+5. Open the site address above. The same address appears on the finished
+   `deploy` job and under Settings → Pages.
 
-   ```sh
-   git remote rename origin upstream        # keep a pointer to the original
-   git remote add origin git@github.com:<you>/<repo>.git
-   git push -u origin main
-   ```
-
-2. **Enable Pages with GitHub Actions.** In the repository on GitHub open
-   *Settings → Pages*, and under *Build and deployment → Source* choose
-   **GitHub Actions**. Do not choose "Deploy from a branch".
-3. **Allow the workflow to run.** In a fork, open the *Actions* tab and click
-   "I understand my workflows, go ahead and enable them". Workflow permissions
-   need no change: the workflow requests `pages: write` and `id-token: write`
-   itself.
-4. **Publish.** Push to the default branch (or run *Actions → Deploy GitHub
-   Pages → Run workflow*). The `build` job tests and builds; the `deploy` job
-   publishes. The first run may ask you to approve the `github-pages`
-   environment under *Settings → Environments*.
-5. **Open the site** at `https://<you>.github.io/<repo>/`; the address is also
-   shown on the workflow run. Activities are `?config=001` to `?config=005`, and
-   `?config=full` opens the unrestricted debug mode (see the README).
-
-The base path (`/<repo>/`) is detected automatically by the workflow, so the
-repository can be named anything, such as `camp-2026-VR`. That name decides the
-URL only; the project identity stays `noneuclid-fpv`. For a user or organization
-site (`<you>.github.io` repository) the base path is `/`.
-
-### Updating a deployment
-
-- Every push to the default branch redeploys. A failing test blocks the deploy.
-- To pull in upstream changes:
-
-  ```sh
-  git fetch upstream
-  git merge upstream/main      # or: git rebase upstream/main
-  git push origin main
-  ```
-
-- Per-class variants live in `public/*.config.js` (menus, tools, starting world,
-  debug defaults). Edit or copy one, and link to it with `?config=<name>`.
-- After changing the README's activity links, point them at your own site.
-
-### Checking a build locally
-
-Supply the target base path explicitly when verifying a project-page build:
+### Publishing a change
 
 ```sh
-VITE_BASE=/<repo>/ npm run build:pages
+git add -A
+git commit -m "Describe the change"
+git push
+```
+
+That is all. Watch the run in the Actions tab; after a minute or two the site
+shows the change (force-refresh the browser, Ctrl+F5, if it looks stale). If
+the tests fail, the deploy is skipped and the old site stays up; open the failed
+run to see which test.
+
+### Activity addresses
+
+Add `?config=...` to the site address: `001` to `005` are the locked student
+activities, and `full` is the unrestricted mode with the world and debug menus.
+Per-activity settings live in `public/*.config.js`.
+
+### Check a build locally first (optional)
+
+```sh
+VITE_BASE=/noneuclid-fpv/ npm run build:pages
 npm run preview
 ```
 
-Then visit the preview under `/<repo>/` and check at least one locked scenario
-URL such as `?config=001`. The active
-[base-path deployment issue](../_issues/37_align_pages_and_deployment_configuration.md)
-tracks removal of the remaining legacy fallback from the helper scripts; do not
-rely on a package name to choose a Pages repository.
+Then open the printed address with `/noneuclid-fpv/` appended and try
+`?config=001`. See also the
+[base-path deployment issue](../_issues/37_align_pages_and_deployment_configuration.md).
 
 ### Troubleshooting
 
-- **404 or a blank page:** the base path does not match the repository name.
-  Rebuild with the correct `VITE_BASE`, or let the workflow set it.
-- **Workflow does not start:** Actions are disabled on the fork, or the push was
-  not to the default branch.
-- **Deploy job fails with a permissions or environment error:** Pages source is
-  not set to *GitHub Actions* (step 2).
-- **Floor textures missing:** only the compressed `runtime/*.ktx2` textures are
-  tracked. Source maps are intentionally not in the repository; see
+- **404 or blank page:** Pages source is not set to GitHub Actions, or the first
+  workflow run has not finished.
+- **Workflow does not start:** the push was not to `main`, or Actions are
+  disabled under Settings → Actions.
+- **Deploy fails with a permissions or environment error:** repeat setup step 2.
+- **Floor textures missing:** only compressed `runtime/*.ktx2` textures are in
+  the repository; see
   [issue 34](../_issues/34_reduce_deployment_and_repository_asset_footprint.md).
-- **Alternative script:** `npm run deploy:pages` force-pushes a build to a
-  `gh-pages` branch. Use it only with Pages set to "Deploy from a branch", and
-  never together with the Actions workflow.
+- **Do not use `npm run deploy:pages`** with this setup; it publishes a
+  separate `gh-pages` branch and conflicts with the workflow.
 
 ## HTTPS and WebXR
 
