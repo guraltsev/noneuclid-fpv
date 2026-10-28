@@ -1,0 +1,11 @@
+Model Information:
+* title:	Imp Character
+* source:	https://sketchfab.com/3d-models/imp-character-e4dd9c9d9ad14976a4ce0d1f6049292e
+* author:	Inuciian (https://sketchfab.com/Inuciian)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Imp Character" (https://sketchfab.com/3d-models/imp-character-e4dd9c9d9ad14976a4ce0d1f6049292e) by Inuciian (https://sketchfab.com/Inuciian) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
