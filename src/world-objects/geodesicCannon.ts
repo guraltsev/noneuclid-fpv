@@ -4150,6 +4150,8 @@ function absorbShortCurveShorteningHalf(input: {
 // Finds a stable interval that is the same geodesic as `candidate`: same two endpoint anchors and the same portal word, read in
 // either direction (A -> B with word w equals B -> A with the inverse word). The word, not just the anchor pair, is the identity:
 // two emitters can be joined by several distinct geodesics in different homotopy classes, and those must stay separate.
+// Only called when a curve-shortening pair finishes and its result is about to be locked, never while geodesics are still moving;
+// only stable, locked (emitter-to-emitter) intervals are candidates.
 function findEquivalentStableInterval(
   registry: RuntimeObjectRegistry,
   candidate: GeodesicIntervalObject,
@@ -4159,6 +4161,7 @@ function findEquivalentStableInterval(
   return registry.getAll().find((object): object is GeodesicIntervalObject =>
     object.kind === "geodesic-interval" &&
     object.motionState === "stable" &&
+    isGeodesicLocked(registry, object.id) &&
     !excludedIds.includes(object.id) &&
     (
       (
