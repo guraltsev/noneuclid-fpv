@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.vite/
+coverage/
+digest.txt
+# Private key material (see _issues/35)
+*.pfx
+*.pem
+*.key

@@ -1,0 +1,38 @@
+{
+  "name": "noneuclid-fpv",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "build": "tsc --noEmit && vite build",
+    "build:pages": "node scripts/build-pages.mjs",
+    "preview": "vite preview",
+    "deploy:pages": "bash scripts/deploy-pages.sh",
+    "textures:floor:inventory": "node scripts/texture-build/inventory-floor-textures.mjs",
+    "textures:floor:build": "node scripts/texture-build/build-floor-runtime-textures.mjs",
+    "textures:ktx2:sync-transcoder": "node scripts/texture-build/sync-three-ktx2-transcoder.mjs",
+    "docs:generate": "node scripts/docs/cli.mjs generate",
+    "docs:check": "node scripts/docs/cli.mjs check",
+    "docs:coverage": "node scripts/docs/cli.mjs coverage",
+    "smoke": "node scripts/smoke/browser-smoke.mjs"
+  },
+  "dependencies": {
+    "@pmndrs/pointer-events": "^6.6.30",
+    "@pmndrs/uikit": "^1.0.73",
+    "@pmndrs/uikit-default": "^1.0.73",
+    "@pmndrs/uikit-lucide": "^1.0.73",
+    "three": "^0.164.1"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.1",
+    "@types/three": "^0.164.0",
+    "jpeg-js": "^0.4.4",
+    "typescript": "^5.4.5",
+    "vite": "^5.2.11",
+    "vitest": "^1.6.0"
+  }
+}

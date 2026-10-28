@@ -1,0 +1,8 @@
+{
+  "python.testing.pytestEnabled": false,
+  "python.testing.unittestEnabled": false,
+  "python.testing.nosetestsEnabled": false,
+  "python.testing.autoTestDiscoverOnSaveEnabled": false,
+  "vitest.commandLine": "npm.cmd test --",
+  "typescript.tsdk": "node_modules/typescript/lib"
+}

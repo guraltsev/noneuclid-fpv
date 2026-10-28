@@ -1,0 +1,63 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "ensure dev server (5173)",
+      "type": "shell",
+      "command": "$port = 5173; $listener = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue; if (-not $listener) { Start-Process -FilePath 'npm.cmd' -ArgumentList 'run dev -- --host 127.0.0.1 --port 5173 --strictPort' -WorkingDirectory '${workspaceFolder}' -WindowStyle Hidden }; $deadline = (Get-Date).AddSeconds(20); do { $listener = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue; if ($listener) { Write-Host 'Vite is listening on http://127.0.0.1:5173/'; exit 0 }; Start-Sleep -Milliseconds 250 } while ((Get-Date) -lt $deadline); throw 'Timed out waiting for Vite on http://127.0.0.1:5173/'",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "silent",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "dev: vite (5173)",
+      "type": "shell",
+      "command": "npm.cmd run dev -- --host 127.0.0.1 --port 5173 --strictPort",
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "vite",
+        "pattern": {
+          "regexp": "^$"
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".*",
+          "endsPattern": "Local:.*http://127\\.0\\.0\\.1:5173/"
+        }
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "typecheck",
+      "type": "shell",
+      "command": "npm.cmd run typecheck",
+      "problemMatcher": "$tsc"
+    },
+    {
+      "label": "test",
+      "type": "shell",
+      "command": "npm.cmd test",
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "test: watch",
+      "type": "shell",
+      "command": "npm.cmd run test:watch",
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "build",
+      "type": "shell",
+      "command": "npm.cmd run build",
+      "group": "build",
+      "problemMatcher": "$tsc"
+    }
+  ]
+}
