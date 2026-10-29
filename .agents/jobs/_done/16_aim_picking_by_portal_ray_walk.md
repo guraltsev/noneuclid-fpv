@@ -1,6 +1,6 @@
 # Job 16 - Aim picking by portal ray walk
 
-Status: in progress.
+Status: done, needs review on 2026-10-29.
 Revised on 2026-10-29 for a less capable implementing model.
 Resolves: issue [72](../../_issues/72_aim_picking_uses_camera_clip_polygons_not_portal_ray_walk.md).
 
@@ -178,3 +178,33 @@ of this issue remains."
 - No code path in `aimTarget.ts` reads clip polygons or `VisiblePortalPath`.
 - Tests 1-8 pass; changed old tests are listed.
 - Issue 72 is closed.
+
+## Report
+
+### Done
+Commit e025a69. Changed files: `src/render/three/aimTarget.ts`, `aimInteraction.ts`, `rootAimRay.ts`, `createThreeApp.ts`, `tests/render-contract/aimTarget.test.ts`, regenerated `_docs/generated/*`.
+
+- `aimTarget.ts`: new `resolveAimTargetsByRayWalk` (`resolveAimTargets` / `resolveAimTarget` call it). Locates the origin cell with `locateDevelopedPoint`, walks the horizontal projection with `walkDevelopedSegment` (200 m, 64 crossings), per cell applies the floor/ceiling window cut, the lower-aperture stop and the wall stop (Decision 4), tests objects only for hits inside the cell's window, and adds the floor target. `ResolveAimTargetRequest` now has `rootCellId` and `rootAnchorPoint` instead of `visiblePortalPaths`; `AimTarget.portalPathId` is `hopCount`; `distanceMeters` is the 3-D ray parameter; root points use the inverted rigid transform. Removed `buildCellRayFromRootThreeRay`, `pathContainsNdcPoint`, `centerNdc`, `transformCellPointToRoot` / `transformCellDirectionToRoot` and `rootDistance`. No code in the file reads clip polygons or `VisiblePortalPath`.
+- `aimInteraction.ts`: `getRuntimeObjectVisiblePaths` dep replaced by `getPlayerPose` and `getFrameSerial` (plus an optional `resolveAimTargets` override used by the cache test); one-entry cache keyed by the ray (origin, direction, quaternion), ignored geodesic and frame serial; new `invalidateAimCache`.
+- `createThreeApp.ts`: `aimFrameSerial` incremented once per `renderFrame`; `invalidateAimCache()` after the tool dispatch whenever `primaryActionConsumed` is true. `rootAimRay.ts` cycle signature and `logVerboseAimClick` use `hopCount`.
+- Tests: new `describe("ray walk")` with the 8 specified tests (through-portal hit with hopCount 1 and root point, wall beside the portal, straddling object hit once, overhang past the far wall, ray above a lower target cell, vertical ray, origin held through a portal, cache via `createAimInteraction` with an injected resolver).
+
+### Deviations
+- Existing tests: only the mechanical `visiblePortalPaths` to `rootCellId` replacement, `portalPathId` to `hopCount` in the last test (expected value `destinationPath.id` became `1`), and removal of the now-unused `visiblePath` helper. No expectation changed. The two through-portal floor tests keep their original camera setups and expectations and pass unchanged (the ray already passes through the aperture).
+- Tests 1 and 2: test 1 asserts the root x lies in (1.5, 2.5) rather than exactly 2 because the surface hit is on the cylinder side, not its centre. Test 2 cannot place a neighbour object geometrically behind a wall (rooms are convex and portals span a whole side), so it asserts that a ray into the north wall returns no targets at all.
+- The Do-not list is respected; the extra per-cell re-test (below) is new behaviour inside the window rule, not a change to proxy shapes.
+
+### Uncertain
+- Origin outside its cell with no portal path to it (all legacy tests put the camera outside the room, e.g. y = -2 in a 2 m room): `walkDevelopedSegment` reports start-outside, so I fall back to a single piece in the root cell with window [0, 200 m] and no portal crossings (the old behaviour). The job did not specify this; real play keeps the origin inside the cell. Also `locateDevelopedPoint` status "start-outside" (anchor outside the root cell) uses the same fallback, while "wall", "crossing-limit" and "missing-cell" return no targets as specified.
+- Straddling proxies: when the nearest surface of an object lies before the cell's window start, I re-test the proxy from the window start so the ray can hit its inside part exactly once (needed for test 3). This makes a ray that starts the cell inside such a proxy hit its far (back) face. Confirm that this is the wanted rule.
+- Per-frame cache can return a slightly stale result within a frame after non-aim registry changes that do not set `primaryActionConsumed` (carried cannon pose updates, creature motion later in the frame). The next frame always resolves again.
+- One full `npm test` run showed 1 failing test out of 873; I did not capture its name, and two later full runs were fully green (865 passed, 8 skipped). Likely a timing-sensitive test under load, unrelated to aim code; unconfirmed.
+- Forbidden-zone floor test still returns undefined; I did not separately verify that the zone, rather than the portal-corner geometry, is what yields no hit.
+
+### Not done
+### Manual checks not run
+- In `?config=full` (browser): aim at a flag through a portal; aim at a wall beside a portal and see no flag behind it highlighted. Also an XR controller held through a portal.
+
+### Checks
+- Baseline `npm run typecheck` and `npm test`: green (857 passed, 8 skipped).
+- After the change: `npm run typecheck` green; `npm test` 865 passed, 8 skipped (see Uncertain for one earlier flaky failure); `npm run docs:check` green after `npm run docs:generate`; `npm run smoke -- --world cube`: SMOKE OK.

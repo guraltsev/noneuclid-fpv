@@ -1,6 +1,6 @@
 # 71 - Runtime-object instance sync runs twice per frame, once against the wrong root table
 
-Status: open; re-verified 2026-10-28.
+Status: open; re-verified 2026-10-28. 2026-10-29: Aim no longer reads visible paths (job 16); only the instance-sync part of this issue remains.
 
 Priority: P2 (performance, with a correctness defect in single-view XR and on portal-crossing frames).
 

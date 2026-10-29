@@ -1,6 +1,6 @@
 # 72 - Aim picking tests controller rays against head-camera clip polygons; replace with a portal ray walk
 
-Status: open; re-verified 2026-10-28; fix designed 2026-10-29.
+Status: open; implemented by job 16 on 2026-10-29, needs review (see the job report: _done/16_aim_picking_by_portal_ray_walk.md).
 
 Priority: P1 (correctness in VR; also performance).
 
