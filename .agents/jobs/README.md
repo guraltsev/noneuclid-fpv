@@ -6,6 +6,8 @@ sketches may live in an issue; anything that is mainly "carry out this change" i
 
 - Jobs are numbered in the order they should be carried out. Take the lowest-numbered queued job whose dependencies
   are done.
+- A coordinator job (`00_coordinate_...`) runs a batch of jobs in order, gates each one on green checks, and writes a
+  batch report to `_reports/`. When a coordinator job covers the next jobs, start with it.
 - Each job names the issues it resolves. When a job lands, close those issues (move them to `_issues/_closed/` with an
   Outcome and Closing evidence) and move the job to `_done/` with `Status: done on <date>` and the commit hashes.
 - A job that turns out to be wrong is edited or split, not silently skipped. Renumber only when the order changes.
@@ -60,7 +62,7 @@ to the report. Mark the job's row in the queue below either way.
 ```markdown
 # Job NN - <imperative title>
 
-Status: queued | in progress | done on <date> | done, needs review on <date>.
+Status: queued | in progress | done on <date> | done, needs review on <date> | skipped on <date>: <reason>.
 Resolves: issue [NN](../../_issues/NN_....md).
 
 ## Goal
@@ -78,6 +80,7 @@ Resolves: issue [NN](../../_issues/NN_....md).
 
 | Job | Title | Resolves issues | Former issue |
 | --- | --- | --- | --- |
+| [00](00_coordinate_jobs_01_10.md) | Coordinate jobs 01-10: order, gates, batch report | - |  |
 | [01](_done/01_frame_loop_error_containment_and_dispose.md) | ~~Contain frame-loop errors and release everything on dispose~~ (done) | [74](../../_issues/_closed/74_frame_loop_error_containment_and_dispose_leaks.md) |  |
 | [02](02_asset_footprint_and_provenance.md) | Shrink the deployed assets and resolve unverified ones | [40](../../_issues/40_resolve_unverified_public_assets.md) | 34 |
 | [03](03_pages_deployment_configuration.md) | Make Pages deployment repository-name agnostic | - | 37 |
