@@ -1,6 +1,6 @@
 # Job 15 - Geodesic tracing on the segment-walk kernel
 
-Status: in progress.
+Status: done, needs review on 2026-10-29.
 Revised on 2026-10-29 for a less capable implementing model.
 Resolves: issue [69](../../_issues/69_geodesic_tracing_kernel_numerics.md).
 
@@ -199,3 +199,42 @@ is gone and lifts use cached inverses.
 - No nudge constant remains; the multi-cell loop uses `walkDevelopedSegment`.
 - Tests 1-8 pass, and every changed old test is listed under `### Deviations`.
 - Issue 69 is closed with evidence.
+
+## Report
+
+### Done
+- `src/world-objects/geodesicCannon.ts`:
+  - `traceGeodesicPathForConnectionMode` now walks the developed segment with `walkDevelopedSegment` (`maxCrossings` 4096, walk length `L + 1e-7` so a side reached within tolerance beyond `L` still counts, clamped to `L`, as the old tracer did) and cuts each piece at its first zone hit (open-disk rule) or emitter hit. `portal-hit` pieces carry the next piece's exact start and direction. `portalStartEpsilonMeters` is deleted (new constants `forbiddenZoneCircleToleranceMeters` 1e-9, `maxGeodesicWalkCrossings`, `geodesicAnchorCrossingToleranceMeters` 1e-6).
+  - New exported helper `geodesicTerminalFromWalkPiece(piece, continuation?)` (piece to terminal; a vertex-tie exit becomes `forbidden-zone-hit` with `junctionId` `<cellId>:vertex-<index>`).
+  - `intersectRayWithForbiddenZone` uses the open-disk rule (Decision 4).
+  - `traceGeodesicSegment`: optional `entrySideIndex`, no nudge (`targetStart` is the exact image of the hit point). No caller outside the multi-cell loop used `targetStart`.
+  - `inversePortalTransform` (`WeakMap` cache) used by both lift functions.
+  - `findGeodesicIntersections`: same-geodesic pairs two or more segments apart are tested; only crossings within 1e-6 m of an anchor end of either geodesic (first segment start, last segment end) are dropped; `pointCoincidesWithGeodesicEmitter` deleted; `intersectHorizontalSegments` returns `leftT`, `rightT` and the segment lengths.
+- `_docs/MATHEMATICAL_MODEL.md` section 6 updated; `_docs/generated/*` regenerated.
+- Tests: new `tests/world-objects/geodesicTracingKernel.test.ts` (11 tests: tests 1-8 of the job; the open-disk rule has three cases). The new tests fail on the old code (7 of 11 fail there).
+- Measured: 50 random torus chords of 15-3000 m (up to about 200 crossings): sum of piece lengths within 1e-9 m of the requested length and the end point, pulled back through the inverse portal transforms, within 1e-8 m of `A + L d` (test bounds; no run exceeded them).
+- Commit hashes: see the job's commit lines in the git log (code commit, then the move-to-done commit).
+
+### Deviations
+- `tests/world-objects/geodesicCannon.test.ts`, "does not create a vertex balloon at an emitter when geodesics intersect there": renamed and inverted (now expects one vertex). Decision 8 removes the 0.3 m emitter exclusion and the emitter there is unrelated to both geodesics, so the crossing must be reported. This is the only changed old test; no test hard-coded a nudged `targetStart`.
+- Test 5 of the job ("a (2, 1) geodesic on the square torus self-crosses") cannot hold: the torus gluing is translation-only, so every piece of a geodesic in a cell is parallel to every other and never crosses. The self-crossing test uses hand-made segments of one geodesic id (indices 0 and 3 cross, indices 0/1 and 1/2 are adjacent).
+- Test 3 (measured length): `measureLengthTool` just sums `lengthMeters`, so the test compares the sum of segment lengths with the summed `|end - start|` polyline length and the requested length.
+- Tests 1 and 3 go through `shootGeodesic(..., connectEmitters: false)` instead of a new test hook. Note the registry splits each piece into two halves, so the test counts `portal-hit` terminals for crossings. Test 2 uses two cannons with a 10-fold `right-left` word.
+- Issue 70 note added; issue 50 row 69 not touched because issue 69 stays open.
+
+### Uncertain
+- A final non-first `end` piece of length at most 1e-7 m is dropped (the previous piece then ends in `portal-hit`), mirroring the old loop's `remaining <= intersectionTolerance` stop. The sum of lengths is then short by at most 1e-7 in that rare case. Would be confirmed by deciding whether a zero-length open tail is wanted.
+- `start-outside` / `missing-cell` fall back to the single-cell tracer for one piece as the job says; no existing test hit that path, but a start more than `cellContainmentToleranceMeters` outside its cell no longer continues across portals.
+- The first full `npm test` run of the finished change showed one failing test file that I did not capture (the output was cut to the last lines); two later full runs were green (115 files, 857 passed, 8 skipped). Probably a load-dependent timeout (`portalPaths.test.ts` takes about 60 s), unconfirmed.
+- Emitter exactly on a portal at the start of a non-first piece is ignored by `findNearestEmitterHitOnTrace` (`projected <= intersectionTolerance`), as before; no test showed it.
+
+### Not done
+- Issue 69 is not closed (see Uncertain). Issue 50 row 69 not updated.
+
+### Checks
+- Baseline: `npm run typecheck` and `npm test` green (114 files, 846 passed, 8 skipped).
+- After: `npm run typecheck` green; `npm test` green (115 files, 857 passed, 8 skipped) on the second and third runs; `npm run docs:check` green after `npm run docs:generate`.
+- `npm run build` ok; `npm run smoke -- --world torus-moduli`: SMOKE OK (the page logs a failed dynamic import of the `inter` font chunk from the preview server; unrelated to this job and not investigated).
+
+### Manual checks not run
+- Visual check in a browser of a long wrapped geodesic and the measured-length label.

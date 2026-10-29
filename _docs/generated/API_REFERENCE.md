@@ -517,6 +517,7 @@ Geodesic emitters ("cannons"), geodesic intervals and curve shortening on a glue
 | function | `traceGeodesicSegment` | Traces one straight ray inside a single cell and reports where and why it stops. |
 | function | `traceGeodesicSegmentWithEmitters` | Like `traceGeodesicSegment`, but shortens the result to an `emitter-hit` when an eligible emitter lies on the ray. |
 | function | `findNearestEmitterHitOnTrace` | Finds the closest emitter in the cell lying within `emitterConnectionToleranceMeters` of the ray and ahead of its start. |
+| function | `geodesicTerminalFromWalkPiece` | Converts one piece of a developed-segment walk into a segment terminal. |
 | function | `traceGeodesicFromLiftedChord` | Realizes an interval's geometry by tracing the lifted chord, and replaces the interval's derived segments with it. |
 | function | `aimFreeGeodesicFromEndpoint` | Re-aims a free geodesic (emitter at one role, a singly attached free end at the other) toward a target point. |
 | function | `rebuildDerivedGeodesicSegments` | Regenerates an interval's segments from its endpoint anchors and portal word (the fundamental "development" step). |

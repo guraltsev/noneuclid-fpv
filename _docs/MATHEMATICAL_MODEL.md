@@ -214,14 +214,23 @@ direction $d$ in a cell and returns the first event along $a+td$, $0<t\le L$:
 - Against a side with endpoints $v,w$ (edge vector $e=w-v$): $t = \dfrac{(v-a)\times e}{d\times e}$ and
   $u=\dfrac{(v-a)\times d}{d\times e}\in[0,1]$ locates the hit along the side ($\times$ is the planar cross product);
   parallel sides ($|d\times e|\le 10^{-7}$) are skipped.
-- Against an exclusion cylinder: ray–circle intersection (`intersectRayWithForbiddenZone`).
+- Against an exclusion cylinder: ray–circle intersection (`intersectRayWithForbiddenZone`) with an **open-disk rule**:
+  a start strictly inside the disk, or on the circle ($\bigl||o|-r\bigr|\le 10^{-9}$ m) moving inward, is a hit at
+  $t=0$; a start on the circle moving outward or tangentially is not a hit.
 - The nearest event wins and yields one of four **terminals**
   (`src/world-objects/geodesicCannon.ts#GeodesicSegmentTerminal`): `open` (length exhausted), `wall-hit`,
-  `forbidden-zone-hit`, or `portal-hit`. A portal hit records the continuation: target start
-  $g(a+td)+\varepsilon\,Rd$ ($\varepsilon=10^{-4}$ m, to start strictly inside the next cell) and target direction $Rd$.
+  `forbidden-zone-hit`, or `portal-hit`. A portal hit records the continuation: target start $g(a+td)$ and target
+  direction $Rd$, exactly, with no nudge (a restart must skip the target side by `entrySideIndex`).
 
-Iterating this (`src/world-objects/geodesicCannon.ts#traceGeodesicFromLiftedChord` and the emitter-aware variants) produces
-the per-cell **segments** of a geodesic; the ordered list of portals crossed is its **portal word**
+**Tracing across portals.** The multi-cell trace does not iterate the single-cell tracer. It walks the developed segment
+$a+td$, $t\in[0,L]$, with `src/cell-complex/segmentWalk.ts#walkDevelopedSegment`; piece $k$ is the walk's piece in cell $k$
+mapped by $M_k$, of length $t_{exit}-t_{enter}$, so the piece lengths add up to $L$ exactly and the end point error does
+not grow with the number of crossings (rounding only). Each piece is then cut at its first forbidden-zone hit or, when
+connecting emitters, emitter hit. A line through a portal-junction vertex (the walk's vertex tie rule) ends the geodesic as
+a `forbidden-zone-hit` with `junctionId` `<cellId>:vertex-<index>`.
+
+The result (`src/world-objects/geodesicCannon.ts#traceGeodesicFromLiftedChord` and the emitter-aware variants) is the
+per-cell **segments** of a geodesic; the ordered list of portals crossed is its **portal word**
 (`src/world-objects/geodesicCannon.ts#GeodesicPortalTraversal`).
 
 **Intervals and endpoints.** A `GeodesicIntervalObject` is a geodesic arc with a `start` and an `end`

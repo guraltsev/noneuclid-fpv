@@ -65,11 +65,13 @@
  *
  * ## Constants
  * Meters unless stated. `GEODESIC_MIN_LENGTH_METERS` (0.15) minimum chord of a geodesic; `minGeodesicSegmentLengthMeters` (0.05) minimum
- * piece when splitting; `intersectionTolerance` (1e-7) numerical zero; `portalStartEpsilonMeters` (1e-4) nudge past a portal;
+ * piece when splitting; `intersectionTolerance` (1e-7) numerical zero; `forbiddenZoneCircleToleranceMeters` (1e-9) band of the open-disk rule;
  * `emitterConnectionToleranceMeters` (0.3) capture radius around an emitter; `curveShortening*` (speed 0.4 m/s, angle 0.03 rad, absorb
  * tolerance 0.165 m, arc-length floor 0.002 m) parameters of the shortening tick.
  */
 import type { CompiledCellComplex } from "../cell-complex/compileCellComplex";
+import type { CompiledPortal } from "../cell-complex/specs";
+import { walkDevelopedSegment, type SegmentWalkPiece } from "../cell-complex/segmentWalk";
 import { getDynamicObjectCollisionBounds, simpleCylinderIntersectsSimpleCylinder, testCellCollision } from "../movement/collision";
 import type { SimpleCollisionCylinder } from "../movement/dynamicObject";
 import { AUTONOMOUS_DYNAMIC_OBJECT_PORTAL_CROSSING_MODE, moveDynamicObject } from "../movement/moveDynamicObject";
@@ -309,7 +311,8 @@ export interface GeodesicIntersectionObject extends RuntimeWorldObjectBase {
  * - `open`: the traced length was used up inside the cell (the requested length, or the lifted chord, ends here).
  * - `emitter-hit`: the segment ends at an emitter (when emitter connection is enabled or the anchored target is an emitter).
  * - `portal-hit`: the ray reached a portal side; `targetStart`/`targetDirection` are the continuation in the target cell,
- *   already pushed `portalStartEpsilonMeters` past the portal so the next trace does not re-hit it.
+ *   exact images of the hit point and direction (no nudge); a restart there must skip the target side (`entrySideIndex`) or use
+ *   the multi-cell path tracer, which walks the developed segment with `walkDevelopedSegment`.
  * - `wall-hit`: the ray reached a side without a portal (`sideIndex` of the cell's side list).
  * - `forbidden-zone-hit`: the ray entered a forbidden collision zone of a junction (`junctionId`).
  */
@@ -351,6 +354,8 @@ export interface TraceGeodesicSegmentInput {
   readonly direction: Vec3;
   /** Maximum ray length in meters; must be finite and > 0 or `traceGeodesicSegment` throws. */
   readonly maxLengthMeters: number;
+  /** Side (index in the cell's side list) the ray just came through; it is skipped instead of relying on the `t <= intersectionTolerance` guard. */
+  readonly entrySideIndex?: number;
 }
 
 /** Input for `traceGeodesicSegmentWithEmitters`: a plain trace that also stops at emitters near the ray. */
@@ -561,8 +566,10 @@ export const geodesicRayBeamStartOffsetMeters = 0;
 export const GEODESIC_MIN_LENGTH_METERS = 0.15;
 /** Default total trace length (meters) when a caller passes no `maxLengthMeters`. */
 const defaultTraceLengthMeters = 2;
-/** Distance (meters) a continuation ray is pushed past a portal so the next trace does not immediately re-hit it. */
-const portalStartEpsilonMeters = 1e-4;
+/** Half-width (meters) of the band around a forbidden-zone circle in which a start counts as being on the circle (open-disk rule). */
+const forbiddenZoneCircleToleranceMeters = 1e-9;
+/** Crossing limit of a geodesic walk; a 3 000 m chord on the torus family needs about 200. */
+const maxGeodesicWalkCrossings = 4096;
 /** Numerical tolerance for ray/side parallelism, hit parameters and length comparisons (meters / unitless). */
 const intersectionTolerance = 1e-7;
 /** Smallest segment/continuation length (meters) worth creating when splitting or building free geodesics. */
@@ -571,6 +578,8 @@ export const minGeodesicSegmentLengthMeters = 0.05;
 const vertexContinuityToleranceMeters = 10;
 /** Perpendicular distance (meters) within which a ray counts as hitting an emitter; equal to the cannon collision radius. */
 const emitterConnectionToleranceMeters = 0.3;
+/** Distance (meters) from a geodesic's anchor within which a crossing counts as the anchor itself and is not reported. */
+const geodesicAnchorCrossingToleranceMeters = 1e-6;
 /** Extra height (meters) above the beam at which an intersection marker is placed. */
 const geodesicIntersectionBalloonHeightOffsetMeters = 0.25;
 /** Legacy: default speed (m/s) of the retired same-cell straightening model. */
@@ -959,7 +968,7 @@ export function liftGeodesicEndpoint(input: {
     if (!portal) {
       return undefined;
     }
-    targetPointInSourceCell = transformPoint3(invertRigidTransform3(portal.transformToTarget), targetPointInSourceCell);
+    targetPointInSourceCell = transformPoint3(inversePortalTransform(portal), targetPointInSourceCell);
   }
 
   return {
@@ -974,6 +983,19 @@ export function liftGeodesicEndpoint(input: {
   };
 }
 
+// Inverse of each compiled portal's transform, computed once. A compiled world is immutable and a rebuilt world has new portal
+// objects, so a WeakMap keyed by the portal is always valid.
+const inversePortalTransforms = new WeakMap<CompiledPortal, RigidTransform3>();
+
+function inversePortalTransform(portal: CompiledPortal): RigidTransform3 {
+  let inverse = inversePortalTransforms.get(portal);
+  if (!inverse) {
+    inverse = invertRigidTransform3(portal.transformToTarget);
+    inversePortalTransforms.set(portal, inverse);
+  }
+
+  return inverse;
+}
 // Same as `liftGeodesicEndpoint`, but anchors found in `candidateAnchorsById` shadow the registry, so a tick can be
 // previewed with a hypothetical free-end position without mutating the registry.
 function liftGeodesicEndpointWithAnchors(input: {
@@ -1012,7 +1034,7 @@ function liftGeodesicEndpointWithAnchors(input: {
     if (!portal) {
       return undefined;
     }
-    targetPointInSourceCell = transformPoint3(invertRigidTransform3(portal.transformToTarget), targetPointInSourceCell);
+    targetPointInSourceCell = transformPoint3(inversePortalTransform(portal), targetPointInSourceCell);
   }
 
   return {
@@ -1304,6 +1326,9 @@ export function traceGeodesicSegment(input: TraceGeodesicSegmentInput): TraceGeo
   // Solving S + t d = A + u e with 2D cross products (w = A - S):  t = (w x e) / (d x e),  u = (w x d) / (d x e).
   // The cell is a convex prism, so the first side with t > 0 is where the ray leaves the cell.
   for (const side of cell.sides) {
+    if (side.sideIndex === input.entrySideIndex) {
+      continue;
+    }
     const edgeX = side.end.x - side.start.x;
     const edgeY = side.end.y - side.start.y;
     // d x e: zero when the ray is parallel to the side; those sides are skipped (a collinear graze is not a hit).
@@ -1385,9 +1410,8 @@ export function traceGeodesicSegment(input: TraceGeodesicSegmentInput): TraceGeo
   const hitPoint = addVec3(input.start, scaleVec3(direction, nearest.t));
   const targetDirection = normalizeHorizontalDirection(transformDirection3(nearest.portal.transformToTarget, direction));
   const transformedStart = transformPoint3(nearest.portal.transformToTarget, hitPoint);
-  // Nudge the continuation a tiny step along the new direction so it starts strictly inside the target cell and does not re-hit
-  // the target portal's own side (hits with t <= intersectionTolerance are ignored).
-  const targetStart = addVec3(transformedStart, scaleVec3(targetDirection, portalStartEpsilonMeters));
+  // No nudge: the continuation starts exactly on the target portal's side; a restart must pass that side as `entrySideIndex`.
+  const targetStart = transformedStart;
 
   return {
     cellId: input.cellId,
@@ -1497,43 +1521,145 @@ function traceGeodesicSegmentForConnectionMode(
     : traceGeodesicSegment(input);
 }
 
-// Traces a geodesic across portals: repeatedly calls the single-cell tracer, restarting in the target cell from the
-// `portal-hit` continuation with the remaining length, until the length is used up or a non-portal terminal occurs.
-// Returned traces are consecutive pieces; the concatenation of their portal hits is the realized portal word.
+/**
+ * Converts one piece of a developed-segment walk into a segment terminal.
+ *
+ * `end` gives `open`; a `wall` or `portal` exit gives `wall-hit` or `portal-hit` (with `continuation`, the next piece's exact start and
+ * unit direction in the target cell, required for portal exits). When the exit was decided by the vertex tie rule
+ * (`throughVertexIndex` defined) the line passes through a portal-junction vertex and the terminal is a `forbidden-zone-hit` whose
+ * `junctionId` is `"<cellId>:vertex-<index>"`; shipped worlds hit the vertex's forbidden zone earlier, so this fires only where a
+ * vertex has no zone. Pure; exported for tests.
+ */
+export function geodesicTerminalFromWalkPiece(
+  piece: SegmentWalkPiece,
+  continuation?: { readonly start: Vec3; readonly direction: Vec3 },
+): GeodesicSegmentTerminal {
+  const exit = piece.exit;
+  if (exit.kind === "end") {
+    return { kind: "open" };
+  }
+  if (exit.throughVertexIndex !== undefined) {
+    return { kind: "forbidden-zone-hit", junctionId: `${piece.cellId}:vertex-${exit.throughVertexIndex}` };
+  }
+  if (exit.kind === "wall") {
+    return { kind: "wall-hit", sideIndex: exit.sideIndex };
+  }
+  if (!continuation) {
+    throw new Error("A portal exit needs a continuation.");
+  }
+
+  return {
+    kind: "portal-hit",
+    portalId: exit.portal.id,
+    targetCellId: exit.portal.targetCellId,
+    targetPortalId: exit.portal.targetPortalId,
+    targetStart: continuation.start,
+    targetDirection: continuation.direction,
+  };
+}
+
+// Traces a geodesic across portals by walking the developed segment A + t d, t in [0, L], with `walkDevelopedSegment`: piece k
+// is the walk's piece in cell k, mapped into cell k's frame, with length tExit - tEnter, so the lengths add up to L exactly and
+// nothing is nudged. Each piece is then cut at its first forbidden-zone hit (open-disk rule) or, when connecting emitters, emitter
+// hit; the first cut ends the geodesic. Returned traces are consecutive pieces; the concatenation of their portal hits is the
+// realized portal word. A `portal-hit` piece's `targetStart`/`targetDirection` are the next piece's exact start and direction.
 function traceGeodesicPathForConnectionMode(
   input: TraceGeodesicSegmentWithEmittersInput & { readonly connectEmitters: boolean },
 ): readonly TraceGeodesicSegmentResult[] {
+  if (!(input.maxLengthMeters > intersectionTolerance)) {
+    return [];
+  }
+
+  const direction = normalizeHorizontalDirection(input.direction);
+  const walk = walkDevelopedSegment({
+    world: input.world,
+    cellId: input.cellId,
+    start: { x: input.start.x, y: input.start.y },
+    direction: { x: direction.x, y: direction.y },
+    // A side reached within `intersectionTolerance` beyond the requested length still counts as hit (clamped to the length), as in `traceGeodesicSegment`.
+    lengthMeters: input.maxLengthMeters + intersectionTolerance,
+    maxCrossings: maxGeodesicWalkCrossings,
+  });
+
+  if (walk.status === "start-outside" || (walk.status === "missing-cell" && walk.pieces.length === 0)) {
+    return [traceGeodesicSegmentForConnectionMode(input)];
+  }
+
+  const pieceFrame = (piece: SegmentWalkPiece, tMeters: number): { readonly start: Vec3; readonly direction: Vec3 } => ({
+    start: transformPoint3(
+      piece.cellFromStart,
+      { x: input.start.x + direction.x * tMeters, y: input.start.y + direction.y * tMeters, z: input.start.z },
+    ),
+    direction: normalizeHorizontalDirection(transformDirection3(piece.cellFromStart, direction)),
+  });
   const traces: TraceGeodesicSegmentResult[] = [];
-  let remainingLengthMeters = input.maxLengthMeters;
-  let currentCellId = input.cellId;
-  let currentStart = input.start;
-  let currentDirection = input.direction;
 
-  while (remainingLengthMeters > intersectionTolerance) {
-    const trace = traceGeodesicSegmentForConnectionMode({
-      ...input,
-      cellId: currentCellId,
-      start: currentStart,
-      direction: currentDirection,
-      maxLengthMeters: remainingLengthMeters,
-    });
-    traces.push(trace);
-    // Length budget shrinks by what was travelled in this cell; the loop ends on any non-portal terminal or when the budget is spent.
-    remainingLengthMeters -= trace.lengthMeters;
-
-    if (trace.terminal.kind !== "portal-hit" || remainingLengthMeters <= intersectionTolerance) {
+  for (let index = 0; index < walk.pieces.length; index += 1) {
+    const piece = walk.pieces[index];
+    const next = walk.pieces[index + 1];
+    const frame = index === 0 ? { start: input.start, direction } : pieceFrame(piece, piece.tEnter);
+    if (index > 0 && piece.tEnter >= input.maxLengthMeters) {
       break;
     }
 
-    // Continue in the target cell from the transformed hit point and direction (the straight line "unfolds" across the portal).
-    currentCellId = trace.terminal.targetCellId;
-    currentStart = trace.terminal.targetStart;
-    currentDirection = trace.terminal.targetDirection;
+    const lengthMeters = Math.max(0, Math.min(piece.tExit, input.maxLengthMeters) - piece.tEnter);
+
+    if (index > 0 && piece.exit.kind === "end" && lengthMeters <= intersectionTolerance) {
+      break;
+    }
+
+    const cell = input.world.cellsById.get(piece.cellId);
+    let cutMeters: number | undefined;
+    let cutTerminal: GeodesicSegmentTerminal | undefined;
+
+    for (const zone of cell?.forbiddenZones ?? []) {
+      const t = intersectRayWithForbiddenZone(frame.start, frame.direction, zone.collision);
+      if (t !== undefined && t <= lengthMeters + intersectionTolerance && (cutMeters === undefined || t < cutMeters)) {
+        cutMeters = Math.min(t, lengthMeters);
+        cutTerminal = { kind: "forbidden-zone-hit", junctionId: zone.junctionId };
+      }
+    }
+
+    if (input.connectEmitters) {
+      const hit = findNearestEmitterHitOnTrace({
+        registry: input.registry,
+        sourceEmitterId: input.sourceEmitterId,
+        geodesicId: input.geodesicId,
+        cellId: piece.cellId,
+        start: frame.start,
+        direction: frame.direction,
+        maxLengthMeters: cutMeters ?? lengthMeters,
+      });
+      if (hit) {
+        cutMeters = hit.distanceMeters;
+        cutTerminal = { kind: "emitter-hit", emitterId: hit.emitter.id };
+      }
+    }
+
+    if (cutMeters !== undefined && cutTerminal) {
+      traces.push({ cellId: piece.cellId, start: frame.start, direction: frame.direction, lengthMeters: cutMeters, terminal: cutTerminal });
+      break;
+    }
+
+    let continuation: { readonly start: Vec3; readonly direction: Vec3 } | undefined;
+    if (piece.exit.kind === "portal") {
+      continuation = next
+        ? pieceFrame(next, next.tEnter)
+        : {
+          start: transformPoint3(piece.exit.portal.transformToTarget, addVec3(frame.start, scaleVec3(frame.direction, lengthMeters))),
+          direction: normalizeHorizontalDirection(transformDirection3(piece.exit.portal.transformToTarget, frame.direction)),
+        };
+    }
+    const terminal = geodesicTerminalFromWalkPiece(piece, continuation);
+    traces.push({ cellId: piece.cellId, start: frame.start, direction: frame.direction, lengthMeters, terminal });
+
+    if (terminal.kind !== "portal-hit") {
+      break;
+    }
   }
 
   return traces;
 }
-
 /**
  * Realizes an interval's geometry by tracing the lifted chord, and replaces the interval's derived segments with it.
  *
@@ -5654,12 +5780,23 @@ function findGeodesicIntersections(registry: RuntimeObjectRegistry): readonly Ge
   const segments = registry.getAll().filter(isGeodesicSegmentObject);
   const intersections: GeodesicIntersectionObject[] = [];
   const seenKeys = new Set<string>();
+  const lastSegmentIndexByGeodesic = new Map<string, number>();
+  for (const segment of segments) {
+    lastSegmentIndexByGeodesic.set(
+      segment.geodesicId,
+      Math.max(lastSegmentIndexByGeodesic.get(segment.geodesicId) ?? 0, segment.segmentIndex),
+    );
+  }
 
   for (let leftIndex = 0; leftIndex < segments.length; leftIndex += 1) {
     for (let rightIndex = leftIndex + 1; rightIndex < segments.length; rightIndex += 1) {
       const left = segments[leftIndex];
       const right = segments[rightIndex];
-      if (left.geodesicId === right.geodesicId || left.cellId !== right.cellId) {
+      if (left.cellId !== right.cellId) {
+        continue;
+      }
+      // Adjacent segments of one geodesic share an endpoint; only pairs two or more apart can cross.
+      if (left.geodesicId === right.geodesicId && Math.abs(left.segmentIndex - right.segmentIndex) < 2) {
         continue;
       }
 
@@ -5667,7 +5804,10 @@ function findGeodesicIntersections(registry: RuntimeObjectRegistry): readonly Ge
       if (!intersection) {
         continue;
       }
-      if (pointCoincidesWithGeodesicEmitter(registry, left.cellId, intersection.point)) {
+      if (
+        crossingIsAtGeodesicAnchor(left, intersection.leftT, intersection.leftLengthMeters, lastSegmentIndexByGeodesic) ||
+        crossingIsAtGeodesicAnchor(right, intersection.rightT, intersection.rightLengthMeters, lastSegmentIndexByGeodesic)
+      ) {
         continue;
       }
 
@@ -5698,24 +5838,20 @@ function findGeodesicIntersections(registry: RuntimeObjectRegistry): readonly Ge
   return intersections;
 }
 
-function pointCoincidesWithGeodesicEmitter(registry: RuntimeObjectRegistry, cellId: string, point: Vec3): boolean {
-  const toleranceSquared = emitterConnectionToleranceMeters * emitterConnectionToleranceMeters;
-  for (const object of registry.getObjectsInCell(cellId)) {
-    if (!isGeodesicCannonObject(object)) {
-      continue;
-    }
-
-    const emitterPoint = {
-      x: object.localPose.translation.x,
-      y: object.localPose.translation.y,
-      z: object.localPose.translation.z + geodesicRayBeamHeightMeters,
-    };
-    if (distanceSquared(point, emitterPoint) <= toleranceSquared) {
-      return true;
-    }
+// True when a crossing lies within 1e-6 m of the geodesic's anchor: the start of its first segment or the end of its last one.
+// Geodesics that share an emitter meet there and that meeting is not a vertex.
+function crossingIsAtGeodesicAnchor(
+  segment: GeodesicSegmentObject,
+  t: number,
+  lengthMeters: number,
+  lastSegmentIndexByGeodesic: ReadonlyMap<string, number>,
+): boolean {
+  const toleranceT = lengthMeters > 0 ? geodesicAnchorCrossingToleranceMeters / lengthMeters : 1;
+  if (segment.segmentIndex === 0 && t <= toleranceT) {
+    return true;
   }
 
-  return false;
+  return segment.segmentIndex === (lastSegmentIndexByGeodesic.get(segment.geodesicId) ?? 0) && t >= 1 - toleranceT;
 }
 
 function assignGeodesicIntersectionIdentities(
@@ -5827,7 +5963,14 @@ function createGeodesicIntersectionObject(options: {
 function intersectHorizontalSegments(
   left: GeodesicSegmentObject,
   right: GeodesicSegmentObject,
-): { readonly point: Vec3 } | undefined {
+): {
+  readonly point: Vec3;
+  /** Position along the left / right segment in [0, 1] and the segments' lengths in meters. */
+  readonly leftT: number;
+  readonly rightT: number;
+  readonly leftLengthMeters: number;
+  readonly rightLengthMeters: number;
+} | undefined {
   const leftEnd = getGeodesicSegmentEnd(left);
   const rightEnd = getGeodesicSegmentEnd(right);
   const rx = leftEnd.x - left.start.x;
@@ -5860,6 +6003,10 @@ function intersectHorizontalSegments(
       y: left.start.y + ry * Math.min(1, Math.max(0, leftT)),
       z: left.start.z,
     },
+    leftT: Math.min(1, Math.max(0, leftT)),
+    rightT: Math.min(1, Math.max(0, rightT)),
+    leftLengthMeters: Math.hypot(rx, ry),
+    rightLengthMeters: Math.hypot(sx, sy),
   };
 }
 
@@ -5943,8 +6090,9 @@ function normalizeHorizontalDirection(direction: Vec3): Vec3 {
 // Ray vs. vertical cylinder (center, radius, height): returns the ray parameter t > 0 of the first crossing of the cylinder wall, or undefined.
 // A start height outside the cylinder's slab (|z - center.z| > height/2; infinite height means no slab) misses. In the plane,
 // with o = start - center and unit d, |o + t d|^2 = r^2 becomes t^2 + b t + c = 0 (b = 2 o.d, c = |o|^2 - r^2);
-// c <= 0 means the start is already inside or on the zone, which is a hit at t = 0 (a ray that begins inside is stopped immediately).
-// Otherwise the first positive root is returned.
+// Open-disk rule: a start strictly inside the disk (|o| < r - 1e-9) is a hit at t = 0; a start on the circle (| |o| - r | <= 1e-9) is a hit at
+// t = 0 only when it moves inward (o.d < 0) and is not a hit when it moves outward or tangentially; a start outside hits at the first root
+// of the quadratic, if the ray moves towards the disk (b < 0) and the discriminant is non-negative.
 function intersectRayWithForbiddenZone(
   start: Vec3,
   direction: Vec3,
@@ -5960,8 +6108,18 @@ function intersectRayWithForbiddenZone(
   const b = 2 * (offsetX * direction.x + offsetY * direction.y);
   const c = offsetX * offsetX + offsetY * offsetY - zone.radius * zone.radius;
 
-  if (c <= 0) {
+  const offsetLength = Math.hypot(offsetX, offsetY);
+
+  if (offsetLength < zone.radius - forbiddenZoneCircleToleranceMeters) {
     return 0;
+  }
+
+  if (Math.abs(offsetLength - zone.radius) <= forbiddenZoneCircleToleranceMeters) {
+    return b < 0 ? 0 : undefined;
+  }
+
+  if (b >= 0) {
+    return undefined;
   }
 
   const discriminant = b * b - 4 * c;
@@ -5969,11 +6127,7 @@ function intersectRayWithForbiddenZone(
     return undefined;
   }
 
-  const sqrtDiscriminant = Math.sqrt(discriminant);
-  const first = (-b - sqrtDiscriminant) / 2;
-  const second = (-b + sqrtDiscriminant) / 2;
-  const t = first > intersectionTolerance ? first : second > intersectionTolerance ? second : undefined;
-  return t;
+  return Math.max(0, (-b - Math.sqrt(discriminant)) / 2);
 }
 
 // Extracts the yaw (rotation about +z, radians) from a pose's rotation matrix as atan2(m10, m00).

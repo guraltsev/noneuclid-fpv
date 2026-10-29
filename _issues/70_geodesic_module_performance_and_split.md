@@ -72,3 +72,9 @@ Performance:
 - `updateGeodesicIntersectionObjects` is a full O(n²) scan (`TODO(issue 70)` at `geodesicCannon.ts:5240`) and does
   not pair segments across a portal boundary, so a crossing that lies exactly on a portal edge can be missed. Item 2
   above (bucket by cell) should handle the boundary case explicitly.
+
+## Note from job 15 (2026-10-29)
+
+- The portal nudge loop is gone (the multi-cell trace walks the developed segment once with `walkDevelopedSegment`) and
+  the lift functions use cached inverse portal transforms (`inversePortalTransform`, a `WeakMap` keyed by portal).
+  `findGeodesicIntersections` now also tests same-geodesic pairs two or more segments apart, so the O(n^2) scan has more pairs.

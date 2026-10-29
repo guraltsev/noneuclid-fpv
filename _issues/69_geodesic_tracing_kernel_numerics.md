@@ -4,7 +4,9 @@ Status: open; re-verified 2026-10-28; fix designed 2026-10-29.
 
 Priority: P2 (robustness / correctness).
 
-Jobs: [15](../.agents/jobs/15_geodesic_tracing_on_kernel.md).
+Jobs: [15](../.agents/jobs/_done/15_geodesic_tracing_on_kernel.md).
+
+Implemented by job 15, needs review: see the Report in [the job](../.agents/jobs/_done/15_geodesic_tracing_on_kernel.md).
 
 ## Status update 2026-10-29
 

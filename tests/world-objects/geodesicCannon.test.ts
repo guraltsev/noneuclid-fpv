@@ -3086,7 +3086,7 @@ describe("geodesic cannon world objects", () => {
     expect(registry.getAll().filter((object) => object.kind === "geodesic-intersection")).toHaveLength(1);
   });
 
-  it("does not create a vertex balloon at an emitter when geodesics intersect there", () => {
+  it("creates a vertex balloon where geodesics intersect at an unrelated emitter (job 15: the 0.3 m emitter exclusion is gone)", () => {
     const registry = createRuntimeObjectRegistry([
       createGeodesicCannonObject({
         id: "cannon-a",
@@ -3111,8 +3111,8 @@ describe("geodesic cannon world objects", () => {
 
     const vertices = updateGeodesicIntersectionObjects(registry);
 
-    expect(vertices).toEqual([]);
-    expect(registry.getAll().filter((object) => object.kind === "geodesic-intersection")).toHaveLength(0);
+    expect(vertices).toHaveLength(1);
+    expect(registry.getAll().filter((object) => object.kind === "geodesic-intersection")).toHaveLength(1);
   });
 
   it("keeps vertex identity while a geodesic pair intersection moves continuously", () => {
