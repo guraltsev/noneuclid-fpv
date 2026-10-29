@@ -5,7 +5,7 @@
 
 This reference is produced from the source code. For the *meaning* of the modules — the mathematical model they implement — read [../MATHEMATICAL_MODEL.md](../MATHEMATICAL_MODEL.md) and [../ARCHITECTURE.md](../ARCHITECTURE.md). For every exported symbol see [API_REFERENCE.md](API_REFERENCE.md).
 
-**163 modules, 45,582 lines** under `src/`.
+**163 modules, 45,858 lines** under `src/`.
 
 ## Layers
 
@@ -17,7 +17,7 @@ A module belongs to the layer named by its first path segment under `src/`. "May
 | `cell-complex` | 14 | 3,760 | `math` | Prism-cell specs, compilation, portal transforms, portal-path tables, static visibility culling. |
 | `movement` | 10 | 1,645 | `math`, `cell-complex` | Player body, collision, movement and portal crossing in compiled cell complexes. |
 | `world-assets` | 1 | 201 | `cell-complex`, `glue` | Floor-texture and asset descriptors. |
-| `world-objects` | 11 | 8,919 | `math`, `cell-complex`, `movement`, `world-assets`, `glue` | Placeable runtime objects: registry, geodesic emitters, measurement tools, flags, creatures. |
+| `world-objects` | 11 | 9,195 | `math`, `cell-complex`, `movement`, `world-assets`, `glue` | Placeable runtime objects: registry, geodesic emitters, measurement tools, flags, creatures. |
 | `authoring` | 5 | 671 | `math`, `cell-complex`, `examples`, `world-assets`, `world-objects` | World builder DSL, world-script compiler, validation and world catalog. |
 | `runtime` | 10 | 2,684 | `math`, `cell-complex`, `movement`, `world-objects`, `authoring`, `ui`, `glue` | Runtime menu state, command dispatch, geometry session/worker and deformation families. |
 | `ui` | 6 | 1,274 | `math`, `cell-complex`, `runtime`, `world-objects`, `authoring`, `glue` | Renderer-neutral palette, help, tooltip and input-intent definitions. |
@@ -72,7 +72,7 @@ flowchart LR
   ui -->|3| runtime
   ui -->|3| world_objects
   world_assets -->|1| cell_complex
-  world_objects -->|13| cell_complex
+  world_objects -->|14| cell_complex
   world_objects -->|13| math
   world_objects -->|13| movement
   world_objects -.->|9| render
@@ -165,7 +165,7 @@ These imports break the intended layering. They are frozen in `scripts/docs/laye
 | `world-objects/placedFlags.ts` | 295 | Placed flags (signs): player-placed wooden signs carrying a short text label. | `cell-complex/compileCellComplex`, `math/rigidTransform3`, `math/vec3`, `movement/collision`, `movement/dynamicObject`, `world-objects/runtimeObjectRegistry` |
 | `world-objects/protractorTool.ts` | 557 | Protractor tool: persistent angle measurements between two geodesic directions at a common vertex. | `math/rigidTransform3`, `math/vec3`, `world-objects/geodesicCannon`, `world-objects/runtimeObjectRegistry` |
 | `world-objects/runtimeObjectRegistry.ts` | 339 | Runtime object registry: the per-cell, id-indexed store of every live (non-terrain) object in the world. | `cell-complex/specs`, `math/rigidTransform3`, `movement/dynamicObject`, `world-objects/geodesicCannon`, `world-objects/measureLengthTool`, `world-objects/objectMetadata`, `world-objects/placedFlags`, `world-objects/protractorTool` |
-| `world-objects/simpleGeoCreature.ts` | 527 | Simple geodesic creatures: the mouse and the butterfly, autonomous walkers that follow straight lines (geodesics) through the cell complex. | `cell-complex/compileCellComplex`, `cell-complex/prismCells`, `cell-complex/specs`, `math/rigidTransform3`, `math/vec3`, `movement/collision`, `movement/depenetrateDynamicObject`, `movement/dynamicObject`, `movement/moveDynamicObject`, `render/three/debugCollisionWireframes`, `render/three/preloadWorldAssets`, `render/three/runtimeDiagnostics`, `render/three/worldAxes`, `runtime/worldGeometryDeformations`, `world-objects/runtimeObjectRegistry`, `world-objects/staticAssets` |
+| `world-objects/simpleGeoCreature.ts` | 803 | Simple geodesic creatures: the mouse and the butterfly, autonomous walkers that follow straight lines (geodesics) through the cell complex. | `cell-complex/compileCellComplex`, `cell-complex/prismCells`, `cell-complex/segmentWalk`, `cell-complex/specs`, `math/rigidTransform3`, `math/vec3`, `movement/collision`, `movement/depenetrateDynamicObject`, `movement/dynamicObject`, `movement/moveDynamicObject`, `render/three/debugCollisionWireframes`, `render/three/preloadWorldAssets`, `render/three/runtimeDiagnostics`, `render/three/worldAxes`, `runtime/worldGeometryDeformations`, `world-objects/runtimeObjectRegistry`, `world-objects/staticAssets` |
 | `world-objects/staticAssets.ts` | 99 | Static asset authoring helper: converts author-facing parameters for a glTF decoration into an AssetObjectSpec. | `cell-complex/specs` |
 
 ### `authoring`

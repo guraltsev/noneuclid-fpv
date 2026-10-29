@@ -2,13 +2,24 @@ import { describe, expect, it } from "vitest";
 import * as THREE from "three";
 import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
 import type { CellComplexSpec } from "../../src/cell-complex/specs";
-import { tetrahedron } from "../../src/authoring/exampleWorlds";
-import { identityMat3, yawRigidTransform3 } from "../../src/math/rigidTransform3";
+import { cube, icosahedron, tetrahedron } from "../../src/authoring/exampleWorlds";
+import type { CompiledCellComplex } from "../../src/cell-complex/compileCellComplex";
+import { walkDevelopedSegment } from "../../src/cell-complex/segmentWalk";
+import {
+  composeRigidTransform3,
+  identityMat3,
+  orthonormalizeYawRigidTransform3,
+  transformDirection3,
+  yawRigidTransform3,
+  type RigidTransform3,
+} from "../../src/math/rigidTransform3";
 import { simpleCollisionCylinder, type DynamicObjectState } from "../../src/movement/dynamicObject";
 import { collectGeodesicCreatureDebugDump } from "../../src/render/three/geodesicCreatureDebug";
 import type { PreparedWorldAssets } from "../../src/render/three/preloadWorldAssets";
 import { createRuntimeObjectRegistry } from "../../src/world-objects/runtimeObjectRegistry";
 import {
+  applyForbiddenZoneSideRule,
+  geodesicSideOfPoint,
   createSimpleGeoCreature,
   createSimpleGeoCreatureRuntime,
   forbiddenZoneLateralOscillationScale,
@@ -253,3 +264,295 @@ function twoRoomsWithPortal(): CellComplexSpec {
     ],
   };
 }
+
+describe("side rule", () => {
+  it("passes the zone centre on the geodesic's side (sign convention)", () => {
+    // Geodesic along +x with the zone centre at the origin on its left (the line is at y = -0.12).
+    expect(geodesicSideOfPoint({ x: -1, y: -0.12 }, { x: 1, y: 0 }, { x: 0, y: 0 })).toBe(1);
+    expect(geodesicSideOfPoint({ x: -1, y: 0.12 }, { x: 1, y: 0 }, { x: 0, y: 0 })).toBe(-1);
+    // On the line: the vertex counts as on the right.
+    expect(geodesicSideOfPoint({ x: -1, y: 0 }, { x: 1, y: 0 }, { x: 0, y: 0 })).toBe(-1);
+    // v = (0, 0), c = (0, -0.2), side +1 gives t = (1, 0).
+    const left = applyForbiddenZoneSideRule({ x: 0, y: 0.05 }, { x: 0, y: -0.2 }, { x: 0, y: 0 }, 0.2 + 1e-5, 1);
+    expect(left.x).toBeCloseTo(0.05, 6);
+    expect(left.y).toBeCloseTo(0, 6);
+    const right = applyForbiddenZoneSideRule({ x: 0, y: 0.05 }, { x: 0, y: -0.2 }, { x: 0, y: 0 }, 0.2 + 1e-5, -1);
+    expect(right.x).toBeCloseTo(-0.05, 6);
+    // A displacement that does not point at the disc is returned unchanged.
+    expect(applyForbiddenZoneSideRule({ x: 0, y: -0.05 }, { x: 0, y: -0.2 }, { x: 0, y: 0 }, 0.2, 1)).toEqual({ x: 0, y: -0.05 });
+  });
+});
+
+describe("leader and detour", () => {
+  const dt = 1 / 60;
+  const mouseCollision = { radius: 0.05, height: 0.2, offset: { x: 0, y: 0, z: 0.1 } } as const;
+
+  function makeCreature(
+    world: CompiledCellComplex,
+    cellId: string,
+    x: number,
+    y: number,
+    turnDegrees: number,
+    speed = 1.2,
+  ) {
+    const registry = createRuntimeObjectRegistry();
+    const spec = createSimpleGeoCreature("geo-mouse", "m", "mouse/Mouse.glb", {
+      position: [x, 0, y],
+      turn: turnDegrees,
+      speed,
+      collision: mouseCollision,
+    });
+    const runtime = createSimpleGeoCreatureRuntime(spec, cellId, stubAssets(), registry);
+    const pose = () => {
+      const object = registry.get("m");
+      if (!object) throw new Error("missing creature");
+      return { cellId: object.cellId, pose: object.localPose };
+    };
+    const leaderInCreatureFrame = (): RigidTransform3 => {
+      const leader = runtime.leaderForDebug();
+      return composeRigidTransform3(leader.creatureFromLeader, leader.localPose);
+    };
+    const lag = (): number => {
+      const leader = leaderInCreatureFrame().translation;
+      const mine = pose().pose.translation;
+      return Math.hypot(leader.x - mine.x, leader.y - mine.y);
+    };
+    const nearestColumn = () => {
+      const cell = world.cellsById.get(pose().cellId);
+      if (!cell) throw new Error("missing cell");
+      const mine = pose().pose.translation;
+      return cell.singularityColumns
+        .map((column) => ({ column, distance: Math.hypot(column.center.x - mine.x, column.center.y - mine.y) }))
+        .sort((a, b) => a.distance - b.distance)[0];
+    };
+    return { runtime, pose, leaderInCreatureFrame, lag, nearestColumn, world };
+  }
+
+  /** Signed angle of the creature around the nearest zone centre, measured from the leader's forward direction (frame independent). */
+  function angleAroundZone(c: ReturnType<typeof makeCreature>) {
+    const { column } = c.nearestColumn();
+    const mine = c.pose().pose.translation;
+    const leaderPose = c.leaderInCreatureFrame();
+    const d = transformDirection3(leaderPose, { x: 0, y: 1, z: 0 });
+    const rx = mine.x - column.center.x;
+    const ry = mine.y - column.center.y;
+    return Math.atan2(d.x * ry - d.y * rx, d.x * rx + d.y * ry);
+  }
+
+  /** v relative to the creature and the leader's forward direction, for the side test. */
+  function crossForwardToZone(c: ReturnType<typeof makeCreature>): { cross: number; distance: number; along: number } {
+    const { column, distance } = c.nearestColumn();
+    const mine = c.pose().pose.translation;
+    const d = transformDirection3(c.leaderInCreatureFrame(), { x: 0, y: 1, z: 0 });
+    const vx = column.center.x - mine.x;
+    const vy = column.center.y - mine.y;
+    return { cross: d.x * vy - d.y * vx, distance, along: -(d.x * vx + d.y * vy) };
+  }
+
+  function expectCoincide(c: ReturnType<typeof makeCreature>, tolerance: number): void {
+    const leaderPose = c.leaderInCreatureFrame();
+    const mine = c.pose().pose;
+    expect(Math.hypot(leaderPose.translation.x - mine.translation.x, leaderPose.translation.y - mine.translation.y)).toBeLessThan(tolerance);
+    expect(Math.abs(leaderPose.rotation.m00 - mine.rotation.m00)).toBeLessThan(tolerance);
+    expect(Math.abs(leaderPose.rotation.m10 - mine.rotation.m10)).toBeLessThan(tolerance);
+  }
+
+  it("1. follows the unobstructed geodesic exactly across portals", () => {
+    const world = compileCellComplex(icosahedron);
+    const cellId = world.cells[0].id;
+    const speed = 1.2;
+    let verified = false;
+
+    for (let candidate = 0; candidate < 40 && !verified; candidate += 1) {
+      const turn = 7 + candidate * 9;
+      // Reference walk; reject headings that come within reach of a zone.
+      let refCell = cellId;
+      let refPose: RigidTransform3 = yawRigidTransform3((turn * Math.PI) / 180, { x: 0.3, y: 0.2, z: 0 });
+      const reference: { cellId: string; pose: RigidTransform3 }[] = [];
+      let clear = true;
+      for (let tick = 0; tick < 2000 && clear; tick += 1) {
+        const dir = transformDirection3(refPose, { x: 0, y: 1, z: 0 });
+        const walk = walkDevelopedSegment({
+          world,
+          cellId: refCell,
+          start: { x: refPose.translation.x, y: refPose.translation.y },
+          direction: { x: dir.x, y: dir.y },
+          lengthMeters: speed * dt,
+        });
+        const last = walk.pieces[walk.pieces.length - 1];
+        const moved: RigidTransform3 = {
+          rotation: refPose.rotation,
+          translation: { x: refPose.translation.x + dir.x * speed * dt, y: refPose.translation.y + dir.y * speed * dt, z: 0 },
+        };
+        refPose = orthonormalizeYawRigidTransform3(composeRigidTransform3(last.cellFromStart, moved));
+        refCell = last.cellId;
+        reference.push({ cellId: refCell, pose: refPose });
+        const cell = world.cellsById.get(refCell)!;
+        for (const column of cell.singularityColumns) {
+          if (Math.hypot(column.center.x - refPose.translation.x, column.center.y - refPose.translation.y) < 0.3) clear = false;
+        }
+      }
+      if (!clear) continue;
+
+      const c = makeCreature(world, cellId, 0.3, 0.2, turn, speed);
+      let maxTranslation = 0;
+      let maxRotation = 0;
+      for (let tick = 0; tick < 2000; tick += 1) {
+        c.runtime.update(world, dt);
+        const mine = c.pose();
+        expect(mine.cellId).toBe(reference[tick].cellId);
+        const r = reference[tick].pose;
+        maxTranslation = Math.max(maxTranslation, Math.hypot(mine.pose.translation.x - r.translation.x, mine.pose.translation.y - r.translation.y));
+        maxRotation = Math.max(maxRotation, Math.abs(mine.pose.rotation.m00 - r.rotation.m00), Math.abs(mine.pose.rotation.m10 - r.rotation.m10));
+      }
+      expect(maxTranslation).toBeLessThan(1e-9);
+      expect(maxRotation).toBeLessThan(1e-12);
+      verified = true;
+    }
+
+    expect(verified).toBe(true);
+  });
+
+  function detourScenario(options: { zoneOnLeft: boolean; lineOffset?: number }) {
+    const world = compileCellComplex(cube);
+    // Cube face "front" is 15 m wide with a zone (radius 0.15) at each corner.
+    // Heading +x along y = 7.5 - 0.12 passes the corner (7.5, 7.5) with it on the left; heading -x along y = 7.38 passes (-7.5, 7.5) on the right.
+    const offset = options.lineOffset ?? 0.12;
+    const c = options.zoneOnLeft
+      ? makeCreature(world, "front", 4.5, 7.5 - offset, -90)
+      : makeCreature(world, "front", -4.5, 7.5 - offset, 90);
+    return c;
+  }
+
+  for (const zoneOnLeft of [true, false]) {
+    it(`${zoneOnLeft ? "2" : "3"}. keeps the zone vertex on the geodesic's side (zone on the ${zoneOnLeft ? "left" : "right"})`, () => {
+      const c = detourScenario({ zoneOnLeft });
+      let passedTicks: number | undefined;
+      let detoured = false;
+
+      for (let tick = 0; tick < 600; tick += 1) {
+        c.runtime.update(c.world, dt);
+        const s = crossForwardToZone(c);
+        if (s.distance < 1) {
+          if (zoneOnLeft) {
+            expect(s.cross).toBeGreaterThanOrEqual(-1e-9);
+          } else {
+            expect(s.cross).toBeLessThanOrEqual(1e-9);
+          }
+        }
+        if (c.lag() > 1e-4) detoured = true;
+        if (passedTicks === undefined && s.along > 1 && s.distance < 3) passedTicks = tick;
+      }
+
+      expect(detoured).toBe(true);
+      expect(passedTicks).toBeDefined();
+      expect(c.lag()).toBeLessThan(1e-6);
+      expectCoincide(c, 1e-6);
+    });
+  }
+
+  it("4. a geodesic exactly through the vertex passes it on the right and the creature rejoins", () => {
+    const world = compileCellComplex(cube);
+    const c = makeCreature(world, "front", 4.5, 7.5, -90);
+    let minCross = Infinity;
+
+    for (let tick = 0; tick < 700; tick += 1) {
+      c.runtime.update(world, dt);
+      const s = crossForwardToZone(c);
+      if (s.distance < 1) minCross = Math.min(minCross, -s.cross);
+    }
+
+    // Vertex on the right of the motion: cross(forward, v - c) <= 0 throughout.
+    expect(minCross).toBeGreaterThanOrEqual(-1e-9);
+    expect(c.lag()).toBeLessThan(1e-6);
+    expectCoincide(c, 1e-6);
+  });
+
+  it("5. a creature pushed to the wrong side of a zone orbits to the required side and rejoins", () => {
+    const world = compileCellComplex(cube);
+    const c = makeCreature(world, "front", 4.5, 7.5 - 0.12, -90);
+    // A body below and left of the corner squeezes the creature up over the line, onto the wrong side of the corner zone (found by scanning body placements; the wrong-side branch is entered here).
+    const body = {
+      cellId: "front",
+      localPose: yawRigidTransform3(0, { x: 7.1, y: 7.1, z: 0 }),
+      collision: simpleCollisionCylinder(0.4, 0.4, { x: 0, y: 0, z: 0.2 }),
+    };
+    let previous: number | undefined;
+    let worstDecrease = 0;
+    let total = 0;
+
+    // The geodesic loops back to the same corner after about 800 ticks, so stop well before that.
+    for (let tick = 0; tick < 400; tick += 1) {
+      c.runtime.update(world, dt, tick < 150 ? [body] : []);
+      const s = crossForwardToZone(c);
+      if (s.distance < 0.6) {
+        const angle = angleAroundZone(c);
+        if (previous !== undefined) {
+          let step = angle - previous;
+          while (step > Math.PI) step -= 2 * Math.PI;
+          while (step < -Math.PI) step += 2 * Math.PI;
+          total += step;
+          worstDecrease = Math.min(worstDecrease, total);
+        }
+        previous = angle;
+      } else {
+        previous = undefined;
+      }
+    }
+
+    // Zone on the left: the creature goes round it counter-clockwise, so the unwrapped angle never decreases by more than jitter.
+    expect(worstDecrease).toBeGreaterThan(-0.2);
+    expect(c.lag()).toBeLessThan(1e-6);
+  });
+
+  it("6. a blocking body leashes the leader; the creature rejoins when it is removed", () => {
+    const world = compileCellComplex(cube);
+    const c = makeCreature(world, "front", 0, 0, -90);
+    const body = {
+      cellId: "front",
+      localPose: yawRigidTransform3(0, { x: 1, y: 0, z: 0 }),
+      collision: simpleCollisionCylinder(0.3, 0.4, { x: 0, y: 0, z: 0.2 }),
+    };
+    let maxLag = 0;
+
+    for (let tick = 0; tick < 120; tick += 1) {
+      c.runtime.update(world, dt, [body]);
+      maxLag = Math.max(maxLag, c.lag());
+    }
+    expect(maxLag).toBeLessThanOrEqual(0.5 + 1.2 * dt + 1e-9);
+    expect(maxLag).toBeGreaterThan(0.3);
+
+    for (let tick = 0; tick < 600; tick += 1) {
+      c.runtime.update(world, dt, []);
+    }
+    expect(c.lag()).toBeLessThan(1e-6);
+    expectCoincide(c, 1e-6);
+  });
+
+  it("8. reset and transformGeometry put the leader back on the creature", () => {
+    const world = compileCellComplex(cube);
+    const c = makeCreature(world, "front", 0, 0, -90);
+    const body = {
+      cellId: "front",
+      localPose: yawRigidTransform3(0, { x: 1, y: 0, z: 0 }),
+      collision: simpleCollisionCylinder(0.3, 0.4, { x: 0, y: 0, z: 0.2 }),
+    };
+    for (let tick = 0; tick < 100; tick += 1) c.runtime.update(world, dt, [body]);
+    expect(c.lag()).toBeGreaterThan(0.1);
+
+    const identityMap = { cellId: "front", mapPoint: (point: { x: number; y: number; z: number }) => point, mapDirection: (direction: { x: number; y: number; z: number }) => direction };
+    c.runtime.transformGeometry(new Map([["front", identityMap]]), world);
+    expect(c.lag()).toBeLessThan(1e-9);
+    expect(c.runtime.leaderForDebug().creatureFromLeader.translation).toEqual({ x: 0, y: 0, z: 0 });
+
+    for (let tick = 0; tick < 100; tick += 1) c.runtime.update(world, dt, [body]);
+    expect(c.lag()).toBeGreaterThan(0.1);
+    c.runtime.reset(new Map());
+    expect(c.lag()).toBeLessThan(1e-9);
+
+    const before = c.pose().pose.translation.x;
+    c.runtime.update(world, dt);
+    expect(c.pose().pose.translation.x).toBeCloseTo(before + 1.2 * dt, 9);
+    expectCoincide(c, 1e-9);
+  });
+});

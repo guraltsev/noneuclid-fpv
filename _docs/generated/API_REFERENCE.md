@@ -682,10 +682,14 @@ Simple geodesic creatures: the mouse and the butterfly, autonomous walkers that 
 | --- | --- | --- |
 | interface | `SimpleGeoCreatureAuthoringParams` | Author-facing parameters for the mouse and butterfly library entries. |
 | interface | `SimpleGeoCreatureRuntime` | Per-creature runtime handle owned by the renderer. |
+| const | `creatureLeashMeters` | The leader advances only while the creature lags it by less than this many meters, so it waits for a blocked creature. |
+| const | `creatureLostMeters` | When the creature lags its leader by more than this many meters (for example after a teleport), the leader is re-seeded on the creature. |
 | function | `createSimpleGeoCreature` | Creates the authored spec for a mouse or butterfly. |
 | function | `isSimpleGeoCreatureObjectSpec` | Type guard: true for geo-mouse and geo-butterfly specs. |
 | function | `createSimpleGeoCreatureRuntime` | Creates the runtime (three.js model instance, state, registry entry) for a creature starting in `startCellId`. |
 | function | `createSimpleGeoCreatureRuntimeObject` | Builds the registry record for a creature spec in the given cell without creating any three.js objects. |
+| function | `geodesicSideOfPoint` | Sign of the side on which the point `v` lies relative to the oriented line through `leaderPoint` with direction `leaderForward`: +1 when `v` is to the left, -1 when it is to the right. |
+| function | `applyForbiddenZoneSideRule` | Replaces a desired horizontal displacement that would run into a zone disc by one that goes round the disc with the zone centre on the required side. |
 | function | `forbiddenZoneLateralOscillationScale` | Returns a factor in [0, 1] that fades the sideways wobble out near forbidden zones. |
 | function | `butterflyVerticalOscillationRateHz` | Returns the butterfly's instantaneous vertical bob rate in Hz at `elapsedSeconds`, or 0 for non-butterflies. |
 | function | `butterflyVerticalOscillationHeightMagnitudeMeters` | Returns the butterfly's vertical bob amplitude in meters (10% of its collision height, capped at 0.08 m), or 0 for non-butterflies. |
