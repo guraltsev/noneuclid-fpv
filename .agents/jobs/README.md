@@ -91,7 +91,7 @@ Resolves: issue [NN](../../_issues/NN_....md).
 | [08](_done/08_xr_slide_replay_and_object_trap.md) | ~~XR slide replay and the player trapped by objects~~ (done) | [64](../../_issues/_closed/64_mover_integration_bugs_xr_slide_marmot_heading_object_trap.md) |  |
 | [09](_done/09_deformation_commit_safety.md) | ~~Make torus deformation commits safe~~ (done) | [53](../../_issues/_closed/53_torus_deformation_commit_transport_defects.md) |  |
 | [10](_done/10_floor_texture_in_lattice_coordinates.md) | ~~Floor texture in lattice coordinates~~ (done) | [81](../../_issues/_closed/81_floor_texture_slides_under_objects_during_deformation.md) |  |
-| [00](00_coordinate_jobs_11_17_36.md) | Coordinate jobs 11-17 and 36: order, gates, batch report | - |  |
+| [00](_done/00_coordinate_jobs_11_17_36.md) | ~~Coordinate jobs 11-17 and 36: order, gates, batch report~~ (done, needs review) | - |  |
 | [11](_done/11_property_tests_for_geometry_core.md) | ~~Property-based tests for the geometry core~~ (done, needs review) | - | 79 |
 | [12](_done/12_segment_walk_kernel.md) | ~~Shared segment-walk kernel and developed-disk atlas~~ (done) | [62](../../_issues/62_segment_based_portal_traversal_and_swept_motion.md) |  |
 | [13](_done/13_swept_collide_and_slide.md) | ~~Swept collide-and-slide on the segment-walk kernel~~ (done, needs review) | [62](../../_issues/62_segment_based_portal_traversal_and_swept_motion.md), [61](../../_issues/61_wall_response_lets_bodies_escape_through_corners.md), [63](../../_issues/63_collision_ignores_cells_a_straddling_body_overlaps.md) |  |

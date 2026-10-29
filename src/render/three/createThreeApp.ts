@@ -854,6 +854,10 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   scene.add(runtimeObjectRenderRoot);
   const runtimeObjectRootsById = new Map<string, THREE.Object3D>();
   const runtimeObjectRenderSourcesByKey = new Map<string, RuntimeObjectRenderSourceMesh>();
+  // Footprint radius per archetype-key prefix, recomputed when the cached source meshes of the prefix are replaced
+  // (sources are dropped and rebuilt on invalidation, so the identity of the first source detects that).
+  // Declared here, not next to its use: record collection runs during setup, before the later lines execute.
+  const runtimeObjectFootprintCache = new Map<string, { readonly first: RuntimeObjectRenderSourceMesh | undefined; readonly count: number; readonly radius: number }>();
   const runtimeObjectRenderArchetypesByKey = new Map<string, RuntimeObjectRenderArchetype>();
   const staticObjectCollisionWireframeGroupsByCellId = new Map<string, THREE.Group>();
   const selectableHitboxDebugGroupsByCellId = new Map<string, THREE.Group>();
@@ -2876,10 +2880,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       runtimeObjectRenderRoot.add(archetype.mesh);
     }
   }
-
-  // Footprint radius per archetype-key prefix, recomputed when the cached source meshes of the prefix are replaced
-  // (sources are dropped and rebuilt on invalidation, so the identity of the first source detects that).
-  const runtimeObjectFootprintCache = new Map<string, { readonly first: RuntimeObjectRenderSourceMesh | undefined; readonly count: number; readonly radius: number }>();
 
   function runtimeObjectFootprintRadius(prefix: string, archetypeKeys: readonly string[]): number {
     const sources = archetypeKeys

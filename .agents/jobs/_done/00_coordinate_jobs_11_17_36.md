@@ -1,6 +1,6 @@
 # Job 00 - Coordinate jobs 11-17 and 36
 
-Status: queued.
+Status: done, needs review on 2026-10-29. Report: [batch_11_17_36](../_reports/batch_11_17_36.md).
 Coordinates: jobs [11](11_property_tests_for_geometry_core.md) to [17](17_multi_hop_ghosts_and_eye_rerooting.md) and
 [36](36_creatures_detour_and_resume_geodesic.md) (geometry and movement core). Resolves no issue itself.
 
@@ -16,7 +16,7 @@ and the batch report.
 
 ## Before you start
 
-1. Read [README.md](README.md), especially "Rules for the implementing model" and "Report". They apply to every job.
+1. Read [README.md](../README.md), especially "Rules for the implementing model" and "Report". They apply to every job.
 2. Read this whole file, then skim the "Goal", "Depends on" and "Decisions" sections of all eight jobs once, so you know
    which later job relies on which earlier result.
 3. Check the starting state:
