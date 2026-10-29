@@ -16,7 +16,6 @@ import { type DebugLevelId } from "../../glue/debugLevels";
 import { yawRigidTransform3 } from "../../math/rigidTransform3";
 import { type Vec3, normalizeVec3 } from "../../math/vec3";
 import { testCellCollision } from "../../movement/collision";
-import { moveDynamicObject } from "../../movement/moveDynamicObject";
 import { type PlayerPose } from "../../movement/playerPose";
 import {
   type RuntimeMenuState,
@@ -48,7 +47,7 @@ import {
   resolveGeodesicEndpointSelectionFromSegmentHit,
   shootGeodesic,
   tieAndDetachGeodesicEndpoints,
-  updateLockedGeodesicPortalWordForCarriedAnchorTraversal,
+  updateLockedGeodesicPortalWordForCarriedAnchorTraversals,
 } from "../../world-objects/geodesicCannon";
 import {
   type RuntimeObjectRegistry,
@@ -68,7 +67,9 @@ import {
 } from "./carriedGeodesicCannon";
 import { createDesktopControls } from "./desktopControls";
 import { resolveGeodesicCannonAimYawFromAbsolutePoints } from "./geodesicCannonAimTarget";
-import { resolveGeodesicCarryPortalTransitionFromPortalMove } from "./geodesicCarryPortalTransition";
+import { locateDevelopedPoint } from "../../cell-complex/segmentWalk";
+import { composeRigidTransform3 } from "../../math/rigidTransform3";
+import { resolveGeodesicCarryPortalTransitionsFromCrossings } from "./geodesicCarryPortalTransition";
 import {
   RootAimRay,
   getAimForwardVector,
@@ -130,7 +131,11 @@ export interface GeodesicCannonToolsDeps {
   getLatestPlayerPortalTransition(): GeodesicCarryPortalTransition | undefined;
   /** Getter for the monotonically increasing serial of that latest crossing. */
   getLatestPlayerPortalTransitionSerial(): number;
-  /** Stores a crossing (and bumps the serial) when a released emitter is normalized across a portal. */
+  /** Crossings with a serial greater than `serial`, oldest first (the log keeps the newest 64). */
+  getPlayerPortalTransitionsSince(
+    serial: number,
+  ): readonly { readonly serial: number; readonly transition: GeodesicCarryPortalTransition }[];
+  /** Appends a crossing to the log (and bumps the serial) when a released emitter is normalized across a portal. */
   recordPlayerPortalTransition(transition: GeodesicCarryPortalTransition): void;
   /** Resolves the single best aim target for a ray. */
   resolveCurrentAimTarget(ray: RootAimRay): AimTarget | undefined;
@@ -162,6 +167,22 @@ export interface GeodesicCannonToolsDeps {
   refreshProtractorAnglesForGeodesic(geodesicId: string): void;
   /** Recomputes protractor angles that use any of the geodesics. */
   refreshProtractorAnglesForGeodesics(geodesicIds: readonly string[]): void;
+}
+
+/**
+ * Extends a carried connection's portal word by one crossing of the carried emitter.
+ *
+ * An `"incoming"` emitter is the end of the word, so the traversal is appended; an `"outgoing"` emitter is the start,
+ * so the inverse traversal is prepended. Call once per crossing, in order, feeding the result into the next call.
+ */
+export function applyCarriedPortalTransition(
+  word: readonly GeodesicPortalTraversal[],
+  transition: GeodesicPortalTraversal,
+  role: "incoming" | "outgoing",
+): readonly GeodesicPortalTraversal[] {
+  return role === "incoming"
+    ? [...word, transition]
+    : [reverseGeodesicPortalTraversal(transition), ...word];
 }
 
 /**
@@ -539,6 +560,7 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
     deps.setCannonToolState({
       selectedCannonId: selectedCannon.id,
       activeGeodesicId: geodesicId,
+      carryPortalTransitionSerial: deps.getLatestPlayerPortalTransitionSerial(),
       carryPortalWordsByGeodesicId,
       carryPortalWord: geodesicId
         ? carryPortalWordsByGeodesicId[geodesicId] ??
@@ -597,31 +619,32 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
     readonly cannon: Extract<RuntimeWorldObject, { readonly kind: "geodesic-cannon" }>;
     readonly previousCannon?: Extract<RuntimeWorldObject, { readonly kind: "geodesic-cannon" }>;
   } {
-    // A zero-displacement move re-resolves which cell/portal side the released cannon is on; if it ended up
-    // across a portal, re-home it to the target cell and record the crossing for portal-word bookkeeping.
-    const moveResult = moveDynamicObject({
-      world: deps.getWorld(),
-      object: runtimeObjectToDynamicObjectState(cannon),
-      displacement: { x: 0, y: 0, z: 0 },
-      ignoreForbiddenZones: true,
-    });
-    if (!moveResult.crossedPortal) {
+    // The carried cannon is held in the player's cell frame and may lie outside that cell. Walk the straight segment
+    // from the player to the cannon through the portals to find the cell the cannon is really in; if that is another
+    // cell, re-home it and record every crossing, in order, for portal-word bookkeeping. (A zero-displacement move
+    // no longer re-homes.) If the cannon is not in the player's cell frame, there is nothing to walk and it stays.
+    const playerPose = deps.getPlayerPose();
+    if (cannon.cellId !== playerPose.cellId) {
+      return { cannon };
+    }
+    const located = locateDevelopedPoint(
+      deps.getWorld(),
+      playerPose.cellId,
+      { x: playerPose.position.x, y: playerPose.position.y },
+      { x: cannon.localPose.translation.x, y: cannon.localPose.translation.y },
+    );
+    if (located.crossings.length === 0) {
       return { cannon };
     }
 
-    const transition = resolveGeodesicCarryPortalTransitionFromPortalMove(deps.getWorld(), cannon.cellId, {
-      crossedPortal: moveResult.crossedPortal,
-      crossedPortalId: moveResult.crossedPortalId,
-      pose: { cellId: moveResult.object.cellId },
-    });
-    if (transition) {
+    for (const transition of resolveGeodesicCarryPortalTransitionsFromCrossings(located.crossings)) {
       deps.recordPlayerPortalTransition(transition);
     }
 
     const nextCannon = {
       ...cannon,
-      cellId: moveResult.object.cellId,
-      localPose: moveResult.object.localPose,
+      cellId: located.cellId,
+      localPose: composeRigidTransform3(located.cellFromStart, cannon.localPose),
     };
     runtimeObjectRegistry.update(nextCannon);
     return { cannon: nextCannon, previousCannon: cannon };
@@ -926,23 +949,31 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
     previousCannon: Extract<RuntimeWorldObject, { readonly kind: "geodesic-cannon" }> | undefined,
     geodesicId: string,
   ): void {
-    const transition = deps.getLatestPlayerPortalTransition();
-    if (
-      !previousCannon ||
-      !transition ||
-      deps.getCannonToolState().carryPortalTransitionSerialByGeodesicId?.[geodesicId] ===
-        deps.getLatestPlayerPortalTransitionSerial() ||
-      previousCannon.cellId !== transition.sourceCellId ||
-      cannon.cellId !== transition.targetCellId
-    ) {
+    // Fold every player crossing this geodesic has not seen yet, oldest first (one frame can hold several).
+    const toolState = deps.getCannonToolState();
+    const lastApplied = toolState.carryPortalTransitionSerialByGeodesicId?.[geodesicId] ??
+      toolState.carryPortalTransitionSerial ??
+      deps.getLatestPlayerPortalTransitionSerial();
+    const pending = deps.getPlayerPortalTransitionsSince(lastApplied);
+    if (!previousCannon || pending.length === 0) {
+      return;
+    }
+    const transitions = pending.map((entry) => entry.transition);
+    const finalSerial = pending[pending.length - 1].serial;
+    const chains = previousCannon.cellId === transitions[0].sourceCellId &&
+      cannon.cellId === transitions[transitions.length - 1].targetCellId &&
+      transitions.every((entry, index) =>
+        index === 0 || transitions[index - 1].targetCellId === entry.sourceCellId
+      );
+    if (!chains) {
       return;
     }
 
-    const intervalWord = updateLockedGeodesicPortalWordForCarriedAnchorTraversal({
+    const intervalWord = updateLockedGeodesicPortalWordForCarriedAnchorTraversals({
       registry: runtimeObjectRegistry,
       geodesicId,
       carriedAnchorObjectId: cannon.id,
-      traversal: transition,
+      traversals: transitions,
     });
     if (intervalWord) {
       deps.setCannonToolState({
@@ -954,10 +985,10 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
         carryPortalWord: deps.getCannonToolState().activeGeodesicId === geodesicId
           ? intervalWord
           : deps.getCannonToolState().carryPortalWord,
-        carryPortalTransitionSerial: deps.getLatestPlayerPortalTransitionSerial(),
+        carryPortalTransitionSerial: finalSerial,
         carryPortalTransitionSerialByGeodesicId: {
           ...deps.getCannonToolState().carryPortalTransitionSerialByGeodesicId,
-          [geodesicId]: deps.getLatestPlayerPortalTransitionSerial(),
+          [geodesicId]: finalSerial,
         },
       });
       if (deps.getDebugLevel() === "verbose") {
@@ -965,7 +996,7 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
           geodesicId,
           carriedEmitterId: cannon.id,
           word: formatGeodesicPortalWord(intervalWord),
-          transition,
+          transitions,
         });
       }
       return;
@@ -977,15 +1008,17 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
         ? deps.getCannonToolState().carryPortalWord
         : undefined) ??
       collectGeodesicPortalWord(deps.getWorld(), runtimeObjectRegistry, geodesicId);
-    let nextWord: readonly GeodesicPortalTraversal[] | undefined;
-    if (connection?.incomingEmitterId === cannon.id) {
-      nextWord = [...currentWord, transition];
-    } else if (connection?.outgoingEmitterId === cannon.id) {
-      nextWord = [reverseGeodesicPortalTraversal(transition), ...currentWord];
-    }
-
-    if (!nextWord) {
+    const role = connection?.incomingEmitterId === cannon.id
+      ? "incoming"
+      : connection?.outgoingEmitterId === cannon.id
+        ? "outgoing"
+        : undefined;
+    if (!role) {
       return;
+    }
+    let nextWord = currentWord;
+    for (const transition of transitions) {
+      nextWord = applyCarriedPortalTransition(nextWord, transition, role);
     }
 
     deps.setCannonToolState({
@@ -997,10 +1030,10 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
       carryPortalWord: deps.getCannonToolState().activeGeodesicId === geodesicId
         ? nextWord
         : deps.getCannonToolState().carryPortalWord,
-      carryPortalTransitionSerial: deps.getLatestPlayerPortalTransitionSerial(),
+      carryPortalTransitionSerial: finalSerial,
       carryPortalTransitionSerialByGeodesicId: {
         ...deps.getCannonToolState().carryPortalTransitionSerialByGeodesicId,
-        [geodesicId]: deps.getLatestPlayerPortalTransitionSerial(),
+        [geodesicId]: finalSerial,
       },
     });
     if (deps.getDebugLevel() === "verbose") {
@@ -1008,7 +1041,7 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
         geodesicId,
         carriedEmitterId: cannon.id,
         word: formatGeodesicPortalWord(nextWord),
-        transition,
+        transitions,
       });
     }
   }

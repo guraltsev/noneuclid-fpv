@@ -2106,16 +2106,35 @@ export function updateLockedGeodesicPortalWordForCarriedAnchorTraversal(input: {
   readonly carriedAnchorObjectId: string;
   readonly traversal: GeodesicPortalTraversal;
 }): readonly GeodesicPortalTraversal[] | undefined {
+  return updateLockedGeodesicPortalWordForCarriedAnchorTraversals({
+    registry: input.registry,
+    geodesicId: input.geodesicId,
+    carriedAnchorObjectId: input.carriedAnchorObjectId,
+    traversals: [input.traversal],
+  });
+}
+
+/**
+ * Same as {@link updateLockedGeodesicPortalWordForCarriedAnchorTraversal} for a chain of traversals the carried
+ * anchor made in one frame, in order. The word is folded through all of them and checked against the endpoint cells once
+ * (the anchor already sits in the last target cell), then stored. Returns `undefined` and stores nothing on failure.
+ */
+export function updateLockedGeodesicPortalWordForCarriedAnchorTraversals(input: {
+  readonly registry: RuntimeObjectRegistry;
+  readonly geodesicId: string;
+  readonly carriedAnchorObjectId: string;
+  readonly traversals: readonly GeodesicPortalTraversal[];
+}): readonly GeodesicPortalTraversal[] | undefined {
   const interval = input.registry.get(input.geodesicId);
   if (interval?.kind !== "geodesic-interval") {
     return undefined;
   }
 
   // See `portalWordAfterAnchorCrossing`: append at the end role, prepend the inverse at the start role, both for a loop.
-  const portalWord = portalWordAfterAnchorCrossing({
+  const portalWord = applyAnchorCrossingTraversals({
     interval,
     anchorObjectId: input.carriedAnchorObjectId,
-    traversal: input.traversal,
+    traversals: input.traversals,
   });
   if (!portalWord || !portalWordMatchesCurrentEndpointCells(input.registry, interval, portalWord)) {
     return undefined;
@@ -2503,6 +2522,27 @@ function portalWordAfterAnchorCrossing(input: {
     word = [reverseGeodesicPortalWord([input.traversal])[0], ...word];
   }
   return reduceAdjacentInversePortalTraversals(word);
+}
+
+/**
+ * Applies {@link portalWordAfterAnchorCrossing} once per traversal, in order, feeding each resulting word into the next.
+ * Returns `undefined` if any step fails (the anchor is not an endpoint of the interval).
+ */
+export function applyAnchorCrossingTraversals(input: {
+  readonly interval: GeodesicIntervalObject;
+  readonly anchorObjectId: string;
+  readonly traversals: readonly GeodesicPortalTraversal[];
+}): readonly GeodesicPortalTraversal[] | undefined {
+  let interval = input.interval;
+  let word: readonly GeodesicPortalTraversal[] | undefined;
+  for (const traversal of input.traversals) {
+    word = portalWordAfterAnchorCrossing({ interval, anchorObjectId: input.anchorObjectId, traversal });
+    if (!word) {
+      return undefined;
+    }
+    interval = { ...interval, portalWord: word };
+  }
+  return word;
 }
 
 function reduceAdjacentInversePortalTraversals(
@@ -3771,14 +3811,21 @@ export function advanceCurveShorteningPairs(
     // (`portalWordAfterAnchorCrossing`: append at an `end` role on F, prepend the inverse at a `start` role on F; a free loop has
     // both roles on F and is conjugated). This is the only change of homotopy class a tick may make. Words that fail the
     // cell-chain check are left unchanged (the preview then fails and nothing is committed).
-    const traversal = moveResult.crossedPortal && moveResult.crossedPortalId
-      ? getPortalTraversalFromSource(request.world, freeEnd.cellId, moveResult.crossedPortalId)
-      : undefined;
-    const candidateIntervals = owned.intervals.map((interval) => {
+    // A tick may cross several portals; the traversals are applied once each, in order.
+    const traversals: GeodesicPortalTraversal[] = [];
+    for (const crossing of moveResult.crossings) {
+      const traversal = getPortalTraversalFromSource(request.world, crossing.sourceCellId, crossing.portalId);
       if (!traversal) {
+        traversals.length = 0;
+        break;
+      }
+      traversals.push(traversal);
+    }
+    const candidateIntervals = owned.intervals.map((interval) => {
+      if (traversals.length === 0) {
         return interval;
       }
-      const portalWord = portalWordAfterAnchorCrossing({ interval, anchorObjectId: pair.freeEndAnchorId, traversal });
+      const portalWord = applyAnchorCrossingTraversals({ interval, anchorObjectId: pair.freeEndAnchorId, traversals });
       if (
         !portalWord ||
         !portalWordMatchesEndpointCellsWithAnchors({

@@ -198,7 +198,7 @@ import {
   createGeodesicRuntimeRenderSources,
 } from "./geodesicCannonRenderer";
 import { GeodesicCannonToolState, createGeodesicCannonTools } from "./geodesicCannonTools";
-import { resolveGeodesicCarryPortalTransitionFromMove } from "./geodesicCarryPortalTransition";
+import { resolveGeodesicCarryPortalTransitionsFromCrossings } from "./geodesicCarryPortalTransition";
 import { createGeodesicDebugDumps } from "./geodesicDebugDumps";
 import { createGeodesicEmitterLabelController } from "./geodesicEmitterLabelController";
 import { createGeometryComputerMenu } from "./geometryComputerMenu";
@@ -877,10 +877,20 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   // onBeforeRender via activatePortalRenderStateForCamera.
   let portalEyeRenderStates: readonly PortalEyeRenderState[] = [];
   let activePortalEyeIndex = 0;
-  // Most recent portal crossing by the player; the serial increments on each crossing so consumers
-  // (geodesic cannon carry) can detect a new one.
-  let latestPlayerPortalTransition: GeodesicCarryPortalTransition | undefined;
+  // Append-only log of the player's portal crossings, newest last, at most 64 entries. Serials increase by 1 per
+  // crossing and are never reused, so consumers (geodesic cannon carry) can fold every crossing they have not seen.
+  let playerPortalTransitionLog: { readonly serial: number; readonly transition: GeodesicCarryPortalTransition }[] = [];
   let latestPlayerPortalTransitionSerial = 0;
+  function recordPlayerPortalTransitionInLog(transition: GeodesicCarryPortalTransition): void {
+    latestPlayerPortalTransitionSerial += 1;
+    playerPortalTransitionLog.push({ serial: latestPlayerPortalTransitionSerial, transition });
+    if (playerPortalTransitionLog.length > 64) {
+      playerPortalTransitionLog = playerPortalTransitionLog.slice(-64);
+    }
+  }
+  function latestPlayerPortalTransition(): GeodesicCarryPortalTransition | undefined {
+    return playerPortalTransitionLog.at(-1)?.transition;
+  }
   let portalInstanceRenderState: PortalInstanceRenderDebugState = {
     enabled: true,
     ShowCellPathRendersInstances: showCellPathRendersInstances,
@@ -918,7 +928,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     getMenuState: () => menuState,
     getVisibleCellId: () => visibleCellId,
     getCannonToolState: () => activeGeodesicCannonToolState,
-    getLatestPlayerPortalTransition: () => latestPlayerPortalTransition,
+    getLatestPlayerPortalTransition: latestPlayerPortalTransition,
     resolveCameraAimTarget: () => resolveCurrentAimTarget(resolveCameraRootRay()),
   });
 
@@ -1059,12 +1069,11 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     },
     getPlayerPose: () => playerPose,
     getDebugLevel: () => debugLevel,
-    getLatestPlayerPortalTransition: () => latestPlayerPortalTransition,
+    getLatestPlayerPortalTransition: latestPlayerPortalTransition,
     getLatestPlayerPortalTransitionSerial: () => latestPlayerPortalTransitionSerial,
-    recordPlayerPortalTransition: (transition) => {
-      latestPlayerPortalTransition = transition;
-      latestPlayerPortalTransitionSerial += 1;
-    },
+    getPlayerPortalTransitionsSince: (serial) =>
+      playerPortalTransitionLog.filter((entry) => entry.serial > serial),
+    recordPlayerPortalTransition: recordPlayerPortalTransitionInLog,
     resolveCurrentAimTarget,
     resolveCurrentAimTargets,
     targetIsWithinInteractionRange,
@@ -2296,19 +2305,15 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   }
 
   function recordCellTransition(previousCellId: string, moveResult: ReturnType<typeof movePlayer>): void {
-    if (moveResult.crossedPortal) {
-      const transition = resolveGeodesicCarryPortalTransitionFromMove(activeWorld(), previousCellId, moveResult);
-      if (transition) {
-        latestPlayerPortalTransition = transition;
-        latestPlayerPortalTransitionSerial += 1;
-      }
+    for (const transition of resolveGeodesicCarryPortalTransitionsFromCrossings(moveResult.crossings)) {
+      recordPlayerPortalTransitionInLog(transition);
     }
 
     if (playerPose.cellId !== previousCellId) {
         runtimeDiagnostics().recordCellEntered(
           previousCellId,
           playerPose.cellId,
-          moveResult.crossedPortalId ?? "unknown-portal",
+          moveResult.crossings.at(-1)?.portalId ?? moveResult.crossedPortalId ?? "unknown-portal",
         );
       portalDebugRuntime.syncRootCell();
     }

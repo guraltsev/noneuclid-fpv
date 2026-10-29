@@ -9,6 +9,7 @@
  */
 import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex";
 import type { GeodesicCarryPortalTransition } from "../../world-objects/geodesicCannon";
+import type { SegmentWalkCrossing } from "../../cell-complex/segmentWalk";
 import type { movePlayer } from "../../movement/movePlayer";
 
 /** Minimal structural subset of a movement result required to detect a portal crossing. */
@@ -30,6 +31,23 @@ export function resolveGeodesicCarryPortalTransitionFromMove(
   moveResult: ReturnType<typeof movePlayer>,
 ): GeodesicCarryPortalTransition | undefined {
   return resolveGeodesicCarryPortalTransitionFromPortalMove(world, previousCellId, moveResult);
+}
+
+/**
+ * Maps the ordered crossings of one move (`MoveResult.crossings`) to carry-portal transitions, one per crossing.
+ * Each entry uses the portal id in its own source cell, so the list chains: target cell of entry i is the source
+ * cell of entry i + 1. The transforms are the crossings' own (shared references).
+ */
+export function resolveGeodesicCarryPortalTransitionsFromCrossings(
+  crossings: readonly SegmentWalkCrossing[],
+): readonly GeodesicCarryPortalTransition[] {
+  return crossings.map((crossing) => ({
+    sourceCellId: crossing.sourceCellId,
+    sourcePortalId: crossing.portalId,
+    targetCellId: crossing.targetCellId,
+    targetPortalId: crossing.targetPortalId,
+    transformToTarget: crossing.transformToTarget,
+  }));
 }
 
 /**

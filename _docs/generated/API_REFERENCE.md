@@ -516,10 +516,12 @@ Geodesic emitters ("cannons"), geodesic intervals and curve shortening on a glue
 | function | `splitGeodesicIntervalAtSegmentHit` | Splits a free geodesic at a point on one of its segments, ending the first part at a newly placed emitter. |
 | function | `rebuildLockedGeodesicFromEndpointsAndPortalWord` | Rebuilds a locked (emitter-to-emitter) interval after an endpoint was carried, updating its portal word first. |
 | function | `updateLockedGeodesicPortalWordForCarriedAnchorTraversal` | Extends an interval's stored portal word with one portal crossing made by a carried anchor, and saves it. |
+| function | `updateLockedGeodesicPortalWordForCarriedAnchorTraversals` | Same as {@link updateLockedGeodesicPortalWordForCarriedAnchorTraversal} for a chain of traversals the carried anchor made in one frame, in order. |
 | function | `getPortalWordBetweenEndpointRoles` | Returns the interval's portal word read from `sourceRole` to `targetRole`: the stored word, its inverse, or empty when the roles are equal. |
 | function | `updatePortalWordForMovedEndpoint` | Returns the interval's portal word after one of its endpoints crossed a portal, or `undefined` if the result is inconsistent. |
 | function | `previewRebuildGeodesicInterval` | Computes the segments an interval would have, without touching the registry (rollback-safe). |
 | function | `collectGeodesicMenuRowsForEmitter` | Lists one menu row (`G<n>` label) per distinct geodesic attached to the emitter, in attachment order. |
+| function | `applyAnchorCrossingTraversals` | Applies {@link portalWordAfterAnchorCrossing} once per traversal, in order, feeding each resulting word into the next. |
 | function | `shootGeodesic` | Emits (or re-aims) a free geodesic from a cannon along its yaw and returns its first derived segment. |
 | function | `extendGeodesic` | Lengthens an aimable free geodesic by re-aiming it from its emitter along the current tangent, and returns its new last segment. |
 | function | `rebuildGeodesicToLength` | Re-shoots a geodesic from its cannon so that its total length is `totalLengthMeters`, returning the new segments. |
@@ -1482,6 +1484,7 @@ Geodesic emitter (cannon) tools: place, rotate, aim, carry, tie-and-detach, and 
 | --- | --- | --- |
 | interface | `GeodesicCannonToolState` | Editing state of the geodesic emitter (cannon) tools. |
 | interface | `GeodesicCannonToolsDeps` | Dependencies of the geodesic cannon tools, supplied by createThreeApp's shell. |
+| function | `applyCarriedPortalTransition` | Extends a carried connection's portal word by one crossing of the carried emitter. |
 | function | `createGeodesicCannonTools` | Creates the geodesic cannon tool controller and returns its operations. |
 
 ### `render/three/geodesicCarryPortalTransition.ts`
@@ -1491,6 +1494,7 @@ Derives the portal-crossing record a carried geodesic cannon needs from a player
 | Kind | Name | Summary |
 | --- | --- | --- |
 | function | `resolveGeodesicCarryPortalTransitionFromMove` | Resolves the carry-portal transition implied by a `movePlayer` result. |
+| function | `resolveGeodesicCarryPortalTransitionsFromCrossings` | Maps the ordered crossings of one move (`MoveResult.crossings`) to carry-portal transitions, one per crossing. |
 | function | `resolveGeodesicCarryPortalTransitionFromPortalMove` | Builds the transition describing which portal a move crossed, or `undefined` if no consistent crossing happened. |
 
 ### `render/three/geodesicCreatureDebug.ts`

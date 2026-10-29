@@ -49,6 +49,8 @@ import {
   traceGeodesicSegment,
   updateGeodesicIntersectionObjects,
   updateLockedGeodesicPortalWordForCarriedAnchorTraversal,
+  updateLockedGeodesicPortalWordForCarriedAnchorTraversals,
+  applyAnchorCrossingTraversals,
   type GeodesicSegmentObject,
 } from "../../src/world-objects/geodesicCannon";
 import { yawRigidTransform3 } from "../../src/math/rigidTransform3";
@@ -1776,6 +1778,49 @@ describe("geodesic cannon world objects", () => {
       expect(segments[segments.length - 1].terminal).toMatchObject({ kind: "emitter-hit", emitterId: "cannon-a" });
       expect(collectGeodesicPortalWord(world, registry, "g-loop")).toEqual([px, py]);
       expect(totalGeodesicLength(registry, "g-loop")).toBeCloseTo(15 * Math.SQRT2, 6);
+    });
+
+    it("folds two crossings of one frame in order, like two single updates (job 13 part C)", () => {
+      const sequential = torusLoopSetup(6, ["top-bottom", "right-left"]);
+      const combined = torusLoopSetup(6, ["top-bottom", "right-left"]);
+      const py = createCarryPortalTraversal(sequential.world, "torus-room", "top-bottom");
+      const px = createCarryPortalTraversal(sequential.world, "torus-room", "right-left");
+      const common = { geodesicId: "g-loop", carriedAnchorObjectId: "cannon-a" } as const;
+
+      updateLockedGeodesicPortalWordForCarriedAnchorTraversal({ registry: sequential.registry, ...common, traversal: py });
+      const expected = updateLockedGeodesicPortalWordForCarriedAnchorTraversal({
+        registry: sequential.registry,
+        ...common,
+        traversal: px,
+      });
+      const folded = updateLockedGeodesicPortalWordForCarriedAnchorTraversals({
+        registry: combined.registry,
+        ...common,
+        traversals: [py, px],
+      });
+
+      expect(expected).toBeDefined();
+      expect(folded).toEqual(expected);
+      expect(combined.registry.get("g-loop")).toMatchObject({ portalWord: expected });
+    });
+
+    it("applies one anchor-crossing traversal per crossing in order (curve shortening loop, job 13 part C)", () => {
+      const { world, registry } = torusLoopSetup(6, ["top-bottom"]);
+      const interval = registry.get("g-loop");
+      if (interval?.kind !== "geodesic-interval") {
+        throw new Error("expected an interval");
+      }
+      const py = createCarryPortalTraversal(world, "torus-room", "top-bottom");
+      const px = createCarryPortalTraversal(world, "torus-room", "right-left");
+      const input = { interval, anchorObjectId: "cannon-a" } as const;
+
+      const once = applyAnchorCrossingTraversals({ ...input, traversals: [px] });
+      const twice = applyAnchorCrossingTraversals({ ...input, traversals: [px, py] });
+      const second = applyAnchorCrossingTraversals({ interval: { ...interval, portalWord: once ?? [] }, anchorObjectId: "cannon-a", traversals: [py] });
+
+      expect(once).toBeDefined();
+      expect(twice).toEqual(second);
+      expect(applyAnchorCrossingTraversals({ ...input, anchorObjectId: "someone-else", traversals: [px, py] })).toBeUndefined();
     });
 
     it("conjugates a torus loop when the crossing is inferred from the emitter's motion", () => {

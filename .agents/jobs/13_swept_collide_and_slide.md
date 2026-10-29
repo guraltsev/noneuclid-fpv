@@ -491,6 +491,13 @@ Close issues 61, 62 and 63 (move them to `_issues/_closed/` with `Outcome` and `
 - `src/movement/collision.ts`: `moveIncreasesCylinderOverlap` deleted. `src/world-objects/simpleGeoCreature.ts`: `update` passes `bodiesInCell` and takes `result.object`; `creatureIntersectsObstacle` deleted.
 - Tests: new `describe("bodies across portals (issue 63)")` in `tests/movement/moveDynamicObject.test.ts` (B5.1 in both directions, a no-deeper-overlap test, an id/height filter test, B5.2 the 30 degree triangle); `tests/render-contract/vrLocomotion.test.ts` literals gained `crossings` and `cellFromStart`.
 - `_docs/MATHEMATICAL_MODEL.md` section 5 "Runtime bodies" paragraph rewritten; generated docs regenerated.
+#### Part C
+- `src/render/three/geodesicCarryPortalTransition.ts`: new `resolveGeodesicCarryPortalTransitionsFromCrossings(crossings)` (one chained transition per crossing). `resolveGeodesicCarryPortalTransitionFromMove` is kept (tests use it) but no longer called by the shell.
+- `src/render/three/createThreeApp.ts` (C1): `latestPlayerPortalTransition` / serial replaced by an append-only `playerPortalTransitionLog` (newest last, at most 64, serials +1 per crossing, never reused) with `recordPlayerPortalTransitionInLog`; `recordCellTransition` records every `moveResult.crossings` entry and reports the last crossing's portal id in the diagnostics line. Both debug consumers still get the newest transition.
+- `src/render/three/geodesicCannonTools.ts` (C2-C5): new dep `getPlayerPortalTransitionsSince(serial)`; `startGeodesicCannonCarry` stores `carryPortalTransitionSerial`; `updateCarriedGeodesicPortalWord` folds every unseen transition in order (chain check as in the job: first source = previous cannon cell, entries chain, last target = cannon cell; the interval branch folds all traversals and validates once, the connection branch applies the new exported `applyCarriedPortalTransition` per crossing); `normalizeReleasedCarriedGeodesicCannon` now uses `locateDevelopedPoint` from the player's position to the cannon's, records each crossing and re-homes with `composeRigidTransform3(result.cellFromStart, cannon.localPose)`; the `moveDynamicObject` import is gone.
+- `src/world-objects/geodesicCannon.ts` (C5/C6): new exports `applyAnchorCrossingTraversals` (folds `portalWordAfterAnchorCrossing` over a traversal list) and `updateLockedGeodesicPortalWordForCarriedAnchorTraversals` (the old single-traversal function now delegates to it); curve shortening builds one traversal per `moveResult.crossings` entry and applies them in order.
+- Tests (C8): two-crossing mapping and `applyCarriedPortalTransition` tests in `tests/render-contract/geodesicCarryPortalTransition.test.ts`; in `tests/world-objects/geodesicCannon.test.ts` (loop words describe) a fold test (two traversals at once equal two single updates) and a direct unit test of `applyAnchorCrossingTraversals`.
+- Generated docs regenerated.
 ### Deviations
 #### Part A
 - Deleted test "throws for the unimplemented bounds crossing mode" (Decision 10).
@@ -507,6 +514,9 @@ Close issues 61, 62 and 63 (move them to `_issues/_closed/` with `Outcome` and `
 - `simpleGeoCreature.test.ts` "blocks a mouse from penetrating a supplied player obstacle" renamed "stops a mouse at the surface of a supplied player obstacle": old expectation y = 0 (the whole move discarded), new y in (0.14, 0.15] (the obstacle is 0.65 m ahead, radii sum 0.5 m).
 - `collision.test.ts`: the `moveIncreasesCylinderOverlap` test deleted with the function (Decision 11).
 - `vrLocomotion.test.ts`: two `MoveResult` literals gained `crossings: []` and `cellFromStart` to satisfy the type.
+#### Part C
+- No existing test was changed. C8 fold test: the Three.js shell (`updateCarriedGeodesicPortalWord`) is not reachable from a test, so the fold is tested through the registry function it calls (`updateLockedGeodesicPortalWordForCarriedAnchorTraversals`) plus `applyCarriedPortalTransition` twice, as the job allows.
+- C8 curve shortening: a direct unit test of the traversal loop (`applyAnchorCrossingTraversals`) was chosen over a two-portal tick in a narrow world; the existing curve-shortening tests still pass.
 ### Uncertain
 #### Part A
 - Creature offset: when the collision offset is horizontal, the obstacles are collected around the body centre in the centre's own cell (found by `locateDevelopedPoint` from the anchor to the centre) and mapped back to the anchor cell's frame with `frameFromCell`, instead of treating the centre as a point of the anchor cell. Not in the job text; confirm the choice with a creature that stands within its offset of a portal.
@@ -519,14 +529,27 @@ Close issues 61, 62 and 63 (move them to `_issues/_closed/` with `Outcome` and `
 - B5.1 as written (a mover 0.1 m before the portal and a r = 0.25 body 0.1 m beyond it) starts already overlapping, so a non-overlap distance cannot hold. I used a mover of radius 0.1 starting 0.1 m before the portal and a body 0.5 m beyond it, which exercises the crossing: the mover ends in `room-b` 0.35 m (the radii sum) from the body. The already-overlapping case is its own test (cannot move closer, may move away).
 - The B5.2 triangle test asserts only the stated invariants (clearance from the developed wall B-C at least 0.1 m, at most one cell change); I did not verify that the wall is actually touched.
 - A creature now advances to the obstacle surface and slides, instead of discarding the whole move; confirm that is the wanted creature behaviour.
+#### Part C
+- `rebuildConnectedGeodesicBetweenEmitters` still receives only the newest transition as `carriedEmitterPortalTransition` (`deps.getLatestPlayerPortalTransition()`); its API takes one transition and the job does not list it. The portal word itself is folded over all transitions, so only the fallback inference uses the newest one. Confirm with a carry that crosses two portals in one frame.
+- `normalizeReleasedCarriedGeodesicCannon` walks from the player's position only when the cannon is in the player's cell; otherwise the cannon is left as is (the job assumes it is always held in the player's cell frame; the old zero-move re-homed from `cannon.cellId`).
+- A move whose crossings do not chain for the cannon (chain check fails) is skipped on every later frame too (as before for a single transition) because the serial is not advanced.
+- The first `npm run smoke -- --world cube,torus-moduli` run failed on torus-moduli ("loading screen still present after 60000 ms; no canvas"); an immediate rerun of torus-moduli alone passed. Looks like a load-time flake, not confirmed against the previous commit.
 ### Not done
 #### Part A
 - Nothing in Part A. Parts B and C, issue closing, the browser smoke test and the manual check are left for later (job stays `in progress`).
 #### Part B
 - Nothing in Part B. Part C, issue closing, the browser smoke test and the manual check are still left.
+#### Part C
+- Nothing in Part C. Issues 61, 62, 63 are not closed (the Uncertain entries above; coordinator ruling): each carries a pointer to this report instead.
+### Manual checks not run
+- Walk into a room corner in `?config=full` with a walled test world, and walk straight at a cube vertex (slides around the zone, never disappears); also carry a geodesic cannon through two portals in one frame. No interactive browser here.
 ### Checks
 #### Part A
 - Baseline: `npm run typecheck` ok; `npm test` 111 files, 813 passed, 8 skipped.
-- After: `npm run typecheck` ok; `npm test` all pass except the documentation test, which failed on stale generated docs; `npm run docs:generate` then `npm run docs:check` all ok and `npx vitest run tests/docs` passes. Final run before the commit: typecheck ok, 113 test files passed (831 tests passed, 8 skipped), docs:check ok.#### Part B
+- After: `npm run typecheck` ok; `npm test` all pass except the documentation test, which failed on stale generated docs; `npm run docs:generate` then `npm run docs:check` all ok and `npx vitest run tests/docs` passes. Final run before the commit: typecheck ok, 113 test files passed (831 tests passed, 8 skipped), docs:check ok.
+#### Part B
 - Baseline: Part A final state (typecheck ok, 831 tests passed, docs:check ok).
 - After: `npm run typecheck` ok; `npm test` 113 files, 835 passed, 8 skipped; `npm run docs:generate` then `npm run docs:check` ok.
+#### Part C
+- Baseline: Part B final state. After: `npm run typecheck` ok; `npm test` 113 files, 839 passed, 8 skipped; `docs:check` first reported a detached JSDoc on `createGeodesicCannonTools` (fixed) and stale generated docs, then `npm run docs:generate` and `npm run docs:check` ok.
+- `npm run build` ok. `npm run smoke -- --world cube,torus-moduli`: cube "SMOKE OK"; torus-moduli failed once ("loading screen still present after 60000 ms; no canvas"), rerun `npm run smoke -- --world torus-moduli` "SMOKE OK".
