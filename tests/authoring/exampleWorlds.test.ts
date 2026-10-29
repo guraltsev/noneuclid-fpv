@@ -79,6 +79,35 @@ describe("example worlds", () => {
     });
   });
 
+  // Expected invariants per world, not a global rule: a world of any genus or cone-angle profile may be added with its
+  // own row. Cone angles are the summed corner angles of each vertex class, in degrees.
+  it.each([
+    ["001-basic-cube", basicCube, { vertices: 8, edges: 12, faces: 6, euler: 2, coneAngles: Array(8).fill(270) }],
+    ["002-basic-tetrahedron", basicTetrahedron, { vertices: 4, edges: 6, faces: 4, euler: 2, coneAngles: Array(4).fill(180) }],
+    ["cube", cube, { vertices: 8, edges: 12, faces: 6, euler: 2, coneAngles: Array(8).fill(270) }],
+    ["dodecahedron", dodecahedron, { vertices: 20, edges: 30, faces: 12, euler: 2, coneAngles: Array(20).fill(324) }],
+    ["genus-2-torus", genus2Torus, { vertices: 1, edges: 4, faces: 1, euler: -2, coneAngles: [1080] }],
+    ["icosahedron", icosahedron, { vertices: 12, edges: 30, faces: 20, euler: 2, coneAngles: Array(12).fill(300) }],
+    ["octahedron", octahedron, { vertices: 6, edges: 12, faces: 8, euler: 2, coneAngles: Array(6).fill(240) }],
+    ["tetrahedron", tetrahedron, { vertices: 4, edges: 6, faces: 4, euler: 2, coneAngles: Array(4).fill(180) }],
+    ["torus", torus, { vertices: 1, edges: 2, faces: 1, euler: 0, coneAngles: [360] }],
+    ["torus-moduli", torusModuli, { vertices: 1, edges: 2, faces: 1, euler: 0, coneAngles: [360] }],
+  ] as const)("glues %s into the intended surface", (_name, world, expected) => {
+    const vertexClasses = buildVertexClasses(world);
+    const edges = world.cells.reduce((total, cell) => total + cell.portals.length, 0) / 2;
+    const coneAngles = vertexClasses
+      .map((vertexClass) => Math.round(vertexClass.reduce((total, key) => total + cornerAngleDegrees(world, key), 0)))
+      .sort((left, right) => left - right);
+
+    expect({
+      vertices: vertexClasses.length,
+      edges,
+      faces: world.cells.length,
+      euler: vertexClasses.length - edges + world.cells.length,
+      coneAngles,
+    }).toEqual(expected);
+  });
+
   it("models the genus-2 torus as a paired octagon", () => {
     const octagon = genus2Torus.cells.find((cell) => cell.id === "genus-2-octagon");
     const vertexClasses = buildVertexClasses(genus2Torus);
@@ -313,6 +342,31 @@ function buildVertexClasses(world: CellComplexSpec) {
   }
 
   return [...classes.values()];
+}
+
+function cornerAngleDegrees(world: CellComplexSpec, key: string) {
+  const separator = key.lastIndexOf(":vertex-");
+  const cell = world.cells.find((candidate) => candidate.id === key.slice(0, separator));
+  const vertexIndex = Number(key.slice(separator + ":vertex-".length));
+
+  if (!cell) {
+    throw new Error(`Missing cell for vertex key "${key}".`);
+  }
+
+  const count = cell.baseVertices.length;
+  const corner = cell.baseVertices[vertexIndex];
+  const previous = cell.baseVertices[(vertexIndex + count - 1) % count];
+  const next = cell.baseVertices[(vertexIndex + 1) % count];
+
+  if (!corner || !previous || !next) {
+    throw new Error(`Missing vertices around "${key}".`);
+  }
+
+  const toPrevious = Math.atan2(previous.y - corner.y, previous.x - corner.x);
+  const toNext = Math.atan2(next.y - corner.y, next.x - corner.x);
+  const angle = Math.abs(toPrevious - toNext);
+
+  return ((angle > Math.PI ? 2 * Math.PI - angle : angle) * 180) / Math.PI;
 }
 
 function vertexKey(cellId: string, vertexIndex: number) {

@@ -26,41 +26,18 @@ PolygonFace("lower-3", sand_floor, pentagon);
 PolygonFace("lower-4", mud_floor, pentagon);
 PolygonFace("bottom", snow_floor, pentagon);
 
-Portal("top", 0, "upper-0", 0);
-Portal("top", 1, "upper-1", 0);
-Portal("top", 2, "upper-2", 0);
-Portal("top", 3, "upper-3", 0);
-Portal("top", 4, "upper-4", 0);
-
-Portal("upper-0", 1, "upper-1", 4);
-Portal("upper-1", 1, "upper-2", 4);
-Portal("upper-2", 1, "upper-3", 4);
-Portal("upper-3", 1, "upper-4", 4);
-Portal("upper-4", 1, "upper-0", 4);
-
-Portal("upper-0", 2, "lower-0", 0);
-Portal("upper-1", 2, "lower-1", 0);
-Portal("upper-2", 2, "lower-2", 0);
-Portal("upper-3", 2, "lower-3", 0);
-Portal("upper-4", 2, "lower-4", 0);
-
-Portal("upper-0", 3, "lower-4", 1);
-Portal("upper-1", 3, "lower-0", 1);
-Portal("upper-2", 3, "lower-1", 1);
-Portal("upper-3", 3, "lower-2", 1);
-Portal("upper-4", 3, "lower-3", 1);
-
-Portal("lower-0", 3, "lower-1", 4);
-Portal("lower-1", 3, "lower-2", 4);
-Portal("lower-2", 3, "lower-3", 4);
-Portal("lower-3", 3, "lower-4", 4);
-Portal("lower-4", 3, "lower-0", 4);
-
-Portal("bottom", 0, "lower-0", 2);
-Portal("bottom", 1, "lower-1", 2);
-Portal("bottom", 2, "lower-2", 2);
-Portal("bottom", 3, "lower-3", 2);
-Portal("bottom", 4, "lower-4", 2);
+// Each pentagon side i runs from vertex i to vertex i + 1, and a portal reverses the side, so
+// Portal(A, i, B, j) identifies corner (A, i) with (B, j + 1). This pairing gives 20 vertex classes of three
+// 108-degree corners each (V - E + F = 20 - 30 + 12 = 2): the dodecahedron.
+for (let k = 0; k < 5; k += 1) {
+  const next = (k + 1) % 5;
+  Portal("top", k, "upper-" + k, 0);
+  Portal("upper-" + k, 4, "upper-" + next, 1);
+  Portal("upper-" + k, 2, "lower-" + k, 0);
+  Portal("upper-" + k, 3, "lower-" + next, 1);
+  Portal("lower-" + k, 4, "lower-" + next, 2);
+  Portal("bottom", (5 - k) % 5, "lower-" + k, 3);
+}
 
 startingHouse("top", {
   position: [-3.0, 0, 0.6],

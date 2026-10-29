@@ -1,8 +1,26 @@
 # 51 - The "dodecahedron" example world is a genus-6 surface, not a dodecahedron
 
-Status: open; re-verified 2026-10-28.
+Status: closed on 2026-10-28.
 
 Priority: P1 (correctness of bundled content; it is also the world the static-cull tests use).
+
+## Outcome
+
+`src/examples/dodecahedron.world.js` now uses the corrected pairing (a loop over k = 0..4), so the world is a real
+dodecahedron: V = 20, E = 30, F = 12, χ = 2, with 20 cone points of 324°. The owner did not want to keep the genus-6
+variant as a separate world. Custom-genus worlds must stay possible later, so χ is **not** enforced globally: the new
+test checks each bundled world against its own expected invariants, and a world of any genus can be added with its
+own row. A shared vertex-class routine in `src`, and any compile-time checks built on it, remain issue 52.
+
+## Closing evidence
+
+- `tests/authoring/exampleWorlds.test.ts`, "glues %s into the intended surface": one row per catalog world with
+  (V, E, F, χ, cone angles). The old pairing fails it (V = 8, χ = −10).
+- The worlds that compile the dodecahedron still pass unchanged:
+  - `tests/cell-complex/staticPortalPathCull.test.ts`, "prunes the dodecahedron path tree contextually at depth 10",
+    asserts bounds and symmetry across roots, not exact counts;
+  - `tests/render-contract/buildCellMesh.test.ts` and `tests/cell-complex/compileCellComplex.test.ts`.
+- `npx tsc --noEmit` passes.
 
 ## Status update 2026-10-28
 

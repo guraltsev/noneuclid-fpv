@@ -57,7 +57,7 @@ to `src/cell-complex/validateCellComplexSpec.ts`.
 ### Complex, gluing, deformation (51-55)
 | # | Pri | Title |
 | --- | --- | --- |
-| [51](51_dodecahedron_example_is_a_genus_6_surface.md) | P1 | "Dodecahedron" example is a genus-6 surface (χ = −10, 8 vertex classes) |
+| [51](_closed/51_dodecahedron_example_is_a_genus_6_surface.md) | P1 | Closed 2026-10-28: the dodecahedron gluing is fixed and per-world invariants are tested |
 | [52](52_compile_time_vertex_classes_and_gluing_validation.md) | P2 | Compile-time vertex classes, cone angles, Gauss–Bonnet, endpoint-matching validation |
 | [53](53_torus_deformation_commit_transport_defects.md) | P1 | Deformation commit can trap the player in an exclusion zone; headings transported by the wrong vector |
 | [54](54_torus_moduli_family_reduction_and_gl2r_generalization.md) | P3 | Torus family as Teichmüller space; lattice reduction; GL(2,ℝ) family for translation surfaces |
