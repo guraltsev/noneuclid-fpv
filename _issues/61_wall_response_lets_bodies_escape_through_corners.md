@@ -1,12 +1,23 @@
 # 61 - Single-wall push-out lets bodies walk out of a room through any corner
 
-Status: open; re-verified 2026-10-28.
+Status: open; re-verified 2026-10-28; fix designed 2026-10-29.
 
 Priority: P1 (correctness). Extends the issue 41 bullet "wall sliding resolves only the first blocking side and does
 not re-test". The consequence is worse than "a corner can still violate a second wall": the body leaves the cell without
 any limit.
 
 Jobs: [13](../.agents/jobs/13_swept_collide_and_slide.md).
+
+## Status update 2026-10-29
+
+Design decided in [job 13](../.agents/jobs/13_swept_collide_and_slide.md) (not implemented yet):
+
+- The wall response is the swept collide-and-slide of issue 62 (capsule time of impact, tangential slide, crease rule
+  "a later contact whose normal opposes an earlier one stops the motion"), at most 4 iterations. The projection onto
+  the inset polygon K and its per-radius cache are **not** built; the slide gives the same corner result.
+- Obstacles come from the developed disk around the body (job 12), so a push that would land across a portal is
+  resolved against the neighbour's walls.
+- Acceptance as written, except the random-walk property uses 2 000 steps instead of 10⁴ for test time.
 
 ## Status update 2026-10-28
 

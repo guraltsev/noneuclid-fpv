@@ -1,10 +1,24 @@
 # 63 - Bodies that straddle a portal are tested only against their own cell
 
-Status: open; re-verified 2026-10-28.
+Status: open; re-verified 2026-10-28; fix designed 2026-10-29.
 
 Priority: P2 (correctness). Category: design. The fix supplies the obstacle set used by issue 62.
 
 Jobs: [13](../.agents/jobs/13_swept_collide_and_slide.md).
+
+## Status update 2026-10-29
+
+Design decided in [job 12](../.agents/jobs/12_segment_walk_kernel.md) (atlas) and
+[job 13](../.agents/jobs/13_swept_collide_and_slide.md) (obstacles); the ghost item is
+[job 17](../.agents/jobs/17_multi_hop_ghosts_and_eye_rerooting.md). Not implemented yet.
+
+- The local atlas is built as described, with wedges seen from the body centre. A prototype (2026-10-29) showed that
+  the copies tile the disk exactly once in cube, icosahedron, torus-moduli, dodecahedron, genus-2 torus and tetrahedron,
+  **also when the disk contains a cone point** (the atlas is the straight-ray chart from the centre). So the
+  "Creatures" concern does not require turning zones on: creatures keep `ignoreForbiddenZones: true`.
+- Runtime bodies become discs in the same swept slide (radius r + r_o, only with vertical overlap); the player's
+  "revert if the overlap grows" check and the creatures' same-cell obstacle test are replaced by it.
+- The area acceptance test is done as a sampled tiling test in job 12.
 
 ## Status update 2026-10-28
 

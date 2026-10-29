@@ -1,10 +1,22 @@
 # 65 - Movement numerics: boundary ping-pong, pose drift and mixed-unit tolerances
 
-Status: open; re-verified 2026-10-28.
+Status: open; re-verified 2026-10-28; fix designed 2026-10-29.
 
 Priority: P3 (robustness). Small items, grouped.
 
 Jobs: [14](../.agents/jobs/14_movement_numerics.md).
+
+## Status update 2026-10-29
+
+Design decided in [job 14](../.agents/jobs/14_movement_numerics.md) (not implemented yet):
+
+- No hysteresis band: after [job 13](../.agents/jobs/13_swept_collide_and_slide.md) a zero horizontal displacement
+  returns before any walk, and a crossing needs a strictly outgoing walk of positive length. The band is the fallback
+  only if the acceptance test still fails.
+- Rotations are re-projected to a pure yaw (`orthonormalizeYawRigidTransform3`) after every crossing and inside the
+  walk and atlas; `derivePortalTransform` builds `R_g` from one angle.
+- `intersectSegmentWithPlane`: a strict sign change is always a crossing; `t` is compared against `tol / length`.
+- `collisionSkinMeters` is added by job 13; job 14 names the other literals.
 
 ## Status update 2026-10-28
 

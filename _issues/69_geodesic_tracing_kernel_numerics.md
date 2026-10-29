@@ -1,10 +1,25 @@
 # 69 - Geodesic tracing kernel: nudge drift, disk test with the start inside, missed intersections
 
-Status: open; re-verified 2026-10-28.
+Status: open; re-verified 2026-10-28; fix designed 2026-10-29.
 
 Priority: P2 (robustness / correctness).
 
 Jobs: [15](../.agents/jobs/15_geodesic_tracing_on_kernel.md).
+
+## Status update 2026-10-29
+
+Design decided in [job 15](../.agents/jobs/15_geodesic_tracing_on_kernel.md) (not implemented yet):
+
+- The multi-cell trace walks the developed chord with `walkDevelopedSegment` (job 12) and then cuts it at the first
+  zone or emitter hit; `targetStart` of a portal hit is the next piece's exact start. No end-point snapping (the job 12
+  prototype measured 0 error after 217 torus crossings).
+- Disk test: strictly inside, or on the circle (±1e-9 m) moving inward, is a hit at t = 0; on the circle moving
+  outward is not.
+- Vertex rule: a kernel exit decided by the vertex tie rule ends the geodesic as a `forbidden-zone-hit` at that vertex.
+  The "compile-time assertion" is a test that every portal-side endpoint has a junction.
+- Inverse portal transforms are cached in a `WeakMap` keyed by the compiled portal.
+- Intersections: same-geodesic pairs with segment indices at least 2 apart are tested; only crossings at an anchor
+  endpoint of either geodesic are dropped; the 0.3 m emitter exclusion is removed.
 
 ## Status update 2026-10-28
 

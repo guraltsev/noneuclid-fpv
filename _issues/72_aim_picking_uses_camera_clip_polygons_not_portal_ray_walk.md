@@ -1,10 +1,22 @@
 # 72 - Aim picking tests controller rays against head-camera clip polygons; replace with a portal ray walk
 
-Status: open; re-verified 2026-10-28.
+Status: open; re-verified 2026-10-28; fix designed 2026-10-29.
 
 Priority: P1 (correctness in VR; also performance).
 
 Jobs: [16](../.agents/jobs/16_aim_picking_by_portal_ray_walk.md).
+
+## Status update 2026-10-29
+
+Design decided in [job 16](../.agents/jobs/16_aim_picking_by_portal_ray_walk.md) (not implemented yet):
+
+- The ray is walked with `walkDevelopedSegment` (job 12) in the horizontal plane; z is tracked along the 3-D ray.
+  Floor, ceiling and the wall above a lower aperture stop it.
+- The ray origin's cell is found by walking from the player's anchor to the origin (`locateDevelopedPoint`), so an XR
+  controller held through a portal works.
+- `ResolveAimTargetRequest` loses `visiblePortalPaths` and gains `rootCellId`; `AimTarget.portalPathId` becomes
+  `hopCount`.
+- One resolution per distinct ray per frame, keyed by the ray and a frame serial; tool actions invalidate the cache.
 
 ## Status update 2026-10-28
 

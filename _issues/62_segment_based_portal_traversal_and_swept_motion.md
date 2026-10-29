@@ -1,11 +1,31 @@
 # 62 - Replace the anchor-point exit guess with segment traversal plus swept collide-and-slide
 
-Status: open; re-verified 2026-10-28.
+Status: open; re-verified 2026-10-28; fix designed 2026-10-29.
 
 Priority: P1 (correctness and robustness). This is a concrete design for the issue 41 items "a step that crosses a portal
 returns before floor/ceiling/forbidden-zone tests" and "`portalCrossingMode` ignored", plus new failures listed below.
 
 Jobs: [12](../.agents/jobs/12_segment_walk_kernel.md), [13](../.agents/jobs/13_swept_collide_and_slide.md).
+
+## Status update 2026-10-29
+
+- Item 5 (framerate dependence) is partly done: the per-frame simulation step is capped at 0.1 s
+  (`maxSimulationStepSeconds`, commit `98a99af`). The slide itself is designed to be step-size independent.
+- Design decided in [job 12](../.agents/jobs/12_segment_walk_kernel.md) (kernel) and
+  [job 13](../.agents/jobs/13_swept_collide_and_slide.md) (mover); not implemented yet:
+  - The centre slides through obstacles collected in the start cell's developed frame (the developed disk of job 12);
+    then the anchor's polyline is walked with the segment-walk kernel. This replaces the per-cell loop sketched in
+    "Proposed change"; the result is the same for steps below 0.5 m and needs less code.
+  - Vertex rule: a segment through a vertex exits through the side that starts at that vertex (an infinitesimal shift
+    to the left). Prototype: the cube-vertex walk goes `front → right (zero length) → bottom` and ends 6.64 m inside
+    `bottom`.
+  - A zero horizontal displacement never walks, so it never crosses.
+  - `PortalCrossingMode` is narrowed to `"anchor"`; the field stays (five callers), the `"bounds"` throw is removed.
+  - The merged issue-41 item (target-wall overlap at a crossing) is decided: neighbour walls are obstacles of the slide,
+    so the question no longer arises.
+  - Results report every crossing (`crossings`) and the start-to-final transform (`cellFromStart`);
+    `crossedPortalId` stays the first crossing. Callers that assumed one crossing per move (cannon carry, curve
+    shortening, cell-transition recording) are fixed in job 13 Part C.
 
 ## Status update 2026-10-28
 
