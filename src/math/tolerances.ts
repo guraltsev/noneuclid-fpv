@@ -11,3 +11,18 @@ export const geometryTolerance = 1e-8;
  * Alias of {@link geometryTolerance}, named to make the meters unit explicit.
  */
 export const defaultGeometryToleranceMeters = geometryTolerance;
+
+/**
+ * Two side crossings closer than this (meters along the walk) are a pass through their shared vertex.
+ */
+export const segmentWalkVertexTieMeters = 1e-9;
+
+/**
+ * A walk start or atlas centre may lie this far (meters) outside its cell and still count as inside.
+ */
+export const cellContainmentToleranceMeters = 1e-6;
+
+/**
+ * A side is crossed outward when dot(direction, inwardNormal) is below minus this (dimensionless).
+ */
+export const segmentWalkOutgoingDotTolerance = 1e-12;

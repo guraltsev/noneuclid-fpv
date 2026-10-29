@@ -74,6 +74,9 @@ Shared absolute tolerance for geometric comparisons.
 | --- | --- | --- |
 | const | `geometryTolerance` | Default absolute geometric tolerance, 1e-8 (meters for lengths and signed distances). |
 | const | `defaultGeometryToleranceMeters` | Alias of {@link geometryTolerance}, named to make the meters unit explicit. |
+| const | `segmentWalkVertexTieMeters` | Two side crossings closer than this (meters along the walk) are a pass through their shared vertex. |
+| const | `cellContainmentToleranceMeters` | A walk start or atlas centre may lie this far (meters) outside its cell and still count as inside. |
+| const | `segmentWalkOutgoingDotTolerance` | A side is crossed outward when dot(direction, inwardNormal) is below minus this (dimensionless). |
 
 ### `math/vec3.ts`
 
@@ -120,6 +123,23 @@ Human-readable text summary of an authored cell-complex spec, for logging and de
 | Kind | Name | Summary |
 | --- | --- | --- |
 | function | `describeGeometrySpec` | Returns a multi-line description of the spec's cells and portal connections. |
+
+### `cell-complex/developedDisk.ts`
+
+Developed-disk atlas: lists every cell copy that a disk of radius rho around a point overlaps.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| type | `DevelopedWedge` | Directions seen from the disk centre. |
+| interface | `DevelopedDiskNode` | One cell copy of the atlas. |
+| interface | `DevelopedDiskRequest` | Input of {@link collectDevelopedDisk}; the centre is in the frame of the start cell. |
+| interface | `DevelopedDiskResult` | The atlas: cell copies tiling the disk, with the centre and radius actually used. |
+| function | `wedgeContainsDirection` | Whether `direction` lies in the wedge (boundary included, tolerance 1e-12 on the cross products). |
+| function | `intersectWedges` | Intersection of two wedges, or undefined when it is empty (or degenerate). |
+| function | `clipSegmentToWedge` | Keeps the part of the segment a-b that lies inside the wedge with apex `center`, or undefined when none does. |
+| function | `distancePointToSegment2` | Distance from `point` to the segment a-b, meters. |
+| function | `distanceToWedge` | Distance from `point` to the wedge with apex `center`; 0 when the point is inside. |
+| function | `collectDevelopedDisk` | Collects every cell copy overlapped by the disk of `radiusMeters` around `center`, with its developing transform and wedge. |
 
 ### `cell-complex/floorUv.ts`
 
@@ -193,6 +213,21 @@ Compiled runtime representation of a single prism cell and its sides.
 | interface | `CompiledPrismSide` | One vertical face of a prism cell, described by its base edge in cell-local x/y meters. |
 | function | `compilePrismCellGeometry` | Compiles side geometry, junction cylinders and resolved floor visuals for one authored cell. |
 | function | `linkCompiledPrismCellPortals` | Attaches compiled portals to a cell's geometry, building the id and side-index indexes and setting `side.portal` on each portal side. |
+
+### `cell-complex/segmentWalk.ts`
+
+Shared segment-walk kernel: walks a straight segment, given in the frame of its start cell, through the glued convex cells.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `SegmentWalkCrossing` | One portal crossing during a walk, in walk order. |
+| type | `SegmentWalkExit` | How a piece ends: at the end of the segment, through a portal, or at a wall (a side without a portal). |
+| interface | `SegmentWalkPiece` | The part of the segment inside one cell. |
+| type | `SegmentWalkStatus` | Why a walk stopped: whole length walked, wall hit, crossing limit reached, start outside its cell, or a cell id that cannot be resolved. |
+| interface | `SegmentWalkResult` | Result of a walk: status, the cell pieces in walk order and the portal crossings between them. |
+| interface | `SegmentWalkRequest` | Input of {@link walkDevelopedSegment}; start and direction are in the frame of the start cell. |
+| function | `walkDevelopedSegment` | Walks the straight segment from `start` along `direction` for `lengthMeters` through the cells of `world`. |
+| function | `locateDevelopedPoint` | Finds the cell and frame of `to`, reached by the straight segment from `from` (both in the frame of `cellId`). |
 
 ### `cell-complex/specs.ts`
 

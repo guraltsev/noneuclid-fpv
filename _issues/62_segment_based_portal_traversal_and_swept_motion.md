@@ -2,6 +2,8 @@
 
 Status: open; re-verified 2026-10-28; fix designed 2026-10-29.
 
+- Kernel landed in job 12 (`segmentWalk.ts`, `developedDisk.ts`); callers move in job 13.
+
 Priority: P1 (correctness and robustness). This is a concrete design for the issue 41 items "a step that crosses a portal
 returns before floor/ceiling/forbidden-zone tests" and "`portalCrossingMode` ignored", plus new failures listed below.
 

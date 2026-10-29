@@ -2,6 +2,8 @@
 
 Status: open; re-verified 2026-10-28.
 
+- Job 12 (2026-10-29): the segment-walk kernel uses `RigidTransform3`; no `Iso2` was introduced (job 30 owns it).
+
 Priority: P2 (performance / design).
 
 Jobs: [30](../.agents/jobs/30_deformation_rebuild_pipeline.md).

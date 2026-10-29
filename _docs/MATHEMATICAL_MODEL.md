@@ -153,6 +153,8 @@ tracked in [Section 11](#11-assumptions-and-known-gaps): the aperture slack reje
 stage does not test sight lines that cross the line sent to infinity. `buildStaticallyCulledPortalPathTables` gives kept paths new ids, so ids in its tables are sparse and differ from those of
 `buildPortalPathTables` (`staticallyCullPortalPathTables` keeps the original ids and drops every descendant of a rejected path).
 
+**Segment walk.** A straight segment from a point $A$ in the frame of its start cell with unit direction $d$ is the line $P(t)=A+t\,d$ in the developed frame of that cell; its piece in the $k$-th cell is $M_k(P(t))$ for $t\in[t_{\text{enter}},t_{\text{exit}}]$, where $M_k=g_k\circ\cdots\circ g_1$. In a convex cell the exit is the outgoing side ($\langle d_k,n_i\rangle<0$) with the smallest crossing parameter $t_i=d_i(A_k)/(-\langle d_k,n_i\rangle)$; the entry side is excluded by index. When two adjacent sides tie within $10^{-9}$ m the line passes through their shared vertex and the walk leaves through the side that *starts* at that vertex (the counterclockwise successor), which equals shifting the line infinitesimally to its left; the next cell may then be left at once, giving a zero-length piece. See [`src/cell-complex/segmentWalk.ts#walkDevelopedSegment`](../src/cell-complex/segmentWalk.ts) and, for the cell copies (each with its angular wedge) that a disk of radius $\rho$ overlaps, [`src/cell-complex/developedDisk.ts#collectDevelopedDisk`](../src/cell-complex/developedDisk.ts).
+
 ## 5. Motion of bodies
 
 A body is a vertical cylinder (radius $r$, height $H$, offset $o$) attached to its local pose
@@ -407,6 +409,9 @@ positions, and any that cannot be re-solved are deleted and reported. Tool selec
 | minimum geodesic length | 0.15 m | `src/world-objects/geodesicCannon.ts#GEODESIC_MIN_LENGTH_METERS` | shorter arcs are rejected |
 | curve-shortening speed | 0.4 m/s | `src/world-objects/geodesicCannon.ts#curveShorteningDefaultSpeedMetersPerSecond` | descent speed of the free vertex |
 | fuse angle tolerance | 0.03 rad | `src/world-objects/geodesicCannon.ts#curveShorteningFuseAngleToleranceRadians` | deviation from a straight angle that still counts as straight |
+| segment-walk vertex tie | $10^{-9}$ m | `src/math/tolerances.ts#segmentWalkVertexTieMeters` | crossings closer than this are a pass through a shared vertex |
+| cell containment tolerance | $10^{-6}$ m | `src/math/tolerances.ts#cellContainmentToleranceMeters` | a walk start or atlas centre this far outside its cell still counts as inside |
+| outgoing dot tolerance | $10^{-12}$ | `src/math/tolerances.ts#segmentWalkOutgoingDotTolerance` | a side is crossed outward when dot(direction, inward normal) is below minus this |
 | camera clip planes | see source | `src/render/three/renderCameraClip.ts#renderCameraNearMeters` | near/far for every camera |
 
 ## 11. Assumptions and known gaps

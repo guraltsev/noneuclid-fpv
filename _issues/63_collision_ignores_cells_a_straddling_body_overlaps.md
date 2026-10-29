@@ -2,6 +2,8 @@
 
 Status: open; re-verified 2026-10-28; fix designed 2026-10-29.
 
+- Kernel landed in job 12 (`segmentWalk.ts`, `developedDisk.ts`); callers move in job 13.
+
 Priority: P2 (correctness). Category: design. The fix supplies the obstacle set used by issue 62.
 
 Jobs: [13](../.agents/jobs/13_swept_collide_and_slide.md).
