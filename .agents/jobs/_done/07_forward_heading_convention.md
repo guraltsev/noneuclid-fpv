@@ -1,8 +1,8 @@
 # Job 07 - One forward-heading convention: marmot heading and deformation transport
 
-Status: queued.
-Resolves: issue [64](../../_issues/64_mover_integration_bugs_xr_slide_marmot_heading_object_trap.md) item 2 (marmot
-heading and zone freeze), issue [53](../../_issues/53_torus_deformation_commit_transport_defects.md) item 2 (heading
+Status: done on 2026-10-29.
+Resolves: issue [64](../../../_issues/64_mover_integration_bugs_xr_slide_marmot_heading_object_trap.md) item 2 (marmot
+heading and zone freeze), issue [53](../../../_issues/53_torus_deformation_commit_transport_defects.md) item 2 (heading
 transport). Both issues stay open after this job; see "Done when".
 
 ## Goal
@@ -587,3 +587,26 @@ npm test
 
 Never stop to ask. If something in this job turns out to be wrong (a line number, a name, an expected number), do the
 closest correct thing, and record it under `### Deviations` or `### Uncertain`.
+
+## Report
+
+### Done
+- Commit e768cd2. `src/world-objects/geodesicMarmot.ts`: `yawFromVelocity` is `atan2(-vx, vy)`; new private
+  `turnAwayFromNearestForbiddenZone` and `update` uses it on a `"forbidden-zone"` block; header and JSDoc updated.
+- `src/runtime/worldGeometryDeformations.ts`: `transformRigidPoseWithMap` carries forward `(m01, m11)`;
+  `yawFromMappedHeading` renamed `yawFromMappedForward`; marmot branch of `transformPositionedObjectSpecWithMap`
+  simplified; JSDoc updated.
+- `src/render/three/runtimeSceneUtils.ts`: `transformYawWithMap` transports `(cos yaw, sin yaw)` directly (cannon numbers unchanged).
+- Tests: marmot velocity `{x: 2}`, un-skipped heading test, new zone-freeze test; torusSkewDeformation tests renamed/rewritten plus 4 new; two expected yaws in worldGeometryRuntimeTransforms changed to pi/2.
+- Docs: MATHEMATICAL_MODEL.md section 9 "Headings" paragraph and section 11 yaw bullet; `_docs/generated/` regenerated.
+- Issues 53 and 64 updated (left open); job moved to `_done/`, links and queue row updated (follow-up bookkeeping commit).
+### Deviations
+- Two commits: the code commit, then a bookkeeping commit, because the issue notes need the code commit's hash.
+- The test edits the job prescribed were applied as written; the `as never` cast in the heading test was removed (typecheck accepts it).
+### Uncertain
+(none)
+### Not done
+(none)
+### Checks
+- Baseline: `npm run typecheck` and `npm test` passed (672 passed, 9 skipped).
+- After changes: `npx vitest run` on the three named test files passed; `npm run typecheck` clean; `npm test` 677 passed, 8 skipped; `npm run docs:generate` then `npm run docs:check` ok.

@@ -1,10 +1,10 @@
 # 64 - Mover integration bugs: XR slide replay, marmot heading and freeze, player trapped by objects
 
-Status: open; re-verified 2026-10-28.
+Status: open; item 2 fixed by job 07 on 2026-10-29.
 
 Priority: P2 (correctness). Three independent bugs in the callers of `moveDynamicObject` / `movePlayer`.
 
-Jobs: [07](../.agents/jobs/07_forward_heading_convention.md), [08](../.agents/jobs/08_xr_slide_replay_and_object_trap.md).
+Jobs: [07](../.agents/jobs/_done/07_forward_heading_convention.md), [08](../.agents/jobs/08_xr_slide_replay_and_object_trap.md).
 
 ## Status update 2026-10-28
 
@@ -23,6 +23,13 @@ None of the three bugs is fixed. Re-checked against the current code (line numbe
 3. Player trap: `blockPlayerMoveAgainstRuntimeObjects` (`src/render/three/createThreeApp.ts:3239-3258`) still reverts
    whenever the new pose overlaps (`playerIntersectsRuntimeObject`, lines 3260-3273), with no "does not increase
    penetration" rule.
+
+## Status update 2026-10-29 (job 07)
+
+Item 2 is fixed by job 07 (commit e768cd2): `yawFromVelocity` is `atan2(-vx, vy)`, so the marmot walks along its
+authored velocity, and a forbidden-zone block reflects its heading off the nearest zone instead of freezing it.
+Tests: "walks along its body +y axis in the authored velocity direction" and "turns away from a forbidden zone
+instead of freezing" in `tests/world-objects/geodesicMarmot.test.ts`. Items 1 and 3 remain open (job 08).
 
 ## Summary
 

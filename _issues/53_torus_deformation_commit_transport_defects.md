@@ -1,11 +1,11 @@
 # 53 - Torus deformation commits can trap the player and mis-transport headings
 
-Status: open; re-verified 2026-10-28.
+Status: open; item 2 fixed by job 07 on 2026-10-29.
 
 Priority: P1 (correctness). Not covered by issue 41, whose deformation items are the hard-coded 15 m, `||` in
 `normalizeState`, `JSON.stringify` equality and the mirrored marmot yaw.
 
-Jobs: [07](../.agents/jobs/07_forward_heading_convention.md), [09](../.agents/jobs/09_deformation_commit_safety.md).
+Jobs: [07](../.agents/jobs/_done/07_forward_heading_convention.md), [09](../.agents/jobs/09_deformation_commit_safety.md).
 
 ## Status update 2026-10-28
 
@@ -30,6 +30,15 @@ All four defects are still present. Re-checked against the current code:
    (builds now run through the worker client).
 
 None of the acceptance criteria is met. Issue 81 (floor UVs) depends on the same lattice-coordinate convention.
+
+## Status update 2026-10-29 (job 07)
+
+Item 2 is fixed by job 07 (commit e768cd2): `transformRigidPoseWithMap` carries the forward vector R·e_y and rebuilds
+yaw as atan2(-f'x, f'y); marmot specs carry their velocity the same way. Correction to the evidence above: the
+geodesic cannon's yaws are direction angles along (cos, sin), so the old right-vector transport was correct for the
+cannon; `transformYawWithMap` now carries that direction explicitly and its results are unchanged. Test:
+"keeps a closed-geodesic forward vector closed under a full shear" in `tests/runtime/torusSkewDeformation.test.ts`.
+Items 1, 3 and 4 remain open (job 09).
 
 ## Summary
 
