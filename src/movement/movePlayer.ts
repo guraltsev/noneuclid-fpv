@@ -3,13 +3,13 @@
  * Yaw and pitch deltas are in radians and pitch is clamped to just under plus or minus pi / 2. The local displacement (x right, y forward at yaw 0, z up, meters) is rotated counterclockwise about +z by the new yaw to give a cell-frame displacement. With a world, the move is delegated to moveDynamicObject using the player's cylinder body and anchor-based portal crossing, so the returned pose may be in a different cell with a different yaw; without a world the player flies freely in a single frame.
  */
 import type { CompiledCellComplex } from "../cell-complex/compileCellComplex";
-import { addVec3, type Vec3 } from "../math/vec3";
+import { addVec3, vec3, type Vec3 } from "../math/vec3";
 import { DEFAULT_PLAYER_HEIGHT_METERS, DEFAULT_PLAYER_RADIUS_METERS, type PlayerBody } from "./playerBody";
 import type { PlayerPose } from "./playerPose";
 import { playerPoseFromDynamicObject, playerPoseToDynamicObject } from "./playerPose";
 import { simpleCollisionCylinder } from "./dynamicObject";
 import { moveDynamicObject } from "./moveDynamicObject";
-import type { BlockingReason } from "./collision";
+import { getDynamicObjectCollisionBounds, moveIncreasesCylinderOverlap, type BlockingReason, type SimpleCylinderBounds } from "./collision";
 
 /**
  * Declares in which frame a local displacement is expressed ("global" or "current-cell"); movePlayer currently treats both identically (rotated by yaw into the current cell's frame).
@@ -51,6 +51,8 @@ export type MoveResult = {
   readonly kind: "moved";
   readonly pose: PlayerPose;
   readonly attemptedDisplacement: Vec3;
+  /** Displacement actually applied, in the cell frame before any portal transform (see MoveDynamicObjectResult). */
+  readonly appliedDisplacement: Vec3;
   readonly blocked: boolean;
   readonly blockingReason?: BlockingReason;
   readonly crossedPortal: boolean;
@@ -94,6 +96,7 @@ export function movePlayer(request: MoveRequest): MoveResult {
       kind: "moved",
       pose: playerPoseFromDynamicObject(result.object, pitchRadians),
       attemptedDisplacement: result.attemptedDisplacement,
+      appliedDisplacement: result.appliedDisplacement,
       blocked: result.blocked,
       blockingReason: result.blockingReason,
       crossedPortal: result.crossedPortal,
@@ -110,8 +113,43 @@ export function movePlayer(request: MoveRequest): MoveResult {
       position: addVec3(request.pose.position, displacement),
     },
     attemptedDisplacement: displacement,
+    appliedDisplacement: displacement,
     blocked: false,
     crossedPortal: false,
+  };
+}
+
+/**
+ * Reverts a player move that increases overlap with a runtime body (see moveIncreasesCylinderOverlap): the result
+ * keeps the new yaw and pitch, but the position and cell of `previousPose`, is marked blocked, crosses no portal and
+ * has a zero applied displacement. `obstaclesInCell(cellId)` returns the bounds of the bodies that block the player in
+ * that cell. A move into another cell is compared without a previous position, so any overlap there reverts it.
+ */
+export function resolvePlayerMoveAgainstBodies(
+  previousPose: PlayerPose,
+  result: MoveResult,
+  body: PlayerBody,
+  obstaclesInCell: (cellId: string) => readonly SimpleCylinderBounds[],
+): MoveResult {
+  const bounds = (pose: PlayerPose) => getDynamicObjectCollisionBounds(playerPoseToDynamicObject(
+    pose,
+    simpleCollisionCylinder(body.radiusMeters, body.heightMeters, { x: 0, y: 0, z: body.heightMeters / 2 }),
+  ));
+  const nextBounds = bounds(result.pose);
+  if (!nextBounds) {
+    return result;
+  }
+  const previousBounds = previousPose.cellId === result.pose.cellId ? bounds(previousPose) : undefined;
+  if (!moveIncreasesCylinderOverlap(previousBounds, nextBounds, obstaclesInCell(result.pose.cellId))) {
+    return result;
+  }
+  return {
+    ...result,
+    pose: { ...previousPose, yawRadians: result.pose.yawRadians, pitchRadians: result.pose.pitchRadians },
+    appliedDisplacement: vec3(0, 0, 0),
+    blocked: true,
+    crossedPortal: false,
+    crossedPortalId: undefined,
   };
 }
 

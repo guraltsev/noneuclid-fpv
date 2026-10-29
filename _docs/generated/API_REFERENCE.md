@@ -249,6 +249,7 @@ Collision tests of a dynamic object against its current cell, and helpers for si
 | function | `getCollisionBounds` | Cylinder bounds for a collision shape placed at `position`, adding the shape's offset unrotated; undefined if there is no shape. |
 | function | `getDynamicObjectCollisionBounds` | Cylinder bounds of a dynamic object, with the shape's offset rotated by the pose rotation before being added to the pose translation; undefined if the object has no shape. |
 | function | `simpleCylinderIntersectsSimpleCylinder` | True if two upright cylinders overlap: horizontal center distance less than the sum of radii and vertical center distance less than the sum of half heights (strict). |
+| function | `moveIncreasesCylinderOverlap` | True if moving a body from `previous` to `next` makes things worse against some obstacle: `next` overlaps it (simpleCylinderIntersectsSimpleCylinder) and either `previous` is undefined (no comparable earlier position, f… |
 | function | `signedDistanceToSide` | Signed distance in meters from a point to the side's vertical plane, positive on the inner (cell) side; only x and y are used. |
 | function | `getSideSupport` | Extent of the body toward a side, in meters; for a cylinder it is the radius in every direction (the side argument is unused). |
 | function | `projectPointAlongSide` | Distance in meters from the side's start vertex to the orthogonal projection of the point onto the side's line; negative or greater than the side length means the point lies beyond the side's ends. |
@@ -287,6 +288,7 @@ Player locomotion: applies look and move input to a player pose, with collision 
 | interface | `MoveRequest` | Input to {@link movePlayer}: current pose, optional world and body, movement and look deltas. |
 | type | `MoveResult` | Result of {@link movePlayer}: the new pose and what happened to the attempted displacement. |
 | function | `movePlayer` | Applies the yaw and pitch deltas, rotates the local displacement by the new yaw, and moves the player, returning the new pose and collision/portal outcome. |
+| function | `resolvePlayerMoveAgainstBodies` | Reverts a player move that increases overlap with a runtime body (see moveIncreasesCylinderOverlap): the result keeps the new yaw and pitch, but the position and cell of `previousPose`, is marked blocked, crosses no por… |
 
 ### `movement/playerBody.ts`
 

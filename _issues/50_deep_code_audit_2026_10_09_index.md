@@ -78,7 +78,7 @@ to `src/cell-complex/validateCellComplexSpec.ts`.
 | [61](61_wall_response_lets_bodies_escape_through_corners.md) | P1 | Single-wall push-out lets bodies walk out of a room through any corner (reproduced) |
 | [62](62_segment_based_portal_traversal_and_swept_motion.md) | P1 | Segment traversal plus swept collide-and-slide; bodies are lost past vertices (reproduced) |
 | [63](63_collision_ignores_cells_a_straddling_body_overlaps.md) | P2 | A body straddling a portal is not tested against the neighbor cell's obstacles |
-| [64](64_mover_integration_bugs_xr_slide_marmot_heading_object_trap.md) | P2 | XR slide replay (~3 m/s glide), marmot heading mirrored, player trapped by objects |
+| [64](_closed/64_mover_integration_bugs_xr_slide_marmot_heading_object_trap.md) | P2 | XR slide replay (~3 m/s glide), marmot heading mirrored, player trapped by objects |
 | [65](65_movement_numerics_boundary_hysteresis_and_pose_drift.md) | P3 | Boundary ping-pong, pose drift, mixed-unit tolerances |
 
 ### Geodesics and curve shortening (66-70)

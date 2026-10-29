@@ -15,6 +15,7 @@ import {
 } from "../../src/render/three/xrPlayerRig";
 import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
 import { movePlayer, type MoveResult } from "../../src/movement/movePlayer";
+import type { PlayerPose } from "../../src/movement/playerPose";
 import { resolveXrPortalEyeRenderRoot } from "../../src/render/three/xrPortalEye";
 import { worldPointToThree } from "../../src/render/three/worldAxes";
 
@@ -116,6 +117,7 @@ describe("VR locomotion mapping", () => {
         pitchRadians: 0,
       },
       attemptedDisplacement: { x: 0, y: 0, z: 0 },
+      appliedDisplacement: { x: 0, y: 0, z: 0 },
       blocked: false,
       crossedPortal: false,
     };
@@ -147,6 +149,7 @@ describe("VR locomotion mapping", () => {
         pitchRadians: 0,
       },
       attemptedDisplacement: { x: 0, y: 0, z: 0 },
+      appliedDisplacement: { x: 0, y: 0, z: 0 },
       blocked: false,
       crossedPortal: false,
     };
@@ -306,3 +309,56 @@ function twoRoomsWithPortal() {
     ],
   };
 }
+
+describe("XR physical move baseline", () => {
+  const runHeld = async (referenceSpaceYaw: number, held: { x: number; y: number; z: number }) => {
+    const THREE = await import("three");
+    const rig = createXrPlayerRig(new THREE.PerspectiveCamera());
+    const world = compileCellComplex({
+      cells: [
+        {
+          id: "room-a",
+          heightMeters: 3,
+          portals: [],
+          baseVertices: [
+            { x: -1, y: -1 },
+            { x: 1, y: -1 },
+            { x: 1, y: 1 },
+            { x: -1, y: 1 },
+          ],
+        },
+      ],
+    });
+    let pose: PlayerPose = { cellId: "room-a", position: { x: 0.7, y: 0, z: 0 }, yawRadians: 0, pitchRadians: 0 };
+    const step = (head: { x: number; y: number; z: number }) => {
+      const frame = rig.consumePhysicalInput(head, pose.yawRadians, referenceSpaceYaw);
+      const result = movePlayer({
+        world,
+        pose,
+        localDisplacement: frame.localDisplacement,
+        yawDeltaRadians: 0,
+        pitchDeltaRadians: 0,
+        coordinateFrame: "global",
+      });
+      rig.acceptPhysicalMove(result, head);
+      pose = result.pose;
+    };
+    step({ x: 0, y: 0, z: 1.6 });
+    step(held);
+    expect(pose.position.x).toBeCloseTo(0.749999, 5);
+    expect(pose.position.y).toBeCloseTo(0.1, 9);
+    for (let frame = 2; frame <= 10; frame += 1) {
+      const before = pose.position;
+      step(held);
+      expect(Math.hypot(pose.position.x - before.x, pose.position.y - before.y)).toBeLessThan(1e-9);
+    }
+  };
+
+  it("does not replay a wall slide while the head is held against the wall", async () => {
+    await runHeld(0, { x: 0.1, y: 0.1, z: 1.6 });
+  });
+
+  it("does not replay a wall slide with a rotated reference space", async () => {
+    await runHeld(Math.PI / 2, { x: 0.1, y: -0.1, z: 1.6 });
+  });
+});

@@ -5,7 +5,7 @@
 import type { CompiledCellComplex } from "../cell-complex/compileCellComplex";
 import type { CompiledPrismSide } from "../cell-complex/prismCells";
 import { rigidTransform3 } from "../math/rigidTransform3";
-import { addVec3, type Vec3 } from "../math/vec3";
+import { addVec3, subVec3, type Vec3 } from "../math/vec3";
 import {
   getDynamicObjectCollisionBounds,
   projectPointAlongSide,
@@ -52,6 +52,11 @@ export interface MoveDynamicObjectResult {
    * The requested displacement, echoed unchanged (even if the object ended up elsewhere).
    */
   readonly attemptedDisplacement: Vec3;
+  /**
+   * The part of the displacement actually applied, in meters in the start cell's frame (before any portal transform):
+   * the full displacement for a free move or a crossing, the pushed offset for a wall slide, zero when the object stayed put.
+   */
+  readonly appliedDisplacement: Vec3;
   /**
    * True if collision stopped or reduced the move; false when a portal was crossed.
    */
@@ -117,6 +122,7 @@ export function moveDynamicObject(request: MoveDynamicObjectRequest): MoveDynami
     return {
       object: crossedObject,
       attemptedDisplacement: request.displacement,
+      appliedDisplacement: request.displacement,
       blocked: false,
       crossedPortal: true,
       crossedPortalId: exitSide.portal.id,
@@ -157,6 +163,7 @@ export function moveDynamicObject(request: MoveDynamicObjectRequest): MoveDynami
   return {
     object: candidateObject,
     attemptedDisplacement: request.displacement,
+    appliedDisplacement: request.displacement,
     blocked: false,
     crossedPortal: false,
   };
@@ -173,6 +180,7 @@ function blockedResult(
   return {
     object,
     attemptedDisplacement: request.displacement,
+    appliedDisplacement: subVec3(object.localPose.translation, request.object.localPose.translation),
     blocked: true,
     blockingReason,
     crossedPortal: false,

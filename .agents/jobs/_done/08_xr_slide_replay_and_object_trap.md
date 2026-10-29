@@ -1,7 +1,7 @@
 # Job 08 - XR slide replay and the player trapped by objects
 
-Status: queued.
-Resolves: issue [64](../../_issues/64_mover_integration_bugs_xr_slide_marmot_heading_object_trap.md) items 1 (XR
+Status: done on 2026-10-29.
+Resolves: issue [64](../../../_issues/_closed/64_mover_integration_bugs_xr_slide_marmot_heading_object_trap.md) items 1 (XR
 slide replay) and 3 (player trapped by runtime objects). Item 2 belongs to job
 [07](07_forward_heading_convention.md); issue 64 is closed only when both jobs are done (see "Done when").
 
@@ -489,7 +489,7 @@ comment (the docs test checks this).
 
     and set `Status: open; items 1 and 3 fixed by job 08 on <date>.`
 - [ ] The job file is moved with `git mv .agents/jobs/08_xr_slide_replay_and_object_trap.md .agents/jobs/_done/`. In
-  the moved file fix relative links (`../../_issues/...` becomes `../../../_issues/...`, and the link to job 07 becomes
+  the moved file fix relative links (`../../../_issues/...` becomes `../../../../_issues/...`, and the link to job 07 becomes
   `07_forward_heading_convention.md` if 07 is in `_done/`, else `../07_forward_heading_convention.md`). Update the link
   in issue 64's `Jobs:` line and anything else `grep -rn "jobs/08_xr_slide" --exclude-dir=node_modules .` finds.
 - [ ] The queue row in `.agents/jobs/README.md` reads like job 01's:
@@ -508,3 +508,29 @@ comment (the docs test checks this).
 
 Never stop to ask. If something in this job turns out to be wrong (a line number, a name, an expected number), do the
 closest correct thing, and record it under `### Deviations` or `### Uncertain`.
+
+## Report
+
+### Done
+- Commit: the single commit that contains this report (subject "Stop replaying XR wall slides and let the player leave object overlaps (job 08)").
+- `src/movement/moveDynamicObject.ts`: `MoveDynamicObjectResult.appliedDisplacement` set in the crossing, free-move and blocked returns.
+- `src/movement/movePlayer.ts`: `MoveResult.appliedDisplacement`; new `resolvePlayerMoveAgainstBodies`.
+- `src/movement/collision.ts`: new `moveIncreasesCylinderOverlap`.
+- `src/render/three/xrPlayerRig.ts`: `acceptPhysicalMove` advances the baseline by `R(-referenceSpaceYaw) * appliedDisplacement` after a blocked move; interface doc rewritten.
+- `src/render/three/createThreeApp.ts`: `blockPlayerMoveAgainstRuntimeObjects` delegates to `resolvePlayerMoveAgainstBodies`; `playerIntersectsRuntimeObject` and the unused import removed.
+- Tests: new cases in `tests/movement/collision.test.ts`, `tests/movement/movePlayer.test.ts`, `tests/render-contract/vrLocomotion.test.ts` (including the optional rotated-reference-space case, which passes); the two `MoveResult` literals got `appliedDisplacement`.
+- `_docs/MATHEMATICAL_MODEL.md` section 5 paragraph; regenerated `_docs/generated/`.
+- Issue 64 closed (job 07 was done) and links fixed; job moved to `_done/`; queue row updated.
+
+### Deviations
+- None. (The rotated-reference-space test was added as its own `it` inside a shared helper rather than a copy of the test body.)
+
+### Uncertain
+(none)
+
+### Not done
+(none)
+
+### Checks
+- Baseline `npm run typecheck` and `npm test`: passed (677 passed, 8 skipped).
+- After changes: `npm run docs:generate`, `npm run typecheck` (clean), `npm test` (682 passed, 8 skipped), `npm run docs:check` (all ok).

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
-import { movePlayer } from "../../src/movement/movePlayer";
+import { movePlayer, resolvePlayerMoveAgainstBodies } from "../../src/movement/movePlayer";
 import { createDefaultPlayerPose } from "../../src/movement/playerPose";
 
 describe("movePlayer", () => {
@@ -184,3 +184,92 @@ function twoRoomsWithPortal() {
     ],
   };
 }
+
+describe("movePlayer applied displacement and runtime bodies", () => {
+  const room = () =>
+    compileCellComplex({
+      cells: [
+        {
+          id: "room-a",
+          heightMeters: 2,
+          baseVertices: [
+            { x: -2, y: -2 },
+            { x: 2, y: -2 },
+            { x: 2, y: 2 },
+            { x: -2, y: 2 },
+          ],
+          portals: [],
+        },
+      ],
+    });
+
+  it("reports the applied part of a wall slide", () => {
+    const world = compileCellComplex({
+      cells: [
+        {
+          id: "room-a",
+          heightMeters: 2,
+          baseVertices: [
+            { x: -1, y: -1 },
+            { x: 1, y: -1 },
+            { x: 1, y: 1 },
+            { x: -1, y: 1 },
+          ],
+          portals: [],
+        },
+      ],
+    });
+    const result = movePlayer({
+      world,
+      pose: { cellId: "room-a", position: { x: 0.7, y: 0, z: 0 }, yawRadians: 0, pitchRadians: 0 },
+      localDisplacement: { x: 0.1, y: 0.1, z: 0 },
+      yawDeltaRadians: 0,
+      pitchDeltaRadians: 0,
+      coordinateFrame: "global",
+    });
+
+    expect(result.blocked).toBe(true);
+    expect(result.pose.position.x).toBeCloseTo(0.749999, 5);
+    expect(result.appliedDisplacement.x).toBeCloseTo(0.049999, 5);
+    expect(result.appliedDisplacement.y).toBeCloseTo(0.1, 9);
+    expect(result.attemptedDisplacement).toEqual({ x: 0.1, y: 0.1, z: 0 });
+
+    const free = movePlayer({
+      world,
+      pose: createDefaultPlayerPose("room-a"),
+      localDisplacement: { x: 0.2, y: 0, z: 0 },
+      yawDeltaRadians: 0,
+      pitchDeltaRadians: 0,
+      coordinateFrame: "global",
+    });
+    expect(free.blocked).toBe(false);
+    expect(free.appliedDisplacement.x).toBeCloseTo(0.2, 9);
+    expect(free.appliedDisplacement.y).toBeCloseTo(0, 9);
+  });
+
+  it("lets a player inside a runtime body step away but not further in", () => {
+    const world = room();
+    const obstacle = { center: { x: 0, y: 0, z: 0.5 }, radius: 0.25, halfHeight: 0.5 };
+    const body = { radiusMeters: 0.25, heightMeters: 1.6 };
+    const pose = { cellId: "room-a", position: { x: 0.3, y: 0, z: 0 }, yawRadians: 0, pitchRadians: 0 };
+    const move = (x: number) =>
+      movePlayer({
+        world,
+        pose,
+        body,
+        localDisplacement: { x, y: 0, z: 0 },
+        yawDeltaRadians: 0,
+        pitchDeltaRadians: 0,
+        coordinateFrame: "global",
+      });
+
+    const away = resolvePlayerMoveAgainstBodies(pose, move(0.04), body, () => [obstacle]);
+    expect(away.pose.position.x).toBeCloseTo(0.34, 9);
+    expect(away.blocked).toBe(false);
+
+    const further = resolvePlayerMoveAgainstBodies(pose, move(-0.04), body, () => [obstacle]);
+    expect(further.pose.position.x).toBe(0.3);
+    expect(further.blocked).toBe(true);
+    expect(further.appliedDisplacement).toEqual({ x: 0, y: 0, z: 0 });
+  });
+});

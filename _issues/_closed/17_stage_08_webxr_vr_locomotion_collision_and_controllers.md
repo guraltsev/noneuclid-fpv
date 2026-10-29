@@ -15,7 +15,7 @@ the XR player rig with collision-approved room-scale movement, and the debug fie
 item) is superseded by per-eye roots and per-eye visibility (`xrPortalEye.ts`, issue 21) and must not be restored. No
 headset log is recorded in the repository; open XR defects are tracked separately in issues
 [59](../59_stereo_split_root_unclipped_roots_and_union_budget.md),
-[64](../64_mover_integration_bugs_xr_slide_marmot_heading_object_trap.md),
+[64](64_mover_integration_bugs_xr_slide_marmot_heading_object_trap.md),
 [72](../72_aim_picking_uses_camera_clip_polygons_not_portal_ray_walk.md) and
 [73](../73_portal_ghosts_and_xr_eye_rerooting_are_single_hop.md), so this stage issue has nothing left of its own.
 

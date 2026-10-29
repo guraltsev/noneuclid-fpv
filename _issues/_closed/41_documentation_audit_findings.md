@@ -17,7 +17,7 @@ renamed to the new owners.
 - Wall overlap at a crossing: [62](../62_segment_based_portal_traversal_and_swept_motion.md).
 - Curve-shortening defects: short free loops stall in [66](66_curve_shortening_stalls_at_high_frame_rate.md); a free loop crossing a portal in [68](68_loop_endpoint_crossing_must_conjugate_portal_word.md);
   emitter orientation and rollbacks in [67](../67_exact_curve_shortening_via_sleeve_funnel.md); O(n²) intersections in [70](../70_geodesic_module_performance_and_split.md).
-- Marmot heading: [64](../64_mover_integration_bugs_xr_slide_marmot_heading_object_trap.md).
+- Marmot heading: [64](64_mover_integration_bugs_xr_slide_marmot_heading_object_trap.md).
 - XR input and palette: [20](../../.agents/jobs/19_vr_palette_and_in_headset_debug.md).
 - Per-frame palette serialisation: [75](../75_frame_loop_allocation_and_per_object_draw_calls.md).
 - Texture lifetimes: [74](74_frame_loop_error_containment_and_dispose_leaks.md).

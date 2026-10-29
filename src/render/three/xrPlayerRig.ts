@@ -61,8 +61,10 @@ export interface XrPlayerRig {
     referenceSpaceYawRadians?: number,
   ): RuntimeInputFrame;
   /**
-   * Records `currentHeadLocalMeters` as the new reference for the next `consumePhysicalInput` unless collision blocked the move.
-   * Leaving the reference unchanged on a blocked move makes the head keep "pushing" against the obstacle until it returns.
+   * Updates the reference for the next `consumePhysicalInput`. An unblocked move (or the first call) takes
+   * `currentHeadLocalMeters` as the reference. A blocked move advances the reference only by the head motion matching
+   * `result.appliedDisplacement` (mapped back with the reference-space yaw of the last `consumePhysicalInput`), so applied
+   * motion is never replayed and the unapplied remainder keeps pushing against the obstacle.
    */
   acceptPhysicalMove(result: MoveResult, currentHeadLocalMeters?: Vec3): void;
   /** Cell id from which both eyes are rendered; currently the player's own cell. */
@@ -79,11 +81,13 @@ export function createXrPlayerRig(camera: THREE.PerspectiveCamera, options: Part
   root.name = "xr-player-rig";
   root.add(camera);
   let previousAcceptedHeadLocalMeters: Vec3 | undefined;
+  let lastPhysicalReferenceSpaceYawRadians = 0;
 
   return {
     root,
     reset() {
       previousAcceptedHeadLocalMeters = undefined;
+      lastPhysicalReferenceSpaceYawRadians = 0;
       root.position.set(0, 0, 0);
       root.rotation.set(0, 0, 0);
       camera.position.set(0, 0, 0);
@@ -168,6 +172,7 @@ export function createXrPlayerRig(camera: THREE.PerspectiveCamera, options: Part
       return root.rotation.y + headLocalYawRadians;
     },
     consumePhysicalInput(headLocalMeters, playerYawRadians, referenceSpaceYawRadians = root.rotation.y) {
+      lastPhysicalReferenceSpaceYawRadians = referenceSpaceYawRadians;
       const physical = computePhysicalRoomScaleDisplacement({
         previousHeadLocalMeters: previousAcceptedHeadLocalMeters,
         currentHeadLocalMeters: headLocalMeters,
@@ -193,9 +198,19 @@ export function createXrPlayerRig(camera: THREE.PerspectiveCamera, options: Part
         return;
       }
 
-      if (!result.blocked) {
+      if (!previousAcceptedHeadLocalMeters || !result.blocked) {
         previousAcceptedHeadLocalMeters = currentHeadLocalMeters;
+        return;
       }
+
+      // Blocked or slid: advance the baseline only by the head motion that was actually applied, so applied motion
+      // is never replayed and only the unapplied remainder keeps pushing. Inverse of consumePhysicalInput's mapping.
+      const appliedHead = rotateHorizontalDelta(result.appliedDisplacement, -lastPhysicalReferenceSpaceYawRadians);
+      previousAcceptedHeadLocalMeters = vec3(
+        previousAcceptedHeadLocalMeters.x + appliedHead.x,
+        previousAcceptedHeadLocalMeters.y + appliedHead.y,
+        currentHeadLocalMeters.z,
+      );
     },
     getSharedRenderRootCellId(pose) {
       return resolveSharedXrRenderRootCellId(pose);

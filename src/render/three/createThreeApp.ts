@@ -69,12 +69,9 @@ import { type DebugSettings } from "../../glue/debugSettings";
 import { type PortalPanelModeId } from "../../glue/portalPanelMode";
 import { type LaunchOptions } from "../../glue/readLaunchOptions";
 import { yawRigidTransform3 } from "../../math/rigidTransform3";
-import {
-  getDynamicObjectCollisionBounds,
-  simpleCylinderIntersectsSimpleCylinder,
-} from "../../movement/collision";
+import { getDynamicObjectCollisionBounds } from "../../movement/collision";
 import { simpleCollisionCylinder } from "../../movement/dynamicObject";
-import { movePlayer } from "../../movement/movePlayer";
+import { movePlayer, resolvePlayerMoveAgainstBodies } from "../../movement/movePlayer";
 import { DEFAULT_PLAYER_EYE_HEIGHT_METERS } from "../../movement/playerBody";
 import { type PlayerPose, playerPoseToDynamicObject } from "../../movement/playerPose";
 import { createAppCommandDispatcher } from "../../runtime/appCommandDispatcher";
@@ -3331,37 +3328,11 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     previousPose: PlayerPose,
     result: ReturnType<typeof movePlayer>,
   ): ReturnType<typeof movePlayer> {
-    if (!playerIntersectsRuntimeObject(result.pose)) {
-      return result;
-    }
-
-    return {
-      ...result,
-      pose: {
-        ...previousPose,
-        yawRadians: result.pose.yawRadians,
-        pitchRadians: result.pose.pitchRadians,
-      },
-      blocked: true,
-      crossedPortal: false,
-      crossedPortalId: undefined,
-    };
-  }
-
-  function playerIntersectsRuntimeObject(pose: PlayerPose): boolean {
-    const playerBounds = getDynamicObjectCollisionBounds(createPlayerCollisionState(pose));
-    if (!playerBounds) {
-      return false;
-    }
-
-    for (const object of runtimeObjectRegistry.getPlayerBlockingObjectsInCell(pose.cellId)) {
-      const bounds = getDynamicObjectCollisionBounds(runtimeObjectToDynamicObjectState(object));
-      if (bounds && simpleCylinderIntersectsSimpleCylinder(playerBounds, bounds)) {
-        return true;
-      }
-    }
-
-    return false;
+    return resolvePlayerMoveAgainstBodies(previousPose, result, appState.playerBody, (cellId) =>
+      runtimeObjectRegistry.getPlayerBlockingObjectsInCell(cellId).flatMap((object) => {
+        const bounds = getDynamicObjectCollisionBounds(runtimeObjectToDynamicObjectState(object));
+        return bounds ? [bounds] : [];
+      }));
   }
 
   function createPlayerCollisionState(pose: PlayerPose) {

@@ -1,10 +1,25 @@
 # 64 - Mover integration bugs: XR slide replay, marmot heading and freeze, player trapped by objects
 
-Status: open; item 2 fixed by job 07 on 2026-10-29.
+Status: closed on 2026-10-29.
 
 Priority: P2 (correctness). Three independent bugs in the callers of `moveDynamicObject` / `movePlayer`.
 
-Jobs: [07](../.agents/jobs/_done/07_forward_heading_convention.md), [08](../.agents/jobs/08_xr_slide_replay_and_object_trap.md).
+Jobs: [07](../../.agents/jobs/_done/07_forward_heading_convention.md), [08](../../.agents/jobs/_done/08_xr_slide_replay_and_object_trap.md).
+
+## Outcome
+
+Fixed by jobs 07 and 08. Item 1: moves report `appliedDisplacement`, and the XR rig advances its head
+baseline by the applied part after a blocked move, so a held head offset no longer replays a wall slide.
+Item 2: see job 07. Item 3: a move that overlaps a runtime body is reverted only if it brings the centers
+closer (`moveIncreasesCylinderOverlap`, `resolvePlayerMoveAgainstBodies`), so the player can step out.
+
+## Closing evidence
+
+- `tests/render-contract/vrLocomotion.test.ts`: "does not replay a wall slide while the head is held against the wall".
+- `tests/movement/movePlayer.test.ts`: "reports the applied part of a wall slide", "lets a player inside a runtime body step away but not further in".
+- `tests/movement/collision.test.ts`: "moveIncreasesCylinderOverlap allows leaving an overlap but not deepening it".
+- Job 07's tests for item 2 (listed in its status update).
+- Not covered: the wiring inside `createThreeApp` (needs WebGL).
 
 ## Status update 2026-10-28
 
@@ -84,5 +99,5 @@ instead of freezing" in `tests/world-objects/geodesicMarmot.test.ts`. Items 1 an
 
 - Issue 41 tracked the same marmot mirror. Decide whether to fix the code (and flip the authored velocities and the
   anchor-crossing test that encode the mirror) or the data; `_docs/MATHEMATICAL_MODEL.md` now points here.
-- The marmot fix and the heading transport in issue [53](53_torus_deformation_commit_transport_defects.md) must use
+- The marmot fix and the heading transport in issue [53](../53_torus_deformation_commit_transport_defects.md) must use
   the same convention: forward is R·e_y. Fix them together so authored and live marmots agree after a commit.

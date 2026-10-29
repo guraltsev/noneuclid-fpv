@@ -1,7 +1,7 @@
 # Job 07 - One forward-heading convention: marmot heading and deformation transport
 
 Status: done on 2026-10-29.
-Resolves: issue [64](../../../_issues/64_mover_integration_bugs_xr_slide_marmot_heading_object_trap.md) item 2 (marmot
+Resolves: issue [64](../../../_issues/_closed/64_mover_integration_bugs_xr_slide_marmot_heading_object_trap.md) item 2 (marmot
 heading and zone freeze), issue [53](../../../_issues/53_torus_deformation_commit_transport_defects.md) item 2 (heading
 transport). Both issues stay open after this job; see "Done when".
 
@@ -537,7 +537,7 @@ npm test
 - [ ] `_docs/MATHEMATICAL_MODEL.md` §9 has the "Headings" paragraph and §11 has the new "Yaw conventions" bullet.
 - [ ] `npm run docs:generate` was run and the regenerated files under `_docs/generated/` are committed.
 - [ ] Issue 64 is **not** closed (job 08 still owns items 1 and 3). Add to
-  `_issues/64_mover_integration_bugs_xr_slide_marmot_heading_object_trap.md`, directly under its "Status update
+  `_issues/_closed/64_mover_integration_bugs_xr_slide_marmot_heading_object_trap.md`, directly under its "Status update
   2026-10-28" section, a section:
 
   ```markdown
