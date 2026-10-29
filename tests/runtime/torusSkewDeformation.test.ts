@@ -10,9 +10,14 @@ import {
   createTorusSkewCellDeformationMaps,
   createTorusSkewDeformationFamily,
   defaultTorusSkewDeformationState,
+  nextTorusSkewStep,
+  validateTorusSkewBaseSpec,
   type TorusSkewDeformationState,
 } from "../../src/runtime/deformations/torusSkewDeformation";
+import { createInitialWorldDeformationState } from "../../src/runtime/worldGeometryDeformationFamilies";
+import { torusModuli } from "../../src/authoring/exampleWorlds";
 import {
+  deformationStatesEqual,
   transformPoseWithCellMaps,
   transformPositionedObjectSpecWithMap,
   transformRigidPoseWithMap,
@@ -185,6 +190,84 @@ describe("torus skew deformation", () => {
 
     expect(staticCull.tables.tablesByRootCellId.get("torus-room")?.paths.length).toBeGreaterThan(0);
     expect(check.existsInBuiltTable).toBe(false);
+  });
+});
+
+describe("torus skew base frame and width step", () => {
+  const rest: TorusSkewDeformationState = {
+    kind: "torus-skew",
+    cellId: "torus-room",
+    widthMeters: 15,
+    depthMeters: 15,
+    skewXMeters: 0,
+  };
+
+  function runSteps(start: TorusSkewDeformationState, target: TorusSkewDeformationState) {
+    const options = { maxStepMeters: 0.08 };
+    let state = start;
+    let steps = 0;
+    for (; steps < 1000 && !deformationStatesEqual(state, target); steps += 1) {
+      const next = nextTorusSkewStep(state, target, options);
+      const moved = Math.hypot(
+        next.widthMeters - state.widthMeters,
+        next.skewXMeters - state.skewXMeters,
+        next.depthMeters - state.depthMeters,
+      );
+      expect(moved).toBeLessThanOrEqual(0.08 + 1e-12);
+      state = next;
+    }
+    return { state, steps };
+  }
+
+  it("rejects a torus footprint that is not centred", () => {
+    const spec = {
+      ...torus,
+      cells: [
+        {
+          ...torus.cells[0],
+          baseVertices: [
+            { x: 0, y: 0 },
+            { x: 15, y: 0 },
+            { x: 15, y: 15 },
+            { x: 0, y: 15 },
+          ],
+        },
+      ],
+    };
+    expect(createTorusSkewDeformationFamily().canApplyToSpec(spec)).toBe(false);
+    expect(validateTorusSkewBaseSpec(spec).some((error) => /centred parallelogram/.test(error))).toBe(true);
+    expect(createInitialWorldDeformationState(spec)).toEqual({ kind: "static-world" });
+  });
+
+  it("rejects a rotated torus footprint", () => {
+    const c = Math.cos(Math.PI / 6);
+    const s = Math.sin(Math.PI / 6);
+    const baseVertices = torus.cells[0].baseVertices.map((vertex) => ({
+      x: vertex.x * c - vertex.y * s,
+      y: vertex.x * s + vertex.y * c,
+    }));
+    const spec = { ...torus, cells: [{ ...torus.cells[0], baseVertices }] };
+    expect(createTorusSkewDeformationFamily().canApplyToSpec(spec)).toBe(false);
+  });
+
+  it("still accepts the shipped torus worlds", () => {
+    const family = createTorusSkewDeformationFamily();
+    expect(family.canApplyToSpec(torus)).toBe(true);
+    expect(family.canApplyToSpec(torusModuli)).toBe(true);
+  });
+
+  it("steps width, skew and depth together and reaches a wider target", () => {
+    const target = { ...rest, widthMeters: 40, depthMeters: 20 };
+    const { state, steps } = runSteps(rest, target);
+    expect(deformationStatesEqual(state, target)).toBe(true);
+    expect(steps).toBeLessThan(1000);
+  });
+
+  it("stays in range on the boundary b = w/2 while the width changes", () => {
+    const start = { ...rest, widthMeters: 15, depthMeters: 7.5, skewXMeters: 0 };
+    const target = { ...rest, widthMeters: 20, depthMeters: 10, skewXMeters: 0 };
+    const { state } = runSteps(start, target);
+    expect(deformationStatesEqual(state, target)).toBe(true);
   });
 });
 

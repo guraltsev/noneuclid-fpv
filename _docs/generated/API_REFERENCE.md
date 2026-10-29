@@ -255,6 +255,18 @@ Collision tests of a dynamic object against its current cell, and helpers for si
 | function | `projectPointAlongSide` | Distance in meters from the side's start vertex to the orthogonal projection of the point onto the side's line; negative or greater than the side length means the point lies beyond the side's ends. |
 | function | `findBoundaryCrossing` | Finds the side the body is leaving between two states of the same cell, if any. |
 
+### `movement/depenetrateDynamicObject.ts`
+
+Pushes a body that overlaps forbidden-zone cylinders or walls of its cell back to a legal pose.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| const | `depenetrationMarginMeters` | Extra clearance, meters, added beyond exact contact so the pushed pose is strictly legal. |
+| const | `maxDepenetrationRounds` | Maximum push rounds before falling back to grid sampling. |
+| interface | `DepenetrationOptions` | Options for {@link depenetrateDynamicObject}. |
+| interface | `DepenetrationResult` | Outcome: "unchanged" (already legal; `object` is the input object itself), "pushed" (fixed by pushes), "sampled" (fixed by the grid fallback), "failed" (no legal pose found; `object` is the input object). |
+| function | `depenetrateDynamicObject` | Returns a legal pose near `object` in the compiled world: unchanged if it is already legal, otherwise pushed out of zones (radially), then walls (along the inward normal), then through a portal if the anchor left the ce… |
+
 ### `movement/dynamicObject.ts`
 
 State of a movable object (player body, creature, geodesic emitter) inside a compiled cell complex.
@@ -696,8 +708,8 @@ Deformation family for the one-cell torus world: the cell "torus-room" is a pris
 | function | `createTorusSkewDeformationFamily` | Creates the "torus-skew" WorldDeformationFamily; applyToSpec rebuilds the parallelogram footprint and carries startingPosition and cell objects from the inferred base state to the requested one. |
 | function | `buildTorusParallelogramVertices` | Returns the four footprint vertices (counter-clockwise, centered at the origin) of the parallelogram spanned by u = (w, 0) and v = (a, b). |
 | function | `createTorusSkewCellDeformationMaps` | Builds the single-entry map {torus-room} that preserves lattice coordinates between the previous and next parallelogram frames and leaves z unchanged. |
-| function | `nextTorusSkewStep` | Moves (skewXMeters, depthMeters) from current toward target by at most maxStepMeters in the Euclidean metric, snapping to the target when the remaining distance is within max(maxStepMeters, snapTolerance); the result is… |
-| function | `validateTorusSkewBaseSpec` | Returns errors unless the spec has exactly one cell, "torus-room", with 4 base vertices, positive finite height and portals side-0..side-3 on sides 0..3 paired 0<->2 and 1<->3 to itself. |
+| function | `nextTorusSkewStep` | Moves (widthMeters, skewXMeters, depthMeters) together from current toward target along a straight segment by at most maxStepMeters in the Euclidean metric, snapping to the target when the remaining distance is within m… |
+| function | `validateTorusSkewBaseSpec` | Returns errors unless the spec has exactly one cell, "torus-room", with 4 base vertices, positive finite height, portals side-0..side-3 on sides 0..3 paired 0<->2 and 1<->3 to itself, and a footprint that is the centred… |
 | function | `inferTorusSkewState` | Reads (w, a, b) from a base spec's torus-room footprint as w = \|v1 - v0\| and (a, b) = v3 - v0; throws if the cell is missing or the values are out of range. |
 
 ### `runtime/runtimeCommands.ts`

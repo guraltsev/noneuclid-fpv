@@ -39,10 +39,10 @@ describe("deformation state helpers", () => {
 
   it("infers non-default width, depth and skew instead of 15 m", () => {
     const vertices = [
-      { x: -5, y: -3 },
-      { x: 5, y: -3 },
-      { x: 6, y: 3 },
-      { x: -4, y: 3 },
+      { x: -5.5, y: -3 },
+      { x: 4.5, y: -3 },
+      { x: 5.5, y: 3 },
+      { x: -4.5, y: 3 },
     ];
     const spec = { ...torus, cells: [{ ...torus.cells[0], baseVertices: vertices }] };
 

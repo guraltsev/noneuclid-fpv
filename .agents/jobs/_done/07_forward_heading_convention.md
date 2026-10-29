@@ -2,7 +2,7 @@
 
 Status: done on 2026-10-29.
 Resolves: issue [64](../../../_issues/_closed/64_mover_integration_bugs_xr_slide_marmot_heading_object_trap.md) item 2 (marmot
-heading and zone freeze), issue [53](../../../_issues/53_torus_deformation_commit_transport_defects.md) item 2 (heading
+heading and zone freeze), issue [53](../../../_issues/_closed/53_torus_deformation_commit_transport_defects.md) item 2 (heading
 transport). Both issues stay open after this job; see "Done when".
 
 ## Goal

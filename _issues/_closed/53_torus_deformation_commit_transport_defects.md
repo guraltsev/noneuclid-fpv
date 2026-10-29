@@ -1,11 +1,42 @@
 # 53 - Torus deformation commits can trap the player and mis-transport headings
 
-Status: open; item 2 fixed by job 07 on 2026-10-29.
+Status: closed on 2026-10-29.
 
 Priority: P1 (correctness). Not covered by issue 41, whose deformation items are the hard-coded 15 m, `||` in
 `normalizeState`, `JSON.stringify` equality and the mirrored marmot yaw.
 
-Jobs: [07](../.agents/jobs/_done/07_forward_heading_convention.md), [09](../.agents/jobs/09_deformation_commit_safety.md).
+Jobs: [07](../../.agents/jobs/_done/07_forward_heading_convention.md), [09](../../.agents/jobs/_done/09_deformation_commit_safety.md).
+
+## Outcome
+
+Fixed by jobs 07 and 09.
+
+- Item 1 (trap): `src/movement/depenetrateDynamicObject.ts#depenetrateDynamicObject` runs after every commit for the
+  player, placed flags, marmots and geo creatures (walls only for the latter). It pushes radially out of zones and
+  along wall normals, crosses a portal if the anchor left the cell, and falls back to the nearest free grid sample.
+- Item 2 (heading): job 07, see the status update below.
+- Item 3 (frame): `validateTorusSkewBaseSpec` rejects a footprint that is not the centred parallelogram of its own
+  (w, a, b) within 1e-6 m; such a world falls back to `static-world`.
+- Item 4 (width step): `nextTorusSkewStep` moves (w, a, b) together along a straight segment, which stays in the convex
+  allowed set.
+
+## Closing evidence
+
+- Trap and "following 1 cm move is not blocked": `tests/movement/depenetrateDynamicObject.test.ts`, "pushes the player
+  out of the junction zone after the issue-53 trap commit"; also "returns the same object when nothing overlaps",
+  "pushes a body sitting exactly on a vertex toward the cell centroid", "leaves no body blocked for legal rest poses
+  near the corners", the two wall tests and "ignores zones when asked".
+- Heading: `tests/runtime/torusSkewDeformation.test.ts`, "keeps a closed-geodesic forward vector closed under a full
+  shear" (job 07).
+- Frame: `tests/runtime/torusSkewDeformation.test.ts`, "rejects a torus footprint that is not centred", "rejects a
+  rotated torus footprint", "still accepts the shipped torus worlds".
+- Width: `tests/runtime/torusSkewDeformation.test.ts`, "steps width, skew and depth together and reaches a wider
+  target", "stays in range on the boundary b = w/2 while the width changes";
+  `tests/runtime/worldGeometrySession.test.ts`, "reaches a target with a different width without recording an error".
+
+## Status update 2026-10-29 (job 09)
+
+Items 1, 3 and 4 are fixed by job 09; the issue is closed.
 
 ## Status update 2026-10-28
 

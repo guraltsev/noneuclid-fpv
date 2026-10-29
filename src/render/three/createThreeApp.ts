@@ -73,7 +73,9 @@ import { getDynamicObjectCollisionBounds } from "../../movement/collision";
 import { simpleCollisionCylinder } from "../../movement/dynamicObject";
 import { movePlayer, resolvePlayerMoveAgainstBodies } from "../../movement/movePlayer";
 import { DEFAULT_PLAYER_EYE_HEIGHT_METERS } from "../../movement/playerBody";
-import { type PlayerPose, playerPoseToDynamicObject } from "../../movement/playerPose";
+import { type PlayerPose, playerPoseFromDynamicObject, playerPoseToDynamicObject } from "../../movement/playerPose";
+import { depenetrateDynamicObject } from "../../movement/depenetrateDynamicObject";
+import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex";
 import { createAppCommandDispatcher } from "../../runtime/appCommandDispatcher";
 import { type RuntimeCommand } from "../../runtime/runtimeCommands";
 import {
@@ -1560,7 +1562,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
 
     // Order matters: the player and objects are mapped using the previous world's cell ids, then the bundle
     // is swapped so later helpers (activeWorld()) see the new world.
-    transformPlayerForGeometryCommit(mapByCellId);
+    transformPlayerForGeometryCommit(mapByCellId, snapshot.world);
     transformRuntimeObjectsForGeometryCommit(mapByCellId, snapshot);
     activeWorldBundle = createActiveWorldBundle(snapshot);
     // Visibility results refer to old path ids; drop them until the next sync.
@@ -1592,6 +1594,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
 
   function transformPlayerForGeometryCommit(
     mapByCellId: ReadonlyMap<string, CellDeformationMap>,
+    nextWorld: CompiledCellComplex,
   ): void {
     const transformed = transformPoseWithCellMaps(
       {
@@ -1601,17 +1604,24 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       mapByCellId,
     );
 
-    if (!transformed || !activeWorld().cellsById.has(transformed.cellId)) {
+    if (!transformed || !nextWorld.cellsById.has(transformed.cellId)) {
       resetPlayerToHome();
       return;
     }
 
-    playerPose = {
+    const mappedPose: PlayerPose = {
       ...playerPose,
       cellId: transformed.cellId,
       position: transformed.localPose.translation,
       yawRadians: yawFromPose(transformed.localPose),
     };
+    const result = depenetrateDynamicObject(nextWorld, createPlayerCollisionState(mappedPose));
+    if (result.kind === "failed") {
+      console.warn("Deformation commit: no legal player pose found; keeping the mapped pose.");
+      playerPose = mappedPose;
+      return;
+    }
+    playerPose = playerPoseFromDynamicObject(result.object, mappedPose.pitchRadians);
   }
 
   function transformRuntimeObjectsForGeometryCommit(
@@ -1619,7 +1629,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     snapshot: WorldGeometrySnapshot,
   ): void {
     for (const runtime of dynamicObjectRuntimes) {
-      runtime.transformGeometry(mapByCellId);
+      runtime.transformGeometry(mapByCellId, snapshot.world);
     }
 
     for (const object of runtimeObjectRegistry.getAll()) {
@@ -1637,10 +1647,14 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
           continue;
         }
 
+        const depenetrated = depenetrateDynamicObject(
+          snapshot.world,
+          runtimeObjectToDynamicObjectState({ ...object, cellId: transformed.cellId, localPose: transformed.localPose }),
+        );
         const nextObject = {
           ...object,
-          cellId: transformed.cellId,
-          localPose: transformed.localPose,
+          cellId: depenetrated.object.cellId,
+          localPose: depenetrated.object.localPose,
         };
         runtimeObjectRegistry.update(nextObject);
         syncPlacedFlagRuntime(nextObject);

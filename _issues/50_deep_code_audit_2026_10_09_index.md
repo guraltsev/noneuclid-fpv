@@ -59,7 +59,7 @@ to `src/cell-complex/validateCellComplexSpec.ts`.
 | --- | --- | --- |
 | [51](_closed/51_dodecahedron_example_is_a_genus_6_surface.md) | P1 | Closed 2026-10-28: the dodecahedron gluing is fixed and per-world invariants are tested |
 | [52](52_compile_time_vertex_classes_and_gluing_validation.md) | P2 | Compile-time vertex classes, cone angles, Gauss–Bonnet, endpoint-matching validation |
-| [53](53_torus_deformation_commit_transport_defects.md) | P1 | Deformation commit can trap the player in an exclusion zone; headings transported by the wrong vector |
+| [53](_closed/53_torus_deformation_commit_transport_defects.md) | P1 | Deformation commit can trap the player in an exclusion zone; headings transported by the wrong vector |
 | [54](../.agents/jobs/35_torus_family_as_teichmuller_space.md) | P3 | Torus family as Teichmüller space; lattice reduction; GL(2,ℝ) family for translation surfaces |
 | [55](55_live_deformation_rebuild_cost_and_se2_transforms.md) | P2 | ~100 ms rebuild per deformation step; worker pipeline; `Iso2` planar transform type |
 

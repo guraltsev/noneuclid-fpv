@@ -10,6 +10,7 @@ import type { CellObjectSpec, SimpleCollisionCylinderSpec, SimpleGeoCreatureObje
 import { yawRigidTransform3, transformDirection3, type RigidTransform3 } from "../math/rigidTransform3";
 import { vec3 } from "../math/vec3";
 import { getDynamicObjectCollisionBounds, simpleCylinderIntersectsSimpleCylinder } from "../movement/collision";
+import { depenetrateDynamicObject } from "../movement/depenetrateDynamicObject";
 import type { DynamicObjectState } from "../movement/dynamicObject";
 import {
   AUTONOMOUS_DYNAMIC_OBJECT_PORTAL_CROSSING_MODE,
@@ -74,8 +75,8 @@ export interface SimpleGeoCreatureRuntime {
   syncParent(cellRoots: ReadonlyMap<string, THREE.Object3D>): void;
   /** Shows or hides the debug collision cylinder. */
   setCollisionWireframeVisible(visible: boolean): void;
-  /** Remaps the current and initial poses through per-cell deformation maps after a live geometry change; leaves state untouched if either pose cannot be mapped. */
-  transformGeometry(mapByCellId: ReadonlyMap<string, CellDeformationMap>): void;
+  /** Remaps the current and initial poses through per-cell deformation maps after a live geometry change; leaves state untouched if either pose cannot be mapped; when `nextWorld` is given, both poses are then pushed out of obstacles in it. */
+  transformGeometry(mapByCellId: ReadonlyMap<string, CellDeformationMap>, nextWorld?: CompiledCellComplex): void;
   /** Restores the initial (possibly deformation-remapped) pose and oscillation phases and reattaches to that cell's root. */
   reset(cellRoots: ReadonlyMap<string, THREE.Object3D>): void;
 }
@@ -258,7 +259,7 @@ export function createSimpleGeoCreatureRuntime(
       collisionWireframeRequested = visible;
       refreshCollisionWireframe();
     },
-    transformGeometry(mapByCellId) {
+    transformGeometry(mapByCellId, nextWorld) {
       const transformedState = transformPoseWithCellMaps(state, mapByCellId);
       const transformedInitialState = transformPoseWithCellMaps(initialState, mapByCellId);
       if (!transformedState || !transformedInitialState) {
@@ -275,6 +276,10 @@ export function createSimpleGeoCreatureRuntime(
         cellId: transformedInitialState.cellId,
         localPose: transformedInitialState.localPose,
       };
+      if (nextWorld) {
+        state = depenetrateDynamicObject(nextWorld, state, { ignoreForbiddenZones: true }).object;
+        initialState = depenetrateDynamicObject(nextWorld, initialState, { ignoreForbiddenZones: true }).object;
+      }
       syncRegistryObject(registry, objectSpec.id, state);
       applyObjectPose(root, state.localPose);
       refreshCollisionWireframe();

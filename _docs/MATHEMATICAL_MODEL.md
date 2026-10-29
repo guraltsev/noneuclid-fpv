@@ -354,11 +354,20 @@ state, and validate that a new snapshot preserves topology.
 The implemented family is the **skewed flat torus**
 (`src/runtime/deformations/torusSkewDeformation.ts#createTorusSkewDeformationFamily`): one cell over the parallelogram with
 edges $u=(w,0)$ and $v=(a,b)$, opposite sides glued by translation, so the world is the flat torus $\mathbb R^2/(\mathbb Zu+\mathbb Zv)$.
-The width $w$ is fixed; the skew $a\in[0,2w]$ and depth $b\in[w/2,2w]$ are the parameters. The footprint is centred, with
+The shipped UI keeps the width $w$ fixed; the skew $a\in[0,2w]$ and depth $b\in[w/2,2w]$ are the parameters. The footprint is centred, with
 vertices at $\pm u/2\pm v/2$. A point with lattice coordinates $(\alpha,\beta)$ — $p=o+\alpha u+\beta v$, $o=-(u+v)/2$ — is
 mapped to the point with the *same* coordinates in the new lattice, $o'+\alpha u'+\beta v'$, and $z$ is unchanged; directions
-are mapped by the same linear part. A step moves $(a,b)$ along the straight segment towards the target by at most
-`maxStepMeters` (default 0.08 m) and snaps when close.
+are mapped by the same linear part. A step moves $(w,a,b)$ together along the straight segment towards the target by at most
+`maxStepMeters` (default 0.08 m) and snaps when close; the allowed set ($b\in[w/2,2w]$, $a\in[0,2w]$) is convex in $(w,a,b)$, so every point of
+the segment is allowed. The family applies only to a base world whose footprint is exactly this centred parallelogram
+(`validateTorusSkewBaseSpec`, tolerance $10^{-6}$ m); any other footprint falls back to a static world.
+
+**Depenetration after a commit.** The map is not rigid, so it can move a body into a forbidden zone or wall. After mapping,
+every body is pushed to a legal pose by `src/movement/depenetrateDynamicObject.ts#depenetrateDynamicObject`: up to four
+rounds of a radial push out of each overlapping zone (to zone radius + body radius + $10^{-6}$ m), a push along the inward
+normal out of each overlapping wall, and a portal crossing if the anchor left the cell; then the nearest free sample of a grid
+over the cell; if none exists the mapped pose is kept. The player, placed flags and marmots use zones and walls; geo
+creatures, which move ignoring zones, use walls only.
 
 **Headings.** Forward is the body +y axis $R e_y=(-\sin\psi,\cos\psi)$ for every yaw pose (player, creatures,
 marmots, flags). A commit carries the forward vector by the linear part $A$ of the cell map,

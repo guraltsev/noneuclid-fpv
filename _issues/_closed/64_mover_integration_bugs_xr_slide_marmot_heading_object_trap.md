@@ -99,5 +99,5 @@ instead of freezing" in `tests/world-objects/geodesicMarmot.test.ts`. Items 1 an
 
 - Issue 41 tracked the same marmot mirror. Decide whether to fix the code (and flip the authored velocities and the
   anchor-crossing test that encode the mirror) or the data; `_docs/MATHEMATICAL_MODEL.md` now points here.
-- The marmot fix and the heading transport in issue [53](../53_torus_deformation_commit_transport_defects.md) must use
+- The marmot fix and the heading transport in issue [53](53_torus_deformation_commit_transport_defects.md) must use
   the same convention: forward is R·e_y. Fix them together so authored and live marmots agree after a commit.

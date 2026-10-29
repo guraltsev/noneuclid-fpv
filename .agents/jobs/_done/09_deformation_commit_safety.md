@@ -1,7 +1,7 @@
 # Job 09 - Make torus deformation commits safe
 
-Status: queued.
-Resolves: issue [53](../../_issues/53_torus_deformation_commit_transport_defects.md) items 1, 3 and 4 (item 2, the heading, is [job 07](07_forward_heading_convention.md)).
+Status: done on 2026-10-29.
+Resolves: issue [53](../../../_issues/_closed/53_torus_deformation_commit_transport_defects.md) items 1, 3 and 4 (item 2, the heading, is [job 07](07_forward_heading_convention.md)).
 Depends: none.
 
 ## Goal
@@ -18,7 +18,7 @@ Three changes do this: a new pure function `depenetrateDynamicObject` called aft
 ## Depends on
 
 Nothing. [Job 07](07_forward_heading_convention.md) also edits the commit path (heading transport) but touches
-different lines; this job can land before or after it. [Job 10](10_floor_texture_in_lattice_coordinates.md) depends on
+different lines; this job can land before or after it. [Job 10](../10_floor_texture_in_lattice_coordinates.md) depends on
 this job (it relies on the footprint check of step 6).
 
 ## Before you start
@@ -599,11 +599,11 @@ Risky points:
 - Do not change how headings are transported (`transformRigidPoseWithMap`, the test "maps a vertical-lattice heading
   into the skewed heading"). That is issue 53 item 2, [job 07](07_forward_heading_convention.md).
 - Do not change `moveDynamicObject` or `testCellCollision` behaviour (swept tests, corner handling): jobs 13 and 14.
-- Do not remove forbidden zones at flat vertices: [job 18](18_vertex_classes_and_gluing_validation.md).
-- Do not make the commit incremental or change the rebuild pipeline: [job 30](30_deformation_rebuild_pipeline.md).
+- Do not remove forbidden zones at flat vertices: [job 18](../18_vertex_classes_and_gluing_validation.md).
+- Do not make the commit incremental or change the rebuild pipeline: [job 30](../30_deformation_rebuild_pipeline.md).
 - Do not change the step units or the session's scheduling: job 30 / issue 55.
-- Do not generalise the lattice frame to rotated or offset footprints: [job 35](35_torus_family_as_teichmuller_space.md).
-- Do not touch floor UVs: [job 10](10_floor_texture_in_lattice_coordinates.md).
+- Do not generalise the lattice frame to rotated or offset footprints: [job 35](../35_torus_family_as_teichmuller_space.md).
+- Do not touch floor UVs: [job 10](../10_floor_texture_in_lattice_coordinates.md).
 - Do not edit `scripts/docs/layering-baseline.json`.
 
 ## Done when
@@ -632,3 +632,36 @@ Risky points:
   strike the title and add "(done)", as row 01 does.
 - [ ] Commit with a message like `Depenetrate bodies after torus deformation commits; check the base frame; step width (job 09)`.
   Do not push unless asked.
+
+## Report
+
+### Done
+
+- `src/movement/depenetrateDynamicObject.ts` (new): `depenetrateDynamicObject`, as in the job sketch (zone push, wall push, portal crossing, 4 rounds, grid fallback).
+- `src/render/three/createThreeApp.ts`: player (`transformPlayerForGeometryCommit` now takes the new world and depenetrates; warns on failure) and placed flags depenetrated after the commit map; `runtime.transformGeometry(mapByCellId, snapshot.world)`.
+- `src/world-objects/geodesicMarmot.ts`, `src/world-objects/simpleGeoCreature.ts`: optional `nextWorld` argument to `transformGeometry`; both poses depenetrated (creature: `ignoreForbiddenZones: true`).
+- `src/runtime/deformations/torusSkewDeformation.ts`: footprint check in `validateTorusSkewBaseSpec`; `nextTorusSkewStep` moves (w, a, b) jointly with a `clamp` helper; headers and JSDoc updated.
+- Tests: `tests/movement/depenetrateDynamicObject.test.ts` (tests 1-7), five tests in `tests/runtime/torusSkewDeformation.test.ts` (8-12), one in `tests/runtime/worldGeometrySession.test.ts` (13); step 7 edit in `tests/runtime/worldGeometryDeformations.test.ts`.
+- `_docs/MATHEMATICAL_MODEL.md` §9 and `_docs/generated/*` updated. Issue 53 closed (job 07 was already done) and moved to `_issues/_closed/` with Outcome and Closing evidence; links to it fixed in issues 29, 50, 64, job 07 and the jobs README. Job row 09 marked done.
+- Commit: see `git log` (the commit that adds this file under `_done/`).
+
+### Deviations
+
+- Step 3: `commitWorldGeometrySnapshot` calls `transformPlayerForGeometryCommit` at a slightly different line than the job says; the change is the same.
+- `tests/runtime/worldGeometryDeformations.test.ts` "infers non-default width, depth and skew instead of 15 m": vertices re-centred as step 7 says.
+- Test 4: the result kinds are asserted only through `not "failed"` and not blocked; the kind counts are not printed. Observed counts when run: 400 unchanged, 80 pushed, 0 sampled.
+- Test helper `mapToTrap` takes a target state; the job did not specify the helper.
+
+### Uncertain
+
+None.
+
+### Not done
+
+- Optional manual check in `npm run dev` was not run.
+
+### Checks
+
+- Baseline `npm run typecheck` and `npm test`: pass (682 passed, 8 skipped).
+- `npx vitest run tests/movement/depenetrateDynamicObject.test.ts tests/runtime`: pass (80 tests).
+- Final `npm run docs:generate`, `npm run typecheck`, `npm test` (695 passed, 8 skipped), `npm run docs:check`: all pass.

@@ -11,7 +11,7 @@ client with inline fallback, a session that steps, drops stale results and keeps
 an atomic commit at the frame boundary in `createThreeApp.ts`, pose transport for the player and runtime objects,
 locked-geodesic rebuild, a `window.noneuclidGeometry` console API and an in-scene geometry-computer page. The
 remaining defects and costs found later are tracked by newer issues: pose transport and frame checks in
-[53](../53_torus_deformation_commit_transport_defects.md), worker cost and pipeline in
+[53](53_torus_deformation_commit_transport_defects.md), worker cost and pipeline in
 [55](../55_live_deformation_rebuild_cost_and_se2_transforms.md), floor texture swim in
 [81](../81_floor_texture_slides_under_objects_during_deformation.md), main-thread commit cost (and the missing
 renderer-contract tests for the commit) in

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { torus } from "../../src/authoring/exampleWorlds";
 import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
 import { buildStaticallyCulledPortalPathTables } from "../../src/cell-complex/staticPortalPathCull";
+import { deformationStatesEqual } from "../../src/runtime/worldGeometryDeformations";
 import { createWorldGeometrySession, type WorldGeometrySnapshot } from "../../src/runtime/worldGeometrySession";
 import {
   buildWorldGeometrySnapshotForRequest,
@@ -53,6 +54,27 @@ describe("world geometry session", () => {
     session.setTarget(skewState(0.2));
 
     expect(client.requests[0].deformation).toMatchObject({ skewXMeters: 0.05 });
+  });
+
+  it("reaches a target with a different width without recording an error", async () => {
+    const client = createDeferredBuildClient();
+    const session = createTestSession(client, { maxStepMeters: 1 });
+
+    session.setTarget({ kind: "torus-skew", cellId: "torus-room", widthMeters: 40, depthMeters: 20, skewXMeters: 0 });
+    expect(session.state.lastError).toBeUndefined();
+
+    for (let round = 0; round < 40; round += 1) {
+      const request = client.requests[client.requests.length - 1];
+      client.resolve(request.requestId, buildWorldGeometrySnapshotForRequest(request));
+      await flushPromises();
+      session.pollReadySnapshot();
+      expect(session.state.lastError).toBeUndefined();
+      if (deformationStatesEqual(session.state.current, session.state.target)) {
+        break;
+      }
+    }
+
+    expect(session.state.current).toMatchObject({ widthMeters: 40 });
   });
 
   it("advances torus skew by at most maxStepMeters per committed snapshot", async () => {

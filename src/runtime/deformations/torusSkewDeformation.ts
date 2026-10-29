@@ -1,8 +1,8 @@
 /**
  * Deformation family for the one-cell torus world: the cell "torus-room" is a prism whose footprint is a parallelogram with edge vectors u = (w, 0) and v = (a, b), and opposite sides glued by translation (side-0 with side-2, side-1 with side-3).
- * The state is width w (kept fixed), skew a = skewXMeters in [0, 2w] and depth b = depthMeters in [w/2, 2w]; changing (a, b) changes the flat torus R^2/(Zu + Zv) while keeping the same combinatorics.
+ * The state is width w (the shipped UI keeps it fixed, but the family allows a width change), skew a = skewXMeters in [0, 2w] and depth b = depthMeters in [w/2, 2w]; changing (a, b) changes the flat torus R^2/(Zu + Zv) while keeping the same combinatorics.
  * The per-cell map sends a point p = o_old + alpha u_old + beta v_old to o_new + alpha u_new + beta v_new, where o = -(u+v)/2 is the footprint's first vertex, and keeps the height z; directions map by the same linear part. So lattice coordinates (alpha, beta) are invariant, which is what carries players and objects across a commit.
- * Stepping moves (a, b) along a straight segment in the (a, b) plane by at most maxStepMeters per rebuild; w is taken from the target at once. Snapshot validation requires unchanged topology and equal lengths of opposite sides.
+ * Stepping moves (w, a, b) together along a straight segment in (w, a, b) space by at most maxStepMeters per rebuild (the allowed set is convex, so every point of the segment is allowed). Snapshot validation requires unchanged topology and equal lengths of opposite sides.
  */
 import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex";
 import type { CellComplexSpec, PrismCellSpec } from "../../cell-complex/specs";
@@ -168,7 +168,7 @@ export function createTorusSkewCellDeformationMaps(
 }
 
 /**
- * Moves (skewXMeters, depthMeters) from current toward target by at most maxStepMeters in the Euclidean metric, snapping to the target when the remaining distance is within max(maxStepMeters, snapTolerance); the result is normalized (range-checked).
+ * Moves (widthMeters, skewXMeters, depthMeters) together from current toward target along a straight segment by at most maxStepMeters in the Euclidean metric, snapping to the target when the remaining distance is within max(maxStepMeters, snapTolerance); the result is normalized (range-checked).
  */
 export function nextTorusSkewStep(
   current: TorusSkewDeformationState,
@@ -177,25 +177,25 @@ export function nextTorusSkewStep(
 ): TorusSkewDeformationState {
   const maxStepMeters = Math.max(0, options.maxStepMeters);
   const snapToleranceMeters = options.snapToleranceMeters ?? 1e-9;
+  const deltaW = target.widthMeters - current.widthMeters;
   const deltaA = target.skewXMeters - current.skewXMeters;
   const deltaB = target.depthMeters - current.depthMeters;
-  const distance = Math.hypot(deltaA, deltaB);
+  const distance = Math.hypot(deltaW, deltaA, deltaB);
 
   if (distance <= Math.max(maxStepMeters, snapToleranceMeters)) {
     return normalizeTorusSkewState(target);
   }
 
   const stepScale = maxStepMeters / distance;
-  return normalizeTorusSkewState({
-    ...current,
-    widthMeters: target.widthMeters,
-    depthMeters: current.depthMeters + deltaB * stepScale,
-    skewXMeters: current.skewXMeters + deltaA * stepScale,
-  });
+  const widthMeters = current.widthMeters + deltaW * stepScale;
+  // The allowed set is convex in (w, a, b), so the exact point is in range; the clamps only remove rounding error.
+  const depthMeters = clamp(current.depthMeters + deltaB * stepScale, widthMeters / 2, widthMeters * 2);
+  const skewXMeters = clamp(current.skewXMeters + deltaA * stepScale, 0, widthMeters * 2);
+  return normalizeTorusSkewState({ ...current, widthMeters, depthMeters, skewXMeters });
 }
 
 /**
- * Returns errors unless the spec has exactly one cell, "torus-room", with 4 base vertices, positive finite height and portals side-0..side-3 on sides 0..3 paired 0<->2 and 1<->3 to itself.
+ * Returns errors unless the spec has exactly one cell, "torus-room", with 4 base vertices, positive finite height, portals side-0..side-3 on sides 0..3 paired 0<->2 and 1<->3 to itself, and a footprint that is the centred parallelogram (within 1e-6 m) of its own w, a, b.
  */
 export function validateTorusSkewBaseSpec(baseSpec: CellComplexSpec): readonly string[] {
   const errors: string[] = [];
@@ -211,6 +211,25 @@ export function validateTorusSkewBaseSpec(baseSpec: CellComplexSpec): readonly s
 
   if (cell.baseVertices.length !== 4) {
     errors.push(`Expected "${torusCellId}" to have 4 base vertices, found ${cell.baseVertices.length}.`);
+  }
+
+  if (cell.baseVertices.length === 4) {
+    const [v0, v1, , v3] = cell.baseVertices;
+    const expected = buildTorusParallelogramVertices({
+      widthMeters: Math.hypot(v1.x - v0.x, v1.y - v0.y),
+      skewXMeters: v3.x - v0.x,
+      depthMeters: v3.y - v0.y,
+    });
+    const matches = cell.baseVertices.every(
+      (vertex, index) =>
+        Math.abs(vertex.x - expected[index].x) <= dimensionToleranceMeters &&
+        Math.abs(vertex.y - expected[index].y) <= dimensionToleranceMeters,
+    );
+    if (!matches) {
+      errors.push(
+        `Cell "${torusCellId}" footprint must be the centred parallelogram with u = (w, 0) and v = (a, b), vertices -u/2-v/2, u/2-v/2, u/2+v/2, -u/2+v/2.`,
+      );
+    }
   }
 
   for (const [portalId, sideIndex, targetPortalId] of expectedPortalPairs) {
@@ -385,4 +404,8 @@ function subtract2(
 
 function length2(vector: { readonly x: number; readonly y: number }): number {
   return Math.hypot(vector.x, vector.y);
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
 }
