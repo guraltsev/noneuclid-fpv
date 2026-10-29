@@ -15,6 +15,8 @@ environment flake (possibly a cold transform cache); not investigated.
 | 03 | done, needs review | e06768c | 650/9 | - |
 | 04 | done, needs review | 690f358 | 660/9 | - |
 | 05 | done | a9b0516 | 667/9 | 68 |
+| 06 | done | 92d0858 | 672/9 | 66 |
+| 07 | done | e768cd2, b18497e | 677/8 | none (issues 53, 64 get status notes) |
 
 ## For review
 
@@ -39,6 +41,10 @@ Not done:
 ### Job 05 (clean pass; deviations noted)
 - Also fixed a link to issue 68 in `_issues/_closed/41_documentation_audit_findings.md`.
 - Issue 68's Closing evidence says "the job 05 commit" rather than a hash.
+
+### Job 07 (clean pass; deviation noted)
+- Two commits instead of one (code, then bookkeeping), because the issue notes need the code commit's hash.
+- Skipped tests went 9 -> 8: the marmot heading test was un-skipped, as the job directs.
 
 ## Cross-job problems
 - The batch report was swept into the job 04 commit (it was untracked, and the job 04 sub-agent's commit included it). Harmless; it is tracked from 690f358 on.
