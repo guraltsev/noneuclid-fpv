@@ -1,11 +1,13 @@
 /**
  * Aim-ray resolution for both input modes: the desktop camera center ray and the right (or first) XR controller ray.
  * Turns a RootAimRay (origin/direction/quaternion in the Three.js root frame, meters) into AimTarget hits through resolveAimTargets, cycles between overlapping interactable objects, and finds the object whose tooltip or interaction should be shown.
- * The ray is always cast from the root frame across the currently visible portal paths, with a maximum distance of 24 m.
+ * The ray is cast from the root frame and walked through the portals it actually crosses (see aimTarget.ts), with a maximum distance of 24 m. One resolution is cached per distinct ray, ignored geodesic and frame serial.
  * Mutable state is limited to the target-cycle selection, which is keyed by a signature of the candidate list and so resets whenever the candidates change.
  */
 import * as THREE from "three";
 import { type CompiledCellComplex } from "../../cell-complex/compileCellComplex";
+import { type PlayerPose } from "../../movement/playerPose";
+import { DEFAULT_PLAYER_EYE_HEIGHT_METERS } from "../../movement/playerBody";
 import { type DebugLevelId } from "../../glue/debugLevels";
 import { type RuntimeMenuState } from "../../runtime/runtimeMenuState";
 import {
@@ -14,7 +16,7 @@ import {
 } from "../../ui/worldInteractionDefinition";
 import { canExtendGeodesicSegment, isGeodesicLocked } from "../../world-objects/geodesicCannon";
 import { type RuntimeObjectRegistry, type RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
-import { AimTarget, resolveAimTargets } from "./aimTarget";
+import { AimTarget, resolveAimTargets as defaultResolveAimTargets } from "./aimTarget";
 import { formatVec3, roundNumber } from "./appDebugHelpers";
 import { GeodesicCannonToolState } from "./geodesicCannonTools";
 import { renderCameraFarMeters, renderCameraNearMeters } from "./renderCameraClip";
@@ -23,7 +25,6 @@ import {
   createAimTargetCycleSignature,
   getRuntimeObjectInteractionRangeMeters,
 } from "./rootAimRay";
-import { VisiblePortalPath } from "./visiblePortalPaths";
 import { createXrPlayerRig, xrRigidTransformLocalMatrix } from "./xrPlayerRig";
 
 /** The interactable object the aim ray currently rests on. */
@@ -51,8 +52,12 @@ export interface AimInteractionDeps {
   getMenuState(): RuntimeMenuState;
   /** Getter: geodesic cannon tool state; activeGeodesicId is excluded from aim hits while aiming a cannon. */
   getCannonToolState(): GeodesicCannonToolState;
-  /** Getter: portal paths visible this frame, through which the ray is continued into neighbouring cells. */
-  getRuntimeObjectVisiblePaths(): readonly VisiblePortalPath[];
+  /** Getter: the player pose; its cell is the render root cell and its position anchors the root frame. */
+  getPlayerPose(): PlayerPose;
+  /** Getter: frame counter, incremented once per rendered frame; invalidates the per-frame aim cache. */
+  getFrameSerial(): number;
+  /** Optional override of the ray-walk resolver (tests count resolutions through it). */
+  readonly resolveAimTargets?: typeof defaultResolveAimTargets;
 }
 
 /**
@@ -61,7 +66,10 @@ export interface AimInteractionDeps {
  * Rays are in the Three.js root frame, in meters. No resources need disposal; the internal camera is only a pose carrier.
  */
 export function createAimInteraction(deps: AimInteractionDeps) {
-  const { camera, renderer, xrRig, runtimeObjectRegistry, getRuntimeObjectVisiblePaths } = deps;
+  const { camera, renderer, xrRig, runtimeObjectRegistry } = deps;
+  const resolveAimTargets = deps.resolveAimTargets ?? defaultResolveAimTargets;
+  // One resolution per distinct ray per frame: keyed by the ray numbers, ignored geodesic and frame serial.
+  let aimCache: { readonly key: string; readonly targets: readonly AimTarget[] } | undefined;
   // Pose-only camera that adapts a RootAimRay to the camera-based resolveAimTargets API.
   const aimRayCamera = new THREE.PerspectiveCamera(70, 1, renderCameraNearMeters, renderCameraFarMeters);
   // Which of several overlapping candidates is selected; valid only while the candidate signature is unchanged.
@@ -96,16 +104,39 @@ export function createAimInteraction(deps: AimInteractionDeps) {
     const ignoredGeodesicIds = deps.getMenuState().selectedTool === "geodesic-cannon-aim" && activeGeodesicId
       ? [activeGeodesicId]
       : undefined;
-    const aimCamera = syncAimRayCamera(ray);
+    const key = [
+      ray.origin.x, ray.origin.y, ray.origin.z,
+      ray.direction.x, ray.direction.y, ray.direction.z,
+      ray.quaternion.x, ray.quaternion.y, ray.quaternion.z, ray.quaternion.w,
+      ignoredGeodesicIds?.join(",") ?? "",
+      deps.getFrameSerial(),
+    ].join("|");
+    if (aimCache?.key === key) {
+      return aimCache.targets;
+    }
 
-    return resolveAimTargets({
+    const aimCamera = syncAimRayCamera(ray);
+    const pose = deps.getPlayerPose();
+    const targets = resolveAimTargets({
       world: deps.getWorld(),
       registry: runtimeObjectRegistry,
       camera: aimCamera,
-      visiblePortalPaths: getRuntimeObjectVisiblePaths(),
+      rootCellId: pose.cellId,
+      rootAnchorPoint: {
+        x: pose.position.x,
+        y: pose.position.y,
+        z: pose.position.z + DEFAULT_PLAYER_EYE_HEIGHT_METERS,
+      },
       maxDistanceMeters: 24,
       ignoredGeodesicIds,
     });
+    aimCache = { key, targets };
+    return targets;
+  }
+
+  // Drops the cached resolution; call after anything that changes the registry or world within a frame.
+  function invalidateAimCache(): void {
+    aimCache = undefined;
   }
 
   // Only object hits within interaction range participate in cycling.
@@ -201,7 +232,7 @@ export function createAimInteraction(deps: AimInteractionDeps) {
     const fields: Record<string, string | number | undefined> = {
       kind: target.kind,
       cellId: target.cellId,
-      portalPathId: target.portalPathId,
+      hopCount: target.hopCount,
       distanceMeters: roundNumber(target.distanceMeters),
       localPoint: formatVec3(target.localPoint),
       rootPoint: formatVec3(target.rootPoint),
@@ -301,7 +332,8 @@ export function createAimInteraction(deps: AimInteractionDeps) {
 
   return {
     resolveCurrentAimTarget,
-      resolveCurrentAimTargets,
+    resolveCurrentAimTargets,
+    invalidateAimCache,
     cycleFocusedAimTarget,
     findFocusedRuntimeObject,
     targetIsWithinInteractionRange,

@@ -53,14 +53,14 @@ export function getAimForwardVector(ray?: RootAimRay): { readonly x: number; rea
 }
 
 /**
- * Builds a string identifying an ordered list of aim targets (object id, geodesic emitter id, portal path id) so callers can detect when the set under the ray changed
+ * Builds a string identifying an ordered list of aim targets (object id, geodesic emitter id, portal hop count) so callers can detect when the set under the ray changed
  * and reset target cycling.
  */
 export function createAimTargetCycleSignature(targets: readonly AimTarget[]): string {
   return targets.map((target) => [
     target.object?.id ?? "",
     target.geodesicEmitterGeodesicId ?? "",
-    target.portalPathId,
+    target.hopCount,
   ].join(":")).join("|");
 }
 

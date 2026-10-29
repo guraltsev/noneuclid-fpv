@@ -1195,7 +1195,7 @@ Aim-ray resolution for both input modes: the desktop camera center ray and the r
 
 ### `render/three/aimTarget.ts`
 
-Crosshair aim picking: finds what the camera's centre ray hits, across portals.
+Aim picking: finds what an aim ray (desktop crosshair or XR controller) hits, across portals.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
@@ -1204,7 +1204,8 @@ Crosshair aim picking: finds what the camera's centre ray hits, across portals.
 | interface | `ResolveAimTargetRequest` | Inputs for {@link resolveAimTarget} and {@link resolveAimTargets}. |
 | const | `geodesicSegmentAimRadiusMeters` | Radius of the capsule used to pick geodesic segments, meters. |
 | function | `resolveAimTarget` | Returns the best aim target under the camera crosshair, or `undefined` if nothing is hit. |
-| function | `resolveAimTargets` | Returns every aim target along the centre ray through all visible portal paths, best first. |
+| function | `resolveAimTargetsByRayWalk` | Returns every aim target along the ray, best first, found by walking the ray through the glued cells. |
+| function | `resolveAimTargets` | Returns the best aim target along the ray, or `undefined` if nothing is hit. |
 | function | `getGeodesicEmitterAimCylinderBounds` | Returns the vertical-cylinder proxy used to pick a geodesic cannon, or `undefined` if the cannon has no collision bounds. |
 | function | `getGeodesicEmitterAimSphereCenter` | Returns the centre of the sphere used to pick (and snap the aim to) a geodesic cannon, in the cell-local frame (meters). |
 
@@ -1811,7 +1812,7 @@ Aim-ray value type and pure aim helpers shared by desktop and XR interaction cod
 | interface | `RootAimRay` | A ray in the render root's Three.js frame. |
 | function | `intersectRootRayWithFloor` | Intersects a Three.js-frame ray with the floor plane z = 0 of the world frame. |
 | function | `getAimForwardVector` | Returns the ray's direction in world axes, or `undefined` if no ray is given. |
-| function | `createAimTargetCycleSignature` | Builds a string identifying an ordered list of aim targets (object id, geodesic emitter id, portal path id) so callers can detect when the set under the ray changed and reset target cycling. |
+| function | `createAimTargetCycleSignature` | Builds a string identifying an ordered list of aim targets (object id, geodesic emitter id, portal hop count) so callers can detect when the set under the ray changed and reset target cycling. |
 | function | `getRuntimeObjectInteractionRangeMeters` | Returns the maximum interaction distance in meters for an object: tooltip range, else interactable range, else 2.5. |
 
 ### `render/three/runtimeDiagnostics.ts`

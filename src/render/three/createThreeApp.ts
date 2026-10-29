@@ -455,6 +455,8 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   // renderFrame (movement), transformPlayerForGeometryCommit and the reset/teleport helpers; factories read it
   // through getPlayerPose getters.
   let playerPose = appState.playerPose;
+  // Incremented once per rendered frame; keys the per-frame aim-ray cache.
+  let aimFrameSerial = 0;
   // XR availability/session status. Written by the async detect call, enterVr, the session "end" listener
   // and requestAppRestart failure handling; read by renderFrame to choose the XR or desktop path.
   let xrSessionState: XrSessionState = createXrSessionState("unknown", {
@@ -1020,6 +1022,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     resolveDesktopTooltipScreenPosition,
     getRuntimeObjectTooltipText,
     getWorldFocusMessageDefinition,
+    invalidateAimCache,
   } = createAimInteraction({
     camera,
     renderer,
@@ -1029,7 +1032,8 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     getDebugLevel: () => debugLevel,
     getMenuState: () => menuState,
     getCannonToolState: () => activeGeodesicCannonToolState,
-    getRuntimeObjectVisiblePaths,
+    getPlayerPose: () => playerPose,
+    getFrameSerial: () => aimFrameSerial,
   });
 
   const {
@@ -1233,6 +1237,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
    */
   function renderFrame(time?: DOMHighResTimeStamp, xrFrame?: XRFrame): void {
     frameDrawn = false;
+    aimFrameSerial += 1;
     frameErrorGuard.runFrame(
       () => renderFrameUnguarded(time, xrFrame),
       () => {
@@ -1419,6 +1424,11 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       (menuState.selectedTool === "none" || menuState.selectedTool === "aim")
     ) {
       primaryActionConsumed = tryUseFocusedObjectPrimaryInteraction(activeAimRay);
+    }
+
+    if (primaryActionConsumed) {
+      // A consumed action may have changed the registry; drop the per-frame aim cache.
+      invalidateAimCache();
     }
 
     if (frame.interactRequested && !desktopFlagEditor.isOpen()) {

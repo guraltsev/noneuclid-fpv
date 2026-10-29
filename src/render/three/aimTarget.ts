@@ -1,26 +1,35 @@
 /**
- * Crosshair aim picking: finds what the camera's centre ray hits, across portals.
+ * Aim picking: finds what an aim ray (desktop crosshair or XR controller) hits, across portals.
  *
- * The camera ray is given in the root (Three.js) frame, then for every visible portal path whose clip polygon contains the
- * screen centre it is mapped into that path's destination cell (via the inverse of `rootFromDestinationMatrix`) and converted
- * to the cell-local world frame (x right, y forward, z up, meters). In each cell the ray is tested against the floor plane z = 0
- * (restricted to the cell polygon, minus forbidden singularity columns) and against analytic proxies of the runtime objects
- * (vertical cylinders, spheres, oriented boxes, capsules). Hits from all paths are merged and ordered by distance in the root
- * frame, with tolerance-based priority rules that prefer interactive things (protractor label, cannon, geodesic intersection,
- * geodesic segment) over nearly co-distant ones. Results carry both cell-local and root-frame points/normals.
+ * The ray is given in the root (Three.js) frame, which is the local frame of the player's root cell. It is walked through the
+ * glued cells with the segment-walk kernel: it starts in the cell that contains its origin, crosses a portal exactly where it
+ * passes the portal side, and stops at walls, ceilings, too-low apertures and the floor. In every cell copy the ray is tested
+ * against the floor plane z = 0 (restricted to the cell polygon, minus forbidden singularity columns) and against analytic
+ * proxies of the runtime objects (vertical cylinders, spheres, oriented boxes, capsules), accepting only hits inside that
+ * cell's parameter window. Hits are ordered by distance along the ray, with tolerance-based priority rules that prefer
+ * interactive things (protractor label, cannon, geodesic intersection, geodesic segment) over nearly co-distant ones.
+ * Results carry both cell-local and root-frame points/normals and the number of portal hops.
  * Invariants: ray directions are unit length; rays are tested for positive distance only (hits within 1e-5 m are ignored);
  * geodesic-segment tests assume horizontal segment directions.
  */
 import * as THREE from "three";
 import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex";
 import type { CompiledPrismCell } from "../../cell-complex/prismCells";
-import { distanceVec3, dotVec3, normalizeVec3, subVec3, type Vec3 } from "../../math/vec3";
+import { dotVec3, normalizeVec3, subVec3, type Vec3 } from "../../math/vec3";
 import { getDynamicObjectCollisionBounds, signedDistanceToSide, type SimpleCylinderBounds } from "../../movement/collision";
 import { geodesicRayBeamHeightMeters, geodesicRayBeamStartOffsetMeters } from "../../world-objects/geodesicCannon";
 import { createProtractorAngleLabelHitbox } from "../../world-objects/protractorTool";
 import { runtimeObjectToDynamicObjectState, type RuntimeObjectRegistry, type RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
-import type { VisiblePortalPath } from "./visiblePortalPaths";
-import { threeDirectionToWorld, threePointToWorld, worldPointToThree } from "./worldAxes";
+import { locateDevelopedPoint, walkDevelopedSegment, type SegmentWalkPiece } from "../../cell-complex/segmentWalk";
+import {
+  composeRigidTransform3,
+  identityRigidTransform3,
+  invertRigidTransform3,
+  transformDirection3,
+  transformPoint3,
+  type RigidTransform3,
+} from "../../math/rigidTransform3";
+import { threeDirectionToWorld, threePointToWorld } from "./worldAxes";
 
 /** Whether an aim target is the floor or a world object. */
 export type AimTargetKind = "floor" | "object";
@@ -28,22 +37,22 @@ export type AimTargetKind = "floor" | "object";
 /** One thing the aim ray hits, expressed both in the hit cell's local frame and in the root (viewer) frame. */
 export interface AimTarget {
   readonly kind: AimTargetKind;
-  /** Cell in which the hit was found (the destination cell of the visible portal path). */
+  /** Cell copy in which the hit was found (reached by walking the ray through portals). */
   readonly cellId: string;
-  /** Ray origin in the hit cell's local frame (the eye as seen through the portal path), meters. */
+  /** Ray origin in the hit cell's local frame (the eye as seen through the portals walked), meters. */
   readonly localEyePosition: Vec3;
   /** Aim point in the hit cell's local frame, meters; for objects this may be a sticky or centre target rather than the surface hit. */
   readonly localPoint: Vec3;
   /** Unit surface normal at the hit in the cell-local frame. */
   readonly localNormal: Vec3;
-  /** `localPoint` mapped to the root world frame (world axes, meters) through the portal path. */
+  /** `localPoint` mapped to the root world frame (world axes, meters) through the portals walked. */
   readonly rootPoint: Vec3;
   /** `localNormal` mapped to the root world frame, normalized. */
   readonly rootNormal: Vec3;
-  /** Distance from the eye to the surface hit measured in the root frame, meters. */
+  /** Distance from the ray origin to the surface hit along the 3-D ray (the ray parameter), meters. */
   readonly distanceMeters: number;
-  /** Id of the visible portal path through which the target was reached. */
-  readonly portalPathId: number;
+  /** Portal crossings between the ray origin's cell and the hit cell. */
+  readonly hopCount: number;
   /** The hit object; absent for floor targets. */
   readonly object?: RuntimeWorldObject;
   /** For geodesic segments and cannon handles: arc-length position of the aimed point along the segment, clamped to [0, length], meters. */
@@ -60,8 +69,10 @@ export interface ResolveAimTargetRequest {
   readonly registry: RuntimeObjectRegistry;
   /** Camera whose world position and forward (-z) axis define the ray, in the root Three.js frame. */
   readonly camera: THREE.Camera;
-  /** Visible portal paths; only those whose clip polygon contains the screen centre are tested. */
-  readonly visiblePortalPaths: readonly VisiblePortalPath[];
+  /** The player's (render root) cell; the Three.js root frame is this cell's local frame. */
+  readonly rootCellId: string;
+  /** A point inside the root cell (world axes, root frame), e.g. the player at eye height; defaults to the ray origin. */
+  readonly rootAnchorPoint?: Vec3;
   /** Maximum hit distance for floor and ordinary objects, meters (default 24). */
   readonly maxDistanceMeters?: number;
   /** Maximum hit distance for cannons, meters (default 200). */
@@ -70,13 +81,21 @@ export interface ResolveAimTargetRequest {
   readonly ignoredGeodesicIds?: readonly string[];
 }
 
-// The aim ray expressed in a destination cell's local world frame; origin/direction in meters/unit.
+// The aim ray expressed in one cell copy's local world frame; origin/direction in meters/unit.
 interface CellRay {
-  readonly path: VisiblePortalPath;
   readonly origin: Vec3;
   readonly direction: Vec3;
-  readonly rootFromCellMatrix: THREE.Matrix4;
+  readonly rootFromCell: RigidTransform3;
 }
+
+// Allowed 3-D ray parameters [tMin, tMax] of hits in one cell copy.
+interface HitWindow {
+  readonly tMin: number;
+  readonly tMax: number;
+}
+
+const hitWindowToleranceMeters = 1e-6;
+const maxRayWalkCrossings = 64;
 
 // Result of one ray-vs-object test, in the cell-local frame. `point` is the surface hit (defaults to origin + distance * direction); `targetPoint` is where the aim should snap (e.g. centerline).
 interface ObjectAimHit {
@@ -88,8 +107,6 @@ interface ObjectAimHit {
   readonly geodesicEmitterGeodesicId?: string;
 }
 
-// The ray always goes through the screen centre (crosshair).
-const centerNdc = { x: 0, y: 0 };
 // Numerical epsilon (meters) for hit validity and containment tests.
 const aimPointToleranceMeters = 1e-5;
 // Targets closer than this (meters) to the nearest hit are ordered by kind priority instead of strict distance.
@@ -121,77 +138,152 @@ export function resolveAimTarget(request: ResolveAimTargetRequest): AimTarget | 
 }
 
 /**
- * Returns every aim target along the centre ray through all visible portal paths, best first.
+ * Returns every aim target along the ray, best first, found by walking the ray through the glued cells.
  *
- * Updates the camera's world matrix. The ray starts at the camera position and points along its forward (-z) axis,
- * both in the root Three.js frame. Ordering is by root-frame distance, except hits within the priority tolerances are
- * ordered by object kind (protractor label > cannon > geodesic intersection > geodesic segment > floor). Cost is linear in
- * the number of visible paths times objects per destination cell.
+ * The ray is read from the camera (world position, forward -z axis; root Three.js frame, which is the frame of
+ * `rootCellId`). It starts in the cell that contains its origin, continues through a portal exactly where it crosses the
+ * portal side, and stops at walls, at a ceiling, at a portal whose target is lower than the ray, and at the floor.
+ * Each cell copy is tested once, for hits inside its parameter window. Ordering is by distance along the ray, except hits
+ * within the priority tolerances are ordered by object kind (protractor label > cannon > geodesic intersection >
+ * geodesic segment > floor). Updates the camera's world matrix.
  */
-export function resolveAimTargets(request: ResolveAimTargetRequest): readonly AimTarget[] {
+export function resolveAimTargetsByRayWalk(request: ResolveAimTargetRequest): readonly AimTarget[] {
   const maxDistanceMeters = request.maxDistanceMeters ?? 24;
+  const maxEmitterDistanceMeters = Math.max(
+    request.maxEmitterDistanceMeters ?? defaultMaxEmitterAimDistanceMeters,
+    maxDistanceMeters,
+  );
+  const ignoredGeodesicIds = new Set(request.ignoredGeodesicIds ?? []);
   request.camera.updateMatrixWorld(true);
-  const originRootThree = new THREE.Vector3().setFromMatrixPosition(request.camera.matrixWorld);
-  const directionRootThree = new THREE.Vector3(0, 0, -1);
+  const originThree = new THREE.Vector3().setFromMatrixPosition(request.camera.matrixWorld);
   const cameraQuaternion = new THREE.Quaternion();
   request.camera.getWorldQuaternion(cameraQuaternion);
-  directionRootThree.applyQuaternion(cameraQuaternion).normalize();
+  const directionThree = new THREE.Vector3(0, 0, -1).applyQuaternion(cameraQuaternion).normalize();
 
-  return resolveAimTargetsFromRootThreeRay({
-    world: request.world,
-    registry: request.registry,
-    rootOriginThree: originRootThree,
-    rootDirectionThree: directionRootThree,
-    ndcPoint: centerNdc,
-    visiblePortalPaths: request.visiblePortalPaths,
-    maxDistanceMeters,
-    maxEmitterDistanceMeters: request.maxEmitterDistanceMeters ?? defaultMaxEmitterAimDistanceMeters,
-    ignoredGeodesicIds: new Set(request.ignoredGeodesicIds ?? []),
-  });
-}
+  // The Three.js root frame is the root cell's local frame (x, y, z-up after the axis conversion).
+  const origin = threePointToWorld(originThree);
+  const direction = normalizeVec3(threeDirectionToWorld(directionThree));
+  const anchor = request.rootAnchorPoint ?? origin;
+  const located = locateDevelopedPoint(
+    request.world,
+    request.rootCellId,
+    { x: anchor.x, y: anchor.y },
+    { x: origin.x, y: origin.y },
+    maxRayWalkCrossings,
+  );
+  // An anchor outside the root cell (or a degenerate setup) falls back to treating the origin as lying in the root cell.
+  const originInRoot = located.status === "start-outside";
+  if (located.status !== "end" && !originInRoot) {
+    return [];
+  }
 
-// Core of the picker: expects a root-frame Three.js ray; result is sorted with the priority comparator.
-function resolveAimTargetsFromRootThreeRay(request: {
-  readonly world: CompiledCellComplex;
-  readonly registry: RuntimeObjectRegistry;
-  readonly rootOriginThree: THREE.Vector3;
-  readonly rootDirectionThree: THREE.Vector3;
-  readonly ndcPoint: { readonly x: number; readonly y: number };
-  readonly visiblePortalPaths: readonly VisiblePortalPath[];
-  readonly maxDistanceMeters: number;
-  readonly maxEmitterDistanceMeters: number;
-  readonly ignoredGeodesicIds: ReadonlySet<string>;
-}): readonly AimTarget[] {
-  const rootDirectionThree = request.rootDirectionThree.clone().normalize();
+  const originCellId = originInRoot ? request.rootCellId : located.cellId;
+  const originFromRoot = originInRoot ? identityRigidTransform3 : located.cellFromStart;
+  const o = transformPoint3(originFromRoot, origin);
+  const d = transformDirection3(originFromRoot, direction);
+  const s = Math.hypot(d.x, d.y);
+  const verticalRay = s < 1e-6;
+  const pieces: readonly SegmentWalkPiece[] = verticalRay
+    ? [singleCellPiece(originCellId, maxEmitterDistanceMeters)]
+    : walkRayPieces(request.world, originCellId, o, d, s, maxEmitterDistanceMeters);
 
   const candidates: AimTarget[] = [];
-
-  for (const path of request.visiblePortalPaths) {
-    if (!pathContainsNdcPoint(path, request.ndcPoint)) {
-      continue;
-    }
-
-    const cell = request.world.cellsById.get(path.destinationCellId);
+  for (let k = 0; k < pieces.length; k += 1) {
+    const piece = pieces[k];
+    const cell = request.world.cellsById.get(piece.cellId);
     if (!cell) {
-      continue;
+      break;
     }
 
-    // Re-express the ray in the destination cell's local frame, then collect object and floor hits there.
-    const ray = buildCellRayFromRootThreeRay(request.rootOriginThree, rootDirectionThree, path);
+    let tMin = verticalRay ? 0 : piece.tEnter / s;
+    let tMax = verticalRay ? maxEmitterDistanceMeters : piece.tExit / s;
+    let stop = false;
+    let floorT: number | undefined;
+    if (d.z < -1e-9) {
+      const t = -o.z / d.z;
+      if (t >= tMin - hitWindowToleranceMeters && t <= tMax + hitWindowToleranceMeters) {
+        tMax = Math.max(tMin, t);
+        floorT = t;
+        stop = true;
+      }
+    } else if (d.z > 1e-9) {
+      const t = (cell.heightMeters - o.z) / d.z;
+      if (t >= tMin - hitWindowToleranceMeters && t <= tMax + hitWindowToleranceMeters) {
+        tMax = Math.max(tMin, t);
+        stop = true;
+      }
+    }
+
+    const cellFromRoot = composeRigidTransform3(piece.cellFromStart, originFromRoot);
+    const rootFromCell = invertRigidTransform3(cellFromRoot);
+    const ray: CellRay = {
+      origin: transformPoint3(piece.cellFromStart, o),
+      direction: transformDirection3(piece.cellFromStart, d),
+      rootFromCell,
+    };
     candidates.push(
       ...resolveObjectAimTargets(
         request.registry,
         cell,
         ray,
-        request.maxDistanceMeters,
-        request.maxEmitterDistanceMeters,
-        request.ignoredGeodesicIds,
+        { tMin, tMax },
+        maxDistanceMeters,
+        maxEmitterDistanceMeters,
+        ignoredGeodesicIds,
+        k,
       ),
-      ...resolveFloorAimTarget(cell, ray, request.maxDistanceMeters),
     );
+    if (floorT !== undefined && floorT <= maxDistanceMeters) {
+      candidates.push(...resolveFloorAimTarget(cell, ray, floorT, k));
+    }
+
+    if (stop || piece.exit.kind === "wall") {
+      break;
+    }
+
+    if (piece.exit.kind === "portal") {
+      // The ray must clear the lower of the two apertures' cells where it crosses the portal side.
+      const target = request.world.cellsById.get(piece.exit.portal.targetCellId);
+      const zAtExit = o.z + d.z * (piece.tExit / s);
+      if (!target || zAtExit > Math.min(cell.heightMeters, target.heightMeters) + aimPointToleranceMeters) {
+        break;
+      }
+    }
   }
 
   return candidates.sort(compareAimTargets);
+}
+
+/**
+ * Returns the best aim target along the ray, or `undefined` if nothing is hit.
+ */
+export function resolveAimTargets(request: ResolveAimTargetRequest): readonly AimTarget[] {
+  return resolveAimTargetsByRayWalk(request);
+}
+
+// A zero-length piece-like window used for vertical rays and as the fallback: only the origin cell, identity frame.
+function singleCellPiece(cellId: string, lengthMeters: number): SegmentWalkPiece {
+  return { cellId, cellFromStart: identityRigidTransform3, tEnter: 0, tExit: lengthMeters, exit: { kind: "end" } };
+}
+
+// Horizontal walk of the ray; if the start lies outside its cell the ray is tested in that cell alone, without crossings.
+function walkRayPieces(
+  world: CompiledCellComplex,
+  cellId: string,
+  o: Vec3,
+  d: Vec3,
+  s: number,
+  maxEmitterDistanceMeters: number,
+): readonly SegmentWalkPiece[] {
+  const result = walkDevelopedSegment({
+    world,
+    cellId,
+    start: { x: o.x, y: o.y },
+    direction: { x: d.x / s, y: d.y / s },
+    lengthMeters: maxEmitterDistanceMeters * s,
+    maxCrossings: maxRayWalkCrossings,
+  });
+  return result.pieces.length > 0 ? result.pieces : [singleCellPiece(cellId, maxEmitterDistanceMeters * s)];
 }
 
 // Sort comparator derived from the (non-transitive-by-design) pairwise preference in isBetterAimTarget.
@@ -205,31 +297,35 @@ function compareAimTargets(left: AimTarget, right: AimTarget): number {
   return 0;
 }
 
-// Maps a root Three.js ray into a cell's local world frame: invert root-from-destination, apply to origin (point) and direction (vector), then Three-to-world axes.
-function buildCellRayFromRootThreeRay(
-  originRootThree: THREE.Vector3,
-  directionRootThree: THREE.Vector3,
-  path: VisiblePortalPath,
-): CellRay {
-  const cellFromRootMatrix = path.rootFromDestinationMatrix.clone().invert();
-  const originCellThree = originRootThree.clone().applyMatrix4(cellFromRootMatrix);
-  const directionCellThree = directionRootThree.clone().transformDirection(cellFromRootMatrix).normalize();
-
-  return {
-    path,
-    origin: threePointToWorld(originCellThree),
-    direction: threeDirectionToWorld(directionCellThree),
-    rootFromCellMatrix: path.rootFromDestinationMatrix,
-  };
+// Object proxy hit for one object in the cell-local frame (before the window test).
+function intersectAimObject(
+  object: RuntimeWorldObject,
+  origin: Vec3,
+  direction: Vec3,
+  ignoredGeodesicIds: ReadonlySet<string>,
+): ObjectAimHit | undefined {
+  const bounds = getDynamicObjectCollisionBounds(runtimeObjectToDynamicObjectState(object));
+  // Pick the proxy shape by object kind: protractor label box, geodesic capsule, cannon cylinder+sphere+handles, collision cylinder, else a small sphere at the pose.
+  return object.kind === "protractor-angle"
+    ? intersectRayWithProtractorAngleLabelHitbox(object, origin, direction)
+    : object.kind === "geodesic-segment"
+    ? intersectRayWithSelectableSegment(object, origin, direction)
+    : object.kind === "geodesic-cannon"
+      ? intersectRayWithGeodesicEmitterAimCylinder(origin, direction, object, ignoredGeodesicIds)
+    : bounds
+      ? intersectRayWithVerticalCylinder(origin, direction, bounds)
+      : intersectRayWithSphere(origin, direction, object.localPose.translation, fallbackObjectRadiusMeters);
 }
 
 function resolveObjectAimTargets(
   registry: RuntimeObjectRegistry,
   cell: CompiledPrismCell,
   ray: CellRay,
+  window: HitWindow,
   maxDistanceMeters: number,
   maxEmitterDistanceMeters: number,
   ignoredGeodesicIds: ReadonlySet<string>,
+  hopCount: number,
 ): readonly AimTarget[] {
   const hits: AimTarget[] = [];
 
@@ -246,20 +342,21 @@ function resolveObjectAimTargets(
       continue;
     }
 
-    const bounds = getDynamicObjectCollisionBounds(runtimeObjectToDynamicObjectState(object));
-    // Pick the proxy shape by object kind: protractor label box, geodesic capsule, cannon cylinder+sphere+handles, collision cylinder, else a small sphere at the pose.
-    const hit = object.kind === "protractor-angle"
-      ? intersectRayWithProtractorAngleLabelHitbox(object, ray.origin, ray.direction)
-      : object.kind === "geodesic-segment"
-      ? intersectRayWithSelectableSegment(object, ray.origin, ray.direction)
-      : object.kind === "geodesic-cannon"
-        ? intersectRayWithGeodesicEmitterAimCylinder(ray.origin, ray.direction, object, ignoredGeodesicIds)
-      : bounds
-        ? intersectRayWithVerticalCylinder(ray.origin, ray.direction, bounds)
-        : intersectRayWithSphere(ray.origin, ray.direction, object.localPose.translation, fallbackObjectRadiusMeters);
+    let hit = intersectAimObject(object, ray.origin, ray.direction, ignoredGeodesicIds);
+    if (hit && hit.distance < window.tMin - hitWindowToleranceMeters && window.tMin > 0) {
+      // The nearest surface lies before this cell copy (the proxy pokes across the entry portal); the part of the proxy
+      // inside this cell is what the ray can hit here, so test again from the window start.
+      const shifted = intersectAimObject(object, pointOnRay(ray.origin, ray.direction, window.tMin), ray.direction, ignoredGeodesicIds);
+      hit = shifted ? { ...shifted, distance: shifted.distance + window.tMin } : undefined;
+    }
 
     const targetMaxDistanceMeters = object.kind === "geodesic-cannon" ? maxEmitterDistanceMeters : maxDistanceMeters;
-    if (!hit || hit.distance > targetMaxDistanceMeters) {
+    if (
+      !hit ||
+      hit.distance > targetMaxDistanceMeters ||
+      hit.distance < window.tMin - hitWindowToleranceMeters ||
+      hit.distance > window.tMax + hitWindowToleranceMeters
+    ) {
       continue;
     }
 
@@ -274,11 +371,11 @@ function resolveObjectAimTargets(
       localEyePosition: ray.origin,
       localPoint: targetLocalPoint,
       localNormal: hit.normal,
-      rootPoint: transformCellPointToRoot(ray.rootFromCellMatrix, targetLocalPoint),
-      rootNormal: transformCellDirectionToRoot(ray.rootFromCellMatrix, hit.normal),
-      // Distance is measured in the root frame (portal transforms are rigid, so equal to the cell-local distance).
-      distanceMeters: rootDistance(ray, localPoint),
-      portalPathId: ray.path.pathId,
+      rootPoint: transformPoint3(ray.rootFromCell, targetLocalPoint),
+      rootNormal: normalizeVec3(transformDirection3(ray.rootFromCell, hit.normal)),
+      // The cell maps are rigid, so the ray parameter equals the distance in every frame.
+      distanceMeters: hit.distance,
+      hopCount,
       object,
       geodesicSegmentDistanceMeters: hit.geodesicSegmentDistanceMeters,
       geodesicEmitterGeodesicId: hit.geodesicEmitterGeodesicId,
@@ -597,14 +694,10 @@ function pointOnSegmentCenterline(segmentStart: Vec3, segmentDirection: Vec3, di
 function resolveFloorAimTarget(
   cell: CompiledPrismCell,
   ray: CellRay,
-  maxDistanceMeters: number,
+  distance: number,
+  hopCount: number,
 ): readonly AimTarget[] {
-  if (ray.direction.z >= -aimPointToleranceMeters) {
-    return [];
-  }
-
-  const distance = -ray.origin.z / ray.direction.z;
-  if (!Number.isFinite(distance) || distance <= aimPointToleranceMeters || distance > maxDistanceMeters) {
+  if (!Number.isFinite(distance) || distance <= aimPointToleranceMeters) {
     return [];
   }
 
@@ -620,10 +713,10 @@ function resolveFloorAimTarget(
     localEyePosition: ray.origin,
     localPoint: floorPoint,
     localNormal: { x: 0, y: 0, z: 1 },
-    rootPoint: transformCellPointToRoot(ray.rootFromCellMatrix, floorPoint),
-    rootNormal: transformCellDirectionToRoot(ray.rootFromCellMatrix, { x: 0, y: 0, z: 1 }),
-    distanceMeters: rootDistance(ray, floorPoint),
-    portalPathId: ray.path.pathId,
+    rootPoint: transformPoint3(ray.rootFromCell, floorPoint),
+    rootNormal: normalizeVec3(transformDirection3(ray.rootFromCell, { x: 0, y: 0, z: 1 })),
+    distanceMeters: distance,
+    hopCount,
   }];
 }
 
@@ -1103,22 +1196,6 @@ function pointOnRay(origin: Vec3, direction: Vec3, distance: number): Vec3 {
   };
 }
 
-// Cell-local world point to root world point: world to Three axes, apply the root-from-cell matrix, Three back to world.
-function transformCellPointToRoot(rootFromCellMatrix: THREE.Matrix4, point: Vec3): Vec3 {
-  return threePointToWorld(worldPointToThree(point).applyMatrix4(rootFromCellMatrix));
-}
-
-// As above for a direction (no translation), renormalized.
-function transformCellDirectionToRoot(rootFromCellMatrix: THREE.Matrix4, direction: Vec3): Vec3 {
-  return normalizeVec3(threeDirectionToWorld(worldPointToThree(direction).transformDirection(rootFromCellMatrix)));
-}
-
-function rootDistance(ray: CellRay, localPoint: Vec3): number {
-  const originRoot = transformCellPointToRoot(ray.rootFromCellMatrix, ray.origin);
-  const pointRoot = transformCellPointToRoot(ray.rootFromCellMatrix, localPoint);
-  return distanceVec3(originRoot, pointRoot);
-}
-
 function distanceSquared2(a: Vec3, b: Vec3): number {
   const dx = a.x - b.x;
   const dy = a.y - b.y;
@@ -1131,34 +1208,4 @@ function normalizeVec3OrFallback(direction: Vec3): Vec3 {
   } catch {
     return { x: 0, y: 0, z: 1 };
   }
-}
-
-// Screen-space test: bounding rect first, then even-odd ray casting against the clip polygon (vertices count as inside).
-function pathContainsNdcPoint(path: VisiblePortalPath, point: { readonly x: number; readonly y: number }): boolean {
-  if (
-    point.x < path.clipRectNdc.minX - aimPointToleranceMeters ||
-    point.x > path.clipRectNdc.maxX + aimPointToleranceMeters ||
-    point.y < path.clipRectNdc.minY - aimPointToleranceMeters ||
-    point.y > path.clipRectNdc.maxY + aimPointToleranceMeters
-  ) {
-    return false;
-  }
-
-  let inside = false;
-  const polygon = path.clipPolygonNdc;
-  for (let currentIndex = 0, previousIndex = polygon.length - 1; currentIndex < polygon.length; previousIndex = currentIndex++) {
-    const current = polygon[currentIndex];
-    const previous = polygon[previousIndex];
-    if (
-      (current.y > point.y) !== (previous.y > point.y) &&
-      point.x < ((previous.x - current.x) * (point.y - current.y)) / (previous.y - current.y) + current.x
-    ) {
-      inside = !inside;
-    }
-  }
-
-  return inside || polygon.some((vertex) =>
-    Math.abs(vertex.x - point.x) <= aimPointToleranceMeters &&
-    Math.abs(vertex.y - point.y) <= aimPointToleranceMeters
-  );
 }

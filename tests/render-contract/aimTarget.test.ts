@@ -1,9 +1,10 @@
 import * as THREE from "three";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
 import { buildPortalPathTables, type PortalRenderPath } from "../../src/cell-complex/portalPaths";
 import type { CellComplexSpec } from "../../src/cell-complex/specs";
 import { yawRigidTransform3 } from "../../src/math/rigidTransform3";
+import { createAimInteraction } from "../../src/render/three/aimInteraction";
 import { createPlacedFlagObject } from "../../src/world-objects/placedFlags";
 import { createRuntimeObjectRegistry } from "../../src/world-objects/runtimeObjectRegistry";
 import {
@@ -17,8 +18,8 @@ import {
   getGeodesicEmitterAimCylinderBounds,
   getGeodesicEmitterAimSphereCenter,
   resolveAimTarget,
+  resolveAimTargets,
 } from "../../src/render/three/aimTarget";
-import type { VisiblePortalPath } from "../../src/render/three/visiblePortalPaths";
 import { rigidTransformToThreeMatrix, worldPointToThree } from "../../src/render/three/worldAxes";
 
 describe("resolveAimTarget", () => {
@@ -32,7 +33,7 @@ describe("resolveAimTarget", () => {
       world,
       registry,
       camera,
-      visiblePortalPaths: [visiblePath(rootPath)],
+      rootCellId: rootPath.destinationCellId,
     });
 
     expect(target?.kind).toBe("floor");
@@ -62,7 +63,7 @@ describe("resolveAimTarget", () => {
       world,
       registry,
       camera,
-      visiblePortalPaths: [visiblePath(rootPath)],
+      rootCellId: rootPath.destinationCellId,
     });
 
     expect(target?.kind).toBe("object");
@@ -91,7 +92,7 @@ describe("resolveAimTarget", () => {
       world,
       registry,
       camera,
-      visiblePortalPaths: [visiblePath(rootPath)],
+      rootCellId: rootPath.destinationCellId,
       maxDistanceMeters: 24,
     });
 
@@ -142,7 +143,7 @@ describe("resolveAimTarget", () => {
       world,
       registry,
       camera,
-      visiblePortalPaths: [visiblePath(rootPath)],
+      rootCellId: rootPath.destinationCellId,
       maxDistanceMeters: 24,
     });
 
@@ -161,7 +162,7 @@ describe("resolveAimTarget", () => {
       world,
       registry,
       camera,
-      visiblePortalPaths: [visiblePath(pathTable.pathsById.get(0)!), visiblePath(destinationPath)],
+      rootCellId: "room-a",
     });
 
     expect(target?.kind).toBe("floor");
@@ -184,7 +185,7 @@ describe("resolveAimTarget", () => {
       world,
       registry,
       camera,
-      visiblePortalPaths: [visiblePath(pathTable.pathsById.get(0)!), visiblePath(destinationPath)],
+      rootCellId: "room-a",
     });
 
     expect(target).toBeUndefined();
@@ -201,7 +202,7 @@ describe("resolveAimTarget", () => {
       world,
       registry,
       camera,
-      visiblePortalPaths: [visiblePath(rootPath)],
+      rootCellId: rootPath.destinationCellId,
     });
 
     expect(target?.kind).toBe("object");
@@ -231,7 +232,7 @@ describe("resolveAimTarget", () => {
       world,
       registry,
       camera,
-      visiblePortalPaths: [visiblePath(rootPath)],
+      rootCellId: rootPath.destinationCellId,
     });
 
     expect(target?.kind).toBe("object");
@@ -260,7 +261,7 @@ describe("resolveAimTarget", () => {
       world,
       registry,
       camera,
-      visiblePortalPaths: [visiblePath(rootPath)],
+      rootCellId: rootPath.destinationCellId,
     });
 
     expect(target?.kind).toBe("object");
@@ -290,7 +291,7 @@ describe("resolveAimTarget", () => {
         { x: 0.32, y: -2, z: geodesicRayBeamHeightMeters },
         { x: 0.32, y: 0, z: geodesicRayBeamHeightMeters },
       ),
-      visiblePortalPaths: [visiblePath(rootPath)],
+      rootCellId: rootPath.destinationCellId,
     });
     const secondTarget = resolveAimTarget({
       world,
@@ -299,7 +300,7 @@ describe("resolveAimTarget", () => {
         { x: 2, y: 0.32, z: geodesicRayBeamHeightMeters },
         { x: 0, y: 0.32, z: geodesicRayBeamHeightMeters },
       ),
-      visiblePortalPaths: [visiblePath(rootPath)],
+      rootCellId: rootPath.destinationCellId,
     });
 
     expect(firstTarget?.object?.id).toBe("cannon-a");
@@ -331,7 +332,7 @@ describe("resolveAimTarget", () => {
         { x: 2, y: 0.32, z: geodesicRayBeamHeightMeters },
         { x: 0, y: 0.32, z: geodesicRayBeamHeightMeters },
       ),
-      visiblePortalPaths: [visiblePath(rootPath)],
+      rootCellId: rootPath.destinationCellId,
       ignoredGeodesicIds: ["g-a"],
     });
 
@@ -362,7 +363,7 @@ describe("resolveAimTarget", () => {
         { x: 0, y: -2, z: geodesicRayBeamHeightMeters - 0.3 },
         { x: 0, y: 0, z: geodesicRayBeamHeightMeters - 0.3 },
       ),
-      visiblePortalPaths: [visiblePath(rootPath)],
+      rootCellId: rootPath.destinationCellId,
       ignoredGeodesicIds: ["g-a"],
     });
 
@@ -388,7 +389,7 @@ describe("resolveAimTarget", () => {
         { x: 0.5, y: 0.14, z: 1.5 },
         { x: 0.5, y: 0.14, z: geodesicRayBeamHeightMeters },
       ),
-      visiblePortalPaths: [visiblePath(rootPath)],
+      rootCellId: rootPath.destinationCellId,
       maxDistanceMeters: 0.5,
     });
     const endTarget = resolveAimTarget({
@@ -398,7 +399,7 @@ describe("resolveAimTarget", () => {
         { x: 0.85, y: 0.14, z: 1.5 },
         { x: 0.85, y: 0.14, z: geodesicRayBeamHeightMeters },
       ),
-      visiblePortalPaths: [visiblePath(rootPath)],
+      rootCellId: rootPath.destinationCellId,
       maxDistanceMeters: 0.5,
     });
 
@@ -427,7 +428,7 @@ describe("resolveAimTarget", () => {
       world,
       registry,
       camera,
-      visiblePortalPaths: [visiblePath(rootPath)],
+      rootCellId: rootPath.destinationCellId,
     });
 
     expect(target?.kind).toBe("object");
@@ -452,7 +453,7 @@ describe("resolveAimTarget", () => {
       world,
       registry,
       camera,
-      visiblePortalPaths: [visiblePath(rootPath)],
+      rootCellId: rootPath.destinationCellId,
     });
 
     expect(target?.kind).toBe("object");
@@ -479,7 +480,7 @@ describe("resolveAimTarget", () => {
       world,
       registry,
       camera,
-      visiblePortalPaths: [visiblePath(rootPath)],
+      rootCellId: rootPath.destinationCellId,
     });
 
     expect(target?.kind).toBe("object");
@@ -502,7 +503,7 @@ describe("resolveAimTarget", () => {
       world,
       registry,
       camera,
-      visiblePortalPaths: [visiblePath(rootPath)],
+      rootCellId: rootPath.destinationCellId,
     });
 
     expect(target?.kind).toBe("object");
@@ -531,7 +532,7 @@ describe("resolveAimTarget", () => {
       world,
       registry,
       camera,
-      visiblePortalPaths: [visiblePath(rootPath)],
+      rootCellId: rootPath.destinationCellId,
     });
 
     expect(target?.kind).toBe("object");
@@ -559,7 +560,7 @@ describe("resolveAimTarget", () => {
       world,
       registry,
       camera,
-      visiblePortalPaths: [visiblePath(rootPath)],
+      rootCellId: rootPath.destinationCellId,
     });
 
     expect(target).toBeUndefined();
@@ -594,7 +595,7 @@ describe("resolveAimTarget", () => {
       world,
       registry,
       camera,
-      visiblePortalPaths: [visiblePath(rootPath)],
+      rootCellId: rootPath.destinationCellId,
     });
 
     expect(target?.kind).toBe("object");
@@ -624,7 +625,7 @@ describe("resolveAimTarget", () => {
       world,
       registry,
       camera,
-      visiblePortalPaths: [visiblePath(rootPath)],
+      rootCellId: rootPath.destinationCellId,
     });
 
     expect(target?.kind).toBe("object");
@@ -642,7 +643,7 @@ describe("resolveAimTarget", () => {
       world,
       registry,
       camera,
-      visiblePortalPaths: [visiblePath(rootPath)],
+      rootCellId: rootPath.destinationCellId,
       ignoredGeodesicIds: ["g-active"],
     });
 
@@ -660,7 +661,7 @@ describe("resolveAimTarget", () => {
       world,
       registry,
       camera,
-      visiblePortalPaths: [visiblePath(rootPath)],
+      rootCellId: rootPath.destinationCellId,
       ignoredGeodesicIds: ["g-active"],
     });
 
@@ -685,7 +686,7 @@ describe("resolveAimTarget", () => {
       world,
       registry,
       camera,
-      visiblePortalPaths: [visiblePath(rootPath)],
+      rootCellId: rootPath.destinationCellId,
     });
 
     expect(target?.kind).toBe("object");
@@ -709,7 +710,7 @@ describe("resolveAimTarget", () => {
       world,
       registry,
       camera,
-      visiblePortalPaths: [visiblePath(rootPath)],
+      rootCellId: rootPath.destinationCellId,
     });
 
     expect(target?.kind).toBe("object");
@@ -730,7 +731,7 @@ describe("resolveAimTarget", () => {
       world,
       registry,
       camera,
-      visiblePortalPaths: [visiblePath(rootPath)],
+      rootCellId: rootPath.destinationCellId,
     });
 
     expect(target?.kind).toBe("object");
@@ -757,38 +758,197 @@ describe("resolveAimTarget", () => {
       world,
       registry,
       camera,
-      visiblePortalPaths: [visiblePath(pathTable.pathsById.get(0)!), visiblePath(destinationPath)],
+      rootCellId: "room-a",
     });
 
     expect(target?.kind).toBe("object");
     expect(target?.object?.id).toBe("segment-a");
     expect(target?.cellId).toBe("room-b");
-    expect(target?.portalPathId).toBe(destinationPath.id);
+    expect(target?.hopCount).toBe(1);
   });
 });
 
-function visiblePath(path: PortalRenderPath): VisiblePortalPath {
+describe("ray walk", () => {
+  const smallFlagCollision = { radius: 0.3, height: 1, offset: { x: 0, y: 0, z: 0.5 } };
+  const flagIn = (cellId: string, x: number, y: number, id = "flag-b") =>
+    createPlacedFlagObject({
+      id,
+      cellId,
+      localPose: yawRigidTransform3(0, { x, y, z: 0 }),
+      flagType: "WoodenSign1",
+      collision: smallFlagCollision,
+    });
+
+  it("continues through a portal the ray really crosses and reports hops and root points", () => {
+    const world = compileCellComplex(rayWalkWorld());
+    const registry = createRuntimeObjectRegistry([flagIn("room-b", 0, 0)]);
+    const targets = resolveAimTargets({
+      world,
+      registry,
+      camera: cameraLookingAt({ x: 0, y: -0.5, z: 1.45 }, { x: 2, y: 0, z: 0.5 }),
+      rootCellId: "room-a",
+    });
+
+    expect(targets[0]?.object?.id).toBe("flag-b");
+    expect(targets[0]?.cellId).toBe("room-b");
+    expect(targets[0]?.hopCount).toBe(1);
+    expect(targets[0]?.rootPoint.x).toBeGreaterThan(1.5);
+    expect(targets[0]?.rootPoint.x).toBeLessThan(2.5);
+  });
+
+  it("does not pick anything in the neighbour when the ray hits the wall beside the portal", () => {
+    const world = compileCellComplex(rayWalkWorld());
+    const registry = createRuntimeObjectRegistry([flagIn("room-b", 0.5, 0.8)]);
+    const targets = resolveAimTargets({
+      world,
+      registry,
+      camera: cameraLookingAt({ x: 0, y: 0.5, z: 0.5 }, { x: 0.8, y: 1, z: 0.5 }),
+      rootCellId: "room-a",
+    });
+
+    expect(targets.filter((target) => target.cellId === "room-b")).toEqual([]);
+    expect(targets).toEqual([]);
+  });
+
+  it("hits an object that straddles the entry portal exactly once", () => {
+    const world = compileCellComplex(rayWalkWorld());
+    const registry = createRuntimeObjectRegistry([flagIn("room-b", -0.9, 0)]);
+    const targets = resolveAimTargets({
+      world,
+      registry,
+      camera: cameraLookingAt({ x: 0, y: 0, z: 0.5 }, { x: 2, y: 0, z: 0.5 }),
+      rootCellId: "room-a",
+    });
+
+    expect(targets.filter((target) => target.object?.id === "flag-b")).toHaveLength(1);
+  });
+
+  it("ignores the part of an object that pokes past the far wall", () => {
+    const world = compileCellComplex(rayWalkWorld());
+    const registry = createRuntimeObjectRegistry([flagIn("room-b", 0.9, 0.9)]);
+    const targets = resolveAimTargets({
+      world,
+      registry,
+      camera: cameraLookingAt({ x: 0, y: 0, z: 0.5 }, { x: 2.9, y: 1.15, z: 0.5 }),
+      rootCellId: "room-a",
+    });
+
+    expect(targets).toEqual([]);
+  });
+
+  it("stops at a lower target cell when the ray crosses the portal above its ceiling", () => {
+    const world = compileCellComplex(rayWalkWorld(1));
+    const registry = createRuntimeObjectRegistry([flagIn("room-b", 0.5, 0)]);
+    const through = resolveAimTargets({
+      world,
+      registry,
+      camera: cameraLookingAt({ x: 0, y: 0, z: 1.45 }, { x: 1, y: 0, z: 1.2 }),
+      rootCellId: "room-a",
+    });
+    const below = resolveAimTargets({
+      world,
+      registry,
+      camera: cameraLookingAt({ x: 0, y: 0, z: 0.9 }, { x: 1, y: 0, z: 0.8 }),
+      rootCellId: "room-a",
+    });
+
+    expect(through).toEqual([]);
+    expect(below[0]?.object?.id).toBe("flag-b");
+  });
+
+  it("picks the floor of the origin cell for a vertical ray", () => {
+    const world = compileCellComplex(rayWalkWorld());
+    const targets = resolveAimTargets({
+      world,
+      registry: createRuntimeObjectRegistry(),
+      camera: cameraLookingAt({ x: 0, y: 0, z: 1.5 }, { x: 0, y: 0, z: 0 }),
+      rootCellId: "room-a",
+    });
+
+    expect(targets[0]?.kind).toBe("floor");
+    expect(targets[0]?.cellId).toBe("room-a");
+    expect(targets[0]?.hopCount).toBe(0);
+  });
+
+  it("starts in the cell that holds a ray origin held through a portal", () => {
+    const world = compileCellComplex(rayWalkWorld());
+    const targets = resolveAimTargets({
+      world,
+      registry: createRuntimeObjectRegistry(),
+      camera: cameraLookingAt({ x: 1.2, y: 0, z: 1.4 }, { x: 1.2, y: 0, z: 0 }),
+      rootCellId: "room-a",
+      rootAnchorPoint: { x: 0.8, y: 0, z: 1.4 },
+    });
+
+    expect(targets[0]?.kind).toBe("floor");
+    expect(targets[0]?.cellId).toBe("room-b");
+    expect(targets[0]?.hopCount).toBe(0);
+    expect(targets[0]?.localPoint.x).toBeCloseTo(-0.8);
+    expect(targets[0]?.localPoint.y).toBeCloseTo(0);
+    expect(targets[0]?.rootPoint.x).toBeCloseTo(1.2);
+    expect(targets[0]?.rootPoint.y).toBeCloseTo(0);
+    expect(targets[0]?.rootPoint.z).toBeCloseTo(0);
+  });
+
+  it("resolves once per distinct ray and frame through the aim interaction", () => {
+    const world = compileCellComplex(rayWalkWorld());
+    const registry = createRuntimeObjectRegistry();
+    const resolver = vi.fn(resolveAimTargets);
+    let frameSerial = 1;
+    const interaction = createAimInteraction({
+      camera: new THREE.PerspectiveCamera(),
+      renderer: {} as THREE.WebGLRenderer,
+      xrRig: {} as never,
+      runtimeObjectRegistry: registry,
+      getWorld: () => world,
+      getDebugLevel: () => "off" as never,
+      getMenuState: () => ({ selectedTool: "none" }) as never,
+      getCannonToolState: () => ({ activeGeodesicId: undefined }) as never,
+      getPlayerPose: () => ({ cellId: "room-a", position: { x: 0, y: 0, z: 0 }, yawRadians: 0, pitchRadians: 0 }),
+      getFrameSerial: () => frameSerial,
+      resolveAimTargets: resolver,
+    });
+    const camera = cameraLookingAt({ x: 0, y: 0, z: 1.5 }, { x: 0.5, y: 0.5, z: 0 });
+    const ray = {
+      origin: camera.position.clone(),
+      direction: new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion),
+      quaternion: camera.quaternion.clone(),
+    };
+
+    interaction.resolveCurrentAimTargets(ray);
+    interaction.resolveCurrentAimTargets(ray);
+    interaction.resolveCurrentAimTarget(ray);
+    expect(resolver).toHaveBeenCalledTimes(1);
+
+    interaction.invalidateAimCache();
+    interaction.resolveCurrentAimTargets(ray);
+    expect(resolver).toHaveBeenCalledTimes(2);
+
+    frameSerial = 2;
+    interaction.resolveCurrentAimTargets(ray);
+    expect(resolver).toHaveBeenCalledTimes(3);
+  });
+});
+
+// room-a (north, south, west walls; east portal) glued to room-b (west portal), both 2 m by 2 m; room-b sits at x = 2 in room-a's frame.
+function rayWalkWorld(roomBHeightMeters = 2): CellComplexSpec {
   return {
-    pathId: path.id,
-    destinationCellId: path.destinationCellId,
-    depth: path.depth,
-    rootFromDestinationMatrix: rigidTransformToThreeMatrix(path.rootFromDestination),
-    clipPolygonNdc: [
-      { x: -1, y: -1 },
-      { x: 1, y: -1 },
-      { x: 1, y: 1 },
-      { x: -1, y: 1 },
+    cells: [
+      {
+        id: "room-a",
+        heightMeters: 2,
+        baseVertices: squareBase(),
+        portals: [{ id: "east", sideIndex: 1, targetCellId: "room-b", targetPortalId: "west" }],
+      },
+      {
+        id: "room-b",
+        heightMeters: roomBHeightMeters,
+        baseVertices: squareBase(),
+        portals: [{ id: "west", sideIndex: 3, targetCellId: "room-a", targetPortalId: "east" }],
+      },
     ],
-    clipRectNdc: {
-      minX: -1,
-      minY: -1,
-      maxX: 1,
-      maxY: 1,
-    },
-    screenAreaPixels: 1,
   };
 }
-
 function cameraLookingAt(
   position: { readonly x: number; readonly y: number; readonly z: number },
   target: { readonly x: number; readonly y: number; readonly z: number },
