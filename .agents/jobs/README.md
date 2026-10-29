@@ -11,18 +11,67 @@ sketches may live in an issue; anything that is mainly "carry out this change" i
 - A job that turns out to be wrong is edited or split, not silently skipped. Renumber only when the order changes.
 - Every job ends with verification; `git push` runs `npm run typecheck` and `npm test` through the pre-push hook.
 
+## Rules for the implementing model
+
+Jobs are written to be carried out by a model working alone. A more capable model reviews the reports afterwards.
+
+1. **Never stop to ask.** Every decision a job needs is recorded under its `## Decisions`. If something is still
+   unclear, make your best choice, carry on, and record it in the report under `### Uncertain`.
+2. **One job at a time,** in queue order. Do only what the job says. If you notice something else that is wrong, write
+   it in the report (`### Not done` or `### Uncertain`); do not fix it.
+3. **Baseline first.** Run `npm run typecheck` and `npm test` before changing anything. If the baseline fails, record
+   the failure under `### Checks` and continue only if the failure is unrelated to the job.
+4. **Small steps.** After each step, run the tests named for it (`npx vitest run <file>`). Do not move on while they
+   fail. If you cannot make a step pass, record what you tried under `### Not done`, revert that step, and continue
+   with the steps that do not depend on it.
+5. **Do not weaken tests to make them pass.** Change an existing test only when the job says so, and record every
+   such change under `### Deviations`.
+6. **Finish:** run `npm run typecheck`, `npm test` and `npm run docs:check`. If `docs:check` reports stale generated
+   documents, run `npm run docs:generate`. Then commit, end the message with the co-author line the repository uses,
+   and push. The pre-push hook runs the checks again.
+7. **Windows shell:** `npm run smoke -- "<url>"` and the Volta `node` shim go through cmd.exe, which cuts URLs at
+   `&`. Call `node.exe` directly when a URL has several parameters.
+
+## Report
+
+Every finished job gets a `## Report` section, appended to the job file before it moves to `_done/`:
+
+```markdown
+## Report
+
+### Done
+What changed: files, functions, tests added, commit hashes.
+### Deviations
+Where the work differs from the steps, and why.
+### Uncertain
+Decisions or results you are not sure of, and what would confirm them.
+### Not done
+Anything skipped or left failing, and why.
+### Checks
+Commands run and their results, including failures.
+```
+
+Set `Status: done on <date>.` when `### Uncertain` and `### Not done` are empty. Otherwise set
+`Status: done, needs review on <date>.` and do not close the resolved issues: leave them open with a one-line pointer
+to the report. Mark the job's row in the queue below either way.
+
 ## Template
 
 ```markdown
 # Job NN - <imperative title>
 
-Status: queued | in progress | done on <date>.
+Status: queued | in progress | done on <date> | done, needs review on <date>.
 Resolves: issue [NN](../../_issues/NN_....md).
 
 ## Goal
 ## Depends on
+## Before you start
+## Background
+## Decisions
 ## Steps
-## Verification
+## Tests and checks
+## Do not
+## Done when
 ```
 
 ## Queue
