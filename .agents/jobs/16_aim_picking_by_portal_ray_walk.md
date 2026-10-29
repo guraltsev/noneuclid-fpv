@@ -1,6 +1,6 @@
 # Job 16 - Aim picking by portal ray walk
 
-Status: queued.
+Status: in progress.
 Revised on 2026-10-29 for a less capable implementing model.
 Resolves: issue [72](../../_issues/72_aim_picking_uses_camera_clip_polygons_not_portal_ray_walk.md).
 
