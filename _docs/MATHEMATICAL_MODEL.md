@@ -165,25 +165,28 @@ A body is a vertical cylinder (radius $r$, height $H$, offset $o$) attached to i
 `src/movement/moveDynamicObject.ts#moveDynamicObject` advances a body by a displacement $\delta$ (already rotated into the
 cell frame by `src/movement/movePlayer.ts#movePlayer`):
 
-1. **Candidate.** $q=p+\delta$ for the pose translation $p$.
-2. **Portal crossing (anchor rule).** Let $s^\star$ be the side with the most negative clearance $d_i(q)$. If $s^\star$ has
-   a portal and the projection of $q$ onto the side's line falls within $[0,\ell]$ (otherwise the nearest portal side
-   whose projection does fall within range, if any), the body **crosses**: its cell becomes the target cell and its pose
-   becomes $g\circ(\text{pose})$ — position *and* heading are transported (`src/movement/portalCrossing.ts#crossDynamicObjectPortal`).
-   Only the *anchor* (the pose origin) is tested; the cylinder may overlap the portal plane before the crossing happens.
-   Before the crossing is accepted, the pose in the **target** cell is checked for floor, ceiling and exclusion-zone
-   violations (the portal just used is ignored); if one occurs the body does not cross and stays put. Wall overlap in the
-   target cell is deliberately not tested, because bodies legitimately cross close to a corner. The `"bounds"` mode is
-   declared but unimplemented and throws if requested.
-3. **Otherwise collision** (`src/movement/collision.ts#testCellCollision`), in this order:
-   floor/ceiling ($z_c\mp H/2$ against $[0,h]$), exclusion cylinders (both a static overlap and a *swept* test of the
-   segment from the previous to the candidate center against radius $\max(r_{\text{start}},r_{\text{end}})+r_{\text{zone}}$),
-   then walls: a **non-portal** side blocks when $d_i(c)<r$ with $c$ the cylinder center. Portal sides never block.
-4. **Response.** A wall hit pushes the candidate back along $n_i$ until $d_i(c)=r+10^{-6}$ — the tangential component is
-   kept, so bodies *slide* along walls (`moveDynamicObject` → `resolveBlockedWallPosition`); only the first blocking side (in
-   side order) is resolved and the pushed position is not re-tested, so a corner can still violate a second wall. Floor,
-   ceiling and exclusion-zone hits revert to the previous pose (no sliding).
-
+1. **Developed obstacles.** Around the body centre $c$ take the developed disk of radius $\rho=r+|\delta_h|+2\varepsilon$
+   ($\varepsilon=10^{-6}$ m, `src/math/tolerances.ts#collisionSkinMeters`) with `collectDevelopedDisk`, and map into the
+   start cell's frame (`src/movement/developedObstacles.ts#collectDevelopedObstacles`): every non-portal side as a
+   *capsule* of radius $r$; every portal side whose target cell is lower than the body top as a capsule with reason
+   `"ceiling"`; every forbidden-zone column as a *disc* of radius $r+r_{\text{zone}}$ (deduplicated by position). An
+   obstacle counts only if it lies in the copy's angular wedge (or within $r$ of it), so each part of the plane appears once.
+2. **Swept tests** (`src/movement/sweptCollision.ts`). For the centre path $p(s)=c+s\delta_h$, $s\in[0,1]$, a disc
+   $(q,R)$ is hit at the smaller root of $|p(s)-q|=R$; a capsule (segment $AB$, radius $R$) at the earliest of its slab
+   ($h_0-R$ over the approach speed, if the foot point lies on $AB$) and its two end discs. Only approaching hits count,
+   so a body that overlaps an obstacle may leave it but never go deeper.
+3. **Slide.** Up to four times: advance to the earliest hit less $\varepsilon$ along the path, keep only the part of the
+   remaining displacement tangent to the hit normal, and drop it if it still points into an earlier contact (a crease
+   where two obstacles meet). Whatever is left after the fourth contact is dropped. The result is a polyline of the
+   centre; shifted by $-o$ ($o$ the horizontal collision offset) it is the polyline of the anchor.
+4. **Anchor walk.** The anchor polyline is walked through the cells with `walkDevelopedSegment` (the vertex rule of
+   Section 4 applies); each crossing maps the pose by $g$ (`src/movement/portalCrossing.ts`), position *and* heading.
+   Only the *anchor* decides the cell; the cylinder may overlap a portal before it crosses. There is no limit of one
+   crossing per move, and the endpoint is never guessed: an anchor that starts more than $10^{-6}$ m outside its cell
+   is first re-homed by walking from the cell's interior point to it. A zero horizontal step never crosses.
+5. **Vertical.** $\delta_z$ is clamped so the cylinder stays between the floor and the start cell's ceiling (a body
+   already outside a bound may only move back in); a clamp reports `"floor"` or `"ceiling"` and the horizontal part is
+   still applied. A portal into a lower cell acts as a wall (item 1).
 **Applied displacement.** Every move reports the displacement it actually applied in the start cell's frame
 (`src/movement/moveDynamicObject.ts#MoveDynamicObjectResult`). The XR rig advances its head baseline by exactly
 that amount after a blocked move, so room-scale motion is never applied twice
@@ -430,7 +433,6 @@ rather than discovered.
 - **Validation scope.** `validateCellComplexSpec` rejects shared portal sides, self-targeting portals, non-finite
   heights/vertices and unequal glued side lengths. Unequal cell heights across a portal are not rejected.
 - **Culling soundness.** See Section 4: the aperture slack and the projective stage can in principle cull a visible path.
-- **Wall overlap at crossings.** The target cell's walls are not tested when a body crosses a portal (Section 5).
 - **Yaw conventions.** Rigid-transform yaw is $\operatorname{atan2}(R_{10},R_{00})$ and forward is $R e_y$. The marmot
   derives its yaw from its velocity as $\operatorname{atan2}(-v_x,v_y)$, so it walks along $v$. Geodesic cannon and
   protractor yaws are direction angles along $(\cos\psi,\sin\psi)$.

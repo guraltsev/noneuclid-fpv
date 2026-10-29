@@ -26,3 +26,8 @@ export const cellContainmentToleranceMeters = 1e-6;
  * A side is crossed outward when dot(direction, inwardNormal) is below minus this (dimensionless).
  */
 export const segmentWalkOutgoingDotTolerance = 1e-12;
+
+/**
+ * Clearance, meters, kept between a body and an obstacle after a collision response.
+ */
+export const collisionSkinMeters = 1e-6;

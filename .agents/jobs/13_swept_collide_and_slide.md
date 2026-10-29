@@ -472,3 +472,39 @@ Close issues 61, 62 and 63 (move them to `_issues/_closed/` with `Outcome` and `
   `walkDevelopedSegment`.
 - Every test in A2, A3, A6, B5 and C8 exists and passes; every changed old test is listed under `### Deviations`.
 - Issues 61, 62 and 63 are closed or carry a pointer to this job's report.
+## Report
+
+### Done
+#### Part A
+- `src/math/tolerances.ts`: added `collisionSkinMeters = 1e-6`.
+- `src/movement/sweptCollision.ts` (new): `sweepDiscAgainstObstacle`, `slideDisc`, the obstacle and hit types.
+- `src/movement/developedObstacles.ts` (new): `collectDevelopedObstacles` (walls, ceiling portals, deduplicated zone discs; Part B bodies not included).
+- `src/movement/moveDynamicObject.ts` rewritten on `collectDevelopedObstacles`, `slideDisc` and `walkDevelopedSegment`; `findMostProbablePortalExit`, `resolveBlockedWallPosition` and `getSignedClearanceToSide` deleted; `PortalCrossingMode` narrowed to `"anchor"`; the result gained `crossings` and `cellFromStart`.
+- Tests: new `tests/movement/sweptCollision.test.ts` (A2, including the 25-run random-polygon property), `tests/movement/developedObstacles.test.ts` (A3), and a `swept motion` describe in `tests/movement/moveDynamicObject.test.ts` (A6 items 1-6).
+- `_docs/MATHEMATICAL_MODEL.md` section 5 items 1-4 rewritten (now items 1-5), section 11 bullet "Wall overlap at crossings" removed; generated docs regenerated.
+- Parts B and C not started; the runtime-body paragraph of section 5 and the `moveIncreasesCylinderOverlap` code are untouched.
+### Deviations
+#### Part A
+- Deleted test "throws for the unimplemented bounds crossing mode" (Decision 10).
+- "teleports an out-of-domain endpoint through only one most probable portal per frame" rewritten as "re-homes an out-of-cell anchor before moving" (3 crossings, x = -0.9, second zero move does not cross).
+- "falls back to the original pose ... (convex corner)" renamed "stops in a convex corner where two walls meet"; expects x, y within 1e-5 of 0.9 (was: unchanged 0.85).
+- "refuses to cross when the object would violate the target cell ceiling": now expects cell `room-a`, x within 1e-12 of 0.95, `blocked`, reason `ceiling`; no longer `result.object` identity.
+- "lets anchor portal crossing take precedence over swept forbidden-zone collision" rewritten as "slides around a swept forbidden zone ...": old expectation was a crossing into room-b, new is blocked with `forbidden-zone`, final anchor inside its cell and at least 0.25 from the zone.
+- "crosses portals near an endpoint when forbidden-zone collision is ignored" (not on the job's list): the start y changed from 0.9 to 0.75 (expected y likewise). Why: with radius 0.2 at y = 0.9 the body starts overlapping the north wall (0.1 away) and moves toward the wall end cap at the portal vertex (1, 1), so it is correctly deflected and reported blocked. At y = 0.75 it is clear of the wall and the crossing intent of the test is kept.
+- The north-portal repro (A6.2) asserts the neighbour-local pose (0.75, 0.75): x 0.75 on the neighbour's east wall, y 0.75 against its north wall (developed y = 2.75), `blocked` and `crossedPortal` both true.
+- Random-polygon slide property uses 25 runs of 2 000 steps each (not 10^4 steps), and the polygon filter is "vertex average more than 0.4 m from every side" (arbitrary polygons have radius from 1 m).
+- `collectDevelopedObstacles` has an extra optional field `frameFromCell` (and `bodiesInCell` / `ignoredObjectIds` are left for Part B).
+### Uncertain
+#### Part A
+- Creature offset: when the collision offset is horizontal, the obstacles are collected around the body centre in the centre's own cell (found by `locateDevelopedPoint` from the anchor to the centre) and mapped back to the anchor cell's frame with `frameFromCell`, instead of treating the centre as a point of the anchor cell. Not in the job text; confirm the choice with a creature that stands within its offset of a portal.
+- A hit at s within 1e-9 of the end of the step counts as a touch, not a block. Needed so that "can ignore forbidden zones" still reports `blocked: false` for a body ending exactly at the wall distance.
+- A body that travels exactly at radius distance along a straight wall can touch the seam end cap where two collinear walls (across a portal) meet; the tangential response leaves the motion unchanged but `blocked` may be reported true for that step.
+- The anchor stop of Decision 7 (anchor hits a wall the centre did not) is implemented but has no dedicated test (no shipped body has an offset larger than its radius).
+- The unfinished-walk path (Decision 8: crossing limit, missing cell, failed re-homing) is implemented with `console.warn` but not covered by a test.
+### Not done
+#### Part A
+- Nothing in Part A. Parts B and C, issue closing, the browser smoke test and the manual check are left for later (job stays `in progress`).
+### Checks
+#### Part A
+- Baseline: `npm run typecheck` ok; `npm test` 111 files, 813 passed, 8 skipped.
+- After: `npm run typecheck` ok; `npm test` all pass except the documentation test, which failed on stale generated docs; `npm run docs:generate` then `npm run docs:check` all ok and `npx vitest run tests/docs` passes. Final run before the commit: typecheck ok, 113 test files passed (831 tests passed, 8 skipped), docs:check ok.

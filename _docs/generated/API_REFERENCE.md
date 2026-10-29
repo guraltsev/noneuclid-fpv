@@ -77,6 +77,7 @@ Shared absolute tolerance for geometric comparisons.
 | const | `segmentWalkVertexTieMeters` | Two side crossings closer than this (meters along the walk) are a pass through their shared vertex. |
 | const | `cellContainmentToleranceMeters` | A walk start or atlas centre may lie this far (meters) outside its cell and still count as inside. |
 | const | `segmentWalkOutgoingDotTolerance` | A side is crossed outward when dot(direction, inwardNormal) is below minus this (dimensionless). |
+| const | `collisionSkinMeters` | Clearance, meters, kept between a body and an obstacle after a collision response. |
 
 ### `math/vec3.ts`
 
@@ -313,6 +314,15 @@ Pushes a body that overlaps forbidden-zone cylinders or walls of its cell back t
 | interface | `DepenetrationResult` | Outcome: "unchanged" (already legal; `object` is the input object itself), "pushed" (fixed by pushes), "sampled" (fixed by the grid fallback), "failed" (no legal pose found; `object` is the input object). |
 | function | `depenetrateDynamicObject` | Returns a legal pose near `object` in the compiled world: unchanged if it is already legal, otherwise pushed out of zones (radially), then walls (along the inward normal), then through a portal if the anchor left the ce… |
 
+### `movement/developedObstacles.ts`
+
+Collects the obstacles around a body in one flat frame by developing the neighbouring cells with the developed-disk atlas.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `DevelopedObstacleRequest` | Input of {@link collectDevelopedObstacles}. |
+| function | `collectDevelopedObstacles` | Wall, ceiling and forbidden-zone obstacles around the body centre, in the frame given by `frameFromCell`. |
+
 ### `movement/dynamicObject.ts`
 
 State of a movable object (player body, creature, geodesic emitter) inside a compiled cell complex.
@@ -326,15 +336,15 @@ State of a movable object (player body, creature, geodesic emitter) inside a com
 
 ### `movement/moveDynamicObject.ts`
 
-Advances a dynamic object by a displacement inside the glued cell complex, handling portal crossing, collision and wall sliding.
+Advances a dynamic object by a displacement inside the glued cell complex with swept collision, wall sliding and any number of portal crossings.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
 | interface | `MoveDynamicObjectRequest` | Input to {@link moveDynamicObject}. |
-| interface | `MoveDynamicObjectResult` | Outcome of a move: the new state, whether and why it was blocked, and any portal crossed. |
-| type | `PortalCrossingMode` | Criterion for when an object crosses a portal: "anchor" (its reference point passes the side) or "bounds" (any part of its body does). |
+| interface | `MoveDynamicObjectResult` | Outcome of a move: the new state, whether and why it was blocked, and every portal crossed. |
+| type | `PortalCrossingMode` | Criterion for when an object crosses a portal: "anchor" (its reference point passes the side). |
 | const | `AUTONOMOUS_DYNAMIC_OBJECT_PORTAL_CROSSING_MODE` | Crossing mode requested by autonomous objects (creatures, emitters); "anchor". |
-| function | `moveDynamicObject` | Moves an object by `displacement`, crossing a portal, sliding along a wall, or stopping as collision dictates. |
+| function | `moveDynamicObject` | Moves an object by `displacement`: slides its centre through the developed obstacles, walks its anchor through the cells and clamps the vertical step. |
 
 ### `movement/movePlayer.ts`
 
@@ -379,6 +389,19 @@ Re-expressing an object's or player's pose in the target cell's frame when it pa
 | --- | --- | --- |
 | function | `crossDynamicObjectPortal` | Returns the object moved into the portal's target cell, with its pose composed with the portal transform (new pose = transformToTarget after old pose). |
 | function | `crossPortal` | Returns the player pose in the portal's target cell, carrying the pitch over unchanged. |
+
+### `movement/sweptCollision.ts`
+
+Swept collision of a moving disc against discs and capsules in one flat plane, and the slide loop built on it.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| type | `SweptObstacleReason` | What an obstacle is, for reporting: a wall, a too-low portal ("ceiling"), a forbidden-zone column or another body. |
+| type | `SweptObstacle` | A swept-test obstacle with the moving body's radius already added to `radius`. |
+| interface | `SweptHit` | First contact of a path with an obstacle: path parameter s in [0, 1] and the unit normal pointing away from the obstacle. |
+| interface | `SlideResult` | Result of {@link slideDisc}: the end centre, the centre polyline and the contacts in order. |
+| function | `sweepDiscAgainstObstacle` | Sweeps the centre path p + s v, s in [0, 1], against one obstacle and returns the first approaching hit, if any. |
+| function | `slideDisc` | Slides a disc centre through obstacles for up to `maxIterations` (default 4) contacts. |
 
 ## `world-assets`
 

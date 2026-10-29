@@ -1,9 +1,10 @@
+import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
 import type { CompiledCellComplex } from "../../src/cell-complex/compileCellComplex";
 import type { CellComplexSpec } from "../../src/cell-complex/specs";
 import { identityMat3, yawRigidTransform3, type Mat3 } from "../../src/math/rigidTransform3";
-import { cube, tetrahedron } from "../../src/authoring/exampleWorlds";
+import { cube, icosahedron, tetrahedron, torusModuli } from "../../src/authoring/exampleWorlds";
 import { vec3 } from "../../src/math/vec3";
 import {
   AUTONOMOUS_DYNAMIC_OBJECT_PORTAL_CROSSING_MODE,
@@ -77,16 +78,7 @@ describe("moveDynamicObject", () => {
     expect(result.object.localPose.translation.x).toBeCloseTo(0.95);
   });
 
-  it("throws for the unimplemented bounds crossing mode", () => {
-    const world = compileCellComplex(twoRoomsWithPortal());
-    const object = dynamicObject("room-a", { x: 0, y: 0, z: 0.5 });
-
-    expect(() =>
-      moveDynamicObject({ world, object, displacement: { x: 0.1, y: 0, z: 0 }, portalCrossingMode: "bounds" }),
-    ).toThrow(/bounds/);
-  });
-
-  it("falls back to the original pose when pushing out of one wall leaves the body inside another (convex corner)", () => {
+  it("stops in a convex corner where two walls meet", () => {
     const world = compileCellComplex(singleRoom());
     const object = dynamicObject("room", { x: 0.85, y: 0.85, z: 0.5 });
 
@@ -94,8 +86,8 @@ describe("moveDynamicObject", () => {
 
     expect(result.blocked).toBe(true);
     expect(result.blockingReason).toBe("wall");
-    expect(result.object.localPose.translation.x).toBeCloseTo(0.85);
-    expect(result.object.localPose.translation.y).toBeCloseTo(0.85);
+    expect(Math.abs(result.object.localPose.translation.x - 0.9)).toBeLessThan(1e-5);
+    expect(Math.abs(result.object.localPose.translation.y - 0.9)).toBeLessThan(1e-5);
   });
 
   it("still slides along a single wall when moving diagonally into it", () => {
@@ -144,7 +136,7 @@ describe("moveDynamicObject", () => {
     expect(result.object.localPose.translation.x).toBeCloseTo(-0.95);
   });
 
-  it("teleports an out-of-domain endpoint through only one most probable portal per frame", () => {
+  it("re-homes an out-of-cell anchor before moving", () => {
     const world = compileCellComplex(selfWrappingRoom());
     const object = dynamicObject("room", { x: 5.1, y: 0, z: 0.5 });
 
@@ -153,15 +145,15 @@ describe("moveDynamicObject", () => {
     expect(firstFrame.blocked).toBe(false);
     expect(firstFrame.crossedPortal).toBe(true);
     expect(firstFrame.crossedPortalId).toBe("east");
+    expect(firstFrame.crossings).toHaveLength(3);
     expect(firstFrame.object.cellId).toBe("room");
-    expect(firstFrame.object.localPose.translation.x).toBeCloseTo(3.1);
+    expect(firstFrame.object.localPose.translation.x).toBeCloseTo(-0.9);
 
     const secondFrame = moveDynamicObject({ world, object: firstFrame.object, displacement: { x: 0, y: 0, z: 0 } });
 
     expect(secondFrame.blocked).toBe(false);
-    expect(secondFrame.crossedPortal).toBe(true);
-    expect(secondFrame.crossedPortalId).toBe("east");
-    expect(secondFrame.object.localPose.translation.x).toBeCloseTo(1.1);
+    expect(secondFrame.crossedPortal).toBe(false);
+    expect(secondFrame.object.localPose.translation.x).toBeCloseTo(-0.9);
   });
 
   it("does not let an offset collision center trigger anchor portal crossing before the object anchor crosses", () => {
@@ -229,7 +221,7 @@ describe("moveDynamicObject", () => {
     const world = compileCellComplex(twoRoomsWithPortal());
     const object = dynamicObject(
       "room-a",
-      { x: 0.95, y: 0.9, z: 0.5 },
+      { x: 0.95, y: 0.75, z: 0.5 },
       identityMat3,
       simpleCollisionCylinder(0.2, 0.2),
     );
@@ -246,7 +238,7 @@ describe("moveDynamicObject", () => {
     expect(result.crossedPortal).toBe(true);
     expect(result.object.cellId).toBe("room-b");
     expect(result.object.localPose.translation.x).toBeCloseTo(-0.95);
-    expect(result.object.localPose.translation.y).toBeCloseTo(0.9);
+    expect(result.object.localPose.translation.y).toBeCloseTo(0.75);
   });
 
   it("uses cylindrical bounds for forbidden-zone blocking regardless of rotation", () => {
@@ -264,7 +256,7 @@ describe("moveDynamicObject", () => {
     expect(result.blockingReason).toBe("forbidden-zone");
   });
 
-  it("lets anchor portal crossing take precedence over swept forbidden-zone collision", () => {
+  it("slides around a swept forbidden zone on the path instead of crossing through it", () => {
     const world = compileCellComplex(twoRoomsWithPortal());
     const object = dynamicObject("room-a", { x: 0.6, y: 0.9, z: 0.5 }, identityMat3, simpleCollisionCylinder(0.1, 0.2));
 
@@ -274,10 +266,18 @@ describe("moveDynamicObject", () => {
       displacement: { x: 0.8, y: 0, z: 0 },
       portalCrossingMode: "anchor",
     });
+    const cell = world.cellsById.get(result.object.cellId);
+    const anchor = result.object.localPose.translation;
+    const zone = cell?.singularityColumns[0];
 
-    expect(result.blocked).toBe(false);
-    expect(result.crossedPortal).toBe(true);
-    expect(result.object.cellId).toBe("room-b");
+    expect(result.blocked).toBe(true);
+    expect(result.blockingReason).toBe("forbidden-zone");
+    expect(cell?.sides.every((side) => (anchor.x - side.start.x) * side.inwardNormal.x + (anchor.y - side.start.y) * side.inwardNormal.y >= -1e-9)).toBe(true);
+    // Every zone of the final cell is at least the combined radius (0.1 + 0.15) away.
+    for (const column of cell?.singularityColumns ?? []) {
+      expect(Math.hypot(anchor.x - column.center.x, anchor.y - column.center.y)).toBeGreaterThanOrEqual(column.radius + 0.1 - 1e-9);
+    }
+    expect(zone).toBeDefined();
   });
 
   it("uses cylindrical radius for wall blocking", () => {
@@ -331,7 +331,8 @@ describe("moveDynamicObject", () => {
     expect(result.blocked).toBe(true);
     expect(result.blockingReason).toBe("ceiling");
     expect(result.crossedPortal).toBe(false);
-    expect(result.object).toBe(object);
+    expect(result.object.cellId).toBe("room-a");
+    expect(Math.abs(result.object.localPose.translation.x - 0.95)).toBeLessThan(1e-12);
   });
 
   it("keeps the autonomous dynamic-object traversal policy explicit and anchor-based", () => {
@@ -376,6 +377,179 @@ describe("moveDynamicObject", () => {
     expect(result.crossedPortal).toBe(true);
     expect(expectedTargetCellId).toBeDefined();
     expect(result.object.cellId).toBe(expectedTargetCellId);
+  });
+});
+
+describe("swept motion", () => {
+  const body = simpleCollisionCylinder(0.25, 1);
+  const insideCell = (world: CompiledCellComplex, state: DynamicObjectState): number => {
+    const cell = world.cellsById.get(state.cellId);
+    const p = state.localPose.translation;
+
+    return Math.min(
+      ...(cell?.sides ?? []).map((side) => (p.x - side.start.x) * side.inwardNormal.x + (p.y - side.start.y) * side.inwardNormal.y),
+    );
+  };
+
+  it("stops in all four corners of a walled room (issue 61)", () => {
+    const world = compileCellComplex(singleRoom());
+
+    for (const [sx, sy] of [
+      [1, 1],
+      [-1, 1],
+      [1, -1],
+      [-1, -1],
+    ]) {
+      let object = dynamicObject("room", { x: 0, y: 0, z: 0.5 }, identityMat3, body);
+
+      for (let i = 0; i < 200; i += 1) {
+        object = moveDynamicObject({ world, object, displacement: { x: 0.03 * sx, y: 0.03 * sy, z: 0 } }).object;
+      }
+
+      expect(Math.abs(object.localPose.translation.x - 0.75 * sx)).toBeLessThan(1e-5);
+      expect(Math.abs(object.localPose.translation.y - 0.75 * sy)).toBeLessThan(1e-5);
+    }
+  });
+
+  it("ends inside the neighbour when a slide past the end of a wall continues through a portal (issue 61)", () => {
+    const base = [
+      { x: -1, y: -1 },
+      { x: 1, y: -1 },
+      { x: 1, y: 1 },
+      { x: -1, y: 1 },
+    ];
+    const world = compileCellComplex({
+      cells: [
+        { id: "south", heightMeters: 2, baseVertices: base, portals: [{ id: "n", sideIndex: 2, targetCellId: "north", targetPortalId: "s" }] },
+        { id: "north", heightMeters: 2, baseVertices: base, portals: [{ id: "s", sideIndex: 0, targetCellId: "south", targetPortalId: "n" }] },
+      ],
+    });
+    const object = dynamicObject("south", { x: 0, y: 0, z: 0.5 }, identityMat3, body);
+    const result = moveDynamicObject({ world, object, displacement: { x: 3, y: 6, z: 0 }, ignoreForbiddenZones: true });
+    const p = result.object.localPose.translation;
+
+    expect(result.object.cellId).toBe("north");
+    expect(result.crossedPortal).toBe(true);
+    expect(result.blocked).toBe(true);
+    expect(insideCell(world, result.object)).toBeGreaterThanOrEqual(0.25 - 1e-5);
+    expect(Math.abs(p.x - 0.75)).toBeLessThan(1e-5);
+    expect(Math.abs(p.y - 0.75)).toBeLessThan(1e-5);
+  });
+
+  it("keeps the anchor inside its cell on a straight walk through a cube vertex with zones ignored (issue 62)", () => {
+    const world = compileCellComplex(cube);
+    const step = 0.05 / Math.SQRT2;
+    let object = dynamicObject("front", { x: 0, y: 0, z: 0.5 }, identityMat3, simpleCollisionCylinder(0.2, 1));
+
+    for (let i = 0; i < 400; i += 1) {
+      object = moveDynamicObject({ world, object, displacement: { x: step, y: -step, z: 0 }, ignoreForbiddenZones: true }).object;
+      expect(insideCell(world, object)).toBeGreaterThanOrEqual(-1e-9);
+    }
+  });
+
+  it("stops at the forbidden zone of a cube vertex when zones are on (issue 62)", () => {
+    const world = compileCellComplex(cube);
+    const step = 0.05 / Math.SQRT2;
+    let object = dynamicObject("front", { x: 0, y: 0, z: 0.5 }, identityMat3, simpleCollisionCylinder(0.2, 1));
+
+    for (let i = 0; i < 400; i += 1) {
+      object = moveDynamicObject({ world, object, displacement: { x: step, y: -step, z: 0 } }).object;
+    }
+
+    const cell = world.cellsById.get(object.cellId);
+    const p = object.localPose.translation;
+    const nearest = Math.min(...(cell?.singularityColumns ?? []).map((c) => Math.hypot(p.x - c.center.x, p.y - c.center.y) - c.radius));
+
+    expect(Math.abs(nearest - 0.2)).toBeLessThan(1e-5);
+  });
+
+  it("gives the same final pose for one long move as for many short ones (issue 62)", () => {
+    const rooms = 6;
+    const base = [
+      { x: -1, y: -1 },
+      { x: 1, y: -1 },
+      { x: 1, y: 1 },
+      { x: -1, y: 1 },
+    ];
+    const world = compileCellComplex({
+      cells: Array.from({ length: rooms }, (_, i) => ({
+        id: `r${i}`,
+        heightMeters: 2,
+        baseVertices: base,
+        portals: [
+          ...(i < rooms - 1 ? [{ id: `e${i}`, sideIndex: 1, targetCellId: `r${i + 1}`, targetPortalId: `w${i + 1}` }] : []),
+          ...(i > 0 ? [{ id: `w${i}`, sideIndex: 3, targetCellId: `r${i - 1}`, targetPortalId: `e${i - 1}` }] : []),
+        ],
+      })),
+    });
+    const start = dynamicObject("r0", { x: 0, y: 0, z: 0.5 }, identityMat3, simpleCollisionCylinder(0.1, 1));
+    const long = moveDynamicObject({ world, object: start, displacement: { x: 10, y: 0.3, z: 0 } });
+    let object = start;
+
+    for (let i = 0; i < 600; i += 1) {
+      object = moveDynamicObject({ world, object, displacement: { x: 10 / 600, y: 0.3 / 600, z: 0 } }).object;
+    }
+
+    expect(long.crossings).toHaveLength(5);
+    expect(long.object.cellId).toBe("r5");
+    expect(object.cellId).toBe(long.object.cellId);
+    expect(Math.abs(object.localPose.translation.x - long.object.localPose.translation.x)).toBeLessThan(1e-6);
+    expect(Math.abs(object.localPose.translation.y - long.object.localPose.translation.y)).toBeLessThan(1e-6);
+  });
+
+  it("keeps random walks inside their cells and out of the forbidden zones on closed worlds", () => {
+    for (const [name, spec] of [
+      ["cube", cube],
+      ["icosahedron", icosahedron],
+      ["torusModuli", torusModuli],
+    ] as const) {
+      const world = compileCellComplex(spec);
+      const cells = [...world.cellsById.values()];
+
+      fc.assert(
+        fc.property(fc.integer({ min: 0, max: cells.length - 1 }), fc.integer({ min: 1, max: 1_000_000 }), (cellIndex, seed) => {
+          const cell = cells[cellIndex];
+          let state = seed;
+          const random = (): number => {
+            state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+            return state / 4294967296;
+          };
+          let object = dynamicObject(
+            cell.id,
+            {
+              x: cell.baseVertices.reduce((s, v) => s + v.x, 0) / cell.baseVertices.length,
+              y: cell.baseVertices.reduce((s, v) => s + v.y, 0) / cell.baseVertices.length,
+              z: 0.5,
+            },
+            identityMat3,
+            body,
+          );
+
+          for (let i = 0; i < 500; i += 1) {
+            const angle = random() * 2 * Math.PI;
+            const length = random() * 0.3;
+
+            object = moveDynamicObject({ world, object, displacement: { x: Math.cos(angle) * length, y: Math.sin(angle) * length, z: 0 } }).object;
+
+            if (insideCell(world, object) < -1e-9) {
+              return false;
+            }
+
+            const p = object.localPose.translation;
+
+            for (const column of world.cellsById.get(object.cellId)?.singularityColumns ?? []) {
+              if (Math.hypot(p.x - column.center.x, p.y - column.center.y) < 0.4 - 1e-6) {
+                return false;
+              }
+            }
+          }
+
+          return true;
+        }),
+        { numRuns: 5 },
+      );
+      expect(name).toBeTruthy();
+    }
   });
 });
 

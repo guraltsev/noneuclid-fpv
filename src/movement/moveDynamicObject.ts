@@ -1,21 +1,23 @@
 /**
- * Advances a dynamic object by a displacement inside the glued cell complex, handling portal crossing, collision and wall sliding.
- * The displacement is added to the object's position in its current cell's frame. If the resulting anchor point (the pose translation, not the collision cylinder) has passed through a portal side it crosses: the pose is mapped into the target cell by the portal transform and the crossed state is tested against the target cell (ignoring the reciprocal portal side); if that test reports a floor, ceiling or forbidden-zone block, the crossing is refused and the object stays at its original pose (wall overlaps in the target cell do not block, so corner straddling still works). Otherwise the new state is tested against its own cell; a wall hit is resolved by pushing the object back along the wall's inward normal so it ends at the radius distance (so it slides along the wall), and if the pushed position still violates the cell (a convex corner) the object stays where it was. Any other block leaves the object where it was.
+ * Advances a dynamic object by a displacement inside the glued cell complex with swept collision, wall sliding and any number of portal crossings.
+ * The body is an upright cylinder; its horizontal centre is slid through the walls, too-low portals and forbidden-zone columns of the developed neighbourhood (see developedObstacles.ts) in the flat frame of the start cell, using swept disc/capsule tests and a slide with a crease rule (see sweptCollision.ts). The anchor (the pose translation, which differs from the centre by the collision offset) then follows the resulting polyline through the cells with the segment-walk kernel, which finds every portal crossed, in order, and the final cell and pose. Vertical motion is clamped to the start cell's floor and ceiling. A zero horizontal move never crosses a portal; an anchor that starts outside its cell is first re-homed by walking from the cell's interior to it.
  */
 import type { CompiledCellComplex } from "../cell-complex/compileCellComplex";
-import type { CompiledPrismSide } from "../cell-complex/prismCells";
-import { rigidTransform3 } from "../math/rigidTransform3";
-import { addVec3, subVec3, type Vec3 } from "../math/vec3";
+import { locateDevelopedPoint, walkDevelopedSegment, type SegmentWalkCrossing } from "../cell-complex/segmentWalk";
 import {
-  getDynamicObjectCollisionBounds,
-  projectPointAlongSide,
-  getSideSupport,
-  signedDistanceToSide,
-  testCellCollision,
-  type BlockingReason,
-} from "./collision";
+  composeRigidTransform3,
+  identityRigidTransform3,
+  invertRigidTransform3,
+  transformDirection3,
+  transformPoint3,
+  type RigidTransform3,
+} from "../math/rigidTransform3";
+import { cellContainmentToleranceMeters, collisionSkinMeters } from "../math/tolerances";
+import { vec3, type Vec3 } from "../math/vec3";
+import { getDynamicObjectCollisionBounds, signedDistanceToSide, type BlockingReason } from "./collision";
+import { collectDevelopedObstacles } from "./developedObstacles";
 import type { DynamicObjectState } from "./dynamicObject";
-import { crossDynamicObjectPortal } from "./portalCrossing";
+import { slideDisc } from "./sweptCollision";
 
 /**
  * Input to {@link moveDynamicObject}.
@@ -31,7 +33,7 @@ export interface MoveDynamicObjectRequest {
    */
   readonly displacement: Vec3;
   /**
-   * Crossing criterion. Only "anchor" is implemented (also the default when omitted); passing "bounds" makes {@link moveDynamicObject} throw so the gap cannot be silently ignored.
+   * Crossing criterion. Only "anchor" exists (also the default when omitted).
    */
   readonly portalCrossingMode?: PortalCrossingMode;
   /**
@@ -41,11 +43,11 @@ export interface MoveDynamicObjectRequest {
 }
 
 /**
- * Outcome of a move: the new state, whether and why it was blocked, and any portal crossed.
+ * Outcome of a move: the new state, whether and why it was blocked, and every portal crossed.
  */
 export interface MoveDynamicObjectResult {
   /**
-   * Final state: moved, moved and re-expressed in the target cell, pushed back along a wall, or unchanged.
+   * Final state: moved (possibly slid along obstacles and re-expressed in another cell) or unchanged.
    */
   readonly object: DynamicObjectState;
   /**
@@ -53,239 +55,259 @@ export interface MoveDynamicObjectResult {
    */
   readonly attemptedDisplacement: Vec3;
   /**
-   * The part of the displacement actually applied, in meters in the start cell's frame (before any portal transform):
-   * the full displacement for a free move or a crossing, the pushed offset for a wall slide, zero when the object stayed put.
+   * The anchor displacement actually applied, in meters in the start cell's frame (before any portal transform), z included.
    */
   readonly appliedDisplacement: Vec3;
   /**
-   * True if collision stopped or reduced the move; false when a portal was crossed.
+   * True if any contact happened, the vertical step was clamped, or the move could not be completed; it can be true together with `crossedPortal`.
    */
   readonly blocked: boolean;
+  /**
+   * Reason of the first contact (else the vertical clamp or an anchor wall stop); undefined for a body contact or an unfinishable move.
+   */
   readonly blockingReason?: BlockingReason;
   readonly crossedPortal: boolean;
   /**
-   * Id of the portal (in the source cell) that was crossed, when crossedPortal is true.
+   * Id of the first portal crossed (in the start cell), when crossedPortal is true.
    */
   readonly crossedPortalId?: string;
+  /**
+   * Every portal crossed, in order (including the crossings of an initial re-homing).
+   */
+  readonly crossings: readonly SegmentWalkCrossing[];
+  /**
+   * Start-cell frame to final-cell frame.
+   */
+  readonly cellFromStart: RigidTransform3;
 }
 
 /**
- * Criterion for when an object crosses a portal: "anchor" (its reference point passes the side) or "bounds" (any part of its body does).
- * Only "anchor" is implemented by moveDynamicObject, which throws for "bounds".
+ * Criterion for when an object crosses a portal: "anchor" (its reference point passes the side).
  */
-export type PortalCrossingMode = "bounds" | "anchor";
+export type PortalCrossingMode = "anchor";
 /**
  * Crossing mode requested by autonomous objects (creatures, emitters); "anchor".
  */
 export const AUTONOMOUS_DYNAMIC_OBJECT_PORTAL_CROSSING_MODE: PortalCrossingMode = "anchor";
 
 /**
- * Moves an object by `displacement`, crossing a portal, sliding along a wall, or stopping as collision dictates.
- * Order of decisions: (1) translate; (2) if the new anchor is outside a portal side (see the exit-side selection), cross it and run testCellCollision in the target cell (ignoring the reciprocal portal side, no swept test); if that reports a floor, ceiling or forbidden-zone block (walls are ignored so corner crossings still work), return a blocked result at the original pose with that reason, otherwise return the crossed state; (3) otherwise run testCellCollision with the old state as previousObject; (4) on a wall block, push the translated object inward just enough (plus 1e-6 m) to clear that wall and retest it against the cell; if the pushed position is still blocked (second wall, floor, ceiling or forbidden zone), return the original object. Non-wall blocks return the original object.
- * @throws Error if `portalCrossingMode` is "bounds" (not implemented), or if the object's cell or the portal's target cell is missing from the world.
+ * Moves an object by `displacement`: slides its centre through the developed obstacles, walks its anchor through the cells and clamps the vertical step.
+ * Order: (1) re-home an anchor that lies outside its cell; (2) clamp the vertical step to the start cell; (3) a zero horizontal step returns after the vertical move without crossing; (4) collect obstacles, slide the centre, and walk the anchor polyline (a wall met by the anchor itself stops it a skin short); (5) compose the pose with the crossings.
+ * If the walk cannot be completed (crossing limit, unresolved cell) the original object is returned, blocked, with a console warning.
+ * @throws Error if the object's cell is missing from the world.
  */
 export function moveDynamicObject(request: MoveDynamicObjectRequest): MoveDynamicObjectResult {
-  if (request.portalCrossingMode === "bounds") {
-    throw new Error('portalCrossingMode "bounds" is not implemented by moveDynamicObject; use "anchor".');
-  }
-
-  const startCell = request.world.cellsById.get(request.object.cellId);
+  const { world } = request;
+  let object = request.object;
+  const startCell = world.cellsById.get(object.cellId);
 
   if (!startCell) {
-    throw new Error(`Cannot move object in missing cell "${request.object.cellId}".`);
+    throw new Error(`Cannot move object in missing cell "${object.cellId}".`);
   }
 
-  const candidateObject = translateObject(request.object, request.displacement);
-  const exitSide = findMostProbablePortalExit(startCell, candidateObject);
+  let prefixCrossings: readonly SegmentWalkCrossing[] = [];
+  let prefixTransform = identityRigidTransform3;
+  const rawAnchor = object.localPose.translation;
 
-  if (exitSide?.portal) {
-    const crossedObject = crossDynamicObjectPortal(candidateObject, exitSide.portal);
-    const targetCell = request.world.cellsById.get(crossedObject.cellId);
+  if (startCell.sides.some((side) => signedDistanceToSide(side, rawAnchor) < -cellContainmentToleranceMeters)) {
+    const average = {
+      x: startCell.baseVertices.reduce((sum, vertex) => sum + vertex.x, 0) / startCell.baseVertices.length,
+      y: startCell.baseVertices.reduce((sum, vertex) => sum + vertex.y, 0) / startCell.baseVertices.length,
+    };
+    const located = locateDevelopedPoint(world, startCell.id, average, { x: rawAnchor.x, y: rawAnchor.y });
 
-    if (!targetCell) {
-      throw new Error(`Portal "${exitSide.portal.id}" targets missing cell "${crossedObject.cellId}".`);
+    if (located.status !== "end") {
+      return unfinishedResult(request, `anchor of an object in cell "${startCell.id}" could not be re-homed (${located.status})`);
     }
 
-    const reciprocalSideIndex = targetCell.portalsById.get(exitSide.portal.reciprocalPortalId)?.sideIndex;
-    const targetCollision = testCellCollision({
-      cell: targetCell,
-      object: crossedObject,
-      ignoredPortalSideIndex: reciprocalSideIndex,
-      ignoreForbiddenZones: request.ignoreForbiddenZones,
-    });
-
-    // Wall overlaps are deliberately not checked here: an anchor that crosses near a corner can legitimately straddle the adjacent wall of the target cell, and the next move resolves it.
-    if (targetCollision.blocked && targetCollision.reason !== "wall") {
-      return blockedResult(request, targetCollision.reason);
-    }
-
-    return {
-      object: crossedObject,
-      attemptedDisplacement: request.displacement,
-      appliedDisplacement: request.displacement,
-      blocked: false,
-      crossedPortal: true,
-      crossedPortalId: exitSide.portal.id,
+    prefixCrossings = located.crossings;
+    prefixTransform = located.cellFromStart;
+    object = {
+      ...object,
+      cellId: located.cellId,
+      localPose: composeRigidTransform3(located.cellFromStart, object.localPose),
     };
   }
 
-  const collision = testCellCollision({
-    cell: startCell,
-    object: candidateObject,
-    previousObject: request.object,
-    ignoreForbiddenZones: request.ignoreForbiddenZones,
-  });
+  const cell = world.cellsById.get(object.cellId);
 
-  if (collision.blocked) {
-    let resolvedObject = request.object;
-
-    if (collision.reason === "wall") {
-      const pushedObject = resolveBlockedWallPosition(
-        candidateObject,
-        startCell.sides.find((side) => side.sideIndex === collision.sideIndex),
-      );
-      // Convex corner: the push-out of one wall can leave the body inside another wall (or a zone); then do not move.
-      const pushedCollision = testCellCollision({
-        cell: startCell,
-        object: pushedObject,
-        previousObject: request.object,
-        ignoreForbiddenZones: request.ignoreForbiddenZones,
-      });
-
-      if (!pushedCollision.blocked) {
-        resolvedObject = pushedObject;
-      }
-    }
-
-    return blockedResult(request, collision.reason, resolvedObject);
+  if (!cell) {
+    return unfinishedResult(request, `cell "${object.cellId}" is missing`);
   }
 
-  return {
-    object: candidateObject,
-    attemptedDisplacement: request.displacement,
-    appliedDisplacement: request.displacement,
-    blocked: false,
-    crossedPortal: false,
-  };
-}
-
-/**
- * Builds the result for a blocked move that did not cross a portal.
- */
-function blockedResult(
-  request: MoveDynamicObjectRequest,
-  blockingReason: BlockingReason | undefined,
-  object = request.object,
-): MoveDynamicObjectResult {
-  return {
-    object,
-    attemptedDisplacement: request.displacement,
-    appliedDisplacement: subVec3(object.localPose.translation, request.object.localPose.translation),
-    blocked: true,
-    blockingReason,
-    crossedPortal: false,
-  };
-}
-
-/**
- * Returns the object with its pose translation increased by `displacement` and rotation unchanged.
- */
-function translateObject(object: DynamicObjectState, displacement: Vec3): DynamicObjectState {
-  return {
-    ...object,
-    localPose: rigidTransform3(
-      object.localPose.rotation,
-      addVec3(object.localPose.translation, displacement),
-    ),
-  };
-}
-
-/**
- * Chooses the portal side, if any, through which the anchor of the candidate state has left the cell.
- * Takes the side with the most negative signed distance to the anchor. If that side has no portal, returns undefined (a wall will handle it). If the anchor's projection onto that side's line falls outside the side's extent (the anchor is past a corner), falls back to the portal side with the most negative clearance whose extent does contain the projection; otherwise returns the side itself. Returns undefined when the anchor is inside the cell.
- */
-function findMostProbablePortalExit(
-  cell: { readonly sides: readonly CompiledPrismSide[] },
-  object: DynamicObjectState,
-): CompiledPrismSide | undefined {
-  let deepestOutsideSide: CompiledPrismSide | undefined;
-  let deepestOutsideClearance = 0;
-
-  for (const side of cell.sides) {
-    const clearance = signedDistanceToSide(side, object.localPose.translation);
-
-    if (clearance < deepestOutsideClearance) {
-      deepestOutsideSide = side;
-      deepestOutsideClearance = clearance;
-    }
-  }
-
-  if (!deepestOutsideSide?.portal) {
-    return undefined;
-  }
-
-  const projection = projectPointAlongSide(deepestOutsideSide, object.localPose.translation);
-
-  if (projection < 0 || projection > deepestOutsideSide.lengthMeters) {
-    let projectedPortalSide: CompiledPrismSide | undefined;
-    let projectedPortalClearance = 0;
-
-    for (const side of cell.sides) {
-      if (!side.portal) {
-        continue;
-      }
-
-      const clearance = signedDistanceToSide(side, object.localPose.translation);
-      const sideProjection = projectPointAlongSide(side, object.localPose.translation);
-
-      if (
-        clearance < projectedPortalClearance &&
-        sideProjection >= 0 &&
-        sideProjection <= side.lengthMeters
-      ) {
-        projectedPortalSide = side;
-        projectedPortalClearance = clearance;
-      }
-    }
-
-    return projectedPortalSide;
-  }
-
-  return deepestOutsideSide;
-}
-
-/**
- * Pushes the object inward along the side's normal until the body's clearance to that side is zero, leaving tangential motion intact.
- */
-function resolveBlockedWallPosition(
-  object: DynamicObjectState,
-  side: CompiledPrismSide | undefined,
-): DynamicObjectState {
-  if (!side) {
-    return object;
-  }
-
+  const anchor = object.localPose.translation;
   const bounds = getDynamicObjectCollisionBounds(object);
-  const point = bounds?.center ?? object.localPose.translation;
-  const support = bounds ? getSideSupport(side, bounds) : 0;
-  const clearance = getSignedClearanceToSide(side, point, support);
-  // Penetration depth of the body into the wall, plus a 1e-6 m margin so the pushed position is strictly clear.
-  const inwardOffset = clearance < 0 ? -clearance + 1e-6 : 0;
+  const radius = bounds?.radius ?? 0;
+  const halfHeight = bounds?.halfHeight ?? 0;
+  const centre = bounds?.center ?? anchor;
+  const offset = { x: centre.x - anchor.x, y: centre.y - anchor.y };
 
-  if (inwardOffset === 0) {
-    return object;
+  // Vertical step: clamp so the body stays between floor and ceiling of the start cell; a body already outside may only move back in.
+  const bottom = centre.z - halfHeight;
+  const top = centre.z + halfHeight;
+  const lowest = Math.min(0, -bottom);
+  const highest = Math.max(0, cell.heightMeters - top);
+  let dz = request.displacement.z;
+  let verticalReason: BlockingReason | undefined;
+
+  if (dz < lowest - 1e-12) {
+    dz = lowest;
+    verticalReason = "floor";
+  } else if (dz > highest + 1e-12) {
+    dz = highest;
+    verticalReason = "ceiling";
   }
 
-  return translateObject(object, {
-    x: side.inwardNormal.x * inwardOffset,
-    y: side.inwardNormal.y * inwardOffset,
-    z: 0,
+  const delta = { x: request.displacement.x, y: request.displacement.y };
+  const startAnchorXY = { x: anchor.x, y: anchor.y };
+
+  const build = (
+    anchorEnd: { readonly x: number; readonly y: number },
+    walkTransform: RigidTransform3 | undefined,
+    walkCrossings: readonly SegmentWalkCrossing[],
+    reason: BlockingReason | undefined,
+    blocked: boolean,
+  ): MoveDynamicObjectResult => {
+    const translated: DynamicObjectState = {
+      ...object,
+      localPose: { rotation: object.localPose.rotation, translation: vec3(anchorEnd.x, anchorEnd.y, anchor.z + dz) },
+    };
+    const moved: DynamicObjectState = walkTransform
+      ? {
+          ...translated,
+          cellId: lastCellId(walkCrossings, object.cellId),
+          localPose: composeRigidTransform3(walkTransform, translated.localPose),
+        }
+      : translated;
+    const crossings = [...prefixCrossings, ...walkCrossings];
+
+    return {
+      object: moved,
+      attemptedDisplacement: request.displacement,
+      appliedDisplacement: vec3(anchorEnd.x - anchor.x, anchorEnd.y - anchor.y, dz),
+      blocked,
+      ...(reason !== undefined ? { blockingReason: reason } : {}),
+      crossedPortal: crossings.length > 0,
+      ...(crossings.length > 0 ? { crossedPortalId: crossings[0].portalId } : {}),
+      crossings,
+      cellFromStart: walkTransform ? composeRigidTransform3(walkTransform, prefixTransform) : prefixTransform,
+    };
+  };
+
+  if (Math.hypot(delta.x, delta.y) <= 1e-12) {
+    return build(startAnchorXY, undefined, [], verticalReason, verticalReason !== undefined);
+  }
+
+  // Frame in which obstacles are collected: the cell holding the body centre, reached by the straight segment from the anchor.
+  let collectCellId = cell.id;
+  let collectCentre = { x: centre.x, y: centre.y };
+  let frameFromCell = identityRigidTransform3;
+
+  if (Math.hypot(offset.x, offset.y) > 1e-9) {
+    const located = locateDevelopedPoint(world, cell.id, startAnchorXY, collectCentre);
+
+    if (located.status === "end") {
+      const mapped = transformPoint3(located.cellFromStart, vec3(centre.x, centre.y, 0));
+
+      collectCellId = located.cellId;
+      collectCentre = { x: mapped.x, y: mapped.y };
+      frameFromCell = invertRigidTransform3(located.cellFromStart);
+    }
+  }
+
+  const obstacles = collectDevelopedObstacles({
+    world,
+    cellId: collectCellId,
+    center: collectCentre,
+    reachMeters: radius + Math.hypot(delta.x, delta.y) + 2 * collisionSkinMeters,
+    bodyRadius: radius,
+    bodyBottomZ: centre.z + dz - halfHeight,
+    bodyTopZ: centre.z + dz + halfHeight,
+    ignoreForbiddenZones: request.ignoreForbiddenZones,
+    frameFromCell,
   });
+  const slide = slideDisc({ x: centre.x, y: centre.y }, delta, obstacles);
+  const points = slide.legs.map((p) => ({ x: p.x - offset.x, y: p.y - offset.y }));
+
+  // Walk the anchor polyline through the cells; `walkTransform` maps the start frame to the current cell.
+  let walkTransform = identityRigidTransform3;
+  let currentCellId = cell.id;
+  let anchorEnd = points[0];
+  const walkCrossings: SegmentWalkCrossing[] = [];
+  let anchorStopped = false;
+
+  for (let k = 0; k + 1 < points.length; k += 1) {
+    const from = points[k];
+    const to = points[k + 1];
+    const length = Math.hypot(to.x - from.x, to.y - from.y);
+
+    if (length <= 1e-12) {
+      continue;
+    }
+
+    const legStart = transformPoint3(walkTransform, vec3(from.x, from.y, 0));
+    const legDirection = transformDirection3(walkTransform, vec3(to.x - from.x, to.y - from.y, 0));
+    const walk = walkDevelopedSegment({
+      world,
+      cellId: currentCellId,
+      start: { x: legStart.x, y: legStart.y },
+      direction: { x: legDirection.x, y: legDirection.y },
+      lengthMeters: length,
+    });
+    const last = walk.pieces[walk.pieces.length - 1];
+
+    if (!last || (walk.status !== "end" && walk.status !== "wall")) {
+      return unfinishedResult(request, `anchor walk stopped with status "${walk.status}"`);
+    }
+
+    walkCrossings.push(...walk.crossings);
+    walkTransform = composeRigidTransform3(last.cellFromStart, walkTransform);
+    currentCellId = last.cellId;
+
+    if (walk.status === "wall") {
+      const stop = Math.max(0, last.tExit - collisionSkinMeters);
+
+      anchorEnd = { x: from.x + ((to.x - from.x) / length) * stop, y: from.y + ((to.y - from.y) / length) * stop };
+      anchorStopped = true;
+      break;
+    }
+
+    anchorEnd = to;
+  }
+
+  const firstContact = slide.contacts[0];
+  const contactReason = firstContact && firstContact.obstacle.reason !== "body" ? firstContact.obstacle.reason : undefined;
+  const reason = firstContact ? contactReason : anchorStopped ? "wall" : verticalReason;
+
+  return build(
+    anchorEnd,
+    walkCrossings.length > 0 ? walkTransform : undefined,
+    walkCrossings,
+    reason,
+    firstContact !== undefined || verticalReason !== undefined || anchorStopped,
+  );
 }
 
 /**
- * Signed distance from a point to the side plane minus the body support; negative means the body overlaps or has passed the side.
+ * Cell reached after the given crossings; the start cell when there are none.
  */
-function getSignedClearanceToSide(side: CompiledPrismSide, point: Vec3, support: number): number {
-  return (point.x - side.start.x) * side.inwardNormal.x + (point.y - side.start.y) * side.inwardNormal.y - support;
+function lastCellId(crossings: readonly SegmentWalkCrossing[], startCellId: string): string {
+  return crossings.length > 0 ? crossings[crossings.length - 1].targetCellId : startCellId;
+}
+
+/**
+ * Result for a move that cannot be completed: the original object, blocked, no reason.
+ */
+function unfinishedResult(request: MoveDynamicObjectRequest, message: string): MoveDynamicObjectResult {
+  console.warn(`moveDynamicObject: ${message}; the object was not moved.`);
+
+  return {
+    object: request.object,
+    attemptedDisplacement: request.displacement,
+    appliedDisplacement: vec3(0, 0, 0),
+    blocked: true,
+    crossedPortal: false,
+    crossings: [],
+    cellFromStart: identityRigidTransform3,
+  };
 }
