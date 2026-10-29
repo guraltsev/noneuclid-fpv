@@ -1,7 +1,7 @@
 # Job 10 - Floor texture in lattice coordinates
 
 Status: done, needs review on 2026-10-29.
-Resolves: issue [81](../../../_issues/_closed/81_floor_texture_slides_under_objects_during_deformation.md).
+Resolves: issue [81](../../../_issues/81_floor_texture_slides_under_objects_during_deformation.md).
 Depends: [job 09](09_deformation_commit_safety.md).
 
 ## Goal

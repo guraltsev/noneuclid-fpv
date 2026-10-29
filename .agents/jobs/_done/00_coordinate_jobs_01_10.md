@@ -1,7 +1,7 @@
 # Job 00 - Coordinate jobs 01-10
 
-Status: queued.
-Coordinates: jobs [01](_done/01_frame_loop_error_containment_and_dispose.md) to
+Status: done, needs review on 2026-10-29.
+Coordinates: jobs [01](01_frame_loop_error_containment_and_dispose.md) to
 [10](10_floor_texture_in_lattice_coordinates.md). Resolves no issue itself.
 
 ## Goal
@@ -16,7 +16,7 @@ and the batch report.
 
 ## Before you start
 
-1. Read [README.md](README.md), especially "Rules for the implementing model" and "Report". They apply to every job.
+1. Read [README.md](../README.md), especially "Rules for the implementing model" and "Report". They apply to every job.
 2. Read this whole file.
 3. Check the starting state:
 

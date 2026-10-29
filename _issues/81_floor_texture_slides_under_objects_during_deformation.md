@@ -1,13 +1,13 @@
 # 81 - Floor texture slides under objects during deformation; tile size depends on cell span
 
-Status: closed on 2026-10-29.
+Status: open. Fix landed in job 10 (235ec96) but the job is "done, needs review": see the Report in [job 10](../.agents/jobs/_done/10_floor_texture_in_lattice_coordinates.md) (manual browser sweep not run). Close after review.
 
 Priority: P1 (correctness, visible in `torus-moduli`). Related: issue 53 (pose transport), issue 82 (commit cost; this
 issue's fix removes one of its costs).
 
-Jobs: [10](../../.agents/jobs/_done/10_floor_texture_in_lattice_coordinates.md).
+Jobs: [10](../.agents/jobs/_done/10_floor_texture_in_lattice_coordinates.md).
 
-## Outcome
+## Proposed outcome (pending review)
 
 Fixed by job 10. `tileSizeMeters` is now a true period: floor UVs are (x/T, y/T) and the texture repeat is always 1
 (`src/render/three/buildCellMesh.ts`, `src/cell-complex/floorUv.ts`). In the `torus-skew` family the floor UVs are
@@ -15,7 +15,7 @@ Fixed by job 10. `tileSizeMeters` is now a true period: floor UVs are (x/T, y/T)
 (`torusSkewDeformation.ts#floorUvFrames`, passed down by `rebuildCellMeshes`). The floor moves with the objects and is
 seamless across portals. Stock tile sizes were divided by 15 to keep the shipped look.
 
-## Closing evidence
+## Evidence so far (pending review)
 
 - `tests/runtime/torusSkewDeformation.test.ts`: "keeps the floor UV of a mapped point across commits" (rest to a = 15 and
   to (30, 7.5), 1e-9); "keeps floor UVs seamless across every torus portal" (rest and both deformed states).

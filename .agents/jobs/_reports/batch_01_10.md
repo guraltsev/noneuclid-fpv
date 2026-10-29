@@ -1,6 +1,6 @@
 # Batch report: jobs 01-10
 
-Coordinator: Claude Sonnet 5.5. Started 2026-10-29 at commit b90380f; finished <date> at commit <hash>.
+Coordinator: Claude Sonnet 5.5. Started 2026-10-29 at commit b90380f; finished 2026-10-29 (final commit is the one that adds this report's last edit; see git log).
 
 ## Start state
 Tree clean. typecheck ok; docs:check ok; tests 625 passed / 9 skipped (86 files). The very first `npm test` run
@@ -19,6 +19,7 @@ environment flake (possibly a cold transform cache); not investigated.
 | 07 | done | e768cd2, b18497e | 677/8 | none (issues 53, 64 get status notes) |
 | 08 | done | 5c4762e | 682/8 | 64 |
 | 09 | done (optional manual checks not run) | 2bc2f39 | 695/8 | 53 |
+| 10 | done, needs review | 235ec96 | 706/8 | none (81 reopened with pointer) |
 
 ## For review
 
@@ -56,7 +57,17 @@ Deviations:
 Not done:
 - Optional manual `npm run dev` check and the worlds' manual walk-away check were not run. Coordinator judged these optional, so the job and issue 53 stay closed; a reviewer may want to run them.
 
+### Job 10 (done, needs review)
+Uncertain:
+- The manual browser check was not run: sweep to A = 30, B = 8, and the cube/icosahedron scale comparison. Tests cover the UV invariants, but nobody has looked at the retuned tile sizes (all defaults in `floorTextures.ts` divided by 15).
+Coordinator action: the sub-agent closed issue 81 despite marking the job "needs review". Per README rules, I moved it back to `_issues/`, set its Status to open with a pointer to the job report, renamed Outcome/Closing evidence to "pending review", and fixed links in the README queue and job 10. Issue 82 has a dated status line and stays open.
+
 ## Cross-job problems
+- Jobs 03, 04 and 10 are `needs review`; job 09 and 10's manual checks are the main unverified items.
 - The batch report was swept into the job 04 commit (it was untracked, and the job 04 sub-agent's commit included it). Harmless; it is tracked from 690f358 on.
 
 ## Final checks
+- `npm run typecheck`, `npm test` (706 passed / 8 skipped, 94 files) and `npm run docs:check` pass.
+- Stale-link grep for issues 40/53/64/66/68/81: remaining hits without `_closed/` are prose in job files describing the closing step (historical), plus the 81 links which point to the open location since 81 was reopened. No broken links.
+- Closed issues present in `_issues/_closed/` with Outcome and Closing evidence: 40, 53, 64, 66, 68 (and 74 earlier). 81 reopened (see job 10).
+- Smoke test on a fresh `npm run build:pages -- --base noneuclid-fpv`: `npm run smoke -- --world cube,dodecahedron,torus-moduli,genus-2-torus` printed `SMOKE OK (4 page(s))`. The `dist/` build was restored with `npm run build`.
