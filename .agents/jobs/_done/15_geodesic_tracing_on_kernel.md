@@ -213,7 +213,7 @@ is gone and lifts use cached inverses.
 - `_docs/MATHEMATICAL_MODEL.md` section 6 updated; `_docs/generated/*` regenerated.
 - Tests: new `tests/world-objects/geodesicTracingKernel.test.ts` (11 tests: tests 1-8 of the job; the open-disk rule has three cases). The new tests fail on the old code (7 of 11 fail there).
 - Measured: 50 random torus chords of 15-3000 m (up to about 200 crossings): sum of piece lengths within 1e-9 m of the requested length and the end point, pulled back through the inverse portal transforms, within 1e-8 m of `A + L d` (test bounds; no run exceeded them).
-- Commit hashes: see the job's commit lines in the git log (code commit, then the move-to-done commit).
+- Commit: 3d5e0a0 (code, tests, docs, job moved to _done/ with this Report).
 
 ### Deviations
 - `tests/world-objects/geodesicCannon.test.ts`, "does not create a vertex balloon at an emitter when geodesics intersect there": renamed and inverted (now expects one vertex). Decision 8 removes the 0.3 m emitter exclusion and the emitter there is unrelated to both geodesics, so the crossing must be reported. This is the only changed old test; no test hard-coded a nudged `targetStart`.
