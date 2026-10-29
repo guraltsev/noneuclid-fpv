@@ -5,14 +5,15 @@
  * geodesic ray models, the player rover), downloads them in parallel before the scene is built, and returns a read-only
  * {@link PreparedWorldAssets} lookup used synchronously during scene construction. Texture loader choice depends on the file
  * extension (KTX2, EXR, common image formats); anything else is treated as glTF. Floor colour textures are optional (a failed
- * load is tolerated) whereas every other asset, including the portal wall texture, is required and rejects the whole preload.
+ * load is tolerated) whereas every other loaded asset is required and rejects the whole preload. The portal wall
+ * texture is generated in code, not loaded.
  * glTF scenes are cloned per instance with skeleton-aware cloning; geometries and materials stay shared with the preloaded
  * original. Nothing is freed until the owner calls `dispose()` on the returned {@link OwnedPreparedWorldAssets}.
  */
 import * as THREE from "three";
 import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex";
 import { publicAssetUrl } from "../../glue/assetUrls";
-import { PORTAL_WALL_TEXTURE_FILE } from "./portalWallTexture";
+import { createPortalWallDataTexture, PORTAL_WALL_TEXTURE_KEY } from "./portalWallTexture";
 import { placedFlagAssetPaths } from "../../world-objects/placedFlags";
 import { geodesicRayAssetPaths } from "./geodesicCannonRenderer";
 import { playerRoverAssetPath } from "./playerRoverModel";
@@ -89,7 +90,7 @@ export interface PreloadWorldAssetsOptions {
  * Lists the unique asset paths needed by `world`.
  *
  * Includes floor material textures (colour, normal, bump, roughness) and every cell object's asset, plus the fixed
- * placed-flag, geodesic-ray and player-rover assets. Does not include the portal wall texture, which is loaded separately.
+ * placed-flag, geodesic-ray and player-rover assets. Does not include the portal wall texture, which is generated in code.
  */
 export function collectWorldAssetPaths(world: CompiledCellComplex): readonly string[] {
   const assetPaths = new Set<string>();
@@ -172,7 +173,6 @@ export async function preloadWorldAssets(
 
   try {
     await Promise.all([
-      loadRequiredTexture(PORTAL_WALL_TEXTURE_FILE, textureLoader, textures, diagnostics),
       ...assetPaths.map((assetPath) => {
         const optional = optionalTexturePaths.has(assetPath);
         const kind = classifyAssetPreloadKind(assetPath);
@@ -207,6 +207,9 @@ export async function preloadWorldAssets(
   } finally {
     ktx2Loader?.dispose();
   }
+
+  // The portal wall map is generated, not downloaded; registering it here lets dispose() free it with the rest.
+  textures.set(PORTAL_WALL_TEXTURE_KEY, createPortalWallDataTexture());
 
   return {
     getTexture(assetPath) {
@@ -313,28 +316,7 @@ function collectOptionalFloorTexturePaths(world: CompiledCellComplex): ReadonlyS
   return optionalTexturePaths;
 }
 
-// Loads a texture whose absence is fatal; records diagnostics and rethrows on error.
-async function loadRequiredTexture(
-  assetPath: string,
-  loader: { loadAsync(url: string): Promise<THREE.Texture> },
-  textures: Map<string, THREE.Texture>,
-  diagnostics: ReturnType<typeof runtimeDiagnostics>,
-): Promise<THREE.Texture> {
-  diagnostics.recordPreloadStart(assetPath, "texture");
-  return loader.loadAsync(publicAssetUrl(assetPath)).then(
-    (texture) => {
-      textures.set(assetPath, texture);
-      diagnostics.recordPreloadComplete(assetPath, "texture");
-      return texture;
-    },
-    (error: unknown) => {
-      diagnostics.recordPreloadError(assetPath, "texture", error);
-      throw error;
-    },
-  );
-}
-
-// Like loadRequiredTexture but resolves to undefined on failure when `optional`.
+// Loads a texture; records diagnostics and rethrows on error, but resolves to undefined on failure when `optional`.
 async function loadTextureAsset(
   assetPath: string,
   loader: { loadAsync(url: string): Promise<THREE.Texture> },

@@ -1,9 +1,11 @@
 import path from "node:path";
 
+// Sources are downloaded by hand into assets-src/textures/<folder>/ (gitignored) from the URLs in
+// _docs/ASSET_PROVENANCE.md ("Floor textures"); runtime output stays under public/.
 export const floorTextureBuildConfig = [
   {
     name: "grass1",
-    sourcePath: "public/assets/textures/forest_leaves_02_4k/textures/forest_leaves_02_diffuse_4k.jpg",
+    sourcePath: "assets-src/textures/forest_leaves_02_4k/textures/forest_leaves_02_diffuse_4k.jpg",
     runtimePath: "public/assets/textures/forest_leaves_02_4k/runtime/forest_leaves_02_color.ktx2",
     worldIds: ["cube", "dodecahedron", "tetrahedron", "twoPrismLoop"],
     role: "color",
@@ -12,7 +14,7 @@ export const floorTextureBuildConfig = [
   },
   {
     name: "forest_leaves",
-    sourcePath: "public/assets/textures/forest_leaves_02_4k/textures/forest_leaves_02_diffuse_4k.jpg",
+    sourcePath: "assets-src/textures/forest_leaves_02_4k/textures/forest_leaves_02_diffuse_4k.jpg",
     runtimePath: "public/assets/textures/forest_leaves_02_4k/runtime/forest_leaves_02_color.ktx2",
     worldIds: ["cube", "dodecahedron", "tetrahedron"],
     role: "color",
@@ -21,7 +23,7 @@ export const floorTextureBuildConfig = [
   },
   {
     name: "river_pebbles",
-    sourcePath: "public/assets/textures/ganges_river_pebbles_4k/textures/ganges_river_pebbles_diff_4k.jpg",
+    sourcePath: "assets-src/textures/ganges_river_pebbles_4k/textures/ganges_river_pebbles_diff_4k.jpg",
     runtimePath: "public/assets/textures/ganges_river_pebbles_4k/runtime/ganges_river_pebbles_color.ktx2",
     worldIds: ["cube", "dodecahedron", "tetrahedron", "torus"],
     role: "color",
@@ -30,7 +32,7 @@ export const floorTextureBuildConfig = [
   },
   {
     name: "gravelly_sand",
-    sourcePath: "public/assets/textures/gravelly_sand_4k/textures/gravelly_sand_diff_4k.jpg",
+    sourcePath: "assets-src/textures/gravelly_sand_4k/textures/gravelly_sand_diff_4k.jpg",
     runtimePath: "public/assets/textures/gravelly_sand_4k/runtime/gravelly_sand_color.ktx2",
     worldIds: ["cube", "dodecahedron", "tetrahedron"],
     role: "color",
@@ -39,7 +41,7 @@ export const floorTextureBuildConfig = [
   },
   {
     name: "red_mud_stones",
-    sourcePath: "public/assets/textures/red_mud_stones_4k/textures/red_mud_stones_diff_4k.jpg",
+    sourcePath: "assets-src/textures/red_mud_stones_4k/textures/red_mud_stones_diff_4k.jpg",
     runtimePath: "public/assets/textures/red_mud_stones_4k/runtime/red_mud_stones_color.ktx2",
     worldIds: ["cube", "dodecahedron"],
     role: "color",
@@ -48,7 +50,7 @@ export const floorTextureBuildConfig = [
   },
   {
     name: "snow",
-    sourcePath: "public/assets/textures/snow_02_4k/textures/snow_02_diff_4k.jpg",
+    sourcePath: "assets-src/textures/snow_02_4k/textures/snow_02_diff_4k.jpg",
     runtimePath: "public/assets/textures/snow_02_4k/runtime/snow_02_color.ktx2",
     worldIds: ["cube", "dodecahedron", "twoPrismLoop"],
     role: "color",
@@ -57,7 +59,7 @@ export const floorTextureBuildConfig = [
   },
   {
     name: "fabric_022",
-    sourcePath: "public/assets/textures/Fabric022_4K-JPG/Fabric022_4K-JPG_Color.jpg",
+    sourcePath: "assets-src/textures/Fabric022_4K-JPG/Fabric022_4K-JPG_Color.jpg",
     runtimePath: "public/assets/textures/Fabric022_4K-JPG/runtime/Fabric022_color.ktx2",
     worldIds: [],
     role: "color",
@@ -66,7 +68,7 @@ export const floorTextureBuildConfig = [
   },
   {
     name: "metal_048c",
-    sourcePath: "public/assets/textures/Metal048C_4K-JPG/Metal048C_4K-JPG_Color.jpg",
+    sourcePath: "assets-src/textures/Metal048C_4K-JPG/Metal048C_4K-JPG_Color.jpg",
     runtimePath: "public/assets/textures/Metal048C_4K-JPG/runtime/Metal048C_color.ktx2",
     worldIds: [],
     role: "color",
@@ -75,7 +77,7 @@ export const floorTextureBuildConfig = [
   },
   {
     name: "paving_stones_114",
-    sourcePath: "public/assets/textures/PavingStones114_4K-JPG/PavingStones114_4K-JPG_Color.jpg",
+    sourcePath: "assets-src/textures/PavingStones114_4K-JPG/PavingStones114_4K-JPG_Color.jpg",
     runtimePath: "public/assets/textures/PavingStones114_4K-JPG/runtime/PavingStones114_color.ktx2",
     worldIds: [],
     role: "color",
@@ -84,7 +86,7 @@ export const floorTextureBuildConfig = [
   },
   {
     name: "paving_stones_138",
-    sourcePath: "public/assets/textures/PavingStones138_4K-JPG/PavingStones138_4K-JPG_Color.jpg",
+    sourcePath: "assets-src/textures/PavingStones138_4K-JPG/PavingStones138_4K-JPG_Color.jpg",
     runtimePath: "public/assets/textures/PavingStones138_4K-JPG/runtime/PavingStones138_color.ktx2",
     worldIds: [],
     role: "color",
@@ -93,7 +95,7 @@ export const floorTextureBuildConfig = [
   },
   {
     name: "tiles_118",
-    sourcePath: "public/assets/textures/Tiles118_4K-JPG/Tiles118_4K-JPG_Color.jpg",
+    sourcePath: "assets-src/textures/Tiles118_4K-JPG/Tiles118_4K-JPG_Color.jpg",
     runtimePath: "public/assets/textures/Tiles118_4K-JPG/runtime/Tiles118_color.ktx2",
     worldIds: [],
     role: "color",
@@ -102,7 +104,7 @@ export const floorTextureBuildConfig = [
   },
   {
     name: "tiles_132a",
-    sourcePath: "public/assets/textures/Tiles132A_4K-JPG/Tiles132A_4K-JPG_Color.jpg",
+    sourcePath: "assets-src/textures/Tiles132A_4K-JPG/Tiles132A_4K-JPG_Color.jpg",
     runtimePath: "public/assets/textures/Tiles132A_4K-JPG/runtime/Tiles132A_color.ktx2",
     worldIds: [],
     role: "color",
@@ -111,7 +113,7 @@ export const floorTextureBuildConfig = [
   },
   {
     name: "wood_floor_064",
-    sourcePath: "public/assets/textures/WoodFloor064_4K-JPG/WoodFloor064_4K-JPG_Color.jpg",
+    sourcePath: "assets-src/textures/WoodFloor064_4K-JPG/WoodFloor064_4K-JPG_Color.jpg",
     runtimePath: "public/assets/textures/WoodFloor064_4K-JPG/runtime/WoodFloor064_color.ktx2",
     worldIds: [],
     role: "color",

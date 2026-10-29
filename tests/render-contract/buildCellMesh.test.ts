@@ -5,7 +5,7 @@ import { dodecahedron } from "../../src/authoring/exampleWorlds";
 import { twoPrismLoop } from "../fixtures/twoPrismLoop";
 import { buildCellMesh } from "../../src/render/three/buildCellMesh";
 import { SCENE_BACKGROUND_COLOR } from "../../src/render/three/sceneColors";
-import { PORTAL_WALL_TEXTURE_URL } from "../../src/render/three/portalWallTexture";
+import { PORTAL_WALL_TEXTURE_KEY } from "../../src/render/three/portalWallTexture";
 import type { PreparedWorldAssets } from "../../src/render/three/preloadWorldAssets";
 
 describe("buildCellMesh", () => {
@@ -63,12 +63,12 @@ describe("buildCellMesh", () => {
       SCENE_BACKGROUND_COLOR,
     );
     expect(portal).toBeDefined();
-    expect(portal?.userData.textureUrl).toBe(PORTAL_WALL_TEXTURE_URL);
+    expect(portal?.userData.textureUrl).toBe(PORTAL_WALL_TEXTURE_KEY);
     expect(portalMesh?.userData.kind).toBe("portal-wall-mesh");
     expect((portalMesh?.geometry as THREE.PlaneGeometry | undefined)?.parameters.height).toBe(roomA.heightMeters);
     expect(portalMesh?.position.y).toBeCloseTo(roomA.heightMeters / 2);
     expect((portalMesh?.material as THREE.MeshStandardMaterial | undefined)?.userData.textureUrl).toBe(
-      PORTAL_WALL_TEXTURE_URL,
+      PORTAL_WALL_TEXTURE_KEY,
     );
   });
 
@@ -312,8 +312,8 @@ describe("buildCellMesh", () => {
     const roomA = compiled.cellsById.get("room-a")!;
     const portalWallTexture = new THREE.Texture();
     const assets: PreparedWorldAssets = {
-      getTexture: (assetPath) => assetPath.includes("abstract-fractal") ? portalWallTexture : undefined,
-      getConfiguredTexture: (request) => request.assetPath.includes("abstract-fractal") ? portalWallTexture : undefined,
+      getTexture: (assetPath) => assetPath === PORTAL_WALL_TEXTURE_KEY ? portalWallTexture : undefined,
+      getConfiguredTexture: (request) => request.assetPath === PORTAL_WALL_TEXTURE_KEY ? portalWallTexture : undefined,
       instantiateGltf: () => ({
         scene: new THREE.Group(),
         animations: [],

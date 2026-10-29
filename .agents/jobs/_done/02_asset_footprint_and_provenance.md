@@ -1,8 +1,8 @@
 # Job 02 - Shrink the deployed assets and resolve unverified ones
 
-Status: queued.
+Status: done on 2026-10-29.
 Former issue: 34 (converted to a job on 2026-10-28).
-Resolves: issue [40](../../_issues/40_resolve_unverified_public_assets.md).
+Resolves: issue [40](../../../_issues/_closed/40_resolve_unverified_public_assets.md).
 
 Priority: P0 deployment reliability and P1 legal release gate.
 
@@ -564,3 +564,42 @@ Converted from issue 34 on 2026-10-28. Already done before this rewrite: the raw
 under `public/assets/textures/`. `_legacy/photo-wall-texture-pattern.jpg` and `_legacy/Ground037_1K-JPG*` were also
 removed. The old baseline was a 964.3 MiB `public/` and a 966.15 MiB `dist/`. The old acceptance criteria ("CI fails
 on budget") are replaced by the `build:pages` size check, because the project does not use GitHub CI.
+
+## Report
+
+### Done
+
+- `src/render/three/portalWallTexture.ts`: `PORTAL_WALL_TEXTURE_FILE`/`_URL` replaced by `PORTAL_WALL_TEXTURE_KEY`; added
+  `PORTAL_WALL_TEXTURE_SIZE` and `createPortalWallDataTexture()` (64x64 sRGB checkerboard).
+- `src/render/three/preloadWorldAssets.ts`: registers the generated texture under the key after loading; removed
+  `loadRequiredTexture` and the JPG download; headers/JSDoc updated.
+- Existing tests updated for the renames (`buildCellMesh.test.ts`, `preloadWorldAssets.test.ts`, as step 3 says).
+- New tests: `tests/render-contract/portalWallTexture.test.ts`, "registers the generated portal wall texture without
+  downloading it", `tests/assets/publicAssetPolicy.test.ts` (5), `tests/scripts/checkDistSize.test.ts` (3).
+- Deleted 27 tracked files from `public/` (step 5); `git ls-files public` now lists 146 files.
+- New `scripts/check-dist-size.mjs`, `npm run size:dist`, and a size check at the end of `scripts/build-pages.mjs`.
+- Texture-build: sources moved to gitignored `assets-src/textures/`; build script skips missing sources.
+- Docs updated: `public/assets/README.md`, `public/assets/textures/README.md`, `_docs/ASSET_PROVENANCE.md`,
+  `_docs/DEPLOYMENT.md`; `_docs/generated/` regenerated. Issue 40 closed. Commit: see the git log entry for this job.
+
+### Deviations
+
+None. (In `ASSET_PROVENANCE.md` I used 2026-10-29 as the removal date.)
+
+### Uncertain
+
+None.
+
+### Not done
+
+Optional visual check of the checkerboard in a desktop browser was not done.
+
+### Checks
+
+- Baseline: `npm run typecheck` passed; `npm test` passed (86 files, 625 passed, 9 skipped).
+- `npx vitest run tests/render-contract` passed; `tests/assets` and `tests/scripts` pass.
+- Policy test bites: a copied `.png` in `public/assets/textures/` made "keeps only runtime KTX2 files" fail; removed.
+- `npm run build` ok; `npm run size:dist`: 53.4 MB of 64.0 MiB budget - OK.
+- `npm run textures:floor:build`: 12 "Skipped" lines, `Built 0 texture(s), skipped 12.`; no change under `public`.
+- `npm run docs:check` passed after `docs:generate`.
+- Smoke on `?world=cube`, `dodecahedron`, `torus-moduli`: all `SMOKE OK`.

@@ -3,7 +3,7 @@
 This directory holds the runtime asset graph used by the browser build.
 
 Before adding, moving, or reusing an asset, read the canonical
-[third-party asset provenance and notices](../../docs/ASSET_PROVENANCE.md).
+[third-party asset provenance and notices](../../_docs/ASSET_PROVENANCE.md).
 Vite copies everything in this directory into a release, so a source file under
 `public/assets` is public even when the application never requests it.
 
@@ -13,22 +13,24 @@ split below instead of extending that bundle.
 
 ## Texture Layout
 
-Floor textures should keep authoring files separate from runtime files:
+Floor textures keep authoring files outside `public/`. Sources are not committed; download them (see the
+provenance record) into the gitignored `assets-src/`:
+
+```text
+assets-src/textures/
+  forest_leaves_02_4k/
+    textures/
+      original_4k_maps...
+```
+
+Only the runtime file is committed:
 
 ```text
 public/assets/textures/
   forest_leaves_02_4k/
-    source/
-      ...
-    textures/
-      original_4k_maps...
     runtime/
       forest_leaves_02_color.ktx2
 ```
-
-For existing textures we are adding `runtime/` first and leaving the source
-folders in place temporarily. Issue 34 will move source material outside the
-public build input without separating it from its provenance record.
 
 ## Runtime Policy
 
@@ -69,8 +71,8 @@ encodes KTX2 Basis ETC1S output using per-texture settings from
 
 When adding a new tiled floor texture, follow this order:
 
-1. Put the original authoring asset under `public/assets/textures/<name>/textures/`
-   or keep the existing source layout if the folder already exists.
+1. Put the original authoring asset under `assets-src/textures/<name>/`
+   (gitignored, not committed).
 2. Add a `runtime/<name>_color.ktx2` target path in
    `scripts/texture-build/floor-texture-config.mjs`.
 3. Point the matching floor definition at that runtime `.ktx2` file.

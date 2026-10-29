@@ -14,8 +14,16 @@ for (const entry of floorTextureBuildConfig) {
 
 const ktx = await loadKtxModule();
 
+let builtCount = 0;
+let skippedCount = 0;
+
 for (const entry of uniqueEntries.values()) {
   const sourcePath = resolveFromRepoRoot(entry.sourcePath);
+  if (!fs.existsSync(sourcePath)) {
+    console.warn(`Skipped ${entry.name}: source not found at ${normalizePath(entry.sourcePath)}. Download it (see _docs/ASSET_PROVENANCE.md) and run again.`);
+    skippedCount += 1;
+    continue;
+  }
   const runtimePath = resolveFromRepoRoot(entry.runtimePath);
   const sourceBuffer = fs.readFileSync(sourcePath);
   const image = jpeg.decode(sourceBuffer, { useTArray: true });
@@ -57,7 +65,10 @@ for (const entry of uniqueEntries.values()) {
   console.info(
     `Encoded ${entry.name}: ${normalizePath(entry.sourcePath)} -> ${normalizePath(entry.runtimePath)} (${serialized.byteLength} bytes, ${mipChain.length} mip levels)`,
   );
+  builtCount += 1;
 }
+
+console.info(`Built ${builtCount} texture(s), skipped ${skippedCount}.`);
 
 function buildMipChain(imageData, width, height) {
   const chain = [{ data: imageData, width, height }];

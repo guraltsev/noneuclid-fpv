@@ -5,7 +5,7 @@
 
 This reference is produced from the source code. For the *meaning* of the modules — the mathematical model they implement — read [../MATHEMATICAL_MODEL.md](../MATHEMATICAL_MODEL.md) and [../ARCHITECTURE.md](../ARCHITECTURE.md). For every exported symbol see [API_REFERENCE.md](API_REFERENCE.md).
 
-**157 modules, 43,681 lines** under `src/`.
+**157 modules, 43,693 lines** under `src/`.
 
 ## Layers
 
@@ -22,7 +22,7 @@ A module belongs to the layer named by its first path segment under `src/`. "May
 | `runtime` | 10 | 2,637 | `math`, `cell-complex`, `movement`, `world-objects`, `authoring`, `ui`, `glue` | Runtime menu state, command dispatch, geometry session/worker and deformation families. |
 | `ui` | 6 | 1,274 | `math`, `cell-complex`, `runtime`, `world-objects`, `authoring`, `glue` | Renderer-neutral palette, help, tooltip and input-intent definitions. |
 | `glue` | 11 | 997 | `authoring`, `runtime`, `ui` | Launch options, debug settings, asset URLs, app configuration. |
-| `render` | 87 | 24,283 | anything | Three.js / DOM / WebXR rendering and input adapters (the application shell). |
+| `render` | 87 | 24,295 | anything | Three.js / DOM / WebXR rendering and input adapters (the application shell). |
 | `root` | 2 | 234 | anything | Entry point and application state. |
 
 ## Layer dependency graph
@@ -51,7 +51,7 @@ flowchart LR
   movement -->|6| cell_complex
   movement -->|10| math
   render -->|36| cell_complex
-  render -->|30| glue
+  render -->|29| glue
   render -->|28| math
   render -->|29| movement
   render -->|3| root
@@ -262,8 +262,8 @@ These imports break the intended layering. They are frozen in `scripts/docs/laye
 | `render/three/portalDebugRuntime.ts` | 476 | Portal-path debug runtime: installs window.noneuclidPortalDebug, manages cell-path overlays and clip-polygon overlays, and feeds the on-screen debug overlay each frame. | `cell-complex/compileCellComplex`, `cell-complex/portalPathDebug`, `cell-complex/staticPortalPathCull`, `glue/debugLevels`, `glue/debugOptions`, `math/rigidTransform3`, `math/vec3`, `movement/playerPose`, `render/three/appDebugHelpers`, `render/three/appDebugLogging`, `render/three/debugOverlay`, `render/three/pathTraceOverlay`, `render/three/portalClipPolygonOverlay`, `render/three/portalInstanceDebug`, `render/three/renderPortalInstances`, `render/three/renderQuality`, `render/three/renderState`, `render/three/runtimeSceneUtils`, `render/three/visiblePortalPaths`, `render/three/worldAxes`, `runtime/runtimeMenuState`, `runtime/worldGeometrySession` |
 | `render/three/portalEyeFrameTransforms.ts` | 91 | Utilities for combining the per-eye visibility results of stereo (VR) rendering into one shared render frame. | `render/three/visiblePortalPaths` |
 | `render/three/portalInstanceDebug.ts` | 87 | Debug renderer that draws a single instance of a cell's archetypes at a chosen `rootFromDestination` matrix. | `render/three/cellRenderArchetypes`, `render/three/runtimeSceneUtils` |
-| `render/three/portalWallTexture.ts` | 67 | Material factory for the debug portal wall: a repeating abstract texture on a double-sided standard material. | `glue/assetUrls`, `render/three/preloadWorldAssets` |
-| `render/three/preloadWorldAssets.ts` | 384 | Asset preloading and instancing for the Three.js renderer. | `cell-complex/compileCellComplex`, `glue/assetUrls`, `render/three/geodesicCannonRenderer`, `render/three/playerRoverModel`, `render/three/portalWallTexture`, `render/three/runtimeDiagnostics`, `world-objects/placedFlags` |
+| `render/three/portalWallTexture.ts` | 97 | Material factory for the debug portal wall: a repeating checkerboard on a double-sided standard material. | `render/three/preloadWorldAssets` |
+| `render/three/preloadWorldAssets.ts` | 366 | Asset preloading and instancing for the Three.js renderer. | `cell-complex/compileCellComplex`, `glue/assetUrls`, `render/three/geodesicCannonRenderer`, `render/three/playerRoverModel`, `render/three/portalWallTexture`, `render/three/runtimeDiagnostics`, `world-objects/placedFlags` |
 | `render/three/prerenderCells.ts` | 112 | Warms up GPU resources by rendering every cell once before play so shader compilation and texture upload do not hitch later. | `render/three/worldAxes` |
 | `render/three/protractorAngleRenderer.ts` | 226 | Renderer for the protractor tool's measured-angle marker. | `render/three/runtimeSceneUtils`, `render/three/worldAxes`, `render/three/worldResultBadge`, `world-objects/protractorTool` |
 | `render/three/protractorToolFeedback.ts` | 246 | In-scene feedback shown while the protractor tool is half-way through a measurement. | `math/vec3`, `render/three/worldAxes`, `world-objects/protractorTool` |

@@ -9,6 +9,7 @@ digest.txt
 *.cer
 *.key
 
-# Raw/source texture material is huge and never loaded at runtime; only runtime/*.ktx2 (and the README) are tracked (see _issues/34)
+# Raw texture sources live in assets-src/ (never committed); under public/ only runtime/*.ktx2 and the README are tracked (job 02).
 public/assets/textures/*/*
 !public/assets/textures/*/runtime/
+assets-src/

@@ -2,6 +2,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { checkDistSize, formatDistSizeReport } from "./check-dist-size.mjs";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const packageJsonPath = resolve(scriptDir, "..", "package.json");
@@ -28,6 +29,12 @@ if (result.status !== 0) {
 }
 
 writeFileSync(resolve(scriptDir, "..", "dist", ".nojekyll"), "\n");
+
+const sizeResult = checkDistSize(resolve(scriptDir, "..", "dist"));
+console.log(formatDistSizeReport(sizeResult));
+if (!sizeResult.ok) {
+  process.exit(1);
+}
 
 function normalizeBase(value) {
   if (!value || value === "/") {

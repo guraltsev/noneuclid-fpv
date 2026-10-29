@@ -13,6 +13,7 @@
     "build": "tsc --noEmit && vite build",
     "build:pages": "node scripts/build-pages.mjs",
     "preview": "vite preview",
+    "size:dist": "node scripts/check-dist-size.mjs",
     "deploy:pages": "bash scripts/deploy-pages.sh",
     "textures:floor:inventory": "node scripts/texture-build/inventory-floor-textures.mjs",
     "textures:floor:build": "node scripts/texture-build/build-floor-runtime-textures.mjs",

@@ -65,8 +65,9 @@ Then open the printed address with `/noneuclid-fpv/` appended and try
   disabled under Settings → Actions.
 - **Deploy fails with a permissions or environment error:** repeat setup step 2.
 - **Floor textures missing:** only compressed `runtime/*.ktx2` textures are in
-  the repository; see
-  [issue 34](../.agents/jobs/02_asset_footprint_and_provenance.md).
+  the repository; texture sources are not (see
+  [job 02](../.agents/jobs/_done/02_asset_footprint_and_provenance.md) and
+  `public/assets/textures/README.md`).
 - **Do not use `npm run deploy:pages`** with this setup; it publishes a
   separate `gh-pages` branch and conflicts with the workflow.
 
@@ -85,8 +86,6 @@ textures appear, and the browser offers VR only when the device supports it.
 ## Release gate for assets
 
 Before publishing, review [asset provenance](ASSET_PROVENANCE.md). Do not add an
-unrecorded file to `public/`; Vite copies that directory into a release. The
-asset footprint and source/runtime split are tracked by
-[issue 34](../.agents/jobs/02_asset_footprint_and_provenance.md), and
-unverified historical files are tracked by
-[issue 40](../_issues/40_resolve_unverified_public_assets.md).
+unrecorded file to `public/`; Vite copies that directory into a release.
+`npm run build:pages` fails when `dist/` exceeds the 64 MiB budget (`npm run size:dist` prints the report), and
+`tests/assets/publicAssetPolicy.test.ts` guards `public/`.

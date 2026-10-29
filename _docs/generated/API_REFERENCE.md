@@ -1583,12 +1583,13 @@ Debug renderer that draws a single instance of a cell's archetypes at a chosen `
 
 ### `render/three/portalWallTexture.ts`
 
-Material factory for the debug portal wall: a repeating abstract texture on a double-sided standard material.
+Material factory for the debug portal wall: a repeating checkerboard on a double-sided standard material.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
-| const | `PORTAL_WALL_TEXTURE_FILE` | Asset-store path of the portal wall texture. |
-| const | `PORTAL_WALL_TEXTURE_URL` | Public URL of the portal wall texture, recorded in material user data for debugging. |
+| const | `PORTAL_WALL_TEXTURE_KEY` | Asset-lookup key of the generated portal wall texture; no file is downloaded for it. |
+| const | `PORTAL_WALL_TEXTURE_SIZE` | Width and height in pixels of the generated portal wall texture. |
+| function | `createPortalWallDataTexture` | Creates the 64 x 64 sRGB checkerboard used as the portal wall map (8-pixel squares, lavender at pixel 0,0). |
 | function | `createPortalWallMaterial` | Creates the portal wall material with the texture repeated `repeatX` x `repeatY` times; throws if the texture was not preloaded. |
 
 ### `render/three/preloadWorldAssets.ts`

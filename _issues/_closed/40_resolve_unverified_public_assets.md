@@ -1,10 +1,29 @@
 # 40 - Unverified public assets are deployed
 
-Status: open; re-verified 2026-10-28.
+Status: closed on 2026-10-29.
 
 Priority: P1 legal release gate.
 
-Jobs: [02](../.agents/jobs/02_asset_footprint_and_provenance.md).
+Jobs: [02](../../.agents/jobs/_done/02_asset_footprint_and_provenance.md).
+
+## Outcome
+
+Fixed by job 02. Every blocked or unreferenced file was removed from `public/`. The portal wall now uses a 64 x 64
+checkerboard generated in code (`src/render/three/portalWallTexture.ts`), so no image of unknown origin is loaded or
+deployed. The manifest's blocked table is replaced by a "None" note.
+
+## Closing evidence
+
+- Deleted: `_legacy/abstract-fractal-geometric-figure-background-with-texture.jpg`, `_legacy/car.gltf`,
+  `_legacy/scene.bin`, `_legacy/skybox-1.png`, `_legacy/skybox-2.jpg` to `skybox-6.jpg`, the unreferenced
+  `_legacy/house-low-poly`, `imp`, `low_poly_cat_walk`, `low_poly_rabbit`, `low_poly_tree_wind`, and the duplicate
+  `WoodenSign2/Wooden Sign2.png`.
+- New tests: `tests/render-contract/portalWallTexture.test.ts`, the "registers the generated portal wall texture
+  without downloading it" test in `tests/render-contract/preloadWorldAssets.test.ts`,
+  `tests/assets/publicAssetPolicy.test.ts` (5 tests), `tests/scripts/checkDistSize.test.ts` (3 tests).
+- `dist/` measured 53.4 MB (budget 64 MiB, enforced by `npm run build:pages` through `scripts/check-dist-size.mjs`).
+
+## Old text
 
 ## Status update 2026-10-28
 
@@ -36,7 +55,7 @@ currently copies these files into builds.
 
 ## Fix
 
-Tracked as job [02](../.agents/jobs/02_asset_footprint_and_provenance.md).
+Tracked as job [02](../../.agents/jobs/_done/02_asset_footprint_and_provenance.md).
 
 ## Acceptance criteria
 
