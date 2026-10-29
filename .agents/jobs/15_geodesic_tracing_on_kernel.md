@@ -1,6 +1,6 @@
 # Job 15 - Geodesic tracing on the segment-walk kernel
 
-Status: queued.
+Status: in progress.
 Revised on 2026-10-29 for a less capable implementing model.
 Resolves: issue [69](../../_issues/69_geodesic_tracing_kernel_numerics.md).
 
