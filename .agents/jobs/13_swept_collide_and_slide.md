@@ -1,6 +1,6 @@
 # Job 13 - Swept collide-and-slide on the segment-walk kernel
 
-Status: queued.
+Status: in progress.
 Revised on 2026-10-29 for a less capable implementing model.
 Resolves: issue [61](../../_issues/61_wall_response_lets_bodies_escape_through_corners.md), issue
 [62](../../_issues/62_segment_based_portal_traversal_and_swept_motion.md), issue
