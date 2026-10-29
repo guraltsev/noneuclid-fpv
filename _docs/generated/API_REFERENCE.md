@@ -1826,14 +1826,14 @@ Optional runtime diagnostics: asset load tracking, portal transition log, slow-f
 
 ### `render/three/runtimeObjectGhostRecords.ts`
 
-Creates "ghost" render records so a dynamic object that overlaps a portal is drawn on both sides of it.
+Creates "ghost" render records so a dynamic object that overlaps a portal is drawn on every side of it.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
 | const | `defaultPortalGhostActivationClearanceMeters` | Default distance in meters (0.02) beyond which an object is considered too far from a portal wall to need a ghost. |
 | type | `PortalGhostRenderableObject` | A dynamic object with an id, i.e. |
 | interface | `PortalGhostRuntimeObjectRenderRecordRequest` | Input for ghost-record collection. |
-| function | `collectPortalGhostRuntimeObjectRenderRecords` | Returns ghost render records, in neighbouring cells, for every portal the object currently overlaps (empty if none, or if the cell, bounds or key list is missing). |
+| function | `collectPortalGhostRuntimeObjectRenderRecords` | Returns ghost render records, in every cell copy the object's footprint reaches (empty if none, or if the cell, footprint or key list is missing). |
 
 ### `render/three/runtimeObjectRenderArchetypes.ts`
 
@@ -1858,6 +1858,7 @@ Data records describing where runtime (non-static) objects should be drawn, and 
 | interface | `RuntimeObjectRenderRecord` | Request to draw one archetype of one runtime object at a cell-local pose. |
 | interface | `RuntimeObjectRenderSourceMesh` | A mesh of a runtime object's source hierarchy, to be baked into an instanced archetype. |
 | function | `collectRuntimeObjectRenderSourceMeshes` | Collects every `Mesh` under `root` as an instancing source and hides the originals. |
+| function | `computeRenderSourceFootprintRadius` | Horizontal render footprint radius of an object: the largest horizontal distance (Three x and z) from the object root to any corner of any source mesh's bounding box, expressed in the root's frame. |
 
 ### `render/three/runtimeSceneUtils.ts`
 
@@ -2177,12 +2178,12 @@ Maps the WebXR viewer pose onto the game's `PlayerPose` and back: the XR player 
 
 ### `render/three/xrPortalEye.ts`
 
-Decides which cell an XR eye camera should render from when the eye has physically crossed a portal plane within the player's cell.
+Decides which cell an XR eye camera should render from when the eye has physically crossed portals away from the player's anchor.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
 | interface | `XrPortalEyeRenderRoot` | Result of eye-root resolution: where to start rendering from and how to place content relative to it. |
-| function | `resolveXrPortalEyeRenderRoot` | Returns the render root for an eye: if the eye is behind a portal side of `sourceCellId` (signed distance < 0) and within that side's length and the cell height, the result is re-rooted in the portal's target cell with … |
+| function | `resolveXrPortalEyeRenderRoot` | Returns the render root for an eye: walks from `anchorPoint` (the player's position in `sourceCellId`) to the eye's horizontal position through the portals. |
 
 ### `render/three/xrScenePaletteInput.ts`
 

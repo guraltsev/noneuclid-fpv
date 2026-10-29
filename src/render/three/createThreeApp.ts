@@ -270,6 +270,7 @@ import {
   RuntimeObjectRenderRecord,
   RuntimeObjectRenderSourceMesh,
   collectRuntimeObjectRenderSourceMeshes,
+  computeRenderSourceFootprintRadius,
 } from "./runtimeObjectRenderRecords";
 import {
   buildCurrentCellForbiddenZoneWireframes,
@@ -2443,6 +2444,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     return resolveXrPortalEyeRenderRoot({
       world: activeWorld(),
       sourceCellId: playerPose.cellId,
+      anchorPoint: playerPose.position,
       camera: cullingCamera,
     });
   }
@@ -2875,6 +2877,25 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     }
   }
 
+  // Footprint radius per archetype-key prefix, recomputed when the cached source meshes of the prefix are replaced
+  // (sources are dropped and rebuilt on invalidation, so the identity of the first source detects that).
+  const runtimeObjectFootprintCache = new Map<string, { readonly first: RuntimeObjectRenderSourceMesh | undefined; readonly count: number; readonly radius: number }>();
+
+  function runtimeObjectFootprintRadius(prefix: string, archetypeKeys: readonly string[]): number {
+    const sources = archetypeKeys
+      .map((key) => runtimeObjectRenderSourcesByKey.get(key))
+      .filter((source): source is RuntimeObjectRenderSourceMesh => source !== undefined);
+    const cached = runtimeObjectFootprintCache.get(prefix);
+
+    if (cached && cached.first === sources[0] && cached.count === sources.length) {
+      return cached.radius;
+    }
+
+    const radius = computeRenderSourceFootprintRadius(sources);
+    runtimeObjectFootprintCache.set(prefix, { first: sources[0], count: sources.length, radius });
+    return radius;
+  }
+
   function collectRuntimeObjectRenderRecords(): readonly RuntimeObjectRenderRecord[] {
     const records = runtimeObjectRegistry.getAll().flatMap((object) => {
       if (object.portalRenderable && isGeodesicRuntimeRenderObject(object)) {
@@ -2902,6 +2923,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
           world: activeWorld(),
           object,
           archetypeKeys,
+          footprintRadiusMeters: runtimeObjectFootprintRadius(prefix, archetypeKeys),
         }),
       ];
     });

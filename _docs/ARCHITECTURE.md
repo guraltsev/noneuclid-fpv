@@ -140,8 +140,8 @@ visible portal path using the path's `rootFromDestination` matrix; a fragment sh
 polygon through which that path is visible. Visibility is computed by
 `src/render/three/visiblePortalPaths.ts#computeVisiblePortalPaths` as recursive convex clipping of portal apertures in
 normalized device coordinates (details and the stereo variant are documented in that module and summarised in
-[MATHEMATICAL_MODEL.md](MATHEMATICAL_MODEL.md)). Objects that straddle a portal are drawn as "ghosts" in the neighbouring
-cell (`src/render/three/runtimeObjectGhostRecords.ts#collectPortalGhostRuntimeObjectRenderRecords`).
+[MATHEMATICAL_MODEL.md](MATHEMATICAL_MODEL.md)). Objects that straddle a portal or a vertex are drawn as "ghosts" in every cell copy their footprint reaches
+(`src/render/three/runtimeObjectGhostRecords.ts#collectPortalGhostRuntimeObjectRenderRecords`).
 
 ## Input, tools and menus
 

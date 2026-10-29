@@ -4,6 +4,7 @@ import {
   buildVisiblePathsByDestinationCell,
   createRootVisiblePortalPath,
   flattenVisiblePortalPathGroups,
+  unclippedPortalClipIndex,
   updateRuntimeObjectRenderArchetypeInstances,
 } from "../../src/render/three/renderPortalInstances";
 import type { PortalRenderPath } from "../../src/cell-complex/portalPaths";
@@ -80,6 +81,7 @@ describe("updateRuntimeObjectRenderArchetypeInstances", () => {
               ...createRootVisiblePortalPath("room-a"),
               depth: 1,
               pathId: 2,
+              rootFromDestinationMatrix: new THREE.Matrix4().makeTranslation(5, 0, 0),
             },
           ],
         ],
@@ -247,6 +249,55 @@ describe("updateRuntimeObjectRenderArchetypeInstances", () => {
     expect(readMatrix(archetype.mesh, 0)).toEqual(farPortalMatrix.elements);
     expect(archetype.portalPathIdAttribute.getX(0)).toBe(4);
     expect(diagnostics.capacityOverflowCount).toBe(0);
+  });
+
+  it("writes one instance, from the lowest depth, when a ghost lands on the real object's place", () => {
+    const archetype = createArchetype("mouse-body", 4);
+    const diagnostics = createRuntimeObjectRenderArchetypeDiagnostics();
+    const shift = new THREE.Matrix4().makeTranslation(-15, 0, 0);
+    const records: RuntimeObjectRenderRecord[] = [
+      { objectId: "mouse-a", cellId: "room-a", archetypeKey: "mouse-body", localMatrix: new THREE.Matrix4().makeTranslation(7.3, 0, 0) },
+      // The ghost sits at 7.3 - 15 in room-b; the depth-1 path to room-b adds +15 and lands on the real object.
+      { objectId: "mouse-a", cellId: "room-b", archetypeKey: "mouse-body", localMatrix: new THREE.Matrix4().makeTranslation(7.3, 0, 0).premultiply(shift) },
+    ];
+
+    updateRuntimeObjectRenderArchetypeInstances(
+      [archetype],
+      groupRuntimeObjectRenderRecordsByArchetype(records),
+      new Map([
+        ["room-a", [createRootVisiblePortalPath("room-a")]],
+        ["room-b", [{ ...createRootVisiblePortalPath("room-b"), depth: 1, pathId: 5, rootFromDestinationMatrix: shift.clone().invert() }]],
+      ]),
+      diagnostics,
+      new Map([[5, 2]]),
+    );
+
+    expect(archetype.mesh.count).toBe(1);
+    expect(readMatrix(archetype.mesh, 0)[12]).toBeCloseTo(7.3, 5);
+    expect(archetype.portalClipIndexAttribute.getX(0)).toBe(unclippedPortalClipIndex);
+    expect(diagnostics.capacityOverflowCount).toBe(0);
+  });
+
+  it("writes both instances when records of one object land on different places", () => {
+    const archetype = createArchetype("mouse-body", 4);
+    const diagnostics = createRuntimeObjectRenderArchetypeDiagnostics();
+    const records: RuntimeObjectRenderRecord[] = [
+      { objectId: "mouse-a", cellId: "room-a", archetypeKey: "mouse-body", localMatrix: new THREE.Matrix4().makeTranslation(1, 0, 0) },
+      { objectId: "mouse-a", cellId: "room-b", archetypeKey: "mouse-body", localMatrix: new THREE.Matrix4().makeTranslation(-1, 0, 0) },
+    ];
+
+    updateRuntimeObjectRenderArchetypeInstances(
+      [archetype],
+      groupRuntimeObjectRenderRecordsByArchetype(records),
+      new Map([
+        ["room-a", [createRootVisiblePortalPath("room-a")]],
+        ["room-b", [{ ...createRootVisiblePortalPath("room-b"), depth: 1, pathId: 5, rootFromDestinationMatrix: new THREE.Matrix4().makeTranslation(15, 0, 0) }]],
+      ]),
+      diagnostics,
+      new Map([[5, 2]]),
+    );
+
+    expect(archetype.mesh.count).toBe(2);
   });
 
   it("flattens statically-kept visible path groups for runtime object rendering", () => {

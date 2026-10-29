@@ -20,7 +20,7 @@ export interface RuntimeObjectRenderRecord {
   readonly archetypeKey: string;
   /** Object-root-to-cell transform in Three axes, applied before the path's rootFromDestination. */
   readonly localMatrix: THREE.Matrix4;
-  /** If true, do not draw this record in the root cell itself (depth-0 path), only through portals; used for ghosts and the viewer's own body. */
+  /** If true, do not draw this record in the root cell itself (depth-0 path), only through portals; used for the viewer's own body. */
   readonly omitRootVisiblePath?: boolean;
   /** If set and positive, skip any instance whose origin is closer than this many meters to a camera. */
   readonly suppressWithinCameraDistanceMeters?: number;
@@ -67,4 +67,45 @@ export function collectRuntimeObjectRenderSourceMeshes(
   });
 
   return sources;
+}
+
+/**
+ * Horizontal render footprint radius of an object: the largest horizontal distance (Three x and z) from the object
+ * root to any corner of any source mesh's bounding box, expressed in the root's frame. Zero when there are no sources.
+ * Calls `updateMatrixWorld(true)` on each source root.
+ */
+export function computeRenderSourceFootprintRadius(sources: readonly RuntimeObjectRenderSourceMesh[]): number {
+  let radius = 0;
+  const corner = new THREE.Vector3();
+  const rootInverse = new THREE.Matrix4();
+  const rootFromMesh = new THREE.Matrix4();
+
+  for (const source of sources) {
+    source.root.updateMatrixWorld(true);
+    const geometry = source.mesh.geometry;
+
+    if (!geometry.boundingBox) {
+      geometry.computeBoundingBox();
+    }
+
+    const box = geometry.boundingBox;
+
+    if (!box || box.isEmpty()) {
+      continue;
+    }
+
+    rootInverse.copy(source.root.matrixWorld).invert();
+    rootFromMesh.multiplyMatrices(rootInverse, source.mesh.matrixWorld);
+
+    for (const x of [box.min.x, box.max.x]) {
+      for (const y of [box.min.y, box.max.y]) {
+        for (const z of [box.min.z, box.max.z]) {
+          corner.set(x, y, z).applyMatrix4(rootFromMesh);
+          radius = Math.max(radius, Math.hypot(corner.x, corner.z));
+        }
+      }
+    }
+  }
+
+  return radius;
 }

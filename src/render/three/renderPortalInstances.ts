@@ -230,7 +230,9 @@ export function updateCellRenderArchetypeInstances(
  * root frame, all in Three axes). Records with `omitRootVisiblePath` skip the depth-0 path, and records with
  * `suppressWithinCameraDistanceMeters` are skipped when their root-frame position lies closer than that distance
  * (meters) to any of `options.cameraPositions` (root Three frame), which hides objects around the viewer's own head.
- * Overflow is counted by requested (not stored) instances.
+ * Instances of one object that land on the same place in the root frame (same translation and first column, rounded
+ * to 1e-4) are written once, from the path with the smallest depth (ties: first), so a real object and its ghost do
+ * not z-fight. Overflow is counted by requested (not stored) instances.
  */
 export function updateRuntimeObjectRenderArchetypeInstances(
   archetypes: readonly RuntimeObjectRenderArchetype[],
@@ -250,6 +252,32 @@ export function updateRuntimeObjectRenderArchetypeInstances(
     let requestedCount = 0;
     let count = 0;
 
+    // Pass 1: the lowest path depth per placement. A real object and a ghost that land on the same place in the
+    // root frame are drawn once, by the copy with the loosest clip (depth 0 is unclipped).
+    const lowestDepthByPlacement = new Map<string, number>();
+    for (const record of records) {
+      const paths = visiblePathsByDestinationCell.get(record.cellId) ?? [];
+
+      for (const path of paths) {
+        if (record.omitRootVisiblePath && path.depth === 0) {
+          continue;
+        }
+
+        composedMatrix.multiplyMatrices(path.rootFromDestinationMatrix, record.localMatrix);
+        if (isRuntimeObjectRecordSuppressedNearCamera(record, composedMatrix, composedPosition, options.cameraPositions)) {
+          continue;
+        }
+
+        const key = runtimeObjectPlacementKey(record.objectId, composedMatrix);
+        const lowest = lowestDepthByPlacement.get(key);
+        if (lowest === undefined || path.depth < lowest) {
+          lowestDepthByPlacement.set(key, path.depth);
+        }
+      }
+    }
+
+    const writtenPlacements = new Set<string>();
+
     for (const record of records) {
       const paths = visiblePathsByDestinationCell.get(record.cellId) ?? [];
       const renderablePaths = record.omitRootVisiblePath
@@ -261,6 +289,12 @@ export function updateRuntimeObjectRenderArchetypeInstances(
         if (isRuntimeObjectRecordSuppressedNearCamera(record, composedMatrix, composedPosition, options.cameraPositions)) {
           continue;
         }
+
+        const key = runtimeObjectPlacementKey(record.objectId, composedMatrix);
+        if (path.depth !== lowestDepthByPlacement.get(key) || writtenPlacements.has(key)) {
+          continue;
+        }
+        writtenPlacements.add(key);
 
         requestedCount += 1;
 
@@ -287,6 +321,14 @@ export function updateRuntimeObjectRenderArchetypeInstances(
       diagnostics.recordCapacityOverflow(archetype, requestedCount);
     }
   }
+}
+
+// Placement identity of an instance: object id, translation and first column of the composed matrix, rounded to 1e-4.
+function runtimeObjectPlacementKey(objectId: string, matrix: THREE.Matrix4): string {
+  const e = matrix.elements;
+  const r = (value: number): number => Math.round(value * 1e4);
+
+  return `${objectId}|${r(e[12])},${r(e[13])},${r(e[14])}|${r(e[0])},${r(e[1])},${r(e[2])}`;
 }
 
 // Uses the translation column of the composed matrix as the object origin; squared distances avoid sqrt.

@@ -86,6 +86,7 @@ describe("VR locomotion mapping", () => {
       resolveXrPortalEyeRenderRoot({
         world,
         sourceCellId: "room-a",
+        anchorPoint: { x: 0, y: 0, z: 0 },
         camera: sourceEye,
       }).rootCellId,
     ).toBe("room-a");
@@ -93,6 +94,7 @@ describe("VR locomotion mapping", () => {
       resolveXrPortalEyeRenderRoot({
         world,
         sourceCellId: "room-a",
+        anchorPoint: { x: 0, y: 0, z: 0 },
         camera: targetEye,
       }).rootCellId,
     ).toBe("room-b");

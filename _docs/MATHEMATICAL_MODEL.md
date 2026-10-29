@@ -351,10 +351,24 @@ frame by left-multiplying `renderFromRoot` onto every path matrix
 clip rows (`src/render/three/portalEyeFrameTransforms.ts#buildUnionVisiblePathById`).
 
 **Objects seen through portals.** Runtime objects are drawn once per visible path of the cell they are in, with matrix
-$M_p\cdot\text{local}$. An object whose collision cylinder reaches within $0.02$ m of a portal side also gets a *ghost* in the
-neighbouring cell with pose $g\circ\text{pose}$
+$M_p\cdot\text{local}$. Ghosts come from the developed disk (`src/cell-complex/developedDisk.ts#collectDevelopedDisk`) of radius
+$r+0.02$ m around the object's horizontal centre, where $r$ is the collision radius, or, for an object without collision bounds,
+the horizontal radius of its rendered meshes (`src/render/three/runtimeObjectRenderRecords.ts#computeRenderSourceFootprintRadius`).
+Every cell copy the disk reaches, however many portals away, gets one *ghost* with pose $g\circ\text{pose}$
 (`src/render/three/runtimeObjectGhostRecords.ts#collectPortalGhostRuntimeObjectRenderRecords`), so a creature half-way through a
-portal is drawn on both sides.
+portal, or next to a vertex, is drawn in every neighbouring cell. Around a cone vertex the same cell can be reached twice; two
+ghosts in the same cell whose centres are closer than $2r$ would overlap, so only the first in breadth-first order is kept (the
+real object first). This also merges the two wedges through which a flat copy is reached. Consequence: neither sector clipping
+nor overlap is used, and a small part of an object that contains a cone point may be left undrawn in one sector. The instancer
+(`src/render/three/renderPortalInstances.ts#updateRuntimeObjectRenderArchetypeInstances`) also writes only one instance per
+placement (object id, translation and first column rounded to $10^{-4}$), the one from the path of smallest depth, so a real
+object and a ghost that coincide on screen do not z-fight.
+
+**Eye roots.** In XR the head may leave the player's cell while the player pose stays put. The eye's render root is found by
+walking the segment from the player's position to the eye through the portals
+(`src/render/three/xrPortalEye.ts#resolveXrPortalEyeRenderRoot`, using `locateDevelopedPoint`); a walk that ends in another
+cell re-roots there, with the camera carried through the walk's transform. A wall, or an eye outside the cell's height range,
+keeps the source cell.
 
 **Aiming uses the same visibility.** `src/render/three/aimTarget.ts#resolveAimTargets` maps the camera's centre ray into each
 visible destination cell by $M_p^{-1}$ for every path whose clip polygon contains the screen centre, intersects it with the
