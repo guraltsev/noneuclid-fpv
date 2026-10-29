@@ -102,3 +102,7 @@ Two render-side helpers assume that only one portal is involved at a time:
 - Unit test: an eye placed past a two-portal corner resolves to the same root and transform as the segment walk,
   independent of side order.
 - Headset check: no z-fighting on an object straddling a portal when viewed head-on.
+
+
+Status update 2026-10-29: implemented in [job 17](../.agents/jobs/_done/17_multi_hop_ghosts_and_eye_rerooting.md) (commit d96f09d); left open only for the headset check, see the job's Report.
+

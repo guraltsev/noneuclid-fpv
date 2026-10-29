@@ -1,6 +1,6 @@
 # Job 17 - Multi-hop portal ghosts and XR eye re-rooting
 
-Status: in progress.
+Status: done, needs review on 2026-10-29.
 Revised on 2026-10-29 for a less capable implementing model.
 Resolves: issue [73](../../_issues/73_portal_ghosts_and_xr_eye_rerooting_are_single_hop.md) and the "Ghosts" item of
 issue [63](../../_issues/63_collision_ignores_cells_a_straddling_body_overlaps.md).
@@ -38,21 +38,21 @@ Baseline: `npm run typecheck`, `npm test`.
 ## Background
 
 - A ghost record says "draw this archetype in cell D at `localMatrix`". The instancer draws it once per visible path
-  ending in D. For an object of cell C straddling the portal C→D, the ghost in D seen through that portal lands at the
+  ending in D. For an object of cell C straddling the portal Câ†’D, the ghost in D seen through that portal lands at the
   same root-frame place as the real object drawn at depth 0. Both are drawn; the depth-0 copy is unclipped, so on the
   overhang the two copies coincide up to rounding and z-fight (issue 73 item 2).
-- The developed disk of job 12 lists every cell copy that the disk of radius ρ around a point reaches, each with its
-  transform `cellFromStart` and the wedge of directions that reach it. Around a flat vertex (total angle 2π, every
-  torus corner) the copies tile the disk with no overlap. Around a cone vertex (cube: 3π/2; genus-2 octagon: 6π) the
+- The developed disk of job 12 lists every cell copy that the disk of radius Ï around a point reaches, each with its
+  transform `cellFromStart` and the wedge of directions that reach it. Around a flat vertex (total angle 2Ï€, every
+  torus corner) the copies tile the disk with no overlap. Around a cone vertex (cube: 3Ï€/2; genus-2 octagon: 6Ï€) the
   same cell can appear in two copies with different transforms. Each covers a different wedge, but a whole mesh drawn
   at each copy's pose would overlap itself in that cell. Meshes cannot be clipped to a wedge without new shader work.
 - Checked numbers (job 12 prototype, run on 2026-10-29 with the rule of Decision 2):
-  - `cube`, object radius 0.3 at 0.1 m from a vertex of `front`, ρ = 0.32: 5 nodes (`front`, `bottom`, `right`, and
+  - `cube`, object radius 0.3 at 0.1 m from a vertex of `front`, Ï = 0.32: 5 nodes (`front`, `bottom`, `right`, and
     second copies of `right` and `bottom` reached around the other side of the vertex). After Decision 2: one ghost in
     `bottom` and one in `right`.
   - `torusModuli`, radius 0.3 at (7.3, 7.3): 5 nodes (the cell, two side translates, and the diagonal translate twice,
-    once through each wedge, at the **same** place). After Decision 2: 3 ghosts at (−7.7, 7.3), (7.3, −7.7) and
-    (−7.7, −7.7).
+    once through each wedge, at the **same** place). After Decision 2: 3 ghosts at (âˆ’7.7, 7.3), (7.3, âˆ’7.7) and
+    (âˆ’7.7, âˆ’7.7).
 
 ## Decisions
 
@@ -61,14 +61,14 @@ Baseline: `npm run typecheck`, `npm test`.
    record per node except the root, with `localMatrix = rigidTransformToThreeMatrix(compose(node.cellFromStart, object.localPose))`
    and `cellId = node.cellId`. c is the horizontal centre of the collision bounds, or the anchor when there are none.
 2. **Conflict rule at cone vertices.** Decided: two nodes in the **same cell** conflict when the ghost centres
-   (`node.cellFromStart(c)`) are closer than 2·r in that cell's frame. Process the nodes in the order
+   (`node.cellFromStart(c)`) are closer than 2Â·r in that cell's frame. Process the nodes in the order
    `collectDevelopedDisk` returns them (breadth-first, so depth never decreases); keep a node only if it conflicts with
    no node kept before it. The root node (the real object) is always kept first and emits no record. This also merges
    the two nodes of one flat copy that is reached through two wedges (the torus diagonal). Why: this gives each sector of a
    cone vertex exactly one image (issue 73 acceptance), and keeps all translates on a flat torus, whose copies are 15 m
    apart. It is the "clip by sector, or accept overlap" choice issue 73 asked for: **neither**: overlapping duplicates
    are dropped, which can leave a small part of an object containing a cone point undrawn in one sector. Record this in
-   `_docs/MATHEMATICAL_MODEL.md` §8.
+   `_docs/MATHEMATICAL_MODEL.md` Â§8.
 3. **Footprint radius.** Decided: r = the collision radius when the object has collision bounds; otherwise the
    horizontal render footprint: the largest horizontal distance (Three x and z) from the object root to any corner of
    any source mesh's bounding box, expressed in the object root's frame. Compute it once per object prefix where the
@@ -88,7 +88,7 @@ Baseline: `npm run typecheck`, `npm test`.
    with a different cell (or the same cell with a non-identity transform, a self-glued cell) re-roots: `rootCellId` =
    the located cell, camera = clone with `matrixWorld` premultiplied by `rigidTransformToThreeMatrix(cellFromStart)`,
    `renderFromRootMatrix` = that matrix inverted. Status `wall`, `start-outside` or any failure: no re-root (today's
-   fallback). Keep today's height test (eye z within [−1e-5, source height + 1e-5]); outside it, no re-root.
+   fallback). Keep today's height test (eye z within [âˆ’1e-5, source height + 1e-5]); outside it, no re-root.
    Why: issue 73 proposed change 3; the walk crosses every portal in order and does not depend on side order.
 
 ## Steps
@@ -103,7 +103,7 @@ Baseline: `npm run typecheck`, `npm test`.
 4. Rewrite `resolveXrPortalEyeRenderRoot` (Decision 5); `createThreeApp.ts` passes
    `anchorPoint: playerPose.position`. Delete `transformCameraThroughPortal` if unused, or make it take a
    `RigidTransform3`.
-5. Docs: `_docs/MATHEMATICAL_MODEL.md` §8 gets a short paragraph on ghosts (Decisions 1, 2, 4) and on eye roots
+5. Docs: `_docs/MATHEMATICAL_MODEL.md` Â§8 gets a short paragraph on ghosts (Decisions 1, 2, 4) and on eye roots
    (Decision 5).
 
 ## Tests
@@ -111,9 +111,9 @@ Baseline: `npm run typecheck`, `npm test`.
 In `tests/render-contract/runtimeObjectGhostRecords.test.ts` (keep the three existing single-hop tests; if one fails,
 check whether the new answer is the correct multi-hop one and record it):
 
-1. Issue 73 acceptance, flat torus: `torusModuli` (one 15 × 15 cell centred on the origin), object with collision
+1. Issue 73 acceptance, flat torus: `torusModuli` (one 15 Ã— 15 cell centred on the origin), object with collision
    radius 0.3 at (7.3, 7.3): exactly 3 ghost records, all in `torus-room`; their translations are the object's
-   translated by (−15, 0), (0, −15) and (−15, −15) (in world axes, read back from the Three matrix with
+   translated by (âˆ’15, 0), (0, âˆ’15) and (âˆ’15, âˆ’15) (in world axes, read back from the Three matrix with
    `threePointToWorld`), each within 1e-9.
 2. Issue 73 acceptance, cone vertex: `cube`, object of radius 0.3 at 0.1 m from a vertex of `front` (on the line to the
    cell's vertex average): the records' cell ids are exactly the two other cells at that vertex, once each (the real
@@ -128,8 +128,8 @@ In `tests/render-contract/runtimeObjectPortalInstances.test.ts`:
    written, with the unclipped index.
 6. Two records of the same object at different places: both written.
 
-`computeRenderSourceFootprintRadius`: a unit box mesh at the root gives √2/2 · 1 = 0.7071 within 1e-9 (half-diagonal of
-the 1 × 1 footprint).
+`computeRenderSourceFootprintRadius`: a unit box mesh at the root gives âˆš2/2 Â· 1 = 0.7071 within 1e-9 (half-diagonal of
+the 1 Ã— 1 footprint).
 
 In a new `tests/render-contract/xrPortalEye.test.ts`:
 
@@ -164,3 +164,25 @@ ghost item.
 - Ghosts come from `collectDevelopedDisk`; the `[-r, L+r]` projection window is gone.
 - Instances are deduplicated by placement; the eye root uses `locateDevelopedPoint`.
 - Tests 1-9 pass.
+
+## Report
+
+### Done
+Commit d96f09d. `runtimeObjectGhostRecords.ts` rewritten: ghosts from `collectDevelopedDisk` (radius r + 0.02), conflict rule of Decision 2, footprint radius from collision or `footprintRadiusMeters`. Added `computeRenderSourceFootprintRadius` in `runtimeObjectRenderRecords.ts` (doc of `omitRootVisiblePath` fixed); `createThreeApp.ts` passes the radius (cached per archetype-key prefix, revalidated by the identity and count of the cached sources) and `anchorPoint: playerPose.position`. `renderPortalInstances.ts`: placement dedupe (two passes, lowest depth, ties first). `xrPortalEye.ts`: re-root by `locateDevelopedPoint`; `transformCameraThroughPortal` replaced by a `RigidTransform3` version. Docs: MATHEMATICAL_MODEL section 8, ARCHITECTURE, regenerated references. Tests 1-9 plus the footprint test: ghost tests and footprint in `runtimeObjectGhostRecords.test.ts`, instance tests in `runtimeObjectPortalInstances.test.ts`, new `xrPortalEye.test.ts`.
+
+### Deviations
+- `runtimeObjectPortalInstances.test.ts` "reports overflow...": the depth-1 path now has a distinct translation; with identical identity matrices the new dedupe correctly collapses it to one instance and no overflow.
+- `vrLocomotion.test.ts`: the two existing `resolveXrPortalEyeRenderRoot` calls now pass the required `anchorPoint`.
+- Test 7 uses a chain world (the eye's walk goes east, then north through a second portal from the east neighbour) so the walk ends in a real cell (`en`) rather than a wall; both side orders give `en`.
+
+### Uncertain
+- Headset check (no z-fighting on the overhang, head-on) not run.
+- The `requested` overflow count now counts deduplicated instances only.
+- Dedupe key ignores archetype (it runs per archetype), so two identical-placement records of one object in one archetype collapse to one.
+- The first `npm run smoke -- --world cube,torus-moduli` run reported torus-moduli "loading screen still present after 60000 ms"; a rerun of torus-moduli alone passed. Looks like a cold-start flake, not confirmed.
+
+### Not done
+- Headset check (no headset). Issue 73 left open with a pointer.
+
+### Checks
+Baseline `npm run typecheck` and `npm test` green (865 passed). Final: typecheck clean, `npm test` 875 passed / 8 skipped, `npm run docs:check` ok (after `docs:generate`), smoke cube OK, torus-moduli OK on rerun (see Uncertain).

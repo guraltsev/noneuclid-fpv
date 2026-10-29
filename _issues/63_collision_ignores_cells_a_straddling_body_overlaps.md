@@ -109,3 +109,6 @@ the `[-r, L+r]` window with `dist(c, segment) < r`.
   overlaps that wall and never changes cell more than once.
 - Atlas unit test: around each vertex of `icosahedron` and `cube`, the copies collected for `B(c, 0.25)` with
   `|c - v| = 0.4` have total clipped area `π·0.25²` (±1e-6).
+
+Status update 2026-10-29: the ghost item is implemented in [job 17](../.agents/jobs/_done/17_multi_hop_ghosts_and_eye_rerooting.md) (commit d96f09d).
+
