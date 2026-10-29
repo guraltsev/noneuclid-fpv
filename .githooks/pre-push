@@ -1,0 +1,19 @@
+#!/bin/sh
+# Pre-push gate. The Pages workflow builds and deploys without running tests,
+# so this hook is the only check between a commit and the live site.
+# Enabled by `npm install`, or by hand with `npm run setup:hooks`
+# (scripts/setup-git-hooks.mjs sets core.hooksPath).
+# Skip once with `git push --no-verify`.
+set -e
+
+if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+  echo "pre-push: warning: uncommitted changes; the checks run on the working tree, not exactly on what is pushed." >&2
+fi
+
+echo "pre-push: npm run typecheck" >&2
+npm run --silent typecheck
+
+echo "pre-push: npm test" >&2
+npm test --silent
+
+echo "pre-push: all checks passed." >&2

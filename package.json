@@ -4,6 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "prepare": "node scripts/setup-git-hooks.mjs",
+    "setup:hooks": "node scripts/setup-git-hooks.mjs",
     "dev": "vite",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",

@@ -23,7 +23,10 @@ Vite prints the local URL. Visit it, choose a scenario with `?config=001`,
 `?config=002`, `?config=default`, or `?config=full`, and confirm that the world
 loads and that the menu and a placed tool work.
 
-Run the automated checks before sharing a change:
+`git push` runs `npm run typecheck` and `npm test` through the pre-push hook in
+`.githooks/` (enabled by `npm install`, or by hand with `npm run setup:hooks`,
+which runs `scripts/setup-git-hooks.mjs` to set `core.hooksPath`) and refuses
+the push on failure. Run the full set yourself before sharing a change:
 
 ```sh
 npm run typecheck

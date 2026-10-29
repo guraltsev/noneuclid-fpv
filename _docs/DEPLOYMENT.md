@@ -9,7 +9,9 @@ The site is published from [guraltsev/noneuclid-fpv](https://github.com/guraltse
 at **https://guraltsev.github.io/noneuclid-fpv/**. Publishing is automatic: every
 push to `main` runs the [Pages workflow](../.github/workflows/deploy-pages.yml),
 which installs dependencies, builds the site and deploys it. The workflow does
-**not** run the tests (they are heavy): run `npm test` locally before pushing.
+**not** run the tests (they are heavy). Instead a local pre-push hook
+(`.githooks/pre-push`, enabled by `npm install` or `npm run setup:hooks`) runs `npm run typecheck` and
+`npm test` and refuses the push if either fails.
 Nothing needs to be run by hand.
 
 ### One-time setup (about two minutes)
@@ -32,8 +34,9 @@ git commit -m "Describe the change"
 git push
 ```
 
-That is all. Run `npm test` yourself before pushing, because the deploy does not
-test anything. Watch the run in the Actions tab; after a minute or two the site
+That is all. `git push` first runs the pre-push hook (about a minute); the
+deploy itself does not test anything. `git push --no-verify` skips the hook,
+so use it only when you know the checks are irrelevant. Watch the run in the Actions tab; after a minute or two the site
 shows the change (force-refresh the browser, Ctrl+F5, if it looks stale). If the
 build fails, the deploy is skipped and the old site stays up.
 

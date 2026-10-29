@@ -4,6 +4,19 @@ Status: open; re-verified 2026-10-28.
 
 Priority: P1 release confidence.
 
+## Decision 2026-10-28: local gate, not GitHub CI
+
+The owner does not want to rely on GitHub for CI. The pre-merge check is a tracked local pre-push hook instead:
+
+- `.githooks/pre-push` runs `npm run typecheck` and `npm test` and refuses the push if either fails. It takes about
+  67 s, most of it in `tests/cell-complex/portalPaths.test.ts`.
+- `scripts/setup-git-hooks.mjs` sets `core.hooksPath`. It runs from `npm install` (`prepare`) or from
+  `npm run setup:hooks`.
+- `.gitattributes` keeps the hook's line endings LF.
+
+Any item below that asks for a GitHub Actions pull-request workflow is superseded by the hook. The browser smoke and
+asset checks still apply, run locally.
+
 ## Status update 2026-10-28
 
 Done (partly):
