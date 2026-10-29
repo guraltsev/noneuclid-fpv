@@ -450,6 +450,8 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   scene.add(xrRig.root);
   const vrComfortVignette = createVrComfortVignette(camera, vrComfortOptions);
   const clock = new THREE.Clock();
+  /** Longest simulation step per frame, in seconds; longer wall-clock gaps (hidden tab, debugger pause) are treated as this long. */
+  const maxSimulationStepSeconds = 0.1;
   // Authoritative player pose (cell id, cell-local position in meters, yaw in radians). Written only in
   // renderFrame (movement), transformPlayerForGeometryCommit and the reset/teleport helpers; factories read it
   // through getPlayerPose getters.
@@ -1262,9 +1264,11 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
    */
   function renderFrameUnguarded(_time?: DOMHighResTimeStamp, xrFrame?: XRFrame): void {
     const frameStartMs = performance.now();
-    // Phase 0: timing. deltaSeconds is the wall-clock time since the previous frame.
-    const deltaSeconds = clock.getDelta();
-    const frameRateFps = deltaSeconds > 0 ? 1 / deltaSeconds : undefined;
+    // Phase 0: timing. deltaSeconds is the wall-clock time since the previous frame, capped so that a frame after the
+    // tab was in the background does not fling creatures and the player far outside their cells in a single step.
+    const wallClockDeltaSeconds = clock.getDelta();
+    const deltaSeconds = Math.min(wallClockDeltaSeconds, maxSimulationStepSeconds);
+    const frameRateFps = wallClockDeltaSeconds > 0 ? 1 / wallClockDeltaSeconds : undefined;
     smoothedFrameRateFps = frameRateFps === undefined
       ? smoothedFrameRateFps
       : smoothedFrameRateFps === undefined
