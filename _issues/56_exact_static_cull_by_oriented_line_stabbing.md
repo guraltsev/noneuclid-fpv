@@ -1,9 +1,20 @@
 # 56 - Exact static cull: oriented line stabbing replaces the tau/sigma machinery
 
-Status: open as of 2026-10-08.
+Status: open; re-verified 2026-10-28.
 
 Priority: P1 (correctness / design). This proposes the fix for the "static visibility cull is not provably conservative"
 item in issue 41. It does not file that defect again.
+
+## Status update 2026-10-28
+
+Nothing in the proposal is implemented. `src/cell-complex/staticPortalPathCull.ts` (1639 lines) still uses the
+aperture-plane tests plus the tau/sigma transversal: interval branch-and-bound with at most 8 splits, then the
+projective-chart polygon clipping. Every evidence item below still holds; line numbers have been updated to the
+current file. One small item is already done: the unused `outside-ancestor-portal-slab` reason is gone, so
+`StaticPortalPathRejectReason` now has four members, `outside-ancestor-portal-plane`,
+`outside-ancestor-vertical-range`, `no-static-line-transversal` and `static-path-budget`. The acceptance item asks
+for two. There is still no property test with random prism chains. Two culling paths share the same logic and both
+need replacing: `buildStaticallyCulledPortalPathTables` (`:184`) and `staticallyCullPortalPathTables` (`:354`).
 
 ## Summary
 
@@ -18,17 +29,17 @@ removes the 0.075 m slack, which rejects more paths as it grows (issue 41).
 
 ## Evidence
 
-- `staticPortalPathCull.ts:509` (`rejectByTauSigmaTransversal`): words of length 2 or less are never tested. This is
+- `staticPortalPathCull.ts:514` (`rejectByTauSigmaTransversal`; the length check is at `:523`): words of length 2 or less are never tested. This is
   right, but only because of convexity, and the code never uses that fact.
-- `staticPortalPathCull.ts:801` (`projectedRayIntersectsWindow`) and `:974` (`clipDomainsByOppositeSigns`): each window
+- `staticPortalPathCull.ts:814` (`projectedRayIntersectsWindow`) and `:994` (`clipDomainsByOppositeSigns`): each window
   is a disjunction ("opposite signs"), so the feasible set is a union of up to 2^(2(k-2)) convex pieces, held down only
   by `pruneTauSigmaDomains`. Neither orientation nor order is used.
-- `staticPortalPathCull.ts:616-668`: the chart restriction (`clipDomainsBySameSigns`, `clipDomainsToWindowChart`) drops
+- `staticPortalPathCull.ts:694-735`: the chart restriction (`clipDomainsBySameSigns`, `clipDomainsToWindowChart`) drops
   lines that cross the critical line. This is non-conservative, as recorded in issue 41.
-- `staticPortalPathCull.ts:229`: `cullTolerance = max(tol, r_junction/2)`. Then `:1525` rejects a path when every
+- `staticPortalPathCull.ts:201` (and `:378`): `cullTolerance = max(tol, r_junction/2)`. Then `:1548` rejects a path when every
   corner satisfies `distance > -cullTolerance`. A destination that reaches up to 7.5 cm past an ancestor plane is
   dropped, which is the wrong direction for a tolerance.
-- `staticPortalPathCull.ts:266-273`: budget truncation. When `maxKeptPathsPerRoot` (50 000, `createThreeApp.ts:763`)
+- `staticPortalPathCull.ts:246-261`: budget truncation. When `maxKeptPathsPerRoot` (50 000, `createThreeApp.ts:767`; also `cellRenderArchetypes.ts:176`)
   runs out partway through a depth level, the paths kept at that level are a prefix of `cell.portals` order. Deep
   visibility then becomes direction-biased: whichever directions come first in the array see deepest.
 
@@ -60,7 +71,7 @@ p_i, so C_k cannot lie entirely on its inner side.
    1e-6 times the world scale) before clipping, and count a ray as inside when h·r >= -ε|h||r|. Both choices only
    enlarge K.
 3. Delete the following: `rejectGeometrically` (subsumed), the interval B&B, the projective stage,
-   `debugTauSigmaDisagreements`, and the unused `outside-ancestor-portal-slab` reason. Together with their helpers this
+   and `debugTauSigmaDisagreements` (~~the unused `outside-ancestor-portal-slab` reason~~ already removed). Together with their helpers this
    is about 900 lines of `staticPortalPathCull.ts`.
 4. Budget: replace BFS-prefix truncation with best-first expansion, using a priority queue keyed on the Crofton measure
    μ(K_p) of the set of lines in K_p. In (θ, p) line coordinates, μ = ∫ (min upper_i(θ) - max lower_j(θ))^+ dθ with
@@ -80,3 +91,17 @@ p_i, so C_k cannot lie entirely on its inner side.
 - `StaticPortalPathRejectReason` is reduced to `no-static-line-transversal | static-path-budget`.
 - Build time for the default worlds at depth 10 does not regress. The expectation is that it improves, since O(|K|)
   replaces up to 8 B&B splits plus clipping of a union of polygons.
+
+## Merged from issue 41 (2026-10-28)
+
+Issue 41's P1 item "static visibility cull is not provably conservative" is tracked here. The current code has these
+defects; the LP in this issue replaces all of them:
+
+- The aperture slack (at least 0.075 m, `max(toleranceMeters, junction radius / 2)`) makes rejection *more*
+  aggressive as it grows (`TODO(issue 56)` at `staticPortalPathCull.ts:199` and `:376`).
+- The projective tau/sigma stage never tests sight lines that cross the line sent to infinity
+  (`TODO(issue 56)` at `:702`).
+- `toleranceMeters` is compared against dimensionless quantities.
+- Projection construction and the intersection test use different parallelism thresholds.
+
+Needs rendering comparisons before and after, not a blind change.

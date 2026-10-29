@@ -1,8 +1,18 @@
 # 68 - Moving the shared anchor of a loop across a portal must conjugate the word
 
-Status: open as of 2026-10-08.
+Status: open; re-verified 2026-10-28.
 
 Priority: P1 (correctness; silent change of homotopy class).
+
+## Status update 2026-10-28
+
+Nothing has changed. All three sites still apply a one-sided update, `liftGeodesicEndpoint` still does not check that the
+word starts in the source anchor's cell, and `createGeodesicIntervalObject` (`src/world-objects/geodesicCannon.ts:732`)
+stores the word as given. There is no conjugation helper and no test for any acceptance item below. Line numbers in
+the evidence are corrected to the current file. The free-loop case is also recorded as a `TODO(issue 68)` at
+`geodesicCannon.ts:3753-3755` and in `_docs/MATHEMATICAL_MODEL.md` section 11.
+
+Remaining: everything under "Proposed change" and "Acceptance criteria".
 
 ## Summary
 
@@ -14,13 +24,13 @@ length. On multi-cell worlds the check fails and the loop falls into the legacy 
 
 ## Evidence
 
-- `src/world-objects/geodesicCannon.ts:2093-2100` (`updateLockedGeodesicPortalWordForCarriedAnchorTraversal`): the
+- `src/world-objects/geodesicCannon.ts:2100-2107` (`updateLockedGeodesicPortalWordForCarriedAnchorTraversal`): the
   `end` test comes first, so a loop with both roles on the carried emitter takes the append branch. The docstring at
-  `:2074-2075` states this as intended.
-- `:2336-2346` (`resolveCarriedIntervalPortalWord`): same ordering.
-- `:3733-3738` (`advanceCurveShorteningPairs`): a free loop gets `movedRole = "start"` only. This is the known gap in
-  the comment at `:3728` and in issue 41 ("free loop crossing a portal probably stalls").
-- Caller: `src/render/three/geodesicCannonTools.ts:924-962` feeds the result into the rebuild as `carriedPortalWord`.
+  `:2081-2082` states this as intended.
+- `:2343-2353` (`resolveCarriedIntervalPortalWord`): same ordering.
+- `:3759-3764` (`advanceCurveShorteningPairs`): a free loop gets `movedRole = "start"` only. This is the known gap in
+  the comment at `:3753-3755` and in issue 41 ("free loop crossing a portal probably stalls").
+- Caller: `src/render/three/geodesicCannonTools.ts:924-971` feeds the result into the rebuild as `carriedPortalWord`.
 - Concrete case, torus (`src/examples/torus.world.js`, one square cell of side s = 15 m). Take a locked loop at
   emitter E near the top edge with `w = [py, px]` (heading up and right, holonomy `τ_x + τ_y`, length `s√2 ≈ 21.2 m`).
   Carry E up through `py`.
@@ -30,9 +40,9 @@ length. On multi-cell worlds the check fails and the loop falls into the legacy 
     carry, `allowOutOfBoundsCarriedEndpoint` (`geodesicCannonTools.ts:885`) relaxes the word check, so a 33.5 m
     loop is drawn. On release the strict rebuild either keeps that wrong class or deletes the loop.
 - Multi-cell case: `w·p` begins in the old cell while the start anchor is in the new one, so
-  `portalWordMatchesCurrentEndpointCells` (`:2486`) rejects it and the code falls back to the legacy word path at
-  `geodesicCannonTools.ts:974`.
-- `liftGeodesicEndpoint` (`:918-959`) never checks that `word[0].sourceCellId === sourceAnchor.cellId`. A
+  `portalWordMatchesCurrentEndpointCells` (`:2467`) rejects it and the code falls back to the legacy word path at
+  `geodesicCannonTools.ts:973-985`.
+- `liftGeodesicEndpoint` (`:925-966`) never checks that `word[0].sourceCellId === sourceAnchor.cellId`. A
   mismatched word mixes frames silently instead of failing.
 
 ## Proposed change

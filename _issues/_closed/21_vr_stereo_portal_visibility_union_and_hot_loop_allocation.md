@@ -2,9 +2,68 @@
 
 ## Repository audit status - 2026-08-03T14:24:10-05:00
 
-Status: archive candidate after a current headset visual/performance check.
+Status: closed on 2026-10-28.
 
 Priority: P2 for manual regression verification.
+
+## Outcome
+
+Merged. The correctness model is done: per-eye roots, per-eye visibility, the OR union, per-eye clip rows, the
+shared-root pass and per-eye debug counts. The unfinished parts are tracked in the issues that already covered them:
+
+- Hierarchical traversal and allocation (steps 3 and 4) are in [57](../57_per_frame_portal_visibility_funnel_and_traversal.md).
+- The split-root defects, the left-only/right-only/both-eye counts and the manual headset checks are in [59](../59_stereo_split_root_unclipped_roots_and_union_budget.md).
+- The in-headset debug readout is in [20](../20_vr_palette_menu_from_shared_definition.md).
+
+## Closing evidence
+
+- `resolveXrPortalEyeRenderRoot` (`src/render/three/xrPortalEye.ts`) resolves each eye's root on its own.
+- `buildUnionVisiblePathById` (`portalEyeFrameTransforms.ts`) builds the union, and `portalClipData.updateStereo`
+  writes one row block per eye.
+- Two contract tests cover this:
+  - "matches separate per-eye visibility when computed in one independent-camera pass" in
+    `tests/render-contract/visiblePortalPaths.test.ts`;
+  - "stores stereo clip polygons in stable per-eye rows for the same path id" in
+    `tests/render-contract/portalClipData.test.ts`.
+- Each open item has a "Merged from issue 21 (2026-10-28)" section in 57, 59 and 20.
+
+## Status update 2026-10-28
+
+The audit note above overstated progress. The correctness model (steps 1, 2) holds. The two performance steps (3, 4)
+were never done, and the 2026-10-09 audit found split-root defects in the union.
+
+Done:
+
+- Per-eye roots: `resolveXrPortalEyeRenderRoot` (`src/render/three/xrPortalEye.ts`) resolves each eye's root
+  independently. `syncStereoPortalInstanceRender` (`createThreeApp.ts`) computes visibility per eye.
+- Shared camera-independent work when both eyes share a root: `computeIndependentVisiblePortalPaths`
+  (`visiblePortalPaths.ts`) builds each path's root-space aperture once and projects it per camera. Test
+  "matches separate per-eye visibility when computed in one independent-camera pass" in
+  `tests/render-contract/visiblePortalPaths.test.ts`.
+- OR union: `buildUnionVisiblePathById` (`portalEyeFrameTransforms.ts`) feeds one instance set.
+  `portalClipData.updateStereo` writes one row block per eye, so an eye that does not see a path has an empty row
+  (count 0, discard). Test "stores stereo clip polygons in stable per-eye rows for the same path id" in
+  `tests/render-contract/portalClipData.test.ts`.
+- Per-eye debug counts: `PortalEyeRenderDebugState` (`renderState.ts`) and `formatPortalEyeLine` (`debugOverlay.ts`,
+  `portal eyes: 0:n@d 1:n@d`). The union count is the instance total in `portalInstances`.
+
+Remaining:
+
+- Step 3, hierarchical traversal: not done. Both `computeVisiblePortalPaths` and `computeIndependentVisiblePortalPaths`
+  still loop over the whole kept table (`for (const path of input.pathTable.paths)`). The concrete design is in issue
+  [57](../57_per_frame_portal_visibility_funnel_and_traversal.md).
+- Step 4, allocation: not done. Per-path `rigidTransformToThreeMatrix`, NDC projection arrays, Sutherland-Hodgman
+  arrays and a per-path matrix `clone()` in `transformVisiblePortalResultToRenderFrame` are still allocated every
+  frame. No scratch buffers exist. Also covered by issue 57, step 5.
+- Step 5: left-only, right-only and both-eye counts are not exposed. Only per-eye totals are.
+- Split roots are not correct yet. When the eyes have different roots, each root's depth-0 path is drawn unclipped in
+  the other eye, and union overflow drops eye 1 first. See issue
+  [59](../59_stereo_split_root_unclipped_roots_and_union_budget.md). The acceptance item "paths visible from only one eye
+  render only in that eye" therefore fails for root cells in that case.
+- Headset visual/performance check: not recorded.
+- `xrDebugPanel.ts` and its test, listed under Required Files, were removed. Debug output is the DOM
+  `debugOverlay.ts`, which is not visible inside an immersive session (issue
+  [20](../20_vr_palette_menu_from_shared_definition.md)).
 
 The renderer computes per-eye portal visibility, builds a conservative union
 for frame-level instances, preserves per-eye clip results, and exposes per-eye
@@ -160,24 +219,24 @@ Likely touched files:
 - `src/render/three/portalClipData.ts`
 - `src/render/three/createThreeApp.ts`
 - `src/render/three/renderState.ts`
-- `src/render/three/xrDebugPanel.ts`
+- ~~`src/render/three/xrDebugPanel.ts`~~ removed as unused; debug output is `debugOverlay.ts`
 
 Likely tests:
 
 - `tests/render-contract/visiblePortalPaths.test.ts`
 - `tests/render-contract/portalInstanceBuffers.test.ts`
 - `tests/render-contract/portalClipData.test.ts`
-- `tests/render-contract/xrDebugPanel.test.ts`
+- ~~`tests/render-contract/xrDebugPanel.test.ts`~~ not present
 
 ## Acceptance Criteria
 
-- XR portal rendering remains true stereo.
-- A path visible from at least one eye is included in the frame-level instance set.
-- Paths visible from only one eye render only in that eye.
-- The optimized per-eye visibility result matches separate per-eye computation in contract tests.
-- Hierarchical traversal produces the same visible path set as full path-table scanning.
-- Hot-loop allocation reduction is implemented and documented in code comments where scratch buffers are reused.
-- Debug state can distinguish per-eye counts from union counts.
+- ~~XR portal rendering remains true stereo.~~ done: per-eye roots and per-eye clip rows.
+- ~~A path visible from at least one eye is included in the frame-level instance set.~~ done: `buildUnionVisiblePathById`, subject to the budget bias of issue 59.
+- Paths visible from only one eye render only in that eye. Holds for depth >= 1. Fails for the depth-0 root paths when the eyes have different roots (issue 59).
+- ~~The optimized per-eye visibility result matches separate per-eye computation in contract tests.~~ done: `visiblePortalPaths.test.ts`.
+- Hierarchical traversal produces the same visible path set as full path-table scanning. Not done; there is no hierarchical traversal (issue 57).
+- Hot-loop allocation reduction is implemented and documented in code comments where scratch buffers are reused. Not done (issue 57).
+- ~~Debug state can distinguish per-eye counts from union counts.~~ done: `portalEyes` per eye, union through `portalInstances`. Left-only/right-only counts are still missing.
 - The headset no longer shows eye conflict, blinking, or mono portal artifacts from culling.
 - `npm run typecheck`, `npm test`, and `npm run build` pass.
 

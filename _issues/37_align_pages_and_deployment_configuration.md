@@ -1,8 +1,38 @@
 # 37 - Make Pages deployment repository-name agnostic
 
-Status: open as of 2026-08-03T14:24:10-05:00.
+Status: open; re-verified 2026-10-28.
 
 Priority: P2 developer/release tooling.
+
+## Status update 2026-10-28
+
+Done:
+
+- Production Pages builds are repository-name agnostic.
+  `.github/workflows/deploy-pages.yml` sets `VITE_BASE` from
+  `actions/configure-pages` `base_path`, falling back to
+  `/${{ github.event.repository.name }}/`, then runs `npm run build:pages`.
+- The package name stays `noneuclid-fpv` (`package.json`).
+- `README.md` ("Source and upstream") names the canonical repository and its
+  own Pages site; `_docs/DEPLOYMENT.md` documents a local check with an
+  explicit `VITE_BASE=/noneuclid-fpv/ npm run build:pages` plus
+  `npm run preview` under the subpath, and says not to use
+  `npm run deploy:pages` with the Actions setup.
+
+Still open:
+
+- `scripts/build-pages.mjs` still falls back to `/${packageJson.name}/` when
+  `VITE_BASE` is unset, and prints neither the resolved base nor its source.
+- `scripts/deploy-pages.sh` still reads `remote.origin.url` and pushes a
+  `gh-pages` branch to `origin`. This checkout's only remote is `github`, so the
+  script cannot resolve a repository name; it builds before it can fail and
+  does not check its inputs first. Either fix it per the work list below or
+  remove it and the `deploy:pages` npm script, since the documented path is the
+  Actions workflow.
+- `README.md` no longer mentions yearly/ad-hoc deployment repositories at all;
+  if that use is still intended, the distinction belongs in
+  `_docs/DEPLOYMENT.md`.
+- Base-path coverage in the browser smoke test (issue 36) does not exist.
 
 Scope clarified on 2026-08-03T14:28:10-05:00: `noneuclid-fpv` is the
 multi-year project identity. Names such as `camp-2026-VR` identify particular
@@ -51,3 +81,8 @@ exposed deploy script are not reusable across deployment repositories.
   early with a clear non-mutating configuration message.
 - README documentation distinguishes the multi-year project from example
   yearly/ad-hoc deployment URLs.
+
+## Merged from issue 35 (2026-10-28)
+
+- `_docs/DEPLOYMENT.md` ("HTTPS and WebXR") does not say how to create the PFX that the bundled `wwwserver` expects.
+  Add a short local-HTTPS recipe for headset testing.

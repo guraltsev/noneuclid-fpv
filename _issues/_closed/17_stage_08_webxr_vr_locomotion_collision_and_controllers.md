@@ -2,9 +2,44 @@
 
 ## Repository audit status - 2026-08-03T14:24:10-05:00
 
-Status: archive candidate after a current manual headset smoke check.
+Status: closed on 2026-10-28.
 
 Priority: P2 for manual regression verification, not new architecture.
+
+## Outcome
+
+The first WebXR path is implemented: session state and entry UI, a shared `setAnimationLoop` frame, the
+`RuntimeInputFrame` adapter for desktop and XR, comfort defaults, joystick locomotion, continuous turn, reset,
+the XR player rig with collision-approved room-scale movement, and the debug fields. All movement goes through
+`movePlayer(...)`. The "one shared render root for both eyes" criterion (steps 3 and 10, and the matching acceptance
+item) is superseded by per-eye roots and per-eye visibility (`xrPortalEye.ts`, issue 21) and must not be restored. No
+headset log is recorded in the repository; open XR defects are tracked separately in issues
+[59](../59_stereo_split_root_unclipped_roots_and_union_budget.md),
+[64](../64_mover_integration_bugs_xr_slide_marmot_heading_object_trap.md),
+[72](../72_aim_picking_uses_camera_clip_polygons_not_portal_ray_walk.md) and
+[73](../73_portal_ghosts_and_xr_eye_rerooting_are_single_hop.md), so this stage issue has nothing left of its own.
+
+## Closing evidence
+
+- `src/render/three/xrSessionState.ts`: statuses `unknown`, `unsupported`, `insecure-context`, `available`,
+  `entering`, `active`, `ended`, `failed`, with labels ("VR requires HTTPS or localhost") and a `secureContext` flag.
+  Tested in `tests/render-contract/xrSessionState.test.ts` (6 tests).
+- `src/render/three/xrEntryUi.ts`: the Enter VR affordance. `createThreeApp.ts` requests `immersive-vr` with
+  optional `local-floor`, `bounded-floor`, `hand-tracking`.
+- `src/render/three/createThreeApp.ts`: `renderer.setAnimationLoop(renderFrame)` starts the loop and
+  `renderer.setAnimationLoop(null)` runs on dispose; `getDesktopInputFrame` and `getXrInputFrame` both return a
+  `RuntimeInputFrame`.
+- `src/render/three/vrComfort.ts`, `src/render/three/vrLocomotion.ts`, `src/render/three/xrControls.ts`: dead zones,
+  diagonal normalization, continuous yaw, edge-triggered reset (`resetRequested`), defensive handling of missing
+  gamepads. Tested in `tests/render-contract/vrComfort.test.ts`, `vrLocomotion.test.ts` (17 tests, including "keeps
+  large physical tracking jumps at the previous accepted pose") and `xrControls.test.ts` (14 tests).
+- `src/render/three/xrPlayerRig.ts`: `maxPhysicalStepMeters` rejects tracking jumps; `acceptPhysicalMove` applies only
+  the `movePlayer` result.
+- `src/render/three/renderState.ts` and `debugOverlay.ts`: `secureContext`, `lastMovementBlocked`,
+  `lastBlockingReason`, `lastCrossedPortalId`, `sharedRenderRootCellId`, per-eye `portalEyes`.
+- `src/render/three/xrPortalEye.ts` (`resolveXrPortalEyeRenderRoot`): per-eye root resolution that replaces the
+  first-pass mono root.
+- Targeted run on 2026-10-28: the XR and visibility render-contract tests above pass.
 
 WebXR entry, session state, headset/player rig, controller input, room-scale
 collision approval, reset, and desktop fallback are implemented. The issue's
@@ -19,11 +54,11 @@ Implement a complete first WebXR VR path for the current Three.js app.
 
 The result should let a student enter VR, look around naturally, move with room-scale and joystick locomotion, collide with authored world geometry, cross portals through the existing movement contract, reset cleanly, and still use the app on desktop when XR is unavailable.
 
-This issue expands the narrower locomotion-readiness work in [15_vr_readiness_locomotion_and_collision.md](./_closed/15_vr_readiness_locomotion_and_collision.md) and implements the Stage 08 handoff in [docs/llm-handoff/18_stage_08_webxr_vr_controls.md](../llm-handoff/18_stage_08_webxr_vr_controls.md).
+This issue expands the narrower locomotion-readiness work in [15_vr_readiness_locomotion_and_collision.md](./15_vr_readiness_locomotion_and_collision.md) and implements the Stage 08 handoff in [docs/llm-handoff/18_stage_08_webxr_vr_controls.md](../../_docs/llm-handoff/18_stage_08_webxr_vr_controls.md).
 
 ## Design Reference
 
-Read [docs/design/010-webxr-vr-runtime.md](../design/010-webxr-vr-runtime.md) before implementing this issue.
+Read [docs/design/010-webxr-vr-runtime.md](../../_docs/design/010-webxr-vr-runtime.md) before implementing this issue.
 
 That design is the source of truth for the intended WebXR architecture, player rig, locomotion model, controller input boundaries, comfort defaults, and testing strategy.
 

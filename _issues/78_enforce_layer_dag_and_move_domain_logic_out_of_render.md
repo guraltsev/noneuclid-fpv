@@ -1,9 +1,32 @@
 # 78 - Make the layer rule a real DAG and move domain logic out of render/three
 
-Status: open as of 2026-10-08.
+Status: open; re-verified 2026-10-28.
 
 Priority: P2 (architecture / tooling). Complements the frozen-baseline list in issue 41 ("Layering debt") with checker
 gaps and a relocation plan.
+
+## Status update 2026-10-28
+
+Partly done. Re-checked the checker, the baseline and the import graph (module-level strongly connected components
+computed from `scanProject()` in `scripts/docs/lib.mjs`).
+
+Done:
+- ~~`src/glue/vrComfortOptions.ts`~~ done: `VrComfortOptions` and `defaultVrComfortOptions` now live in
+  `src/glue/vrComfortOptions.ts`. `runtime/runtimeMenuState.ts:12` and `glue/readLaunchOptions.ts:16` import from
+  there, and `render/three/vrComfort.ts:10-12` re-exports them. `scripts/docs/layering-baseline.json` no longer has
+  any `runtime -> render` or `glue -> render` edge.
+
+Remains:
+- `layers` (`scripts/docs/lib.mjs:23-50`) is still not a DAG: `runtime`/`ui` and `glue`/`runtime`/`ui` still permit
+  each other, and `world-objects -> glue -> runtime -> world-objects` is a cycle of permissions. No test asserts
+  acyclicity.
+- No npm-import rule: `src/world-objects/geodesicMarmot.ts:6` and `simpleGeoCreature.ts:6` still import `three`.
+- The baseline still lists 11 `world-objects -> render`/`runtime` edges, all from the two creature modules.
+- All five import cycles listed below are still present, unchanged.
+- No relocation has happened: `aimTarget.ts`, `visiblePortalPaths.ts`, `runtimeDiagnostics.ts`, `vrLocomotion.ts`,
+  `xrSessionState.ts` and the others are still in `src/render/three` (still 83 files), and their tests are still in
+  `tests/render-contract/`. `staticPortalPathCull.ts` (now 1,639 lines) still holds its private 2D kit and debug
+  logging. There is no `src/math/vec2.ts` and no `src/ui/toolIds.ts`.
 
 ## Summary
 
@@ -15,7 +38,7 @@ shell needs".
 
 ## Evidence
 
-- `scripts/docs/lib.mjs:22-49`: `runtime` may import `ui` and `glue`; `ui` may import `runtime`; `glue` may import
+- `scripts/docs/lib.mjs:23-50`: `runtime` may import `ui` and `glue`; `ui` may import `runtime`; `glue` may import
   `runtime` and `ui`; `world-objects` may import `glue`. These are mutual permissions, contradicting the linear order in
   `docs/ARCHITECTURE.md` ("math → cell-complex → movement → world-objects → runtime/ui/authoring → glue → render") and
   `docs/coding_style.md` ("glue -> browser APIs ...").
@@ -34,10 +57,11 @@ shell needs".
 - Modules using `three` only as a vector library: `visiblePortalPaths.ts` (839; `THREE.Vector*`/`Camera` for NDC
   projection, :22) and `aimTarget.ts` (1,164; ray/capsule/box/sphere intersection at :345-1100 over `Vec3`, `THREE.Matrix4`
   only for root-from-cell at :1107-1116).
-- `render/three/vrComfort.ts` mixes the `VrComfortOptions` data type with a vignette mesh; that is why
-  `runtime/runtimeMenuState.ts:12` and `glue/readLaunchOptions.ts:16` are baseline violations.
-- `src/cell-complex/staticPortalPathCull.ts` (1,608) contains a private 2D geometry kit (`Vec2` :28, `clipConvexPolygonByHalfPlane`
-  :1393, `polygonArea` :1365, `add2..orient2` :1477-1517) and debug logging (:612-683) beside the cull itself;
+- ~~`render/three/vrComfort.ts` mixes the `VrComfortOptions` data type with a vignette mesh; that is why
+  `runtime/runtimeMenuState.ts:12` and `glue/readLaunchOptions.ts:16` are baseline violations.~~ done: the type moved to
+  `src/glue/vrComfortOptions.ts`.
+- `src/cell-complex/staticPortalPathCull.ts` (1,639) contains a private 2D geometry kit (`Vec2` :28, `clipConvexPolygonByHalfPlane`
+  :1406, `polygonArea` :1378, `add2..orient2` :1490-1526) and debug logging (:624-690) beside the cull itself;
   `visiblePortalPaths.ts:461,647` has a second convex clipper.
 
 ## Proposed change
@@ -50,7 +74,7 @@ src/cell-complex/staticCull/{index,aperture,tauSigma,projective,debug}.ts   spli
 src/visibility/visiblePortalPaths.ts            NDC clipping on Vec3 + a 4x4 projection matrix type; three-free
 src/interaction/aimTarget.ts                    ray-vs-object picking on RigidTransform3; render keeps a 20-line adapter
 src/interaction/{inputFrame,vrLocomotion,xrSessionState,carryPortalTransition}.ts
-src/glue/vrComfortOptions.ts                    VrComfortOptions + defaults (removes 2 baseline edges)
+src/glue/vrComfortOptions.ts                    VrComfortOptions + defaults (done; removed the 2 baseline edges)
 src/diagnostics/runtimeDiagnostics.ts           (removes 3 world-objects baseline edges)
 ```
 
@@ -70,3 +94,9 @@ Checker (`scripts/docs/lib.mjs`):
 - No `from "three"` outside `src/render` and `src/main.ts`, enforced by `docs:check`.
 - `aimTarget` and `visiblePortalPaths` tests move from `tests/render-contract/` to plain-Node test dirs.
 - Zero import cycles reported.
+
+## Merged from issue 41 (2026-10-28)
+
+- Eleven imports still break the intended layering, mostly `world-objects -> render` mesh builders and
+  `world-objects -> runtime`. They are frozen in `scripts/docs/layering-baseline.json` and listed in
+  `_docs/generated/ARCHITECTURE_REFERENCE.md`. Delete baseline entries as they are fixed; never add them.

@@ -3724,7 +3724,7 @@ export function advanceCurveShorteningPairs(
       } else if (removeDegenerateFreeLoop(request.registry, pair, owned.intervals)) {
         changed.push(pair.id);
       }
-      // TODO(issue 41): a free loop whose length lies between GEODESIC_MIN_LENGTH_METERS and 4 * curveShorteningMinStepMeters stalls here forever.
+      // TODO(issue 66): a free loop whose length lies between GEODESIC_MIN_LENGTH_METERS and 4 * curveShorteningMinStepMeters stalls here forever.
       continue;
     }
 
@@ -3752,7 +3752,7 @@ export function advanceCurveShorteningPairs(
     // This is the only change of homotopy class a tick may make. Words that fail the cell-chain check are left unchanged.
     // Known gap: for a free loop (one interval with both roles on F) only the `start` branch is applied, so the end cell no longer
     // matches the word and the preview normally fails.
-    // TODO(issue 41): a free loop whose free end crosses a portal stalls; update the word for both roles of a single interval.
+    // TODO(issue 68): a free loop whose free end crosses a portal stalls; update the word for both roles of a single interval.
     const traversal = moveResult.crossedPortal && moveResult.crossedPortalId
       ? getPortalTraversalFromSource(request.world, freeEnd.cellId, moveResult.crossedPortalId)
       : undefined;
@@ -3952,7 +3952,7 @@ export function fuseCurveShorteningPair(input: {
     return undefined;
   }
   // Each arc's "other end" (not at the shared vertex) must be an emitter; it becomes an endpoint of the fused geodesic.
-  // TODO(issue 41): the emitter-at-the-non-free-end assumption (here and in absorbShortCurveShorteningHalf) rejects other anchors.
+  // TODO(issue 67): the emitter-at-the-non-free-end assumption (here and in absorbShortCurveShorteningHalf) rejects other anchors.
   const firstNonFreeRole = getOppositeEndRole(pair.first.role);
   const secondNonFreeRole = getOppositeEndRole(pair.second.role);
   const firstAnchor = input.registry.get(firstInterval[firstNonFreeRole].anchorObjectId);
@@ -5237,7 +5237,7 @@ export function placeGeodesicCannonAtGeodesicVertex(
  *
  * Existing markers are removed and re-added with ids preserved when a new marker pairs the same two geodesics in the same cell within
  * `vertexContinuityToleranceMeters` of an earlier one (identity continuity, so UI selections survive a moving crossing). Every call
- * is a full O(n^2) scan of all segments (TODO(issue 41): use a spatial index or per-cell buckets). Crossings within `emitterConnectionToleranceMeters` of an emitter are suppressed. Previously seen
+ * is a full O(n^2) scan of all segments (TODO(issue 70): use a spatial index or per-cell buckets). Crossings within `emitterConnectionToleranceMeters` of an emitter are suppressed. Previously seen
  * markers stay in the per-registry memory (see `getRememberedGeodesicIntersectionObject`).
  */
 export function updateGeodesicIntersectionObjects(registry: RuntimeObjectRegistry): readonly GeodesicIntersectionObject[] {

@@ -2,9 +2,50 @@
 
 ## Repository audit status - 2026-08-03T14:24:10-05:00
 
-Status: active; revise this issue before further Phase F work.
+Status: closed on 2026-10-28.
 
 Priority: P1 domain correctness.
+
+## Outcome
+
+The endpoint model is in place and Phases A-F are delivered: geodesics are `GeodesicIntervalObject`s with two
+`(geodesicId, role)` attachments to emitters or free ends, a stored portal word, and derived per-cell segment chains;
+tie/release works on endpoint selections, creates a `CurveShorteningPairObject`, shortens across portals and fuses
+role-aware, including into a same-emitter wrapped loop. The torus scenario in "Goal" now collapses to one locked
+wrapped geodesic. The remaining work is tracked elsewhere: the correctness defects of the descent (issues 66, 67, 68),
+the missing end-to-end Phase F tests (moved to issue 67, "Carried over from issues 31 and 32"), and removal of the
+legacy connection/straightening code (issue 76 stages 2 and 5, issue 70, issue 38).
+
+## Closing evidence
+
+- Endpoint model: `GeodesicIntervalObject`, `GeodesicEndpointAttachment`, `FreeGeodesicEndObject`,
+  `getGeodesicEndpointAttachmentsForAnchor`, `liftGeodesicEndpoint`, `geodesicHasNonzeroLiftedDisplacement`,
+  `rebuildLockedGeodesicFromEndpointsAndPortalWord`, `splitDerivedSegmentsIntoEndpointHalves` in
+  `src/world-objects/geodesicCannon.ts`; described in `_docs/MATHEMATICAL_MODEL.md` section 6.
+- Protractor endpoint roles: `src/world-objects/protractorTool.ts` rejects only the same `(geodesicId, endRole)` twice;
+  tests "allows measuring different endpoint roles of the same geodesic" and "requires the second selected side to come
+  from a different geodesic endpoint" (`tests/world-objects/protractorTool.test.ts`).
+- Emitter menu: `collectGeodesicMenuRowsForEmitter` returns one row per interval even when both roles attach to the
+  same emitter.
+- Phase F: `tieAndDetachGeodesicEndpoints`, `advanceCurveShorteningPairs`, `fuseCurveShorteningPair`,
+  `getPortalWordBetweenEndpointRoles`, `updatePortalWordForMovedEndpoint`, `previewRebuildGeodesicInterval`; the tool
+  state stores `tieAndDetachEndpointSelections` (`src/render/three/geodesicCannonTools.ts:96`, `:667-760`); the frame
+  loop calls `advanceCurveShorteningPairs` (`src/render/three/createThreeApp.ts:1373`) and nothing outside tests calls
+  `advanceStraighteningGeodesics`.
+- Tests in `tests/world-objects/geodesicCannon.test.ts`: "detaches the two endpoint roles of a same-emitter loop into one
+  curve-shortening free end", "fuses a ready curve-shortening pair into one stable locked interval using the lower
+  geodesic id", "fusing into an already existing geodesic" (3 tests), "rolls back a shortening step whose total length
+  would increase beyond the tolerance", "moves a shortening free end through a portal and recomputes moved-start portal
+  words", "deletes a degenerate free loop together with its derived objects", plus the Phase C-E locking, same-emitter
+  loop and carry tests. The file and `protractorTool.test.ts` pass (80 passed, 8 skipped) on 2026-10-28.
+- Torus scenario, scratch run on 2026-10-28 (single 15 m torus cell, E1 at (-3, 0), E2 at (3, 2), G2 = E1→E2 straight,
+  G1 = E2→E1 with word `[right]`, tie and release at E2, 60 Hz ticks): fused after 286 ticks into one stable interval
+  E1→E1 with word `[right]`, length 15 m, 3 segments each inside the cell. At 240 Hz the same setup stalls; that is
+  issue 66.
+- Not done here, tracked elsewhere: `GeodesicEmitterConnection`, segment `connectionState` (moving intervals still
+  render as `"straightening"`), `tieAndDetachIncidentGeodesicsLegacy`, `advanceStraighteningGeodesics` and the 4
+  skipped straightening tests remain (issue 76 stages 2 and 5, issue 70 `geodesics/legacy.ts`); fusion and absorption
+  still require emitters at the non-free ends (`TODO(issue 41)` in `fuseCurveShorteningPair`, carried over in issue 67).
 
 Phases A-E are implemented, and Phase F is no longer wholly unimplemented:
 explicit shortening-pair objects, endpoint-role detach, portal-aware movement,
@@ -62,7 +103,7 @@ them. Phase F is greenlit only through the separate curve-shortening algorithm
 note, which specifies the portal/lift shortening step, monotonicity tolerance,
 failure behavior, rollback-safe retracing, and final-fusion trace construction
 in implementation-level detail. See
-`docs/issues/32_phase_f_curve_shortening_algorithm_note.md` for the Phase F
+`_issues/_closed/32_phase_f_curve_shortening_algorithm_note.md` for the Phase F
 greenlight contract.
 
 Do not start by relaxing the same-geodesic rejection in tie/release or the
@@ -84,7 +125,7 @@ Status as of 2026-06-25:
   endpoint preview, release-time portal normalization, geometry commit rebuilds,
   and refresh of dependent measurements/protractor angles/intersections.
 - Phase F is greenlit for implementation through
-  `docs/issues/32_phase_f_curve_shortening_algorithm_note.md`, but remains
+  `_issues/_closed/32_phase_f_curve_shortening_algorithm_note.md`, but remains
   incomplete. Tie/release, curve-shortening pairs, monotone shortening, and
   final fusion are not implemented by this document.
 
@@ -831,7 +872,7 @@ replaced by a portal-aware initialization:
 
 This section describes the target model. Phase F is greenlit only through the
 complete curve-shortening algorithm note in
-`docs/issues/32_phase_f_curve_shortening_algorithm_note.md`, so implementation
+`_issues/_closed/32_phase_f_curve_shortening_algorithm_note.md`, so implementation
 should not start from this section alone.
 
 Curve shortening is a state over two endpoint roles at one shared free end, not
@@ -1239,7 +1280,7 @@ Acceptance:
 Introduce curve-shortening pairs and portal-aware final fusion.
 
 This phase must be implemented from
-`docs/issues/32_phase_f_curve_shortening_algorithm_note.md`, not from the target
+`_issues/_closed/32_phase_f_curve_shortening_algorithm_note.md`, not from the target
 description alone.
 
 Scope:

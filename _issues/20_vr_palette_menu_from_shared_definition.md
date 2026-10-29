@@ -2,9 +2,42 @@
 
 ## Repository audit status - 2026-08-03T14:24:10-05:00
 
-Status: archive candidate after a current headset interaction check. Note: `vrPaletteController`, `xrPointers`, and `xrDebugPanel` listed below were later removed as unused; the live path is `scenePaletteController` + `vrPaletteLibraryAdapter`.
+Status: open; re-verified 2026-10-28. Note: `vrPaletteController`, `xrPointers`, and `xrDebugPanel` listed below were later removed as unused; the live path is `scenePaletteController` + `vrPaletteLibraryAdapter`.
 
 Priority: P2 for manual verification only.
+
+## Status update 2026-10-28
+
+Done:
+
+- Shared definition: `src/ui/paletteDefinition.ts` drives both the desktop in-scene palette and the VR palette
+  (`scenePaletteController.ts`, `scenePaletteLibraryAdapter.ts`, `vrPaletteLibraryAdapter.ts`). The DOM palette of
+  issue 19 is gone; desktop also uses the in-scene palette (`desktopScenePaletteInput.ts`).
+- Library: `@pmndrs/uikit`, `@pmndrs/uikit-default` and `@pmndrs/uikit-lucide` in `package.json`, used through the
+  vanilla Three.js path. The cog is the lucide `Settings` icon, and the header also uses `X`, `ArrowLeft`,
+  `ChevronLeft`/`ChevronRight`.
+- Header actions: `tests/render-contract/vrPaletteHeaderActions.test.ts` checks settings plus close on the main page,
+  and back plus close on the settings and debug submenus.
+- Placement: `vrPalettePlacement.ts`, tested in `vrPalettePlacement.test.ts`.
+- Input: `xrScenePaletteInput.ts` (`isSelectPressed`, `isMenuTogglePressed` on the side trigger) and
+  `scenePointers.ts`, tested in `xrScenePaletteInput.test.ts` and `scenePointers.test.ts`.
+- Hands: `xrControllerHandModels.ts` loads `lowpolyhands/Lowpolyhands.glb`, tested in
+  `xrControllerHandModels.test.ts`.
+- Settings content: world selector, reload, and a "UI overlay" toggle with per-item toggles
+  (`vrPaletteLibraryAdapter.ts`, debug settings page).
+- Superseded: "main page has no selectable tools" and "empty content area" no longer apply. Issues 27 and 30 put
+  tools (geodesic cannon, flags, help) on the main page.
+
+Remaining:
+
+- **In-XR debug readout (step 7).** `xrDebugPanel.ts` was removed, and the only debug overlay is the DOM element from
+  `debugOverlay.ts`. That element is not visible in an immersive session (the session requests no `dom-overlay`
+  feature). The VR "UI overlay" toggle therefore changes state, but nothing appears in the headset. The two
+  acceptance items "debug overlay can be toggled in immersive VR" and "remains visible independent of menu open/closed
+  state" are not met. Either add a small head-locked Three.js/uikit text panel fed from `DebugOverlayState`, or drop
+  these items explicitly.
+- Manual headset check of the items in step 9: hover/select, menu toggle from either controller, menu closed at
+  session start, hand tracking of the models, and text readability. No headset result is recorded.
 
 Shared definitions, scene UI rendering, controller pointer/select behavior,
 tracked hand models, page headers, world/debug settings, and contract tests now
@@ -20,7 +53,7 @@ This issue should not recreate widgets from scratch. It should evaluate and inte
 Supersedes the closed DOM-first proposal in
 [19_fps_dom_palette_menu.md](./_closed/19_fps_dom_palette_menu.md).
 
-Design reference: [docs/design/011-vr-hand-tools-palette.md](../design/011-vr-hand-tools-palette.md).
+Design reference: [_docs/design/011-vr-hand-tools-palette.md](../_docs/design/011-vr-hand-tools-palette.md).
 
 ## Scope
 
@@ -66,17 +99,17 @@ Likely touched files:
 Likely new files:
 
 - `src/render/three/vrPaletteLibraryAdapter.ts`
-- `src/render/three/vrPaletteController.ts`
+- ~~`src/render/three/vrPaletteController.ts`~~ removed; the live path is `scenePaletteController.ts`
 - `src/render/three/vrPalettePlacement.ts`
 - `src/render/three/xrControllerHandModels.ts`
-- `src/render/three/xrPointers.ts`
-- `src/render/three/xrDebugPanel.ts`
+- ~~`src/render/three/xrPointers.ts`~~ removed; pointers live in `scenePointers.ts` and `xrScenePaletteInput.ts`
+- ~~`src/render/three/xrDebugPanel.ts`~~ removed as unused; no in-XR debug panel exists (see status update)
 
 Likely tests:
 
-- `tests/render-contract/vrPaletteController.test.ts`
+- ~~`tests/render-contract/vrPaletteController.test.ts`~~ not created; see `scenePaletteLibraryAdapter.test.ts`, `vrPaletteHeaderActions.test.ts`
 - `tests/render-contract/vrPalettePlacement.test.ts`
-- `tests/render-contract/xrPointers.test.ts`
+- ~~`tests/render-contract/xrPointers.test.ts`~~ not created; see `scenePointers.test.ts`, `xrScenePaletteInput.test.ts`
 
 ## Implementation Plan
 
@@ -204,22 +237,22 @@ Manual checks should cover:
 
 ## Acceptance Criteria
 
-- The VR menu uses the shared palette definition from issue 19.
-- A VR UI library handles widget rendering/layout rather than local custom widgets.
-- The main VR menu shows an empty rectangular content area with no selectable tools and no placeholder text.
-- The cog/settings button renders as a recognizable cogwheel icon, not a missing-glyph rectangle.
-- The `Lowpolyhands.glb` models render as left and right controller-tracked hand visuals.
+- ~~The VR menu uses the shared palette definition from issue 19.~~ done: `src/ui/paletteDefinition.ts`.
+- ~~A VR UI library handles widget rendering/layout rather than local custom widgets.~~ done: `@pmndrs/uikit`.
+- ~~The main VR menu shows an empty rectangular content area with no selectable tools and no placeholder text.~~ superseded by issues 27 and 30 (the main page now holds tools).
+- ~~The cog/settings button renders as a recognizable cogwheel icon, not a missing-glyph rectangle.~~ done: lucide `Settings` icon.
+- ~~The `Lowpolyhands.glb` models render as left and right controller-tracked hand visuals.~~ done in code (`xrControllerHandModels.ts`); headset check pending.
 - Entering XR does not auto-open the VR menu.
 - The side/menu button on either controller toggles the VR menu.
 - The cog opens settings.
-- The `X` closes every VR menu page.
-- The settings page uses `<-` back while still keeping an `X` close button available.
-- Settings include a world selector, reload button, and debug overlay toggle.
+- ~~The `X` closes every VR menu page.~~ done: `vrPaletteHeaderActions.test.ts`.
+- ~~The settings page uses `<-` back while still keeping an `X` close button available.~~ done: `vrPaletteHeaderActions.test.ts`.
+- ~~Settings include a world selector, reload button, and debug overlay toggle.~~ done.
 - Controller ray hover/select works.
-- The debug overlay can be toggled in immersive VR.
-- The debug overlay remains visible independent of menu open/closed state when enabled.
+- The debug overlay can be toggled in immersive VR. **Not met:** the toggle exists, but no overlay renders in XR.
+- The debug overlay remains visible independent of menu open/closed state when enabled. **Not met** in XR (see status update).
 - Existing VR locomotion, collision, reset, and portal traversal still work.
-- Desktop FPS menu from issue 19 still works.
+- ~~Desktop FPS menu from issue 19 still works.~~ superseded: the DOM menu was replaced by the shared in-scene palette.
 - `npm run typecheck`, `npm test`, and `npm run build` pass.
 
 ## Non-goals
@@ -236,3 +269,22 @@ Manual checks should cover:
 - `@pmndrs/uikit` may require more integration work than expected in a plain Three.js app.
 - Dropdown behavior in VR may be better represented as a compact scrollable list than as a literal desktop-style dropdown.
 - Text readability and transparent panel ordering need headset testing, not only desktop inspection.
+
+## Merged from issues 21 and 41 (2026-10-28)
+
+From issue 41 (XR input and palette):
+
+- `isCarryActionPressed` (`render/three/xrControls.ts`) always returns false, so carry cannot be reached from XR. This
+  needs a button-binding decision.
+- `menuTogglePressed` is always false in both palette input modules: `xrScenePaletteInput.ts` computes it in
+  `createControllerSources`, but `createXrScenePaletteInput` returns `false`.
+- `xrScenePaletteInput` shares a module-level `controllerObjects` set across instances.
+- `onGeometryComputerSetTargetRequested` is wired through `scenePaletteController.ts` but never invoked by
+  `vrPaletteLibraryAdapter.ts`.
+- Legacy `xrPalette*` userData keys still exist beside `scenePalette*`: the writers are in
+  `vrPaletteLibraryAdapter.ts`, and fallback readers are in `scenePaletteController.ts` and `scenePointers.ts`.
+
+From issue 21 (stereo debugging):
+
+- The in-headset debug readout is the one missing piece for the stereo headset checks in issue
+  [59](59_stereo_split_root_unclipped_roots_and_union_budget.md). When it exists, it should show per-eye, union, left-only, right-only and both-eye path counts.

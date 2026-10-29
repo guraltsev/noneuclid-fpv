@@ -1,19 +1,32 @@
 # 63 - Bodies that straddle a portal are tested only against their own cell
 
-Status: open as of 2026-10-08.
+Status: open; re-verified 2026-10-28.
 
 Priority: P2 (correctness). Category: design. The fix supplies the obstacle set used by issue 62.
+
+## Status update 2026-10-28
+
+Nothing is done; every query is still single-cell.
+
+- `testCellCollision` (`src/movement/collision.ts:120-131`) loops over `candidate.cell.sides` only; the module header
+  says "Collision is only evaluated against the object's own cell, never against neighboring cells."
+- Player vs runtime objects: `playerIntersectsRuntimeObject` calls
+  `runtimeObjectRegistry.getPlayerBlockingObjectsInCell(pose.cellId)` (`src/render/three/createThreeApp.ts:3266`).
+- Creature vs player: `creatureIntersectsObstacle` still skips `obstacle.cellId !== state.cellId`
+  (`src/world-objects/simpleGeoCreature.ts:366`), and creatures still pass `ignoreForbiddenZones: true` (line 242).
+- Ghosts: `runtimeObjectGhostRecords.ts:80-83` still uses the `[-r, L+r]` projection window and the 1-ring only.
+- No local atlas, no neighbor obstacle collection, no atlas test. Line numbers in the body below are corrected.
 
 ## Summary
 
 A body is a disk of radius `r` in a flat surface. When its center is within `r` of a portal side, part of the disk lies in
 the neighbor cell. Every collision query uses only the owning cell:
 
-- walls and zones: `testCellCollision` loops over `candidate.cell` only (`src/movement/collision.ts:100-131`);
-- player vs runtime objects: `getPlayerBlockingObjectsInCell(pose.cellId)` (`src/render/three/createThreeApp.ts:3209`);
-- creature vs player: `if (obstacle.cellId !== state.cellId) return false` (`src/world-objects/simpleGeoCreature.ts:358`);
+- walls and zones: `testCellCollision` loops over `candidate.cell` only (`src/movement/collision.ts:100-131`, unchanged);
+- player vs runtime objects: `getPlayerBlockingObjectsInCell(pose.cellId)` (`src/render/three/createThreeApp.ts:3266`);
+- creature vs player: `if (obstacle.cellId !== state.cellId) return false` (`src/world-objects/simpleGeoCreature.ts:366`);
 - render ghosts are emitted into the 1-ring only, using a loose `[-r, L+r]` projection window
-  (`src/render/three/runtimeObjectGhostRecords.ts:70-81`).
+  (`src/render/three/runtimeObjectGhostRecords.ts:70-83`).
 
 ## Evidence
 
@@ -23,7 +36,7 @@ the neighbor cell. Every collision query uses only the owning cell:
 - **Neighbor walls.** Let the glued vertex make interior angle `α` between the portal side and a wall in the neighbor. A
   center on the portal line at distance `s` from the vertex overlaps that wall iff `s·sin α < r`. The zone forces
   `s >= r + 0.15`, so for the player (`r = 0.25`) the overlap happens iff `α < arcsin(0.25/0.40) = 38.7°`. Creatures run
-  with `ignoreForbiddenZones: true` (`simpleGeoCreature.ts:235`), where `s` is unbounded below, so any `α < 180°` overlaps.
+  with `ignoreForbiddenZones: true` (`simpleGeoCreature.ts:242`), where `s` is unbounded below, so any `α < 180°` overlaps.
   After the anchor crosses, the neighbor-wall push along `n_W` (which has a component `-cos α` *back across the portal*)
   moves the anchor back out, and the body ping-pongs between cells (see issue 61 for the missing re-test).
 - **Cone points inside the body.** With zones ignored, a creature's disk can contain a vertex of angle sum

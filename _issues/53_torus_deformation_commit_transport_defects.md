@@ -1,9 +1,33 @@
 # 53 - Torus deformation commits can trap the player and mis-transport headings
 
-Status: open as of 2026-10-08.
+Status: open; re-verified 2026-10-28.
 
 Priority: P1 (correctness). Not covered by issue 41, whose deformation items are the hard-coded 15 m, `||` in
 `normalizeState`, `JSON.stringify` equality and the mirrored marmot yaw.
+
+## Status update 2026-10-28
+
+All four defects are still present. Re-checked against the current code:
+
+1. Trap: `transformPlayerForGeometryCommit` (`src/render/three/createThreeApp.ts:1529-1551`) still writes the mapped
+   pose with no collision test, and nothing depenetrates bodies after a commit. The escape route is now narrower than
+   described below: a portal crossing is refused when the crossed state overlaps a zone in the target cell
+   (`src/movement/moveDynamicObject.ts:95-115`), and at the torus's single vertex class that is the same cylinder seen
+   from the other side, so the player can be fully stuck.
+2. Heading: `transformRigidPoseWithMap` (`src/runtime/worldGeometryDeformations.ts:156-165`) still maps
+   `(m00, m10)`, the right vector. It is used for the player, placed flags, the geodesic cannon
+   (`transformYawWithMap` in `src/render/three/runtimeSceneUtils.ts:146`), geo creatures
+   (`simpleGeoCreature.ts:261`) and live marmots (`geodesicMarmot.ts:169-189`). Only the *authored spec* path for
+   marmots (`transformPositionedObjectSpecWithMap`, `worldGeometryDeformations.ts:186-210`) transports the real
+   walking direction. The test "maps a vertical-lattice heading into the skewed heading" in
+   `tests/runtime/torusSkewDeformation.test.ts` asserts the right-vector behaviour and must change with the fix.
+3. Frame: `inferTorusSkewState` (`torusSkewDeformation.ts:242-258`), `torusLatticeFrame` (`:338-350`) and
+   `validateTorusSkewBaseSpec` (`:200-237`) are unchanged; the footprint is still not checked against the frame.
+4. Width step: `nextTorusSkewStep` (`:173-194`) still takes `widthMeters: target.widthMeters` at once (`:191`);
+   the range check is now at `:304`, and a failed build sets `lastError` in `worldGeometrySession.ts:185-193`
+   (builds now run through the worker client).
+
+None of the acceptance criteria is met. Issue 81 (floor UVs) depends on the same lattice-coordinate convention.
 
 ## Summary
 
@@ -20,7 +44,7 @@ the two tori, which is the right choice for positions. It is not conformal, thou
 
 ## Evidence
 
-1. Trap. `src/render/three/createThreeApp.ts:1525-1546` (`transformPlayerForGeometryCommit`) writes the mapped
+1. Trap. `src/render/three/createThreeApp.ts:1529-1551` (`transformPlayerForGeometryCommit`) writes the mapped
    position with no test. `src/movement/collision.ts:100-114` blocks any candidate that overlaps a zone; it does not
    check whether the move reduces the overlap. `moveDynamicObject` then reverts to the previous pose.
    - Concrete case in `torus-moduli`. Start with w = b = 15, a = 0. The player stands at corner v₁ = (7.5, −7.5)
@@ -29,25 +53,28 @@ the two tori, which is the right choice for positions. It is not conformal, thou
      inside the 0.15 m cylinder itself.
    - Distance to the vertex shrinks monotonically along the straight (a, b) path, so every intermediate commit is
      also unchecked.
-   - The player can then only escape by a portal crossing, which skips zone tests (`moveDynamicObject.ts:79`).
+   - The player can then only escape by a portal crossing, and a crossing is refused if the crossed state overlaps a
+     zone in the target cell (`moveDynamicObject.ts:95-115`; corrected 2026-10-28, the audit said crossings skip zone
+     tests).
    - The same applies to walls in any future family with walls.
-2. Heading. `src/runtime/worldGeometryDeformations.ts:161` maps `(m00, m10)`, i.e. R·e_x, the body's *right* vector.
-   Forward is R·e_y (`movePlayer.ts:136-140`; `simpleGeoCreature.ts:229` moves along body +y).
+2. Heading. `src/runtime/worldGeometryDeformations.ts:161` (`transformRigidPoseWithMap`) maps `(m00, m10)`, i.e. R·e_x, the body's *right* vector.
+   Forward is R·e_y (`movePlayer.ts:136-140`; `simpleGeoCreature.ts:236` moves along body +y).
    - Example: a creature facing +x (yaw −π/2) has R·e_x = (0, −1).
    - Shear a: 0 → w gives A = [[1, 1], [0, 1]]. The right vector maps to (−1, −1)/√2, so the new forward is
      (1, −1)/√2, 45° off.
    - The geometrically consistent image is A·(1, 0) = (1, 0), which keeps the (1, 0) closed geodesic closed.
-   - Players and `geo-mouse`/`geo-butterfly` (`simpleGeoCreature.ts:254`) go through this path. Marmots map their
-     velocity directly (`:190`), so the two kinds disagree after the same commit.
-3. Frame. `torusSkewDeformation.ts:237-253` (`inferTorusSkewState`) reads w = |v₁ − v₀| and (a, b) = v₃ − v₀.
-   `torusLatticeFrame` (`:329-341`) then assumes u = (w, 0) and origin −(u + v)/2.
-   - `validateTorusSkewBaseSpec` (`:195-232`) checks ids, portals and height, but not the footprint.
+   - Players and `geo-mouse`/`geo-butterfly` (`simpleGeoCreature.ts:261`) go through this path. Authored marmot specs map their
+     walking direction instead (`worldGeometryDeformations.ts#transformPositionedObjectSpecWithMap`), so the two paths
+     disagree after the same commit.
+3. Frame. `torusSkewDeformation.ts:242-258` (`inferTorusSkewState`) reads w = |v₁ − v₀| and (a, b) = v₃ − v₀.
+   `torusLatticeFrame` (`:338-350`) then assumes u = (w, 0) and origin −(u + v)/2.
+   - `validateTorusSkewBaseSpec` (`:200-237`) checks ids, portals and height, but not the footprint.
    - Failure: a torus authored on [0, 15]² is accepted. `applyToSpec` maps objects using a frame offset by
      (7.5, 7.5) m, so objects land outside the cell. The rebuilt footprint is re-centred, so the whole world jumps.
    - A rotated or non-parallelogram quad gives a meaningless A.
-4. Width step. `nextTorusSkewStep` (`:184-189`) adopts the target width immediately but steps (a, b) partially.
-   `normalizeTorusSkewState` can then throw on the range check `b ∈ [w'/2, 2w']` (`:299`). `scheduleNextBuild`
-   catches it into `lastError` (`worldGeometrySession.ts:218-222`) and the target is never reached.
+4. Width step. `nextTorusSkewStep` (`:186-194`) adopts the target width immediately but steps (a, b) partially.
+   `normalizeTorusSkewState` can then throw on the range check `b ∈ [w'/2, 2w']` (`:304`). `scheduleNextBuild`
+   catches it into `lastError` (`worldGeometrySession.ts:185-193` for failed or invalid builds, `:218-222` for a thrown step) and the target is never reached.
 
 ## Proposed change
 

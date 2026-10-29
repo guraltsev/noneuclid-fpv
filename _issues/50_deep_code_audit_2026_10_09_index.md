@@ -1,16 +1,50 @@
 # 50 - Deep code audit, 2026-10-09: index, cross-cutting themes, and order of work
 
-Status: open as of 2026-10-09.
+Status: open; re-verified 2026-10-28.
 
 Priority: P1 (tracking issue). Close it when every issue listed below is closed or moved on.
+
+## Status update 2026-10-28
+
+Every issue from 51 to 80 was re-checked against the current code. None is closed. Each open issue now has its own
+dated status section.
+
+- Partly fixed:
+  - 61: a blocked push-out now keeps the original pose, so bodies no longer escape through a corner. They stop short
+    instead of sliding, and a large step can still exit through a portal.
+  - 62: a crossing into a zone, floor or ceiling is now refused. The cube-vertex loss still reproduces.
+  - 69: a ray that starts inside a disk now hits at t = 0.
+  - 78: `VrComfortOptions` moved to `src/glue`, which removes two layer edges. All 5 import cycles remain.
+- Reproduced again: 62, 65 and 66. Issue 66 is still `moving` after 20,000 ticks at 240 Hz.
+- Unchanged: all the others.
+- Older issues touched by this audit:
+  - Closed on 2026-10-28: [17](_closed/17_stage_08_webxr_vr_locomotion_collision_and_controllers.md),
+    [29](_closed/29_live_torus_skew_geometry_deformation.md),
+    [31](_closed/31_geodesic_end_model_and_curve_shortening_rehaul.md),
+    [32](_closed/32_phase_f_curve_shortening_algorithm_note.md),
+    [33](_closed/33_repository_issue_and_risk_audit_2026_08_03.md) and
+    [35](_closed/35_remove_committed_shared_tls_private_key.md) (the owner discarded the certificate).
+  - Merged and closed on 2026-10-28:
+    - [21](_closed/21_vr_stereo_portal_visibility_union_and_hot_loop_allocation.md): traversal and allocation went
+      to 57; split-root defects, stereo counts and headset checks to 59; the in-headset debug readout to 20.
+    - [41](_closed/41_documentation_audit_findings.md): each open item went to the issue that owns its area (52, 56,
+      60, 62, 64, 66-68, 70, 74, 75, 20, 38 and 78). The `TODO(issue 41)` comments in the source were renamed to
+      match.
+  - Still open: 38.
+- Other merges on 2026-10-28:
+  - The module split proposed by both 70 and 76 now lives only in 76. 70 keeps the performance work.
+  - The marmot heading (64) and the heading transport after a deformation commit (53) cross-reference each other.
+    Both must use forward = R·e_y.
+- The suggested order below still applies. Nothing from themes 1 (the shared segment-walk kernel) or 7 (frame
+  snapshots) has landed, and those two block most of 62, 69 and 71-73.
 
 ## Summary
 
 Six parallel reviews covered the code: math core and gluing, portal visibility, movement, geodesics, the frame loop, and
 architecture. They produced issues 51-80. Items already recorded in
-[41](41_documentation_audit_findings.md), [38](38_decompose_runtime_monoliths_and_retire_legacy_paths.md),
-[21](21_vr_stereo_portal_visibility_union_and_hot_loop_allocation.md) and
-[MATHEMATICAL_MODEL.md §11](../MATHEMATICAL_MODEL.md#11-assumptions-and-known-gaps) were not filed again. Where this
+[41](_closed/41_documentation_audit_findings.md), [38](38_decompose_runtime_monoliths_and_retire_legacy_paths.md),
+[21](_closed/21_vr_stereo_portal_visibility_union_and_hot_loop_allocation.md) and
+[MATHEMATICAL_MODEL.md §11](../_docs/MATHEMATICAL_MODEL.md#11-assumptions-and-known-gaps) were not filed again. Where this
 audit has a concrete fix design for one of those items, the new issue says so.
 
 Evidence levels differ between issues. The audit ran scratch scripts to confirm 51 (example invariants), 61 (escaping
@@ -54,7 +88,7 @@ to `src/cell-complex/validateCellComplexSpec.ts`.
 | [67](67_exact_curve_shortening_via_sleeve_funnel.md) | P1 | Exact taut-string solution via the sleeve/funnel algorithm replaces gradient descent |
 | [68](68_loop_endpoint_crossing_must_conjugate_portal_word.md) | P1 | Moving a loop's shared anchor across portal p must map w ↦ p⁻¹wp (currently changes homotopy class) |
 | [69](69_geodesic_tracing_kernel_numerics.md) | P2 | Nudge drift k·10⁻⁴ m, disk test from inside, missed self-intersections |
-| [70](70_geodesic_module_performance_and_split.md) | P2 | Rebuild cost (registry copies, repeated all-pairs intersections) and a split of the module |
+| [70](70_geodesic_module_performance_and_split.md) | P2 | Rebuild cost (registry copies, repeated all-pairs intersections); the module split moved to 76 |
 
 ### Frame loop, aiming, objects (71-75)
 | # | Pri | Title |
@@ -68,11 +102,11 @@ to `src/cell-complex/validateCellComplexSpec.ts`.
 ### Architecture, tooling, tests (76-80)
 | # | Pri | Title |
 | --- | --- | --- |
-| [76](76_split_geodesic_cannon_into_model_trace_and_tool_modules.md) | P1 | Concrete seams for `geodesicCannon.ts` (5,812 lines) and `geodesicCannonTools.ts` |
+| [76](76_split_geodesic_cannon_into_model_trace_and_tool_modules.md) | P1 | Concrete seams for `geodesicCannon.ts` (5,942 lines) and `geodesicCannonTools.ts` |
 | [77](77_app_shell_state_holder_and_command_model.md) | P2 | One state holder and one command path for `createThreeApp` |
 | [78](78_enforce_layer_dag_and_move_domain_logic_out_of_render.md) | P2 | Make the layer rule a real DAG; 5 import cycles; move domain logic out of `render/three` |
 | [79](79_property_based_tests_for_geometry_core_and_test_layout.md) | P2 | Property-based invariants (fast-check) for the geometry core |
-| [80](80_type_strictness_lint_and_bundle_configuration.md) | P2/P3 | `noUncheckedIndexedAccess` (330 errors), lint, bundle chunking (1.44 MB single chunk) |
+| [80](80_type_strictness_lint_and_bundle_configuration.md) | P2/P3 | `noUncheckedIndexedAccess` (353 errors), lint, bundle chunking (1.44 MB single chunk) |
 
 ## Cross-cutting themes
 

@@ -1,10 +1,32 @@
 # 52 - Compile-time vertex classes, cone angles and gluing validation
 
-Status: open as of 2026-10-08.
+Status: open; re-verified 2026-10-28.
 
 Priority: P2 (correctness / robustness / design). This extends the following items of
-[MATHEMATICAL_MODEL §11](../MATHEMATICAL_MODEL.md#11-assumptions-and-known-gaps) and issue 41: equal side lengths,
+[MATHEMATICAL_MODEL §11](../_docs/MATHEMATICAL_MODEL.md#11-assumptions-and-known-gaps) and issue 41: equal side lengths,
 exclusion cylinders at vertices of angle sum 2π, and validation gaps. It adds a concrete design and several new defects.
+
+## Status update 2026-10-28
+
+Done since the audit:
+
+- Equal-length check for glued sides: `src/cell-complex/validateCellComplexSpec.ts` rejects a pair whose lengths differ
+  by more than `gluedSideLengthToleranceMeters` (1e-6 m, absolute); test "rejects glued sides of unequal length but
+  allows unequal heights" in `tests/cell-complex/validateCellComplexSpec.test.ts`. `compileCellComplex` turns the check
+  off because deformation snapshots report mismatches through `validateTopologyPreservingSnapshot`.
+- `src/cell-complex/prismBase.ts#validatePrismBaseVertices` now compares with `geometryTolerance` (1e-8, from
+  `src/math/tolerances.ts`) rather than a literal; the validator still uses `<= 0`, so the two still differ.
+
+Still open (all of "Proposed change"):
+
+- No vertex classes, cone angles, χ or Gauss–Bonnet in `src/` (no `vertexClasses.ts`, no `topology` field on
+  `CompiledCellComplex`). Two tests compute vertex classes with private helpers (`buildVertexClasses` in
+  `tests/cell-complex/compileCellComplex.test.ts` and `tests/authoring/exampleWorlds.test.ts`).
+- The length check is a length comparison, not the endpoint-isometry check, and its tolerance is absolute, not scaled
+  by the world's diameter; no holonomy self-check; no short-portal or connectivity warning.
+- Cylinders are still compiled at every portal-incident corner, including the flat torus corners
+  (`src/cell-complex/prismCells.ts#compilePortalJunctions`, `:150-169`); junction ids are still per corner.
+- The unit-mismatched predicates remain; current locations are given in the Evidence list below.
 
 ## Summary
 
@@ -23,9 +45,9 @@ Making them visible would need an amendment to 003. This issue only uses them in
 
 ## Evidence
 
-- No corner identification anywhere. `src/cell-complex/prismCells.ts:365-384` (`compilePortalJunctions`) adds a
+- No corner identification anywhere. `src/cell-complex/prismCells.ts:150-169` (`compilePortalJunctions`) adds a
   junction for both endpoints of every portal side. Gluing data is used only to build `transformToTarget`
-  (`compilePortalTransforms.ts:51-58`).
+  (`compilePortalTransforms.ts`, `derivePortalTransform`).
 - Flat vertices still get cylinders. In `torus.world.js` and `torus-moduli.world.js` the single vertex class has
   θ = 4·90° = 360°, so it is a regular point of the flat torus, yet 4 cylinders are compiled. Issue 53 shows these
   cylinders trapping the player after a live deformation.
@@ -35,15 +57,17 @@ Making them visible would need an amendment to 003. This issue only uses them in
 - Gauss–Bonnet holds in every example (see issue 51's table). That makes it a cheap self-test:
   Σ_interior (2π − θ_v) + Σ_boundary (π − θ_v) = 2πχ, with E counting walls once and portal pairs once.
 - Short portals are impassable without a diagnostic. A portal side of length ℓ leaves a walkable gap of
-  ℓ − 2(r_zone + r_player) = ℓ − 0.8 m (`forbiddenZones.ts:115`, `playerBody.ts`). Nothing warns when ℓ ≤ 0.8 m.
+  ℓ − 2(r_zone + r_player) = ℓ − 0.8 m (`forbiddenZones.ts#forbiddenPortalJunctionRadiusMeters` = 0.15,
+  `playerBody.ts` default radius 0.25). Nothing warns when ℓ ≤ 0.8 m.
 - Unit mismatches in tolerances:
-  - `prismBase.ts:86,100` compares twice the area and the edge cross product (both m²) with 1e-8. Its sibling
+  - `prismBase.ts:86,100` compares twice the area and the edge cross product (both m²) with `geometryTolerance` = 1e-8. Its sibling
     `src/cell-complex/validateCellComplexSpec.ts:190,205` uses `<= 0` instead. That validator was moved there from
     `authoring/validateAuthoringSpec.ts`, which is now a shim, while this audit was under way. The builder and the validator therefore accept different
     polygons, and both results depend on the world's scale.
-  - `polygons.ts:290-292` compares `cross` (|e|·distance, m²) with a tolerance in metres. The boundary band is
+  - `polygons.ts:110-112` (`pointLiesOnSegment2xy`) compares `cross` (|e|·distance, m²) with a tolerance in metres. The boundary band is
     tol/|e| wide: 1.8e-10 m on a 55 m genus-2 side and 1e-7 m on a 0.1 m side.
-  - `intersections.ts:424,430` compares a length difference (m) and a dimensionless `t` with the same `tolerance`.
+  - `intersections.ts:45,51` (`intersectSegmentWithPlane`, re-verified 2026-10-28; the file is now 62 lines) compares a
+    signed-distance difference (m) and a dimensionless `t` with the same `tolerance`.
 - The cell graph is not checked for connectivity. An unreachable cell compiles, gets path tables and is never seen.
 
 ## Proposed change
@@ -90,3 +114,9 @@ Making them visible would need an amendment to 003. This issue only uses them in
 - With flag (3) enabled, the torus worlds compile with 0 forbidden zones. Movement and geodesic tests through a flat
   corner pass.
 - Scaling every vertex of a valid world by 1e-3 or 1e3 does not change validation results.
+
+## Merged from issue 41 (2026-10-28)
+
+- Unequal cell heights across a portal are neither modelled (the aperture is the smaller height) nor rejected. The
+  `validateCellComplexSpec.ts` header says it does not check them. Either reject them in validation or model the
+  aperture explicitly.

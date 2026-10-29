@@ -1,8 +1,28 @@
 # 73 - Portal ghost records and XR eye re-rooting are single-hop
 
-Status: open as of 2026-10-08.
+Status: open; re-verified 2026-10-28.
 
 Priority: P2 (correctness, visible near cone vertices and portal corners).
+
+## Status update 2026-10-28
+
+Nothing in this issue has been fixed. Re-checked against the current code; the paths and line numbers in the evidence
+below are updated (the ghost module is `src/render/three/runtimeObjectGhostRecords.ts`, now 99 lines).
+
+Done:
+- Nothing. The player rover no longer requests ghosts at all (`playerRoverModel.ts:40-54`: the `options` argument is
+  ignored), which removes one caller but changes nothing for runtime objects.
+
+Remains:
+- `collectPortalGhostRuntimeObjectRenderRecords` still loops once over the sides of the object's own cell
+  (`runtimeObjectGhostRecords.ts:70-96`), with no recursion and the `[-r, L+r]` projection box (`:80-83`).
+- Objects without collision bounds still get no ghosts (`:55-60`).
+- Ghost records still do not set `omitRootVisiblePath`, and depth-0 runtime instances are still drawn unclipped
+  (`renderPortalInstances.ts:255-257`, `:273-277`). No overhang policy is documented.
+- `resolveXrPortalEyeRenderRoot` still takes the first side in array order (`xrPortalEye.ts:53-73`); its doc
+  comment still says chained crossings are unsupported (`:33`). No segment-walk kernel exists yet (issue 72).
+- `tests/render-contract/runtimeObjectGhostRecords.test.ts` has 3 single-hop cases; none of the acceptance tests
+  exist.
 
 ## Summary
 
@@ -16,7 +36,7 @@ Two render-side helpers assume that only one portal is involved at a time:
 
 ## Evidence
 
-- `runtimeObjectGhostRecords.ts:302-328`: the loop runs over the sides of the object's own cell only. Each ghost is
+- `runtimeObjectGhostRecords.ts:70-96`: the loop runs over the sides of the object's own cell only. Each ghost is
   `transformToTarget * localPose` in `side.portal.targetCellId`. Nothing recurses from the target cell.
   - Scenario: a single-cell square torus of side L, with a marmot of radius 0.3 m at (0.1, 0.1). Its disk covers
     the four quadrants around the (single) vertex. Ghosts are emitted across x=0 and across y=0. The diagonal image
@@ -25,12 +45,12 @@ Two render-side helpers assume that only one portal is involved at a time:
   - Cone vertices with total angle other than 2π and k cells in the link: an object containing the vertex is
     missing from k-3 sectors. It also has a self-overlapping image when the cone angle is below 2π. That case needs
     an explicit decision: clip by sector, or accept overlap.
-- `runtimeObjectGhostRecords.ts:287-291`: objects without collision bounds get no ghosts at all, whatever their
+- `runtimeObjectGhostRecords.ts:55-60`: objects without collision bounds get no ghosts at all, whatever their
   rendered extent. Any portal-renderable object without `collision` that is placed near a portal is cut at the
   aperture when seen from the other side.
-- `runtimeObjectRenderRecords.ts:185` documents `omitRootVisiblePath` as "used for ghosts", but ghost records never
-  set it (`runtimeObjectGhostRecords.ts:321-326`). Leaving it unset is correct when the viewer is in the ghost's cell.
-  However, the true object at depth 0 is drawn unclipped (`renderPortalInstances.ts:273-276`, clip index -2), so its
+- `runtimeObjectRenderRecords.ts:23` documents `omitRootVisiblePath` as "used for ghosts", but ghost records never
+  set it (`runtimeObjectGhostRecords.ts:89-94`). Leaving it unset is correct when the viewer is in the ghost's cell.
+  However, the true object at depth 0 is drawn unclipped (`renderPortalInstances.ts:273-277`, clip index -2), so its
   overhang past the portal plane coincides with the clipped depth-1 ghost. The two matrices
   `rootFromDest(path) * transformToTarget * localPose` and `localPose` differ only by rounding, so z-fighting is
   likely on the overhang. Verify on a headset.

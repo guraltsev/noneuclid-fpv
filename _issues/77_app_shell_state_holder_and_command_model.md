@@ -1,9 +1,27 @@
 # 77 - Give the application shell one state holder and one command path
 
-Status: open as of 2026-10-08.
+Status: open; re-verified 2026-10-28.
 
 Priority: P2 (architecture). Refines the `createThreeApp` part of issue 38 ("introduce an explicit shared-state holder
 instead of more getter/setter pairs") into a concrete design.
+
+## Status update 2026-10-28
+
+Nothing in this issue has been implemented. Re-checked against the current code; line numbers and counts in the
+evidence below are updated (`createThreeApp.ts` is now 3,555 lines).
+
+Done:
+- One small step toward item 6: `src/render/three/scenePaletteLibraryAdapter.ts` (10 lines) is now the public entry
+  point that re-exports the adapter under the `ScenePalette*` names, so consumers no longer import the
+  `vrPaletteLibraryAdapter.ts` file directly. The implementation is still one 2,035-line file and the aliases remain.
+
+Remains:
+- No `src/runtime/appSession.ts`; `createThreeApp` has 35 `let` declarations and 39 `menuState = ` assignments.
+- `RuntimeCommand` still has 4 kinds (`src/runtime/runtimeCommands.ts:8-12`); only `go-home` (`createThreeApp.ts:609`)
+  and `reload-world` (`:2966`) are dispatched.
+- `AppState.selectedTool` (`src/appState.ts:18`) is still present and unread.
+- Startup still calls `buildStaticallyCulledPortalPathTables` on the main thread (`createThreeApp.ts:775`).
+- Mono and stereo portal sync are still two functions (`:2326-2393`, `:2397-2518`); no `portalFrameRender.ts`.
 
 ## Summary
 
@@ -14,24 +32,25 @@ and stereo portal rendering are two near-copies. The VR palette adapter is one 2
 
 ## Evidence
 
-- Mutable state in the closure: `src/render/three/createThreeApp.ts:438-481`, `:813-881` (`playerPose`, `menuState`,
-  `debugLevel`, `debugOptions`, tool states, id counters `placedFlagIdCounter` :813, `latestVisibleResult` :853, ...).
-- `menuState = ...` occurs 38 times in `createThreeApp.ts` (e.g. :535, :567, :663, :913, :1032, :2063-2097, :2818-2923);
-  palette callbacks at :562-765 are ~200 lines of inline `on*` handlers each doing its own state transition.
-- Getter/setter deps: `createThreeApp.ts:564-565`, `:895-913` (`getMenuState`/`setMenuState`-style pairs passed to
+- Mutable state in the closure: `src/render/three/createThreeApp.ts:438-485`, `:784-885` (`playerPose`, `menuState`,
+  `debugLevel`, `debugOptions`, tool states, id counters `placedFlagIdCounter` :817, `latestVisibleResult` :857, ...).
+- `menuState = ...` occurs 39 times in `createThreeApp.ts` (e.g. :539, :571, :667, :917, :1036, :2120-2154, :2875-3235);
+  palette callbacks at :566-755 are ~200 lines of inline `on*` handlers each doing its own state transition.
+- Getter/setter deps: `createThreeApp.ts:900`, `:915-917`, `:1002`, `:1034-1036` (`getMenuState`/`setMenuState`-style pairs passed to
   `portalDebugRuntime`, `aimInteraction`, `geodesicCannonTools`, ...).
-- `src/runtime/runtimeCommands.ts:8-12` defines 4 kinds; only `go-home` (`createThreeApp.ts:605`) and `reload-world`
-  (`:2909`) are dispatched; `dispatchRuntimeCommand` (:3495) is a one-line wrapper.
+- `src/runtime/runtimeCommands.ts:8-12` defines 4 kinds; only `go-home` (`createThreeApp.ts:609`) and `reload-world`
+  (`:2966`) are dispatched; `dispatchRuntimeCommand` (:3552) is a one-line wrapper.
 - `src/appState.ts:18` `selectedTool: "none" | "straight-ray" | "marker"` names tools that no longer exist and is never
   read; `RuntimeMenuState.selectedTool` is the real one.
-- Startup computes the static cull on the main thread (`createThreeApp.ts:771`) although a worker exists for exactly that
+- Startup computes the static cull on the main thread (`createThreeApp.ts:775`) although a worker exists for exactly that
   (`src/runtime/worldGeometryWorkerClient.ts:72`).
-- Mono vs stereo duplication: `syncPortalInstanceRender` (:2269-2339) and `syncStereoPortalInstanceRender` (:2340-2462)
+- Mono vs stereo duplication: `syncPortalInstanceRender` (:2326-2393) and `syncStereoPortalInstanceRender` (:2397-2518)
   repeat the empty-table reset block verbatim; mono is the 1-eye case. The mono default parameter allocates a
-  `THREE.Matrix4` per call (:2274).
+  `THREE.Matrix4` per call (:2330).
 - `src/render/three/vrPaletteLibraryAdapter.ts` (2,035 lines) mixes page builders (:436-1700), a lattice diagram widget
   (:799-1008), ~15 icon factories (:1403-1620), generic widgets (:1747-2000) and disposal (:2021-2035); it exports
-  `ScenePaletteLibraryAdapter` as an alias of `VrPaletteLibraryAdapter` (:103-107) though it serves desktop too.
+  `ScenePaletteLibraryAdapter` as an alias of `VrPaletteLibraryAdapter` (:103-107, :205) though it serves desktop too; `scenePaletteLibraryAdapter.ts`
+  re-exports those aliases.
 
 ## Proposed change
 

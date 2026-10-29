@@ -1,12 +1,33 @@
 # 40 - Resolve or remove unverified public assets
 
-Status: open as of 2026-08-03.
+Status: open; re-verified 2026-10-28.
 
 Priority: P1 legal release gate.
 
+## Status update 2026-10-28
+
+Done since filing:
+
+- Two blocked entries are no longer tracked: `_legacy/photo-wall-texture-pattern.jpg`
+  and `_legacy/Ground037_1K-JPG.zip` / `_legacy/Ground037_1K-JPG/**` do not
+  appear in `git ls-files public/assets/_legacy`. The manifest row in
+  `_docs/ASSET_PROVENANCE.md` ("Blocked, unverified, or incorrect historical
+  records") still lists them and should drop them.
+
+Still open (all still tracked and copied into every build):
+
+- `_legacy/abstract-fractal-geometric-figure-background-with-texture.jpg`
+  (22 MB) is still runtime-requested on every world:
+  `src/render/three/portalWallTexture.ts` (`PORTAL_WALL_TEXTURE_FILE`) is loaded
+  unconditionally by `preloadWorldAssets` (`loadRequiredTexture`) and used by
+  `buildPortalMesh.ts` via `createPortalWallMaterial`.
+- `_legacy/car.gltf`, `_legacy/scene.bin`, `_legacy/skybox-1.png`,
+  `_legacy/skybox-2.jpg` to `_legacy/skybox-6.jpg` are unreferenced by `src/`
+  and `public/*.config.js` and can simply be removed (overlaps issue 34).
+
 ## Not done
 
-The canonical [asset provenance manifest](../ASSET_PROVENANCE.md) identifies
+The canonical [asset provenance manifest](../_docs/ASSET_PROVENANCE.md) identifies
 the remaining historical files for which this repository cannot establish a
 source, creator, or license. The legacy portal-wall image is among them. Vite
 currently copies these files into builds.
@@ -18,7 +39,7 @@ currently copies these files into builds.
   it with a documented asset; **or** remove it from the public build input.
 - Replace or verify the legacy portal-wall image before a release that includes
   it.
-- Update `docs/ASSET_PROVENANCE.md`, local notices, and any affected world or
+- Update `_docs/ASSET_PROVENANCE.md`, local notices, and any affected world or
   renderer references in the same change.
 
 ## Acceptance criteria
@@ -36,3 +57,5 @@ currently copies these files into builds.
   derivative status in the manifest and local icon notice.
 - [x] Removed the old carry files and their runtime references, so no runtime
   icon remains blocked by this issue.
+- [x] `photo-wall-texture-pattern.jpg` and the `Ground037_1K-JPG` archive and
+  folder are no longer tracked (verified 2026-10-28).

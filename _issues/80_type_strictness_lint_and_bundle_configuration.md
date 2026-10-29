@@ -1,8 +1,26 @@
 # 80 - Tighten type strictness, add linting, and configure the bundle
 
-Status: open as of 2026-10-08.
+Status: open; re-verified 2026-10-28.
 
 Priority: P2 (tooling / performance); bundle items P3.
+
+## Status update 2026-10-28
+
+Nothing in this issue has been implemented. Re-checked:
+
+- `tsconfig.json` has the same flags; there is no `tsconfig.strict.json` and no `src/math/indexing.ts`.
+- `npx tsc --noEmit --noUncheckedIndexedAccess` now gives 353 errors: `src/render` 86, `src/cell-complex` 78,
+  `src/world-objects` 50, `src/math` 13, `src/runtime` 2, `src/authoring` 0 (the validator moved to
+  `src/cell-complex/validateCellComplexSpec.ts`), tests 124. Top files: `geodesicCannon.ts` 50,
+  `staticPortalPathCull.ts` 39, `tests/render-contract/visiblePortalPaths.test.ts` 27, `visiblePortalPaths.ts` 21,
+  `tests/runtime/worldGeometryDeformations.test.ts` 17, `validateCellComplexSpec.ts` 16, `polygons.ts` 13,
+  `prismBase.ts` 12. Plain `npm run typecheck` passes.
+- `package.json` has no ESLint/Prettier and no `lint` script; there is no CI workflow that could run one (issue 36).
+- `vite.config.ts` still sets only `base` and `test` (lines 13-18).
+- `dist/assets` from a 2026-10-28 build: `index-*.js` 1,444,086 B, `inter-*.js` 423,250 B, `worker-*.js` 41,907 B,
+  `worldGeometryWorker-*.js` 29,772 B.
+- `src/authoring/exampleWorlds.ts` still compiles all ten `?raw` world scripts eagerly; `compileWorldScript.ts:85` still
+  uses `new Function`; `_docs/ARCHITECTURE.md` has no world-script trust or CSP note.
 
 ## Summary
 
@@ -14,13 +32,13 @@ must stay closed to user input and blocks a strict CSP.
 ## Evidence
 
 - `tsconfig.json`: `strict: true`; no `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `noImplicitOverride`,
-  `noPropertyAccessFromIndexSignature`. Turning on `noUncheckedIndexedAccess` gives 330 errors: `src/render` 84,
+  `noPropertyAccessFromIndexSignature`. Turning on `noUncheckedIndexedAccess` gave 330 errors at filing (353 on 2026-10-28, see status update): `src/render` 84,
   `src/cell-complex` 60, `src/world-objects` 46, `src/math` 13, `src/authoring` 12, `src/runtime` 2, tests 113.
   Top files: `geodesicCannon.ts` 46, `staticPortalPathCull.ts` 39, `visiblePortalPaths.ts` 21, `polygons.ts` 13,
-  `prismBase.ts` 12, `validateAuthoringSpec.ts` 12. These are exactly the polygon/side-index loops where an off-by-one
+  `prismBase.ts` 12, `validateAuthoringSpec.ts` 12 (now `cell-complex/validateCellComplexSpec.ts`). These are exactly the polygon/side-index loops where an off-by-one
   yields `undefined` silently.
 - `package.json`: no ESLint/Prettier; nothing catches floating promises, `any` (`vrPaletteLibraryAdapter.ts` uses
-  `Component<any>` at :1427-1620), or `!` non-null assertions in tests.
+  `Component<any>` at :1406-2028, ten occurrences), or `!` non-null assertions in tests.
 - `vite.config.ts:13-18` sets only `base` and `test`; no `build.rollupOptions`, `worker.format`, or chunk limits.
 - Last `dist/assets`: `index-*.js` 1,442,486 B (single chunk: three + uikit + app), `inter-*.js` 423,250 B (uikit font
   as JS), `worldGeometryWorker-*.js` 28,682 B, `worker-*.js` 41,907 B. The latter starts with
@@ -58,7 +76,7 @@ Bundle (`vite.config.ts`):
 5. Add `rollup-plugin-visualizer` (or `vite-bundle-visualizer`) script `npm run build:analyze` and a size budget check
    in CI (e.g. main chunk < 700 KB minified).
 
-World scripts: keep `new Function` but document in `docs/ARCHITECTURE.md` that world scripts must never be loaded from
+World scripts: keep `new Function` but document in `_docs/ARCHITECTURE.md` that world scripts must never be loaded from
 URL or user upload; if that is ever wanted, run them in a Worker with no DOM and return only JSON spec data. Add a CSP
 note: deployment needs `script-src 'unsafe-eval'` while scripts are evaluated at runtime; alternatively precompile
 examples to JSON specs at build time (a small Vite plugin) and remove runtime eval entirely.

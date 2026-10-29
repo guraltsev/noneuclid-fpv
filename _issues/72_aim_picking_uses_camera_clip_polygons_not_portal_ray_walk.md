@@ -1,8 +1,30 @@
 # 72 - Aim picking tests controller rays against head-camera clip polygons; replace with a portal ray walk
 
-Status: open as of 2026-10-08.
+Status: open; re-verified 2026-10-28.
 
 Priority: P1 (correctness in VR; also performance).
+
+## Status update 2026-10-28
+
+Nothing in this issue has been fixed. The aim picker is unchanged; line numbers in the evidence below are updated to
+the current code.
+
+Done:
+- Partly addressed by reordering only: the frame now resolves one `activeAimRay` right after movement and the rig sync
+  (`createThreeApp.ts:1308`), and tool dispatch uses it (`:1309-1357`). That ray is post-move, but the paths it is
+  tested against are still last frame's.
+
+Remains:
+- `resolveAimTargetsFromRootThreeRay` still gates every path on `pathContainsNdcPoint(path, centerNdc)`
+  (`aimTarget.ts:92`, `:145`, `:170`). There is no `resolveAimTargetsByRayWalk` and no shared segment-walk kernel
+  (theme 1 of issue 50) in `src/math` or `src/cell-complex`.
+- Object hits are still accepted for any `t > 1e-5` with no `[tStart, tExit]` window; walls and ceilings are not
+  tested.
+- Aim still reads `getRuntimeObjectVisiblePaths()` (`aimInteraction.ts:105`), with the root mismatch from issue 71.
+- No per-frame cache: `resolveCurrentAimTarget` runs separately for tools, tooltip, help lens, cross marker,
+  protractor feedback and cannon aim.
+- None of the acceptance tests exist (`tests/render-contract/aimTarget.test.ts` covers proxy shapes and priorities
+  only).
 
 ## Summary
 
@@ -14,9 +36,9 @@ visibility, runs several times per frame, and has no wall or ceiling occlusion.
 
 ## Evidence
 
-- `aimInteraction.ts:121-126` copies the controller pose into a pose-only `aimRayCamera`. `aimTarget.ts:92` and
+- `aimInteraction.ts:121-126` (`syncAimRayCamera`) copies the controller pose into a pose-only `aimRayCamera`. `aimTarget.ts:92` and
   `:145` always pass `centerNdc`. `aimTarget.ts:170` keeps only paths with `pathContainsNdcPoint(path, {0,0})`. The
-  polygons are the per-eye or union clip polygons in eye NDC (`createThreeApp.ts:2429-2441`). Two failure scenarios
+  polygons are the per-eye or union clip polygons in eye NDC (computed in `syncPortalInstanceRender` and `syncStereoPortalInstanceRender`, `createThreeApp.ts:2360`, `:2460`). Two failure scenarios
   in VR:
   - *Missed hit:* the user looks at a wall and points the controller sideways through a portal at a flag. The
     portal's clip polygon does not contain the view centre, so the path is skipped and the flag cannot be selected.
@@ -24,8 +46,8 @@ visibility, runs several times per frame, and has no wall or ceiling occlusion.
     centre test, the controller ray is mapped by `rootFromDestination^-1` (`:214-216`), and it hits objects in the
     destination cell. Physically, the ray never passes through the aperture.
 - *Hit interval not restricted.* After mapping, objects are tested for any `t > 1e-5` (`:236-285`), but only floor
-  hits check cell containment (`:613`, `:667-669`). Object proxies extend beyond the cell: the collision cylinder,
-  the cannon cylinder plus sphere (`:885-893`), and geodesic capsules of radius 0.187 m (`:112`). So a ray can hit:
+  hits check cell containment (`:613`, `:667-670`). Object proxies extend beyond the cell: the collision cylinder,
+  the cannon cylinder plus sphere (`:879-907`), and geodesic capsules of radius 0.187 m (`:112`). So a ray can hit:
   - the part of a destination-cell object that pokes back in front of the portal plane, which is a duplicate of
     the ghost or root hit;
   - an object overhang beyond a *wall* of the destination cell, i.e. in a region the path does not show.
@@ -34,16 +56,16 @@ visibility, runs several times per frame, and has no wall or ceiling occlusion.
 - *Visibility-dependent:* only paths that survive camera culling, the area threshold and the `maxVisiblePaths` budget
   are candidates (`aimInteraction.ts:105`). In XR a controller ray aimed outside the view frustum, or through a portal
   under 16 px of screen area, cannot reach the far side.
-- *Stale paths:* aim runs at `createThreeApp.ts:1304` (tools), `:1409-1410` (tooltip, help) and `:1432-1433`
-  (cross marker, protractor). Visibility is recomputed at `:1416`. Tools and tooltip therefore use the previous
+- *Stale paths:* aim runs at `createThreeApp.ts:1308-1357` (tools), `:1413-1414` (tooltip, help) and `:1436-1437`
+  (cross marker, protractor). Visibility is recomputed at `:1421-1430`. Tools and tooltip therefore use the previous
   frame's paths, while the cross marker uses this frame's. On portal boundaries, the marker can show target A while
   the click acts on target B. See issue 71 for the crossing-frame root mismatch.
 - *Metric:* distances are consistent. The root-frame distance (`:1116-1120`) equals the cell-local distance because
   the maps are rigid. This is not a defect; it is a ready-made invariant for the ray walk below.
 - *Cost:* each call clones and inverts a `Matrix4` per candidate path and clones two `Vector3`s (`:214-216`). It
   calls `registry.getObjectsInCell`, which allocates 3 arrays (`runtimeObjectRegistry.ts:226-229`), and allocates
-  hit objects per proxy. Full resolution runs 3-6 times per frame on identical input: tooltip `:3241`, help lens
-  `:3417`, cross marker `:3284`, protractor `:3315`, cannon aim `geodesicCannonTools.ts:1161`, and tool clicks.
+  hit objects per proxy. Full resolution runs 3-6 times per frame on identical input: tooltip `:3298`, help lens
+  `:3474` and `:3496`, cross marker `:3341`, protractor `:3372`, cannon aim `geodesicCannonTools.ts:1161`, and tool clicks.
 
 ## Proposed change
 

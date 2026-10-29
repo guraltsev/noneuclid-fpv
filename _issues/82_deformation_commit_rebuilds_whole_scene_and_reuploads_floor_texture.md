@@ -1,9 +1,17 @@
 # 82 - Each deformation commit rebuilds the whole scene and re-uploads the floor texture
 
-Status: open as of 2026-10-28.
+Status: open; re-verified 2026-10-28.
 
 Priority: P2 (performance). Complements issue 55, which covers the worker build cost (~100 ms per step). This issue
 covers the main-thread cost of *applying* each step, which is what makes the frame rate drop during a deformation.
+
+## Status update 2026-10-28
+
+Filed today; references re-checked against the current code and still accurate, with small line corrections below
+(`rebuildCellMeshes` ends at `:2313`, `collectCellArchetypeSources` at `cellRenderArchetypes.ts:245`, and the texture
+clone path in `preloadWorldAssets.ts` runs to `:243`). Nothing is implemented, and the measurements under
+"Verification" have not been taken. Note that the app now steps by 0.04 m (`createThreeApp.ts:792`), so a full sweep
+has about twice as many commits as the default 0.08 m step would give.
 
 ## Summary
 
@@ -19,14 +27,14 @@ Not yet measured; see "Verification" before implementing.
 `commitWorldGeometrySnapshot` (`src/render/three/createThreeApp.ts:1487-1527`) does, on every commit:
 
 - Receives the snapshot through `structuredClone` from the worker: ~9.5 ms on desktop (issue 55 table).
-- `rebuildCellMeshes()` (`:2251-2311`):
+- `rebuildCellMeshes()` (`:2251-2313`):
   - Disposes every cell render archetype (geometry and material).
-  - `buildCellRenderArchetypes` → `collectCellArchetypeSources` (`cellRenderArchetypes.ts:201-243`) calls
+  - `buildCellRenderArchetypes` → `collectCellArchetypeSources` (`cellRenderArchetypes.ts:201-245`) calls
     `buildCellMesh`, which re-instantiates every decoration GLTF (house, bench, computer, flowers, cone) via
     `cloneSkeleton`, then clones and bakes every geometry (`geometry.clone()` + `applyMatrix4`), clones and re-patches
     every material, and allocates new `InstancedMesh` and instanced attribute buffers.
   - All static geometry is therefore re-uploaded to the GPU, although only its placement changed.
-- Floor texture (`preloadWorldAssets.ts:205-238`): the cache key contains `repeatX/repeatY`, which change with every
+- Floor texture (`preloadWorldAssets.ts:205-243`): the cache key contains `repeatX/repeatY`, which change with every
   step (issue 81). Each commit creates a new `texture.clone()` with `needsUpdate = true`.
   - In three r164 `needsUpdate = true` also sets `source.needsUpdate`, bumping the version of the `Source` shared with
     the preloaded texture, so the GPU image is re-uploaded on the next render.

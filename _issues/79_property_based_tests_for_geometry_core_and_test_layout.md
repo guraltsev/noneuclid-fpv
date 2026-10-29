@@ -1,8 +1,27 @@
 # 79 - Property-based tests for the geometry core; fix test layout gaps
 
-Status: open as of 2026-10-08.
+Status: open; re-verified 2026-10-28.
 
 Priority: P2 (testing).
+
+## Status update 2026-10-28
+
+Nothing in this issue has been done. Re-checked `package.json`, `vite.config.ts` and the `tests/` tree.
+
+Done:
+- Nothing.
+
+Remains:
+- No `fast-check` or `@vitest/coverage-v8` dev dependency; no `tests/support/`; no `*.property.test.ts` files; no
+  coverage configuration in `vite.config.ts`.
+- `tests/math/*.test.ts` are unchanged (29 + 20 + 35 + 51 + 33 lines; `rigidTransform3.test.ts` still has 4 cases).
+- Core modules with no matching test file: `math/tolerances.ts`, `cell-complex/compilePortalTransforms.ts`,
+  `cell-complex/prismCells.ts`, `cell-complex/forbiddenZones.ts`, `cell-complex/specs.ts`, `cell-complex/prismBase.ts`
+  (type test only, `tests/typecheck/prismBase.types.ts`), `movement/portalCrossing.ts`, `movement/dynamicObject.ts`,
+  `movement/playerBody.ts`, `movement/playerPose.ts`.
+- The four root test files are still directly under `tests/`, and the pure-logic tests are still in
+  `tests/render-contract/` (blocked on issue 78).
+- `tests/world-objects/geodesicCannon.test.ts` has grown to 3,111 lines (split with issue 76).
 
 ## Summary
 
@@ -15,15 +34,17 @@ generated-input invariant would have caught. Test placement also no longer mirro
 
 - `tests/math/*.test.ts`: 29 + 20 + 35 + 51 + 33 lines; `rigidTransform3.test.ts` has 4 cases (:14, :19, :26, :38).
 - No test file references `src/cell-complex/compilePortalTransforms.ts` or `src/cell-complex/prismCells.ts`;
-  `src/movement/portalCrossing.ts` is referenced from one test only.
+  `src/movement/portalCrossing.ts` is not imported by any test (`tests/movement/moveDynamicObject.test.ts` only exercises it
+  indirectly through `portalCrossingMode`).
 - No property-testing dependency in `package.json`.
 - Pure logic tested under `tests/render-contract/` because its source lives in `render/three`: `aimTarget.test.ts`,
   `visiblePortalPaths.test.ts`, `vrLocomotion.test.ts`, `xrSessionState.test.ts`, `geodesicCarryPortalTransition.test.ts`
   (see 78).
 - Loose root tests `tests/debugSettings.test.ts`, `tests/launchOptionsUrl.test.ts`, `tests/readLaunchOptions.test.ts`,
   `tests/geometrySelection.test.ts` test `src/glue/*` but sit outside a `tests/glue/` folder.
-- `tests/world-objects/geodesicCannon.test.ts` is 2,834 lines (split with issue 76).
-- 330 type errors appear in `src/` + `tests/` under `noUncheckedIndexedAccess` (see 80); 13 are in `src/math/polygons.ts`.
+- `tests/world-objects/geodesicCannon.test.ts` is 3,111 lines (split with issue 76).
+- 330 type errors appeared in `src/` + `tests/` under `noUncheckedIndexedAccess` on 2026-10-08 (see 80, which owns the
+  current count); 13 were in `src/math/polygons.ts`.
 
 ## Proposed change
 

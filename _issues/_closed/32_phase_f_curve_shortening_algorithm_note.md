@@ -2,9 +2,44 @@
 
 ## Repository audit status - 2026-08-03T14:24:10-05:00
 
-Status: active; partially implemented and insufficiently verified.
+Status: closed on 2026-10-28.
 
 Priority: P1 domain correctness.
+
+## Outcome
+
+This was a design note, not a work item. Its implementable contracts landed: the pair object, the public APIs and
+helpers, the constants, endpoint-role tie/detach, preview-before-commit ticks, the monotone length check, role-aware
+fusion and the renderer/UI slices. The algorithmic core it specifies (free-vertex descent in "Tick Geometry",
+"Monotonicity", parts of "Failure Cleanup") is superseded by issue 67, which replaces the descent by an exact
+sleeve/funnel solution; the current algorithm is documented in `_docs/MATHEMATICAL_MODEL.md` section 7. The test slices
+that are still missing were moved to issue 67 ("Carried over from issues 31 and 32"); defects of the current code are
+issues 66 (stall at high frame rate) and 68 (free-loop word update). Kept as the record of the Phase F design.
+
+## Closing evidence
+
+- Runtime model and APIs, all in `src/world-objects/geodesicCannon.ts`: `CurveShorteningPairObject` (`:209`),
+  `createCurveShorteningPairObject`, `tieAndDetachGeodesicEndpoints`, `advanceCurveShorteningPairs`,
+  `fuseCurveShorteningPair`, `getPortalWordBetweenEndpointRoles`, `updatePortalWordForMovedEndpoint`,
+  `previewRebuildGeodesicInterval`. All five constants exist with the values given below (`:580-591`).
+- Renderer/UI slices 1-3, 5, 6: `tieAndDetachEndpointSelections` in `src/render/three/geodesicCannonTools.ts`; the action
+  is enabled when an emitter has two locked endpoint attachments (`canTieAndDetachGeodesicsFromCannon`); the frame loop
+  calls `advanceCurveShorteningPairs` (`src/render/three/createThreeApp.ts:1373`). Slice 4 differs: moving intervals get
+  their colour from segment `connectionState: "straightening"`, not from `motionState` (legacy removal, issue 76).
+- Test slices with direct tests in `tests/world-objects/geodesicCannon.test.ts`: 4 ("detaches the two endpoint roles of
+  a same-emitter loop..."), 5 ("emits a debug diagnostic when a shortening pair is marked ready by mobile angle", "records
+  the new total length after a monotone shortening step"), 6 ("fuses a ready curve-shortening pair into one stable locked
+  interval using the lower geodesic id"), 9 ("deletes a degenerate free loop together with its derived objects"), 14
+  ("does not report a pair as changed when a non-forbidden preview failure commits nothing", "refuses to realize a lifted
+  chord that hits a wall..."), 15 (the fusion test pairs an `end` free role with a `start` free role), and the portal
+  half of 13 ("moves a shortening free end through a portal and recomputes moved-start portal words").
+- Slices 1 (runtime cleanup), 3, 7, 8, 10, 11, 12 and the rollback half of 13 have no direct test; they are listed in
+  issue 67. Slice 7 was checked by a scratch run on 2026-10-28 (see issue 31's closing evidence).
+- Deliberate deviations from this note: a fusion that fails without a forbidden zone reverts the pair to `moving` instead
+  of deleting it ("reverts a ready-to-fuse pair to moving when its fusion preview fails without a forbidden zone"); a
+  rejected (lengthening) step is skipped, not turned into `ready-to-fuse`; a very short half is absorbed
+  (`absorbShortCurveShorteningHalf`); fusion into an already existing equal geodesic keeps the existing one
+  (`findEquivalentStableInterval`).
 
 Current tests cover same-emitter detach, ready-pair fusion, angle readiness,
 portal crossing with moved-start word updates, and short-half absorption. The

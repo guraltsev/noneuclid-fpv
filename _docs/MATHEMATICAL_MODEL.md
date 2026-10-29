@@ -211,7 +211,7 @@ the per-cell **segments** of a geodesic; the ordered list of portals crossed is 
 *attachment* (`src/world-objects/geodesicCannon.ts#GeodesicEndpointAttachment`): each end is attached to an
 *anchor object* — an emitter ("cannon"), or a `FreeGeodesicEndObject` (a loose end that can be aimed). The interval stores
 its portal word, so the arc is determined by (anchor positions, word) alone. This is the "geodesic end model" of
-`_issues/31_geodesic_end_model_and_curve_shortening_rehaul.md`.
+`_issues/_closed/31_geodesic_end_model_and_curve_shortening_rehaul.md`.
 
 **Lifting (unfolding).** Given the word $w=(p_1,\dots,p_k)$ from the source anchor $a$ (in cell $C_0$) to the target
 anchor $b$ (in cell $C_k$), the straight arc is the Euclidean segment from $a$ to the *developed* target
@@ -265,7 +265,7 @@ $u_A+u_B=0$: the two arcs form a single straight line through $X$. Concretely ea
 
 This is local descent, not a global shortest-path solver: it finds *a* locally shortest geodesic in the current homotopy
 class, never a minimum over classes. The full design, including the free-loop case in which both ends of one interval
-attach to the same free vertex, is `_issues/32_phase_f_curve_shortening_algorithm_note.md`.
+attach to the same free vertex, is `_issues/_closed/32_phase_f_curve_shortening_algorithm_note.md`.
 
 ## 8. Visibility and rendering through portals
 
@@ -393,7 +393,7 @@ rather than discovered.
 - **Yaw conventions.** Rigid-transform yaw is $\operatorname{atan2}(R_{10},R_{00})$. The marmot derives its heading from
   its velocity as $\operatorname{atan2}(v_x,v_y)$, so it actually walks along $(-v_x,v_y)$ — a mirror of the authored velocity
   (`src/world-objects/geodesicMarmot.ts#yawFromVelocity`); deformation maps transport the *real* direction. Fixing this
-  changes every authored marmot and is tracked in issue 41. (The placed-flag facing was wrong in the same way and is fixed.)
+  changes every authored marmot and is tracked in issue 64. (The placed-flag facing was wrong in the same way and is fixed.)
 - **Curve shortening.** A step that would lengthen the pair is skipped rather than rolled back to a fused geodesic, so a pair
   whose recorded length is stale may stall without ever becoming ready to fuse; a free loop crossing a portal probably stalls
   (only one of its two roles has its word updated); a free loop shorter than the minimum geodesic length is deleted, but one

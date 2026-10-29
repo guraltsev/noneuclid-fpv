@@ -1,8 +1,34 @@
 # 33 - Repository issue and risk audit, 2026-08-03
 
-Status: open as of 2026-08-03T14:24:10-05:00.
+Status: closed on 2026-10-28.
 
 Priority: P1 repository governance.
+
+## Outcome
+
+Closed as outdated: this was a dated snapshot of the 2026-08-03 issue set, and
+every follow-up it listed is now either done or tracked by its own issue. Issues
+17 and 29 were archived; issues 31 and 32 were re-verified and archived; issues
+20 and 21 stay open as the record for their own headset verification; the risk
+issues 34-38 were accepted and each carries its own 2026-10-28 status; 39 is
+closed. Typecheck, tests and `docs:check` were run on the current tree, and the
+Pages workflow builds on every push to `main`.
+
+## Closing evidence
+
+- `_issues/_closed/` contains 15-19, 22-32 and 39; `_issues/` still contains
+  20, 21 and 34-38, each with a `Status: open; re-verified 2026-10-28.` line.
+- `npx tsc --noEmit`: exit 0. `npx vitest run`: 85 files, 608 passed,
+  9 skipped. `npm run docs:check`: exit 0 (2026-10-28).
+- `.github/workflows/deploy-pages.yml` runs `npm run build:pages` (which runs
+  `tsc --noEmit && vite build`) on every push to `main`; no Pages build was run
+  locally for this closure.
+- Headset verification is not recorded here; it remains the closing condition
+  of [issue 20](../20_vr_palette_menu_from_shared_definition.md) and
+  [issue 21](../21_vr_stereo_portal_visibility_union_and_hot_loop_allocation.md).
+- Snapshot facts below are outdated: `public` is now about 75 MiB tracked
+  (issue 34), the PFX is no longer in the tree (issue 35), and
+  `createThreeApp.ts`/`geodesicCannon.ts` are 3,555/5,942 lines (issue 38).
 
 ## Goal
 
@@ -54,12 +80,12 @@ those commands run in CI or a Node-enabled environment.
 
 ## New risk issues
 
-- [34 - Reduce deployment and repository asset footprint](34_reduce_deployment_and_repository_asset_footprint.md), P0.
-- [35 - Remove the committed shared TLS private key](35_remove_committed_shared_tls_private_key.md), P1 security.
-- [36 - Add pre-merge CI and browser smoke coverage](36_add_premerge_ci_and_browser_smoke_coverage.md), P1.
-- [37 - Make Pages deployment repository-name agnostic](37_align_pages_and_deployment_configuration.md), P2.
-- [38 - Decompose runtime monoliths and retire legacy paths](38_decompose_runtime_monoliths_and_retire_legacy_paths.md), P1/P3 staged cleanup.
-- [39 - Document project and third-party asset provenance](_closed/39_document_project_and_asset_provenance.md), completed 2026-08-03.
+- [34 - Reduce deployment and repository asset footprint](../34_reduce_deployment_and_repository_asset_footprint.md), P0.
+- [35 - Remove the committed shared TLS private key](../35_remove_committed_shared_tls_private_key.md), P1 security.
+- [36 - Add pre-merge CI and browser smoke coverage](../36_add_premerge_ci_and_browser_smoke_coverage.md), P1.
+- [37 - Make Pages deployment repository-name agnostic](../37_align_pages_and_deployment_configuration.md), P2.
+- [38 - Decompose runtime monoliths and retire legacy paths](../38_decompose_runtime_monoliths_and_retire_legacy_paths.md), P1/P3 staged cleanup.
+- [39 - Document project and third-party asset provenance](39_document_project_and_asset_provenance.md), completed 2026-08-03.
 
 ## Important evidence
 

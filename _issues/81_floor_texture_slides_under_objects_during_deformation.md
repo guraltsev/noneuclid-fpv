@@ -1,9 +1,17 @@
 # 81 - Floor texture slides under objects during deformation; tile size depends on cell span
 
-Status: open as of 2026-10-28.
+Status: open; re-verified 2026-10-28.
 
 Priority: P1 (correctness, visible in `torus-moduli`). Related: issue 53 (pose transport), issue 82 (commit cost; this
 issue's fix removes one of its costs).
+
+## Status update 2026-10-28
+
+Filed today; references re-checked and still accurate. The floor is still a `ShapeGeometry` with raw-meter UVs
+(`src/render/three/buildCellMesh.ts:107`) and `floorTextureRepeat` (`:151-163`) still divides the bounding-box span by
+the tile size; `river_pebbles` has `defaultTileSizeMeters: 40` (`src/world-assets/floorTextures.ts:64-69`). Nothing is
+implemented yet. The lattice-UV proposal assumes the lattice-coordinate transport of issue 53; if 53 or 54 change the
+frame (footprint read from the vertices, or a reduced basis), the UV frame must follow.
 
 ## Summary
 

@@ -1,8 +1,32 @@
 # 69 - Geodesic tracing kernel: nudge drift, disk test with the start inside, missed intersections
 
-Status: open as of 2026-10-08.
+Status: open; re-verified 2026-10-28.
 
 Priority: P2 (robustness / correctness).
+
+## Status update 2026-10-28
+
+Done:
+
+- Start inside a disk. `intersectRayWithForbiddenZone` (`src/world-objects/geodesicCannon.ts:5884-5913`) now returns
+  `t = 0` when `c <= 0`, so a ray that starts inside or on the circle is a zone hit and the trace ends there
+  (`traceGeodesicSegment`, `:1322-1331`). Test: "stops immediately when a segment starts inside a forbidden zone"
+  (`tests/world-objects/geodesicCannon.test.ts`). The role-orientation asymmetry described below is gone: an arc whose
+  start role is inside a disk now fails its preview just as the reversed arc does. A start on the circle aimed inward
+  is a hit for either sign of the rounded `c`, but no test covers it.
+
+Still open:
+
+- Nudge drift: unchanged (`portalStartEpsilonMeters = 1e-4`, `:564`; nudge at `:1373`; budget at `:1505`).
+- Disk test, new form of the problem: a start *on* the circle that moves outward is a hit at `t = 0` whenever rounding
+  gives `c <= 0`. Proposed change 2 (open-disk predicate with tolerance) still applies, now to avoid false hits instead
+  of missed ones.
+- Vertex tie rule: unchanged and still undocumented; no compile-time assertion.
+- Development cost: `liftGeodesicEndpoint` and `liftGeodesicEndpointWithAnchors` still call `invertRigidTransform3`
+  per letter on every call (`:953`, `:998`).
+- Intersections: self-crossings and crossings within 0.3 m of any emitter are still dropped (`:5598-5608`,
+  `:5637-5655`).
+- No acceptance test exists.
 
 ## Summary
 
@@ -14,29 +38,30 @@ any emitter.
 
 ## Evidence
 
-- Nudge: `src/world-objects/geodesicCannon.ts:1366` sets `targetStart = T(hit) + ε·d'`. `:1498` subtracts only
-  `trace.lengthMeters`, and `:1506` restarts from the nudged point. Summed over k crossings, the realized path
+- Nudge: `src/world-objects/geodesicCannon.ts:1373` sets `targetStart = T(hit) + ε·d'`. `:1505` subtracts only
+  `trace.lengthMeters`, and `:1513` restarts from the nudged point. Summed over k crossings, the realized path
   covers `L + kε` of the developed line while the segment lengths sum to L. The last segment therefore ends
-  `kε` past `B̃`, and no step snaps it to the end anchor (`withAnchoredTargetTerminalForAnchors`, `:2565-2583`,
+  `kε` past `B̃`, and no step snaps it to the end anchor (`withAnchoredTargetTerminalForAnchors`, `:2576-2598`,
   only relabels the terminal). Effects:
   - The drawn endpoint is offset from the emitter by kε: 1 mm for a geodesic that wraps a torus 10 times.
   - If the end anchor is within kε of a portal side in its cell, the trace crosses that portal, the realized word
-    gains a letter, and `samePortalWord` fails (`:1553`, `:2221`). The locked geodesic then refuses to rebuild, or
+    gains a letter, and `samePortalWord` fails (`:1560`, `:2228`). The locked geodesic then refuses to rebuild, or
     is deleted at release.
-  - The measurement tool sums `lengthMeters` (`src/world-objects/measureLengthTool.ts:175-180`), so the label (L) and
+  - The measurement tool sums `lengthMeters` (`src/world-objects/measureLengthTool.ts:175-181`), so the label (L) and
     the drawing (L + kε) disagree.
-- Start inside a disk: `intersectRayWithForbiddenZone` returns "no hit" when `c <= 0` (`:5769-5771`). A free end
+- ~~Start inside a disk: `intersectRayWithForbiddenZone` returns "no hit" when `c <= 0` (`:5769-5771`).~~ Fixed (see
+  the status update); the rest of this bullet describes the old behavior. A free end
   created at a `forbidden-zone-hit` terminal lies on the circle (c ≈ 0, either sign from rounding). The
-  curve-shortening free end moves with `ignoreForbiddenZones: true` (`:3713`). An arc whose `start` role sits at
+  curve-shortening free end moves with `ignoreForbiddenZones: true` (`:3738`). An arc whose `start` role sits at
   such a point therefore crosses the disk undetected, while the reversed arc (trace from the other end) reports the
   hit. The result depends on role orientation.
-- Ties at `u ≈ 0/1`: `:1300-1312` accepts both sides at a shared vertex within 1e-7 and keeps the first. This is
+- Ties at `u ≈ 0/1`: `:1306-1319` accepts both sides at a shared vertex within 1e-7 and keeps the first. This is
   benign today only because every portal endpoint carries a 0.15 m disk that is hit first. Nothing documents or
   asserts that invariant.
-- Development cost: `liftGeodesicEndpoint` calls `invertRigidTransform3` for each letter on every call (`:946`, `:991`).
-- Intersections: `findGeodesicIntersections` skips `left.geodesicId === right.geodesicId` (`:5468`), so a long
-  geodesic's self-crossings are never vertices for the protractor. `pointCoincidesWithGeodesicEmitter` (`:5476`,
-  `:5507-5525`) drops every crossing within `emitterConnectionToleranceMeters` = 0.3 m of any emitter in the cell,
+- Development cost: `liftGeodesicEndpoint` calls `invertRigidTransform3` for each letter on every call (`:953`, `:998`).
+- Intersections: `findGeodesicIntersections` skips `left.geodesicId === right.geodesicId` (`:5598`), so a long
+  geodesic's self-crossings are never vertices for the protractor. `pointCoincidesWithGeodesicEmitter` (`:5606`,
+  `:5637-5655`) drops every crossing within `emitterConnectionToleranceMeters` = 0.3 m of any emitter in the cell,
   including real crossings of two geodesics passing near a third emitter. The 1e-4 gaps at portals can also hide
   crossings that fall inside a gap.
 

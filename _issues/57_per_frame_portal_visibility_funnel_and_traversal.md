@@ -1,9 +1,18 @@
 # 57 - Per-frame portal visibility: visit only visible parents, use the exact 2.5D funnel, stop leaving background holes
 
-Status: open as of 2026-10-08.
+Status: open; re-verified 2026-10-28.
 
-Priority: P2 (performance / robustness). Issue 21 covers the general goal of fewer hot-loop allocations; this issue gives
+Priority: P2 (performance / robustness). Issue 21 (closed 2026-10-28, merged here) covered the general goal of fewer hot-loop allocations; this issue gives
 the concrete algorithmic replacement.
+
+## Status update 2026-10-28
+
+Nothing in the proposal is implemented. `computeVisiblePortalPaths` and `computeIndependentVisiblePortalPaths`
+(`src/render/three/visiblePortalPaths.ts`) still scan the whole kept table with near-plane projection and
+Sutherland-Hodgman. Every evidence item below still holds; line numbers have been updated. The 16 px threshold now
+appears in three places in `createThreeApp.ts`: the mono pass (`:2369`), the shared-root stereo pass (`:2440`) and the
+split-root stereo pass (`:2469`). No benchmark, brute-force ray-walk property test or allocation counter exists.
+Issue 21's unfinished steps 3 and 4 (hierarchical traversal, allocation) are the same work as steps 1 and 5 here.
 
 ## Summary
 
@@ -16,26 +25,26 @@ plane. Paths culled by the area threshold or the depth limit also leave pixels w
 ## Evidence
 
 - `visiblePortalPaths.ts:195-225`: `for (const path of input.pathTable.paths)` runs over all kept paths, up to 50 000 per
-  root (`createThreeApp.ts:763`), and pays a `Map.get` on each one to find out that its parent is invisible. In stereo
+  root (`createThreeApp.ts:767`), and pays a `Map.get` on each one to find out that its parent is invisible. In stereo
   (`:291`) this happens once per camera. The cost is O(table), whereas the work needed is O(visible x degree).
   `pathsByParentPathId` already exists and is never used here.
-- `visiblePortalPaths.ts:622-629`: `createVisiblePath` rebuilds `rigidTransformToThreeMatrix(path.rootFromDestination)`
-  for every visible path on every frame, although the transform is static per path. `portalEyeFrameTransforms.ts:33`
-  then clones it again. Further per-path allocations: `projectRootSpacePointsToNdc` (`:382`, `:443`, `:705`), the hull
-  (`:780`, `:806`), the Sutherland-Hodgman arrays (`:469`, `:653`) and `ndcRectForPolygon` (`:489-492`, four spreads).
+- `visiblePortalPaths.ts:615-630`: `createVisiblePath` rebuilds `rigidTransformToThreeMatrix(path.rootFromDestination)`
+  for every visible path on every frame, although the transform is static per path. `portalEyeFrameTransforms.ts:48` (`transformVisiblePortalResultToRenderFrame`)
+  then clones it again. Further per-path allocations: `projectRootSpacePointsToNdc` (`:378`, `:438`, `:691`), the hull
+  (`:778`, `:809`), the Sutherland-Hodgman arrays (`:461`, `:647`) and `ndcRectForPolygon` (`:487-499`, four spreads).
 - `visiblePortalPaths.ts:385`: `near` falls back to 0.01 because the XR culling cameras are plain `THREE.Camera`
-  objects (`createThreeApp.ts:425`, `xrPlayerRig.ts:151-163`) with no `near` field. The actual near plane in the
+  objects (`createThreeApp.ts:425`, `xrPlayerRig.ts:145-165`, `syncXrViewCullingCameras`) with no `near` field. The actual near plane in the
   WebXR projection matrix is different (0.03, `renderCameraClip.ts:11`). The mismatch errs on the conservative side,
   but it is accidental.
 - `visiblePortalPaths.ts:407-435`: `projectNearCoplanarPortalToNdc` uses the distance to the *infinite* plane plus a
   hard-coded 5 cm. The near-plane clip can lose rays that cross the portal at depth below `near`. That is safe only
   because such points project outside the screen when lateral/|z| > 2.47, i.e. when the half-FOV is below 68°.
   Wide-FOV headsets violate this.
-- `visiblePortalPaths.ts:217`: if the area is below `minPortalScreenAreaPixels` (16, `createThreeApp.ts:2312`), the path
+- `visiblePortalPaths.ts:217`: if the area is below `minPortalScreenAreaPixels` (16, `createThreeApp.ts:2369`, `:2440`, `:2469`), the path
   and its whole subtree are dropped. Sibling clip polygons are disjoint, so no other instance covers those pixels, and
   they show the clear color. At grazing angles this appears as 1-2 px flickering lines along door jambs. The depth limit
   of 10 and the `maxVisiblePaths` cut produce the same kind of hole at terminal portals.
-- `visiblePortalPaths.ts:601-613`: the multi-camera conservative hull, `computeVisiblePortalPaths({cameras})`, has no
+- `visiblePortalPaths.ts:602-613` (`projectRootSpacePointsToConservativeNdc`): the multi-camera conservative hull, `computeVisiblePortalPaths({cameras})`, has no
   production caller; stereo uses `computeIndependentVisiblePortalPaths`. It is also unsafe as a *clip* polygon. The
   developing map is not injective at cone points with angle sum > 2π, so an over-large clip polygon draws one developed
   copy over another rather than merely drawing extra fragments that fail the depth test.
@@ -78,3 +87,16 @@ plane. Paths culled by the area threshold or the depth limit also leave pixels w
 - No clear-color pixels appear along grazing portals in a scripted grazing-angle walk. Use a screenshot diff or a
   readPixels count of the clear color.
 - `visiblePortalPaths` allocates nothing per visible path in steady state (heap-snapshot test or allocation counter).
+
+## Merged from issue 21 (2026-10-28)
+
+Issue 21's unfinished steps are tracked here:
+
+- Hierarchical traversal (its step 3): expand children based on *pre-budget* visibility, so deep paths do not vanish
+  when the final sorted budget truncates their parents. Acceptance: the traversal produces the same visible set as the
+  full-table scan, in contract tests for both mono and the shared-root stereo pass
+  (`computeIndependentVisiblePortalPaths`).
+- Allocation (its step 4): reuse scratch vectors and polygon buffers, clone matrices and polygons only after a path
+  survives, and avoid transient maps in inner loops. Document scratch-buffer ownership in code comments. Current
+  allocations: per-path `rigidTransformToThreeMatrix`, NDC projection arrays, Sutherland-Hodgman arrays, and a matrix
+  `clone()` in `transformVisiblePortalResultToRenderFrame`.

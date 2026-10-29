@@ -1,8 +1,26 @@
 # 55 - Live-deformation rebuild cost, worker pipeline, and an SE(2) transform type
 
-Status: open as of 2026-10-08.
+Status: open; re-verified 2026-10-28.
 
 Priority: P2 (performance / design).
+
+## Status update 2026-10-28
+
+Nothing in "Proposed change" is implemented:
+
+- The session is still serial: `scheduleNextBuild` (`src/runtime/worldGeometrySession.ts:144-223`) returns while a
+  build is in flight or a snapshot is ready, and only `pollReadySnapshot` (`:260-271`) schedules the next one.
+- Steps are still fixed in parameter units. The app now passes `maxStepMeters: 0.04`
+  (`src/render/three/createThreeApp.ts:792`), half the session default of 0.08 m (`worldGeometrySession.ts:120-123`),
+  so at the same build time the sweep a = 0 → 30 m needs about 750 builds, twice the estimate below.
+- `cancel()` (`:253-259`) still only clears local state; the worker (`worldGeometryWorker.ts:109`) has no cancel or
+  init message, recompiles `baseWorld` per request (`:70`), and the client (`worldGeometryWorkerClient.ts:73-110`) keeps
+  the stale resolver in `pending`.
+- No `src/math/iso2.ts`; `RigidTransform3` is unchanged, and `compilePortalTransforms.ts:133-162` still has private
+  `multiplyMat3`, `multiplyMat3Vec3` and `transposeMat3` alongside the ones in `src/math/rigidTransform3.ts:133-162`.
+
+The build times in the table were not re-measured. Issue 82 covers the main-thread side of each commit (scene rebuild,
+floor texture re-upload) and proposes the same cheap intermediate steps as item 2 here.
 
 ## Summary
 
@@ -18,7 +36,7 @@ on a headset. Three further costs:
 ## Evidence
 
 Measured with `buildWorldGeometrySnapshotForRequest` on `torus-moduli`, using the app's options (depth 10,
-`maxKeptPathsPerRoot` 50 000; `createThreeApp.ts:757-764`), Node 25:
+`maxKeptPathsPerRoot` 50 000; `createThreeApp.ts:761-768`), Node 25:
 
 | (a, b) | build | kept paths | `structuredClone(response)` |
 | --- | --- | --- | --- |
@@ -29,21 +47,21 @@ Measured with `buildWorldGeometrySnapshotForRequest` on `torus-moduli`, using th
 
 `compileCellComplex` itself costs 0.02 ms, so the build is almost entirely `buildStaticallyCulledPortalPathTables`.
 
-- Serial pipeline. `worldGeometrySession.ts:144-153` builds only when no snapshot is pending. `pollReadySnapshot`
-  (`:256-267`) triggers the next build only after the commit. The parameter speed is therefore
+- Serial pipeline. `worldGeometrySession.ts:144-153` (`scheduleNextBuild`) builds only when no snapshot is pending. `pollReadySnapshot`
+  (`:260-271`) triggers the next build only after the commit. The parameter speed is therefore
   0.08 m / (build + ≤ 1 frame) ≈ 0.7 m/s here. The sweep a = 0 → 30 m takes 375 builds, about 40 s, and several
   times longer on a mobile XR SoC.
 - The step size is fixed in parameter units (`:120-123`), not in time, so the deformation speed varies with the device.
-- Cancel does not reach the worker. `cancel()` (`:249-255`) only forgets `activeRequestId`. The worker
-  (`worldGeometryWorker.ts:108-110`) still finishes the stale build, and the next `postMessage`
+- Cancel does not reach the worker. `cancel()` (`:253-259`) only forgets `activeRequestId`. The worker
+  (`worldGeometryWorker.ts:109`) still finishes the stale build, and the next `postMessage`
   (`worldGeometryWorkerClient.ts:110`) queues behind it. Its `pending` resolver is never removed.
 - Every request re-sends `baseSpec` and recompiles `baseWorld` (`worldGeometryWorker.ts:70`). This is cheap today but
   redundant by design.
 - Transforms. `RigidTransform3` (`src/math/rigidTransform3.ts:26-29`) is a nested object with 12 numbers.
-  - `composeRigidTransform3` makes 27 multiplies for R plus a `vec3` allocation per row (`:133-139`).
+  - `composeRigidTransform3` makes 27 multiplies for R plus a `vec3` allocation per row (`:86-91`, helpers at `:133-162`).
   - Path tables compose and invert once per candidate path (`portalPaths.ts:197,215`;
     `staticPortalPathCull.ts:263,281,486,571`).
-  - `compilePortalTransforms.ts:133-167` keeps its own copies of `multiplyMat3`, `transposeMat3` and
+  - `compilePortalTransforms.ts:133-162` keeps its own copies of `multiplyMat3`, `transposeMat3` and
     `multiplyMat3Vec3`.
   - Every gluing is a yaw plus a horizontal translation (MATHEMATICAL_MODEL §1), so 8 of the 12 entries are
     structurally 0 or 1.

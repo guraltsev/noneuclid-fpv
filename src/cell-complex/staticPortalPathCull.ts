@@ -196,7 +196,7 @@ export function buildStaticallyCulledPortalPathTables(
   const tablesByRootCellId = new Map<string, PortalPathTable>();
   const summariesByRootCellId = new Map<string, StaticPortalPathCullSummary>();
   const skipImmediateReverse = options.skipImmediateReverse ?? true;
-  // TODO(issue 41): the aperture slack (max(toleranceMeters, junction radius / 2)) makes rejection MORE aggressive as it grows, which can remove visible paths; soundness of this widening needs design review.
+  // TODO(issue 56): the aperture slack (max(toleranceMeters, junction radius / 2)) makes rejection MORE aggressive as it grows, which can remove visible paths; soundness of this widening needs design review.
   // Widen the aperture tolerance to half the forbidden-junction radius; larger tolerance means more paths count as "not beyond the portal plane", so this makes the aperture rejection more aggressive, not more conservative.
   const cullTolerance = Math.max(options.toleranceMeters, forbiddenPortalJunctionRadiusMeters / 2);
   const tauSigmaDebugStats = options.debugTauSigmaDisagreements ? createTauSigmaDisagreementStats() : undefined;
@@ -373,7 +373,7 @@ export function staticallyCullPortalPathTables(
     const rejectedPaths: RejectedPortalRenderPath[] = [];
     const rejectedByReason = new Map<StaticPortalPathRejectReason, number>();
     const budget = options.maxKeptPathsPerRoot ?? Number.POSITIVE_INFINITY;
-    // TODO(issue 41): same aperture-slack soundness question as in buildStaticallyCulledPortalPathTables.
+    // TODO(issue 56): same aperture-slack soundness question as in buildStaticallyCulledPortalPathTables.
     // Same widened aperture tolerance as in buildStaticallyCulledPortalPathTables.
     const cullTolerance = Math.max(options.toleranceMeters, forbiddenPortalJunctionRadiusMeters / 2);
 
@@ -699,7 +699,7 @@ function projectiveTauSigmaLineTransversalMayExist(
   windows: readonly Segment2[],
   toleranceMeters: number,
 ): ProjectiveTauSigmaResult {
-  // TODO(issue 41): this stage does not represent sight lines that cross the line sent to infinity (the critical line); such paths may be rejected although visible. Needs design review before changing.
+  // TODO(issue 56): this stage does not represent sight lines that cross the line sent to infinity (the critical line); such paths may be rejected although visible. Needs design review before changing.
   const rootDirection = sub2(rootPortal.end, rootPortal.start);
   const leafDirection = sub2(leafPortal.end, leafPortal.start);
   // Non-parallel root and leaf edge lines need the projective chart bookkeeping below. This threshold is not the same as the areaTolerance used when the projection is built, so the two can disagree for nearly parallel edges.

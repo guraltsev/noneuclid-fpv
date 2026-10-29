@@ -1,10 +1,34 @@
 # 61 - Single-wall push-out lets bodies walk out of a room through any corner
 
-Status: open as of 2026-10-08.
+Status: open; re-verified 2026-10-28.
 
 Priority: P1 (correctness). Extends the issue 41 bullet "wall sliding resolves only the first blocking side and does
 not re-test". The consequence is worse than "a corner can still violate a second wall": the body leaves the cell without
 any limit.
+
+## Status update 2026-10-28
+
+Done (partial fix, not the projection proposed below):
+
+- `moveDynamicObject` (`src/movement/moveDynamicObject.ts:133-155`) now re-tests the pushed position with
+  `testCellCollision` against the start cell. If the push out of one wall leaves the body in another wall, a floor,
+  ceiling or zone, it returns the original pose ("convex corner" fallback). Covered by
+  `tests/movement/moveDynamicObject.test.ts` "falls back to the original pose when pushing out of one wall leaves the
+  body inside another (convex corner)" and "still slides along a single wall when moving diagonally into it".
+- Re-ran the four-corner repro (throwaway vitest file, current code): the body no longer escapes. All four corners end
+  at `(±0.72, ±0.72)`. Shallow diagonals `(0.03, 0.01)` and `(0.01, 0.03)` end at `(0.749999, 0.74)` and
+  `(0.74, 0.749999)`, inside the room.
+
+Still open:
+
+- The corner response is "stop", not a slide into the inset corner. The four-corner repro stops 0.03 m (one step) short
+  of the acceptance target `(±0.75, ±0.75)`, and any step whose single-wall push lands in a second wall is lost whole.
+  The projection onto `K` (or the swept slide of issue 62) is not implemented.
+- The re-test covers only walls of the start cell. The "push lands outside the cell across a portal" case still
+  reproduces exactly: in a room with a north portal, `δ = (3, 6)` from the origin returns `(0.749999, 6)` in the start
+  cell (`blocked: true`), and the next call with zero displacement crosses to the neighbor at `(0.749999, 4)`, which is
+  3 m outside the neighbor `[-1,1]^2`.
+- No property test of random walks in convex wall-only polygons.
 
 ## Summary
 
@@ -18,8 +42,10 @@ makes it much worse.
 ## Evidence
 
 - `src/movement/collision.ts:120-131`: the wall loop returns on the first hit.
-- `src/movement/moveDynamicObject.ts:116-125`: resolves `collision.sideIndex` only.
-- `src/movement/moveDynamicObject.ts:223-247` (`resolveBlockedWallPosition`): push along `n_A` by `r - d_A + 1e-6`, no re-test.
+- `src/movement/moveDynamicObject.ts:133-155` (was 116-125): resolves `collision.sideIndex` only. (2026-10-28: the pushed
+  position is now re-tested and the move is dropped if it is still blocked.)
+- `src/movement/moveDynamicObject.ts:252-276` (`resolveBlockedWallPosition`, was 223-247): push along `n_A` by
+  `r - d_A + 1e-6`. ~~no re-test~~ re-test added in the caller (2026-10-28).
 - Reproduced (scratch script, `vite-node`): square room `[-1,1]^2` with 4 walls, body `r = 0.25`, 200 steps of
   `δ = (±0.03, ±0.03)` from the origin. Final positions:
   `(0.749999, 6.0)`, `(-6.0, 0.749999)`, `(6.0, -0.749999)`, `(-6.0, -0.749999)`. In all four corners the body ends
@@ -62,4 +88,6 @@ the fast path: if `q ∈ K` and `q` is inside every portal half-plane, no furthe
   `(±0.75, ±0.75)`.
 - Property test: random walks (random `δ`, `|δ| <= 0.5`, 10^4 steps) in random convex wall-only polygons never leave
   `K` (by more than 1e-9).
-- Sliding along one wall still keeps the full tangential speed (existing test `moveDynamicObject.test.ts:158`).
+- Sliding along one wall still keeps the full tangential speed (existing tests in `tests/movement/moveDynamicObject.test.ts`:
+  "still slides along a single wall when moving diagonally into it" and "resolves blocked non-portal exits back to an
+  in-bounds pose near the wall"; both pass today).

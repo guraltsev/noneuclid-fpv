@@ -1,10 +1,54 @@
 # 29 - Dynamic geometry deformation infrastructure and torus skew MVP
 
-## Repository audit status - 2026-08-03T14:24:10-05:00
-
-Status: archive candidate; implementation is substantially complete.
+Status: closed on 2026-10-28.
 
 Priority: P2 only for fresh end-to-end/manual verification.
+
+## Outcome
+
+The infrastructure and the torus-skew MVP are implemented: a generic deformation-family registry, a worker build
+client with inline fallback, a session that steps, drops stale results and keeps failed builds out, a topology guard,
+an atomic commit at the frame boundary in `createThreeApp.ts`, pose transport for the player and runtime objects,
+locked-geodesic rebuild, a `window.noneuclidGeometry` console API and an in-scene geometry-computer page. The
+remaining defects and costs found later are tracked by newer issues: pose transport and frame checks in
+[53](../53_torus_deformation_commit_transport_defects.md), worker cost and pipeline in
+[55](../55_live_deformation_rebuild_cost_and_se2_transforms.md), floor texture swim in
+[81](../81_floor_texture_slides_under_objects_during_deformation.md), main-thread commit cost (and the missing
+renderer-contract tests for the commit) in
+[82](../82_deformation_commit_rebuilds_whole_scene_and_reuploads_floor_texture.md), and moduli reduction in
+[54](../54_torus_moduli_family_reduction_and_gl2r_generalization.md).
+
+## Closing evidence
+
+- Family contracts and generic helpers: `src/runtime/worldGeometryDeformations.ts` (`WorldDeformationFamily`,
+  `CellDeformationMap`, `applyPrismBaseReplacements`, `validateTopologyPreservingSnapshot`,
+  `transformRigidPoseWithMap`, `transformPoseWithCellMaps`); registry in
+  `src/runtime/worldGeometryDeformationFamilies.ts`.
+- Torus adapter: `src/runtime/deformations/torusSkewDeformation.ts` (`createTorusSkewDeformationFamily`,
+  `buildTorusParallelogramVertices`, `createTorusSkewCellDeformationMaps`, `nextTorusSkewStep`). The family takes
+  a ∈ [0, 2w], b ∈ [w/2, 2w], so negative skew is rejected by design (test "rejects negative A offsets").
+- Build pipeline: `src/runtime/worldGeometryWorker.ts`, `src/runtime/worldGeometryWorkerClient.ts`,
+  `src/runtime/worldGeometrySession.ts` (`createWorldGeometrySession`, request ids, `lastError`).
+- Commit: `commitWorldGeometrySnapshot`, `transformPlayerForGeometryCommit`,
+  `transformRuntimeObjectsForGeometryCommit` and `rebuildCellMeshes` in `src/render/three/createThreeApp.ts`;
+  computed-object policy in `src/runtime/worldGeometryComputedObjects.ts#applyGeometryCommitComputedObjectPolicy`.
+- Debug and UI: `GeometryDebugHelpers` (`SetTorusSkew`, `StepTorusSkew`) in `src/render/three/appDebugHelpers.ts`;
+  world-deformation page in `src/ui/paletteDefinition.ts`; `src/examples/torus-moduli.world.js`.
+- Documentation: `_docs/MATHEMATICAL_MODEL.md` §9 "Live deformation of the complex".
+- Tests (all pass on 2026-10-28, `npx vitest run tests/runtime`, 64 tests):
+  - `tests/runtime/worldGeometryDeformations.test.ts`: registry, unknown kinds, base replacement, topology guard
+    (portal target, side index, side count, side-length mismatch, nonconvex base), no Three.js import.
+  - `tests/runtime/torusSkewDeformation.test.ts`: square at zero skew, parallelogram, lattice-coordinate point map,
+    heading map, non-torus rejection, finite transforms, depth-10 cull with immediate reverses filtered.
+  - `tests/runtime/worldGeometrySession.test.ts`: one build in flight, stale responses dropped, step ≤
+    `maxStepMeters`, failed builds keep the old snapshot, cancel stops queued steps.
+  - `tests/runtime/worldGeometryRuntimeTransforms.test.ts` and `tests/runtime/worldGeometryComputedObjects.test.ts`:
+    starting position, static asset collision records, placed signs, creature state, unlocked geodesics cleared,
+    locked geodesics rebuilt with measurements and angles.
+- Not delivered as specified: there is no extracted `worldGeometryCommit.ts` with renderer-contract tests; the commit
+  stays inline in `createThreeApp.ts` (see 82 and issue 77 for the restructuring).
+
+## Repository audit status - 2026-08-03T14:24:10-05:00
 
 The repository now has deformation families, a worker/inline build client,
 stale-result rejection, topology-preserving validation, atomic snapshot commit,

@@ -1,8 +1,20 @@
 # 58 - GPU portal clipping: silent drop on vertex overflow, 32 texture fetches per fragment, no early-Z
 
-Status: open as of 2026-10-08.
+Status: open; re-verified 2026-10-28.
 
 Priority: P2 (correctness for the overflow; performance for the rest).
+
+## Status update 2026-10-28
+
+Nothing in the proposal is implemented. Clips are still NDC polygons of at most 8 vertices in a float texture. Overflow
+paths still get clip index -1, the fragment shader still loops over vertices with texture fetches, and every patched
+material still compiles `discard`. Line numbers below have been updated. One fact needs a correction: the shader has
+two modes (`portalClipMaterial.ts:191-235`). The `1e-5` edge test applies only to the hard mode
+(`portalFragmentShouldDiscard`, `:309`). The smooth mode (`portalFragmentClipCoverage`), on when render quality and
+`portalClipEdgeSmoothingEnabled` are on (`createThreeApp.ts:853`), divides by edge length and works in pixels
+(`:370`). Its leak does not depend on edge length, but it still discards stochastically. The overflow ids reach the
+debug state as `clipPolygonOverflowPathIds` (`createThreeApp.ts:2597`). No randomized sweep, GPU timing or pixel test
+exists.
 
 ## Summary
 
@@ -15,26 +27,26 @@ hardware clip distances or by a single varying.
 
 ## Evidence
 
-- `portalClipData.ts:5`: `defaultMaxClipVerticesPerPath = 8`.
-- `portalClipData.ts:90-105`: a path whose polygon has more than 8 vertices in *any* eye goes into
-  `polygonVertexOverflowPathIds` and gets no clip index. `renderPortalInstances.ts:164,219` then writes clip index -1,
-  and `portalClipMaterial.ts:267` discards every fragment. The path's descendants still render, inside a hole. Ways to
+- `portalClipData.ts:17`: `defaultMaxClipVerticesPerPath = 8`.
+- `portalClipData.ts:129-140` (`updateStereo`): a path whose polygon has more than 8 vertices in *any* eye goes into
+  `polygonVertexOverflowPathIds` and gets no clip index. `renderPortalInstances.ts:211,275` then writes clip index -1,
+  and `portalClipMaterial.ts:267-269` discards every fragment. The path's descendants still render, inside a hole. Ways to
   reach 9 or more vertices:
   - a depth-1 aperture clipped by the near plane is a pentagon, and pentagon ∩ screen square can have up to 9 vertices;
   - unequal heights (issue 41) add top and bottom edges;
   - Sutherland-Hodgman keeps collinear vertices, since `dedupePolygonVertices` (`visiblePortalPaths.ts:756`) only
     merges consecutive points closer than 1e-9.
-- `portalClipMaterial.ts:280-312`: per fragment, two loops of up to 8 iterations with 2 `texture2D` reads each, so 32
+- `portalClipMaterial.ts:282-312` (hard mode; the smooth mode at `:318-375` has the same loops): per fragment, two loops of up to 8 iterations with 2 `texture2D` reads each, so 32
   fetches, plus a shoelace sum to recover the winding sign. The CPU already knows the winding: `convexHull` returns CCW
-  (`visiblePortalPaths.ts:777`), and Sutherland-Hodgman preserves the candidate's orientation.
-- `portalClipMaterial.ts:309`: the threshold `edgeSide < -1e-5` is applied to `cross(edge, toPoint) = |edge| · dist`.
+  (`visiblePortalPaths.ts:778`), and Sutherland-Hodgman preserves the candidate's orientation.
+- `portalClipMaterial.ts:309` (hard mode only; see the status update): the threshold `edgeSide < -1e-5` is applied to `cross(edge, toPoint) = |edge| · dist`.
   The tolerated leak is therefore 1e-5/|edge| in NDC: sub-pixel for long edges, about 10 px for an edge 1 px long.
-- `portalClipMaterial.ts:218-235`: `discard` is compiled into every patched material. On tile-based GPUs (Quest/Adreno)
+- `portalClipMaterial.ts:191-235` (`discard` at `:223`, `:226`, `:232`): `discard` is compiled into every patched material. On tile-based GPUs (Quest/Adreno)
   this disables early-Z/LRZ for *all* cell geometry, the root instance (clip index -2) included. Each clipped instance
   also rasterizes the whole projected cell mesh and discards everything outside its polygon. Fragment cost scales with
   the sum of the projected cell areas, not with the polygon areas.
-- `portalClipData.ts:31-33`: texture height = maxVisiblePaths x eyes = 4000 rows. Raising `maxVisiblePaths`
-  (`createThreeApp.ts:758`) above 2048 exceeds `MAX_TEXTURE_SIZE` = 4096 on some mobile GPUs.
+- `portalClipData.ts:62-63`: texture height = maxVisiblePaths x eyes = 4000 rows. Raising `maxVisiblePaths`
+  (`createThreeApp.ts:762`) above 2048 exceeds `MAX_TEXTURE_SIZE` = 4096 on some mobile GPUs.
 
 ## Proposed change
 

@@ -1,9 +1,21 @@
 # 60 - Replace eager per-root path tables with a lazily grown, shared path trie
 
-Status: open as of 2026-10-08.
+Status: open; re-verified 2026-10-28.
 
 Priority: P2 (design / performance / memory). The id inconsistencies already listed in issue 41 disappear under this
 design; they are not filed again here.
+
+## Status update 2026-10-28
+
+Nothing in the proposal is implemented. Startup still builds every root's table synchronously
+(`createThreeApp.ts:775`, `buildStaticallyCulledPortalPathTables(appState.world, portalPathOptions)`). The worker
+still rebuilds and posts `staticCull` on every deformation (`src/runtime/worldGeometryWorker.ts:79-87`). Paths still
+copy their step lists and carry two `RigidTransform3` objects. `buildPortalPathTables` still uses `queue.shift()`
+(`portalPaths.ts:179`); only tests call it now (`tests/cell-complex/portalPaths.test.ts`,
+`portalPathDebug.test.ts`). Archetype capacity still comes from the table (`deriveCellRenderArchetypeCapacities`,
+called at `createThreeApp.ts:802`). Line numbers below have been updated. `buildDefaultCellRenderArchetypeCapacities`
+(`cellRenderArchetypes.ts:166-180`) is an unused export that builds a second full static cull, and it should go with
+this change.
 
 ## Summary
 
@@ -21,13 +33,13 @@ the per-frame funnel (issue 57) reaches them, and each node stores its static-cu
 
 ## Evidence
 
-- `createThreeApp.ts:757-771`: `maxDepth 10`, `maxKeptPathsPerRoot 50_000`.
+- `createThreeApp.ts:760-775`: `maxDepth 10`, `maxKeptPathsPerRoot 50_000`.
   `buildStaticallyCulledPortalPathTables(appState.world, ...)` runs synchronously on the main thread during startup,
   for all roots.
-- `worldGeometryWorker.ts:79-86`: on every deformation the worker rebuilds all roots and `postMessage`s `staticCull`.
+- `src/runtime/worldGeometryWorker.ts:79-87`: on every deformation the worker rebuilds all roots and `postMessage`s `staticCull`.
   That message holds every path plus the `pathsById`, `pathsByDestinationCellId` and `pathsByParentPathId` maps, and
   `rejectedPaths`. The structured clone grows linearly with Σ_roots |table|.
-- `staticPortalPathCull.ts:279-293` and `portalPaths.ts:198-216`: each path allocates `steps: [...parent.steps, step]`,
+- `staticPortalPathCull.ts:262-281` and `portalPaths.ts:198-216`: each path allocates `steps: [...parent.steps, step]`,
   which is O(depth) per path, so the total is O(N·depth). It also allocates two `RigidTransform3` objects, each holding
   a `Mat3` and a `Vec3`. A rough estimate is 0.5 KB per path, so a world at the 50 000-path budget costs about 25 MB per
   root cell before the Maps.
@@ -36,10 +48,10 @@ the per-frame funnel (issue 57) reaches them, and each node stores its static-cu
   bias).
 - `portalPaths.ts:179`: `queue.shift()` in the BFS is O(n) per pop, so the build is O(n²). The function is now used only
   by tests, but still exported.
-- `cellRenderArchetypes.ts:142-162`: capacity depends on the table, so a deformation that changes table sizes forces the
+- `cellRenderArchetypes.ts:140-164`: capacity depends on the table, so a deformation that changes table sizes forces the
   archetype meshes to be rebuilt.
 - Ids are positional: they depend on root, culling order and budget. In stereo they are remapped every frame
-  (`portalEyeFrameTransforms.ts:43`), and the clip-slot assignment changes between frames. Nothing keyed by path id
+  (`portalEyeFrameTransforms.ts:59`), and the clip-slot assignment changes between frames. Nothing keyed by path id
   (debug selection, `ShowCellPath`, aim results) survives a root change or a rebuild.
 
 ## Proposed change
@@ -76,3 +88,9 @@ the per-frame funnel (issue 57) reaches them, and each node stores its static-cu
 - Heap usage after a 60 s scripted walk through the default worlds is bounded by O(visited words). Peak memory is
   reported before and after.
 - All existing visibility contract tests pass with the trie as the source of paths.
+
+## Merged from issue 41 (2026-10-28)
+
+- The path ids that `buildStaticallyCulledPortalPathTables` returns are sparse and differ from those of
+  `buildPortalPathTables`. This is documented in its JSDoc (`staticPortalPathCull.ts:181`) but not changed. The lazy
+  trie should give one id scheme for culled and unculled tables.

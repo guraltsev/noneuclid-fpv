@@ -68,9 +68,9 @@ After changing code, run `npm run docs:generate` and commit the regenerated
 `camp-2026-VR` are replaceable classroom or yearly deployment instances; do
 not rename the source project merely to match an instance.
 
-Open work lives in [`_docs/issues`](issues/). A numbered issue is the source of
+Open work lives in [`_issues`](../_issues/). A numbered issue is the source of
 truth for its scope and acceptance criteria. Move completed records to
-[`_issues/_closed`](issues/_closed/) only when their requested work and
+[`_issues/_closed`](../_issues/_closed/) only when their requested work and
 verification are actually complete.
 
 For GitHub Pages builds, HTTPS/WebXR expectations, and base-path details, use

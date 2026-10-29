@@ -1,24 +1,36 @@
 # 59 - Stereo with split roots: each eye's root cell is drawn unclipped in the other eye; union overflow favors eye 0
 
-Status: open as of 2026-10-08.
+Status: open; re-verified 2026-10-28.
 
-Priority: P2 (correctness, XR only). Related to issue 21. That issue covers stereo union and allocation; it does not
+Priority: P2 (correctness, XR only). Related to issue 21 (closed 2026-10-28; its remaining stereo items are merged here). That issue covered stereo union and allocation; it did not
 cover these defects.
+
+## Status update 2026-10-28
+
+Nothing in the proposal is implemented, and the defects are confirmed in the current code. In the split-root branch of
+`syncStereoPortalInstanceRender` (`createThreeApp.ts:2397`), each eye runs `computeVisiblePortalPaths` with
+`includeRootCell: true`. `remapStereoPortalPathIds` (`portalEyeFrameTransforms.ts:59-90`) hands out ids in first-seen
+order, eye 0 first. `updateCellRenderArchetypeInstances` (`renderPortalInstances.ts:195-224`) still writes
+`unclippedPortalClipIndex` (-2) for every depth-0 path, and both shader modes skip the clip test for -2
+(`portalClipMaterial.ts:263`, `:318`). `portalClipData.updateStereo` still sorts the union by remapped id and slices it
+to `maxVisiblePaths` (`portalClipData.ts:129-131`). Archetype capacity is still the per-single-root maximum
+(`deriveCellRenderArchetypeCapacities`, `cellRenderArchetypes.ts:146-165`). Line numbers below have been updated. No
+test of the split-root case exists yet.
 
 ## Summary
 
-When the two eyes resolve to different root cells (the head straddles a portal, `xrPortalEye.ts:53-72`), both roots'
+When the two eyes resolve to different root cells (the head straddles a portal, `xrPortalEye.ts:53-74`), both roots'
 depth-0 paths end up in the instance union with clip index -2, which means "unclipped in every eye". Eye 1's root cell
 is then drawn without restriction in eye 0, and eye 0's in eye 1. When the union overflows the clip-texture or
 archetype capacity, eye 1's unique paths are always the ones dropped.
 
 ## Evidence
 
-- `createThreeApp.ts:2401-2429`: with different roots, each eye runs `computeVisiblePortalPaths` with
-  `includeRootCell: true`. `remapStereoPortalPathIds` (`portalEyeFrameTransforms.ts:43-73`) maps `A:0 -> 0` and
+- `createThreeApp.ts:2457-2486`: with different roots, each eye runs `computeVisiblePortalPaths` with
+  `includeRootCell: true`. `remapStereoPortalPathIds` (`portalEyeFrameTransforms.ts:59-90`) maps `A:0 -> 0` and
   `B:0 -> n`.
-- `renderPortalInstances.ts:164` and `:219`: `path.depth === 0 ? unclippedPortalClipIndex : ...`. Both depth-0
-  instances get -2, and `portalClipMaterial.ts:263` skips the clip test for -2 in *every* eye.
+- `renderPortalInstances.ts:211` and `:275`: `path.depth === 0 ? unclippedPortalClipIndex : ...`. Both depth-0
+  instances get -2, and `portalClipMaterial.ts:263` (and `:318` in smooth mode) skips the clip test for -2 in *every* eye.
 - Consequence: in eye 0 (in cell A), cell B is drawn at B's placement with no clip.
   - Rays from eye 0 that leave A through a portal other than p_AB should see the neighbor D across that portal.
   - Around a vertex whose angle sum exceeds 2π, the developed wedge of B overlaps the wedge of D. The worlds in this
@@ -26,13 +38,13 @@ archetype capacity, eye 1's unique paths are always the ones dropped.
   - B's walls and floor are then depth-tested against D's clipped instance, and wherever they are nearer they win.
   - The result is wrong geometry in one eye while the head is in a doorway. Without excess angle (flat tilings) the
     overlap is empty, which is why it goes unnoticed.
-- `portalClipData.ts:97-99`: the union is sorted by remapped id and cut to `maxVisiblePaths`. Every id remapped from eye 1
+- `portalClipData.ts:129-131`: the union is sorted by remapped id and cut to `maxVisiblePaths`. Every id remapped from eye 1
   is larger than every id from eye 0, so eye 1's unique paths are dropped first. The same ordering decides the
-  per-cell capacity cut in `updateCellRenderArchetypeInstances` (`renderPortalInstances.ts:156`).
-- `cellRenderArchetypes.ts:148-152`: capacity is the maximum over *single* roots of the paths ending at a cell. The union
+  per-cell capacity cut in `updateCellRenderArchetypeInstances` (`renderPortalInstances.ts:203`).
+- `cellRenderArchetypes.ts:151-155`: capacity is the maximum over *single* roots of the paths ending at a cell. The union
   of two roots' visible sets can exceed it. Overflow is recorded but silently truncates.
 - Even with a shared root, each eye can return up to `maxVisiblePaths` = 2000 paths, so the union can reach 4000, but
-  `portalClipData` has only `maxVisiblePaths` clip slots (`portalClipData.ts:31`).
+  `portalClipData` has only `maxVisiblePaths` clip slots (`portalClipData.ts:63`).
 
 ## Proposed change
 
@@ -54,3 +66,17 @@ archetype capacity, eye 1's unique paths are always the ones dropped.
   cell outside that eye's portal region.
 - With the union over budget, the number of paths dropped per eye differs by at most 1.
 - `capacityOverflowCount` stays at 0 in the existing stereo contract tests when the eyes straddle a portal.
+
+## Merged from issue 21 (2026-10-28)
+
+Remaining stereo items from issue 21:
+
+- Debug state exposes per-eye totals (`PortalEyeRenderDebugState`) and the union through `portalInstances`, but not
+  left-only, right-only and both-eye counts. Add them to renderer debug state. The in-headset readout is tracked in
+  issue [20](20_vr_palette_menu_from_shared_definition.md).
+- Manual headset checks, to record when the split-root fix lands:
+  - Stand near a portal boundary and move the headset sideways. A portal image may be visible in one eye, but it must
+    not blink out of both.
+  - Left and right portal edges stay stable and do not fight.
+  - Recursive views reach the same depth as the desktop settings allow.
+  - Compare `portal ms` before and after, in the same world and viewpoint.

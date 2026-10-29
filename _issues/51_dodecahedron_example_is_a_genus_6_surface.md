@@ -1,8 +1,22 @@
 # 51 - The "dodecahedron" example world is a genus-6 surface, not a dodecahedron
 
-Status: open as of 2026-10-08.
+Status: open; re-verified 2026-10-28.
 
 Priority: P1 (correctness of bundled content; it is also the world the static-cull tests use).
+
+## Status update 2026-10-28
+
+Nothing has changed. `src/examples/dodecahedron.world.js:29-63` still has the pairing described below (for example
+`Portal("upper-0", 1, "upper-1", 4)` at `:35`), so the world is still the genus-6 surface.
+
+- Done: none of the acceptance criteria.
+- Partial coverage only: two tests build vertex classes with private helpers, `tests/cell-complex/compileCellComplex.test.ts`
+  ("keeps the tetrahedron example glued as four distinct tetrahedral vertices", `buildVertexClasses`) and
+  `tests/authoring/exampleWorlds.test.ts` ("models the genus-2 torus as a paired octagon", χ = −2). Neither covers the
+  dodecahedron, and there is no shared vertex-class routine in `src/` (issue 52 is also still open).
+- Remains: fix the pairing, add the per-world {χ, cone angles} test, re-baseline the static-cull test (now
+  `tests/cell-complex/staticPortalPathCull.test.ts:269`, "prunes the dodecahedron path tree contextually at depth 10").
+  `tests/render-contract/buildCellMesh.test.ts:157` also compiles the dodecahedron and may need a look.
 
 ## Summary
 
@@ -16,7 +30,7 @@ icosahedron) and the torus and genus-2 worlds have the expected invariants.
 
 Vertex classes were computed from the compiled complex. A portal on side i of cell A, glued to side j of cell B,
 identifies corner (A, i) with (B, j+1) and corner (A, i+1) with (B, j), because the gluing reverses the tangent
-(`src/cell-complex/compilePortalTransforms.ts:65-79`). For each class the script summed interior angles and checked
+(`src/cell-complex/compilePortalTransforms.ts#derivePortalTransform`, `:60-79`). For each class the script summed interior angles and checked
 Gauss–Bonnet, Σ(2π − θ_v) = 2πχ. It also checked numerically that `transformToTarget` sends vertex i to vertex j+1
 (error ≤ 1.5e-14 in every example).
 
@@ -36,7 +50,7 @@ The script glues `upper-k` side 1 to `upper-(k+1)` side 4, which runs the ring i
 `upper→lower` cross links (`:47-51`), the lower ring (`:53-57`) and the bottom face (`:59-63`) inherit the same error.
 
 Tests do not catch it. `tests/cell-complex/compileCellComplex.test.ts:32-40` counts only cells, sides and portals.
-`tests/cell-complex/staticPortalPathCull.test.ts:228` profiles culling on this genus-6 surface. The catalog text
+`tests/cell-complex/staticPortalPathCull.test.ts:269` profiles culling on this genus-6 surface. The catalog text
 (`src/authoring/exampleWorlds.ts:31`, `worldCatalog.ts:36`) calls it a dodecahedron.
 
 ## Proposed change
