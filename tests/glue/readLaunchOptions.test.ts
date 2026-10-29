@@ -5,8 +5,8 @@ import {
   buildAppConfigUrl,
   readAppConfigForwardName,
   readAppConfigName,
-} from "../src/glue/appConfig";
-import { readLaunchOptions } from "../src/glue/readLaunchOptions";
+} from "../../src/glue/appConfig";
+import { readLaunchOptions } from "../../src/glue/readLaunchOptions";
 
 describe("readLaunchOptions", () => {
   it("disables render quality by default", () => {

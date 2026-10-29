@@ -2,10 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   buildUrlWithLaunchOptions,
   removeLaunchOptionsFromUrl,
-} from "../src/glue/launchOptionsUrl";
-import { defaultAppConfig, defaultAppConfigName } from "../src/glue/appConfig";
-import type { LaunchOptions } from "../src/glue/readLaunchOptions";
-import { defaultVrComfortOptions } from "../src/render/three/vrComfort";
+} from "../../src/glue/launchOptionsUrl";
+import { defaultAppConfig, defaultAppConfigName } from "../../src/glue/appConfig";
+import type { LaunchOptions } from "../../src/glue/readLaunchOptions";
+import { defaultVrComfortOptions } from "../../src/render/three/vrComfort";
 
 describe("launchOptionsUrl", () => {
   it("removes recognized launch options from the visible URL while preserving config", () => {

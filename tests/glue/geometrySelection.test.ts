@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readLaunchOptions } from "../src/glue/readLaunchOptions";
+import { readLaunchOptions } from "../../src/glue/readLaunchOptions";
 
 describe("readLaunchOptions", () => {
   it("reads debug launcher visibility and named debug options from URL params", () => {

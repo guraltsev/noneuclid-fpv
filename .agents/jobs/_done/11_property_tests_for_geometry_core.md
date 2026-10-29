@@ -1,6 +1,6 @@
 # Job 11 - Property-based tests for the geometry core
 
-Status: queued.
+Status: done, needs review on 2026-10-29.
 Former issue: 79 (converted to a job on 2026-10-28). Revised on 2026-10-29 for a less capable implementing model.
 Resolves: nothing by itself (it is test infrastructure). Jobs 12-17 add their own property tests on top of it.
 
@@ -212,3 +212,35 @@ into the test's comment and into the report.
 - Every property in steps 3-6 exists and passes, or is skipped with a recorded counterexample.
 - No test file sits directly under `tests/`.
 - `npm run test:coverage` exists, is not in the pre-push hook, and its floor is recorded in the report.
+
+
+## Report
+
+### Done
+- Dev dependencies `fast-check@3.23.2` and `@vitest/coverage-v8@1.6.1` (exact). `npm run test:coverage` added (not in the pre-push hook). `vite.config.ts` `test.coverage` scoped to `src/math`, `src/cell-complex`, `src/movement` with `thresholds.lines: 92`.
+- Measured line coverage of the three directories together: 93.88% (statements 93.88, branches 87.23, functions 95). Per directory: math 99.26, cell-complex 94.67, movement 89.48. Floor = floor(93.88) - 1 = 92. Not enforced per directory.
+- `tests/support/arbitraries.ts` (all names of step 2) plus `tests/support/arbitraries.test.ts`.
+- Property tests: `tests/math/{rigidTransform3,vec3,polygons,intersections}.property.test.ts`; `tests/cell-complex/{compilePortalTransforms,portalPaths}.property.test.ts`; `tests/movement/{portalCrossing,moveDynamicObject}.property.test.ts`; `tests/world-objects/geodesicPortalWord.property.test.ts`; `tests/runtime/worldGeometryDeformations.property.test.ts`. All pass; none skipped; no counterexample found.
+- New example files: `tests/cell-complex/compilePortalTransforms.test.ts`, `tests/cell-complex/prismCells.test.ts`, `tests/movement/portalCrossing.test.ts`.
+- Moved the four root tests into `tests/glue/` (imports fixed).
+- Composition order found in the code (for `portalPaths.property.test.ts`): `destinationFromRoot = g_k after ... after g_1`, so `rootFromDestination = inv(g_1) after ... after inv(g_k)`. The test comments say so.
+- Commits: see the final message (first commit: tests and configuration; second: job file moved to `_done/`).
+
+### Deviations
+- The job's example "crossing the east portal maps (0.95, 0, 0.5) to (-0.95, 0, 0.5)" is wrong for `crossDynamicObjectPortal` alone: it applies only the gluing map (translation -2 in x), so the test uses the pose (1.05, 0, 0.5), which maps to (-0.95, 0, 0.5). Likewise the hand-checked gluing of two squares is a translation by (-2, 0, 0) for the east portal of the left room (and (+2, 0, 0) for the reverse), not (2, 0, 0).
+- `prismCells.test.ts`: the test room is the 2 m x 2 m square used by other tests (side length 2), as the job's listed side lengths require.
+- vec3 cross-product orthogonality tolerance got an absolute floor of `+1e-12` because fast-check found subnormal inputs (a dot product of 5e-324 against a tolerance of exactly 0).
+- Intersection property: the job's wording (draw plane and segment independently, then require opposite signs) produced too many discarded cases, so endpoints are built from points projected onto the plane and pushed to opposite sides along the normal by 1e-3..100 m. Same property.
+- `numRuns` for world-compiling properties is 50 everywhere except the per-portal loops in `compilePortalTransforms.property.test.ts` and `portalCrossing.property.test.ts`, which run 50 per portal (many portals per world, so total runs are far higher).
+- The "attach `thresholds`" comment placeholder in `vite.config.ts` was replaced by the value.
+
+### Uncertain
+- The coverage floor is for the three directories combined, not per directory. Each directory is already above the 85% target of issue 79 (movement is lowest at 89.5%).
+- Suite time is noisy (51.6 s baseline, 53.3 s with coverage run, 37 s on the second coverage run); the new tests add about 1-2 s. Confirm with a few runs if the 15 s budget matters.
+
+### Not done
+- Nothing skipped. Modules with no test file of their own name: `src/math/tolerances.ts`, `src/cell-complex/forbiddenZones.ts`, `src/cell-complex/prismBase.ts`, `src/cell-complex/specs.ts` (types only), `src/movement/playerBody.ts`, `src/movement/playerPose.ts`. Per the job no tests were written for them.
+
+### Checks
+- Baseline: `npm run typecheck` pass; `npm test` 94 files, 706 passed, 8 skipped, 51.6 s.
+- After: `npm run typecheck` pass; `npm test` (via `npm run test:coverage`) 108 files, 780 passed, 8 skipped, 53.3 s and 37.5 s; `npm run docs:check` all ok; `npm run test:coverage` passes with `lines: 92`.

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { canApplyDebugSettingsAtRuntime } from "../src/glue/debugSettings";
-import { hasActiveDebugOption, parseDebugOptions, serializeDebugOptions } from "../src/glue/debugOptions";
+import { canApplyDebugSettingsAtRuntime } from "../../src/glue/debugSettings";
+import { hasActiveDebugOption, parseDebugOptions, serializeDebugOptions } from "../../src/glue/debugOptions";
 
 describe("canApplyDebugSettingsAtRuntime", () => {
   it("allows the current runtime-mutable debug settings", () => {
