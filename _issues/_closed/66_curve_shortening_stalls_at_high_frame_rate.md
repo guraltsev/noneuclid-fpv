@@ -1,10 +1,30 @@
 # 66 - Curve shortening stalls above 200 fps and can livelock near the fuse angle
 
-Status: open; re-verified 2026-10-28.
+Status: closed on 2026-10-29.
 
 Priority: P1 (correctness; small fix). Independent of the redesign in issue 67, which removes the root cause.
 
-Jobs: [06](../.agents/jobs/06_curve_shortening_stalls.md).
+Jobs: [06](../../.agents/jobs/_done/06_curve_shortening_stalls.md).
+
+## Outcome
+
+Fixed by job 06. Absorption is now decided by arc length (a two-arc pair whose shorter arc is below 0.165 m), not by the
+size of the step. The step is `min(v*dt, 1/4 shorter arc, delta/(1/a+1/b))` with no lower bound, so it does not depend on
+the frame rate and does not jump across the chord. A free loop shorter than the minimum geodesic length is deleted, and
+otherwise steps normally. The length range named by the `TODO(issue 66)` was empty (the loops it described are deleted
+already), and the TODO is gone. "Proposed change 2" (projection onto the developed chord) was not done; job 26 supersedes it.
+
+## Closing evidence
+
+Tests in `tests/world-objects/geodesicCannon.test.ts`, block "curve shortening at any frame rate (job 06)":
+
+- "fuses the issue 66 torus pair into the same loop at 60 Hz and at 240 Hz" (job's measured ticks: 286 and 1138)
+- "does not 2-cycle next to the fuse angle on 0.2 m arcs" (4 and 7 ticks)
+- "reaches the fuse within ceil(distance / step) + 2 ticks at 240 Hz" (593 ticks, bound 602)
+- "keeps moving a free loop at 240 Hz until it is resolved"
+- "deletes a free loop below the minimum length at 240 Hz"
+
+Commit: the job 06 commit ("Make curve shortening converge at any frame rate (job 06)").
 
 ## Status update 2026-10-28
 

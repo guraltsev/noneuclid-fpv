@@ -81,5 +81,5 @@ Curve-shortening defects from issue 41 that the exact solution must not reproduc
 - `tieAndDetachGeodesicEndpoints` deletes geodesics when a forbidden-zone rebuild fails, instead of rolling back.
 - A rejected (lengthening) step is skipped, not rolled back to a fused geodesic.
 
-The other curve-shortening items of issue 41 are tracked in [66](66_curve_shortening_stalls_at_high_frame_rate.md) (the short free loop stall, `TODO(issue 66)` at
+The other curve-shortening items of issue 41 are tracked in [66](_closed/66_curve_shortening_stalls_at_high_frame_rate.md) (the short free loop stall, `TODO(issue 66)` at
 `geodesicCannon.ts:3727`) and [68](_closed/68_loop_endpoint_crossing_must_conjugate_portal_word.md) (a free loop whose free end crosses a portal, `TODO(issue 68)` at `:3755`).

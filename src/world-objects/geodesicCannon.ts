@@ -67,7 +67,7 @@
  * Meters unless stated. `GEODESIC_MIN_LENGTH_METERS` (0.15) minimum chord of a geodesic; `minGeodesicSegmentLengthMeters` (0.05) minimum
  * piece when splitting; `intersectionTolerance` (1e-7) numerical zero; `portalStartEpsilonMeters` (1e-4) nudge past a portal;
  * `emitterConnectionToleranceMeters` (0.3) capture radius around an emitter; `curveShortening*` (speed 0.4 m/s, angle 0.03 rad, absorb
- * tolerance 0.165 m, minimum step 0.002 m) parameters of the shortening tick.
+ * tolerance 0.165 m, arc-length floor 0.002 m) parameters of the shortening tick.
  */
 import type { CompiledCellComplex } from "../cell-complex/compileCellComplex";
 import { getDynamicObjectCollisionBounds, simpleCylinderIntersectsSimpleCylinder, testCellCollision } from "../movement/collision";
@@ -581,9 +581,9 @@ const geodesicStraighteningToleranceMeters = 0.01;
 export const curveShorteningDefaultSpeedMetersPerSecond = 0.4;
 /** Turn-angle tolerance (radians) below which the free end counts as locally straight, so the pair is ready to fuse. */
 export const curveShorteningFuseAngleToleranceRadians = 0.03;
-/** Length tolerance (meters): a moving half shorter than this is absorbed when fusing; slightly above the minimum geodesic length. */
+/** Length tolerance (meters): a two-arc pair whose shorter arc is below this is absorbed into one geodesic (`absorbShortCurveShorteningHalf`); slightly above the minimum geodesic length. */
 export const curveShorteningFuseStepToleranceMeters = 1.1 * GEODESIC_MIN_LENGTH_METERS;
-/** Smallest free-end step (meters) worth taking; a smaller step stalls the tick (the pair may become ready to fuse). */
+/** Floor (meters) applied to the arc lengths in the curve-shortening step's distance-to-straight estimate, so that a vanishing arc cannot divide by zero. It no longer gates the step. */
 export const curveShorteningMinStepMeters = 0.002;
 /**
  * Length tolerance (meters) for the monotone-descent check of curve shortening: a previewed step is committed only if the new total
@@ -3612,8 +3612,9 @@ export function advanceStraighteningGeodesics(
  *
  * Per pair, in this order: (1) a `"ready-to-fuse"` pair is fused with `fuseCurveShorteningPair` (fusion happens one call after the
  * pair was flagged); (2) structurally invalid pairs (missing free end, intervals gone, no longer `"moving"`, missing tangents) are
- * silently removed; (3) a straight corner flags the pair `"ready-to-fuse"`; (4) step length = min(speed times `deltaSeconds`,
- * a quarter of the shortest incident arc); a step below `curveShorteningMinStepMeters` instead tries `absorbShortCurveShorteningHalf`;
+ * silently removed; (3) a straight corner flags the pair `"ready-to-fuse"`; (4) a free loop shorter than `GEODESIC_MIN_LENGTH_METERS` is deleted, and a two-arc pair whose shorter arc is below
+ * `curveShorteningFuseStepToleranceMeters` is absorbed (`absorbShortCurveShorteningHalf`; if that is refused the tick goes on). Step
+ * length = min(speed times `deltaSeconds`, a quarter of the shorter arc, `delta / (1/a + 1/b)` with `delta` the angle deficit), with no lower bound;
  * (5) F is moved with `moveDynamicObject` (autonomous portal crossing, forbidden zones ignored); a blocked move skips the tick;
  * (6) if F crossed a portal each interval's word is updated by that traversal; (7) every interval is re-traced against the candidate
  * F position WITHOUT touching the registry (`previewRebuildGeodesicInterval`); (8) on success, and if the total length did not grow
@@ -3707,16 +3708,18 @@ export function advanceCurveShorteningPairs(
       changed.push(pair.id);
       continue;
     }
-    // Cap the step by a quarter of the shortest incident arc so a step never overshoots the opposite endpoint's neighbourhood.
-    const shortestIncidentLength = Math.max(
-      curveShorteningMinStepMeters,
-      Math.min(...owned.intervals.map((interval) => totalGeodesicLengthFromSegments(getGeodesicSegments(request.registry, interval.id)))),
-    );
-    const stepMeters = Math.min(
-      (request.speedMetersPerSecond ?? curveShorteningDefaultSpeedMetersPerSecond) * request.deltaSeconds,
-      0.25 * shortestIncidentLength,
-    );
-    if (stepMeters < curveShorteningMinStepMeters) {
+    // Arc lengths as seen from the pair's two attachments (for a free loop both name the same interval, so a = b = L).
+    const firstArcLengthMeters = totalGeodesicLengthFromSegments(getGeodesicSegments(request.registry, pair.first.geodesicId));
+    const secondArcLengthMeters = totalGeodesicLengthFromSegments(getGeodesicSegments(request.registry, pair.second.geodesicId));
+    const shortestIncidentLength = Math.min(firstArcLengthMeters, secondArcLengthMeters);
+    // Geometry, not the step size, decides when an arc is gone: a free loop below the minimum length is deleted; a two-arc pair
+    // whose shorter arc is below the absorb tolerance is absorbed. A refused absorption does not stall the tick.
+    if (owned.intervals.length === 1) {
+      if (removeDegenerateFreeLoop(request.registry, pair, owned.intervals)) {
+        changed.push(pair.id);
+        continue;
+      }
+    } else if (shortestIncidentLength < curveShorteningFuseStepToleranceMeters) {
       const absorbed = absorbShortCurveShorteningHalf({
         world: request.world,
         registry: request.registry,
@@ -3726,10 +3729,22 @@ export function advanceCurveShorteningPairs(
       });
       if (absorbed) {
         changed.push(absorbed.id);
-      } else if (removeDegenerateFreeLoop(request.registry, pair, owned.intervals)) {
-        changed.push(pair.id);
+        continue;
       }
-      // TODO(issue 66): a free loop whose length lies between GEODESIC_MIN_LENGTH_METERS and 4 * curveShorteningMinStepMeters stalls here forever.
+    }
+    // Step = min(speed * dt, a quarter of the shorter arc, estimated distance to the straight position). The last term is
+    // delta / (1/a + 1/b), from delta ~ h (1/a + 1/b) for a vertex at distance h from the chord: it stops the fixed step from
+    // jumping back and forth across the chord. No lower bound, so the tick behaves the same at any frame rate.
+    const distanceToStraightEstimateMeters = angleDeltaFromPiRadians / (
+      1 / Math.max(firstArcLengthMeters, curveShorteningMinStepMeters) +
+      1 / Math.max(secondArcLengthMeters, curveShorteningMinStepMeters)
+    );
+    const stepMeters = Math.min(
+      (request.speedMetersPerSecond ?? curveShorteningDefaultSpeedMetersPerSecond) * request.deltaSeconds,
+      0.25 * shortestIncidentLength,
+      distanceToStraightEstimateMeters,
+    );
+    if (!(stepMeters > 0)) {
       continue;
     }
 

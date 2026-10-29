@@ -249,7 +249,7 @@ $u_A+u_B=0$: the two arcs form a single straight line through $X$. Concretely ea
    pair is marked *ready to fuse*; fusion
    (`src/world-objects/geodesicCannon.ts#fuseCurveShorteningPair`) replaces the two arcs by one locked geodesic whose
    portal word is the role-aware composition of the two words.
-2. Otherwise $X$ moves by $\min(v\,\Delta t,\ \tfrac14\,\ell_{\min})$ ($v=0.4$ m/s by default,
+2. Otherwise $X$ moves by $\min\big(v\,\Delta t,\ \tfrac14\,\ell_{\min},\ \delta/(1/a+1/b)\big)$, where $\delta$ is the angle deficit and $a, b$ are the arc lengths. The last term estimates the distance to the straight position, so the step never jumps across it, and there is no lower bound, so the result does not depend on the frame rate ($v=0.4$ m/s by default,
    `src/world-objects/geodesicCannon.ts#curveShorteningDefaultSpeedMetersPerSecond`) along $(u_A+u_B)/|u_A+u_B|$, using the
    ordinary body motion of Section 5 so that crossing a portal updates the words.
 3. Every affected arc is *previewed* (`src/world-objects/geodesicCannon.ts#previewRebuildGeodesicInterval`) before anything is
@@ -261,9 +261,11 @@ $u_A+u_B=0$: the two arcs form a single straight line through $X$. Concretely ea
    not committed (free vertex, arcs and recorded length stay as they were) and the tick is skipped; the recorded length is
    updated only by a committed tick. A pair whose fusion fails without a forbidden-zone hit reverts from *ready to fuse*
    to *moving*.
-4. A step below `src/world-objects/geodesicCannon.ts#curveShorteningMinStepMeters` means one half has become shorter than
-   the resolution of the method; that half is absorbed into the other
-   (`absorbShortCurveShorteningHalf`).
+4. Geometry decides when an arc is gone. A two-arc pair whose shorter arc is below
+   `src/world-objects/geodesicCannon.ts#curveShorteningFuseStepToleranceMeters` (0.165 m) is absorbed into one
+   geodesic (`absorbShortCurveShorteningHalf`), and a free loop shorter than
+   `src/world-objects/geodesicCannon.ts#GEODESIC_MIN_LENGTH_METERS` is deleted. A refused absorption does not stop the
+   descent.
 
 This is local descent, not a global shortest-path solver: it finds *a* locally shortest geodesic in the current homotopy
 class, never a minimum over classes. The full design, including the free-loop case in which both ends of one interval
@@ -397,7 +399,6 @@ rather than discovered.
   (`src/world-objects/geodesicMarmot.ts#yawFromVelocity`); deformation maps transport the *real* direction. Fixing this
   changes every authored marmot and is tracked in issue 64. (The placed-flag facing was wrong in the same way and is fixed.)
 - **Curve shortening.** A step that would lengthen the pair is skipped rather than rolled back to a fused geodesic, so a pair
-  whose recorded length is stale may stall without ever becoming ready to fuse; a free loop shorter than the minimum geodesic length is deleted, but one
-  between that length and four minimum steps still stalls. Fusion and absorption assume the non-free ends are emitters, and
+  whose recorded length is stale may stall without ever becoming ready to fuse. Fusion and absorption assume the non-free ends are emitters, and
   intervals are assumed to run emitter→free end with the emitter at the `start` role.
   The old "straightening" string survives as the render state of moving intervals.

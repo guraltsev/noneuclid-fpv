@@ -86,7 +86,7 @@ Resolves: issue [NN](../../_issues/NN_....md).
 | [03](_done/03_pages_deployment_configuration.md) | ~~Make Pages deployment repository-name agnostic~~ (done, needs review) | - | 37 |
 | [04](_done/04_local_browser_smoke_coverage.md) | ~~Local browser smoke coverage~~ (done, needs review) | - | 36 |
 | [05](_done/05_conjugate_loop_word_on_anchor_crossing.md) | ~~Conjugate a loop's portal word when its shared anchor crosses a portal~~ (done) | [68](../../_issues/_closed/68_loop_endpoint_crossing_must_conjugate_portal_word.md) |  |
-| [06](06_curve_shortening_stalls.md) | Stop curve shortening from stalling | [66](../../_issues/66_curve_shortening_stalls_at_high_frame_rate.md) |  |
+| [06](_done/06_curve_shortening_stalls.md) | ~~Stop curve shortening from stalling~~ (done) | [66](../../_issues/_closed/66_curve_shortening_stalls_at_high_frame_rate.md) |  |
 | [07](07_forward_heading_convention.md) | One forward-heading convention: marmot heading and deformation transport | [64](../../_issues/64_mover_integration_bugs_xr_slide_marmot_heading_object_trap.md), [53](../../_issues/53_torus_deformation_commit_transport_defects.md) |  |
 | [08](08_xr_slide_replay_and_object_trap.md) | XR slide replay and the player trapped by objects | [64](../../_issues/64_mover_integration_bugs_xr_slide_marmot_heading_object_trap.md) |  |
 | [09](09_deformation_commit_safety.md) | Make torus deformation commits safe | [53](../../_issues/53_torus_deformation_commit_transport_defects.md) |  |

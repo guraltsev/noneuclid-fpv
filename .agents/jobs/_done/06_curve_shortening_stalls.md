@@ -1,13 +1,13 @@
 # Job 06 - Stop curve shortening from stalling
 
-Status: queued.
-Resolves: issue [66](../../_issues/66_curve_shortening_stalls_at_high_frame_rate.md).
+Status: done on 2026-10-29.
+Resolves: issue [66](../../../_issues/_closed/66_curve_shortening_stalls_at_high_frame_rate.md).
 
 ## Goal
 
 Curve shortening must converge at any frame rate. It must also not 2-cycle (livelock) next to the fuse angle, and a
 free loop must keep moving until it fuses or is deleted. This is a small, safe change to the gradient-descent tick
-(`advanceCurveShorteningPairs`): no new solver, no new state. [Job 26](26_exact_curve_shortening.md) later replaces
+(`advanceCurveShorteningPairs`): no new solver, no new state. [Job 26](../26_exact_curve_shortening.md) later replaces
 the solver.
 
 ## Depends on
@@ -466,7 +466,7 @@ The JSDoc of the exported constants changes, so `_docs/generated/API_REFERENCE.m
   file, fix the relative links (`../../_issues/...` becomes `../../../_issues/...` or `../../../_issues/_closed/...`;
   `05_...md` becomes `05_...md` if job 05 is also in `_done/`, otherwise `../05_...md`; `26_...md` becomes `../26_...md`).
 - [ ] The queue row in `.agents/jobs/README.md` becomes
-  `| [06](_done/06_curve_shortening_stalls.md) | ~~Stop curve shortening from stalling~~ (done) | [66](../../_issues/_closed/66_curve_shortening_stalls_at_high_frame_rate.md) |  |`.
+  `| [06](_done/06_curve_shortening_stalls.md) | ~~Stop curve shortening from stalling~~ (done) | [66](../../../_issues/_closed/66_curve_shortening_stalls_at_high_frame_rate.md) |  |`.
   Use `../../_issues/66_...` if the issue stays open.
 - [ ] The job file's `Status:` is `Status: done on <date>.` if `### Uncertain` and `### Not done` are empty; otherwise
   it is `Status: done, needs review on <date>.`. A `## Report` section is appended at the end, with these subsections:
@@ -480,3 +480,31 @@ The JSDoc of the exported constants changes, so `_docs/generated/API_REFERENCE.m
 
 Never stop to ask. If something in this job turns out to be wrong (a line number, a name, an expected number), do the
 closest correct thing, and record it under `### Deviations` or `### Uncertain`.
+
+## Report
+
+### Done
+
+- `src/world-objects/geodesicCannon.ts`, `advanceCurveShorteningPairs`: replaced the step block as in Step 1 (free loop: `removeDegenerateFreeLoop` first; two-arc pair with shorter arc below `curveShorteningFuseStepToleranceMeters`: absorb, and fall through if refused; step = `min(v*dt, 0.25*shorter arc, delta/(1/a+1/b))`, no lower bound). Removed `TODO(issue 66)`. Rewrote the JSDoc of `curveShorteningMinStepMeters`, `curveShorteningFuseStepToleranceMeters`, the function docstring item (4) and the module header.
+- `_docs/MATHEMATICAL_MODEL.md`: section 7 items 2 and 4 and the section 11 curve-shortening bullet updated. `npm run docs:generate` re-run (`_docs/generated/API_REFERENCE.md`, `ARCHITECTURE_REFERENCE.md`).
+- `tests/world-objects/geodesicCannon.test.ts`: block "curve shortening at any frame rate (job 06)" with the five tests, plus helpers `runCurveShorteningUntilPairGone`, `createTorusTiedPairScenario`, `createSymmetricPairScenario`.
+- Issue 66 closed and moved to `_issues/_closed/`; links in issues 50, 67 and 41 fixed; queue row updated.
+- Commit: the single job 06 commit (see `git log`).
+
+### Deviations
+
+None. No existing test was changed.
+
+### Uncertain
+
+None. The new tests passed on the first run with the job's tolerances and tick bounds; I did not re-measure the exact tick counts, so the counts quoted in the issue's closing evidence are the job's.
+
+### Not done
+
+Nothing.
+
+### Checks
+
+- Baseline: `npm run typecheck` ok; `npm test` 667 passed, 9 skipped.
+- After: `npx vitest run tests/world-objects/geodesicCannon.test.ts` 80 passed, 8 skipped; `npm run typecheck` ok; `npm test` 672 passed, 9 skipped; `npm run docs:check` ok (after `docs:generate`).
+- `grep -n "TODO(issue 66)" src/world-objects/geodesicCannon.ts` finds nothing.

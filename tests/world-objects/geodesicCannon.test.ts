@@ -2590,6 +2590,146 @@ describe("geodesic cannon world objects", () => {
     });
   });
 
+  describe("curve shortening at any frame rate (job 06)", () => {
+    it("fuses the issue 66 torus pair into the same loop at 60 Hz and at 240 Hz", () => {
+      for (const [deltaSeconds, maxTicks] of [[1 / 60, 300], [1 / 240, 1200]] as const) {
+        const { world, registry } = createTorusTiedPairScenario();
+        runCurveShorteningUntilPairGone(world, registry, { pairId: "pair", geodesicIds: ["g1", "g2"], deltaSeconds, maxTicks });
+        expect(registry.get("pair")).toBeUndefined();
+        expect(registry.get("g2")).toBeUndefined();
+        expect(registry.get("g1")).toMatchObject({
+          motionState: "stable",
+          start: { anchorObjectId: "e1" },
+          end: { anchorObjectId: "e1" },
+        });
+        expect((registry.get("g1") as { portalWord?: unknown }).portalWord).toEqual([createCarryPortalTraversal(world, "torus-room", "right-left")]);
+        expect(totalGeodesicLength(registry, "g1")).toBeCloseTo(15, 6);
+      }
+    });
+
+    it("does not 2-cycle next to the fuse angle on 0.2 m arcs", () => {
+      for (const deltaSeconds of [1 / 60, 1 / 240]) {
+        const { world, registry } = createSymmetricPairScenario(0.2, 0.01);
+        runCurveShorteningUntilPairGone(world, registry, { pairId: "pair", geodesicIds: ["g1", "g2"], deltaSeconds, maxTicks: 10 });
+        expect(registry.get("pair")).toBeUndefined();
+        expect(registry.get("g1")).toMatchObject({
+          motionState: "stable",
+          start: { anchorObjectId: "e1" },
+          end: { anchorObjectId: "e2" },
+        });
+        expect(totalGeodesicLength(registry, "g1")).toBeCloseTo(0.4, 6);
+        expect(registry.get("g2")).toBeUndefined();
+      }
+    });
+
+    it("reaches the fuse within ceil(distance / step) + 2 ticks at 240 Hz", () => {
+      const { world, registry } = createSymmetricPairScenario(1, 1);
+      const maxTicks = Math.ceil(1 / (0.4 / 240)) + 2;
+      const ticks = runCurveShorteningUntilPairGone(world, registry, { pairId: "pair", geodesicIds: ["g1", "g2"], deltaSeconds: 1 / 240, maxTicks });
+      expect(ticks).toBeLessThanOrEqual(maxTicks);
+      expect(registry.get("pair")).toBeUndefined();
+      expect(registry.get("g1")).toMatchObject({
+        motionState: "stable",
+        start: { anchorObjectId: "e1" },
+        end: { anchorObjectId: "e2" },
+      });
+      expect(totalGeodesicLength(registry, "g1")).toBeCloseTo(2, 6);
+    });
+
+    it("keeps moving a free loop at 240 Hz until it is resolved", () => {
+      const world = compileRotatedFreeLoopWorld();
+      const registry = createRuntimeObjectRegistry();
+      const point = { x: 4.9, y: 1, z: geodesicRayBeamHeightMeters };
+      registry.add(createFreeGeodesicEndObject({ id: "free-loop", cellId: "a", point }));
+      registry.add(createGeodesicIntervalObject({
+        id: "g-loop",
+        startAnchorObjectId: "free-loop",
+        endAnchorObjectId: "free-loop",
+        startCellId: "a",
+        motionState: "moving",
+        portalWord: [
+          createCarryPortalTraversal(world, "a", "ab"),
+          createCarryPortalTraversal(world, "b", "b-bottom"),
+          createCarryPortalTraversal(world, "b", "ba"),
+        ],
+      }));
+      expect(rebuildDerivedGeodesicSegments({ world, registry, geodesicId: "g-loop" })).toBeTruthy();
+      const startLength = totalGeodesicLength(registry, "g-loop");
+      expect(startLength).toBeCloseTo(7.34983, 5);
+      registry.add(createCurveShorteningPairObject({
+        id: "pair-loop",
+        first: { geodesicId: "g-loop", role: "start", anchorObjectId: "free-loop" },
+        second: { geodesicId: "g-loop", role: "end", anchorObjectId: "free-loop" },
+        freeEndAnchorId: "free-loop",
+        previousTotalLengthMeters: startLength,
+        lastGoodFreeEndCellId: "a",
+        lastGoodFreeEndPoint: point,
+      }));
+
+      advanceCurveShorteningPairs({ world, registry, deltaSeconds: 1 / 240 });
+
+      const freeEnd = registry.get("free-loop");
+      expect(freeEnd).toMatchObject({ kind: "free-geodesic-end", cellId: "a" });
+      expect(freeEnd?.localPose.translation.x).toBeCloseTo(4.9016, 4);
+      expect(freeEnd?.localPose.translation.y).toBeCloseTo(0.9997, 4);
+      expect(totalGeodesicLength(registry, "g-loop")).toBeCloseTo(7.347473, 5);
+
+      runCurveShorteningUntilPairGone(world, registry, { pairId: "pair-loop", geodesicIds: ["g-loop"], deltaSeconds: 1 / 240, maxTicks: 3100 });
+      expect(registry.get("pair-loop")).toBeUndefined();
+      expect(registry.get("g-loop")).toBeUndefined();
+      expect(registry.get("free-loop")).toBeUndefined();
+    });
+
+    it("deletes a free loop below the minimum length at 240 Hz", () => {
+      const world = compileLargeWorld();
+      const registry = createRuntimeObjectRegistry();
+      registry.add(createFreeGeodesicEndObject({
+        id: "free-loop",
+        cellId: "a",
+        point: { x: 0, y: 0, z: geodesicRayBeamHeightMeters },
+      }));
+      registry.add(createGeodesicIntervalObject({
+        id: "g-loop",
+        startAnchorObjectId: "free-loop",
+        endAnchorObjectId: "free-loop",
+        startCellId: "a",
+        motionState: "moving",
+      }));
+      registry.add(createSegment({
+        id: "g-loop:segment:0",
+        geodesicId: "g-loop",
+        segmentIndex: 0,
+        direction: { x: 1, y: 0, z: 0 },
+        lengthMeters: 0.03,
+        connectionState: "straightening",
+      }));
+      registry.add(createSegment({
+        id: "g-loop:segment:1",
+        geodesicId: "g-loop",
+        segmentIndex: 1,
+        start: { x: 0.03, y: 0, z: geodesicRayBeamHeightMeters },
+        direction: { x: 0, y: -1, z: 0 },
+        lengthMeters: 0.03,
+        connectionState: "straightening",
+      }));
+      registry.add(createCurveShorteningPairObject({
+        id: "pair-loop",
+        first: { geodesicId: "g-loop", role: "start", anchorObjectId: "free-loop" },
+        second: { geodesicId: "g-loop", role: "end", anchorObjectId: "free-loop" },
+        freeEndAnchorId: "free-loop",
+        lastGoodFreeEndCellId: "a",
+        lastGoodFreeEndPoint: { x: 0, y: 0, z: geodesicRayBeamHeightMeters },
+      }));
+
+      const changed = advanceCurveShorteningPairs({ world, registry, deltaSeconds: 1 / 240 });
+
+      expect(changed).toContain("pair-loop");
+      expect(registry.get("g-loop")).toBeUndefined();
+      expect(registry.get("free-loop")).toBeUndefined();
+      expect(registry.get("pair-loop")).toBeUndefined();
+    });
+  });
+
   it.skip("ties and detaches two locked geodesics from an emitter as a straightening pair", () => {
     const world = compileLargeWorld();
     const registry = createRuntimeObjectRegistry();
@@ -3375,4 +3515,77 @@ function compileRotatedFreeLoopWorld() {
       ] },
     ],
   });
+}
+
+// Advances until the pair is gone or `maxTicks` is reached. Fails if the pair's total length ever grows by more than 1e-9 m.
+function runCurveShorteningUntilPairGone(
+  world: ReturnType<typeof compileCellComplex>,
+  registry: ReturnType<typeof createRuntimeObjectRegistry>,
+  options: { readonly pairId: string; readonly geodesicIds: readonly string[]; readonly deltaSeconds: number; readonly maxTicks: number },
+): number {
+  const total = () => [...new Set(options.geodesicIds)].reduce((sum, id) => sum + totalGeodesicLength(registry, id), 0);
+  let previous = total();
+  let ticks = 0;
+  while (ticks < options.maxTicks && registry.get(options.pairId)) {
+    advanceCurveShorteningPairs({ world, registry, deltaSeconds: options.deltaSeconds });
+    ticks += 1;
+    if (registry.get(options.pairId)) {
+      const next = total();
+      expect(next).toBeLessThanOrEqual(previous + 1e-9);
+      previous = next;
+    }
+  }
+  return ticks;
+}
+
+// Issue 66: two emitters on the 15 m torus, a straight arc E1 -> E2 and an arc E2 -> E1 that wraps once to the right,
+// tied and released at E2.
+function createTorusTiedPairScenario() {
+  const world = compileTorusLoopWorld();
+  const registry = createRuntimeObjectRegistry();
+  registry.add(createGeodesicCannonObject({ id: "e1", cellId: "torus-room", localPose: yawRigidTransform3(0, { x: -3, y: 0, z: 0 }) }));
+  registry.add(createGeodesicCannonObject({ id: "e2", cellId: "torus-room", localPose: yawRigidTransform3(0, { x: 3, y: 2, z: 0 }) }));
+  registry.add(createGeodesicIntervalObject({ id: "g1", startAnchorObjectId: "e1", endAnchorObjectId: "e2", startCellId: "torus-room" }));
+  registry.add(createGeodesicIntervalObject({
+    id: "g2",
+    startAnchorObjectId: "e2",
+    endAnchorObjectId: "e1",
+    startCellId: "torus-room",
+    portalWord: [createCarryPortalTraversal(world, "torus-room", "right-left")],
+  }));
+  rebuildConnectedGeodesicBetweenEmitters({ world, registry, geodesicId: "g1" });
+  rebuildConnectedGeodesicBetweenEmitters({ world, registry, geodesicId: "g2" });
+  tieAndDetachGeodesicEndpoints({
+    world,
+    registry,
+    detachedEmitterId: "e2",
+    first: { geodesicId: "g1", role: "end", anchorObjectId: "e2" },
+    second: { geodesicId: "g2", role: "start", anchorObjectId: "e2" },
+    createPairId: () => "pair",
+    createFreeEndId: () => "free",
+  });
+  return { world, registry };
+}
+
+// A two-arc pair in the 6 m single cell: emitters at (-halfWidth, 0) and (halfWidth, 0), free end at (0, height).
+function createSymmetricPairScenario(halfWidth: number, height: number) {
+  const world = compileLargeWorld();
+  const registry = createRuntimeObjectRegistry();
+  registry.add(createGeodesicCannonObject({ id: "e1", cellId: "a", localPose: yawRigidTransform3(0, { x: -halfWidth, y: 0, z: 0 }) }));
+  registry.add(createGeodesicCannonObject({ id: "e2", cellId: "a", localPose: yawRigidTransform3(0, { x: halfWidth, y: 0, z: 0 }) }));
+  registry.add(createFreeGeodesicEndObject({ id: "free", cellId: "a", point: { x: 0, y: height, z: geodesicRayBeamHeightMeters } }));
+  registry.add(createGeodesicIntervalObject({ id: "g1", startAnchorObjectId: "e1", endAnchorObjectId: "free", startCellId: "a", motionState: "moving" }));
+  registry.add(createGeodesicIntervalObject({ id: "g2", startAnchorObjectId: "free", endAnchorObjectId: "e2", startCellId: "a", motionState: "moving" }));
+  rebuildDerivedGeodesicSegments({ world, registry, geodesicId: "g1" });
+  rebuildDerivedGeodesicSegments({ world, registry, geodesicId: "g2" });
+  registry.add(createCurveShorteningPairObject({
+    id: "pair",
+    first: { geodesicId: "g1", role: "end", anchorObjectId: "free" },
+    second: { geodesicId: "g2", role: "start", anchorObjectId: "free" },
+    freeEndAnchorId: "free",
+    previousTotalLengthMeters: totalGeodesicLength(registry, "g1") + totalGeodesicLength(registry, "g2"),
+    lastGoodFreeEndCellId: "a",
+    lastGoodFreeEndPoint: { x: 0, y: height, z: geodesicRayBeamHeightMeters },
+  }));
+  return { world, registry };
 }

@@ -386,8 +386,8 @@ Geodesic emitters ("cannons"), geodesic intervals and curve shortening on a glue
 | const | `geodesicStraighteningSpeedMetersPerSecond` | Legacy: default speed (m/s) of the retired same-cell straightening model. |
 | const | `curveShorteningDefaultSpeedMetersPerSecond` | Default speed (m/s) at which a curve-shortening pair's shared free end moves downhill. |
 | const | `curveShorteningFuseAngleToleranceRadians` | Turn-angle tolerance (radians) below which the free end counts as locally straight, so the pair is ready to fuse. |
-| const | `curveShorteningFuseStepToleranceMeters` | Length tolerance (meters): a moving half shorter than this is absorbed when fusing; slightly above the minimum geodesic length. |
-| const | `curveShorteningMinStepMeters` | Smallest free-end step (meters) worth taking; a smaller step stalls the tick (the pair may become ready to fuse). |
+| const | `curveShorteningFuseStepToleranceMeters` | Length tolerance (meters): a two-arc pair whose shorter arc is below this is absorbed into one geodesic (`absorbShortCurveShorteningHalf`); slightly above the minimum geodesic length. |
+| const | `curveShorteningMinStepMeters` | Floor (meters) applied to the arc lengths in the curve-shortening step's distance-to-straight estimate, so that a vanishing arc cannot divide by zero. |
 | const | `curveShorteningLengthIncreaseToleranceMeters` | Length tolerance (meters) for the monotone-descent check of curve shortening: a previewed step is committed only if the new total length of the pair's arcs is at most `previousTotalLengthMeters + curveShorteningLengthIn… |
 | function | `createGeodesicCannonObject` | Builds a geodesic emitter object from options, filling defaults. |
 | function | `placeGeodesicCannonAtFloorPoint` | Adds a new cannon standing on the floor at `floorPoint` unless the spot is blocked. |
