@@ -19,7 +19,7 @@ environment flake (possibly a cold transform cache); not investigated.
 | 07 | done | e768cd2, b18497e | 677/8 | none (issues 53, 64 get status notes) |
 | 08 | done | 5c4762e | 682/8 | 64 |
 | 09 | done (optional manual checks not run) | 2bc2f39 | 695/8 | 53 |
-| 10 | done, needs review | 235ec96 | 706/8 | none (81 reopened with pointer) |
+| 10 | done (manual check later confirmed by maintainer) | 235ec96 | 706/8 | 81 (closed after manual check) |
 
 ## For review
 
@@ -71,3 +71,6 @@ Coordinator action: the sub-agent closed issue 81 despite marking the job "needs
 - Stale-link grep for issues 40/53/64/66/68/81: remaining hits without `_closed/` are prose in job files describing the closing step (historical), plus the 81 links which point to the open location since 81 was reopened. No broken links.
 - Closed issues present in `_issues/_closed/` with Outcome and Closing evidence: 40, 53, 64, 66, 68 (and 74 earlier). 81 reopened (see job 10).
 - Smoke test on a fresh `npm run build:pages -- --base noneuclid-fpv`: `npm run smoke -- --world cube,dodecahedron,torus-moduli,genus-2-torus` printed `SMOKE OK (4 page(s))`. The `dist/` build was restored with `npm run build`.
+
+## Addendum
+The maintainer confirmed the floor texture looks right in the browser, so issue 81 was closed and job 10 set to done.

@@ -13,7 +13,7 @@ locked-geodesic rebuild, a `window.noneuclidGeometry` console API and an in-scen
 remaining defects and costs found later are tracked by newer issues: pose transport and frame checks in
 [53](53_torus_deformation_commit_transport_defects.md), worker cost and pipeline in
 [55](../55_live_deformation_rebuild_cost_and_se2_transforms.md), floor texture swim in
-[81](../81_floor_texture_slides_under_objects_during_deformation.md), main-thread commit cost (and the missing
+[81](81_floor_texture_slides_under_objects_during_deformation.md), main-thread commit cost (and the missing
 renderer-contract tests for the commit) in
 [82](../82_deformation_commit_rebuilds_whole_scene_and_reuploads_floor_texture.md), and moduli reduction in
 [54](../../.agents/jobs/35_torus_family_as_teichmuller_space.md).

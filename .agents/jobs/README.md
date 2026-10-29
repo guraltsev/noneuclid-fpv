@@ -90,7 +90,7 @@ Resolves: issue [NN](../../_issues/NN_....md).
 | [07](_done/07_forward_heading_convention.md) | ~~One forward-heading convention: marmot heading and deformation transport~~ (done) | [64](../../_issues/_closed/64_mover_integration_bugs_xr_slide_marmot_heading_object_trap.md), [53](../../_issues/_closed/53_torus_deformation_commit_transport_defects.md) |  |
 | [08](_done/08_xr_slide_replay_and_object_trap.md) | ~~XR slide replay and the player trapped by objects~~ (done) | [64](../../_issues/_closed/64_mover_integration_bugs_xr_slide_marmot_heading_object_trap.md) |  |
 | [09](_done/09_deformation_commit_safety.md) | ~~Make torus deformation commits safe~~ (done) | [53](../../_issues/_closed/53_torus_deformation_commit_transport_defects.md) |  |
-| [10](_done/10_floor_texture_in_lattice_coordinates.md) | ~~Floor texture in lattice coordinates~~ (done, needs review) | [81](../../_issues/81_floor_texture_slides_under_objects_during_deformation.md) |  |
+| [10](_done/10_floor_texture_in_lattice_coordinates.md) | ~~Floor texture in lattice coordinates~~ (done) | [81](../../_issues/_closed/81_floor_texture_slides_under_objects_during_deformation.md) |  |
 | [11](11_property_tests_for_geometry_core.md) | Property-based tests for the geometry core | - | 79 |
 | [12](12_segment_walk_kernel.md) | Shared segment-walk kernel | [62](../../_issues/62_segment_based_portal_traversal_and_swept_motion.md) |  |
 | [13](13_swept_collide_and_slide.md) | Swept collide-and-slide on the segment-walk kernel | [62](../../_issues/62_segment_based_portal_traversal_and_swept_motion.md), [61](../../_issues/61_wall_response_lets_bodies_escape_through_corners.md), [63](../../_issues/63_collision_ignores_cells_a_straddling_body_overlaps.md) |  |
