@@ -33,7 +33,8 @@
  *
  * ## Locked and moving intervals
  * An interval whose both endpoints are emitters is LOCKED (`isGeodesicLocked`): carrying an emitter keeps the interval and updates its
- * word by the portal the emitter crossed (`rebuildLockedGeodesicFromEndpointsAndPortalWord`). An interval with an emitter and a free end
+ * word by the portal the emitter crossed (both ends of a loop on that emitter move, so its word is conjugated: `w -> p^-1 w p`)
+ * (`rebuildLockedGeodesicFromEndpointsAndPortalWord`). An interval with an emitter and a free end
  * is an aimable free geodesic (`aimFreeGeodesicFromEndpoint`, `extendGeodesic`, split by `splitGeodesicIntervalAtSegmentHit`).
  * `motionState: "moving"` marks intervals owned by a curve-shortening pair; `"stable"` is everything else.
  *
@@ -41,8 +42,8 @@
  * `tieAndDetachGeodesicEndpoints` detaches two endpoint roles (possibly the two roles of one loop) from an emitter and ties them to one
  * shared free end F, creating a `CurveShorteningPairObject`. Each tick (`advanceCurveShorteningPairs`) moves F in the direction
  * `normalize(u + v)` (`u`, `v` unit tangents of the two arcs at F, pointing away from F), which is the steepest descent of total length
- * (first variation `dL = -(u + v) . dF`), by a bounded step; when F crosses a portal, each arc's word is extended by that portal
- * (`updatePortalWordForMovedEndpoint`), otherwise the words stay fixed (no search over homotopy classes). Every arc is re-traced as a
+ * (first variation `dL = -(u + v) . dF`), by a bounded step; when F crosses a portal, each arc's word is updated by that portal
+ * (`portalWordAfterAnchorCrossing`; a free loop's word is conjugated), otherwise the words stay fixed (no search over homotopy classes). Every arc is re-traced as a
  * preview before anything is written (`previewRebuildGeodesicInterval`). When the corner at F is straight (`u + v` vanishes, or the angle
  * is within `curveShorteningFuseAngleToleranceRadians` of pi) the pair becomes `"ready-to-fuse"` and `fuseCurveShorteningPair` merges the
  * arcs into one stable geodesic whose word is the role-aware concatenation of the two arcs' words, freely reduced
@@ -726,7 +727,7 @@ export function createFreeGeodesicEndObject(input: {
 /**
  * Builds a geodesic interval from two anchor ids, a start cell and an optional portal word.
  *
- * Defaults: empty `portalWord`, `motionState: "stable"`. Does not validate that the word matches the anchors' cells and
+ * Defaults: empty `portalWord`, `motionState: "stable"`. The word is freely reduced (adjacent inverse traversals cancel). Does not validate that the word matches the anchors' cells and
  * does not generate segments; call `rebuildDerivedGeodesicSegments` afterwards. Pure; the caller adds it to the registry.
  */
 export function createGeodesicIntervalObject(input: {
@@ -744,7 +745,7 @@ export function createGeodesicIntervalObject(input: {
     localPose: identityRigidTransform3,
     portalRenderable: false,
     startCellId: input.startCellId,
-    portalWord: input.portalWord ?? [],
+    portalWord: reduceAdjacentInversePortalTraversals(input.portalWord ?? []),
     motionState: input.motionState ?? "stable",
     start: {
       geodesicId: input.id,
@@ -919,7 +920,8 @@ export function reverseGeodesicPortalWord(
  * x/y difference), and it is the unique locally straight path realizing this word between the two anchors.
  *
  * Returns `undefined` if either anchor is missing or cannot attach geodesics, or a traversal names a portal not in
- * `world`. It does not check that the word chains between cells or that the lifted chord is long enough.
+ * `world`. Also returns `undefined` when the stored word does not chain from the start anchor's cell to the end anchor's
+ * cell (`portalWordMatchesEndpointCellsWithAnchors`). It does not check that the lifted chord is long enough.
  * Units: meters; z of both points is the anchors' beam height.
  */
 export function liftGeodesicEndpoint(input: {
@@ -934,6 +936,13 @@ export function liftGeodesicEndpoint(input: {
   const sourceAnchor = input.registry.get(sourceAttachment.anchorObjectId);
   const targetAnchor = input.registry.get(targetAttachment.anchorObjectId);
   if (!canObjectAttachGeodesics(sourceAnchor) || !canObjectAttachGeodesics(targetAnchor)) {
+    return undefined;
+  }
+  if (!portalWordMatchesEndpointCellsWithAnchors({
+    registry: input.registry,
+    interval: input.interval,
+    word: input.interval.portalWord,
+  })) {
     return undefined;
   }
 
@@ -982,6 +991,14 @@ function liftGeodesicEndpointWithAnchors(input: {
   const targetAnchor = input.candidateAnchorsById?.get(targetAttachment.anchorObjectId) ??
     input.registry.get(targetAttachment.anchorObjectId);
   if (!canObjectAttachGeodesics(sourceAnchor) || !canObjectAttachGeodesics(targetAnchor)) {
+    return undefined;
+  }
+  if (!portalWordMatchesEndpointCellsWithAnchors({
+    registry: input.registry,
+    interval: input.interval,
+    word: input.interval.portalWord,
+    candidateAnchorsById: input.candidateAnchorsById,
+  })) {
     return undefined;
   }
 
@@ -2078,9 +2095,9 @@ export function rebuildLockedGeodesicFromEndpointsAndPortalWord(input: {
 /**
  * Extends an interval's stored portal word with one portal crossing made by a carried anchor, and saves it.
  *
- * Appends the traversal when the carried anchor is the `end` anchor; prepends the inverse traversal when it is the
- * `start` anchor (an interval whose both ends are the anchor uses the `end` branch). Adjacent inverse traversals
- * cancel. Returns the new word, or `undefined` (nothing written) if the anchor is not an endpoint or the resulting word
+ * Appends the traversal when the carried anchor is the `end` anchor, and prepends the inverse when it is the `start`
+ * anchor. A loop with both ends on the anchor gets both, which conjugates the word (`p^-1 w p`). The result is freely
+ * reduced. Returns the new word, or `undefined` (nothing written) if the anchor is not an endpoint or the resulting word
  * does not chain between the endpoint anchors' current cells.
  */
 export function updateLockedGeodesicPortalWordForCarriedAnchorTraversal(input: {
@@ -2094,17 +2111,12 @@ export function updateLockedGeodesicPortalWordForCarriedAnchorTraversal(input: {
     return undefined;
   }
 
-  // The path from the start anchor to the moved end anchor gains the crossed portal at its end; for the moved start anchor the path
-  // from its new location first has to go back through that portal, so the inverse is prepended. Free reduction cancels re-crossings.
-  let portalWord: readonly GeodesicPortalTraversal[] | undefined;
-  if (interval.end.anchorObjectId === input.carriedAnchorObjectId) {
-    portalWord = reduceAdjacentInversePortalTraversals([...interval.portalWord, input.traversal]);
-  } else if (interval.start.anchorObjectId === input.carriedAnchorObjectId) {
-    portalWord = reduceAdjacentInversePortalTraversals([
-      reverseGeodesicPortalWord([input.traversal])[0],
-      ...interval.portalWord,
-    ]);
-  }
+  // See `portalWordAfterAnchorCrossing`: append at the end role, prepend the inverse at the start role, both for a loop.
+  const portalWord = portalWordAfterAnchorCrossing({
+    interval,
+    anchorObjectId: input.carriedAnchorObjectId,
+    traversal: input.traversal,
+  });
   if (!portalWord || !portalWordMatchesCurrentEndpointCells(input.registry, interval, portalWord)) {
     return undefined;
   }
@@ -2139,7 +2151,8 @@ export function getPortalWordBetweenEndpointRoles(input: {
  *
  * `movedRole === "end"` appends `traversal`; `"start"` prepends its inverse. Adjacent inverse traversals are cancelled
  * (so walking back through the same portal restores the old word), then the word must chain from the start anchor's cell
- * to the end anchor's cell as currently stored in the registry. Does not write anything.
+ * to the end anchor's cell as currently stored in the registry. If the other role is on the same anchor (a loop), that role
+ * moves too and the word is conjugated. Does not write anything.
  */
 export function updatePortalWordForMovedEndpoint(input: {
   readonly registry: RuntimeObjectRegistry;
@@ -2147,39 +2160,12 @@ export function updatePortalWordForMovedEndpoint(input: {
   readonly movedRole: GeodesicEndRole;
   readonly traversal: GeodesicPortalTraversal;
 }): readonly GeodesicPortalTraversal[] | undefined {
-  // Same rule as in updateLockedGeodesicPortalWordForCarriedAnchorTraversal: append at the end role, prepend the inverse at the start role.
-  const word = input.movedRole === "end"
-    ? reduceAdjacentInversePortalTraversals([...input.interval.portalWord, input.traversal])
-    : reduceAdjacentInversePortalTraversals([
-        reverseGeodesicPortalWord([input.traversal])[0],
-        ...input.interval.portalWord,
-      ]);
-  return portalWordMatchesCurrentEndpointCells(input.registry, input.interval, word) ? word : undefined;
-}
-
-// Same as `updatePortalWordForMovedEndpoint`, but cell checks use `candidateAnchorsById` in place of registry anchors
-// (the moved free end already sits in its candidate cell during a preview).
-function updatePortalWordForMovedEndpointWithAnchors(input: {
-  readonly registry: RuntimeObjectRegistry;
-  readonly interval: GeodesicIntervalObject;
-  readonly movedRole: GeodesicEndRole;
-  readonly traversal: GeodesicPortalTraversal;
-  readonly candidateAnchorsById?: ReadonlyMap<string, RuntimeWorldObject>;
-}): readonly GeodesicPortalTraversal[] | undefined {
-  const word = input.movedRole === "end"
-    ? reduceAdjacentInversePortalTraversals([...input.interval.portalWord, input.traversal])
-    : reduceAdjacentInversePortalTraversals([
-        reverseGeodesicPortalWord([input.traversal])[0],
-        ...input.interval.portalWord,
-      ]);
-  return portalWordMatchesEndpointCellsWithAnchors({
-    registry: input.registry,
+  const word = portalWordAfterAnchorCrossing({
     interval: input.interval,
-    word,
-    candidateAnchorsById: input.candidateAnchorsById,
-  })
-    ? word
-    : undefined;
+    anchorObjectId: input.interval[input.movedRole].anchorObjectId,
+    traversal: input.traversal,
+  });
+  return word && portalWordMatchesCurrentEndpointCells(input.registry, input.interval, word) ? word : undefined;
 }
 
 /**
@@ -2300,8 +2286,8 @@ function samePortalWord(
 
 // Determines the new portal word of an interval whose endpoint anchor was carried. Precedence: explicit word (reduced and
 // validated) > traversal inferred from the anchor's motion > traversal reported by the mover > undefined (no change).
-// The traversal is appended for the `end` anchor and prepended inverted for the `start` anchor, then reduced and validated
-// against the endpoint cells. Returns `undefined` whenever the candidate word is inconsistent.
+// The traversal is appended for the `end` anchor and prepended inverted for the `start` anchor (both for a loop, which
+// conjugates the word; see `portalWordAfterAnchorCrossing`), then reduced and validated against the endpoint cells. Returns `undefined` whenever the candidate word is inconsistent.
 function resolveCarriedIntervalPortalWord(input: {
   readonly world: CompiledCellComplex;
   readonly interval: GeodesicIntervalObject;
@@ -2340,17 +2326,12 @@ function resolveCarriedIntervalPortalWord(input: {
     input.carriedAnchorObjectId &&
     carriedTraversal
   ) {
-    if (input.interval.end.anchorObjectId === input.carriedAnchorObjectId) {
-      const word = reduceAdjacentInversePortalTraversals([...input.interval.portalWord, carriedTraversal]);
-      return portalWordMatchesCurrentEndpointCells(input.registry, input.interval, word) ? word : undefined;
-    }
-    if (input.interval.start.anchorObjectId === input.carriedAnchorObjectId) {
-      const word = reduceAdjacentInversePortalTraversals([
-        reverseGeodesicPortalWord([carriedTraversal])[0],
-        ...input.interval.portalWord,
-      ]);
-      return portalWordMatchesCurrentEndpointCells(input.registry, input.interval, word) ? word : undefined;
-    }
+    const word = portalWordAfterAnchorCrossing({
+      interval: input.interval,
+      anchorObjectId: input.carriedAnchorObjectId,
+      traversal: carriedTraversal,
+    });
+    return word && portalWordMatchesCurrentEndpointCells(input.registry, input.interval, word) ? word : undefined;
   }
 
   return undefined;
@@ -2500,6 +2481,30 @@ function portalWordMatchesEndpointCellsWithAnchors(input: {
 
 // Free reduction of a word: cancels each traversal against an immediately preceding inverse one (a stack-based pass), so
 // crossing a portal and returning through it leaves no trace in the homotopy class.
+// New portal word of `interval` after anchor `anchorObjectId` crossed a portal by `traversal`. The `end` role appends the
+// traversal (the path gains one crossing at its end); the `start` role prepends its inverse (the path first steps back across
+// the portal). When both roles sit on the anchor (a loop) both apply, which conjugates the word: w -> p^-1 w p. The result is
+// freely reduced. Returns undefined when neither role is on the anchor. Does not check the cell chain; callers do.
+function portalWordAfterAnchorCrossing(input: {
+  readonly interval: GeodesicIntervalObject;
+  readonly anchorObjectId: string;
+  readonly traversal: GeodesicPortalTraversal;
+}): readonly GeodesicPortalTraversal[] | undefined {
+  const movesStart = input.interval.start.anchorObjectId === input.anchorObjectId;
+  const movesEnd = input.interval.end.anchorObjectId === input.anchorObjectId;
+  if (!movesStart && !movesEnd) {
+    return undefined;
+  }
+  let word: readonly GeodesicPortalTraversal[] = input.interval.portalWord;
+  if (movesEnd) {
+    word = [...word, input.traversal];
+  }
+  if (movesStart) {
+    word = [reverseGeodesicPortalWord([input.traversal])[0], ...word];
+  }
+  return reduceAdjacentInversePortalTraversals(word);
+}
+
 function reduceAdjacentInversePortalTraversals(
   word: readonly GeodesicPortalTraversal[],
 ): readonly GeodesicPortalTraversal[] {
@@ -3747,39 +3752,36 @@ export function advanceCurveShorteningPairs(
       localPose: moveResult.object.localPose,
     };
     const candidateAnchors = new Map<string, RuntimeWorldObject>([[candidateFreeEnd.id, candidateFreeEnd]]);
-    // If F crossed a portal during the move, F now lives in the neighbouring cell. Each arc's portal word to F must therefore grow
-    // by this traversal (append for the `end` role, prepend the inverse for the `start` role) so that the arc still ends at F.
-    // This is the only change of homotopy class a tick may make. Words that fail the cell-chain check are left unchanged.
-    // Known gap: for a free loop (one interval with both roles on F) only the `start` branch is applied, so the end cell no longer
-    // matches the word and the preview normally fails.
-    // TODO(issue 68): a free loop whose free end crosses a portal stalls; update the word for both roles of a single interval.
+    // If F crossed a portal during the move, F now lives in the neighbouring cell. Each arc's word changes by that traversal
+    // (`portalWordAfterAnchorCrossing`: append at an `end` role on F, prepend the inverse at a `start` role on F; a free loop has
+    // both roles on F and is conjugated). This is the only change of homotopy class a tick may make. Words that fail the
+    // cell-chain check are left unchanged (the preview then fails and nothing is committed).
     const traversal = moveResult.crossedPortal && moveResult.crossedPortalId
       ? getPortalTraversalFromSource(request.world, freeEnd.cellId, moveResult.crossedPortalId)
       : undefined;
     const candidateIntervals = owned.intervals.map((interval) => {
-      const movedRole = interval.start.anchorObjectId === pair.freeEndAnchorId
-        ? "start"
-        : interval.end.anchorObjectId === pair.freeEndAnchorId
-          ? "end"
-          : undefined;
-      if (!traversal || !movedRole) {
+      if (!traversal) {
         return interval;
       }
-      const portalWord = updatePortalWordForMovedEndpointWithAnchors({
-        registry: request.registry,
-        interval,
-        movedRole,
-        traversal,
-        candidateAnchorsById: candidateAnchors,
-      });
-      return portalWord
-        ? {
-            ...interval,
-            cellId: movedRole === "start" ? candidateFreeEnd.cellId : interval.cellId,
-            startCellId: movedRole === "start" ? candidateFreeEnd.cellId : interval.startCellId,
-            portalWord,
-          }
-        : interval;
+      const portalWord = portalWordAfterAnchorCrossing({ interval, anchorObjectId: pair.freeEndAnchorId, traversal });
+      if (
+        !portalWord ||
+        !portalWordMatchesEndpointCellsWithAnchors({
+          registry: request.registry,
+          interval,
+          word: portalWord,
+          candidateAnchorsById: candidateAnchors,
+        })
+      ) {
+        return interval;
+      }
+      const startMoved = interval.start.anchorObjectId === pair.freeEndAnchorId;
+      return {
+        ...interval,
+        cellId: startMoved ? candidateFreeEnd.cellId : interval.cellId,
+        startCellId: startMoved ? candidateFreeEnd.cellId : interval.startCellId,
+        portalWord,
+      };
     });
     // Dry-run re-trace of every arc from its candidate anchors/word: each must realize its word exactly without hitting a wall or zone.
     const previews = candidateIntervals.map((interval) =>

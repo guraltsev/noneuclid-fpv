@@ -228,8 +228,10 @@ the arc from the other end: reverse the order and swap source/target of each ste
 **Why words, not just positions.** In a quotient space such as the torus two anchors are joined by infinitely many
 geodesics, distinguished by the sequence of portals crossed. Keeping the word makes a rebuilt arc a continuous
 deformation of the previous one rather than a jump to a different homotopy class
-(`src/world-objects/geodesicCannon.ts#updatePortalWordForMovedEndpoint` extends or shortens the word when an endpoint is
-carried through a portal).
+(`src/world-objects/geodesicCannon.ts#updatePortalWordForMovedEndpoint` appends the crossed portal p when the `end`
+anchor crosses it, prepends p⁻¹ when the `start` anchor crosses it, and does both when one anchor holds both ends of
+a loop. The loop's word then becomes the conjugate $p^{-1}wp$, the same loop read from the new base point. Words are
+always freely reduced.)
 
 ## 7. Curve shortening
 
@@ -395,8 +397,7 @@ rather than discovered.
   (`src/world-objects/geodesicMarmot.ts#yawFromVelocity`); deformation maps transport the *real* direction. Fixing this
   changes every authored marmot and is tracked in issue 64. (The placed-flag facing was wrong in the same way and is fixed.)
 - **Curve shortening.** A step that would lengthen the pair is skipped rather than rolled back to a fused geodesic, so a pair
-  whose recorded length is stale may stall without ever becoming ready to fuse; a free loop crossing a portal probably stalls
-  (only one of its two roles has its word updated); a free loop shorter than the minimum geodesic length is deleted, but one
+  whose recorded length is stale may stall without ever becoming ready to fuse; a free loop shorter than the minimum geodesic length is deleted, but one
   between that length and four minimum steps still stalls. Fusion and absorption assume the non-free ends are emitters, and
   intervals are assumed to run emitter→free end with the emitter at the `start` role.
   The old "straightening" string survives as the render state of moving intervals.

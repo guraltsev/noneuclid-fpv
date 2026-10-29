@@ -1,7 +1,7 @@
 # Job 05 - Conjugate a loop's portal word when its shared anchor crosses a portal
 
-Status: queued.
-Resolves: issue [68](../../_issues/68_loop_endpoint_crossing_must_conjugate_portal_word.md).
+Status: done on 2026-10-29.
+Resolves: issue [68](../../../_issues/_closed/68_loop_endpoint_crossing_must_conjugate_portal_word.md).
 
 ## Goal
 
@@ -562,3 +562,19 @@ word is right, the length decreased, the loop exists), use the measured number. 
 
 Never stop to ask. If something in this job turns out to be wrong (a line number, a name, an expected number), do the
 closest correct thing, and record it under `### Deviations` or `### Uncertain`.
+
+## Report
+
+### Done
+- `src/world-objects/geodesicCannon.ts`: added private `portalWordAfterAnchorCrossing` (append at `end`, prepend inverse at `start`, both for a loop, freely reduced) and routed `updateLockedGeodesicPortalWordForCarriedAnchorTraversal`, `resolveCarriedIntervalPortalWord`, `updatePortalWordForMovedEndpoint` and `advanceCurveShorteningPairs` through it; removed `updatePortalWordForMovedEndpointWithAnchors` and the `TODO(issue 68)`. Both lift functions now return `undefined` for a word that does not chain between the anchors' cells. `createGeodesicIntervalObject` reduces its word. Module header and docstrings updated.
+- `_docs/MATHEMATICAL_MODEL.md` sections 6 and 11 updated; `_docs/generated/ARCHITECTURE_REFERENCE.md` regenerated.
+- `tests/world-objects/geodesicCannon.test.ts`: seven new tests in the block "loop words under anchor portal crossings (job 05)", fixtures `compileTwoCellCylinderWorld` and `compileRotatedFreeLoopWorld`, and the `liftGeodesicEndpoint` import. All passed on the first run with the numbers given in the job.
+- Issue 68 closed and moved to `_issues/_closed/`; links in issues 41, 50, 67 and job 25 fixed; queue row updated.
+- Commit: the single job 05 commit (see `git log`).
+### Deviations
+- Also fixed the link to issue 68 in `_issues/_closed/41_documentation_audit_findings.md` (it pointed to the old path; found by the grep the job asks for).
+### Uncertain
+### Not done
+### Checks
+- Baseline `npm run typecheck` and `npm test`: green (660 passed, 9 skipped).
+- After the change: `npm run typecheck` green; `npm test` 666 passed (the only failure was the stale generated document, fixed by `npm run docs:generate`); `npm run docs:check` green after regenerating.

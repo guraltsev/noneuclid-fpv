@@ -86,7 +86,7 @@ to `src/cell-complex/validateCellComplexSpec.ts`.
 | --- | --- | --- |
 | [66](66_curve_shortening_stalls_at_high_frame_rate.md) | P1 | Curve shortening stalls above ~200 fps; near-fuse livelock |
 | [67](67_exact_curve_shortening_via_sleeve_funnel.md) | P1 | Exact taut-string solution via the sleeve/funnel algorithm replaces gradient descent |
-| [68](68_loop_endpoint_crossing_must_conjugate_portal_word.md) | P1 | Moving a loop's shared anchor across portal p must map w ↦ p⁻¹wp (currently changes homotopy class) |
+| [68](_closed/68_loop_endpoint_crossing_must_conjugate_portal_word.md) | P1 | Moving a loop's shared anchor across portal p must map w ↦ p⁻¹wp (currently changes homotopy class) |
 | [69](69_geodesic_tracing_kernel_numerics.md) | P2 | Nudge drift k·10⁻⁴ m, disk test from inside, missed self-intersections |
 | [70](70_geodesic_module_performance_and_split.md) | P2 | Rebuild cost (registry copies, repeated all-pairs intersections); the module split moved to 76 |
 

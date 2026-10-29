@@ -26,6 +26,7 @@ import {
   getGeodesicTail,
   getRememberedGeodesicIntersectionObject,
   isGeodesicLocked,
+  liftGeodesicEndpoint,
   isGeodesicStraightening,
   minGeodesicSegmentLengthMeters,
   placeGeodesicCannonAtGeodesicVertex,
@@ -1734,6 +1735,237 @@ describe("geodesic cannon world objects", () => {
     expect(getGeodesicSegments(registry, "g-loop").map((segment) => segment.connectionState)).toContain("straightening");
   });
 
+  describe("loop words under anchor portal crossings (job 05)", () => {
+    const torusLoopSetup = (startY: number, wordIds: readonly string[]) => {
+      const world = compileTorusLoopWorld();
+      const registry = createRuntimeObjectRegistry();
+      const cannon = createGeodesicCannonObject({
+        id: "cannon-a",
+        cellId: "torus-room",
+        localPose: yawRigidTransform3(0, { x: 0, y: startY, z: 0 }),
+      });
+      registry.add(cannon);
+      registry.add(createGeodesicIntervalObject({
+        id: "g-loop",
+        startAnchorObjectId: "cannon-a",
+        endAnchorObjectId: "cannon-a",
+        startCellId: "torus-room",
+        portalWord: wordIds.map((id) => createCarryPortalTraversal(world, "torus-room", id)),
+      }));
+      return { world, registry, cannon };
+    };
+
+    it("conjugates a same-emitter torus loop when its emitter is carried across the top portal", () => {
+      const { world, registry, cannon } = torusLoopSetup(6, ["top-bottom", "right-left"]);
+      const py = createCarryPortalTraversal(world, "torus-room", "top-bottom");
+      const px = createCarryPortalTraversal(world, "torus-room", "right-left");
+      rebuildConnectedGeodesicBetweenEmitters({ world, registry, geodesicId: "g-loop" });
+      expect(totalGeodesicLength(registry, "g-loop")).toBeCloseTo(15 * Math.SQRT2, 6);
+
+      registry.update({ ...cannon, localPose: yawRigidTransform3(0, { x: 0, y: -7.4, z: 0 }) });
+      expect(updateLockedGeodesicPortalWordForCarriedAnchorTraversal({
+        registry,
+        geodesicId: "g-loop",
+        carriedAnchorObjectId: "cannon-a",
+        traversal: py,
+      })).toEqual([px, py]);
+      rebuildConnectedGeodesicBetweenEmitters({ world, registry, geodesicId: "g-loop" });
+
+      const segments = getGeodesicSegments(registry, "g-loop");
+      expect(segments).toHaveLength(3);
+      expect(segments[segments.length - 1].terminal).toMatchObject({ kind: "emitter-hit", emitterId: "cannon-a" });
+      expect(collectGeodesicPortalWord(world, registry, "g-loop")).toEqual([px, py]);
+      expect(totalGeodesicLength(registry, "g-loop")).toBeCloseTo(15 * Math.SQRT2, 6);
+    });
+
+    it("conjugates a torus loop when the crossing is inferred from the emitter's motion", () => {
+      const { world, registry, cannon: before } = torusLoopSetup(7.4, ["top-bottom", "right-left"]);
+      const py = createCarryPortalTraversal(world, "torus-room", "top-bottom");
+      const px = createCarryPortalTraversal(world, "torus-room", "right-left");
+      rebuildConnectedGeodesicBetweenEmitters({ world, registry, geodesicId: "g-loop" });
+
+      registry.update({ ...before, localPose: yawRigidTransform3(0, { x: 0, y: -7.4, z: 0 }) });
+      rebuildConnectedGeodesicBetweenEmitters({
+        world,
+        registry,
+        geodesicId: "g-loop",
+        carriedEmitterId: "cannon-a",
+        carriedEmitterBeforeMove: before,
+      });
+
+      expect(registry.get("g-loop")).toMatchObject({ kind: "geodesic-interval", portalWord: [px, py] });
+      expect(totalGeodesicLength(registry, "g-loop")).toBeCloseTo(15 * Math.SQRT2, 6);
+    });
+
+    it("fails to rebuild a horizontal torus loop carried across the perpendicular portal instead of making it diagonal", () => {
+      const { world, registry, cannon } = torusLoopSetup(6, ["right-left"]);
+      const py = createCarryPortalTraversal(world, "torus-room", "top-bottom");
+      const px = createCarryPortalTraversal(world, "torus-room", "right-left");
+      rebuildConnectedGeodesicBetweenEmitters({ world, registry, geodesicId: "g-loop" });
+      expect(totalGeodesicLength(registry, "g-loop")).toBeCloseTo(15, 6);
+
+      registry.update({ ...cannon, localPose: yawRigidTransform3(0, { x: 0, y: -7.4, z: 0 }) });
+      expect(updateLockedGeodesicPortalWordForCarriedAnchorTraversal({
+        registry,
+        geodesicId: "g-loop",
+        carriedAnchorObjectId: "cannon-a",
+        traversal: py,
+      })).toEqual([createCarryPortalTraversal(world, "torus-room", "bottom-top"), px, py]);
+
+      expect(rebuildConnectedGeodesicBetweenEmitters({ world, registry, geodesicId: "g-loop" })).toEqual([]);
+      expect(registry.get("g-loop")).toBeUndefined();
+    });
+
+    it("keeps a same-emitter loop through a portal crossing in a two-cell world", () => {
+      for (const mode of ["explicit", "inferred"] as const) {
+        const world = compileTwoCellCylinderWorld();
+        const registry = createRuntimeObjectRegistry();
+        const before = createGeodesicCannonObject({
+          id: "cannon-a",
+          cellId: "a",
+          localPose: yawRigidTransform3(0, { x: 4.9, y: 2.5, z: 0 }),
+        });
+        registry.add(before);
+        const ab = createCarryPortalTraversal(world, "a", "ab");
+        const bRight = createCarryPortalTraversal(world, "b", "b-right");
+        registry.add(createGeodesicIntervalObject({
+          id: "g-loop",
+          startAnchorObjectId: "cannon-a",
+          endAnchorObjectId: "cannon-a",
+          startCellId: "a",
+          portalWord: [ab, bRight],
+        }));
+        rebuildConnectedGeodesicBetweenEmitters({ world, registry, geodesicId: "g-loop" });
+        expect(totalGeodesicLength(registry, "g-loop")).toBeCloseTo(10, 6);
+
+        registry.update({ ...before, cellId: "b", localPose: yawRigidTransform3(0, { x: 0.1, y: 2.5, z: 0 }) });
+        if (mode === "explicit") {
+          expect(updateLockedGeodesicPortalWordForCarriedAnchorTraversal({
+            registry,
+            geodesicId: "g-loop",
+            carriedAnchorObjectId: "cannon-a",
+            traversal: ab,
+          })).toEqual([bRight, ab]);
+          rebuildConnectedGeodesicBetweenEmitters({ world, registry, geodesicId: "g-loop" });
+        } else {
+          rebuildConnectedGeodesicBetweenEmitters({
+            world,
+            registry,
+            geodesicId: "g-loop",
+            carriedEmitterId: "cannon-a",
+            carriedEmitterBeforeMove: before,
+          });
+        }
+
+        expect(registry.get("g-loop")).toMatchObject({
+          kind: "geodesic-interval",
+          startCellId: "b",
+          cellId: "b",
+          portalWord: [bRight, ab],
+        });
+        expect(totalGeodesicLength(registry, "g-loop")).toBeCloseTo(10, 6);
+      }
+    });
+
+    it("conjugates a free loop's word when curve shortening moves its free end through a portal", () => {
+      const world = compileRotatedFreeLoopWorld();
+      const registry = createRuntimeObjectRegistry();
+      const point = { x: 4.9, y: 1, z: geodesicRayBeamHeightMeters };
+      registry.add(createFreeGeodesicEndObject({ id: "free-loop", cellId: "a", point }));
+      registry.add(createGeodesicIntervalObject({
+        id: "g-loop",
+        startAnchorObjectId: "free-loop",
+        endAnchorObjectId: "free-loop",
+        startCellId: "a",
+        motionState: "moving",
+        portalWord: [
+          createCarryPortalTraversal(world, "a", "ab"),
+          createCarryPortalTraversal(world, "b", "b-bottom"),
+          createCarryPortalTraversal(world, "b", "ba"),
+        ],
+      }));
+      expect(rebuildDerivedGeodesicSegments({ world, registry, geodesicId: "g-loop" })).toBeTruthy();
+      const startLength = totalGeodesicLength(registry, "g-loop");
+      expect(startLength).toBeCloseTo(7.34983, 5);
+      registry.add(createCurveShorteningPairObject({
+        id: "pair-loop",
+        first: { geodesicId: "g-loop", role: "start", anchorObjectId: "free-loop" },
+        second: { geodesicId: "g-loop", role: "end", anchorObjectId: "free-loop" },
+        freeEndAnchorId: "free-loop",
+        previousTotalLengthMeters: startLength,
+        lastGoodFreeEndCellId: "a",
+        lastGoodFreeEndPoint: point,
+      }));
+
+      const changed = advanceCurveShorteningPairs({ world, registry, deltaSeconds: 1 });
+
+      expect(changed).toEqual(["g-loop"]);
+      const freeEnd = registry.get("free-loop");
+      expect(freeEnd).toMatchObject({ kind: "free-geodesic-end", cellId: "b" });
+      expect(freeEnd?.localPose.translation.x).toBeCloseTo(0.2925, 3);
+      expect(freeEnd?.localPose.translation.y).toBeCloseTo(0.923, 3);
+      expect(registry.get("g-loop")).toMatchObject({
+        kind: "geodesic-interval",
+        cellId: "b",
+        startCellId: "b",
+        portalWord: [createCarryPortalTraversal(world, "b", "b-bottom")],
+      });
+      expect(totalGeodesicLength(registry, "g-loop")).toBeCloseTo(6.784145, 4);
+      const pair = registry.get("pair-loop");
+      expect(pair).toMatchObject({ kind: "curve-shortening-pair", state: "moving" });
+      expect(pair?.kind === "curve-shortening-pair" ? pair.previousTotalLengthMeters : undefined).toBeCloseTo(6.784145, 4);
+    });
+
+    it("refuses to lift an interval whose word does not chain between its anchors' cells", () => {
+      const world = compileLargePortalWorld();
+      const registry = createRuntimeObjectRegistry();
+      registry.add(createGeodesicCannonObject({
+        id: "cannon-a",
+        cellId: "a",
+        localPose: yawRigidTransform3(0, { x: 4, y: 2.5, z: 0 }),
+      }));
+      registry.add(createGeodesicCannonObject({
+        id: "cannon-b",
+        cellId: "b",
+        localPose: yawRigidTransform3(0, { x: 1, y: 2.5, z: 0 }),
+      }));
+      const bad = createGeodesicIntervalObject({
+        id: "g-a",
+        startAnchorObjectId: "cannon-a",
+        endAnchorObjectId: "cannon-b",
+        startCellId: "a",
+        portalWord: [],
+      });
+      expect(liftGeodesicEndpoint({ world, registry, interval: bad, sourceRole: "start" })).toBeUndefined();
+      expect(liftGeodesicEndpoint({ world, registry, interval: bad, sourceRole: "end" })).toBeUndefined();
+
+      const good = createGeodesicIntervalObject({
+        id: "g-a",
+        startAnchorObjectId: "cannon-a",
+        endAnchorObjectId: "cannon-b",
+        startCellId: "a",
+        portalWord: [createCarryPortalTraversal(world, "a", "ab")],
+      });
+      const lifted = liftGeodesicEndpoint({ world, registry, interval: good, sourceRole: "start" });
+      expect(lifted?.targetPointInSourceCell.x).toBeCloseTo(6, 6);
+    });
+
+    it("reduces the portal word when an interval is created", () => {
+      const world = compileLargePortalWorld();
+      const interval = createGeodesicIntervalObject({
+        id: "g-a",
+        startAnchorObjectId: "cannon-a",
+        endAnchorObjectId: "cannon-b",
+        startCellId: "a",
+        portalWord: [
+          createCarryPortalTraversal(world, "a", "ab"),
+          createCarryPortalTraversal(world, "b", "ba"),
+        ],
+      });
+      expect(interval.portalWord).toEqual([]);
+    });
+  });
+
   it("fuses a ready curve-shortening pair into one stable locked interval using the lower geodesic id", () => {
     const world = compileLargeWorld();
     const registry = createRuntimeObjectRegistry();
@@ -3106,6 +3338,41 @@ function compileTorusLoopWorld() {
           { id: "left-right", sideIndex: 3, targetCellId: "torus-room", targetPortalId: "right-left" },
         ],
       },
+    ],
+  });
+}
+
+// Two 5 m cells glued into a 10 m cylinder: a's right side to b's left side, b's right side to a's left side.
+function compileTwoCellCylinderWorld() {
+  const square = [{ x: 0, y: 0 }, { x: 5, y: 0 }, { x: 5, y: 5 }, { x: 0, y: 5 }];
+  return compileCellComplex({
+    cells: [
+      { id: "a", heightMeters: 3, baseVertices: square, portals: [
+        { id: "ab", sideIndex: 1, targetCellId: "b", targetPortalId: "ba" },
+        { id: "a-left", sideIndex: 3, targetCellId: "b", targetPortalId: "b-right" },
+      ] },
+      { id: "b", heightMeters: 3, baseVertices: square, portals: [
+        { id: "ba", sideIndex: 3, targetCellId: "a", targetPortalId: "ab" },
+        { id: "b-right", sideIndex: 1, targetCellId: "a", targetPortalId: "a-left" },
+      ] },
+    ],
+  });
+}
+
+// Cell a's right side is glued to cell b's left side; b's bottom side is glued to b's own right side, which is a
+// rotation by -90 degrees about b's corner (5, 0). A free loop around that corner has a kink, so it really moves.
+function compileRotatedFreeLoopWorld() {
+  const square = [{ x: 0, y: 0 }, { x: 5, y: 0 }, { x: 5, y: 5 }, { x: 0, y: 5 }];
+  return compileCellComplex({
+    cells: [
+      { id: "a", heightMeters: 3, baseVertices: square, portals: [
+        { id: "ab", sideIndex: 1, targetCellId: "b", targetPortalId: "ba" },
+      ] },
+      { id: "b", heightMeters: 3, baseVertices: square, portals: [
+        { id: "ba", sideIndex: 3, targetCellId: "a", targetPortalId: "ab" },
+        { id: "b-bottom", sideIndex: 0, targetCellId: "b", targetPortalId: "b-right" },
+        { id: "b-right", sideIndex: 1, targetCellId: "b", targetPortalId: "b-bottom" },
+      ] },
     ],
   });
 }

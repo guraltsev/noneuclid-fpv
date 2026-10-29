@@ -1,10 +1,30 @@
 # 68 - Moving the shared anchor of a loop across a portal must conjugate the word
 
-Status: open; re-verified 2026-10-28.
+Status: closed on 2026-10-29.
 
 Priority: P1 (correctness; silent change of homotopy class).
 
-Jobs: [05](../.agents/jobs/05_conjugate_loop_word_on_anchor_crossing.md).
+Jobs: [05](../../.agents/jobs/_done/05_conjugate_loop_word_on_anchor_crossing.md).
+
+## Outcome
+
+Fixed by job 05. A private helper, `portalWordAfterAnchorCrossing`, appends the crossed portal at an `end` role, prepends its
+inverse at a `start` role, and does both when one anchor holds both ends of a loop, so the word becomes the conjugate
+`p^-1 w p`. It serves the four sites: the explicit carried-traversal update, the inferred carried-traversal resolver,
+`updatePortalWordForMovedEndpoint` and the free end in `advanceCurveShorteningPairs`. `liftGeodesicEndpoint` now refuses a word
+that does not chain between the anchors' cells, and `createGeodesicIntervalObject` freely reduces the word it stores.
+
+## Closing evidence
+
+- `tests/world-objects/geodesicCannon.test.ts`, block "loop words under anchor portal crossings (job 05)":
+  - "conjugates a same-emitter torus loop when its emitter is carried across the top portal"
+  - "conjugates a torus loop when the crossing is inferred from the emitter's motion"
+  - "fails to rebuild a horizontal torus loop carried across the perpendicular portal instead of making it diagonal"
+  - "keeps a same-emitter loop through a portal crossing in a two-cell world"
+  - "conjugates a free loop's word when curve shortening moves its free end through a portal"
+  - "refuses to lift an interval whose word does not chain between its anchors' cells"
+  - "reduces the portal word when an interval is created"
+- Commit: the job 05 commit ("Conjugate a loop's portal word when its shared anchor crosses a portal (job 05)").
 
 ## Status update 2026-10-28
 

@@ -5,7 +5,7 @@
 
 This reference is produced from the source code. For the *meaning* of the modules — the mathematical model they implement — read [../MATHEMATICAL_MODEL.md](../MATHEMATICAL_MODEL.md) and [../ARCHITECTURE.md](../ARCHITECTURE.md). For every exported symbol see [API_REFERENCE.md](API_REFERENCE.md).
 
-**157 modules, 43,693 lines** under `src/`.
+**157 modules, 43,695 lines** under `src/`.
 
 ## Layers
 
@@ -17,7 +17,7 @@ A module belongs to the layer named by its first path segment under `src/`. "May
 | `cell-complex` | 11 | 3,204 | `math` | Prism-cell specs, compilation, portal transforms, portal-path tables, static visibility culling. |
 | `movement` | 7 | 956 | `math`, `cell-complex` | Player body, collision, movement and portal crossing in compiled cell complexes. |
 | `world-assets` | 1 | 200 | `cell-complex`, `glue` | Floor-texture and asset descriptors. |
-| `world-objects` | 11 | 8,678 | `math`, `cell-complex`, `movement`, `world-assets`, `glue` | Placeable runtime objects: registry, geodesic emitters, measurement tools, flags, creatures. |
+| `world-objects` | 11 | 8,680 | `math`, `cell-complex`, `movement`, `world-assets`, `glue` | Placeable runtime objects: registry, geodesic emitters, measurement tools, flags, creatures. |
 | `authoring` | 5 | 671 | `math`, `cell-complex`, `examples`, `world-assets`, `world-objects` | World builder DSL, world-script compiler, validation and world catalog. |
 | `runtime` | 10 | 2,637 | `math`, `cell-complex`, `movement`, `world-objects`, `authoring`, `ui`, `glue` | Runtime menu state, command dispatch, geometry session/worker and deformation families. |
 | `ui` | 6 | 1,274 | `math`, `cell-complex`, `runtime`, `world-objects`, `authoring`, `glue` | Renderer-neutral palette, help, tooltip and input-intent definitions. |
@@ -150,7 +150,7 @@ These imports break the intended layering. They are frozen in `scripts/docs/laye
 
 | Module | Lines | Summary | Imports |
 | --- | ---: | --- | --- |
-| `world-objects/geodesicCannon.ts` | 5943 | Geodesic emitters ("cannons"), geodesic intervals and curve shortening on a glued cell complex. | `cell-complex/compileCellComplex`, `math/rigidTransform3`, `math/vec3`, `movement/collision`, `movement/dynamicObject`, `movement/moveDynamicObject`, `world-objects/runtimeObjectRegistry` |
+| `world-objects/geodesicCannon.ts` | 5945 | Geodesic emitters ("cannons"), geodesic intervals and curve shortening on a glued cell complex. | `cell-complex/compileCellComplex`, `math/rigidTransform3`, `math/vec3`, `movement/collision`, `movement/dynamicObject`, `movement/moveDynamicObject`, `world-objects/runtimeObjectRegistry` |
 | `world-objects/geodesicMarmot.ts` | 265 | Geodesic marmot: an autonomous creature that walks in a straight line (a locally straight geodesic) through the cell complex, crossing portals. | `cell-complex/compileCellComplex`, `cell-complex/specs`, `math/rigidTransform3`, `math/vec3`, `movement/dynamicObject`, `movement/moveDynamicObject`, `render/three/buildDecorationMesh`, `render/three/debugCollisionWireframes`, `render/three/preloadWorldAssets`, `render/three/runtimeDiagnostics`, `render/three/worldAxes`, `runtime/worldGeometryDeformations`, `world-objects/runtimeObjectRegistry` |
 | `world-objects/helpHubCopy.ts` | 10 | Help-hub copy shared by the authoring layer (world tutorial text) and the ui layer (palette and help hubs), so both show identical wording. | — |
 | `world-objects/library.ts` | 396 | World object library: the catalogue of named, ready-to-place objects available to world scripts (tree, house, bench, geo_mouse, geodesic_marmot, ...). | `cell-complex/specs`, `world-objects/geodesicMarmot`, `world-objects/objectMetadata`, `world-objects/simpleGeoCreature`, `world-objects/staticAssets` |
