@@ -1,10 +1,11 @@
 /**
  * Geodesic marmot: an autonomous creature that walks in a straight line (a locally straight geodesic) through the cell complex, crossing portals.
  * Provides the authoring helper that produces a GeodesicMarmotObjectSpec, the runtime that owns its three.js proxy mesh and moves it each frame via moveDynamicObject with the autonomous portal-crossing mode, and the registry record kept in the RuntimeObjectRegistry.
- * Units are meters and seconds; poses live in the current cell's local frame (x right, y forward, z up) and the heading is a yaw in radians derived from the authored velocity (yaw = atan2(vx, vy); the marmot walks along its body +y axis rotated counterclockwise by that yaw, i.e. towards (-vx, vy), so the sign of vx appears mirrored relative to the authored velocity; known defect, see _issues/41_documentation_audit_findings.md). Forward speed is the magnitude of the 2D velocity and is constant; the marmot never turns on its own.
+ * Units are meters and seconds; poses live in the current cell's local frame (x right, y forward, z up) and the heading is a yaw in radians derived from the authored velocity as yaw = atan2(-vx, vy), so the marmot walks along its authored velocity (body +y axis R·e_y = (-sin yaw, cos yaw)). Forward speed is the magnitude of the 2D velocity and is constant; the marmot turns only when a forbidden zone blocks it, by reflecting off the nearest zone.
  */
 import * as THREE from "three";
 import type { CompiledCellComplex } from "../cell-complex/compileCellComplex";
+import type { CompiledPrismCell } from "../cell-complex/prismCells";
 import type { CellObjectSpec, GeodesicMarmotObjectSpec } from "../cell-complex/specs";
 import { yawRigidTransform3, transformDirection3, type RigidTransform3 } from "../math/rigidTransform3";
 import { vec3 } from "../math/vec3";
@@ -50,7 +51,7 @@ export interface GeodesicMarmotRuntime {
   readonly root: THREE.Object3D;
   readonly objectId: string;
   readonly cellId: string;
-  /** Advances the marmot by `deltaSeconds` along its heading, crossing portals as needed; no-op for non-positive speed or time. */
+  /** Advances the marmot by `deltaSeconds` along its heading, crossing portals as needed; no-op for non-positive speed or time; when a forbidden zone blocks the step it turns away from the nearest zone (reflection) instead of moving. */
   update(world: CompiledCellComplex, deltaSeconds: number): void;
   /** Attaches `root` to the scene node of the marmot's current cell if it is not already there. */
   syncParent(cellRoots: ReadonlyMap<string, THREE.Object3D>): void;
@@ -150,8 +151,10 @@ export function createGeodesicMarmotRuntime(
         displacement,
         portalCrossingMode: AUTONOMOUS_DYNAMIC_OBJECT_PORTAL_CROSSING_MODE,
       });
-      state = result.object;
-      syncRegistryObject(registry, objectSpec.id, result.object);
+      state = result.blocked && result.blockingReason === "forbidden-zone"
+        ? { ...state, localPose: turnAwayFromNearestForbiddenZone(state.localPose, world.cellsById.get(state.cellId)) }
+        : result.object;
+      syncRegistryObject(registry, objectSpec.id, state);
       applyObjectPose(root, state.localPose);
       refreshCollisionWireframe();
     },
@@ -254,9 +257,37 @@ function syncRegistryObject(
   });
 }
 
-// Known mirrored convention: a yaw of psi heads towards (-sin psi, cos psi), so atan2(vx, vy) walks towards (-vx, vy). The correct value would be atan2(-vx, vy), but the existing marmot test and authored worlds depend on the current behavior (_issues/41).
+// Forward is the body +y axis R·e_y = (-sin yaw, cos yaw); yaw = atan2(-vx, vy) makes it point along the velocity.
 function yawFromVelocity(velocity: GeodesicMarmotObjectSpec["velocity"]): number {
-  return Math.atan2(velocity.x, velocity.y);
+  return Math.atan2(-velocity.x, velocity.y);
+}
+
+/**
+ * Returns the pose turned away from the nearest forbidden-zone cylinder of the cell: the forward vector is reflected
+ * about the radial normal from the zone center to the marmot, or reversed if that reflection would not point away.
+ */
+function turnAwayFromNearestForbiddenZone(pose: RigidTransform3, cell: CompiledPrismCell | undefined): RigidTransform3 {
+  const forward = transformDirection3(pose, vec3(0, 1, 0));
+  const position = pose.translation;
+  let nearestCenter: { readonly x: number; readonly y: number } | undefined;
+  let nearestDistance = Infinity;
+  for (const column of cell?.singularityColumns ?? []) {
+    const distance = Math.hypot(position.x - column.center.x, position.y - column.center.y);
+    if (distance < nearestDistance) {
+      nearestDistance = distance;
+      nearestCenter = column.center;
+    }
+  }
+  let next = { x: -forward.x, y: -forward.y };
+  if (nearestCenter && nearestDistance > 1e-9) {
+    const normalX = (position.x - nearestCenter.x) / nearestDistance;
+    const normalY = (position.y - nearestCenter.y) / nearestDistance;
+    const dot = forward.x * normalX + forward.y * normalY;
+    if (dot < 0) {
+      next = { x: forward.x - 2 * dot * normalX, y: forward.y - 2 * dot * normalY };
+    }
+  }
+  return yawRigidTransform3(Math.atan2(-next.x, next.y), position);
 }
 
 function applyObjectPose(root: THREE.Object3D, pose: RigidTransform3): void {

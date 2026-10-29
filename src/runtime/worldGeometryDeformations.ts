@@ -151,21 +151,22 @@ export function transformPoseWithCellMaps(
 }
 
 /**
- * Maps a pose by sending its translation through mapPoint and its heading (the rotation's first column, projected to the horizontal plane) through mapDirection; the result is a pure yaw rotation, so pitch and roll are discarded.
+ * Maps a pose by sending its translation through mapPoint and its forward vector R·e_y (the rotation's second column, projected to the horizontal plane) through mapDirection; the new yaw makes R'·e_y parallel to the mapped forward vector. The result is a pure yaw rotation, so pitch and roll are discarded.
  */
 export function transformRigidPoseWithMap(
   pose: RigidTransform3,
   map: CellDeformationMap,
 ): RigidTransform3 {
   const translation = map.mapPoint(pose.translation);
-  const heading = map.mapDirection(vec3(pose.rotation.m00, pose.rotation.m10, 0), pose.translation);
-  const yawRadians = yawFromMappedHeading(heading);
+  // Forward is R·e_y = (m01, m11); carry it through the linear part of the map and rebuild the yaw from it.
+  const forward = map.mapDirection(vec3(pose.rotation.m01, pose.rotation.m11, 0), pose.translation);
+  const yawRadians = yawFromMappedForward(forward);
 
   return yawRigidTransform3(yawRadians, translation);
 }
 
 /**
- * Returns a copy of a cell-object spec with position and yaw (turnRadians or yawRadians, whichever is defined) mapped; for marmots the velocity direction is mapped too, keeping its speed, and yaw is re-derived from it (see the convention note in the function body: the real walking direction (-vx, vy) is what is transported).
+ * Returns a copy of a cell-object spec with position and yaw (turnRadians or yawRadians, whichever is defined) mapped; for marmots the velocity direction is mapped by the linear part, its speed kept, and the yaw re-derived as atan2(-v'x, v'y).
  */
 export function transformPositionedObjectSpecWithMap<TObject extends CellObjectSpec>(
   object: TObject,
@@ -185,27 +186,16 @@ export function transformPositionedObjectSpecWithMap<TObject extends CellObjectS
   };
 
   if (object.kind === "geodesci-marmot") {
-    // Convention note: the marmot (src/world-objects/geodesicMarmot.ts) derives yaw = atan2(vx, vy) and then
-    // walks along its body +y axis rotated counterclockwise by that yaw, i.e. along the REAL direction
-    // D(v) = (-vx, vy). The stored authored velocity is therefore the mirror image F v of the real walking
-    // direction (F = diag(-1, 1)). To transport the real walking direction exactly by the cell map's linear
-    // part L, we map D = F v through L and store v' = F L F v; the new yaw atan2(v'x, v'y) then points the
-    // body +y axis along L D. (Mapping v directly through L would not transport the walking direction.)
+    // The marmot walks along its velocity (yaw = atan2(-vx, vy)); carry the velocity direction by the map, keep the speed.
     const speedMetersPerSecond = Math.hypot(object.velocity.x, object.velocity.y);
-    const mappedWalk = speedMetersPerSecond > 0
-      ? normalizeVec3(map.mapDirection(vec3(-object.velocity.x, object.velocity.y, 0), object.position))
-      : vec3(0, 0, 0);
-    const mappedVelocity = vec3(-mappedWalk.x, mappedWalk.y, 0);
-
+    if (speedMetersPerSecond === 0) {
+      return transformedObject as TObject;
+    }
+    const forward = normalizeVec3(map.mapDirection(vec3(object.velocity.x, object.velocity.y, 0), object.position));
     return {
       ...transformedObject,
-      velocity: {
-        x: mappedVelocity.x * speedMetersPerSecond,
-        y: mappedVelocity.y * speedMetersPerSecond,
-      },
-      yawRadians: speedMetersPerSecond > 0
-        ? Math.atan2(mappedVelocity.x, mappedVelocity.y)
-        : transformedObject.yawRadians,
+      velocity: { x: forward.x * speedMetersPerSecond, y: forward.y * speedMetersPerSecond },
+      yawRadians: Math.atan2(-forward.x, forward.y),
     } as TObject;
   }
 
@@ -426,9 +416,9 @@ function structurallyEqual(left: unknown, right: unknown): boolean {
   );
 }
 
-function yawFromMappedHeading(heading: Vec3): number {
-  const horizontal = normalizeVec3({ x: heading.x, y: heading.y, z: 0 });
-  return Math.atan2(horizontal.y, horizontal.x);
+function yawFromMappedForward(forward: Vec3): number {
+  const horizontal = normalizeVec3({ x: forward.x, y: forward.y, z: 0 });
+  return Math.atan2(-horizontal.x, horizontal.y);
 }
 
 function yawFromRigidPose(pose: RigidTransform3): number {

@@ -352,6 +352,14 @@ mapped to the point with the *same* coordinates in the new lattice, $o'+\alpha u
 are mapped by the same linear part. A step moves $(a,b)$ along the straight segment towards the target by at most
 `maxStepMeters` (default 0.08 m) and snaps when close.
 
+**Headings.** Forward is the body +y axis $R e_y=(-\sin\psi,\cos\psi)$ for every yaw pose (player, creatures,
+marmots, flags). A commit carries the forward vector by the linear part $A$ of the cell map,
+$f'=A f/|A f|$, and rebuilds the yaw as $\psi'=\operatorname{atan2}(-f'_x,f'_y)$
+(`src/runtime/worldGeometryDeformations.ts#transformRigidPoseWithMap`); a marmot's velocity becomes $|v|\,f'$.
+Because $A$ maps the lattice to the lattice, a body walking along a closed geodesic of class $(p,q)\in\mathbb Z^2$
+still walks along one of class $(p,q)$ after the commit. Geodesic cannon yaws are direction angles
+($(\cos\psi,\sin\psi)$) and are carried as directions (`src/render/three/runtimeSceneUtils.ts#transformYawWithMap`).
+
 `src/runtime/worldGeometrySession.ts#createWorldGeometrySession` keeps the committed *current* state, the *target*, at most
 one build in flight and one finished snapshot. Each build normalizes the next state, applies it to the **base** spec (never to
 the previous deformed spec, so error does not accumulate), recompiles the complex, validates topology preservation and rebuilds
@@ -394,10 +402,9 @@ rather than discovered.
   heights/vertices and unequal glued side lengths. Unequal cell heights across a portal are not rejected.
 - **Culling soundness.** See Section 4: the aperture slack and the projective stage can in principle cull a visible path.
 - **Wall overlap at crossings.** The target cell's walls are not tested when a body crosses a portal (Section 5).
-- **Yaw conventions.** Rigid-transform yaw is $\operatorname{atan2}(R_{10},R_{00})$. The marmot derives its heading from
-  its velocity as $\operatorname{atan2}(v_x,v_y)$, so it actually walks along $(-v_x,v_y)$ — a mirror of the authored velocity
-  (`src/world-objects/geodesicMarmot.ts#yawFromVelocity`); deformation maps transport the *real* direction. Fixing this
-  changes every authored marmot and is tracked in issue 64. (The placed-flag facing was wrong in the same way and is fixed.)
+- **Yaw conventions.** Rigid-transform yaw is $\operatorname{atan2}(R_{10},R_{00})$ and forward is $R e_y$. The marmot
+  derives its yaw from its velocity as $\operatorname{atan2}(-v_x,v_y)$, so it walks along $v$. Geodesic cannon and
+  protractor yaws are direction angles along $(\cos\psi,\sin\psi)$.
 - **Curve shortening.** A step that would lengthen the pair is skipped rather than rolled back to a fused geodesic, so a pair
   whose recorded length is stale may stall without ever becoming ready to fuse. Fusion and absorption assume the non-free ends are emitters, and
   intervals are assumed to run emitter→free end with the emitter at the `start` role.

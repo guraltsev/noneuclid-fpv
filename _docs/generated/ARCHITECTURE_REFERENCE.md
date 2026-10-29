@@ -5,7 +5,7 @@
 
 This reference is produced from the source code. For the *meaning* of the modules — the mathematical model they implement — read [../MATHEMATICAL_MODEL.md](../MATHEMATICAL_MODEL.md) and [../ARCHITECTURE.md](../ARCHITECTURE.md). For every exported symbol see [API_REFERENCE.md](API_REFERENCE.md).
 
-**157 modules, 43,710 lines** under `src/`.
+**157 modules, 43,730 lines** under `src/`.
 
 ## Layers
 
@@ -17,12 +17,12 @@ A module belongs to the layer named by its first path segment under `src/`. "May
 | `cell-complex` | 11 | 3,204 | `math` | Prism-cell specs, compilation, portal transforms, portal-path tables, static visibility culling. |
 | `movement` | 7 | 956 | `math`, `cell-complex` | Player body, collision, movement and portal crossing in compiled cell complexes. |
 | `world-assets` | 1 | 200 | `cell-complex`, `glue` | Floor-texture and asset descriptors. |
-| `world-objects` | 11 | 8,695 | `math`, `cell-complex`, `movement`, `world-assets`, `glue` | Placeable runtime objects: registry, geodesic emitters, measurement tools, flags, creatures. |
+| `world-objects` | 11 | 8,726 | `math`, `cell-complex`, `movement`, `world-assets`, `glue` | Placeable runtime objects: registry, geodesic emitters, measurement tools, flags, creatures. |
 | `authoring` | 5 | 671 | `math`, `cell-complex`, `examples`, `world-assets`, `world-objects` | World builder DSL, world-script compiler, validation and world catalog. |
-| `runtime` | 10 | 2,637 | `math`, `cell-complex`, `movement`, `world-objects`, `authoring`, `ui`, `glue` | Runtime menu state, command dispatch, geometry session/worker and deformation families. |
+| `runtime` | 10 | 2,627 | `math`, `cell-complex`, `movement`, `world-objects`, `authoring`, `ui`, `glue` | Runtime menu state, command dispatch, geometry session/worker and deformation families. |
 | `ui` | 6 | 1,274 | `math`, `cell-complex`, `runtime`, `world-objects`, `authoring`, `glue` | Renderer-neutral palette, help, tooltip and input-intent definitions. |
 | `glue` | 11 | 997 | `authoring`, `runtime`, `ui` | Launch options, debug settings, asset URLs, app configuration. |
-| `render` | 87 | 24,295 | anything | Three.js / DOM / WebXR rendering and input adapters (the application shell). |
+| `render` | 87 | 24,294 | anything | Three.js / DOM / WebXR rendering and input adapters (the application shell). |
 | `root` | 2 | 234 | anything | Entry point and application state. |
 
 ## Layer dependency graph
@@ -52,7 +52,7 @@ flowchart LR
   movement -->|10| math
   render -->|36| cell_complex
   render -->|29| glue
-  render -->|28| math
+  render -->|27| math
   render -->|29| movement
   render -->|3| root
   render -->|22| runtime
@@ -72,7 +72,7 @@ flowchart LR
   ui -->|3| runtime
   ui -->|3| world_objects
   world_assets -->|1| cell_complex
-  world_objects -->|10| cell_complex
+  world_objects -->|11| cell_complex
   world_objects -->|13| math
   world_objects -->|11| movement
   world_objects -.->|9| render
@@ -151,7 +151,7 @@ These imports break the intended layering. They are frozen in `scripts/docs/laye
 | Module | Lines | Summary | Imports |
 | --- | ---: | --- | --- |
 | `world-objects/geodesicCannon.ts` | 5960 | Geodesic emitters ("cannons"), geodesic intervals and curve shortening on a glued cell complex. | `cell-complex/compileCellComplex`, `math/rigidTransform3`, `math/vec3`, `movement/collision`, `movement/dynamicObject`, `movement/moveDynamicObject`, `world-objects/runtimeObjectRegistry` |
-| `world-objects/geodesicMarmot.ts` | 265 | Geodesic marmot: an autonomous creature that walks in a straight line (a locally straight geodesic) through the cell complex, crossing portals. | `cell-complex/compileCellComplex`, `cell-complex/specs`, `math/rigidTransform3`, `math/vec3`, `movement/dynamicObject`, `movement/moveDynamicObject`, `render/three/buildDecorationMesh`, `render/three/debugCollisionWireframes`, `render/three/preloadWorldAssets`, `render/three/runtimeDiagnostics`, `render/three/worldAxes`, `runtime/worldGeometryDeformations`, `world-objects/runtimeObjectRegistry` |
+| `world-objects/geodesicMarmot.ts` | 296 | Geodesic marmot: an autonomous creature that walks in a straight line (a locally straight geodesic) through the cell complex, crossing portals. | `cell-complex/compileCellComplex`, `cell-complex/prismCells`, `cell-complex/specs`, `math/rigidTransform3`, `math/vec3`, `movement/dynamicObject`, `movement/moveDynamicObject`, `render/three/buildDecorationMesh`, `render/three/debugCollisionWireframes`, `render/three/preloadWorldAssets`, `render/three/runtimeDiagnostics`, `render/three/worldAxes`, `runtime/worldGeometryDeformations`, `world-objects/runtimeObjectRegistry` |
 | `world-objects/helpHubCopy.ts` | 10 | Help-hub copy shared by the authoring layer (world tutorial text) and the ui layer (palette and help hubs), so both show identical wording. | — |
 | `world-objects/library.ts` | 396 | World object library: the catalogue of named, ready-to-place objects available to world scripts (tree, house, bench, geo_mouse, geodesic_marmot, ...). | `cell-complex/specs`, `world-objects/geodesicMarmot`, `world-objects/objectMetadata`, `world-objects/simpleGeoCreature`, `world-objects/staticAssets` |
 | `world-objects/measureLengthTool.ts` | 226 | Measured-length tool: persistent "geodesic length = N m" labels attached to a geodesic. | `math/rigidTransform3`, `math/vec3`, `world-objects/geodesicCannon`, `world-objects/runtimeObjectRegistry` |
@@ -182,7 +182,7 @@ These imports break the intended layering. They are frozen in `scripts/docs/laye
 | `runtime/runtimeMenuState.ts` | 733 | Renderer-neutral state machine for the in-game menu, shared by the desktop overlay and the VR palette. | `cell-complex/specs`, `glue/appConfig`, `glue/debugLevels`, `glue/debugOptions`, `glue/debugSettings`, `glue/portalPanelMode`, `glue/vrComfortOptions`, `world-objects/placedFlags` |
 | `runtime/worldGeometryComputedObjects.ts` | 329 | Policy for derived objects (geodesics, measured geodesic lengths, protractor angles, geodesic intersection markers) when a newly deformed world geometry is committed. | `cell-complex/compileCellComplex`, `math/vec3`, `world-objects/geodesicCannon`, `world-objects/measureLengthTool`, `world-objects/protractorTool`, `world-objects/runtimeObjectRegistry` |
 | `runtime/worldGeometryDeformationFamilies.ts` | 132 | Registry of WorldDeformationFamily implementations keyed by state kind, plus helpers to apply a state to a spec and to choose the initial state for a world. | `cell-complex/specs`, `runtime/deformations/torusSkewDeformation`, `runtime/worldGeometryDeformations` |
-| `runtime/worldGeometryDeformations.ts` | 440 | Family-independent vocabulary and helpers for live deformation of a cell complex while preserving its combinatorics (cells, sides, portals and their pairing). | `cell-complex/compileCellComplex`, `cell-complex/specs`, `math/rigidTransform3`, `math/vec3`, `runtime/deformations/torusSkewDeformation` |
+| `runtime/worldGeometryDeformations.ts` | 430 | Family-independent vocabulary and helpers for live deformation of a cell complex while preserving its combinatorics (cells, sides, portals and their pairing). | `cell-complex/compileCellComplex`, `cell-complex/specs`, `math/rigidTransform3`, `math/vec3`, `runtime/deformations/torusSkewDeformation` |
 | `runtime/worldGeometrySession.ts` | 298 | Owns the live deformation of the cell complex during play: it tracks the committed deformation state (current), the requested target, and at most one in-flight background build. | `cell-complex/compileCellComplex`, `cell-complex/specs`, `cell-complex/staticPortalPathCull`, `runtime/worldGeometryDeformationFamilies`, `runtime/worldGeometryDeformations`, `runtime/worldGeometryWorkerClient` |
 | `runtime/worldGeometryWorker.ts` | 115 | Pure build step (and Web Worker entry) that turns a base CellComplexSpec plus a deformation state into a fully compiled, topology-validated world with its static portal-path culling tables. | `cell-complex/compileCellComplex`, `cell-complex/specs`, `cell-complex/staticPortalPathCull`, `runtime/worldGeometryDeformationFamilies`, `runtime/worldGeometryDeformations` |
 | `runtime/worldGeometryWorkerClient.ts` | 127 | Abstracts where world-geometry snapshots are built: a dedicated module Web Worker, or an inline fallback on the main thread. | `runtime/worldGeometryWorker` |
@@ -276,7 +276,7 @@ These imports break the intended layering. They are frozen in `scripts/docs/laye
 | `render/three/runtimeObjectGhostRecords.ts` | 100 | Creates "ghost" render records so a dynamic object that overlaps a portal is drawn on both sides of it. | `cell-complex/compileCellComplex`, `math/rigidTransform3`, `movement/collision`, `movement/dynamicObject`, `render/three/runtimeObjectRenderRecords`, `render/three/worldAxes` |
 | `render/three/runtimeObjectRenderArchetypes.ts` | 153 | Instanced-mesh archetypes for runtime objects: one `THREE.InstancedMesh` per source mesh, drawn once per visible portal path. | `render/three/portalClipMaterial`, `render/three/runtimeObjectRenderRecords`, `render/three/runtimeSceneUtils` |
 | `render/three/runtimeObjectRenderRecords.ts` | 71 | Data records describing where runtime (non-static) objects should be drawn, and the source meshes they instance. | — |
-| `render/three/runtimeSceneUtils.ts` | 193 | Small scene-graph, geometry, and pose helpers shared by the app shell. | `appState`, `cell-complex/prismCells`, `math/rigidTransform3`, `math/vec3`, `movement/playerBody`, `render/three/debugCollisionWireframes`, `runtime/worldGeometryDeformations`, `world-objects/runtimeObjectRegistry` |
+| `render/three/runtimeSceneUtils.ts` | 192 | Small scene-graph, geometry, and pose helpers shared by the app shell. | `appState`, `cell-complex/prismCells`, `math/vec3`, `movement/playerBody`, `render/three/debugCollisionWireframes`, `runtime/worldGeometryDeformations`, `world-objects/runtimeObjectRegistry` |
 | `render/three/sceneColors.ts` | 8 | Shared scene colour constants for the Three.js renderer. | — |
 | `render/three/sceneLighting.ts` | 70 | Lighting rig for the stylized (non-physical) look of the scene. | — |
 | `render/three/scenePaletteController.ts` | 627 | Controller that owns the in-scene palette's scene graph and routes pointer input to palette actions, for both desktop and XR. | `glue/portalPanelMode`, `render/three/canvasDrawing`, `render/three/runtimeSceneUtils`, `render/three/scenePaletteInput`, `render/three/scenePaletteLibraryAdapter`, `render/three/scenePointers`, `runtime/runtimeMenuState`, `ui/paletteDefinition`, `ui/paletteTooltips`, `world-objects/placedFlags` |

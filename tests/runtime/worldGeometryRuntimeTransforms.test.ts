@@ -19,7 +19,7 @@ describe("world geometry runtime transforms", () => {
     expect(spec.startingPosition?.position.x).toBeCloseTo(0.6);
     expect(spec.startingPosition?.position.y).toBeCloseTo(3);
     expect(spec.startingPosition?.position.z).toBeCloseTo(1);
-    expect(spec.startingPosition?.yawRadians).toBeCloseTo(Math.atan2(15, 3));
+    expect(spec.startingPosition?.yawRadians).toBeCloseTo(Math.PI / 2);
   });
 
   it("rebuilds authored static asset collision records from the deformed spec pose", () => {
@@ -53,7 +53,7 @@ describe("world geometry runtime transforms", () => {
     expect(transformed?.localPose.translation.y).toBeCloseTo(3);
     expect(transformed?.localPose.translation.z).toBeCloseTo(0);
     expect(transformed ? Math.atan2(transformed.localPose.rotation.m10, transformed.localPose.rotation.m00) : 0)
-      .toBeCloseTo(Math.atan2(15, 2));
+      .toBeCloseTo(Math.PI / 2);
   });
 
   it("keeps dynamic creature private state and registry state aligned after deformation", () => {

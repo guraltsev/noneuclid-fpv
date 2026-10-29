@@ -6,10 +6,9 @@
 import * as THREE from "three";
 import { type AppState } from "../../appState";
 import { type CompiledPrismCell } from "../../cell-complex/prismCells";
-import { yawRigidTransform3 } from "../../math/rigidTransform3";
-import { type Vec3 } from "../../math/vec3";
+import { vec3, type Vec3 } from "../../math/vec3";
 import { DEFAULT_PLAYER_EYE_HEIGHT_METERS } from "../../movement/playerBody";
-import { type CellDeformationMap, transformRigidPoseWithMap } from "../../runtime/worldGeometryDeformations";
+import { type CellDeformationMap } from "../../runtime/worldGeometryDeformations";
 import { type RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
 import { buildForbiddenZoneWireframe } from "./debugCollisionWireframes";
 
@@ -156,13 +155,13 @@ export function yawFromPose(pose: { readonly rotation: { readonly m00: number; r
   return Math.atan2(pose.rotation.m10, pose.rotation.m00);
 }
 
-/** Returns the yaw (radians) of a yaw-only pose at atPoint after pushing it through a deformation map. */
-export function transformYawWithMap(
-  yawRadians: number,
-  atPoint: Vec3,
-  map: CellDeformationMap,
-): number {
-  return yawFromPose(transformRigidPoseWithMap(yawRigidTransform3(yawRadians, atPoint), map));
+/**
+ * Maps a direction angle (the direction (cos yaw, sin yaw), as used by geodesic cannon aim and emitter yaws) at
+ * atPoint through a deformation map's linear part and returns the angle of the image, atan2(d'.y, d'.x).
+ */
+export function transformYawWithMap(yawRadians: number, atPoint: Vec3, map: CellDeformationMap): number {
+  const direction = map.mapDirection(vec3(Math.cos(yawRadians), Math.sin(yawRadians), 0), atPoint);
+  return Math.atan2(direction.y, direction.x);
 }
 
 /** Builds a group with one forbidden-zone collision wireframe per forbidden zone of the cell; the caller owns the group and must dispose it (see disposeObject3D). */

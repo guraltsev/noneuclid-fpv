@@ -13,9 +13,12 @@ import {
   type TorusSkewDeformationState,
 } from "../../src/runtime/deformations/torusSkewDeformation";
 import {
+  transformPoseWithCellMaps,
   transformPositionedObjectSpecWithMap,
   transformRigidPoseWithMap,
 } from "../../src/runtime/worldGeometryDeformations";
+import { transformYawWithMap } from "../../src/render/three/runtimeSceneUtils";
+import { createGeodesicMarmot, createGeodesicMarmotRuntimeObject } from "../../src/world-objects/geodesicMarmot";
 import type { CellObjectSpec } from "../../src/cell-complex/specs";
 
 describe("torus skew deformation", () => {
@@ -65,15 +68,16 @@ describe("torus skew deformation", () => {
     expect(map.mapPoint(vec3(-7.5, -7.5, 0))).toEqual({ x: -8.5, y: -7.5, z: 0 });
   });
 
-  it("maps a vertical-lattice heading into the skewed heading", () => {
+  it("maps the forward vector through the linear part of the lattice map", () => {
     const map = createTorusSkewCellDeformationMaps(skewState(0), skewState(2)).get("torus-room")!;
     const transformed = map.mapDirection(vec3(0, 1, 0));
 
     expect(transformed.x / transformed.y).toBeCloseTo(2 / 15);
 
-    const pose = transformRigidPoseWithMap(yawRigidTransform3(Math.PI / 2, vec3(0, 0, 0)), map);
-
-    expect(Math.tan(Math.atan2(pose.rotation.m10, pose.rotation.m00))).toBeCloseTo(15 / 2);
+    const pose = transformRigidPoseWithMap(yawRigidTransform3(0, vec3(0, 0, 0)), map);
+    expect(Math.atan2(pose.rotation.m10, pose.rotation.m00)).toBeCloseTo(-Math.atan(2 / 15), 10);
+    // New forward R'·e_y = (m01, m11) is parallel to A·e_y = (2/15, 1).
+    expect(pose.rotation.m01 / pose.rotation.m11).toBeCloseTo(2 / 15, 10);
   });
 
   it("rejects invalid non-torus specs clearly", () => {
@@ -116,33 +120,51 @@ describe("torus skew deformation", () => {
     ).toBe(15);
   });
 
-  it("transports the marmot's real walking direction by the linear part of the map", () => {
+  it("transports the marmot velocity direction by the linear part of the map", () => {
     const map = createTorusSkewCellDeformationMaps(skewState(0), skewState(6)).get("torus-room")!;
     const velocity = { x: 0.6, y: 0.8 };
     const marmot = {
-      kind: "geodesci-marmot",
-      id: "m",
-      position: vec3(1, 2, 0),
-      velocity,
-      yawRadians: Math.atan2(velocity.x, velocity.y),
+      kind: "geodesci-marmot", id: "m", position: vec3(1, 2, 0), velocity,
+      yawRadians: Math.atan2(-velocity.x, velocity.y),
     } as unknown as CellObjectSpec;
-
     const mapped = transformPositionedObjectSpecWithMap(marmot, map) as unknown as {
-      velocity: { x: number; y: number };
-      yawRadians: number;
+      velocity: { x: number; y: number }; yawRadians: number;
     };
+    expect(mapped.velocity.x).toBeCloseTo(0.7546055221635046, 10);
+    expect(mapped.velocity.y).toBeCloseTo(0.6561787149247866, 10);
+    expect(mapped.yawRadians).toBeCloseTo(-0.8550527371260165, 10);
+    // The body +y axis of the new yaw points along the new velocity.
+    expect(-Math.sin(mapped.yawRadians)).toBeCloseTo(mapped.velocity.x, 10);
+    expect(Math.cos(mapped.yawRadians)).toBeCloseTo(mapped.velocity.y, 10);
+  });
 
-    // The marmot walks along (-sin yaw, cos yaw) = (-vx, vy)/|v| (see geodesicMarmot.ts).
-    const walkBefore = vec3(-velocity.x, velocity.y, 0);
-    const expected = map.mapDirection(walkBefore);
-    const expectedLength = Math.hypot(expected.x, expected.y);
-    const walkAfter = { x: -Math.sin(mapped.yawRadians), y: Math.cos(mapped.yawRadians) };
+  it("keeps a closed-geodesic forward vector closed under a full shear", () => {
+    const map = createTorusSkewCellDeformationMaps(skewState(0), skewState(15)).get("torus-room")!;
+    // Forward (1, 0) is yaw -π/2; A·(1, 0) = (1, 0).
+    const east = transformRigidPoseWithMap(yawRigidTransform3(-Math.PI / 2, vec3(1, 2, 0)), map);
+    expect(east.rotation.m01).toBeCloseTo(1, 10);
+    expect(east.rotation.m11).toBeCloseTo(0, 10);
+    // Forward ∝ v = (0, 15) is yaw 0; it must become ∝ v' = (15, 15), yaw -π/4.
+    const north = transformRigidPoseWithMap(yawRigidTransform3(0, vec3(1, 2, 0)), map);
+    expect(Math.atan2(north.rotation.m10, north.rotation.m00)).toBeCloseTo(-Math.PI / 4, 10);
+    expect(north.rotation.m01).toBeCloseTo(Math.SQRT1_2, 10);
+    expect(north.rotation.m11).toBeCloseTo(Math.SQRT1_2, 10);
+  });
 
-    expect(walkAfter.x).toBeCloseTo(expected.x / expectedLength, 10);
-    expect(walkAfter.y).toBeCloseTo(expected.y / expectedLength, 10);
-    expect(Math.hypot(mapped.velocity.x, mapped.velocity.y)).toBeCloseTo(1, 10);
-    expect(-mapped.velocity.x).toBeCloseTo(expected.x / expectedLength, 10);
-    expect(mapped.velocity.y).toBeCloseTo(expected.y / expectedLength, 10);
+  it("keeps geodesic cannon direction angles as directions", () => {
+    const map = createTorusSkewCellDeformationMaps(skewState(0), skewState(15)).get("torus-room")!;
+    expect(transformYawWithMap(0, vec3(0, 0, 0), map)).toBeCloseTo(0, 10);
+    expect(transformYawWithMap(Math.PI / 2, vec3(0, 0, 0), map)).toBeCloseTo(Math.PI / 4, 10);
+  });
+
+  it("live and authored marmots get the same heading after a commit", () => {
+    const maps = createTorusSkewCellDeformationMaps(skewState(0), skewState(6));
+    const spec = createGeodesicMarmot({ id: "m", position: { x: 1, y: 2, z: 0 }, velocity: { x: 0.6, y: 0.8 } });
+    const live = transformPoseWithCellMaps(createGeodesicMarmotRuntimeObject(spec, "torus-room"), maps)!;
+    const authored = transformPositionedObjectSpecWithMap(spec, maps.get("torus-room")!);
+    const liveYaw = Math.atan2(live.localPose.rotation.m10, live.localPose.rotation.m00);
+    expect(liveYaw).toBeCloseTo(-0.8550527371260165, 10);
+    expect(authored.yawRadians!).toBeCloseTo(liveYaw, 10);
   });
 
   it("keeps immediate reverse paths filtered under depth-10 static culling", () => {

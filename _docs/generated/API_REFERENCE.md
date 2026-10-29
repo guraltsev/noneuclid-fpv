@@ -794,8 +794,8 @@ Family-independent vocabulary and helpers for live deformation of a cell complex
 | interface | `RuntimePoseInCell` | Rigid pose expressed in the local frame of a named cell. |
 | function | `applyPrismBaseReplacements` | Returns a spec whose listed cells have their baseVertices replaced (copied) while all else is shared with the input; throws if any replacement names a missing cell. |
 | function | `transformPoseWithCellMaps` | Maps a cell-local pose through the map for its cell, or returns undefined if that cell has no map. |
-| function | `transformRigidPoseWithMap` | Maps a pose by sending its translation through mapPoint and its heading (the rotation's first column, projected to the horizontal plane) through mapDirection; the result is a pure yaw rotation, so pitch and roll are dis… |
-| function | `transformPositionedObjectSpecWithMap` | Returns a copy of a cell-object spec with position and yaw (turnRadians or yawRadians, whichever is defined) mapped; for marmots the velocity direction is mapped too, keeping its speed, and yaw is re-derived from it (se… |
+| function | `transformRigidPoseWithMap` | Maps a pose by sending its translation through mapPoint and its forward vector R·e_y (the rotation's second column, projected to the horizontal plane) through mapDirection; the new yaw makes R'·e_y parallel to the mappe… |
+| function | `transformPositionedObjectSpecWithMap` | Returns a copy of a cell-object spec with position and yaw (turnRadians or yawRadians, whichever is defined) mapped; for marmots the velocity direction is mapped by the linear part, its speed kept, and the yaw re-derive… |
 | function | `transformStartingPositionWithMap` | Maps a spec's startingPosition through the map for its cell; returns it unchanged if there is no map and undefined if there is no starting position. |
 | function | `transformCellObjectsWithMaps` | Returns the cell with every visuals.objects entry mapped by the cell's map, or the same cell if it has no map or no objects. |
 | function | `createIdentityCellDeformationMaps` | Creates a copy-through map for every cell of the world, used by families that do not move anything. |
@@ -1779,7 +1779,7 @@ Small scene-graph, geometry, and pose helpers shared by the app shell.
 | function | `disposeCanvasTextures` | Disposes every `CanvasTexture` used as a material `map` under object (for example portal debug labels), leaving geometries, materials and all other textures alone. |
 | function | `distanceSquared` | Returns the squared Euclidean distance between two points, in square meters. |
 | function | `yawFromPose` | Extracts the yaw (radians, about +z, atan2 of m10 and m00) from a pose's rotation matrix. |
-| function | `transformYawWithMap` | Returns the yaw (radians) of a yaw-only pose at atPoint after pushing it through a deformation map. |
+| function | `transformYawWithMap` | Maps a direction angle (the direction (cos yaw, sin yaw), as used by geodesic cannon aim and emitter yaws) at atPoint through a deformation map's linear part and returns the angle of the image, atan2(d'.y, d'.x). |
 | function | `buildCurrentCellForbiddenZoneWireframes` | Builds a group with one forbidden-zone collision wireframe per forbidden zone of the cell; the caller owns the group and must dispose it (see disposeObject3D). |
 | function | `runtimeObjectArchetypeKeyPrefix` | Returns the render-archetype key prefix for a runtime object: kind and id, plus the flag type for placed flags. |
 | function | `clampInteger` | Rounds value to the nearest integer and clamps it to [ceil(min), floor(max)]; if that interval is empty the result is the lower bound, ceil(min). |
