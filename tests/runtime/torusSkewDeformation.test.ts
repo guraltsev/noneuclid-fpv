@@ -25,6 +25,8 @@ import {
 import { transformYawWithMap } from "../../src/render/three/runtimeSceneUtils";
 import { createGeodesicMarmot, createGeodesicMarmotRuntimeObject } from "../../src/world-objects/geodesicMarmot";
 import type { CellObjectSpec } from "../../src/cell-complex/specs";
+import { floorLatticeUv } from "../../src/cell-complex/floorUv";
+import { transformPoint3 } from "../../src/math/rigidTransform3";
 
 describe("torus skew deformation", () => {
   it("zero skew reproduces the current torus square", () => {
@@ -268,6 +270,63 @@ describe("torus skew base frame and width step", () => {
     const target = { ...rest, widthMeters: 20, depthMeters: 10, skewXMeters: 0 };
     const { state } = runSteps(start, target);
     expect(deformationStatesEqual(state, target)).toBe(true);
+  });
+});
+
+describe("torus skew floor UV frames", () => {
+  const family = createTorusSkewDeformationFamily();
+  const rest = skewState(0);
+  const s15 = skewState(15);
+  const trap = { ...skewState(30), depthMeters: 7.5 };
+  const frame = (state: TorusSkewDeformationState) => family.floorUvFrames!(torusModuli, state).get("torus-room")!;
+
+  it("keeps the floor UV of a mapped point across commits", () => {
+    for (const next of [s15, trap]) {
+      const map = createTorusSkewCellDeformationMaps(rest, next).get("torus-room")!;
+      for (const p of [{ x: 0, y: 0 }, { x: 6, y: 3 }, { x: -7, y: 7 }, { x: 7.4, y: -7.4 }, { x: -3.0, y: 0.6 }]) {
+        const before = floorLatticeUv(frame(rest), p);
+        const mapped = map.mapPoint(vec3(p.x, p.y, 0));
+        const after = floorLatticeUv(frame(next), mapped);
+        expect(after[0]).toBeCloseTo(before[0], 9);
+        expect(after[1]).toBeCloseTo(before[1], 9);
+      }
+    }
+  });
+
+  it("keeps floor UVs seamless across every torus portal", () => {
+    for (const state of [rest, s15, trap]) {
+      const world = compileCellComplex(family.applyToSpec(torusModuli, state));
+      const cell = world.cellsById.get("torus-room")!;
+      for (const portal of cell.portals) {
+        const a = cell.baseVertices[portal.sideIndex];
+        const b = cell.baseVertices[(portal.sideIndex + 1) % cell.baseVertices.length];
+        for (const q of [a, { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, b]) {
+          const uvA = floorLatticeUv(frame(state), q);
+          const moved = transformPoint3(portal.transformToTarget, vec3(q.x, q.y, 0));
+          const uvB = floorLatticeUv(frame(state), moved);
+          for (const k of [0, 1]) {
+            const d = uvB[k] - uvA[k];
+            expect(Math.abs(d - Math.round(d))).toBeLessThan(1e-9);
+          }
+        }
+      }
+    }
+  });
+
+  it("uses six tiles per lattice vector for the torus-moduli pebbles", () => {
+    expect(frame(rest).tilesAlongU).toBe(6);
+    expect(frame(rest).tilesAlongV).toBe(6);
+    expect(frame(trap).tilesAlongU).toBe(6);
+    expect(frame(trap).tilesAlongV).toBe(6);
+  });
+
+  it("has no floor UV frame for a colour floor", () => {
+    const cell = torus.cells[0];
+    const spec = {
+      ...torus,
+      cells: [{ ...cell, visuals: { ...cell.visuals, floorMaterial: { kind: "floor-color" as const, floorColor: "#888888" } } }],
+    };
+    expect(family.floorUvFrames!(spec, rest).size).toBe(0);
   });
 });
 

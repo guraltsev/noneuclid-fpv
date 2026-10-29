@@ -1,11 +1,29 @@
 # 81 - Floor texture slides under objects during deformation; tile size depends on cell span
 
-Status: open; re-verified 2026-10-28.
+Status: closed on 2026-10-29.
 
 Priority: P1 (correctness, visible in `torus-moduli`). Related: issue 53 (pose transport), issue 82 (commit cost; this
 issue's fix removes one of its costs).
 
-Jobs: [10](../.agents/jobs/10_floor_texture_in_lattice_coordinates.md).
+Jobs: [10](../../.agents/jobs/_done/10_floor_texture_in_lattice_coordinates.md).
+
+## Outcome
+
+Fixed by job 10. `tileSizeMeters` is now a true period: floor UVs are (x/T, y/T) and the texture repeat is always 1
+(`src/render/three/buildCellMesh.ts`, `src/cell-complex/floorUv.ts`). In the `torus-skew` family the floor UVs are
+(nU*alpha, nV*beta) in the lattice frame of the current state, with whole tile counts fixed from the base state
+(`torusSkewDeformation.ts#floorUvFrames`, passed down by `rebuildCellMeshes`). The floor moves with the objects and is
+seamless across portals. Stock tile sizes were divided by 15 to keep the shipped look.
+
+## Closing evidence
+
+- `tests/runtime/torusSkewDeformation.test.ts`: "keeps the floor UV of a mapped point across commits" (rest to a = 15 and
+  to (30, 7.5), 1e-9); "keeps floor UVs seamless across every torus portal" (rest and both deformed states).
+- `tests/render-contract/buildCellMesh.test.ts`: "gives floor textures a period of tileSizeMeters meters" (cell sizes 10
+  and 40); "requests the floor texture with repeat 1"; "uses lattice UVs when a floor UV frame is given".
+- `tests/render-contract/cellRenderArchetypes.test.ts`: "passes the floor UV frame through to the floor archetype".
+- `tests/cell-complex/floorUv.test.ts` (3 tests) covers the UV formulas.
+- Manual sweep in the browser: not run.
 
 ## Status update 2026-10-28
 

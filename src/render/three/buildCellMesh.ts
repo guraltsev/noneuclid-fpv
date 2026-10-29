@@ -5,13 +5,14 @@
  * `heightMeters`. The returned group is authored directly in Three.js axes (world (x, y, z) becomes (x, z, -y), see
  * `worldAxes`): a textured floor at y = 0, a ceiling at y = height, one wall per side (a solid wall, or a portal
  * wall via `buildPortalMesh` for sides with a portal), optional portal debug panels, optional forbidden-zone
- * wireframes and one decoration per static object spec. Meshes carry names (`floor:`, `ceiling:`, `wall:`) and
+ * wireframes and one decoration per static object spec. Floor UVs are metric (one texture tile = `tileSizeMeters`) or lattice UVs when a `floorUvFrame` is given (see `floorUv`). Meshes carry names (`floor:`, `ceiling:`, `wall:`) and
  * `userData.kind` tags that `cellRenderArchetypes` uses to classify them for instancing. Walls are nudged 1 cm
  * toward the cell interior along the inward normal to avoid z-fighting with coplanar surfaces. Creature object specs are skipped here
  * because they are runtime objects. Called once per cell at load time; not a per-frame path.
  */
 
 import * as THREE from "three";
+import { floorLatticeUv, floorMetricUv, type FloorLatticeUvFrame } from "../../cell-complex/floorUv";
 import type { CompiledPrismCell } from "../../cell-complex/prismCells";
 import type { DebugLevelId } from "../../glue/debugLevels";
 import {
@@ -40,6 +41,8 @@ export interface BuildCellMeshOptions {
   readonly assets: PreparedWorldAssets;
   /** Whether to add wireframes of the cell's forbidden (non-walkable) zones when debugging. */
   readonly showForbiddenZoneWireframes?: boolean;
+  /** Lattice frame for floor UVs (deformable families); when absent the floor uses metric UVs with the material's tile size. */
+  readonly floorUvFrame?: FloorLatticeUvFrame;
 }
 
 /** Builds the full Three.js group for a cell, named `cell:<id>` and tagged with its portal sides in `userData`. */
@@ -57,7 +60,7 @@ export function buildCellMesh(cell: CompiledPrismCell, options: BuildCellMeshOpt
     })),
   };
 
-  group.add(buildFloorMesh(cell, options.assets));
+  group.add(buildFloorMesh(cell, options.assets, options.floorUvFrame));
   group.add(buildCeilingMesh(cell));
   group.add(buildSideWalls(cell, options.assets, options.debugLevel, options.portalPanelMode));
 
@@ -92,7 +95,7 @@ function buildForbiddenZoneWireframes(cell: CompiledPrismCell): THREE.Object3D {
 }
 
 // ShapeGeometry lives in the xy plane; rotateX(-pi/2) sends (x, y, 0) to (x, 0, -y), i.e. world y becomes Three -z.
-function buildFloorMesh(cell: CompiledPrismCell, assets: PreparedWorldAssets): THREE.Object3D {
+function buildFloorMesh(cell: CompiledPrismCell, assets: PreparedWorldAssets, floorUvFrame?: FloorLatticeUvFrame): THREE.Object3D {
   const shape = new THREE.Shape();
   const first = cell.baseVertices[0];
 
@@ -105,6 +108,17 @@ function buildFloorMesh(cell: CompiledPrismCell, assets: PreparedWorldAssets): T
   shape.closePath();
 
   const geometry = new THREE.ShapeGeometry(shape);
+  // Overwrite the UVs while the positions are still cell-local (x, y).
+  const tileSizeMeters = cell.floorMaterial.kind === "floor-texture" ? cell.floorMaterial.tileSizeMeters : 1;
+  const positions = geometry.getAttribute("position");
+  const uvs = new Float32Array(positions.count * 2);
+  for (let index = 0; index < positions.count; index += 1) {
+    const point = { x: positions.getX(index), y: positions.getY(index) };
+    const [s, t] = floorUvFrame ? floorLatticeUv(floorUvFrame, point) : floorMetricUv(point, tileSizeMeters);
+    uvs[index * 2] = s;
+    uvs[index * 2 + 1] = t;
+  }
+  geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
   geometry.rotateX(-Math.PI / 2);
 
   const material = new THREE.MeshStandardMaterial({
@@ -117,18 +131,17 @@ function buildFloorMesh(cell: CompiledPrismCell, assets: PreparedWorldAssets): T
   material.normalScale = new THREE.Vector2(0.8, 0.8);
 
   if (cell.floorMaterial.kind === "floor-texture" && cell.floorMaterial.colorTexturePath) {
-    const repeat = floorTextureRepeat(cell.baseVertices, cell.floorMaterial.tileSizeMeters);
     const texture = assets.getConfiguredTexture({
       assetPath: cell.floorMaterial.colorTexturePath,
       colorSpace: THREE.SRGBColorSpace,
-      repeatX: repeat,
-      repeatY: repeat,
+      repeatX: 1,
+      repeatY: 1,
       wrapS: THREE.RepeatWrapping,
       wrapT: THREE.RepeatWrapping,
       userData: {
         textureUrl: cell.floorMaterial.colorTexturePath,
-        repeatX: repeat,
-        repeatY: repeat,
+        repeatX: 1,
+        repeatY: 1,
       },
     });
 
@@ -145,21 +158,6 @@ function buildFloorMesh(cell: CompiledPrismCell, assets: PreparedWorldAssets): T
   const floor = new THREE.Mesh(geometry, material);
   floor.name = `floor:${cell.id}`;
   return floor;
-}
-
-// Number of texture tiles across the larger bounding-box extent; floored at 0.01 and 1 for non-positive tile sizes.
-function floorTextureRepeat(
-  vertices: readonly { readonly x: number; readonly y: number }[],
-  tileSizeMeters: number,
-): number {
-  if (tileSizeMeters <= 0) {
-    return 1;
-  }
-
-  const xs = vertices.map((vertex) => vertex.x);
-  const ys = vertices.map((vertex) => vertex.y);
-  const span = Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
-  return Math.max(span / tileSizeMeters, 0.01);
 }
 
 function buildCeilingMesh(cell: CompiledPrismCell): THREE.Object3D {

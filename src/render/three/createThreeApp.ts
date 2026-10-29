@@ -2390,7 +2390,13 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       scene.add(cellMesh);
     }
 
+    const deformation = activeWorldBundle.snapshot.deformation;
+    const floorUvFramesByCellId = deformationFamilyRegistry
+      .get(deformation.kind)
+      ?.floorUvFrames?.(options.worldSpec, deformation as never);
+
     cellRenderArchetypes = buildCellRenderArchetypes(activeWorld(), {
+      floorUvFramesByCellId,
       debugLevel,
       portalPanelMode,
       eyeHeightMeters: DEFAULT_PLAYER_EYE_HEIGHT_METERS,

@@ -17,6 +17,8 @@ environment flake (possibly a cold transform cache); not investigated.
 | 05 | done | a9b0516 | 667/9 | 68 |
 | 06 | done | 92d0858 | 672/9 | 66 |
 | 07 | done | e768cd2, b18497e | 677/8 | none (issues 53, 64 get status notes) |
+| 08 | done | 5c4762e | 682/8 | 64 |
+| 09 | done (optional manual checks not run) | 2bc2f39 | 695/8 | 53 |
 
 ## For review
 
@@ -45,6 +47,14 @@ Not done:
 ### Job 07 (clean pass; deviation noted)
 - Two commits instead of one (code, then bookkeeping), because the issue notes need the code commit's hash.
 - Skipped tests went 9 -> 8: the marmot heading test was un-skipped, as the job directs.
+
+### Job 09 (done; sub-agent set Status "done", closed issue 53)
+Deviations:
+- Step 3: the `transformPlayerForGeometryCommit` call sits at a different line than the job says; the change is the same.
+- Test 4 asserts only "not failed and not blocked" and does not print kind counts; when run, poses came out 400 unchanged, 80 pushed, 0 sampled, matching the job's prototype.
+- Test helper `mapToTrap` takes a target state; the job did not specify it.
+Not done:
+- Optional manual `npm run dev` check and the worlds' manual walk-away check were not run. Coordinator judged these optional, so the job and issue 53 stay closed; a reviewer may want to run them.
 
 ## Cross-job problems
 - The batch report was swept into the job 04 commit (it was untracked, and the job 04 sub-agent's commit included it). Harmless; it is tracked from 690f358 on.

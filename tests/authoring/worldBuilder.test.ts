@@ -55,7 +55,7 @@ describe("worldBuilder", () => {
         kind: "floor-texture",
         name: "grass1",
         floorColor: "#5b8f48",
-        tileSizeMeters: 60,
+        tileSizeMeters: 4,
       },
       objects: [],
     });

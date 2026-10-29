@@ -10,6 +10,7 @@
  * Archetypes are built once at load time and disposed with `disposeCellRenderArchetypes`.
  */
 
+import type { FloorLatticeUvFrame } from "../../cell-complex/floorUv";
 import * as THREE from "three";
 import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex";
 import type { CompiledPrismCell } from "../../cell-complex/prismCells";
@@ -62,6 +63,8 @@ export interface BuildCellRenderArchetypesOptions {
   /** If provided, materials are patched for portal clipping; otherwise instances are drawn unclipped. */
   readonly portalClipMaterialState?: PortalClipMaterialState;
   readonly showForbiddenZoneWireframes?: boolean;
+  /** Per cell id, the lattice frame for floor UVs; cells not in the map use metric UVs. */
+  readonly floorUvFramesByCellId?: ReadonlyMap<string, FloorLatticeUvFrame>;
 }
 
 /** Description of an archetype that would be built, for diagnostics and tests, without creating GPU resources. */
@@ -208,6 +211,7 @@ function collectCellArchetypeSources(
     eyeHeightMeters: options.eyeHeightMeters,
     assets: options.assets,
     showForbiddenZoneWireframes: options.showForbiddenZoneWireframes,
+    floorUvFrame: options.floorUvFramesByCellId?.get(cell.id),
   });
   sourceRoot.updateMatrixWorld(true);
 

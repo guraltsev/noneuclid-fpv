@@ -7,6 +7,10 @@ covers the main-thread cost of *applying* each step, which is what makes the fra
 
 Jobs: [30](../.agents/jobs/30_deformation_rebuild_pipeline.md).
 
+## Status update 2026-10-29
+
+Job 10 fixed the floor texture repeat at 1, so a commit no longer creates a new configured texture; the scene rebuild remains (job 30).
+
 ## Status update 2026-10-28
 
 Filed today; references re-checked against the current code and still accurate, with small line corrections below

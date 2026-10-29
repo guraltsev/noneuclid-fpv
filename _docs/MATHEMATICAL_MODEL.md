@@ -377,6 +377,13 @@ Because $A$ maps the lattice to the lattice, a body walking along a closed geode
 still walks along one of class $(p,q)$ after the commit. Geodesic cannon yaws are direction angles
 ($(\cos\psi,\sin\psi)$) and are carried as directions (`src/render/three/runtimeSceneUtils.ts#transformYawWithMap`).
 
+**Floor texture.** In the torus family the floor UV of a point with lattice coordinates $(\alpha,\beta)$ is
+$(n_U\alpha,\,n_V\beta)$, where $n_U=\max(1,\operatorname{round}(|u_0|/T))$ and $n_V$ likewise for $v_0$ are whole numbers
+fixed from the base state ($T$ is the material's `tileSizeMeters`). So the floor moves with the objects, which keep their
+$(\alpha,\beta)$, and a portal crossing adds an integer to the UV, so the repeating texture is seamless at every deformation
+(`src/cell-complex/floorUv.ts#floorLatticeUv`). Other worlds use metric UVs $(x/T,\,y/T)$, so one tile is $T$ meters
+(`src/cell-complex/floorUv.ts#floorMetricUv`).
+
 `src/runtime/worldGeometrySession.ts#createWorldGeometrySession` keeps the committed *current* state, the *target*, at most
 one build in flight and one finished snapshot. Each build normalizes the next state, applies it to the **base** spec (never to
 the previous deformed spec, so error does not accumulate), recompiles the complex, validates topology preservation and rebuilds

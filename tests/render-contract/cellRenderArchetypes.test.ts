@@ -2,9 +2,12 @@ import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import { cube } from "../../src/authoring/exampleWorlds";
 import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
+import { floorLatticeUv } from "../../src/cell-complex/floorUv";
 import type { CellComplexSpec } from "../../src/cell-complex/specs";
 import { buildStaticallyCulledPortalPathTables } from "../../src/cell-complex/staticPortalPathCull";
 import {
+  buildCellRenderArchetypes,
+  disposeCellRenderArchetypes,
   deriveCellRenderArchetypeCapacities,
   planCellRenderArchetypes,
 } from "../../src/render/three/cellRenderArchetypes";
@@ -72,6 +75,48 @@ describe("deriveCellRenderArchetypeCapacities", () => {
     }
 
     expect(Math.max(...world.cells.map((cell) => uncapped.get(cell.id) ?? 0))).toBeGreaterThan(1);
+  });
+});
+
+describe("buildCellRenderArchetypes floor UV frames", () => {
+  it("passes the floor UV frame through to the floor archetype", () => {
+    const world = compileCellComplex({
+      cells: [
+        {
+          id: "floor-room",
+          heightMeters: 4,
+          baseVertices: [
+            { x: -5, y: -5 },
+            { x: 5, y: -5 },
+            { x: 5, y: 5 },
+            { x: -5, y: 5 },
+          ],
+          portals: [],
+          visuals: {
+            floorMaterial: { kind: "floor-texture", name: "test", floorColor: "#5b8f48", tileSizeMeters: 4, colorTexturePath: "textures/test.ktx2" },
+          },
+        },
+      ],
+    } as unknown as CellComplexSpec);
+    const frame = { origin: { x: -5, y: -5 }, u: { x: 10, y: 0 }, v: { x: 2, y: 10 }, tilesAlongU: 3, tilesAlongV: 2 };
+    const archetypes = buildCellRenderArchetypes(world, {
+      debugLevel: "off",
+      portalPanelMode: "none",
+      eyeHeightMeters: 1.6,
+      assets: createPreparedAssets(),
+      capacitiesByCellId: new Map([["floor-room", 1]]),
+      floorUvFramesByCellId: new Map([["floor-room", frame]]),
+    });
+    const floor = archetypes.find((archetype) => archetype.kind === "floor")!;
+    const position = floor.mesh.geometry.getAttribute("position");
+    const uv = floor.mesh.geometry.getAttribute("uv");
+    for (let i = 0; i < position.count; i += 1) {
+      // Archetype geometry has the cell mesh's world matrix baked in; floor is at y = 0 with z = -y.
+      const [s, t] = floorLatticeUv(frame, { x: position.getX(i), y: -position.getZ(i) });
+      expect(uv.getX(i)).toBeCloseTo(s, 5);
+      expect(uv.getY(i)).toBeCloseTo(t, 5);
+    }
+    disposeCellRenderArchetypes(archetypes);
   });
 });
 

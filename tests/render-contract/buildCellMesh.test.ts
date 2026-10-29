@@ -3,6 +3,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
 import { dodecahedron } from "../../src/authoring/exampleWorlds";
 import { twoPrismLoop } from "../fixtures/twoPrismLoop";
+import { floorLatticeUv, type FloorLatticeUvFrame } from "../../src/cell-complex/floorUv";
+import type { CellComplexSpec } from "../../src/cell-complex/specs";
 import { buildCellMesh } from "../../src/render/three/buildCellMesh";
 import { SCENE_BACKGROUND_COLOR } from "../../src/render/three/sceneColors";
 import { PORTAL_WALL_TEXTURE_KEY } from "../../src/render/three/portalWallTexture";
@@ -336,6 +338,82 @@ describe("buildCellMesh", () => {
       : undefined);
   });
 });
+
+describe("buildCellMesh floor UVs", () => {
+  const readFloor = (half: number, extra: { floorUvFrame?: FloorLatticeUvFrame } = {}, assets = createPreparedAssets()) => {
+    const world = compileCellComplex(createFloorRoomSpec(half));
+    const mesh = buildCellMesh(world.cellsById.get("floor-room")!, {
+      debugLevel: "off",
+      portalPanelMode: "none",
+      eyeHeightMeters: 1.6,
+      assets,
+      ...extra,
+    });
+    const floor = mesh.getObjectByName("floor:floor-room") as THREE.Mesh;
+    return { position: floor.geometry.getAttribute("position"), uv: floor.geometry.getAttribute("uv") };
+  };
+
+  it("gives floor textures a period of tileSizeMeters meters", () => {
+    for (const half of [5, 20]) {
+      const { position, uv } = readFloor(half);
+      for (let i = 0; i < position.count; i += 1) {
+        expect(uv.getX(i)).toBeCloseTo(position.getX(i) / 4, 6);
+        expect(uv.getY(i)).toBeCloseTo(-position.getZ(i) / 4, 6);
+      }
+    }
+  });
+
+  it("requests the floor texture with repeat 1", () => {
+    const getConfiguredTexture = vi.fn(() => new THREE.Texture());
+    const assets: PreparedWorldAssets = { ...createPreparedAssets(), getConfiguredTexture };
+    readFloor(5, {}, assets);
+    const calls = (getConfiguredTexture.mock.calls as unknown as [Parameters<PreparedWorldAssets["getConfiguredTexture"]>[0]][])
+      .map(([request]) => request)
+      .filter((request) => request.assetPath === "textures/test.ktx2");
+    expect(calls.length).toBeGreaterThan(0);
+    for (const request of calls) {
+      expect(request.repeatX).toBe(1);
+      expect(request.repeatY).toBe(1);
+    }
+  });
+
+  it("uses lattice UVs when a floor UV frame is given", () => {
+    const frame = { origin: { x: -5, y: -5 }, u: { x: 10, y: 0 }, v: { x: 2, y: 10 }, tilesAlongU: 3, tilesAlongV: 2 };
+    const { position, uv } = readFloor(5, { floorUvFrame: frame });
+    for (let i = 0; i < position.count; i += 1) {
+      const [s, t] = floorLatticeUv(frame, { x: position.getX(i), y: -position.getZ(i) });
+      expect(uv.getX(i)).toBeCloseTo(s, 5);
+      expect(uv.getY(i)).toBeCloseTo(t, 5);
+    }
+  });
+});
+
+function createFloorRoomSpec(half: number): CellComplexSpec {
+  return {
+    cells: [
+      {
+        id: "floor-room",
+        heightMeters: 4,
+        baseVertices: [
+          { x: -half, y: -half },
+          { x: half, y: -half },
+          { x: half, y: half },
+          { x: -half, y: half },
+        ],
+        portals: [],
+        visuals: {
+          floorMaterial: {
+            kind: "floor-texture",
+            name: "test",
+            floorColor: "#5b8f48",
+            tileSizeMeters: 4,
+            colorTexturePath: "textures/test.ktx2",
+          },
+        },
+      },
+    ],
+  } as unknown as CellComplexSpec;
+}
 
 function createPreparedAssets(): PreparedWorldAssets {
   return {

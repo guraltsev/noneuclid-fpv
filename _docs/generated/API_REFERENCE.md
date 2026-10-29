@@ -121,6 +121,17 @@ Human-readable text summary of an authored cell-complex spec, for logging and de
 | --- | --- | --- |
 | function | `describeGeometrySpec` | Returns a multi-line description of the spec's cells and portal connections. |
 
+### `cell-complex/floorUv.ts`
+
+Floor texture coordinates.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `FloorLatticeUvFrame` | A lattice frame for floor UVs: p = origin + alpha*u + beta*v (cell-local meters) and the tile counts per lattice vector. |
+| function | `floorLatticeUv` | UV (tilesAlongU*alpha, tilesAlongV*beta) of a cell-local floor point. |
+| function | `floorMetricUv` | UV (x/T, y/T) of a cell-local floor point, so one texture tile is T meters; T <= 0 or non-finite is treated as 1. |
+| function | `floorTilesAlong` | Whole number of tiles, at least 1, that best fits a length: max(1, round(length / T)); T <= 0 gives 1. |
+
 ### `cell-complex/forbiddenZones.ts`
 
 Constants and types for forbidden zones: vertical cylinders at cell base vertices where portal sides meet.

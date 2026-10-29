@@ -1,7 +1,7 @@
 # Job 10 - Floor texture in lattice coordinates
 
-Status: queued.
-Resolves: issue [81](../../_issues/81_floor_texture_slides_under_objects_during_deformation.md).
+Status: done, needs review on 2026-10-29.
+Resolves: issue [81](../../../_issues/_closed/81_floor_texture_slides_under_objects_during_deformation.md).
 Depends: [job 09](09_deformation_commit_safety.md).
 
 ## Goal
@@ -462,10 +462,10 @@ Risky points:
 ## Do not
 
 - Do not make the commit incremental, reuse archetypes across commits or change texture caching: that is
-  [job 30](30_deformation_rebuild_pipeline.md) (issue 82). This job only stops the floor texture request from
+  [job 30](../30_deformation_rebuild_pipeline.md) (issue 82). This job only stops the floor texture request from
   changing.
 - Do not change how objects or headings are mapped (jobs 07 and 09).
-- Do not change the lattice frame itself (offset or rotated footprints, reduced bases): [job 35](35_torus_family_as_teichmuller_space.md).
+- Do not change the lattice frame itself (offset or rotated footprints, reduced bases): [job 35](../35_torus_family_as_teichmuller_space.md).
 - Do not texture the ceiling or walls differently.
 - Do not use the normal, bump or roughness maps; `buildFloorMesh` uses only the colour map today, keep it that way.
 
@@ -496,3 +496,31 @@ Risky points:
   strike the title and add "(done)", as row 01 does.
 - [ ] Commit with a message like `Floor UVs in lattice coordinates; tileSizeMeters is a true period (job 10)`. Do not
   push unless asked.
+
+## Report
+
+### Done
+- `src/cell-complex/floorUv.ts` (new): `FloorLatticeUvFrame`, `floorLatticeUv`, `floorMetricUv`, `floorTilesAlong`.
+- `src/runtime/worldGeometryDeformations.ts`: optional `floorUvFrames` on `WorldDeformationFamily`.
+- `src/runtime/deformations/torusSkewDeformation.ts`: `floorUvFrames` (lattice frame of the state, tile counts from the base state).
+- `src/render/three/buildCellMesh.ts`: floor UVs written from metric or lattice maths before `rotateX`; texture requested with repeat 1; `floorTextureRepeat` deleted.
+- `src/render/three/cellRenderArchetypes.ts`, `createThreeApp.ts`: `floorUvFramesByCellId` plumbed from `rebuildCellMeshes`.
+- `src/world-assets/floorTextures.ts`: all default tile sizes divided by 15 (per step 6 table); header note.
+- `tests/authoring/worldBuilder.test.ts`: `tileSizeMeters: 60` to `4` (as the job says).
+- New tests 1-11 in `tests/cell-complex/floorUv.test.ts`, `tests/runtime/torusSkewDeformation.test.ts`, `tests/render-contract/buildCellMesh.test.ts`, `tests/render-contract/cellRenderArchetypes.test.ts`.
+- `_docs/MATHEMATICAL_MODEL.md` section 9 "Floor texture" paragraph; `_docs/generated/*` regenerated. No other `_docs` sentence described the span-based behaviour.
+- Issue 81 closed (moved to `_issues/_closed/`); issue 82 status line added; README row 10 updated.
+- Commit: see the git log entry "Floor UVs in lattice coordinates; tileSizeMeters is a true period (job 10)".
+
+### Deviations
+None.
+
+### Uncertain
+- The manual browser check (sweep to A = 30, B = 8; cube and icosahedron scale comparison) was not run. The automated tests cover the UV invariants, but the look of the retuned tile sizes is unconfirmed.
+
+### Not done
+None.
+
+### Checks
+- Baseline `npm run typecheck` and `npm test`: pass (695 passed, 8 skipped).
+- After the change: `npm run typecheck`, `npm test`, `npm run docs:check`: pass.

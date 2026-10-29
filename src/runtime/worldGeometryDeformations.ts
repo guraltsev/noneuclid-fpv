@@ -5,6 +5,7 @@
  * Everything here is pure and immutable: functions return new specs and objects, and validation is by exact side/portal bookkeeping with a 1e-6 m tolerance.
  */
 import type { CompiledCellComplex } from "../cell-complex/compileCellComplex";
+import type { FloorLatticeUvFrame } from "../cell-complex/floorUv";
 import type { CellComplexSpec, CellObjectSpec, PositionedCellObjectSpec, PrismCellSpec } from "../cell-complex/specs";
 import { yawRigidTransform3, type RigidTransform3 } from "../math/rigidTransform3";
 import { normalizeVec3, vec3, type Vec3 } from "../math/vec3";
@@ -84,6 +85,11 @@ export interface WorldDeformationFamily<TState extends WorldDeformationState> {
     previousWorld: CompiledCellComplex,
     nextWorld: CompiledCellComplex,
   ): readonly string[];
+
+  /**
+   * Optional floor-texture policy: per cell id, the lattice frame whose coordinates the floor UVs follow in the given state. Cells not in the map use metric UVs. Families without this method use metric UVs everywhere.
+   */
+  floorUvFrames?(baseSpec: CellComplexSpec, state: TState): ReadonlyMap<string, FloorLatticeUvFrame>;
 }
 
 /** Replacement footprint (2D vertices in order, meters) for one prism cell identified by id. */
