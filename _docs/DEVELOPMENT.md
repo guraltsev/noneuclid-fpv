@@ -36,18 +36,35 @@ npm run build
 
 The test suite checks mathematical and renderer contracts and the documentation
 rules (`tests/docs`). It does not replace a short browser check of the
-interaction you changed. For a scripted check, build, serve the build, and run
-the headless smoke test (needs a Chromium-based browser; set `BROWSER` if it is
-not in the default location):
+interaction you changed. For a scripted check, build for a subpath and run the
+headless smoke test (needs a Chromium-based browser):
 
 ```sh
-npm run build
-npx vite preview --port 4173 &
-npm run smoke -- "http://localhost:4173/?config=full&world=cube&debugLevel=verbose" local
+npm run build:pages -- --base noneuclid-fpv
+npm run smoke -- --world cube,dodecahedron,torus-moduli
 ```
 
-It reports console output and uncaught exceptions and exits non-zero if the app
-throws or never creates a canvas.
+The script serves `dist/` itself under the build base path, with real 404s like GitHub Pages (no HTML fallback), loads one page per world, opens and closes the menu (right click, Escape), and prints `SMOKE OK` or `SMOKE FAILED` per world. A world fails on:
+
+- an uncaught exception;
+- a console message with `[noneuclid] frame error` or `frames in a row failed`;
+- a console message with `[noneuclid] using built-in defaults` (the app config did not load);
+- a request answered with HTTP status 400 or more, or a network failure that was not cancelled (`/favicon.ico` is ignored);
+- a loading screen with the error class;
+- a loading screen still present after the timeout;
+- no `canvas` element.
+
+Other console errors and warnings are printed but do not fail the run. Flags:
+
+- `--world <id[,id...]>` (default `cube`);
+- `--config <name>` (default `full`);
+- `--debug-level <off|basic|verbose>`;
+- `--dist <dir>` (default `dist`);
+- `--url <site-url>`, to check a running site such as `--url https://guraltsev.github.io/noneuclid-fpv/` instead of serving `dist/`;
+- `--timeout-ms <n>` (default 60000);
+- `--label <text>`.
+
+Set `BROWSER` to the path of a Chromium-based browser if it is not in the default location (Edge on Windows, else `chromium`). The script builds the URL itself, so no `&` is needed on the command line. The old form `node scripts/smoke/browser-smoke.mjs "<page url>" [label]` still loads one page.
 
 After changing code, run `npm run docs:generate` and commit the regenerated
 `_docs/generated` files. `npm run docs:coverage` lists missing documentation.

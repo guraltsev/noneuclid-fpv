@@ -32,7 +32,7 @@ Jobs are written to be carried out by a model working alone. A more capable mode
    documents, run `npm run docs:generate`. Then commit, end the message with the co-author line the repository uses,
    and push. The pre-push hook runs the checks again.
 7. **Windows shell:** `npm run smoke -- "<url>"` and the Volta `node` shim go through cmd.exe, which cuts URLs at
-   `&`. Call `node.exe` directly when a URL has several parameters.
+   `&`. Call `node.exe` directly when a URL has several parameters. `npm run smoke` now takes `--world`/`--config` flags, so no URL with `&` is needed.
 
 ## Report
 
@@ -84,7 +84,7 @@ Resolves: issue [NN](../../_issues/NN_....md).
 | [01](_done/01_frame_loop_error_containment_and_dispose.md) | ~~Contain frame-loop errors and release everything on dispose~~ (done) | [74](../../_issues/_closed/74_frame_loop_error_containment_and_dispose_leaks.md) |  |
 | [02](_done/02_asset_footprint_and_provenance.md) | ~~Shrink the deployed assets and resolve unverified ones~~ (done) | [40](../../_issues/_closed/40_resolve_unverified_public_assets.md) | 34 |
 | [03](_done/03_pages_deployment_configuration.md) | ~~Make Pages deployment repository-name agnostic~~ (done, needs review) | - | 37 |
-| [04](04_local_browser_smoke_coverage.md) | Local browser smoke coverage | - | 36 |
+| [04](_done/04_local_browser_smoke_coverage.md) | ~~Local browser smoke coverage~~ (done, needs review) | - | 36 |
 | [05](05_conjugate_loop_word_on_anchor_crossing.md) | Conjugate a loop's portal word when its shared anchor crosses a portal | [68](../../_issues/68_loop_endpoint_crossing_must_conjugate_portal_word.md) |  |
 | [06](06_curve_shortening_stalls.md) | Stop curve shortening from stalling | [66](../../_issues/66_curve_shortening_stalls_at_high_frame_rate.md) |  |
 | [07](07_forward_heading_convention.md) | One forward-heading convention: marmot heading and deformation transport | [64](../../_issues/64_mover_integration_bugs_xr_slide_marmot_heading_object_trap.md), [53](../../_issues/53_torus_deformation_commit_transport_defects.md) |  |

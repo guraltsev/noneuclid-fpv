@@ -78,8 +78,7 @@ tracking issue.
 
 ## Browser Smoke Tests
 
-Playwright is reserved for later browser smoke tests. It should not be used for
-mathematical correctness.
+Browser smoke tests are `scripts/smoke/browser-smoke.mjs` (Chrome DevTools Protocol, no Playwright). They check start-up and integration only, never mathematical correctness, and run by hand (see `DEVELOPMENT.md`).
 
 ## Stage Gates
 

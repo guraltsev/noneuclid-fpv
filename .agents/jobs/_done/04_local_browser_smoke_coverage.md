@@ -1,6 +1,6 @@
 # Job 04 - Local browser smoke coverage
 
-Status: queued.
+Status: done, needs review on 2026-10-29.
 Former issue: 36 (converted to a job on 2026-10-28).
 Resolves: no open issue.
 
@@ -408,3 +408,32 @@ workflow" and "pull requests receive required statuses" are superseded by the ho
 already limited to `main`: `.github/workflows/deploy-pages.yml` runs on push to `main` and manual dispatch only.
 Since commit 64b3797 it runs no tests. The manual CDP smoke script was added in commit d2ee130 and used for job 01's
 verification.
+
+## Report
+
+### Done
+- New `scripts/smoke/smokeArgs.mjs` (`parseSmokeArgs`, `buildPageUrl`) and `scripts/smoke/staticServer.mjs` (`detectBaseFromIndexHtml`, `contentTypeFor`, `startStaticServer`), with tests `tests/smoke/smokeArgs.test.ts` (7) and `tests/smoke/staticServer.test.ts` (3).
+- Rewrote `scripts/smoke/browser-smoke.mjs`: serves `dist/` with real 404s, named flags plus the legacy page-URL form, Network domain, ready polling, debug-helper poke, right-click and Escape menu exercise, the failure rules of Decision 4, cleanup in `finally` (temp profile removed), and a clear error when the browser does not start.
+- Docs: `_docs/DEVELOPMENT.md`, `_docs/testing.md`, `_docs/DEPLOYMENT.md`, `_docs/acceptance-checklists.md` (headset checklist), `.agents/jobs/README.md` (rule 7 and the queue row).
+- Commit: see the git log entry "Add local browser smoke coverage (job 04)".
+
+### Deviations
+- For the bite test I renamed `dist/assets/baloon/Balloon.glb` (first .glb found) instead of `rover.glb`; both are used assets. The run failed with the 404 listed.
+
+### Uncertain
+- The menu interaction can only show that opening and closing the palette throws nothing, since its state is not observable (Decision 6).
+- On a missing model the page reports `loading error: Starting world` (the loading text), plus the 404 line; the 404 is the useful signal.
+
+### Not done
+- `renderer.info.memory` baseline check after create/dispose/create (Decision 7): needs a test hook in `src/`, not added.
+- Ending an XR session after persistent frame failure: listed as "not covered" in the headset checklist.
+- The manual headset checklist has not been run (no headset).
+
+### Checks
+- Baseline `npm run typecheck`, `npm test`: pass (90 files, 650 passed, 9 skipped).
+- `npx vitest run tests/smoke`: 10 passed. `node --check scripts/smoke/browser-smoke.mjs`: ok.
+- `npm run build:pages -- --base noneuclid-fpv` then `npm run smoke -- --world cube,dodecahedron,torus-moduli`: `SMOKE OK (3 page(s))` (Edge headless).
+- Missing model: `SMOKE FAILED cube: 1 failed request(s)` with `404 .../assets/baloon/Balloon.glb`. File restored.
+- `--config does-not-exist`: `SMOKE FAILED cube: app config failed to load (built-in defaults used); 1 failed request(s)`.
+- `npm run build` run afterwards to restore `dist/` at base `/`.
+- Final `npm run typecheck`, `npm test` (92 files, 660 passed, 9 skipped) and `npm run docs:check`: pass.

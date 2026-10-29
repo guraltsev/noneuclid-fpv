@@ -40,6 +40,15 @@ so use it only when you know the checks are irrelevant. Watch the run in the Act
 shows the change (force-refresh the browser, Ctrl+F5, if it looks stale). If the
 build fails, the deploy is skipped and the old site stays up.
 
+Before pushing a release you can also run the browser smoke check (optional, needs a Chromium-based browser):
+
+```sh
+npm run build:pages -- --base noneuclid-fpv
+npm run smoke -- --world cube,dodecahedron,torus-moduli
+```
+
+After a deploy, check the live site with `npm run smoke -- --url https://guraltsev.github.io/noneuclid-fpv/ --world cube`.
+
 ### Activity addresses
 
 Add `?config=...` to the site address: `001` to `005` are the locked student
@@ -93,7 +102,7 @@ WebXR requires a secure context. GitHub Pages provides HTTPS. For local headset
 testing, use a trusted HTTPS server and certificate appropriate for the device;
 plain HTTP on a LAN is not enough. `localhost` is normally treated as secure by
 browsers for desktop development, but it is not a substitute for a headset
-connecting from another device.
+connecting from another device. A manual headset checklist is in `_docs/acceptance-checklists.md` ("Headset smoke checklist (manual)").
 
 ### Local HTTPS server for a headset
 

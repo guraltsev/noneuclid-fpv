@@ -115,3 +115,18 @@ The project is on track when:
 - Dense logic has block comments.
 - Tests remain behavior-focused.
 - No new feature was smuggled into cleanup.
+
+## Headset smoke checklist (manual)
+
+Latest run: none recorded. Record as: <date>, <device and browser>, <commit>, <URL>, <result>.
+
+- The site opens under its deployment URL.
+- `?config=001` loads.
+- Enter VR is offered and works.
+- 30 s of looking and walking without stutter.
+- Walking through one portal.
+- Opening the palette with a controller, firing one geodesic, and closing the palette.
+- Exiting VR returns to the desktop view.
+- Reloading the page and entering VR again.
+
+Not covered: ending an XR session after repeated frame failures (job 01) needs a test hook and is not checked.
