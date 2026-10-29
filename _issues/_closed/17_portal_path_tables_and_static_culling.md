@@ -14,21 +14,21 @@ Debug inspection is available behind debug flags. The app can install `window.no
 
 ## Implemented changes
 
-- [src/cell-complex/compileCellComplex.ts](../../../src/cell-complex/compileCellComplex.ts), [src/cell-complex/prismCells.ts](../../../src/cell-complex/prismCells.ts), and [src/cell-complex/specs.ts](../../../src/cell-complex/specs.ts) provide the renderer-neutral compiled world contract used by path construction.
-- [src/cell-complex/portalPaths.ts](../../../src/cell-complex/portalPaths.ts) defines `buildPortalPathTables(...)`, path table indexes, stable path ids, parent links, accumulated transforms, and immediate-reverse filtering.
-- [src/cell-complex/staticPortalPathCull.ts](../../../src/cell-complex/staticPortalPathCull.ts) defines `staticallyCullPortalPathTables(...)`, kept tables, rejection summaries, optional rejected-path details, geometric culling, and static path budgets.
-- [src/cell-complex/portalPathDebug.ts](../../../src/cell-complex/portalPathDebug.ts) provides renderer-neutral path parsing, path checking, and compact debug state.
-- [src/glue/debugOptions.ts](../../../src/glue/debugOptions.ts) defines `portal-path-debug`, `portal-static-cull-debug`, and `portal-path-overlays`.
-- [src/render/three/createThreeApp.ts](../../../src/render/three/createThreeApp.ts) wires the debug flags into `window.noneuclidPortalDebug` and optional path overlays.
+- [src/cell-complex/compileCellComplex.ts](../../src/cell-complex/compileCellComplex.ts), [src/cell-complex/prismCells.ts](../../src/cell-complex/prismCells.ts), and [src/cell-complex/specs.ts](../../src/cell-complex/specs.ts) provide the renderer-neutral compiled world contract used by path construction.
+- [src/cell-complex/portalPaths.ts](../../src/cell-complex/portalPaths.ts) defines `buildPortalPathTables(...)`, path table indexes, stable path ids, parent links, accumulated transforms, and immediate-reverse filtering.
+- [src/cell-complex/staticPortalPathCull.ts](../../src/cell-complex/staticPortalPathCull.ts) defines `staticallyCullPortalPathTables(...)`, kept tables, rejection summaries, optional rejected-path details, geometric culling, and static path budgets.
+- [src/cell-complex/portalPathDebug.ts](../../src/cell-complex/portalPathDebug.ts) provides renderer-neutral path parsing, path checking, and compact debug state.
+- [src/glue/debugOptions.ts](../../src/glue/debugOptions.ts) defines `portal-path-debug`, `portal-static-cull-debug`, and `portal-path-overlays`.
+- [src/render/three/createThreeApp.ts](../../src/render/three/createThreeApp.ts) wires the debug flags into `window.noneuclidPortalDebug` and optional path overlays.
 
 ## Verification
 
 ### Automated
 
-- [tests/cell-complex/portalPaths.test.ts](../../../tests/cell-complex/portalPaths.test.ts) covers per-root tables, depth-0 paths, outgoing depth-1 counts, immediate reverse behavior, duplicate destinations, transform inverses, stable ids, parent ids, and cube paths through depth 10.
-- [tests/cell-complex/staticPortalPathCull.test.ts](../../../tests/cell-complex/staticPortalPathCull.test.ts) covers depth-0 preservation, kept path ids, ambiguous kept bounds, impossible rejected bounds, rejection summaries, static path budgets, and well-formed no-rejection summaries.
-- [tests/cell-complex/portalPathDebug.test.ts](../../../tests/cell-complex/portalPathDebug.test.ts) covers pure path parsing/checking, cull reporting, and debug state.
-- [tests/debugSettings.test.ts](../../../tests/debugSettings.test.ts) covers portal path debug option parsing and runtime applicability.
+- [tests/cell-complex/portalPaths.test.ts](../../tests/cell-complex/portalPaths.test.ts) covers per-root tables, depth-0 paths, outgoing depth-1 counts, immediate reverse behavior, duplicate destinations, transform inverses, stable ids, parent ids, and cube paths through depth 10.
+- [tests/cell-complex/staticPortalPathCull.test.ts](../../tests/cell-complex/staticPortalPathCull.test.ts) covers depth-0 preservation, kept path ids, ambiguous kept bounds, impossible rejected bounds, rejection summaries, static path budgets, and well-formed no-rejection summaries.
+- [tests/cell-complex/portalPathDebug.test.ts](../../tests/cell-complex/portalPathDebug.test.ts) covers pure path parsing/checking, cull reporting, and debug state.
+- [tests/debugSettings.test.ts](../../tests/debugSettings.test.ts) covers portal path debug option parsing and runtime applicability.
 
 ### Final checks
 

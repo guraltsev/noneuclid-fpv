@@ -5,6 +5,8 @@ Status: open; re-verified 2026-10-28.
 Priority: P2 (performance). Complements issue 55, which covers the worker build cost (~100 ms per step). This issue
 covers the main-thread cost of *applying* each step, which is what makes the frame rate drop during a deformation.
 
+Jobs: [30](../.agents/jobs/30_deformation_rebuild_pipeline.md).
+
 ## Status update 2026-10-28
 
 Filed today; references re-checked against the current code and still accurate, with small line corrections below

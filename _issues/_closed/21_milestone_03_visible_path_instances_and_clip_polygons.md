@@ -10,20 +10,20 @@ The renderer now uses the full visible-path result for the current root cell, fe
 
 ## Implemented changes
 
-- [src/render/three/createThreeApp.ts](../../../src/render/three/createThreeApp.ts) computes visible portal paths during the normal frame loop, updates clip data from the live paths, and populates archetype instance buffers from the current destination-cell buckets.
-- [src/render/three/renderPortalInstances.ts](../../../src/render/three/renderPortalInstances.ts) builds visible paths by destination cell, writes instance matrices, writes per-instance `portalPathId` values, and reports overflow diagnostics.
-- [src/render/three/portalClipData.ts](../../../src/render/three/portalClipData.ts) stores per-path clip polygons in a compact lookup structure and tracks overflow conditions.
-- [src/render/three/portalClipMaterial.ts](../../../src/render/three/portalClipMaterial.ts) patches materials so fragments are discarded outside the active portal clip polygon.
-- [src/render/three/cellRenderArchetypes.ts](../../../src/render/three/cellRenderArchetypes.ts) exposes instanced `portalPathId` attributes for each archetype mesh.
+- [src/render/three/createThreeApp.ts](../../src/render/three/createThreeApp.ts) computes visible portal paths during the normal frame loop, updates clip data from the live paths, and populates archetype instance buffers from the current destination-cell buckets.
+- [src/render/three/renderPortalInstances.ts](../../src/render/three/renderPortalInstances.ts) builds visible paths by destination cell, writes instance matrices, writes per-instance `portalPathId` values, and reports overflow diagnostics.
+- [src/render/three/portalClipData.ts](../../src/render/three/portalClipData.ts) stores per-path clip polygons in a compact lookup structure and tracks overflow conditions.
+- [src/render/three/portalClipMaterial.ts](../../src/render/three/portalClipMaterial.ts) patches materials so fragments are discarded outside the active portal clip polygon.
+- [src/render/three/cellRenderArchetypes.ts](../../src/render/three/cellRenderArchetypes.ts) exposes instanced `portalPathId` attributes for each archetype mesh.
 
 ## Verification
 
 ### Automated
 
-- [tests/render-contract/portalInstanceBuffers.test.ts](../../../tests/render-contract/portalInstanceBuffers.test.ts) covers visible-path instance population, duplicate destination handling, per-slot path ids, and overflow reporting.
-- [tests/render-contract/portalClipData.test.ts](../../../tests/render-contract/portalClipData.test.ts) covers clip polygon lookup and overflow handling.
-- [tests/render-contract/portalClipMaterial.test.ts](../../../tests/render-contract/portalClipMaterial.test.ts) covers material patching and viewport-to-NDC helpers.
-- [tests/render-contract/visiblePortalPaths.test.ts](../../../tests/render-contract/visiblePortalPaths.test.ts) continues to cover visible-path computation and polygon clipping inputs.
+- [tests/render-contract/portalInstanceBuffers.test.ts](../../tests/render-contract/portalInstanceBuffers.test.ts) covers visible-path instance population, duplicate destination handling, per-slot path ids, and overflow reporting.
+- [tests/render-contract/portalClipData.test.ts](../../tests/render-contract/portalClipData.test.ts) covers clip polygon lookup and overflow handling.
+- [tests/render-contract/portalClipMaterial.test.ts](../../tests/render-contract/portalClipMaterial.test.ts) covers material patching and viewport-to-NDC helpers.
+- [tests/render-contract/visiblePortalPaths.test.ts](../../tests/render-contract/visiblePortalPaths.test.ts) continues to cover visible-path computation and polygon clipping inputs.
 
 ### Final checks
 

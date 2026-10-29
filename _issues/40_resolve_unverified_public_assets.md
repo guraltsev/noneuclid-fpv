@@ -1,8 +1,10 @@
-# 40 - Resolve or remove unverified public assets
+# 40 - Unverified public assets are deployed
 
 Status: open; re-verified 2026-10-28.
 
 Priority: P1 legal release gate.
+
+Jobs: [02](../.agents/jobs/02_asset_footprint_and_provenance.md).
 
 ## Status update 2026-10-28
 
@@ -32,15 +34,9 @@ the remaining historical files for which this repository cannot establish a
 source, creator, or license. The legacy portal-wall image is among them. Vite
 currently copies these files into builds.
 
-## Required to close this issue
+## Fix
 
-- For each blocked path, locate the original acquisition record and add a
-  source URL, creator, license version, and required attribution; **or** replace
-  it with a documented asset; **or** remove it from the public build input.
-- Replace or verify the legacy portal-wall image before a release that includes
-  it.
-- Update `_docs/ASSET_PROVENANCE.md`, local notices, and any affected world or
-  renderer references in the same change.
+Tracked as job [02](../.agents/jobs/02_asset_footprint_and_provenance.md).
 
 ## Acceptance criteria
 

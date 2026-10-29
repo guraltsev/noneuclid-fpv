@@ -12,11 +12,11 @@ This does not close the full original stage-04 renderer scope. Remaining rendere
 
 ## Implemented changes
 
-- [src/main.ts](../../../src/main.ts) loads a selected world, compiles it, builds app state, and starts the renderer.
-- [src/render/three/createThreeApp.ts](../../../src/render/three/createThreeApp.ts) creates the scene, camera, renderer, lighting, animation loop, and current-cell visibility behavior.
-- [src/render/three/desktopControls.ts](../../../src/render/three/desktopControls.ts) provides keyboard movement, mouse look, pointer lock, and reset input.
-- [src/render/three/buildCellMesh.ts](../../../src/render/three/buildCellMesh.ts) builds the current floor mesh, outline, portal debug panels, and decoration attachment points.
-- [src/movement/movePlayer.ts](../../../src/movement/movePlayer.ts) is already wired into the desktop frame loop so collisions and portal crossings use the shared runtime rules.
+- [src/main.ts](../../src/main.ts) loads a selected world, compiles it, builds app state, and starts the renderer.
+- [src/render/three/createThreeApp.ts](../../src/render/three/createThreeApp.ts) creates the scene, camera, renderer, lighting, animation loop, and current-cell visibility behavior.
+- [src/render/three/desktopControls.ts](../../src/render/three/desktopControls.ts) provides keyboard movement, mouse look, pointer lock, and reset input.
+- [src/render/three/buildCellMesh.ts](../../src/render/three/buildCellMesh.ts) builds the current floor mesh, outline, portal debug panels, and decoration attachment points.
+- [src/movement/movePlayer.ts](../../src/movement/movePlayer.ts) is already wired into the desktop frame loop so collisions and portal crossings use the shared runtime rules.
 
 ## Verification
 

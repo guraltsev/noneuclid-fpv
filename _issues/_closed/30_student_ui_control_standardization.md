@@ -66,7 +66,7 @@ control.
 This issue builds on:
 
 - [19_fps_dom_palette_menu.md](./19_fps_dom_palette_menu.md)
-- [20_vr_palette_menu_from_shared_definition.md](../20_vr_palette_menu_from_shared_definition.md)
+- [20_vr_palette_menu_from_shared_definition.md](../../.agents/jobs/19_vr_palette_and_in_headset_debug.md)
 - [27_common_in_scene_palette_aimer_interaction.md](./27_common_in_scene_palette_aimer_interaction.md)
 
 This issue supersedes the prompt guidance in issue 27 where it says complex

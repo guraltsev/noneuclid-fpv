@@ -1,6 +1,7 @@
-# 37 - Make Pages deployment repository-name agnostic
+# Job 03 - Make Pages deployment repository-name agnostic
 
-Status: open; re-verified 2026-10-28.
+Status: queued.
+Former issue: 37 (converted to a job on 2026-10-28).
 
 Priority: P2 developer/release tooling.
 

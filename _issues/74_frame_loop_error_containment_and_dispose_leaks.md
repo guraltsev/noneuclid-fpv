@@ -4,6 +4,8 @@ Status: open; re-verified 2026-10-28.
 
 Priority: P2 (robustness). In VR, a single throw freezes the headset image.
 
+Jobs: [01](../.agents/jobs/01_frame_loop_error_containment_and_dispose.md).
+
 ## Status update 2026-10-28
 
 Nothing in this issue has been fixed. Re-checked against the current `src/render/three/createThreeApp.ts`; line

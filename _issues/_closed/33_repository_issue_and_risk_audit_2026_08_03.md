@@ -24,8 +24,8 @@ Pages workflow builds on every push to `main`.
   `tsc --noEmit && vite build`) on every push to `main`; no Pages build was run
   locally for this closure.
 - Headset verification is not recorded here; it remains the closing condition
-  of [issue 20](../20_vr_palette_menu_from_shared_definition.md) and
-  [issue 21](../21_vr_stereo_portal_visibility_union_and_hot_loop_allocation.md).
+  of [issue 20](../../.agents/jobs/19_vr_palette_and_in_headset_debug.md) and
+  [issue 21](21_vr_stereo_portal_visibility_union_and_hot_loop_allocation.md).
 - Snapshot facts below are outdated: `public` is now about 75 MiB tracked
   (issue 34), the PFX is no longer in the tree (issue 35), and
   `createThreeApp.ts`/`geodesicCannon.ts` are 3,555/5,942 lines (issue 38).
@@ -80,11 +80,11 @@ those commands run in CI or a Node-enabled environment.
 
 ## New risk issues
 
-- [34 - Reduce deployment and repository asset footprint](../34_reduce_deployment_and_repository_asset_footprint.md), P0.
-- [35 - Remove the committed shared TLS private key](../35_remove_committed_shared_tls_private_key.md), P1 security.
-- [36 - Add pre-merge CI and browser smoke coverage](../36_add_premerge_ci_and_browser_smoke_coverage.md), P1.
-- [37 - Make Pages deployment repository-name agnostic](../37_align_pages_and_deployment_configuration.md), P2.
-- [38 - Decompose runtime monoliths and retire legacy paths](../38_decompose_runtime_monoliths_and_retire_legacy_paths.md), P1/P3 staged cleanup.
+- [34 - Reduce deployment and repository asset footprint](../../.agents/jobs/02_asset_footprint_and_provenance.md), P0.
+- [35 - Remove the committed shared TLS private key](35_remove_committed_shared_tls_private_key.md), P1 security.
+- [36 - Add pre-merge CI and browser smoke coverage](../../.agents/jobs/04_local_browser_smoke_coverage.md), P1.
+- [37 - Make Pages deployment repository-name agnostic](../../.agents/jobs/03_pages_deployment_configuration.md), P2.
+- [38 - Decompose runtime monoliths and retire legacy paths](../../.agents/jobs/33_decompose_runtime_monoliths.md), P1/P3 staged cleanup.
 - [39 - Document project and third-party asset provenance](39_document_project_and_asset_provenance.md), completed 2026-08-03.
 
 ## Important evidence

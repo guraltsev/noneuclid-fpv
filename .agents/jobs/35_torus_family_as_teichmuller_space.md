@@ -1,6 +1,7 @@
-# 54 - Treat the torus family as Teichmüller space: reduction, geodesic stepping, GL(2,ℝ) generalization
+# Job 35 - Treat the torus family as Teichmüller space
 
-Status: open; re-verified 2026-10-28.
+Status: queued.
+Former issue: 54 (converted to a job on 2026-10-28).
 
 Priority: P3 (design; it also improves rendering quality and makes the family generalize).
 

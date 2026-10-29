@@ -5,6 +5,8 @@ Status: open; re-verified 2026-10-28.
 Priority: P1 (correctness, visible in `torus-moduli`). Related: issue 53 (pose transport), issue 82 (commit cost; this
 issue's fix removes one of its costs).
 
+Jobs: [10](../.agents/jobs/10_floor_texture_in_lattice_coordinates.md).
+
 ## Status update 2026-10-28
 
 Filed today; references re-checked and still accurate. The floor is still a `ShapeGeometry` with raw-meter UVs

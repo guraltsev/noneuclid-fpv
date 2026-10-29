@@ -4,6 +4,8 @@ Status: open; re-verified 2026-10-28.
 
 Priority: P2 (correctness). Three independent bugs in the callers of `moveDynamicObject` / `movePlayer`.
 
+Jobs: [07](../.agents/jobs/07_forward_heading_convention.md), [08](../.agents/jobs/08_xr_slide_replay_and_object_trap.md).
+
 ## Status update 2026-10-28
 
 None of the three bugs is fixed. Re-checked against the current code (line numbers in the body below are corrected):

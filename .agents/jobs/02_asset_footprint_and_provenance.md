@@ -1,6 +1,8 @@
-# 34 - Reduce deployment and repository asset footprint
+# Job 02 - Shrink the deployed assets and resolve unverified ones
 
-Status: open; re-verified 2026-10-28.
+Status: queued.
+Former issue: 34 (converted to a job on 2026-10-28).
+Resolves: issue [40](../../_issues/40_resolve_unverified_public_assets.md).
 
 Priority: P0 deployment reliability.
 
@@ -87,3 +89,13 @@ coordinated migration.
 - CI fails with a readable message if the agreed artifact budget is exceeded.
 - Texture rebuild documentation uses source paths outside the deployed public
   graph.
+
+## From issue 40: required work
+
+- For each blocked path, locate the original acquisition record and add a
+  source URL, creator, license version, and required attribution; **or** replace
+  it with a documented asset; **or** remove it from the public build input.
+- Replace or verify the legacy portal-wall image before a release that includes
+  it.
+- Update `_docs/ASSET_PROVENANCE.md`, local notices, and any affected world or
+  renderer references in the same change.

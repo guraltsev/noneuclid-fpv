@@ -4,6 +4,8 @@ Status: open; re-verified 2026-10-28.
 
 Priority: P2 (robustness / correctness).
 
+Jobs: [15](../.agents/jobs/15_geodesic_tracing_on_kernel.md).
+
 ## Status update 2026-10-28
 
 Done:

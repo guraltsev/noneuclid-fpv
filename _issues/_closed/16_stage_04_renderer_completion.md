@@ -32,9 +32,9 @@ What remains is mostly the debug overlay/state surface from the original stage-0
 
 The repository already has:
 
-- browser app startup in [src/main.ts](../../../src/main.ts),
-- a working Three.js app loop in [src/render/three/createThreeApp.ts](../../../src/render/three/createThreeApp.ts),
-- desktop keyboard and mouse controls in [src/render/three/desktopControls.ts](../../../src/render/three/desktopControls.ts),
+- browser app startup in [src/main.ts](../../src/main.ts),
+- a working Three.js app loop in [src/render/three/createThreeApp.ts](../../src/render/three/createThreeApp.ts),
+- desktop keyboard and mouse controls in [src/render/three/desktopControls.ts](../../src/render/three/desktopControls.ts),
 - world-aware player movement routed through the stage-03 runtime contract.
 
 That work should remain in place. This issue is about finishing the renderer-side polish and testability that the original stage-04 checklist expected.
@@ -43,8 +43,8 @@ That work should remain in place. This issue is about finishing the renderer-sid
 
 The current renderer is still incomplete in a few specific places:
 
-- [src/render/three/debugOverlay.ts](../../../src/render/three/debugOverlay.ts) still exposes a compact overlay focused on portal-path and instance state, not the richer desktop/XR readiness summary described below.
-- [src/render/three/renderState.ts](../../../src/render/three/renderState.ts) still focuses on frame-level render state and portal-path diagnostics rather than the original stage-04 debug snapshot shape.
+- [src/render/three/debugOverlay.ts](../../src/render/three/debugOverlay.ts) still exposes a compact overlay focused on portal-path and instance state, not the richer desktop/XR readiness summary described below.
+- [src/render/three/renderState.ts](../../src/render/three/renderState.ts) still focuses on frame-level render state and portal-path diagnostics rather than the original stage-04 debug snapshot shape.
 - The stage-04 debug surface could still be reshaped to surface world id, cell id, local position, yaw, last movement result, secure-context status, and WebXR availability more directly.
 
 Because of those gaps, the original stage-04 renderer responsibilities are only partially complete.
@@ -53,7 +53,7 @@ Because of those gaps, the original stage-04 renderer responsibilities are only 
 
 ### 1. Finish cell mesh construction
 
-Update [src/render/three/buildCellMesh.ts](../../../src/render/three/buildCellMesh.ts) so it produces renderable geometry for:
+Update [src/render/three/buildCellMesh.ts](../../src/render/three/buildCellMesh.ts) so it produces renderable geometry for:
 
 - floor,
 - ceiling,
@@ -69,7 +69,7 @@ This part is effectively done now: the cell mesh path already covers floor, ceil
 
 Return or expose enough metadata from `buildCellMesh(...)` that tests can verify which side faces are portals without walking huge Three.js graphs.
 
-If [src/render/three/buildPortalMesh.ts](../../../src/render/three/buildPortalMesh.ts) remains part of the design, wire it into that path. If not, remove or replace the stub so the architecture is clearer.
+If [src/render/three/buildPortalMesh.ts](../../src/render/three/buildPortalMesh.ts) remains part of the design, wire it into that path. If not, remove or replace the stub so the architecture is clearer.
 
 ### 3. Implement useful debug state and overlay behavior
 

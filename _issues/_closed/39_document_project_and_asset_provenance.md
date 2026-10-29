@@ -18,7 +18,7 @@ license for an asset with missing history.
   source and terms verified, replacement with documented assets, or removal
   from the public build input. This is the open, release-gated work in
   [issue 40](../40_resolve_unverified_public_assets.md).
-- [Issue 34](../34_reduce_deployment_and_repository_asset_footprint.md) still
+- [Issue 34](../../.agents/jobs/02_asset_footprint_and_provenance.md) still
   needs to separate source-only material from deployed public assets. Until
   then, the manifest documents some files Vite copies even though the app does
   not request them.

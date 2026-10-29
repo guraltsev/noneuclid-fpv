@@ -10,10 +10,10 @@ Autonomous dynamic objects, including geodesic marmots, now use anchor-based por
 
 ## Implemented changes
 
-- [src/movement/moveDynamicObject.ts](../../../src/movement/moveDynamicObject.ts) supports explicit anchor/bounds portal-crossing modes and exposes the autonomous dynamic-object anchor policy.
-- [src/world-objects/geodesciMarmot.ts](../../../src/world-objects/geodesciMarmot.ts) uses the anchor-based autonomous movement policy.
-- [tests/movement/moveDynamicObject.test.ts](../../../tests/movement/moveDynamicObject.test.ts) covers before-center and after-center crossing behavior plus invalid-crossing rejection.
-- [tests/world-objects/geodesciMarmot.test.ts](../../../tests/world-objects/geodesciMarmot.test.ts) covers the marmot runtime behavior.
+- [src/movement/moveDynamicObject.ts](../../src/movement/moveDynamicObject.ts) supports explicit anchor/bounds portal-crossing modes and exposes the autonomous dynamic-object anchor policy.
+- [src/world-objects/geodesciMarmot.ts](../../src/world-objects/geodesciMarmot.ts) uses the anchor-based autonomous movement policy.
+- [tests/movement/moveDynamicObject.test.ts](../../tests/movement/moveDynamicObject.test.ts) covers before-center and after-center crossing behavior plus invalid-crossing rejection.
+- [tests/world-objects/geodesciMarmot.test.ts](../../tests/world-objects/geodesciMarmot.test.ts) covers the marmot runtime behavior.
 
 ## Verification
 

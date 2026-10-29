@@ -4,6 +4,8 @@ Status: open; re-verified 2026-10-28.
 
 Priority: P2 (performance + design). Complements issue 38 (decompose monoliths) with a concrete cut for this file.
 
+Jobs: [27](../.agents/jobs/27_geodesic_rebuild_performance.md).
+
 ## Status update 2026-10-28
 
 Nothing has been done. `getGeodesicSegments` still copies the registry (`src/world-objects/geodesicCannon.ts:1037-1045`),
@@ -14,7 +16,7 @@ The facts below are corrected to the current code: `getGeodesicSegments` has 42 
 `updateGeodesicIntersectionObjects` 26 in the file; the suite has 85 test files.
 
 Merged 2026-10-28: the module split that this issue used to propose is now tracked only in issue
-[76](76_split_geodesic_cannon_into_model_trace_and_tool_modules.md). This issue keeps the performance items.
+[76](../.agents/jobs/25_split_geodesic_cannon_modules.md). This issue keeps the performance items.
 
 ## Summary
 

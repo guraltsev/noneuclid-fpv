@@ -12,7 +12,7 @@ any item below.
   means Vite currently deploys it even though the app does not request it.
 - **Source-only** files are kept for authoring or rebuilding, not for browser
   loading. They remain accidentally public until
-  [issue 34](issues/34_reduce_deployment_and_repository_asset_footprint.md)
+  [issue 34](../.agents/jobs/02_asset_footprint_and_provenance.md)
   completes the source/runtime split.
 - The repository did not preserve original download dates, checksums, or an
   upstream version number. The sources and local license records below were
@@ -20,7 +20,7 @@ any item below.
   page records.
 - **Blocked** is a release gate, not a license. It means the asset must not be
   used in a new deployment or redistributed separately until
-  [issue 40](issues/40_resolve_unverified_public_assets.md) resolves it.
+  [issue 40](../_issues/40_resolve_unverified_public_assets.md) resolves it.
 
 When an asset moves, update its path in this file in the same change. Keep this
 record and any required local license text with the asset; generated KTX2 files

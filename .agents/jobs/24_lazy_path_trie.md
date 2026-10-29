@@ -1,6 +1,7 @@
-# 60 - Replace eager per-root path tables with a lazily grown, shared path trie
+# Job 24 - Replace per-root path tables with a lazy path trie
 
-Status: open; re-verified 2026-10-28.
+Status: queued.
+Former issue: 60 (converted to a job on 2026-10-28).
 
 Priority: P2 (design / performance / memory). The id inconsistencies already listed in issue 41 disappear under this
 design; they are not filed again here.

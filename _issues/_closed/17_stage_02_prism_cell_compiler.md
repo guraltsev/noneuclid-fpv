@@ -10,24 +10,24 @@ Authoring specs now compile into validated prism cells, side geometry, portal lo
 
 ## Implemented changes
 
-- [src/cell-complex/specs.ts](../../../src/cell-complex/specs.ts) defines the authored and compiled cell-complex contracts.
-- [src/cell-complex/prismCells.ts](../../../src/cell-complex/prismCells.ts) exposes compiled prism-cell geometry, side data, portal lookups, and cell metadata.
-- [src/cell-complex/compileCellComplex.ts](../../../src/cell-complex/compileCellComplex.ts) compiles authored worlds into runtime cells.
-- [src/cell-complex/compilePortalTransforms.ts](../../../src/cell-complex/compilePortalTransforms.ts) and [src/cell-complex/portalTransforms.ts](../../../src/cell-complex/portalTransforms.ts) provide explicit runtime portal transforms.
-- [src/cell-complex/forbiddenZones.ts](../../../src/cell-complex/forbiddenZones.ts) computes portal-junction collision columns from compiled prism geometry.
-- [src/authoring/validateAuthoringSpec.ts](../../../src/authoring/validateAuthoringSpec.ts) reports movement-critical authoring errors before runtime.
+- [src/cell-complex/specs.ts](../../src/cell-complex/specs.ts) defines the authored and compiled cell-complex contracts.
+- [src/cell-complex/prismCells.ts](../../src/cell-complex/prismCells.ts) exposes compiled prism-cell geometry, side data, portal lookups, and cell metadata.
+- [src/cell-complex/compileCellComplex.ts](../../src/cell-complex/compileCellComplex.ts) compiles authored worlds into runtime cells.
+- [src/cell-complex/compilePortalTransforms.ts](../../src/cell-complex/compilePortalTransforms.ts) and [src/cell-complex/portalTransforms.ts](../../src/cell-complex/portalTransforms.ts) provide explicit runtime portal transforms.
+- [src/cell-complex/forbiddenZones.ts](../../src/cell-complex/forbiddenZones.ts) computes portal-junction collision columns from compiled prism geometry.
+- [src/authoring/validateAuthoringSpec.ts](../../src/authoring/validateAuthoringSpec.ts) reports movement-critical authoring errors before runtime.
 
 ## Verification
 
 ### Automated
 
-- [tests/cell-complex/compileCellComplex.test.ts](../../../tests/cell-complex/compileCellComplex.test.ts) verifies:
+- [tests/cell-complex/compileCellComplex.test.ts](../../tests/cell-complex/compileCellComplex.test.ts) verifies:
   - valid sample worlds compile,
   - duplicate and missing references are rejected with readable errors,
   - side geometry and portal lookup data are present,
   - portal transforms round-trip correctly,
   - forbidden zones are produced at adjacent portal junctions.
-- [tests/cell-complex/describeGeometry.test.ts](../../../tests/cell-complex/describeGeometry.test.ts) verifies the compiled geometry can be summarized for inspection.
+- [tests/cell-complex/describeGeometry.test.ts](../../tests/cell-complex/describeGeometry.test.ts) verifies the compiled geometry can be summarized for inspection.
 
 ### Final checks
 

@@ -4,6 +4,8 @@ Status: open; re-verified 2026-10-28.
 
 Priority: P2 (correctness, visible near cone vertices and portal corners).
 
+Jobs: [17](../.agents/jobs/17_multi_hop_ghosts_and_eye_rerooting.md).
+
 ## Status update 2026-10-28
 
 Nothing in this issue has been fixed. Re-checked against the current code; the paths and line numbers in the evidence

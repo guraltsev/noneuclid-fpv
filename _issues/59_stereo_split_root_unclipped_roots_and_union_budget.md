@@ -5,6 +5,8 @@ Status: open; re-verified 2026-10-28.
 Priority: P2 (correctness, XR only). Related to issue 21 (closed 2026-10-28; its remaining stereo items are merged here). That issue covered stereo union and allocation; it did not
 cover these defects.
 
+Jobs: [23](../.agents/jobs/23_stereo_split_root_correctness.md).
+
 ## Status update 2026-10-28
 
 Nothing in the proposal is implemented, and the defects are confirmed in the current code. In the split-root branch of
@@ -73,7 +75,7 @@ Remaining stereo items from issue 21:
 
 - Debug state exposes per-eye totals (`PortalEyeRenderDebugState`) and the union through `portalInstances`, but not
   left-only, right-only and both-eye counts. Add them to renderer debug state. The in-headset readout is tracked in
-  issue [20](20_vr_palette_menu_from_shared_definition.md).
+  issue [20](../.agents/jobs/19_vr_palette_and_in_headset_debug.md).
 - Manual headset checks, to record when the split-root fix lands:
   - Stand near a portal boundary and move the headset sideways. A portal image may be visible in one eye, but it must
     not blink out of both.

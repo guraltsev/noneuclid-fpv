@@ -7,7 +7,7 @@ Status: closed on 2026-08-03.
 Runtime floor textures now use KTX2 color maps with preload, mipmap, color-space,
 conversion-script, and documentation support. Raw authoring assets remaining in
 `public` are a separate deployment-footprint problem tracked by
-[issue 34](../34_reduce_deployment_and_repository_asset_footprint.md).
+[issue 34](../../.agents/jobs/02_asset_footprint_and_provenance.md).
 
 ## Closing evidence
 

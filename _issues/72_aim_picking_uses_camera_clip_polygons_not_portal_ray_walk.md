@@ -4,6 +4,8 @@ Status: open; re-verified 2026-10-28.
 
 Priority: P1 (correctness in VR; also performance).
 
+Jobs: [16](../.agents/jobs/16_aim_picking_by_portal_ray_walk.md).
+
 ## Status update 2026-10-28
 
 Nothing in this issue has been fixed. The aim picker is unchanged; line numbers in the evidence below are updated to

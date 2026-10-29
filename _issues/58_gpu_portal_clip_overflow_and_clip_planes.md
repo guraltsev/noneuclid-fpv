@@ -4,6 +4,8 @@ Status: open; re-verified 2026-10-28.
 
 Priority: P2 (correctness for the overflow; performance for the rest).
 
+Jobs: [22](../.agents/jobs/22_gpu_portal_clip_planes.md).
+
 ## Status update 2026-10-28
 
 Nothing in the proposal is implemented. Clips are still NDC polygons of at most 8 vertices in a float texture. Overflow

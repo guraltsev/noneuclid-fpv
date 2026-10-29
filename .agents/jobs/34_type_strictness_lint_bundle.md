@@ -1,6 +1,7 @@
-# 80 - Tighten type strictness, add linting, and configure the bundle
+# Job 34 - Type strictness, linting and bundle configuration
 
-Status: open; re-verified 2026-10-28.
+Status: queued.
+Former issue: 80 (converted to a job on 2026-10-28).
 
 Priority: P2 (tooling / performance); bundle items P3.
 

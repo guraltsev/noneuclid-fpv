@@ -5,6 +5,8 @@ Status: open; re-verified 2026-10-28.
 Priority: P1 (correctness and robustness). This is a concrete design for the issue 41 items "a step that crosses a portal
 returns before floor/ceiling/forbidden-zone tests" and "`portalCrossingMode` ignored", plus new failures listed below.
 
+Jobs: [12](../.agents/jobs/12_segment_walk_kernel.md), [13](../.agents/jobs/13_swept_collide_and_slide.md).
+
 ## Status update 2026-10-28
 
 Done (small parts only):

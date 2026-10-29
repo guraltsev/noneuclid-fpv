@@ -5,6 +5,8 @@ Status: open; re-verified 2026-10-28.
 Priority: P1 (correctness). Not covered by issue 41, whose deformation items are the hard-coded 15 m, `||` in
 `normalizeState`, `JSON.stringify` equality and the mirrored marmot yaw.
 
+Jobs: [07](../.agents/jobs/07_forward_heading_convention.md), [09](../.agents/jobs/09_deformation_commit_safety.md).
+
 ## Status update 2026-10-28
 
 All four defects are still present. Re-checked against the current code:

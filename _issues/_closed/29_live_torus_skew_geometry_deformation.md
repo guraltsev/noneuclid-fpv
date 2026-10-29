@@ -16,7 +16,7 @@ remaining defects and costs found later are tracked by newer issues: pose transp
 [81](../81_floor_texture_slides_under_objects_during_deformation.md), main-thread commit cost (and the missing
 renderer-contract tests for the commit) in
 [82](../82_deformation_commit_rebuilds_whole_scene_and_reuploads_floor_texture.md), and moduli reduction in
-[54](../54_torus_moduli_family_reduction_and_gl2r_generalization.md).
+[54](../../.agents/jobs/35_torus_family_as_teichmuller_space.md).
 
 ## Closing evidence
 

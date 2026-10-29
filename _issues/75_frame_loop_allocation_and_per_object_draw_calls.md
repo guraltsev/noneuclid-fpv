@@ -4,6 +4,8 @@ Status: open; re-verified 2026-10-28.
 
 Priority: P2 (performance; matters most at 72-120 Hz in XR).
 
+Jobs: [29](../.agents/jobs/29_frame_loop_allocation_and_draw_calls.md).
+
 ## Status update 2026-10-28
 
 Nothing in this issue has been fixed. Every allocation and draw-call item below was re-checked against the current

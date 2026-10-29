@@ -16,20 +16,20 @@ Milestone 3 as a whole is still not complete. Ordinary camera-visible portal-cop
 
 ## Implemented changes
 
-- [src/render/three/cellRenderArchetypes.ts](../../../src/render/three/cellRenderArchetypes.ts) plans and builds per-cell floor, ceiling, solid-wall, portal-frame, and static-object archetypes as reusable fixed-capacity `THREE.InstancedMesh` batches.
-- [src/render/three/renderPortalInstances.ts](../../../src/render/three/renderPortalInstances.ts) creates the depth-0 root visible path, groups paths by destination cell, updates instance matrices and `mesh.count`, and reports compact capacity-overflow diagnostics.
-- [src/render/three/portalInstanceDebug.ts](../../../src/render/three/portalInstanceDebug.ts) provides the separate debug instance renderer used by `ShowCellPath(...)` so inspected paths do not mutate the live frame buffers.
-- [src/render/three/createThreeApp.ts](../../../src/render/three/createThreeApp.ts) derives capacities from `buildStaticallyCulledPortalPathTables(...)`, adds the archetype meshes to the scene, updates the active cell through the root path each frame, and wires `ShowCellPathRendersInstances` into `window.noneuclidPortalDebug`.
-- [src/render/three/debugOverlay.ts](../../../src/render/three/debugOverlay.ts) and [src/render/three/renderState.ts](../../../src/render/three/renderState.ts) surface compact portal-instance counts and overflow diagnostics.
-- [src/glue/debugOptions.ts](../../../src/glue/debugOptions.ts) defines the `portal-path-overlay-instances` debug option with the public label `ShowCellPathRendersInstances`.
+- [src/render/three/cellRenderArchetypes.ts](../../src/render/three/cellRenderArchetypes.ts) plans and builds per-cell floor, ceiling, solid-wall, portal-frame, and static-object archetypes as reusable fixed-capacity `THREE.InstancedMesh` batches.
+- [src/render/three/renderPortalInstances.ts](../../src/render/three/renderPortalInstances.ts) creates the depth-0 root visible path, groups paths by destination cell, updates instance matrices and `mesh.count`, and reports compact capacity-overflow diagnostics.
+- [src/render/three/portalInstanceDebug.ts](../../src/render/three/portalInstanceDebug.ts) provides the separate debug instance renderer used by `ShowCellPath(...)` so inspected paths do not mutate the live frame buffers.
+- [src/render/three/createThreeApp.ts](../../src/render/three/createThreeApp.ts) derives capacities from `buildStaticallyCulledPortalPathTables(...)`, adds the archetype meshes to the scene, updates the active cell through the root path each frame, and wires `ShowCellPathRendersInstances` into `window.noneuclidPortalDebug`.
+- [src/render/three/debugOverlay.ts](../../src/render/three/debugOverlay.ts) and [src/render/three/renderState.ts](../../src/render/three/renderState.ts) surface compact portal-instance counts and overflow diagnostics.
+- [src/glue/debugOptions.ts](../../src/glue/debugOptions.ts) defines the `portal-path-overlay-instances` debug option with the public label `ShowCellPathRendersInstances`.
 
 ## Verification
 
 ### Automated
 
-- [tests/render-contract/cellRenderArchetypes.test.ts](../../../tests/render-contract/cellRenderArchetypes.test.ts) covers archetype planning, static-object inclusion, marmot exclusion, and capacity derivation from statically kept path tables.
-- [tests/render-contract/portalInstanceBuffers.test.ts](../../../tests/render-contract/portalInstanceBuffers.test.ts) covers root-path writes, duplicate destination handling, `mesh.count` capping, overflow reporting, debug-state summaries, and the separate debug instance renderer.
-- [tests/debugSettings.test.ts](../../../tests/debugSettings.test.ts) covers the `portal-path-overlay-instances` debug option and its parse/serialize/runtime behavior.
+- [tests/render-contract/cellRenderArchetypes.test.ts](../../tests/render-contract/cellRenderArchetypes.test.ts) covers archetype planning, static-object inclusion, marmot exclusion, and capacity derivation from statically kept path tables.
+- [tests/render-contract/portalInstanceBuffers.test.ts](../../tests/render-contract/portalInstanceBuffers.test.ts) covers root-path writes, duplicate destination handling, `mesh.count` capping, overflow reporting, debug-state summaries, and the separate debug instance renderer.
+- [tests/debugSettings.test.ts](../../tests/debugSettings.test.ts) covers the `portal-path-overlay-instances` debug option and its parse/serialize/runtime behavior.
 
 ### Final checks
 

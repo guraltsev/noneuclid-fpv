@@ -13,7 +13,7 @@ shared-root pass and per-eye debug counts. The unfinished parts are tracked in t
 
 - Hierarchical traversal and allocation (steps 3 and 4) are in [57](../57_per_frame_portal_visibility_funnel_and_traversal.md).
 - The split-root defects, the left-only/right-only/both-eye counts and the manual headset checks are in [59](../59_stereo_split_root_unclipped_roots_and_union_budget.md).
-- The in-headset debug readout is in [20](../20_vr_palette_menu_from_shared_definition.md).
+- The in-headset debug readout is in [20](../../.agents/jobs/19_vr_palette_and_in_headset_debug.md).
 
 ## Closing evidence
 
@@ -63,7 +63,7 @@ Remaining:
 - Headset visual/performance check: not recorded.
 - `xrDebugPanel.ts` and its test, listed under Required Files, were removed. Debug output is the DOM
   `debugOverlay.ts`, which is not visible inside an immersive session (issue
-  [20](../20_vr_palette_menu_from_shared_definition.md)).
+  [20](../../.agents/jobs/19_vr_palette_and_in_headset_debug.md)).
 
 The renderer computes per-eye portal visibility, builds a conservative union
 for frame-level instances, preserves per-eye clip results, and exposes per-eye

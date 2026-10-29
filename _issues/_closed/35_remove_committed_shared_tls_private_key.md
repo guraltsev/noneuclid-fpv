@@ -14,7 +14,7 @@ password stays committed on purpose; it is a local test-server setting, not a se
 
 - `git ls-files wwwserver` lists no PFX or certificate (commits 70d132a and c58f88d).
 - `.gitignore` ignores `*.pfx`, `*.pem`, `*.cer` and `*.key`.
-- The missing local-HTTPS recipe moved to issue [37](../37_align_pages_and_deployment_configuration.md).
+- The missing local-HTTPS recipe moved to issue [37](../../.agents/jobs/03_pages_deployment_configuration.md).
 
 ## Status update 2026-10-28
 

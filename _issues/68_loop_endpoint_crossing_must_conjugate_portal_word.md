@@ -4,6 +4,8 @@ Status: open; re-verified 2026-10-28.
 
 Priority: P1 (correctness; silent change of homotopy class).
 
+Jobs: [05](../.agents/jobs/05_conjugate_loop_word_on_anchor_crossing.md).
+
 ## Status update 2026-10-28
 
 Nothing has changed. All three sites still apply a one-sided update, `liftGeodesicEndpoint` still does not check that the

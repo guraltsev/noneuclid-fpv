@@ -4,6 +4,8 @@ Status: open; re-verified 2026-10-28.
 
 Priority: P2 (performance / design).
 
+Jobs: [30](../.agents/jobs/30_deformation_rebuild_pipeline.md).
+
 ## Status update 2026-10-28
 
 Nothing in "Proposed change" is implemented:

@@ -4,6 +4,8 @@ Status: open; re-verified 2026-10-28.
 
 Priority: P2 (correctness). Category: design. The fix supplies the obstacle set used by issue 62.
 
+Jobs: [13](../.agents/jobs/13_swept_collide_and_slide.md).
+
 ## Status update 2026-10-28
 
 Nothing is done; every query is still single-cell.

@@ -42,7 +42,7 @@ dated status section.
 
 Six parallel reviews covered the code: math core and gluing, portal visibility, movement, geodesics, the frame loop, and
 architecture. They produced issues 51-80. Items already recorded in
-[41](_closed/41_documentation_audit_findings.md), [38](38_decompose_runtime_monoliths_and_retire_legacy_paths.md),
+[41](_closed/41_documentation_audit_findings.md), [38](../.agents/jobs/33_decompose_runtime_monoliths.md),
 [21](_closed/21_vr_stereo_portal_visibility_union_and_hot_loop_allocation.md) and
 [MATHEMATICAL_MODEL.md §11](../_docs/MATHEMATICAL_MODEL.md#11-assumptions-and-known-gaps) were not filed again. Where this
 audit has a concrete fix design for one of those items, the new issue says so.
@@ -60,7 +60,7 @@ to `src/cell-complex/validateCellComplexSpec.ts`.
 | [51](_closed/51_dodecahedron_example_is_a_genus_6_surface.md) | P1 | Closed 2026-10-28: the dodecahedron gluing is fixed and per-world invariants are tested |
 | [52](52_compile_time_vertex_classes_and_gluing_validation.md) | P2 | Compile-time vertex classes, cone angles, Gauss–Bonnet, endpoint-matching validation |
 | [53](53_torus_deformation_commit_transport_defects.md) | P1 | Deformation commit can trap the player in an exclusion zone; headings transported by the wrong vector |
-| [54](54_torus_moduli_family_reduction_and_gl2r_generalization.md) | P3 | Torus family as Teichmüller space; lattice reduction; GL(2,ℝ) family for translation surfaces |
+| [54](../.agents/jobs/35_torus_family_as_teichmuller_space.md) | P3 | Torus family as Teichmüller space; lattice reduction; GL(2,ℝ) family for translation surfaces |
 | [55](55_live_deformation_rebuild_cost_and_se2_transforms.md) | P2 | ~100 ms rebuild per deformation step; worker pipeline; `Iso2` planar transform type |
 
 ### Portal visibility and rendering through portals (56-60)
@@ -70,7 +70,7 @@ to `src/cell-complex/validateCellComplexSpec.ts`.
 | [57](57_per_frame_portal_visibility_funnel_and_traversal.md) | P2 | Per-frame visibility: traverse only visible parents; exact 2.5D funnel; no background holes |
 | [58](58_gpu_portal_clip_overflow_and_clip_planes.md) | P2 | Paths with more than 8 clip vertices silently vanish; 32 texture fetches per fragment; `discard` disables early-Z |
 | [59](59_stereo_split_root_unclipped_roots_and_union_budget.md) | P2 | Split-root stereo draws the other eye's root cell unclipped |
-| [60](60_replace_per_root_path_tables_with_lazy_path_trie.md) | P2 | Replace eager per-root path tables with a lazy shared trie |
+| [60](../.agents/jobs/24_lazy_path_trie.md) | P2 | Replace eager per-root path tables with a lazy shared trie |
 
 ### Movement and collision (61-65)
 | # | Pri | Title |
@@ -102,11 +102,11 @@ to `src/cell-complex/validateCellComplexSpec.ts`.
 ### Architecture, tooling, tests (76-80)
 | # | Pri | Title |
 | --- | --- | --- |
-| [76](76_split_geodesic_cannon_into_model_trace_and_tool_modules.md) | P1 | Concrete seams for `geodesicCannon.ts` (5,942 lines) and `geodesicCannonTools.ts` |
-| [77](77_app_shell_state_holder_and_command_model.md) | P2 | One state holder and one command path for `createThreeApp` |
+| [76](../.agents/jobs/25_split_geodesic_cannon_modules.md) | P1 | Concrete seams for `geodesicCannon.ts` (5,942 lines) and `geodesicCannonTools.ts` |
+| [77](../.agents/jobs/31_app_shell_state_holder.md) | P2 | One state holder and one command path for `createThreeApp` |
 | [78](78_enforce_layer_dag_and_move_domain_logic_out_of_render.md) | P2 | Make the layer rule a real DAG; 5 import cycles; move domain logic out of `render/three` |
-| [79](79_property_based_tests_for_geometry_core_and_test_layout.md) | P2 | Property-based invariants (fast-check) for the geometry core |
-| [80](80_type_strictness_lint_and_bundle_configuration.md) | P2/P3 | `noUncheckedIndexedAccess` (353 errors), lint, bundle chunking (1.44 MB single chunk) |
+| [79](../.agents/jobs/11_property_tests_for_geometry_core.md) | P2 | Property-based invariants (fast-check) for the geometry core |
+| [80](../.agents/jobs/34_type_strictness_lint_bundle.md) | P2/P3 | `noUncheckedIndexedAccess` (353 errors), lint, bundle chunking (1.44 MB single chunk) |
 
 ## Cross-cutting themes
 
@@ -158,22 +158,15 @@ to `src/cell-complex/validateCellComplexSpec.ts`.
    from one state snapshot, keyed by the root actually used to render. This removes duplicate work and the stale-root
    bug together.
 
-## Suggested order
+## Order of work
 
-1. Small, high-value fixes:
-   - 51: fix the example gluing and add an invariant test;
-   - 66: fix the stall;
-   - 68: conjugate the loop word;
-   - 74: add a try/catch around the frame;
-   - 64: fix the XR slide replay and the marmot heading;
-   - 53: re-check collision after a deformation commit.
-2. Movement correctness: 61, then 62 and 63. This is P1 because authored worlds with walls can be escaped today.
-3. The kernel from theme 1, then 72, 73 and 69 on top of it; then 52, including dropping the disks at flat vertices.
-4. Visibility rework: 56, 57, 58, 59, then 60.
-5. Geodesic redesign, 67, done together with the module split in 70 and 76.
-6. Structure and tooling, ongoing: 77-80, 75, 55, 54.
+Superseded on 2026-10-28 by the numbered job queue in [`.agents/jobs`](../.agents/jobs/README.md). Issues 54, 60, 76,
+77, 79 and 80 were mainly "carry out this change", so they became jobs 35, 24, 25, 31, 11 and 34; their rows above
+link to the jobs. Issues 52, 56, 67 and 78 were split: the defect stays here, and the design moved to jobs 18, 20, 26
+and 32.
 
 ## Acceptance criteria
 
-- Each of issues 51-80 is closed, merged into another issue with a link, or explicitly deferred with a reason.
+- Each of issues 51-80 is closed, converted into a job, merged into another issue with a link, or explicitly deferred
+  with a reason.
 - `MATHEMATICAL_MODEL.md` §11 is updated as each listed gap is closed.

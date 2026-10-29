@@ -64,7 +64,8 @@ Both hand-written documents contain machine-checked references to the code
 - [testing.md](testing.md), [acceptance-checklists.md](acceptance-checklists.md),
   and [llm-implementation-workflow.md](llm-implementation-workflow.md) cover
   verification and LLM-assisted workflow.
-- Open work lives in `_issues`; closed work in `_issues/_closed`.
+- Problems live in `_issues` (closed ones in `_issues/_closed`); work orders live in
+  `.agents/jobs`, numbered in execution order.
 
 ## Handoff Packet
 

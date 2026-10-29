@@ -4,6 +4,8 @@ Status: open; re-verified 2026-10-28.
 
 Priority: P1 (correctness; small fix). Independent of the redesign in issue 67, which removes the root cause.
 
+Jobs: [06](../.agents/jobs/06_curve_shortening_stalls.md).
+
 ## Status update 2026-10-28
 
 Nothing in this issue has been fixed. The step/absorb logic, the constants and the angle-only fuse test are unchanged;

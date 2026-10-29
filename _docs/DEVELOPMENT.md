@@ -71,10 +71,12 @@ After changing code, run `npm run docs:generate` and commit the regenerated
 `camp-2026-VR` are replaceable classroom or yearly deployment instances; do
 not rename the source project merely to match an instance.
 
-Open work lives in [`_issues`](../_issues/). A numbered issue is the source of
-truth for its scope and acceptance criteria. Move completed records to
-[`_issues/_closed`](../_issues/_closed/) only when their requested work and
-verification are actually complete.
+Problems live in [`_issues`](../_issues/): what is wrong, the evidence and the
+impact. Work orders live in [`.agents/jobs`](../.agents/jobs/README.md), numbered
+in the order they should be carried out; each names the issues it resolves. An
+item that is mainly "carry out this change" is a job, not an issue. Move an issue
+to [`_issues/_closed`](../_issues/_closed/) and a job to `.agents/jobs/_done/`
+only when the work and its verification are actually complete.
 
 For GitHub Pages builds, HTTPS/WebXR expectations, and base-path details, use
 the [deployment guide](DEPLOYMENT.md).

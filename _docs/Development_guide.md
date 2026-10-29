@@ -85,7 +85,7 @@ deploys the built `dist/` output.
 `npm run build:pages` is the local verification build for that deployment path.
 Set `VITE_BASE` explicitly for the target Pages repository. The checked-in
 helper still has a legacy package-name fallback; its removal is tracked in
-[issue 37](issues/37_align_pages_and_deployment_configuration.md). See the
+[issue 37](../.agents/jobs/03_pages_deployment_configuration.md). See the
 [deployment guide](DEPLOYMENT.md) for the current release procedure.
 
 ## Repository Map

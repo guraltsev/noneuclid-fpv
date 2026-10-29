@@ -6,6 +6,8 @@ Priority: P1 (correctness). Extends the issue 41 bullet "wall sliding resolves o
 not re-test". The consequence is worse than "a corner can still violate a second wall": the body leaves the cell without
 any limit.
 
+Jobs: [13](../.agents/jobs/13_swept_collide_and_slide.md).
+
 ## Status update 2026-10-28
 
 Done (partial fix, not the projection proposed below):

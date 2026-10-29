@@ -84,4 +84,4 @@ Development, testing, authoring, and deployment instructions are provided:
 - [Documentation home](_docs/Readme.md)
 - [Development guide](_docs/DEVELOPMENT.md)
 - [Deployment guide](_docs/DEPLOYMENT.md)
-- [Open project work](_issues/)
+- [Open issues](_issues/) and the [job queue](.agents/jobs/README.md)

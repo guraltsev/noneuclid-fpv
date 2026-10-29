@@ -4,6 +4,8 @@ Status: open; re-verified 2026-10-28.
 
 Priority: P3 (robustness). Small items, grouped.
 
+Jobs: [14](../.agents/jobs/14_movement_numerics.md).
+
 ## Status update 2026-10-28
 
 Nothing is done. Re-checked against the current code with a throwaway vitest file (line numbers in the body below are

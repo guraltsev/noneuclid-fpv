@@ -1,6 +1,7 @@
-# 36 - Add pre-merge CI and browser smoke coverage
+# Job 04 - Local browser smoke coverage
 
-Status: open; re-verified 2026-10-28.
+Status: queued.
+Former issue: 36 (converted to a job on 2026-10-28).
 
 Priority: P1 release confidence.
 

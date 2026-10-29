@@ -4,6 +4,8 @@ Status: open; re-verified 2026-10-28.
 
 Priority: P2 (performance, with a correctness defect in single-view XR and on portal-crossing frames).
 
+Jobs: [28](../.agents/jobs/28_frame_snapshot_instance_sync.md).
+
 ## Status update 2026-10-28
 
 Nothing in this issue has been fixed. Re-checked against the current `src/render/three/createThreeApp.ts` (3,555

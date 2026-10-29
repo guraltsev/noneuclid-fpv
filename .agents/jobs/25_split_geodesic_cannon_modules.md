@@ -1,6 +1,7 @@
-# 76 - Split geodesicCannon.ts and geodesicCannonTools.ts along concrete seams
+# Job 25 - Split geodesicCannon.ts and geodesicCannonTools.ts
 
-Status: open; re-verified 2026-10-28.
+Status: queued.
+Former issue: 76 (converted to a job on 2026-10-28).
 
 Priority: P1 (architecture). Concrete execution plan for the geodesic half of issue 38; coordinate legacy removal with
 issues 31/32 as 38 requires.
@@ -90,12 +91,12 @@ Stages (each a separate PR, behavior-preserving, full test suite green):
 Issue 70 proposed the same split. Its additions are kept here:
 
 - A separate `geodesic/development.ts` for lift, sleeve construction and the funnel/taut string of issue
-  [67](67_exact_curve_shortening_via_sleeve_funnel.md), between `portalWord.ts` and `intervals.ts`.
+  [67](../../_issues/67_exact_curve_shortening_via_sleeve_funnel.md), between `portalWord.ts` and `intervals.ts`.
 - `portalWord.ts` also owns the chain check, the anchor-crossing update with conjugation (issue
-  [68](68_loop_endpoint_crossing_must_conjugate_portal_word.md)) and the holonomy of a word.
+  [68](../../_issues/68_loop_endpoint_crossing_must_conjugate_portal_word.md)) and the holonomy of a word.
 - `trace.ts` also owns the disk predicate (issue 69).
 - The pure modules import nothing from `world-objects/runtimeObjectRegistry` or `render/`, enforced by the layering
   check in `scripts/docs`.
 
-Issue [70](70_geodesic_module_performance_and_split.md) keeps the performance work (segment index, once-per-frame intersections, structured preview results,
+Issue [70](../../_issues/70_geodesic_module_performance_and_split.md) keeps the performance work (segment index, once-per-frame intersections, structured preview results,
 cached inverse transforms).

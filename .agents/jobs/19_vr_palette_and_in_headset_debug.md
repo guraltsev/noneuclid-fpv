@@ -1,8 +1,7 @@
-# 20 - VR palette menu from shared definition
+# Job 19 - Finish the VR palette and add an in-headset debug readout
 
-## Repository audit status - 2026-08-03T14:24:10-05:00
-
-Status: open; re-verified 2026-10-28. Note: `vrPaletteController`, `xrPointers`, and `xrDebugPanel` listed below were later removed as unused; the live path is `scenePaletteController` + `vrPaletteLibraryAdapter`.
+Status: queued.
+Former issue: 20 (converted to a job on 2026-10-28).
 
 Priority: P2 for manual verification only.
 
@@ -51,9 +50,9 @@ Port the FPS palette menu to immersive VR by reusing the shared menu definition 
 This issue should not recreate widgets from scratch. It should evaluate and integrate a library-backed VR UI path for buttons, toggles, dropdown/list behavior, text, focus/hover/active states, clipping, and controller selection.
 
 Supersedes the closed DOM-first proposal in
-[19_fps_dom_palette_menu.md](./_closed/19_fps_dom_palette_menu.md).
+[[job 19](../../_issues/_closed/19_fps_dom_palette_menu.md)](../../_issues/_closed/19_fps_dom_palette_menu.md).
 
-Design reference: [_docs/design/011-vr-hand-tools-palette.md](../_docs/design/011-vr-hand-tools-palette.md).
+Design reference: [_docs/design/011-vr-hand-tools-palette.md](../../_docs/design/011-vr-hand-tools-palette.md).
 
 ## Scope
 
@@ -287,4 +286,4 @@ From issue 41 (XR input and palette):
 From issue 21 (stereo debugging):
 
 - The in-headset debug readout is the one missing piece for the stereo headset checks in issue
-  [59](59_stereo_split_root_unclipped_roots_and_union_budget.md). When it exists, it should show per-eye, union, left-only, right-only and both-eye path counts.
+  [59](../../_issues/59_stereo_split_root_unclipped_roots_and_union_budget.md). When it exists, it should show per-eye, union, left-only, right-only and both-eye path counts.

@@ -1,6 +1,7 @@
-# 79 - Property-based tests for the geometry core; fix test layout gaps
+# Job 11 - Property-based tests for the geometry core
 
-Status: open; re-verified 2026-10-28.
+Status: queued.
+Former issue: 79 (converted to a job on 2026-10-28).
 
 Priority: P2 (testing).
 

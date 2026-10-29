@@ -10,9 +10,9 @@ The renderer lighting rig is now centralized in a small module, uses a portal-st
 
 ## Implemented changes
 
-- [src/render/three/sceneLighting.ts](../../../src/render/three/sceneLighting.ts) centralizes the stylized lighting policy and lifecycle.
-- [src/render/three/createThreeApp.ts](../../../src/render/three/createThreeApp.ts) uses the lighting helper instead of hard-coding the rig inline.
-- [tests/render-contract/sceneLighting.test.ts](../../../tests/render-contract/sceneLighting.test.ts) covers the lighting contract.
+- [src/render/three/sceneLighting.ts](../../src/render/three/sceneLighting.ts) centralizes the stylized lighting policy and lifecycle.
+- [src/render/three/createThreeApp.ts](../../src/render/three/createThreeApp.ts) uses the lighting helper instead of hard-coding the rig inline.
+- [tests/render-contract/sceneLighting.test.ts](../../tests/render-contract/sceneLighting.test.ts) covers the lighting contract.
 
 ## Verification
 

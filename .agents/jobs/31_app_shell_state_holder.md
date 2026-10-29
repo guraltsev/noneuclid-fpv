@@ -1,6 +1,7 @@
-# 77 - Give the application shell one state holder and one command path
+# Job 31 - One state holder and one command path for the app shell
 
-Status: open; re-verified 2026-10-28.
+Status: queued.
+Former issue: 77 (converted to a job on 2026-10-28).
 
 Priority: P2 (architecture). Refines the `createThreeApp` part of issue 38 ("introduce an explicit shared-state holder
 instead of more getter/setter pairs") into a concrete design.
