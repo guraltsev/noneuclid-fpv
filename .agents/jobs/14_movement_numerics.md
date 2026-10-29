@@ -1,6 +1,6 @@
 # Job 14 - Movement numerics: crossing at rest, pose drift, tolerances
 
-Status: queued.
+Status: in progress.
 Revised on 2026-10-29 for a less capable implementing model.
 Resolves: issue [65](../../_issues/65_movement_numerics_boundary_hysteresis_and_pose_drift.md).
 
