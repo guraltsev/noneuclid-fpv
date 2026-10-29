@@ -1,6 +1,6 @@
 # Job 36 - Creatures detour around obstacles and resume their geodesic
 
-Status: queued.
+Status: in progress.
 Written on 2026-10-29 for a less capable implementing model. Approved by the maintainer on 2026-10-29, with the
 requirement that **a detour around a forbidden zone passes the vertex on the same side as the creature's geodesic**.
 Resolves: no open issue. It replaces job 13 Decision 12 ("creatures keep ignoring zones").
