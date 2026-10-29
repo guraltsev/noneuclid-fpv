@@ -3,7 +3,7 @@
  * Crossing applies the portal's gluing transform g (source-cell frame to target-cell frame) to the pose, so the new pose is g composed with the old one: the position is mapped as x -> R x + t and the heading is rotated by R, which changes the yaw by the portal's rotation angle but keeps z and pitch. No collision or bounds checking happens here; deciding when to cross is done in moveDynamicObject.ts.
  */
 import type { CompiledPortal } from "../cell-complex/specs";
-import { composeRigidTransform3 } from "../math/rigidTransform3";
+import { composeRigidTransform3, orthonormalizeYawRigidTransform3 } from "../math/rigidTransform3";
 import type { PlayerPose } from "./playerPose";
 import type { DynamicObjectState } from "./dynamicObject";
 import { playerPoseToDynamicObject, playerPoseFromDynamicObject } from "./playerPose";
@@ -15,7 +15,7 @@ export function crossDynamicObjectPortal(object: DynamicObjectState, portal: Com
   return {
     ...object,
     cellId: portal.targetCellId,
-    localPose: composeRigidTransform3(portal.transformToTarget, object.localPose),
+    localPose: orthonormalizeYawRigidTransform3(composeRigidTransform3(portal.transformToTarget, object.localPose)),
   };
 }
 

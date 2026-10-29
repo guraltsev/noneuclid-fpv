@@ -165,3 +165,11 @@ function transposeMat3(matrix: Mat3): Mat3 {
     m22: matrix.m22,
   };
 }
+
+/**
+ * Returns the transform with the same translation and the exact yaw rotation closest to the given rotation, `yaw = atan2(m10, m00)`.
+ * Only valid for transforms whose rotation is a yaw about +z (every gluing rotation and every object pose in this model is); any pitch or roll in the input is discarded. Use it after composing many yaw transforms to remove accumulated round-off.
+ */
+export function orthonormalizeYawRigidTransform3(transform: RigidTransform3): RigidTransform3 {
+  return yawRigidTransform3(Math.atan2(transform.rotation.m10, transform.rotation.m00), transform.translation);
+}

@@ -6,13 +6,14 @@ import type { CompiledCellComplex } from "../cell-complex/compileCellComplex";
 import { locateDevelopedPoint, walkDevelopedSegment, type SegmentWalkCrossing } from "../cell-complex/segmentWalk";
 import {
   composeRigidTransform3,
+  orthonormalizeYawRigidTransform3,
   identityRigidTransform3,
   invertRigidTransform3,
   transformDirection3,
   transformPoint3,
   type RigidTransform3,
 } from "../math/rigidTransform3";
-import { cellContainmentToleranceMeters, collisionSkinMeters } from "../math/tolerances";
+import { anchorCentreOffsetToleranceMeters, cellContainmentToleranceMeters, collisionSkinMeters, degenerateLengthMeters, verticalStepSlackMeters } from "../math/tolerances";
 import { vec3, type Vec3 } from "../math/vec3";
 import { getDynamicObjectCollisionBounds, signedDistanceToSide, type BlockingReason } from "./collision";
 import { collectDevelopedObstacles, type ObstacleBodyState } from "./developedObstacles";
@@ -158,10 +159,10 @@ export function moveDynamicObject(request: MoveDynamicObjectRequest): MoveDynami
   let dz = request.displacement.z;
   let verticalReason: BlockingReason | undefined;
 
-  if (dz < lowest - 1e-12) {
+  if (dz < lowest - verticalStepSlackMeters) {
     dz = lowest;
     verticalReason = "floor";
-  } else if (dz > highest + 1e-12) {
+  } else if (dz > highest + verticalStepSlackMeters) {
     dz = highest;
     verticalReason = "ceiling";
   }
@@ -180,7 +181,7 @@ export function moveDynamicObject(request: MoveDynamicObjectRequest): MoveDynami
       ...object,
       localPose: { rotation: object.localPose.rotation, translation: vec3(anchorEnd.x, anchorEnd.y, anchor.z + dz) },
     };
-    const moved: DynamicObjectState = walkTransform
+    const composed: DynamicObjectState = walkTransform
       ? {
           ...translated,
           cellId: lastCellId(walkCrossings, object.cellId),
@@ -188,6 +189,11 @@ export function moveDynamicObject(request: MoveDynamicObjectRequest): MoveDynami
         }
       : translated;
     const crossings = [...prefixCrossings, ...walkCrossings];
+    // Poses are pure yaws; drop the round-off that crossings accumulate in the rotation.
+    const moved: DynamicObjectState =
+      crossings.length > 0
+        ? { ...composed, localPose: orthonormalizeYawRigidTransform3(composed.localPose) }
+        : composed;
 
     return {
       object: moved,
@@ -202,7 +208,7 @@ export function moveDynamicObject(request: MoveDynamicObjectRequest): MoveDynami
     };
   };
 
-  if (Math.hypot(delta.x, delta.y) <= 1e-12) {
+  if (Math.hypot(delta.x, delta.y) <= degenerateLengthMeters) {
     return build(startAnchorXY, undefined, [], verticalReason, verticalReason !== undefined);
   }
 
@@ -211,7 +217,7 @@ export function moveDynamicObject(request: MoveDynamicObjectRequest): MoveDynami
   let collectCentre = { x: centre.x, y: centre.y };
   let frameFromCell = identityRigidTransform3;
 
-  if (Math.hypot(offset.x, offset.y) > 1e-9) {
+  if (Math.hypot(offset.x, offset.y) > anchorCentreOffsetToleranceMeters) {
     const located = locateDevelopedPoint(world, cell.id, startAnchorXY, collectCentre);
 
     if (located.status === "end") {
@@ -251,7 +257,7 @@ export function moveDynamicObject(request: MoveDynamicObjectRequest): MoveDynami
     const to = points[k + 1];
     const length = Math.hypot(to.x - from.x, to.y - from.y);
 
-    if (length <= 1e-12) {
+    if (length <= degenerateLengthMeters) {
       continue;
     }
 

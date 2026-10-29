@@ -1,8 +1,9 @@
-import { describe, expect, it } from "vitest";
+﻿import { describe, expect, it } from "vitest";
 import {
   composeRigidTransform3,
   identityRigidTransform3,
   invertRigidTransform3,
+  orthonormalizeYawRigidTransform3,
   rigidTransform3,
   transformDirection3,
   transformPoint3,
@@ -47,5 +48,31 @@ describe("rigidTransform3", () => {
         vec3(-2, 10, 0),
       ),
     ).toBe(true);
+  });
+});
+
+describe("orthonormalizeYawRigidTransform3", () => {
+  it("removes a 1e-9 perturbation and preserves the yaw angle", () => {
+    const base = yawRigidTransform3(0.7, { x: 1, y: 2, z: 3 });
+    const perturbed = {
+      ...base,
+      rotation: { ...base.rotation, m00: base.rotation.m00 * (1 + 1e-9), m10: base.rotation.m10 * (1 + 1e-9) },
+    };
+    const r = orthonormalizeYawRigidTransform3(perturbed).rotation;
+
+    expect(Math.abs(r.m00 * r.m00 + r.m10 * r.m10 - 1)).toBeLessThan(1e-15);
+    expect(Math.abs(r.m00 * r.m01 + r.m10 * r.m11)).toBeLessThan(1e-15);
+    expect(Math.abs(Math.atan2(r.m10, r.m00) - 0.7)).toBeLessThan(1e-12);
+    expect(orthonormalizeYawRigidTransform3(perturbed).translation).toEqual({ x: 1, y: 2, z: 3 });
+  });
+});
+
+describe("orthonormalizeYawRigidTransform3 at yaw 0", () => {
+  it("restores Rt R = I when only m00 is perturbed by 1e-9", () => {
+    const base = yawRigidTransform3(0);
+    const r = orthonormalizeYawRigidTransform3({ ...base, rotation: { ...base.rotation, m00: 1 + 1e-9 } }).rotation;
+
+    expect(Math.abs(r.m00 * r.m00 + r.m10 * r.m10 - 1)).toBeLessThan(1e-15);
+    expect(Math.atan2(r.m10, r.m00)).toBe(0);
   });
 });

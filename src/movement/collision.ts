@@ -77,7 +77,7 @@ const zeroOffset = { x: 0, y: 0, z: 0 };
 
 /**
  * Tests whether the candidate state collides with the floor, ceiling, forbidden-zone cylinders or walls of its cell, returning the first collision found.
- * Checks in order: floor (cylinder bottom below z = 0), ceiling (top above the cell height), forbidden zones (overlap at the new position, then overlap of the swept path from previousObject when given), then walls: every side that has no portal (and is not ignored) blocks if the cylinder center is closer than its radius to the side plane. Objects without a collision shape never block. Comparisons are strict with no tolerance.
+ * Checks in order: floor (cylinder bottom below z = 0), ceiling (top above the cell height), forbidden zones (overlap at the new position, then overlap of the swept path from previousObject when given), then walls: every side that has no portal (and is not ignored) blocks if the cylinder center is closer than its radius to the side plane. Objects without a collision shape never block. Comparisons are strict with no tolerance. The movers keep bodies `collisionSkinMeters` clear of every obstacle, so a body at rest after a move is never reported blocked.
  */
 export function testCellCollision(candidate: CollisionCandidate): CollisionResult {
   const bounds = getDynamicObjectCollisionBounds(candidate.object);

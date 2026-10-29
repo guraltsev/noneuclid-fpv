@@ -3,7 +3,7 @@
  * The moving body is its horizontal centre c with the path p(s) = p + s v, s in [0, 1] (meters). Obstacles carry a radius that already includes the moving body's radius, so the centre is tested against a point (disc) or a segment (capsule) thickened by that radius. Only approaching hits count: a body that already overlaps an obstacle may move away from it or along it, never deeper in. A hit at the very end of the step (within 1e-9 of s = 1) is a touch, not a block.
  */
 import type { Vec2xy } from "../math/polygons";
-import { collisionSkinMeters } from "../math/tolerances";
+import { approachDotToleranceMeters, collisionSkinMeters, degenerateLengthMeters } from "../math/tolerances";
 
 /**
  * What an obstacle is, for reporting: a wall, a too-low portal ("ceiling"), a forbidden-zone column or another body.
@@ -77,7 +77,7 @@ function sweepDiscRaw(p: Vec2xy, v: Vec2xy, q: Vec2xy, radius: number): RawHit |
 
     const wl = Math.hypot(w.x, w.y);
 
-    if (wl < 1e-12) {
+    if (wl < degenerateLengthMeters) {
       const vl = Math.sqrt(a);
 
       return { s: 0, normal: { x: -v.x / vl, y: -v.y / vl } };
@@ -120,7 +120,7 @@ function sweepCapsuleRaw(p: Vec2xy, v: Vec2xy, a: Vec2xy, b: Vec2xy, radius: num
   const ey = b.y - a.y;
   const length = Math.hypot(ex, ey);
 
-  if (length > 1e-12) {
+  if (length > degenerateLengthMeters) {
     const u = { x: ex / length, y: ey / length };
     let n = { x: -u.y, y: u.x };
     let h0 = (p.x - a.x) * n.x + (p.y - a.y) * n.y;
@@ -190,7 +190,7 @@ export function slideDisc(
   for (let iteration = 0; iteration < maxIterations; iteration += 1) {
     const speed = Math.hypot(v.x, v.y);
 
-    if (speed <= 1e-12) {
+    if (speed <= degenerateLengthMeters) {
       break;
     }
 
@@ -224,7 +224,7 @@ export function slideDisc(
     rem = { x: rem.x - into * hit.normal.x, y: rem.y - into * hit.normal.y };
 
     for (const earlier of contacts) {
-      if (dot(rem, earlier.normal) < -1e-12) {
+      if (dot(rem, earlier.normal) < -approachDotToleranceMeters) {
         rem = { x: 0, y: 0 };
         break;
       }

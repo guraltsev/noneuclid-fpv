@@ -31,3 +31,48 @@ export const segmentWalkOutgoingDotTolerance = 1e-12;
  * Clearance, meters, kept between a body and an obstacle after a collision response.
  */
 export const collisionSkinMeters = 1e-6;
+
+/**
+ * Lengths, speeds and displacements (meters) at or below this are treated as zero: a degenerate segment has no direction, a zero horizontal step does not walk.
+ */
+export const degenerateLengthMeters = 1e-12;
+
+/**
+ * Tolerance (dimensionless, cross products of unit directions) for a direction lying on the boundary of a visibility wedge.
+ */
+export const wedgeCrossTolerance = 1e-12;
+
+/**
+ * A half-plane constraint whose coefficient on the ray parameter is below this (dimensionless) is treated as parallel to the ray.
+ */
+export const parallelConstraintTolerance = 1e-15;
+
+/**
+ * A point whose signed distance to a side is at most this (meters) counts as on the side, not past it.
+ */
+export const sideBoundaryToleranceMeters = 1e-12;
+
+/**
+ * Slack (meters) when clamping a vertical step against the floor and ceiling of a cell.
+ */
+export const verticalStepSlackMeters = 1e-12;
+
+/**
+ * An offset (meters) between a body's anchor and its collision centre below this is treated as zero.
+ */
+export const anchorCentreOffsetToleranceMeters = 1e-9;
+
+/**
+ * A distance (meters) below this is treated as zero when a direction would be computed from it (depenetration out of a zone).
+ */
+export const zeroDistanceToleranceMeters = 1e-9;
+
+/**
+ * A neighbouring cell counts as lower than the body top only if it is lower by more than this (meters).
+ */
+export const ceilingHeightSlackMeters = 1e-9;
+
+/**
+ * Tolerance (meters, a dot product of a displacement with a unit normal) for a remaining displacement still approaching an earlier contact.
+ */
+export const approachDotToleranceMeters = 1e-12;

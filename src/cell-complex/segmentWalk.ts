@@ -9,16 +9,13 @@ import type { CompiledPortal } from "./specs";
 import type { Vec2xy } from "../math/polygons";
 import {
   composeRigidTransform3,
+  orthonormalizeYawRigidTransform3,
   identityRigidTransform3,
   transformDirection3,
   transformPoint3,
   type RigidTransform3,
 } from "../math/rigidTransform3";
-import {
-  cellContainmentToleranceMeters,
-  segmentWalkOutgoingDotTolerance,
-  segmentWalkVertexTieMeters,
-} from "../math/tolerances";
+import { cellContainmentToleranceMeters, degenerateLengthMeters, segmentWalkOutgoingDotTolerance, segmentWalkVertexTieMeters } from "../math/tolerances";
 import { vec3 } from "../math/vec3";
 
 /**
@@ -117,7 +114,7 @@ export function walkDevelopedSegment(request: SegmentWalkRequest): SegmentWalkRe
   const maxCrossings = request.maxCrossings ?? defaultMaxCrossings;
   const directionLength = Math.hypot(request.direction.x, request.direction.y);
 
-  if (!(directionLength > 1e-12)) {
+  if (!(directionLength > degenerateLengthMeters)) {
     throw new Error("walkDevelopedSegment: direction must not be zero.");
   }
 
@@ -235,7 +232,7 @@ export function walkDevelopedSegment(request: SegmentWalkRequest): SegmentWalkRe
       transformToTarget: portal.transformToTarget,
       tMeters: tExit,
     });
-    cellFromStart = composeRigidTransform3(portal.transformToTarget, cellFromStart);
+    cellFromStart = orthonormalizeYawRigidTransform3(composeRigidTransform3(portal.transformToTarget, cellFromStart));
     cell = target;
     entry = reciprocal.sideIndex;
     entryForPiece = reciprocal.sideIndex;
@@ -265,7 +262,7 @@ export function locateDevelopedPoint(
   const dy = to.y - from.y;
   const length = Math.hypot(dx, dy);
 
-  if (length <= 1e-12) {
+  if (length <= degenerateLengthMeters) {
     return { status: "end", cellId, cellFromStart: identityRigidTransform3, crossings: [] };
   }
 

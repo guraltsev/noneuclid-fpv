@@ -5,7 +5,7 @@
 
 This reference is produced from the source code. For the *meaning* of the modules — the mathematical model they implement — read [../MATHEMATICAL_MODEL.md](../MATHEMATICAL_MODEL.md) and [../ARCHITECTURE.md](../ARCHITECTURE.md). For every exported symbol see [API_REFERENCE.md](API_REFERENCE.md).
 
-**163 modules, 45,218 lines** under `src/`.
+**163 modules, 45,215 lines** under `src/`.
 
 ## Layers
 
@@ -13,9 +13,9 @@ A module belongs to the layer named by its first path segment under `src/`. "May
 
 | Layer | Modules | Lines | May import | Purpose |
 | --- | ---: | ---: | --- | --- |
-| `math` | 6 | 567 | nothing | Vectors, rigid transforms, planes, polygons, tolerances. Pure; imports nothing. |
-| `cell-complex` | 14 | 3,838 | `math` | Prism-cell specs, compilation, portal transforms, portal-path tables, static visibility culling. |
-| `movement` | 10 | 1,632 | `math`, `cell-complex` | Player body, collision, movement and portal crossing in compiled cell complexes. |
+| `math` | 6 | 630 | nothing | Vectors, rigid transforms, planes, polygons, tolerances. Pure; imports nothing. |
+| `cell-complex` | 14 | 3,759 | `math` | Prism-cell specs, compilation, portal transforms, portal-path tables, static visibility culling. |
+| `movement` | 10 | 1,645 | `math`, `cell-complex` | Player body, collision, movement and portal crossing in compiled cell complexes. |
 | `world-assets` | 1 | 201 | `cell-complex`, `glue` | Floor-texture and asset descriptors. |
 | `world-objects` | 11 | 8,765 | `math`, `cell-complex`, `movement`, `world-assets`, `glue` | Placeable runtime objects: registry, geodesic emitters, measurement tools, flags, creatures. |
 | `authoring` | 5 | 671 | `math`, `cell-complex`, `examples`, `world-assets`, `world-objects` | World builder DSL, world-script compiler, validation and world catalog. |
@@ -45,11 +45,11 @@ flowchart LR
   authoring -->|6| cell_complex
   authoring -->|2| world_assets
   authoring -->|4| world_objects
-  cell_complex -->|14| math
+  cell_complex -->|15| math
   glue -->|2| authoring
   glue -->|3| runtime
   movement -->|11| cell_complex
-  movement -->|19| math
+  movement -->|21| math
   render -->|41| cell_complex
   render -->|29| glue
   render -->|27| math
@@ -105,11 +105,11 @@ These imports break the intended layering. They are frozen in `scripts/docs/laye
 
 | Module | Lines | Summary | Imports |
 | --- | ---: | --- | --- |
-| `math/intersections.ts` | 63 | Segment-versus-plane intersection. | `math/planes`, `math/tolerances`, `math/vec3` |
+| `math/intersections.ts` | 73 | Segment-versus-plane intersection. | `math/planes`, `math/tolerances`, `math/vec3` |
 | `math/planes.ts` | 65 | Oriented planes in 3D and point-versus-plane classification. | `math/tolerances`, `math/vec3` |
 | `math/polygons.ts` | 136 | Planar polygons in the horizontal x/y plane: signed area, validation and point-in-polygon classification. | `math/tolerances` |
-| `math/rigidTransform3.ts` | 168 | Rigid (orientation-preserving, distance-preserving) transforms of 3D space and 3x3 rotation matrices. | `math/vec3` |
-| `math/tolerances.ts` | 34 | Shared absolute tolerance for geometric comparisons. | — |
+| `math/rigidTransform3.ts` | 176 | Rigid (orientation-preserving, distance-preserving) transforms of 3D space and 3x3 rotation matrices. | `math/vec3` |
+| `math/tolerances.ts` | 79 | Shared absolute tolerance for geometric comparisons. | — |
 | `math/vec3.ts` | 101 | Immutable 3D vector type and the small set of free functions used throughout the engine. | `math/tolerances` |
 
 ### `cell-complex`
@@ -117,16 +117,16 @@ These imports break the intended layering. They are frozen in `scripts/docs/laye
 | Module | Lines | Summary | Imports |
 | --- | ---: | --- | --- |
 | `cell-complex/compileCellComplex.ts` | 60 | Top-level compiler from an authored cell-complex spec to the runtime geometry used by movement and rendering. | `cell-complex/compilePortalTransforms`, `cell-complex/prismCells`, `cell-complex/specs`, `cell-complex/validateCellComplexSpec` |
-| `cell-complex/compilePortalTransforms.ts` | 168 | Derives the rigid gluing map of every portal from the geometry of the two sides it joins. | `cell-complex/prismCells`, `cell-complex/specs`, `math/rigidTransform3`, `math/vec3` |
+| `cell-complex/compilePortalTransforms.ts` | 90 | Derives the rigid gluing map of every portal from the geometry of the two sides it joins. | `cell-complex/prismCells`, `cell-complex/specs`, `math/rigidTransform3`, `math/vec3` |
 | `cell-complex/describeGeometry.ts` | 48 | Human-readable text summary of an authored cell-complex spec, for logging and debugging. | `cell-complex/specs` |
-| `cell-complex/developedDisk.ts` | 296 | Developed-disk atlas: lists every cell copy that a disk of radius rho around a point overlaps. | `cell-complex/compileCellComplex`, `cell-complex/prismCells`, `math/polygons`, `math/rigidTransform3`, `math/vec3` |
+| `cell-complex/developedDisk.ts` | 298 | Developed-disk atlas: lists every cell copy that a disk of radius rho around a point overlaps. | `cell-complex/compileCellComplex`, `cell-complex/prismCells`, `math/polygons`, `math/rigidTransform3`, `math/tolerances`, `math/vec3` |
 | `cell-complex/floorUv.ts` | 49 | Floor texture coordinates. | — |
 | `cell-complex/forbiddenZones.ts` | 47 | Constants and types for forbidden zones: vertical cylinders at cell base vertices where portal sides meet. | — |
 | `cell-complex/portalPathDebug.ts` | 235 | Debugging helpers that explain what happened to a portal path during table construction and static culling. | `cell-complex/compileCellComplex`, `cell-complex/portalPaths`, `cell-complex/staticPortalPathCull` |
 | `cell-complex/portalPaths.ts` | 254 | Portal-path tables: for each root cell, every portal word (sequence of portals crossed) up to a depth limit, with the rigid transforms that place the destination cell in the root cell's frame. | `cell-complex/compileCellComplex`, `cell-complex/specs`, `math/rigidTransform3` |
 | `cell-complex/prismBase.ts` | 107 | Type-level and runtime validation of the base polygon of a prism cell. | `math/tolerances` |
 | `cell-complex/prismCells.ts` | 185 | Compiled runtime representation of a single prism cell and its sides. | `cell-complex/forbiddenZones`, `cell-complex/specs` |
-| `cell-complex/segmentWalk.ts` | 289 | Shared segment-walk kernel: walks a straight segment, given in the frame of its start cell, through the glued convex cells. | `cell-complex/compileCellComplex`, `cell-complex/prismCells`, `cell-complex/specs`, `math/polygons`, `math/rigidTransform3`, `math/tolerances`, `math/vec3` |
+| `cell-complex/segmentWalk.ts` | 286 | Shared segment-walk kernel: walks a straight segment, given in the frame of its start cell, through the glued convex cells. | `cell-complex/compileCellComplex`, `cell-complex/prismCells`, `cell-complex/specs`, `math/polygons`, `math/rigidTransform3`, `math/tolerances`, `math/vec3` |
 | `cell-complex/specs.ts` | 235 | Authoring-level data model for a cell complex: the plain-data spec that world files produce and the compiler consumes. | `math/rigidTransform3` |
 | `cell-complex/staticPortalPathCull.ts` | 1640 | Static, view-independent culling of portal-path tables: discards portal words through which no sight line from the root cell could reach the destination cell. | `cell-complex/compileCellComplex`, `cell-complex/forbiddenZones`, `cell-complex/portalPaths`, `cell-complex/prismCells`, `cell-complex/specs`, `math/rigidTransform3`, `math/vec3` |
 | `cell-complex/validateCellComplexSpec.ts` | 225 | Cell-complex spec validator: structural checks on a CellComplexSpec before it is compiled (authoring spec -> compiled complex stage). | `cell-complex/specs` |
@@ -136,10 +136,10 @@ These imports break the intended layering. They are frozen in `scripts/docs/laye
 | Module | Lines | Summary | Imports |
 | --- | ---: | --- | --- |
 | `movement/collision.ts` | 350 | Collision tests of a dynamic object against its current cell, and helpers for side-relative geometry. | `cell-complex/forbiddenZones`, `cell-complex/prismCells`, `math/rigidTransform3`, `math/vec3`, `movement/dynamicObject` |
-| `movement/depenetrateDynamicObject.ts` | 177 | Pushes a body that overlaps forbidden-zone cylinders or walls of its cell back to a legal pose. | `cell-complex/compileCellComplex`, `cell-complex/prismCells`, `math/rigidTransform3`, `math/vec3`, `movement/collision`, `movement/dynamicObject`, `movement/portalCrossing` |
-| `movement/developedObstacles.ts` | 200 | Collects the obstacles around a body in one flat frame by developing the neighbouring cells with the developed-disk atlas. | `cell-complex/compileCellComplex`, `cell-complex/developedDisk`, `math/polygons`, `math/rigidTransform3`, `math/vec3`, `movement/collision`, `movement/dynamicObject`, `movement/sweptCollision` |
+| `movement/depenetrateDynamicObject.ts` | 178 | Pushes a body that overlaps forbidden-zone cylinders or walls of its cell back to a legal pose. | `cell-complex/compileCellComplex`, `cell-complex/prismCells`, `math/rigidTransform3`, `math/tolerances`, `math/vec3`, `movement/collision`, `movement/dynamicObject`, `movement/portalCrossing` |
+| `movement/developedObstacles.ts` | 206 | Collects the obstacles around a body in one flat frame by developing the neighbouring cells with the developed-disk atlas. | `cell-complex/compileCellComplex`, `cell-complex/developedDisk`, `math/polygons`, `math/rigidTransform3`, `math/tolerances`, `math/vec3`, `movement/collision`, `movement/dynamicObject`, `movement/sweptCollision` |
 | `movement/dynamicObject.ts` | 49 | State of a movable object (player body, creature, geodesic emitter) inside a compiled cell complex. | `math/rigidTransform3`, `math/vec3` |
-| `movement/moveDynamicObject.ts` | 324 | Advances a dynamic object by a displacement inside the glued cell complex with swept collision, wall sliding and any number of portal crossings. | `cell-complex/compileCellComplex`, `cell-complex/segmentWalk`, `math/rigidTransform3`, `math/tolerances`, `math/vec3`, `movement/collision`, `movement/developedObstacles`, `movement/dynamicObject`, `movement/sweptCollision` |
+| `movement/moveDynamicObject.ts` | 330 | Advances a dynamic object by a displacement inside the glued cell complex with swept collision, wall sliding and any number of portal crossings. | `cell-complex/compileCellComplex`, `cell-complex/segmentWalk`, `math/rigidTransform3`, `math/tolerances`, `math/vec3`, `movement/collision`, `movement/developedObstacles`, `movement/dynamicObject`, `movement/sweptCollision` |
 | `movement/movePlayer.ts` | 164 | Player locomotion: applies look and move input to a player pose, with collision and portal crossing when a world is given. | `cell-complex/compileCellComplex`, `cell-complex/segmentWalk`, `math/rigidTransform3`, `math/vec3`, `movement/collision`, `movement/developedObstacles`, `movement/dynamicObject`, `movement/moveDynamicObject`, `movement/playerBody`, `movement/playerPose` |
 | `movement/playerBody.ts` | 35 | Physical dimensions of the player's body used for collision and eye placement. | — |
 | `movement/playerPose.ts` | 62 | Player pose (cell, position, yaw, pitch) and its conversion to and from the generic dynamic-object representation. | `math/rigidTransform3`, `math/vec3`, `movement/dynamicObject` |

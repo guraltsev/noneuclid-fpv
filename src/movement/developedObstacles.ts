@@ -16,10 +16,16 @@ import {
   transformPoint3,
   type RigidTransform3,
 } from "../math/rigidTransform3";
+import { ceilingHeightSlackMeters } from "../math/tolerances";
 import { vec3 } from "../math/vec3";
 import { getDynamicObjectCollisionBounds } from "./collision";
 import type { DynamicObjectState } from "./dynamicObject";
 import type { SweptObstacle } from "./sweptCollision";
+
+/**
+ * Resolution of the deduplication key for obstacle positions: positions are compared on a grid of 1e-6 m (1e6 cells per meter).
+ */
+const positionKeyScalePerMeter = 1e6;
 
 /**
  * A runtime body that can block a mover; the optional id identifies it for `ignoredObjectIds` and for deduplication.
@@ -101,7 +107,7 @@ export function collectDevelopedObstacles(request: DevelopedObstacleRequest): re
       if (side.portal) {
         const targetHeight = world.cellsById.get(side.portal.targetCellId)?.heightMeters ?? Infinity;
 
-        if (!(targetHeight < request.bodyTopZ - 1e-9)) {
+        if (!(targetHeight < request.bodyTopZ - ceilingHeightSlackMeters)) {
           continue;
         }
 
@@ -155,7 +161,7 @@ export function collectDevelopedObstacles(request: DevelopedObstacleRequest): re
           continue;
         }
 
-        const key = `${other.id ?? ""}:${Math.round(position.x * 1e6)},${Math.round(position.y * 1e6)}`;
+        const key = `${other.id ?? ""}:${Math.round(position.x * positionKeyScalePerMeter)},${Math.round(position.y * positionKeyScalePerMeter)}`;
 
         if (seenBodies.has(key)) {
           continue;
@@ -184,7 +190,7 @@ export function collectDevelopedObstacles(request: DevelopedObstacleRequest): re
         continue;
       }
 
-      const key = `${Math.round(position.x * 1e6)},${Math.round(position.y * 1e6)}`;
+      const key = `${Math.round(position.x * positionKeyScalePerMeter)},${Math.round(position.y * positionKeyScalePerMeter)}`;
 
       if (seenZones.has(key)) {
         continue;

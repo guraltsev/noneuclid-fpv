@@ -65,6 +65,7 @@ Rigid (orientation-preserving, distance-preserving) transforms of 3D space and 3
 | function | `composeRigidTransform3` | Returns the composite transform "a after b", i.e. |
 | function | `invertRigidTransform3` | Returns the inverse transform (R^T, -R^T t), so that compose(inverse, g) is the identity up to round-off. |
 | function | `yawRigidTransform3` | Builds the transform that rotates counterclockwise by `radians` about the +z axis (viewed from above) and then translates by `translation`. |
+| function | `orthonormalizeYawRigidTransform3` | Returns the transform with the same translation and the exact yaw rotation closest to the given rotation, `yaw = atan2(m10, m00)`. |
 
 ### `math/tolerances.ts`
 
@@ -78,6 +79,15 @@ Shared absolute tolerance for geometric comparisons.
 | const | `cellContainmentToleranceMeters` | A walk start or atlas centre may lie this far (meters) outside its cell and still count as inside. |
 | const | `segmentWalkOutgoingDotTolerance` | A side is crossed outward when dot(direction, inwardNormal) is below minus this (dimensionless). |
 | const | `collisionSkinMeters` | Clearance, meters, kept between a body and an obstacle after a collision response. |
+| const | `degenerateLengthMeters` | Lengths, speeds and displacements (meters) at or below this are treated as zero: a degenerate segment has no direction, a zero horizontal step does not walk. |
+| const | `wedgeCrossTolerance` | Tolerance (dimensionless, cross products of unit directions) for a direction lying on the boundary of a visibility wedge. |
+| const | `parallelConstraintTolerance` | A half-plane constraint whose coefficient on the ray parameter is below this (dimensionless) is treated as parallel to the ray. |
+| const | `sideBoundaryToleranceMeters` | A point whose signed distance to a side is at most this (meters) counts as on the side, not past it. |
+| const | `verticalStepSlackMeters` | Slack (meters) when clamping a vertical step against the floor and ceiling of a cell. |
+| const | `anchorCentreOffsetToleranceMeters` | An offset (meters) between a body's anchor and its collision centre below this is treated as zero. |
+| const | `zeroDistanceToleranceMeters` | A distance (meters) below this is treated as zero when a direction would be computed from it (depenetration out of a zone). |
+| const | `ceilingHeightSlackMeters` | A neighbouring cell counts as lower than the body top only if it is lower by more than this (meters). |
+| const | `approachDotToleranceMeters` | Tolerance (meters, a dot product of a displacement with a unit normal) for a remaining displacement still approaching an earlier contact. |
 
 ### `math/vec3.ts`
 

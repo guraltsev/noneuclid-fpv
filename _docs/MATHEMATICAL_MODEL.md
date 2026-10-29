@@ -200,6 +200,8 @@ The swept disc test hits only approaching motion, so a mover already inside a bo
 Because $g$ is a rigid motion and acts on the pose as a whole, heading and handedness are preserved by crossings, and a
 round trip through a reciprocal pair returns the original pose up to floating-point error.
 
+Every gluing rotation is a yaw, so after every crossing the pose (and each composed `cellFromStart` of the segment walk and the developed disk) is re-projected to a pure yaw, $R\leftarrow\mathrm{yaw}(\operatorname{atan2}(R_{10},R_{00}))$ (`src/math/rigidTransform3.ts#orthonormalizeYawRigidTransform3`); $10^5$ crossings of a reciprocal pair then keep $|R^TR-I|$ and $|\det R-1|$ near $10^{-16}$. The gluing rotation itself is built from the single angle between the side tangents (`src/cell-complex/compilePortalTransforms.ts`).
+
 ## 6. Geodesics
 
 A **geodesic** here is a locally straight horizontal path at the constant beam height
@@ -417,6 +419,16 @@ positions, and any that cannot be re-solved are deleted and reported. Tool selec
 | segment-walk vertex tie | $10^{-9}$ m | `src/math/tolerances.ts#segmentWalkVertexTieMeters` | crossings closer than this are a pass through a shared vertex |
 | cell containment tolerance | $10^{-6}$ m | `src/math/tolerances.ts#cellContainmentToleranceMeters` | a walk start or atlas centre this far outside its cell still counts as inside |
 | outgoing dot tolerance | $10^{-12}$ | `src/math/tolerances.ts#segmentWalkOutgoingDotTolerance` | a side is crossed outward when dot(direction, inward normal) is below minus this |
+| degenerate length | $10^{-12}$ m | `src/math/tolerances.ts#degenerateLengthMeters` | lengths, speeds and displacements at or below this are zero (a zero horizontal step never walks) |
+| wedge cross tolerance | $10^{-12}$ | `src/math/tolerances.ts#wedgeCrossTolerance` | a direction on the boundary of a visibility wedge counts as inside |
+| parallel constraint tolerance | $10^{-15}$ | `src/math/tolerances.ts#parallelConstraintTolerance` | a half-plane constraint this close to parallel to the ray is parallel |
+| side boundary tolerance | $10^{-12}$ m | `src/math/tolerances.ts#sideBoundaryToleranceMeters` | a point this close to a side is on it, not past it |
+| vertical step slack | $10^{-12}$ m | `src/math/tolerances.ts#verticalStepSlackMeters` | slack when clamping a vertical step to floor and ceiling |
+| anchor-centre offset tolerance | $10^{-9}$ m | `src/math/tolerances.ts#anchorCentreOffsetToleranceMeters` | an anchor-to-centre offset below this is zero |
+| zero distance tolerance | $10^{-9}$ m | `src/math/tolerances.ts#zeroDistanceToleranceMeters` | a distance below this has no usable direction (depenetration) |
+| ceiling height slack | $10^{-9}$ m | `src/math/tolerances.ts#ceilingHeightSlackMeters` | a neighbouring cell is lower than the body top only by more than this |
+| approach dot tolerance | $10^{-12}$ m | `src/math/tolerances.ts#approachDotToleranceMeters` | a remaining displacement still approaching an earlier contact |
+| collision skin | $10^{-6}$ m | `src/math/tolerances.ts#collisionSkinMeters` | clearance kept between a body and an obstacle; the movers keep bodies this far from every obstacle, so a body at rest is never reported blocked |
 | camera clip planes | see source | `src/render/three/renderCameraClip.ts#renderCameraNearMeters` | near/far for every camera |
 
 ## 11. Assumptions and known gaps

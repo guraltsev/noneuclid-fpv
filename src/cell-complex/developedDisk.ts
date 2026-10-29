@@ -8,11 +8,13 @@ import type { CompiledPrismSide } from "./prismCells";
 import type { Vec2xy } from "../math/polygons";
 import {
   composeRigidTransform3,
+  orthonormalizeYawRigidTransform3,
   identityRigidTransform3,
   invertRigidTransform3,
   transformPoint3,
   type RigidTransform3,
 } from "../math/rigidTransform3";
+import { wedgeCrossTolerance, parallelConstraintTolerance, degenerateLengthMeters, sideBoundaryToleranceMeters } from "../math/tolerances";
 import { vec3 } from "../math/vec3";
 
 /**
@@ -84,7 +86,7 @@ function signedDistance(side: CompiledPrismSide, p: Vec2xy): number {
  * Whether `direction` lies in the wedge (boundary included, tolerance 1e-12 on the cross products).
  */
 export function wedgeContainsDirection(wedge: DevelopedWedge, direction: Vec2xy): boolean {
-  return wedge.kind === "full" || (cross(wedge.from, direction) >= -1e-12 && cross(direction, wedge.to) >= -1e-12);
+  return wedge.kind === "full" || (cross(wedge.from, direction) >= -wedgeCrossTolerance && cross(direction, wedge.to) >= -wedgeCrossTolerance);
 }
 
 /**
@@ -102,7 +104,7 @@ export function intersectWedges(a: DevelopedWedge, b: DevelopedWedge): Developed
   const from = wedgeContainsDirection(b, a.from) ? a.from : wedgeContainsDirection(a, b.from) ? b.from : undefined;
   const to = wedgeContainsDirection(b, a.to) ? a.to : wedgeContainsDirection(a, b.to) ? b.to : undefined;
 
-  if (!from || !to || cross(from, to) <= 1e-12) {
+  if (!from || !to || cross(from, to) <= wedgeCrossTolerance) {
     return undefined;
   }
 
@@ -132,7 +134,7 @@ export function clipSegmentToWedge(
   let u1 = 1;
 
   for (const [f0, f1] of constraints) {
-    if (Math.abs(f1) < 1e-15) {
+    if (Math.abs(f1) < parallelConstraintTolerance) {
       if (f0 < 0) {
         return undefined;
       }
@@ -215,7 +217,7 @@ export function collectDevelopedDisk(request: DevelopedDiskRequest): DevelopedDi
 
     const length = Math.hypot(nx, ny);
 
-    if (length > 1e-12) {
+    if (length > degenerateLengthMeters) {
       center = { x: center.x + (nudgeMeters * nx) / length, y: center.y + (nudgeMeters * ny) / length };
     }
 
@@ -246,7 +248,7 @@ export function collectDevelopedDisk(request: DevelopedDiskRequest): DevelopedDi
     for (const side of cell.sides) {
       const portal = side.portal;
 
-      if (!portal || signedDistance(side, local) <= 1e-12) {
+      if (!portal || signedDistance(side, local) <= sideBoundaryToleranceMeters) {
         continue;
       }
 
@@ -278,7 +280,7 @@ export function collectDevelopedDisk(request: DevelopedDiskRequest): DevelopedDi
         continue;
       }
 
-      const cellFromStart = composeRigidTransform3(portal.transformToTarget, node.cellFromStart);
+      const cellFromStart = orthonormalizeYawRigidTransform3(composeRigidTransform3(portal.transformToTarget, node.cellFromStart));
 
       nodes.push({
         cellId: target.id,

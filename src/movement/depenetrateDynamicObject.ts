@@ -5,6 +5,7 @@
 import type { CompiledCellComplex } from "../cell-complex/compileCellComplex";
 import type { CompiledPrismCell } from "../cell-complex/prismCells";
 import { rigidTransform3 } from "../math/rigidTransform3";
+import { zeroDistanceToleranceMeters } from "../math/tolerances";
 import { vec3 } from "../math/vec3";
 import { getDynamicObjectCollisionBounds, signedDistanceToSide, testCellCollision } from "./collision";
 import type { DynamicObjectState } from "./dynamicObject";
@@ -90,7 +91,7 @@ function pushOutOfZonesAndWalls(
       }
       let nx = dx / distance;
       let ny = dy / distance;
-      if (!(distance > 1e-9)) {
+      if (!(distance > zeroDistanceToleranceMeters)) {
         const count = cell.baseVertices.length;
         const cx = cell.baseVertices.reduce((sum, vertex) => sum + vertex.x, 0) / count - zone.center.x;
         const cy = cell.baseVertices.reduce((sum, vertex) => sum + vertex.y, 0) / count - zone.center.y;
@@ -98,7 +99,7 @@ function pushOutOfZonesAndWalls(
         nx = cLength > 0 ? cx / cLength : 1;
         ny = cLength > 0 ? cy / cLength : 0;
       }
-      const push = required - (distance > 1e-9 ? distance : 0);
+      const push = required - (distance > zeroDistanceToleranceMeters ? distance : 0);
       current = translateBy(current, nx * push, ny * push);
     }
   }
