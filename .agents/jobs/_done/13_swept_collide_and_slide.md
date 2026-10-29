@@ -1,11 +1,11 @@
 # Job 13 - Swept collide-and-slide on the segment-walk kernel
 
-Status: in progress.
+Status: done, needs review on 2026-10-29.
 Revised on 2026-10-29 for a less capable implementing model.
-Resolves: issue [61](../../_issues/61_wall_response_lets_bodies_escape_through_corners.md), issue
-[62](../../_issues/62_segment_based_portal_traversal_and_swept_motion.md), issue
-[63](../../_issues/63_collision_ignores_cells_a_straddling_body_overlaps.md) (except the ghost item, which is
-[job 17](17_multi_hop_ghosts_and_eye_rerooting.md)).
+Resolves: issue [61](../../../_issues/61_wall_response_lets_bodies_escape_through_corners.md), issue
+[62](../../../_issues/62_segment_based_portal_traversal_and_swept_motion.md), issue
+[63](../../../_issues/63_collision_ignores_cells_a_straddling_body_overlaps.md) (except the ghost item, which is
+[job 17](../17_multi_hop_ghosts_and_eye_rerooting.md)).
 
 ## Goal
 
@@ -176,7 +176,7 @@ north, and stops at its north wall. The final pose is inside the neighbour, not 
 12. **Creatures keep ignoring zones.** Decided: `simpleGeoCreature` keeps `ignoreForbiddenZones: true`. Why: issue 63
     worried that a disk containing a cone point is not flat; job 12 showed the atlas is still exact (one straight-ray
     chart), and turning zones on would make creatures stick to zones head-on (they have no turn-away logic, unlike
-    marmots). [Job 36](36_creatures_detour_and_resume_geodesic.md) later turns zones on for creatures with a
+    marmots). [Job 36](../36_creatures_detour_and_resume_geodesic.md) later turns zones on for creatures with a
     leader-following detour; do not anticipate it here.
 13. **Several crossings in one frame (Part C).** Decided: replace the single "latest player portal transition" with an
     append-only log of transitions with serial numbers; the cannon carry folds **every** unseen transition, in order.

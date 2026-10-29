@@ -2,6 +2,8 @@
 
 Status: open; re-verified 2026-10-28; fix designed 2026-10-29.
 
+- Implemented by job 13; needs review, see the Report in [job 13](../.agents/jobs/_done/13_swept_collide_and_slide.md).
+
 - Kernel landed in job 12 (`segmentWalk.ts`, `developedDisk.ts`); callers move in job 13.
 
 Priority: P1 (correctness and robustness). This is a concrete design for the issue 41 items "a step that crosses a portal

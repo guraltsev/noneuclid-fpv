@@ -2,6 +2,8 @@
 
 Status: open; re-verified 2026-10-28; fix designed 2026-10-29.
 
+- Implemented by job 13; needs review, see the Report in [job 13](../.agents/jobs/_done/13_swept_collide_and_slide.md).
+
 Priority: P1 (correctness). Extends the issue 41 bullet "wall sliding resolves only the first blocking side and does
 not re-test". The consequence is worse than "a corner can still violate a second wall": the body leaves the cell without
 any limit.

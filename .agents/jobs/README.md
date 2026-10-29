@@ -94,7 +94,7 @@ Resolves: issue [NN](../../_issues/NN_....md).
 | [00](00_coordinate_jobs_11_17_36.md) | Coordinate jobs 11-17 and 36: order, gates, batch report | - |  |
 | [11](_done/11_property_tests_for_geometry_core.md) | ~~Property-based tests for the geometry core~~ (done, needs review) | - | 79 |
 | [12](_done/12_segment_walk_kernel.md) | ~~Shared segment-walk kernel and developed-disk atlas~~ (done) | [62](../../_issues/62_segment_based_portal_traversal_and_swept_motion.md) |  |
-| [13](13_swept_collide_and_slide.md) | Swept collide-and-slide on the segment-walk kernel | [62](../../_issues/62_segment_based_portal_traversal_and_swept_motion.md), [61](../../_issues/61_wall_response_lets_bodies_escape_through_corners.md), [63](../../_issues/63_collision_ignores_cells_a_straddling_body_overlaps.md) |  |
+| [13](_done/13_swept_collide_and_slide.md) | ~~Swept collide-and-slide on the segment-walk kernel~~ (done, needs review) | [62](../../_issues/62_segment_based_portal_traversal_and_swept_motion.md), [61](../../_issues/61_wall_response_lets_bodies_escape_through_corners.md), [63](../../_issues/63_collision_ignores_cells_a_straddling_body_overlaps.md) |  |
 | [14](14_movement_numerics.md) | Movement numerics: crossing at rest, pose drift, tolerances | [65](../../_issues/65_movement_numerics_boundary_hysteresis_and_pose_drift.md) |  |
 | [15](15_geodesic_tracing_on_kernel.md) | Geodesic tracing on the segment-walk kernel | [69](../../_issues/69_geodesic_tracing_kernel_numerics.md) |  |
 | [16](16_aim_picking_by_portal_ray_walk.md) | Aim picking by portal ray walk | [72](../../_issues/72_aim_picking_uses_camera_clip_polygons_not_portal_ray_walk.md) |  |
