@@ -91,10 +91,11 @@ Resolves: issue [NN](../../_issues/NN_....md).
 | [08](_done/08_xr_slide_replay_and_object_trap.md) | ~~XR slide replay and the player trapped by objects~~ (done) | [64](../../_issues/_closed/64_mover_integration_bugs_xr_slide_marmot_heading_object_trap.md) |  |
 | [09](_done/09_deformation_commit_safety.md) | ~~Make torus deformation commits safe~~ (done) | [53](../../_issues/_closed/53_torus_deformation_commit_transport_defects.md) |  |
 | [10](_done/10_floor_texture_in_lattice_coordinates.md) | ~~Floor texture in lattice coordinates~~ (done) | [81](../../_issues/_closed/81_floor_texture_slides_under_objects_during_deformation.md) |  |
+| [00](00_coordinate_jobs_11_17_36.md) | Coordinate jobs 11-17 and 36: order, gates, batch report | - |  |
 | [11](11_property_tests_for_geometry_core.md) | Property-based tests for the geometry core | - | 79 |
-| [12](12_segment_walk_kernel.md) | Shared segment-walk kernel | [62](../../_issues/62_segment_based_portal_traversal_and_swept_motion.md) |  |
+| [12](12_segment_walk_kernel.md) | Shared segment-walk kernel and developed-disk atlas | [62](../../_issues/62_segment_based_portal_traversal_and_swept_motion.md) |  |
 | [13](13_swept_collide_and_slide.md) | Swept collide-and-slide on the segment-walk kernel | [62](../../_issues/62_segment_based_portal_traversal_and_swept_motion.md), [61](../../_issues/61_wall_response_lets_bodies_escape_through_corners.md), [63](../../_issues/63_collision_ignores_cells_a_straddling_body_overlaps.md) |  |
-| [14](14_movement_numerics.md) | Movement numerics: boundary hysteresis, pose drift, tolerances | [65](../../_issues/65_movement_numerics_boundary_hysteresis_and_pose_drift.md) |  |
+| [14](14_movement_numerics.md) | Movement numerics: crossing at rest, pose drift, tolerances | [65](../../_issues/65_movement_numerics_boundary_hysteresis_and_pose_drift.md) |  |
 | [15](15_geodesic_tracing_on_kernel.md) | Geodesic tracing on the segment-walk kernel | [69](../../_issues/69_geodesic_tracing_kernel_numerics.md) |  |
 | [16](16_aim_picking_by_portal_ray_walk.md) | Aim picking by portal ray walk | [72](../../_issues/72_aim_picking_uses_camera_clip_polygons_not_portal_ray_walk.md) |  |
 | [17](17_multi_hop_ghosts_and_eye_rerooting.md) | Multi-hop portal ghosts and XR eye re-rooting | [73](../../_issues/73_portal_ghosts_and_xr_eye_rerooting_are_single_hop.md) |  |
@@ -116,3 +117,4 @@ Resolves: issue [NN](../../_issues/NN_....md).
 | [33](33_decompose_runtime_monoliths.md) | Decompose runtime monoliths and retire legacy paths | - | 38 |
 | [34](34_type_strictness_lint_bundle.md) | Type strictness, linting and bundle configuration | - | 80 |
 | [35](35_torus_family_as_teichmuller_space.md) | Treat the torus family as Teichmüller space | - | 54 |
+| [36](36_creatures_detour_and_resume_geodesic.md) | Creatures detour around obstacles and resume their geodesic | - |  |
