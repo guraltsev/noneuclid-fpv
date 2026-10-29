@@ -1,6 +1,6 @@
 # Job 12 - Shared segment-walk kernel and developed-disk atlas
 
-Status: queued.
+Status: in progress.
 Revised on 2026-10-29 for a less capable implementing model (design prototyped and checked on every example world).
 Resolves: the kernel part of issue [62](../../_issues/62_segment_based_portal_traversal_and_swept_motion.md) and the
 "local atlas" part of issue [63](../../_issues/63_collision_ignores_cells_a_straddling_body_overlaps.md). It closes no
