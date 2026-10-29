@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
-import { movePlayer, resolvePlayerMoveAgainstBodies } from "../../src/movement/movePlayer";
+import { movePlayer } from "../../src/movement/movePlayer";
+import { identityMat3 } from "../../src/math/rigidTransform3";
+import { simpleCollisionCylinder } from "../../src/movement/dynamicObject";
 import { createDefaultPlayerPose } from "../../src/movement/playerPose";
 
 describe("movePlayer", () => {
@@ -249,7 +251,11 @@ describe("movePlayer applied displacement and runtime bodies", () => {
 
   it("lets a player inside a runtime body step away but not further in", () => {
     const world = room();
-    const obstacle = { center: { x: 0, y: 0, z: 0.5 }, radius: 0.25, halfHeight: 0.5 };
+    const obstacle = {
+      cellId: "room-a",
+      localPose: { rotation: identityMat3, translation: { x: 0, y: 0, z: 0 } },
+      collision: simpleCollisionCylinder(0.25, 1, { x: 0, y: 0, z: 0.5 }),
+    };
     const body = { radiusMeters: 0.25, heightMeters: 1.6 };
     const pose = { cellId: "room-a", position: { x: 0.3, y: 0, z: 0 }, yawRadians: 0, pitchRadians: 0 };
     const move = (x: number) =>
@@ -261,14 +267,15 @@ describe("movePlayer applied displacement and runtime bodies", () => {
         yawDeltaRadians: 0,
         pitchDeltaRadians: 0,
         coordinateFrame: "global",
+        bodiesInCell: () => [obstacle],
       });
 
-    const away = resolvePlayerMoveAgainstBodies(pose, move(0.04), body, () => [obstacle]);
+    const away = move(0.04);
     expect(away.pose.position.x).toBeCloseTo(0.34, 9);
     expect(away.blocked).toBe(false);
 
-    const further = resolvePlayerMoveAgainstBodies(pose, move(-0.04), body, () => [obstacle]);
-    expect(further.pose.position.x).toBe(0.3);
+    const further = move(-0.04);
+    expect(further.pose.position.x).toBeCloseTo(0.3, 9);
     expect(further.blocked).toBe(true);
     expect(further.appliedDisplacement).toEqual({ x: 0, y: 0, z: 0 });
   });

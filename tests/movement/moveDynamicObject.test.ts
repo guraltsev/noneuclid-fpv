@@ -3,7 +3,16 @@ import { describe, expect, it } from "vitest";
 import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
 import type { CompiledCellComplex } from "../../src/cell-complex/compileCellComplex";
 import type { CellComplexSpec } from "../../src/cell-complex/specs";
-import { identityMat3, yawRigidTransform3, type Mat3 } from "../../src/math/rigidTransform3";
+import {
+  composeRigidTransform3,
+  identityMat3,
+  identityRigidTransform3,
+  invertRigidTransform3,
+  transformPoint3,
+  yawRigidTransform3,
+  type Mat3,
+  type RigidTransform3,
+} from "../../src/math/rigidTransform3";
 import { cube, icosahedron, tetrahedron, torusModuli } from "../../src/authoring/exampleWorlds";
 import { vec3 } from "../../src/math/vec3";
 import {
@@ -685,3 +694,131 @@ function pitchMat3(radians: number): Mat3 {
     m22: cos,
   };
 }
+
+describe("bodies across portals (issue 63)", () => {
+  const bodyAt = (cellId: string, x: number, y: number): DynamicObjectState => ({
+    cellId,
+    localPose: { rotation: identityMat3, translation: vec3(x, y, 0) },
+    collision: simpleCollisionCylinder(0.25, 1, vec3(0, 0, 0.5)),
+  });
+  const mover = (cellId: string, x: number, y: number): DynamicObjectState => ({
+    cellId,
+    localPose: { rotation: identityMat3, translation: vec3(x, y, 0) },
+    collision: simpleCollisionCylinder(0.1, 1, vec3(0, 0, 0.5)),
+  });
+
+  it("is blocked by a body in the neighbouring cell while straddling the portal", () => {
+    const world = compileCellComplex(twoRoomsWithPortal());
+    const obstacle = bodyAt("room-b", -0.5, 0);
+    const result = moveDynamicObject({
+      world,
+      object: mover("room-a", 0.9, 0),
+      displacement: vec3(0.5, 0, 0),
+      bodiesInCell: (cellId) => (cellId === "room-b" ? [obstacle] : []),
+    });
+    const x = result.object.localPose.translation.x;
+
+    // The mover stops 0.35 m before the body: its anchor is past the portal, so it is in room-b.
+    expect(result.blocked).toBe(true);
+    expect(result.blockingReason).toBeUndefined();
+    expect(result.crossedPortal).toBe(true);
+    expect(result.object.cellId).toBe("room-b");
+    expect(Math.abs(x - -0.5)).toBeGreaterThanOrEqual(0.35 - 1e-6);
+    expect(Math.abs(x - -0.5)).toBeLessThan(0.35 + 1e-5);
+  });
+
+  it("is blocked the same way with the roles of the cells swapped", () => {
+    const world = compileCellComplex(twoRoomsWithPortal());
+    const obstacle = bodyAt("room-a", 0.5, 0);
+    const result = moveDynamicObject({
+      world,
+      object: mover("room-b", -0.9, 0),
+      displacement: vec3(-0.5, 0, 0),
+      bodiesInCell: (cellId) => (cellId === "room-a" ? [obstacle] : []),
+    });
+    const x = result.object.localPose.translation.x;
+
+    expect(result.blocked).toBe(true);
+    expect(result.object.cellId).toBe("room-a");
+    expect(Math.abs(x - 0.5)).toBeGreaterThanOrEqual(0.35 - 1e-6);
+    expect(Math.abs(x - 0.5)).toBeLessThan(0.35 + 1e-5);
+  });
+
+  it("does not move closer to a neighbour-cell body it already overlaps, and may move away", () => {
+    const world = compileCellComplex(twoRoomsWithPortal());
+    const obstacle = bodyAt("room-b", -0.9, 0);
+    const bodiesInCell = (cellId: string) => (cellId === "room-b" ? [obstacle] : []);
+    const closer = moveDynamicObject({ world, object: mover("room-a", 0.9, 0), displacement: vec3(0.05, 0, 0), bodiesInCell });
+    const away = moveDynamicObject({ world, object: mover("room-a", 0.9, 0), displacement: vec3(-0.05, 0, 0), bodiesInCell });
+
+    expect(closer.blocked).toBe(true);
+    expect(closer.object.localPose.translation.x).toBeCloseTo(0.9, 9);
+    expect(away.blocked).toBe(false);
+    expect(away.object.localPose.translation.x).toBeCloseTo(0.85, 9);
+  });
+
+  it("ignores listed object ids and bodies at another height", () => {
+    const world = compileCellComplex(twoRoomsWithPortal());
+    const obstacle = { ...bodyAt("room-a", 0.5, 0), id: "mouse" };
+    const high = { ...bodyAt("room-a", 0.5, 0), localPose: { rotation: identityMat3, translation: vec3(0.5, 0, 1.5) } };
+    const move = (extra: object) =>
+      moveDynamicObject({ world, object: mover("room-a", 0, 0), displacement: vec3(0.5, 0, 0), ...extra });
+
+    expect(move({ bodiesInCell: (cellId: string) => (cellId === "room-a" ? [obstacle] : []) }).blocked).toBe(true);
+    expect(
+      move({ bodiesInCell: (cellId: string) => (cellId === "room-a" ? [obstacle] : []), ignoredObjectIds: new Set(["mouse"]) }).blocked,
+    ).toBe(false);
+    expect(move({ bodiesInCell: (cellId: string) => (cellId === "room-a" ? [high] : []) }).blocked).toBe(false);
+  });
+
+  it("keeps clear of a neighbour wall that meets the portal at 30 degrees", () => {
+    const sqrt3 = Math.sqrt(3);
+    const world = compileCellComplex({
+      cells: [
+        {
+          id: "room-a",
+          heightMeters: 2,
+          baseVertices: squareRoomBase,
+          portals: [{ id: "east", sideIndex: 1, targetCellId: "room-b", targetPortalId: "glued" }],
+        },
+        {
+          id: "room-b",
+          heightMeters: 2,
+          baseVertices: [
+            { x: 0, y: -1 },
+            { x: 2 / sqrt3, y: -1 },
+            { x: 0, y: 1 },
+          ],
+          portals: [{ id: "glued", sideIndex: 2, targetCellId: "room-a", targetPortalId: "east" }],
+        },
+      ],
+    });
+    // Wall B -> C of room-b developed into room-a's frame.
+    const wallA = { x: 1 + 2 / sqrt3, y: -1 };
+    const wallB = { x: 1, y: 1 };
+    const distanceToWall = (p: { x: number; y: number }): number => {
+      const ex = wallB.x - wallA.x;
+      const ey = wallB.y - wallA.y;
+      const t = Math.max(0, Math.min(1, ((p.x - wallA.x) * ex + (p.y - wallA.y) * ey) / (ex * ex + ey * ey)));
+
+      return Math.hypot(p.x - (wallA.x + t * ex), p.y - (wallA.y + t * ey));
+    };
+    let object = mover("room-a", 0.95, -0.5);
+    let roomAFromCurrent: RigidTransform3 = identityRigidTransform3;
+    let cellChanges = 0;
+
+    for (let step = 0; step < 100; step += 1) {
+      const result = moveDynamicObject({ world, object, displacement: vec3(0, 0.02, 0), ignoreForbiddenZones: true });
+
+      cellChanges += result.crossings.length;
+      roomAFromCurrent = composeRigidTransform3(roomAFromCurrent, invertRigidTransform3(result.cellFromStart));
+      object = result.object;
+
+      const p = transformPoint3(roomAFromCurrent, object.localPose.translation);
+
+      expect(distanceToWall(p)).toBeGreaterThanOrEqual(0.1 - 1e-9);
+    }
+
+    expect(cellChanges).toBeLessThanOrEqual(1);
+  });
+});

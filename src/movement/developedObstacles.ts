@@ -17,7 +17,14 @@ import {
   type RigidTransform3,
 } from "../math/rigidTransform3";
 import { vec3 } from "../math/vec3";
+import { getDynamicObjectCollisionBounds } from "./collision";
+import type { DynamicObjectState } from "./dynamicObject";
 import type { SweptObstacle } from "./sweptCollision";
+
+/**
+ * A runtime body that can block a mover; the optional id identifies it for `ignoredObjectIds` and for deduplication.
+ */
+export type ObstacleBodyState = DynamicObjectState & { readonly id?: string };
 
 /**
  * Input of {@link collectDevelopedObstacles}.
@@ -39,11 +46,19 @@ export interface DevelopedObstacleRequest {
    * Used when the body centre lies in a different cell than the one whose frame the caller slides in.
    */
   readonly frameFromCell?: RigidTransform3;
+  /**
+   * Runtime bodies in a cell (poses in that cell's frame); each one in the developed disk becomes a disc obstacle.
+   */
+  readonly bodiesInCell?: (cellId: string) => readonly ObstacleBodyState[];
+  /**
+   * Ids of bodies in `bodiesInCell` that are not obstacles (for example the moving body itself).
+   */
+  readonly ignoredObjectIds?: ReadonlySet<string>;
 }
 
 /**
  * Wall, ceiling and forbidden-zone obstacles around the body centre, in the frame given by `frameFromCell`.
- * Non-portal sides become capsules of the body radius (reason "wall"); a portal side whose target cell is lower than the body top becomes a capsule with reason "ceiling"; each forbidden-zone column becomes a disc of the body radius plus the zone radius (deduplicated by position to 1e-6 m).
+ * Non-portal sides become capsules of the body radius (reason "wall"); a portal side whose target cell is lower than the body top becomes a capsule with reason "ceiling"; each forbidden-zone column becomes a disc of the body radius plus the zone radius (deduplicated by position to 1e-6 m); each runtime body from `bodiesInCell` whose vertical interval overlaps the moving body's becomes a disc of the summed radii (deduplicated by object id and position).
  */
 export function collectDevelopedObstacles(request: DevelopedObstacleRequest): readonly SweptObstacle[] {
   const { world, bodyRadius } = request;
@@ -59,6 +74,7 @@ export function collectDevelopedObstacles(request: DevelopedObstacleRequest): re
   const reach = disk.radiusMeters;
   const obstacles: SweptObstacle[] = [];
   const seenZones = new Set<string>();
+  const seenBodies = new Set<string>();
 
   const toFrame = (p: Vec2xy): Vec2xy => {
     const q = transformPoint3(frame, vec3(p.x, p.y, 0));
@@ -109,6 +125,45 @@ export function collectDevelopedObstacles(request: DevelopedObstacleRequest): re
       }
 
       obstacles.push({ kind: "capsule", a: toFrame(a), b: toFrame(b), radius: bodyRadius, reason });
+    }
+
+    if (request.bodiesInCell) {
+      const bodyCenterZ = (request.bodyBottomZ + request.bodyTopZ) / 2;
+      const bodyHalfHeight = (request.bodyTopZ - request.bodyBottomZ) / 2;
+
+      for (const other of request.bodiesInCell(node.cellId)) {
+        if (other.id !== undefined && request.ignoredObjectIds?.has(other.id)) {
+          continue;
+        }
+
+        const bounds = getDynamicObjectCollisionBounds(other);
+
+        if (!bounds || !(Math.abs(bodyCenterZ - bounds.center.z) < bodyHalfHeight + bounds.halfHeight)) {
+          continue;
+        }
+
+        const position = develop(bounds.center);
+        const discRadius = bodyRadius + bounds.radius;
+
+        if (Math.hypot(position.x - center.x, position.y - center.y) >= reach + bounds.radius) {
+          continue;
+        }
+
+        const relative = { x: position.x - center.x, y: position.y - center.y };
+
+        if (!wedgeContainsDirection(node.wedge, relative) && !(distanceToWedge(node.wedge, center, position) < discRadius)) {
+          continue;
+        }
+
+        const key = `${other.id ?? ""}:${Math.round(position.x * 1e6)},${Math.round(position.y * 1e6)}`;
+
+        if (seenBodies.has(key)) {
+          continue;
+        }
+
+        seenBodies.add(key);
+        obstacles.push({ kind: "disc", center: toFrame(position), radius: discRadius, reason: "body", ...(other.id !== undefined ? { objectId: other.id } : {}) });
+      }
     }
 
     if (request.ignoreForbiddenZones) {

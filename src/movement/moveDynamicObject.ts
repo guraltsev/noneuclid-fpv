@@ -15,7 +15,7 @@ import {
 import { cellContainmentToleranceMeters, collisionSkinMeters } from "../math/tolerances";
 import { vec3, type Vec3 } from "../math/vec3";
 import { getDynamicObjectCollisionBounds, signedDistanceToSide, type BlockingReason } from "./collision";
-import { collectDevelopedObstacles } from "./developedObstacles";
+import { collectDevelopedObstacles, type ObstacleBodyState } from "./developedObstacles";
 import type { DynamicObjectState } from "./dynamicObject";
 import { slideDisc } from "./sweptCollision";
 
@@ -40,6 +40,14 @@ export interface MoveDynamicObjectRequest {
    * If true, forbidden-zone cylinders are not tested (used by autonomous objects and tools).
    */
   readonly ignoreForbiddenZones?: boolean;
+  /**
+   * Runtime bodies per cell (poses in that cell's frame) that block this object, also across portals.
+   */
+  readonly bodiesInCell?: (cellId: string) => readonly ObstacleBodyState[];
+  /**
+   * Ids of bodies from `bodiesInCell` that must not block this object.
+   */
+  readonly ignoredObjectIds?: ReadonlySet<string>;
 }
 
 /**
@@ -225,6 +233,8 @@ export function moveDynamicObject(request: MoveDynamicObjectRequest): MoveDynami
     bodyTopZ: centre.z + dz + halfHeight,
     ignoreForbiddenZones: request.ignoreForbiddenZones,
     frameFromCell,
+    bodiesInCell: request.bodiesInCell,
+    ignoredObjectIds: request.ignoredObjectIds,
   });
   const slide = slideDisc({ x: centre.x, y: centre.y }, delta, obstacles);
   const points = slide.legs.map((p) => ({ x: p.x - offset.x, y: p.y - offset.y }));

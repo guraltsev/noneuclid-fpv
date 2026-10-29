@@ -483,6 +483,14 @@ Close issues 61, 62 and 63 (move them to `_issues/_closed/` with `Outcome` and `
 - Tests: new `tests/movement/sweptCollision.test.ts` (A2, including the 25-run random-polygon property), `tests/movement/developedObstacles.test.ts` (A3), and a `swept motion` describe in `tests/movement/moveDynamicObject.test.ts` (A6 items 1-6).
 - `_docs/MATHEMATICAL_MODEL.md` section 5 items 1-4 rewritten (now items 1-5), section 11 bullet "Wall overlap at crossings" removed; generated docs regenerated.
 - Parts B and C not started; the runtime-body paragraph of section 5 and the `moveIncreasesCylinderOverlap` code are untouched.
+#### Part B
+- `src/movement/developedObstacles.ts`: `bodiesInCell` and `ignoredObjectIds` now produce `"body"` discs (radius r + r_body) for every body of every cell of the developed disk, mapped to the start frame, filtered by wedge, vertical overlap and reach, deduplicated by id plus rounded position; new exported type `ObstacleBodyState` (a `DynamicObjectState` with an optional `id`).
+- `src/movement/moveDynamicObject.ts`: request gains `bodiesInCell` and `ignoredObjectIds`; a `"body"` contact reports `blocked: true` with `blockingReason` undefined.
+- `src/movement/movePlayer.ts`: `MoveRequest.bodiesInCell`; `MoveResult` gains `crossings` and `cellFromStart`; `resolvePlayerMoveAgainstBodies` deleted.
+- `src/render/three/createThreeApp.ts`: both `movePlayer` calls pass `bodiesInCell: playerBlockingBodiesInCell`; `blockPlayerMoveAgainstRuntimeObjects` and its two call sites deleted.
+- `src/movement/collision.ts`: `moveIncreasesCylinderOverlap` deleted. `src/world-objects/simpleGeoCreature.ts`: `update` passes `bodiesInCell` and takes `result.object`; `creatureIntersectsObstacle` deleted.
+- Tests: new `describe("bodies across portals (issue 63)")` in `tests/movement/moveDynamicObject.test.ts` (B5.1 in both directions, a no-deeper-overlap test, an id/height filter test, B5.2 the 30 degree triangle); `tests/render-contract/vrLocomotion.test.ts` literals gained `crossings` and `cellFromStart`.
+- `_docs/MATHEMATICAL_MODEL.md` section 5 "Runtime bodies" paragraph rewritten; generated docs regenerated.
 ### Deviations
 #### Part A
 - Deleted test "throws for the unimplemented bounds crossing mode" (Decision 10).
@@ -494,6 +502,11 @@ Close issues 61, 62 and 63 (move them to `_issues/_closed/` with `Outcome` and `
 - The north-portal repro (A6.2) asserts the neighbour-local pose (0.75, 0.75): x 0.75 on the neighbour's east wall, y 0.75 against its north wall (developed y = 2.75), `blocked` and `crossedPortal` both true.
 - Random-polygon slide property uses 25 runs of 2 000 steps each (not 10^4 steps), and the polygon filter is "vertex average more than 0.4 m from every side" (arbitrary polygons have radius from 1 m).
 - `collectDevelopedObstacles` has an extra optional field `frameFromCell` (and `bodiesInCell` / `ignoredObjectIds` are left for Part B).
+#### Part B
+- `movePlayer.test.ts` "lets a player inside a runtime body step away but not further in": now passes the body through `bodiesInCell` (as a `DynamicObjectState`); the "further in" case expects the position within 1e-9 of 0.3 instead of exactly equal.
+- `simpleGeoCreature.test.ts` "blocks a mouse from penetrating a supplied player obstacle" renamed "stops a mouse at the surface of a supplied player obstacle": old expectation y = 0 (the whole move discarded), new y in (0.14, 0.15] (the obstacle is 0.65 m ahead, radii sum 0.5 m).
+- `collision.test.ts`: the `moveIncreasesCylinderOverlap` test deleted with the function (Decision 11).
+- `vrLocomotion.test.ts`: two `MoveResult` literals gained `crossings: []` and `cellFromStart` to satisfy the type.
 ### Uncertain
 #### Part A
 - Creature offset: when the collision offset is horizontal, the obstacles are collected around the body centre in the centre's own cell (found by `locateDevelopedPoint` from the anchor to the centre) and mapped back to the anchor cell's frame with `frameFromCell`, instead of treating the centre as a point of the anchor cell. Not in the job text; confirm the choice with a creature that stands within its offset of a portal.
@@ -501,10 +514,19 @@ Close issues 61, 62 and 63 (move them to `_issues/_closed/` with `Outcome` and `
 - A body that travels exactly at radius distance along a straight wall can touch the seam end cap where two collinear walls (across a portal) meet; the tangential response leaves the motion unchanged but `blocked` may be reported true for that step.
 - The anchor stop of Decision 7 (anchor hits a wall the centre did not) is implemented but has no dedicated test (no shipped body has an offset larger than its radius).
 - The unfinished-walk path (Decision 8: crossing limit, missing cell, failed re-homing) is implemented with `console.warn` but not covered by a test.
+#### Part B
+- A `DynamicObjectState` has no id, so `ObstacleBodyState.id` is optional: `createThreeApp.ts` adds the registry id to the player's blocking bodies; creatures pass their obstacles without ids. The moving body is never in its own `bodiesInCell` list (the player is not in the registry's blocking list), so nothing self-ignores.
+- B5.1 as written (a mover 0.1 m before the portal and a r = 0.25 body 0.1 m beyond it) starts already overlapping, so a non-overlap distance cannot hold. I used a mover of radius 0.1 starting 0.1 m before the portal and a body 0.5 m beyond it, which exercises the crossing: the mover ends in `room-b` 0.35 m (the radii sum) from the body. The already-overlapping case is its own test (cannot move closer, may move away).
+- The B5.2 triangle test asserts only the stated invariants (clearance from the developed wall B-C at least 0.1 m, at most one cell change); I did not verify that the wall is actually touched.
+- A creature now advances to the obstacle surface and slides, instead of discarding the whole move; confirm that is the wanted creature behaviour.
 ### Not done
 #### Part A
 - Nothing in Part A. Parts B and C, issue closing, the browser smoke test and the manual check are left for later (job stays `in progress`).
+#### Part B
+- Nothing in Part B. Part C, issue closing, the browser smoke test and the manual check are still left.
 ### Checks
 #### Part A
 - Baseline: `npm run typecheck` ok; `npm test` 111 files, 813 passed, 8 skipped.
-- After: `npm run typecheck` ok; `npm test` all pass except the documentation test, which failed on stale generated docs; `npm run docs:generate` then `npm run docs:check` all ok and `npx vitest run tests/docs` passes. Final run before the commit: typecheck ok, 113 test files passed (831 tests passed, 8 skipped), docs:check ok.
+- After: `npm run typecheck` ok; `npm test` all pass except the documentation test, which failed on stale generated docs; `npm run docs:generate` then `npm run docs:check` all ok and `npx vitest run tests/docs` passes. Final run before the commit: typecheck ok, 113 test files passed (831 tests passed, 8 skipped), docs:check ok.#### Part B
+- Baseline: Part A final state (typecheck ok, 831 tests passed, docs:check ok).
+- After: `npm run typecheck` ok; `npm test` 113 files, 835 passed, 8 skipped; `npm run docs:generate` then `npm run docs:check` ok.

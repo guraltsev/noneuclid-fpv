@@ -9,7 +9,7 @@ import type { CompiledPrismCell } from "../cell-complex/prismCells";
 import type { CellObjectSpec, SimpleCollisionCylinderSpec, SimpleGeoCreatureObjectSpec } from "../cell-complex/specs";
 import { yawRigidTransform3, transformDirection3, type RigidTransform3 } from "../math/rigidTransform3";
 import { vec3 } from "../math/vec3";
-import { getDynamicObjectCollisionBounds, simpleCylinderIntersectsSimpleCylinder } from "../movement/collision";
+import { getDynamicObjectCollisionBounds } from "../movement/collision";
 import { depenetrateDynamicObject } from "../movement/depenetrateDynamicObject";
 import type { DynamicObjectState } from "../movement/dynamicObject";
 import {
@@ -241,9 +241,10 @@ export function createSimpleGeoCreatureRuntime(
         displacement,
         portalCrossingMode: AUTONOMOUS_DYNAMIC_OBJECT_PORTAL_CROSSING_MODE,
         ignoreForbiddenZones: true,
+        bodiesInCell: (cellId) => obstacles.filter((obstacle) => obstacle.cellId === cellId),
       });
-      // Blocked moves are discarded whole; time and oscillation phase still advance.
-      state = creatureIntersectsObstacle(result.object, obstacles) ? state : result.object;
+      // Obstacle bodies (the player) are swept discs in the move, so the creature slides around them.
+      state = result.object;
       syncRegistryObject(registry, objectSpec.id, state);
       applyObjectPose(root, state.localPose);
       refreshCollisionWireframe();
@@ -355,25 +356,6 @@ function syncRegistryObject(
     cellId: state.cellId,
     localPose: state.localPose,
     collision: state.collision,
-  });
-}
-
-function creatureIntersectsObstacle(
-  state: DynamicObjectState,
-  obstacles: readonly DynamicObjectState[],
-): boolean {
-  const bounds = getDynamicObjectCollisionBounds(state);
-  if (!bounds) {
-    return false;
-  }
-
-  return obstacles.some((obstacle) => {
-    if (obstacle.cellId !== state.cellId) {
-      return false;
-    }
-
-    const obstacleBounds = getDynamicObjectCollisionBounds(obstacle);
-    return obstacleBounds ? simpleCylinderIntersectsSimpleCylinder(bounds, obstacleBounds) : false;
   });
 }
 

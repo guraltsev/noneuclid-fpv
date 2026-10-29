@@ -14,6 +14,7 @@ import {
   xrRigidTransformLocalMatrix,
 } from "../../src/render/three/xrPlayerRig";
 import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
+import { identityRigidTransform3 } from "../../src/math/rigidTransform3";
 import { movePlayer, type MoveResult } from "../../src/movement/movePlayer";
 import type { PlayerPose } from "../../src/movement/playerPose";
 import { resolveXrPortalEyeRenderRoot } from "../../src/render/three/xrPortalEye";
@@ -120,6 +121,8 @@ describe("VR locomotion mapping", () => {
       appliedDisplacement: { x: 0, y: 0, z: 0 },
       blocked: false,
       crossedPortal: false,
+      crossings: [],
+      cellFromStart: identityRigidTransform3,
     };
 
     rig.acceptPhysicalMove(accepted, { x: 0, y: 0, z: 1.6 });
@@ -152,6 +155,8 @@ describe("VR locomotion mapping", () => {
       appliedDisplacement: { x: 0, y: 0, z: 0 },
       blocked: false,
       crossedPortal: false,
+      crossings: [],
+      cellFromStart: identityRigidTransform3,
     };
 
     rig.acceptPhysicalMove(accepted, { x: 0, y: 0, z: 1.6 });

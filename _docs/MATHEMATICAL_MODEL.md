@@ -190,10 +190,12 @@ cell frame by `src/movement/movePlayer.ts#movePlayer`):
 **Applied displacement.** Every move reports the displacement it actually applied in the start cell's frame
 (`src/movement/moveDynamicObject.ts#MoveDynamicObjectResult`). The XR rig advances its head baseline by exactly
 that amount after a blocked move, so room-scale motion is never applied twice
-(`src/render/three/xrPlayerRig.ts#createXrPlayerRig`). **Runtime bodies.** After the cell test, the player is tested
-against the runtime objects of its cell; a move is reverted only if it overlaps one of them and brings the two
-centers closer (`src/movement/collision.ts#moveIncreasesCylinderOverlap`), so a player that is already inside a
-body can always step away.
+(`src/render/three/xrPlayerRig.ts#createXrPlayerRig`). **Runtime bodies.** Bodies that block the mover (for the player the
+objects of `getPlayerBlockingObjectsInCell`, for a creature the supplied obstacles) enter the same slide as discs of
+radius $r + r_{\text{body}}$: each body of each cell in the developed disk is mapped into the start frame and kept if
+its vertical interval overlaps the mover's (`src/movement/developedObstacles.ts#collectDevelopedObstacles`). A body
+therefore blocks across a portal while the mover straddles it, and a move slides around it instead of being reverted.
+The swept disc test hits only approaching motion, so a mover already inside a body can step away but not deeper.
 
 Because $g$ is a rigid motion and acts on the pose as a whole, heading and handedness are preserved by crossings, and a
 round trip through a reciprocal pair returns the original pose up to floating-point error.

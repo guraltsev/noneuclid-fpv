@@ -20,7 +20,7 @@
  * 1. Input: `getXrInputFrame` or `getDesktopInputFrame` consume one `RuntimeInputFrame` (XR is used only when
  *    `renderer.xr.isPresenting` and the session state is `active`).
  * 2. Movement: `movePlayer` against `activeWorld()` (global coordinate frame), then
- *    `blockPlayerMoveAgainstRuntimeObjects`; in XR a second `movePlayer` applies physical head motion
+ *    `bodiesInCell`; in XR a second `movePlayer` applies physical head motion
  *    (room-scale walking). The result replaces `playerPose` and may change `playerPose.cellId` by crossing a
  *    portal. Then the camera/XR rig is synced to the pose, the aim ray is resolved, and the selected tool
  *    handles the primary/carry/interact actions. Creatures, flags and curve-shortening geodesics advance.
@@ -69,9 +69,8 @@ import { type DebugSettings } from "../../glue/debugSettings";
 import { type PortalPanelModeId } from "../../glue/portalPanelMode";
 import { type LaunchOptions } from "../../glue/readLaunchOptions";
 import { yawRigidTransform3 } from "../../math/rigidTransform3";
-import { getDynamicObjectCollisionBounds } from "../../movement/collision";
 import { simpleCollisionCylinder } from "../../movement/dynamicObject";
-import { movePlayer, resolvePlayerMoveAgainstBodies } from "../../movement/movePlayer";
+import { movePlayer } from "../../movement/movePlayer";
 import { DEFAULT_PLAYER_EYE_HEIGHT_METERS } from "../../movement/playerBody";
 import { type PlayerPose, playerPoseFromDynamicObject, playerPoseToDynamicObject } from "../../movement/playerPose";
 import { depenetrateDynamicObject } from "../../movement/depenetrateDynamicObject";
@@ -1323,8 +1322,8 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
         yawDeltaRadians: playerYawDeltaRadians,
         pitchDeltaRadians: rotatingGeodesicCannon ? 0 : frame.pitchDeltaRadians,
         coordinateFrame: "global",
+        bodiesInCell: playerBlockingBodiesInCell,
       });
-      moveResult = blockPlayerMoveAgainstRuntimeObjects(playerPose, moveResult);
       playerPose = moveResult.pose;
       recordCellTransition(previousCellId, moveResult);
 
@@ -1346,8 +1345,9 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
           yawDeltaRadians: 0,
           pitchDeltaRadians: 0,
           coordinateFrame: "global",
+          bodiesInCell: playerBlockingBodiesInCell,
         });
-        const runtimeCollisionPhysicalMoveResult = blockPlayerMoveAgainstRuntimeObjects(playerPose, physicalMoveResult);
+        const runtimeCollisionPhysicalMoveResult = physicalMoveResult;
         playerPose = runtimeCollisionPhysicalMoveResult.pose;
         xrRig.acceptPhysicalMove(runtimeCollisionPhysicalMoveResult, effectiveHeadLocalMeters);
         moveResult = runtimeCollisionPhysicalMoveResult.blocked || runtimeCollisionPhysicalMoveResult.crossedPortal
@@ -3348,15 +3348,8 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     syncDesktopPalette();
   }
 
-  function blockPlayerMoveAgainstRuntimeObjects(
-    previousPose: PlayerPose,
-    result: ReturnType<typeof movePlayer>,
-  ): ReturnType<typeof movePlayer> {
-    return resolvePlayerMoveAgainstBodies(previousPose, result, appState.playerBody, (cellId) =>
-      runtimeObjectRegistry.getPlayerBlockingObjectsInCell(cellId).flatMap((object) => {
-        const bounds = getDynamicObjectCollisionBounds(runtimeObjectToDynamicObjectState(object));
-        return bounds ? [bounds] : [];
-      }));
+  function playerBlockingBodiesInCell(cellId: string) {
+    return runtimeObjectRegistry.getPlayerBlockingObjectsInCell(cellId).map((object) => ({ ...runtimeObjectToDynamicObjectState(object), id: object.id }));
   }
 
   function createPlayerCollisionState(pose: PlayerPose) {

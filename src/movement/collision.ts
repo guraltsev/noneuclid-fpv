@@ -200,33 +200,6 @@ export function simpleCylinderIntersectsSimpleCylinder(
 }
 
 /**
- * True if moving a body from `previous` to `next` makes things worse against some obstacle: `next` overlaps it
- * (simpleCylinderIntersectsSimpleCylinder) and either `previous` is undefined (no comparable earlier position, for
- * example after a portal crossing) or the horizontal center distance shrank by more than 1e-9 m. A body that already
- * overlaps an obstacle may therefore move away from it or keep its distance.
- */
-export function moveIncreasesCylinderOverlap(
-  previous: SimpleCylinderBounds | undefined,
-  next: SimpleCylinderBounds,
-  obstacles: readonly SimpleCylinderBounds[],
-): boolean {
-  for (const obstacle of obstacles) {
-    if (!simpleCylinderIntersectsSimpleCylinder(next, obstacle)) {
-      continue;
-    }
-    if (!previous) {
-      return true;
-    }
-    const nextDistance = Math.sqrt(horizontalDistanceSquared(next.center, obstacle.center));
-    const previousDistance = Math.sqrt(horizontalDistanceSquared(previous.center, obstacle.center));
-    if (nextDistance < previousDistance - 1e-9) {
-      return true;
-    }
-  }
-  return false;
-}
-
-/**
  * Point-in-time overlap test between a body and a forbidden-zone cylinder.
  */
 function simpleCylinderIntersectsSingularityCylinder(

@@ -148,7 +148,7 @@ describe("simple geo creature movement", () => {
     expect(object?.localPose.translation.y).toBeCloseTo(1);
   });
 
-  it("blocks a mouse from penetrating a supplied player obstacle", () => {
+  it("stops a mouse at the surface of a supplied player obstacle", () => {
     const world = compileCellComplex(singleRoom());
     const registry = createRuntimeObjectRegistry();
     const mouse = createSimpleGeoCreature("geo-mouse", "mouse", "mouse/Mouse.glb", {
@@ -172,7 +172,9 @@ describe("simple geo creature movement", () => {
 
     const object = registry.get("mouse");
     expect(object?.kind).toBe("geo-mouse");
-    expect(object?.localPose.translation.y).toBeCloseTo(0);
+    // The obstacle sits 0.65 m ahead and the radii sum to 0.5 m, so the mouse advances 0.15 m and stops there.
+    expect(object?.localPose.translation.y).toBeGreaterThan(0.14);
+    expect(object?.localPose.translation.y).toBeLessThanOrEqual(0.15);
   });
 });
 

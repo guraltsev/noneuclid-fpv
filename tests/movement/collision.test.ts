@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getCollisionBounds, getDynamicObjectCollisionBounds, simpleCylinderIntersectsSimpleCylinder, moveIncreasesCylinderOverlap } from "../../src/movement/collision";
+import { getCollisionBounds, getDynamicObjectCollisionBounds, simpleCylinderIntersectsSimpleCylinder } from "../../src/movement/collision";
 import { simpleCollisionCylinder, type DynamicObjectState } from "../../src/movement/dynamicObject";
 import { identityMat3, yawRigidTransform3, type Mat3 } from "../../src/math/rigidTransform3";
 
@@ -75,17 +75,3 @@ function cylinder(x: number, y: number, z: number, radius: number, halfHeight: n
     halfHeight,
   };
 }
-
-describe("moveIncreasesCylinderOverlap", () => {
-  it("allows leaving an overlap but not deepening it", () => {
-    const o = cylinder(0, 0, 0.8, 0.25, 0.8);
-    const p = (x: number, y = 0) => cylinder(x, y, 0.8, 0.25, 0.8);
-
-    expect(moveIncreasesCylinderOverlap(p(0.3), p(0.34), [o])).toBe(false);
-    expect(moveIncreasesCylinderOverlap(p(0.3), p(0.26), [o])).toBe(true);
-    expect(moveIncreasesCylinderOverlap(p(0.3), p(0, 0.3), [o])).toBe(false);
-    expect(moveIncreasesCylinderOverlap(p(0.6), p(0.45), [o])).toBe(true);
-    expect(moveIncreasesCylinderOverlap(undefined, p(0.45), [o])).toBe(true);
-    expect(moveIncreasesCylinderOverlap(undefined, p(0.6), [o])).toBe(false);
-  });
-});
