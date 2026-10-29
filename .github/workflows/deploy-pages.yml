@@ -39,10 +39,12 @@ jobs:
         shell: bash
         run: |
           if [ -n "${{ steps.pages.outputs.base_path }}" ]; then
-            echo "VITE_BASE=${{ steps.pages.outputs.base_path }}/" >> "$GITHUB_ENV"
+            base="${{ steps.pages.outputs.base_path }}/"
           else
-            echo "VITE_BASE=/${{ github.event.repository.name }}/" >> "$GITHUB_ENV"
+            base="/"
           fi
+          echo "Pages base: ${base}"
+          echo "VITE_BASE=${base}" >> "$GITHUB_ENV"
 
       - name: Install dependencies
         run: npm ci

@@ -1,6 +1,6 @@
 # Job 03 - Make Pages deployment repository-name agnostic
 
-Status: queued.
+Status: done, needs review on 2026-10-29.
 Former issue: 37 (converted to a job on 2026-10-28).
 Resolves: no open issue (issue 35's local-HTTPS item was merged in here).
 
@@ -430,3 +430,33 @@ Converted from issue 37 on 2026-10-28. Already done before this rewrite: product
 `camp-2026-VR` are replaceable deployment repositories. On 2026-10-28 issue 35's request for a local-HTTPS recipe
 was merged in. The old acceptance criterion "deploy to two differently named test repositories" is replaced by the
 two local `--base` builds in step 3; creating real repositories is not needed.
+
+## Report
+
+### Done
+- New `scripts/pagesBase.mjs` (`normalizeBase`, `resolvePagesBase`) and `tests/scripts/pagesBase.test.ts` (15 tests).
+- `scripts/build-pages.mjs` uses it: base only from `--base`/`VITE_BASE`, printed, fails before building; package-name fallback removed; `.nojekyll` and the job 02 size check kept.
+- Removed `scripts/deploy-pages.sh` and the `deploy:pages` npm script.
+- `.github/workflows/deploy-pages.yml`: empty `base_path` now gives `VITE_BASE=/`; prints "Pages base:".
+- `_docs/DEPLOYMENT.md` (local preview, another instance, troubleshooting, local HTTPS recipe), `_docs/Development_guide.md`, `README.md` updated.
+- Commit: see the git log entry "Make Pages deployment repository-name agnostic (job 03)".
+
+### Deviations
+None.
+
+### Uncertain
+- Workflow run not observed (nothing was pushed). If the first deploy serves broken asset URLs, revert the `base="/"` fallback.
+- The Rebex server loading the generated PFX was not tested.
+
+### Not done
+Nothing skipped.
+
+### Checks
+- Baseline `npm run typecheck` and `npm test` passed (635 passed, 9 skipped).
+- `npx vitest run tests/scripts/pagesBase.test.ts`: 15 passed.
+- `npm run build:pages` (no base): exit 1, "No Pages base path given..." and no build.
+- `--base camp-2026-VR`: "base /camp-2026-VR/ (from --base)", dist size 53.4 MB OK, `src="/camp-2026-VR/assets/index-....js"`.
+- `--base noneuclid-fpv`: `src="/noneuclid-fpv/assets/index-....js"`.
+- `VITE_BASE=/noneuclid-fpv/ npm run build:pages`: failed with the Git Bash "looks like a Windows path" message.
+- OpenSSL recipe in a scratch folder: `server-certificate.pfx` created.
+- Final typecheck, test, docs:check and `npm run build`: see below / run before commit.

@@ -67,7 +67,7 @@ npm run dev
 npm run typecheck
 npm test
 npm run build
-npm run build:pages
+npm run build:pages -- --base noneuclid-fpv
 ```
 
 For local classroom serving:
@@ -77,15 +77,14 @@ npm run dev -- --host 0.0.0.0
 ```
 
 For GitHub Pages, use [`.github/workflows/deploy-pages.yml`](../.github/workflows/deploy-pages.yml)
-and set the repository Pages source to `GitHub Actions`. The workflow runs the
-test suite, builds the site with the correct Pages base path, publishes
+and set the repository Pages source to `GitHub Actions`. The workflow does not run
+tests (the pre-push hook runs `npm run typecheck` and `npm test`); it builds the site with the correct Pages base path, publishes
 `.nojekyll` so underscore-prefixed asset folders survive deployment, and
 deploys the built `dist/` output.
 
 `npm run build:pages` is the local verification build for that deployment path.
-Set `VITE_BASE` explicitly for the target Pages repository. The checked-in
-helper still has a legacy package-name fallback; its removal is tracked in
-[issue 37](../.agents/jobs/03_pages_deployment_configuration.md). See the
+`npm run build:pages` requires the target repository name (`--base <name>` or
+`VITE_BASE`) and prints the base it uses. See the
 [deployment guide](DEPLOYMENT.md) for the current release procedure.
 
 ## Repository Map

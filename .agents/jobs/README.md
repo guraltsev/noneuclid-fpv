@@ -83,7 +83,7 @@ Resolves: issue [NN](../../_issues/NN_....md).
 | [00](00_coordinate_jobs_01_10.md) | Coordinate jobs 01-10: order, gates, batch report | - |  |
 | [01](_done/01_frame_loop_error_containment_and_dispose.md) | ~~Contain frame-loop errors and release everything on dispose~~ (done) | [74](../../_issues/_closed/74_frame_loop_error_containment_and_dispose_leaks.md) |  |
 | [02](_done/02_asset_footprint_and_provenance.md) | ~~Shrink the deployed assets and resolve unverified ones~~ (done) | [40](../../_issues/_closed/40_resolve_unverified_public_assets.md) | 34 |
-| [03](03_pages_deployment_configuration.md) | Make Pages deployment repository-name agnostic | - | 37 |
+| [03](_done/03_pages_deployment_configuration.md) | ~~Make Pages deployment repository-name agnostic~~ (done, needs review) | - | 37 |
 | [04](04_local_browser_smoke_coverage.md) | Local browser smoke coverage | - | 36 |
 | [05](05_conjugate_loop_word_on_anchor_crossing.md) | Conjugate a loop's portal word when its shared anchor crosses a portal | [68](../../_issues/68_loop_endpoint_crossing_must_conjugate_portal_word.md) |  |
 | [06](06_curve_shortening_stalls.md) | Stop curve shortening from stalling | [66](../../_issues/66_curve_shortening_stalls_at_high_frame_rate.md) |  |

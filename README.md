@@ -67,6 +67,8 @@ The canonical source is **[guraltsev/noneuclid-fpv](https://github.com/guraltsev
 <https://guraltsev.github.io/noneuclid-fpv/>. Report problems and propose
 changes there. Maintainer instructions for publishing are in the
 [deployment guide](_docs/DEPLOYMENT.md).
+Other repositories may host yearly or workshop copies of the same project; the
+guide explains how to publish one.
 
 ## Credits and reuse
 

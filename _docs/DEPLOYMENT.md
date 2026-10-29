@@ -49,13 +49,27 @@ Per-activity settings live in `public/*.config.js`.
 ### Check a build locally first (optional)
 
 ```sh
-VITE_BASE=/noneuclid-fpv/ npm run build:pages
-npm run preview
+npm run build:pages -- --base noneuclid-fpv
+VITE_BASE=noneuclid-fpv npm run preview
 ```
 
-Then open the printed address with `/noneuclid-fpv/` appended and try
-`?config=001`. See also the
-[base-path deployment issue](../.agents/jobs/03_pages_deployment_configuration.md).
+Then open `http://localhost:4173/noneuclid-fpv/?config=001`. Write the base
+without a leading slash, because Git Bash rewrites `/noneuclid-fpv/` into a
+Windows path, and `build:pages` refuses such a value. The preview also needs
+`VITE_BASE`, or it serves the app's files as HTML. `build:pages` never guesses
+the base: it takes `--base <name>` or `VITE_BASE`, prints the base it uses, and
+fails before building when neither is given (use `--base .` for a site at a
+domain root).
+
+### Deploying another instance (yearly or ad-hoc repository)
+
+`noneuclid-fpv` is the project; an instance such as `camp-2026-VR` is just
+another GitHub repository with the same source.
+
+- Push the same source to the new repository and do the one-time setup in it.
+- The workflow takes the base from GitHub Pages, so no file changes.
+- To check locally, use `--base camp-2026-VR` and `VITE_BASE=camp-2026-VR`.
+- Do not rename the package.
 
 ### Troubleshooting
 
@@ -68,8 +82,10 @@ Then open the printed address with `/noneuclid-fpv/` appended and try
   the repository; texture sources are not (see
   [job 02](../.agents/jobs/_done/02_asset_footprint_and_provenance.md) and
   `public/assets/textures/README.md`).
-- **Do not use `npm run deploy:pages`** with this setup; it publishes a
-  separate `gh-pages` branch and conflicts with the workflow.
+- **Every asset 404s or the page is blank locally:** the build and the preview
+  use different bases. Run both with the same `--base`/`VITE_BASE` value.
+- **`build:pages` says the base looks like a Windows path:** drop the leading
+  slash (Git Bash rewrote it).
 
 ## HTTPS and WebXR
 
@@ -78,6 +94,30 @@ testing, use a trusted HTTPS server and certificate appropriate for the device;
 plain HTTP on a LAN is not enough. `localhost` is normally treated as secure by
 browsers for desktop development, but it is not a substitute for a headset
 connecting from another device.
+
+### Local HTTPS server for a headset
+
+`wwwserver/` holds the Rebex Tiny Web Server, configured to serve `dist/` at the
+site root on HTTP port 1183 and HTTPS port 11446, with the certificate
+`wwwserver/server-certificate.pfx`.
+
+1. Run `npm run build` (base `/`, because the server serves `dist/` at the root).
+2. Find the PC's LAN IPv4 address with `ipconfig`.
+3. In Git Bash, run these two OpenSSL commands from `wwwserver/`, with that
+   address in place of `192.168.1.50`:
+
+   ```sh
+   cd wwwserver
+   MSYS_NO_PATHCONV=1 openssl req -x509 -newkey rsa:2048 -nodes -days 365      -keyout server.key -out server-certificate.cer      -subj "/CN=192.168.1.50" -addext "subjectAltName=IP:192.168.1.50,DNS:localhost"
+   openssl pkcs12 -export -out server-certificate.pfx -inkey server.key -in server-certificate.cer      -passout pass:my-super-secure-password -certpbe PBE-SHA1-3DES -keypbe PBE-SHA1-3DES -macalg sha1
+   ```
+
+4. Start `wwwserver/RebexTinyWebServer.exe` and press Start.
+5. On the headset, open `https://<address>:11446/?config=001` and accept the
+   certificate warning.
+
+The certificate files are ignored by Git and must never be committed. The
+password in the server config is a local test setting, not a secret.
 
 Check a release on the actual deployment URL before class: the page loads under
 the intended base path, the selected config loads, static models and floor

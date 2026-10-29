@@ -1,20 +1,26 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { resolvePagesBase } from "./pagesBase.mjs";
 import { checkDistSize, formatDistSizeReport } from "./check-dist-size.mjs";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
-const packageJsonPath = resolve(scriptDir, "..", "package.json");
-const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf8"));
-const fallbackBase = normalizeBase(`/${packageJson.name ?? ""}/`);
-const configuredBase = normalizeBase(process.env.VITE_BASE);
+
+let pagesBase;
+try {
+  pagesBase = resolvePagesBase({ argv: process.argv.slice(2), env: process.env });
+} catch (error) {
+  console.error(`build:pages: ${error instanceof Error ? error.message : String(error)}`);
+  process.exit(1);
+}
+console.log(`build:pages: base ${pagesBase.base} (from ${pagesBase.source})`);
 
 const result = spawnSync(...buildCommand(), {
   cwd: resolve(scriptDir, ".."),
   env: {
     ...process.env,
-    VITE_BASE: configuredBase ?? fallbackBase,
+    VITE_BASE: pagesBase.base,
   },
   stdio: "inherit",
 });
@@ -34,14 +40,6 @@ const sizeResult = checkDistSize(resolve(scriptDir, "..", "dist"));
 console.log(formatDistSizeReport(sizeResult));
 if (!sizeResult.ok) {
   process.exit(1);
-}
-
-function normalizeBase(value) {
-  if (!value || value === "/") {
-    return value ? "/" : undefined;
-  }
-
-  return `/${String(value).replace(/^\/+/, "").replace(/\/+$/, "")}/`;
 }
 
 function npmCommand() {
