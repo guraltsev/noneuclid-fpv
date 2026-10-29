@@ -117,4 +117,4 @@ Resolves: issue [NN](../../_issues/NN_....md).
 | [33](33_decompose_runtime_monoliths.md) | Decompose runtime monoliths and retire legacy paths | - | 38 |
 | [34](34_type_strictness_lint_bundle.md) | Type strictness, linting and bundle configuration | - | 80 |
 | [35](35_torus_family_as_teichmuller_space.md) | Treat the torus family as TeichmÃ¼ller space | - | 54 |
-| [36](36_creatures_detour_and_resume_geodesic.md) | Creatures detour around obstacles and resume their geodesic | - |  |
+| [36](_done/36_creatures_detour_and_resume_geodesic.md) | ~~Creatures detour around obstacles and resume their geodesic~~ (done, needs review) | - |  |

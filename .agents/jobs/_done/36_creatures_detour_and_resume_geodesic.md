@@ -1,6 +1,6 @@
 # Job 36 - Creatures detour around obstacles and resume their geodesic
 
-Status: in progress.
+Status: done, needs review on 2026-10-29.
 Written on 2026-10-29 for a less capable implementing model. Approved by the maintainer on 2026-10-29, with the
 requirement that **a detour around a forbidden zone passes the vertex on the same side as the creature's geodesic**.
 Resolves: no open issue. It replaces job 13 Decision 12 ("creatures keep ignoring zones").
@@ -195,3 +195,29 @@ Job 13's Decision 12 already points here. When this job lands, mark job 36 done 
 
 - Creatures move with zones on, follow their leader, and tests 1-9 pass.
 - The side rule is a tested pure function, and test 5 shows a creature never passes a vertex on the wrong side.
+
+## Report
+
+### Done
+Commit d57aaf4.
+- `src/world-objects/simpleGeoCreature.ts`: each creature owns a private leader (`leader`, `creatureFromLeader`, identity at creation, `reset` and `transformGeometry`). `update` advances the leader with `walkDevelopedSegment` while the creature lags it by less than `creatureLeashMeters` (0.5; exported), re-seeds it when the lag exceeds `creatureLostMeters` (3; exported), targets leader + wobble (offset values, not increments; butterfly bob measured from its start value), caps the horizontal step at 1.5 x speed x dt, applies the side rule, and calls `moveDynamicObject` with zones on. `creatureFromLeader` is updated by both rules with `orthonormalizeYawRigidTransform3` (job 14 helper). `transformGeometry` depenetrates with zones on. New exported pure functions `geodesicSideOfPoint` and `applyForbiddenZoneSideRule`; new runtime method `leaderForDebug()` (for tests). Module header and JSDoc updated.
+- `_docs/MATHEMATICAL_MODEL.md`: paragraph "Creatures follow a leader on their geodesic" at the end of section 5; generated docs regenerated.
+- `tests/world-objects/simpleGeoCreature.test.ts`: `describe("side rule")` (sign convention on numbers, v=(0,0), c=(0,-0.2), side +1 gives t=(1,0)) and `describe("leader and detour")` with tests 1-6 and 8.
+### Deviations
+- Side rule trigger. The job fires the rule only when touching the disc. I also fire it when the step would reach the disc: the creature walks to the contact point and spends the rest of the step along the tangent there (the straight move to that end point stays outside the disc). Without this the slide itself would choose the side when the creature approaches from a distance. A creature touching a zone on the wrong side (zone centre on the other side of the geodesic than required) orbits toward the required side by one step regardless of where the target is (`applyForbiddenZoneSideRuleToColumns`, private).
+- Heading (Decision 6). The leader's rotation is used when the lag is below 1e-4 m or when the move was neither blocked nor altered by the side rule; otherwise the yaw of the applied displacement. The second condition keeps the heading constant while the wobble pulls the creature sideways of the leader (the lag is then never below 1e-4).
+- Step cap (Decision 4): the cap is 1.5 x speed x dt plus the change of the (scaled) lateral offset in that tick, so a speed-0 wobbling creature still wobbles (existing test).
+- Lag in the leash and lost rules is measured to the target (leader plus wobble), horizontally.
+- Test 5 reaches the wrong-side branch with a fixed body at (7.1, 7.1), radius 0.4 for 150 ticks (placement found by scanning; the branch was confirmed entered with a temporary counter, since removed). A creature cannot otherwise start on the wrong side because the leader is seeded on it.
+- Existing tests: none changed.
+### Uncertain
+- Heading while detouring jumps from the leader's yaw to the displacement yaw; since the collision centre is offset from the anchor (mouse), the centre moves slightly when the yaw changes. Not seen to cause trouble.
+- Near a zone the lateral wobble value is now scaled to 0 (previously its increments were scaled and the offset froze), so the creature returns to the geodesic there instead of keeping a frozen sideways offset.
+- Only the creature's own cell columns are tested for zones (as the job says).
+### Not done
+- Test 7 (lost leader). The re-seed branch is unreachable through the public API: the leash caps the lag at about 0.5 m + one step, and `transformGeometry`/`reset` re-seed anyway; the runtime does not read teleports from the registry. The branch is a defensive guard and is untested.
+### Checks
+- Baseline: `npm run typecheck` ok; `npm test` 875 passed, 8 skipped.
+- After: `npm run typecheck` ok; `npm test` 883 passed, 8 skipped (116 files); `npm run docs:check` ok after `npm run docs:generate`; `npm run smoke -- --world cube` SMOKE OK.
+### Manual checks not run
+- Watching a mouse approach a cube vertex in a browser (it should walk round the invisible zone on its geodesic's side and continue straight).
