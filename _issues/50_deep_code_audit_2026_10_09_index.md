@@ -96,7 +96,7 @@ to `src/cell-complex/validateCellComplexSpec.ts`.
 | [71](71_runtime_object_instance_sync_runs_twice_with_stale_root.md) | P2 | Object instance sync runs twice per frame, once against the wrong root's table |
 | [72](72_aim_picking_uses_camera_clip_polygons_not_portal_ray_walk.md) | P1 | VR aim gated by head-camera clip polygons, not by the controller ray; walls never occlude |
 | [73](73_portal_ghosts_and_xr_eye_rerooting_are_single_hop.md) | P2 | Ghosts and XR eye re-rooting only look one portal hop away |
-| [74](74_frame_loop_error_containment_and_dispose_leaks.md) | P2 | One exception stops the render loop for good (freezes the headset); `dispose` leaks |
+| [74](_closed/74_frame_loop_error_containment_and_dispose_leaks.md) | P2 | Closed 2026-10-28 by job 01: frame errors are contained and `dispose` frees the runtime families |
 | [75](75_frame_loop_allocation_and_per_object_draw_calls.md) | P2 | Per-frame allocations; ~13 draw calls per creature |
 
 ### Architecture, tooling, tests (76-80)

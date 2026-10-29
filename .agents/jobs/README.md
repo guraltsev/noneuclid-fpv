@@ -29,7 +29,7 @@ Resolves: issue [NN](../../_issues/NN_....md).
 
 | Job | Title | Resolves issues | Former issue |
 | --- | --- | --- | --- |
-| [01](01_frame_loop_error_containment_and_dispose.md) | Contain frame-loop errors and release everything on dispose | [74](../../_issues/74_frame_loop_error_containment_and_dispose_leaks.md) |  |
+| [01](_done/01_frame_loop_error_containment_and_dispose.md) | ~~Contain frame-loop errors and release everything on dispose~~ (done) | [74](../../_issues/_closed/74_frame_loop_error_containment_and_dispose_leaks.md) |  |
 | [02](02_asset_footprint_and_provenance.md) | Shrink the deployed assets and resolve unverified ones | [40](../../_issues/40_resolve_unverified_public_assets.md) | 34 |
 | [03](03_pages_deployment_configuration.md) | Make Pages deployment repository-name agnostic | - | 37 |
 | [04](04_local_browser_smoke_coverage.md) | Local browser smoke coverage | - | 36 |

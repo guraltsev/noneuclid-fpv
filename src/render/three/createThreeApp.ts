@@ -33,6 +33,12 @@
  *    palette and debug state are refreshed here too.
  * 5. Render: a single `renderer.render(scene, camera)`; per-frame phase timings are then recorded.
  *
+ * Errors: `renderFrame` runs the frame through a `FrameErrorGuard` (`frameErrorGuard.ts`). A throw is reported
+ * once per distinct message, the frame is still drawn if it failed before the draw (so a headset keeps a live,
+ * head-tracked image), and the loop keeps running. Per-object updates, curve shortening and the UI refresh run as
+ * contained phases, so one failing object or tooltip cannot block movement or rendering. After
+ * `MAX_CONSECUTIVE_FAILED_FRAMES` failed frames in a row an immersive session is ended.
+ *
  * ## State ownership
  * All mutable state lives in the `createThreeApp` closure and is mutated only by it (or through the
  * setter callbacks it hands to the factories above). `playerPose`, `menuState`, `activeWorldBundle`,
@@ -251,6 +257,7 @@ import {
   XrDebugRenderState,
 } from "./renderState";
 import { RootAimRay } from "./rootAimRay";
+import { createFrameErrorGuard } from "./frameErrorGuard";
 import { installRuntimeDiagnostics, runtimeDiagnostics } from "./runtimeDiagnostics";
 import { collectPortalGhostRuntimeObjectRenderRecords } from "./runtimeObjectGhostRecords";
 import {
@@ -271,6 +278,7 @@ import {
   createCellWarmupViews,
   disableFrustumCulling,
   disableShadows,
+  disposeCanvasTextures,
   disposeObject3D,
   isGeodesicRuntimeRenderObject,
   runtimeObjectArchetypeKeyPrefix,
@@ -388,6 +396,8 @@ interface ActiveWorldBundle {
 
 // Time (milliseconds) within which a second reload request counts as confirmation.
 const reloadConfirmationWindowMs = 2000;
+// Consecutive failed frames (about half a second at 60-90 Hz) before an immersive session is ended.
+const MAX_CONSECUTIVE_FAILED_FRAMES = 30;
 // Module-level scratch objects for resolveXrHeadWorldPose; the returned pose aliases them, so it is valid
 // only until the next call and must not be stored.
 const xrHeadWorldMatrix = new THREE.Matrix4();
@@ -481,6 +491,14 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   let reloadConfirmationTimeout: number | undefined;
   // Disposal bookkeeping: `disposed` neutralises late XR 'end' events; the session/cleanup pair is set by enterVr.
   let disposed = false;
+  // Frame error containment (see the module header). `frameDrawn` tells recovery whether the failed frame
+  // already reached `renderer.render`.
+  const frameErrorGuard = createFrameErrorGuard({
+    maxConsecutiveFailures: MAX_CONSECUTIVE_FAILED_FRAMES,
+    report: reportFrameError,
+    onPersistentFailure: endXrSessionAfterPersistentFrameFailure,
+  });
+  let frameDrawn = false;
   let activeXrSession: XRSession | undefined;
   let xrSessionEndHandlerCleanup: (() => void) | undefined;
   const xrSessionRestartCoordinator = createXrSessionRestartCoordinator();
@@ -1199,13 +1217,51 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   }
 
   /**
+   * Animation-loop callback: runs {@link renderFrameUnguarded} inside the frame error guard and never throws.
+   *
+   * Called by `renderer.setAnimationLoop`; `xrFrame` is provided only while an XR session is presenting. If the
+   * frame throws before drawing, the scene is still rendered once so the loop and the headset image stay live.
+   */
+  function renderFrame(time?: DOMHighResTimeStamp, xrFrame?: XRFrame): void {
+    frameDrawn = false;
+    frameErrorGuard.runFrame(
+      () => renderFrameUnguarded(time, xrFrame),
+      () => {
+        if (!frameDrawn && !disposed) {
+          renderer.render(scene, camera);
+        }
+      },
+    );
+  }
+
+  // Reports a contained frame or phase error once per distinct message, to the console and runtime diagnostics.
+  function reportFrameError(phase: string, error: unknown): void {
+    console.error(`[noneuclid] frame error in ${phase}; the loop continues.`, error);
+    runtimeDiagnostics().recordDebugEvent("frame-error", {
+      phase,
+      message: error instanceof Error ? error.message : String(error),
+    });
+  }
+
+  // Frames keep failing: end an immersive session so the user is not left in a frozen or broken world.
+  function endXrSessionAfterPersistentFrameFailure(error: unknown): void {
+    console.error(
+      `[noneuclid] ${MAX_CONSECUTIVE_FAILED_FRAMES} frames in a row failed; ending any immersive session.`,
+      error,
+    );
+    const session = renderer.xr.getSession?.();
+    if (session) {
+      void Promise.resolve(session.end()).catch(() => undefined);
+    }
+  }
+
+  /**
    * Runs one animation frame (input, movement, portal visibility, instance sync, render; see the module header).
    *
-   * Called by `renderer.setAnimationLoop`; `xrFrame` is provided only while an XR session is presenting. Reads
-   * and replaces `playerPose`, may swap the world via a geometry commit, and renders exactly once. Must not
-   * be called re-entrantly.
+   * Called only through {@link renderFrame}. Reads and replaces `playerPose`, may swap the world via a geometry
+   * commit, and renders exactly once (setting `frameDrawn`). Must not be called re-entrantly.
    */
-  function renderFrame(_time?: DOMHighResTimeStamp, xrFrame?: XRFrame): void {
+  function renderFrameUnguarded(_time?: DOMHighResTimeStamp, xrFrame?: XRFrame): void {
     const frameStartMs = performance.now();
     // Phase 0: timing. deltaSeconds is the wall-clock time since the previous frame.
     const deltaSeconds = clock.getDelta();
@@ -1362,27 +1418,33 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     // obstacle; geodesics under curve shortening advance and dependent measurements are refreshed.
     const playerObstacle = createPlayerCollisionState(playerPose);
 
+    // Each object is its own contained phase: one failing creature must not stop the others or the frame.
     for (const runtime of dynamicObjectRuntimes) {
-      runtime.update(activeWorld(), frame.resetRequested ? 0 : deltaSeconds, [playerObstacle]);
-      runtime.syncParent(cellMeshes);
+      frameErrorGuard.runPhase(`object ${runtime.objectId}`, () => {
+        runtime.update(activeWorld(), frame.resetRequested ? 0 : deltaSeconds, [playerObstacle]);
+        runtime.syncParent(cellMeshes);
+      });
     }
     updateGeodesicCreatureDebug(deltaSeconds);
     for (const runtime of placedFlagRuntimes.values()) {
       runtime.syncParent(cellMeshes);
     }
-    const straightenedGeodesicIds = advanceCurveShorteningPairs({
-      world: activeWorld(),
-      registry: runtimeObjectRegistry,
-      deltaSeconds: frame.resetRequested ? 0 : deltaSeconds,
-      onDebugMessage: menuState.debugEnabled
-        ? (message, detail) => {
-            const diagnostics = runtimeDiagnostics();
-            diagnostics.recordDebugEvent(message, detail);
-            if (!diagnostics.enabled) {
-              console.info(`[noneuclid] ${message}`, detail);
+    let straightenedGeodesicIds: readonly string[] = [];
+    frameErrorGuard.runPhase("curve shortening", () => {
+      straightenedGeodesicIds = advanceCurveShorteningPairs({
+        world: activeWorld(),
+        registry: runtimeObjectRegistry,
+        deltaSeconds: frame.resetRequested ? 0 : deltaSeconds,
+        onDebugMessage: menuState.debugEnabled
+          ? (message, detail) => {
+              const diagnostics = runtimeDiagnostics();
+              diagnostics.recordDebugEvent(message, detail);
+              if (!diagnostics.enabled) {
+                console.info(`[noneuclid] ${message}`, detail);
+              }
             }
-          }
-        : undefined,
+          : undefined,
+      });
     });
     for (const geodesicId of straightenedGeodesicIds) {
       refreshProtractorAnglesForGeodesic(geodesicId);
@@ -1410,8 +1472,10 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     } else {
       applyDesktopCameraPose();
     }
-    updateFloatingObjectTooltip(xrActive, activeAimRay, xrHeadWorldPose);
-    updateHelpLens(xrActive, activeAimRay);
+    frameErrorGuard.runPhase("tooltips", () => {
+      updateFloatingObjectTooltip(xrActive, activeAimRay, xrHeadWorldPose);
+      updateHelpLens(xrActive, activeAimRay);
+    });
     const frameAfterCameraMs = performance.now();
     const frameBeforePortalMs = frameAfterCameraMs;
 
@@ -1432,17 +1496,20 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     const frameAfterPortalMs = performance.now();
     const frameBeforeUiMs = frameAfterPortalMs;
 
-    // UI/debug refresh; none of this changes simulation state.
-    updateAimCrossMarker(xrActive, activeAimRay);
-    updateProtractorToolFeedback(activeAimRay);
-    updateGeodesicEmitterLabels();
-    syncXrDebugState(frame.source, moveResult);
-    updateScenePalette(xrActive, xrFrame, xrReferenceSpace, xrHeadWorldPose, deltaSeconds, frame);
-    portalDebugRuntime.updateVisiblePortalPaths();
+    // UI/debug refresh; none of this changes simulation state, so it runs as one contained phase.
+    frameErrorGuard.runPhase("ui", () => {
+      updateAimCrossMarker(xrActive, activeAimRay);
+      updateProtractorToolFeedback(activeAimRay);
+      updateGeodesicEmitterLabels();
+      syncXrDebugState(frame.source, moveResult);
+      updateScenePalette(xrActive, xrFrame, xrReferenceSpace, xrHeadWorldPose, deltaSeconds, frame);
+      portalDebugRuntime.updateVisiblePortalPaths();
+    });
     const frameAfterUiMs = performance.now();
     // Phase 5: draw. In XR the renderer renders each eye from `camera` as updated by the WebXR manager.
     const frameBeforeRenderMs = performance.now();
     renderer.render(scene, camera);
+    frameDrawn = true;
     const frameAfterRenderMs = performance.now();
     // Per-phase timings in milliseconds (cameraMs also covers tooltips/help lens; moveMs includes tools).
     const framePerformance: FramePerformanceRenderState = {
@@ -1856,7 +1923,30 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
         disposeObject3D(label.root);
       }
       geodesicEmitterLabelsByKey.clear();
+      // Runtime objects are detached before their cell meshes are freed. Their textures belong to the preloaded
+      // assets, which the caller disposes.
+      for (const runtime of dynamicObjectRuntimes) {
+        runtime.root.removeFromParent();
+        disposeObject3D(runtime.root);
+      }
+      dynamicObjectRuntimes.length = 0;
+      for (const runtime of measuredGeodesicLengthRuntimes.values()) {
+        runtime.dispose();
+      }
+      measuredGeodesicLengthRuntimes.clear();
+      for (const runtime of protractorAngleRuntimes.values()) {
+        runtime.dispose();
+      }
+      protractorAngleRuntimes.clear();
+      if (playerRoverRenderModel) {
+        playerRoverRenderModel.root.removeFromParent();
+        disposeObject3D(playerRoverRenderModel.root);
+      }
+      for (const source of geodesicRuntimeRenderSources) {
+        disposeObject3D(source.root);
+      }
       for (const cellMesh of cellMeshes.values()) {
+        disposeCanvasTextures(cellMesh);
         disposeObject3D(cellMesh);
       }
       scene.remove(underCellInfinityFloor);
@@ -2267,6 +2357,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
 
     for (const [cellId, cellMesh] of cellMeshes) {
       scene.remove(cellMesh);
+      disposeCanvasTextures(cellMesh);
       disposeObject3D(cellMesh);
       cellMeshes.delete(cellId);
     }

@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { describe, expect, it, vi } from "vitest";
-import { disposeObject3D, disposeObject3DWithTextures } from "../../src/render/three/runtimeSceneUtils";
+import { disposeCanvasTextures, disposeObject3D, disposeObject3DWithTextures } from "../../src/render/three/runtimeSceneUtils";
 
 function createTexturedMesh() {
   const texture = new THREE.Texture();
@@ -31,5 +31,22 @@ describe("runtime scene disposal helpers", () => {
     expect(spies.geometry).toHaveBeenCalledTimes(1);
     expect(spies.material).toHaveBeenCalledTimes(1);
     expect(spies.texture).toHaveBeenCalledTimes(1);
+  });
+
+  it("disposeCanvasTextures frees canvas maps only", () => {
+    // No DOM in this environment; any image-like object will do for a texture that is never uploaded.
+    const canvasTexture = new THREE.CanvasTexture({ width: 1, height: 1 } as unknown as HTMLCanvasElement);
+    const label = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: canvasTexture }));
+    const { mesh: floor, spies } = createTexturedMesh();
+    const canvasSpy = vi.spyOn(canvasTexture, "dispose");
+    const root = new THREE.Group();
+    root.add(label, floor);
+
+    disposeCanvasTextures(root);
+
+    expect(canvasSpy).toHaveBeenCalledTimes(1);
+    expect(spies.texture).not.toHaveBeenCalled();
+    expect(spies.geometry).not.toHaveBeenCalled();
+    expect(spies.material).not.toHaveBeenCalled();
   });
 });

@@ -81,3 +81,10 @@ integration, and basic menu regressions can pass all Node tests.
 - At least one authored world starts without uncaught errors or missing required
   assets.
 - Production deployment remains restricted to the default branch.
+
+## Note (2026-10-28)
+
+On Windows, `npm run smoke -- "<url with &>"` and a Volta `node` shim both pass through cmd.exe, which cuts the URL at
+the first `&`, so the run silently uses the default world. Call `node.exe` directly or make the script take the world
+and options as separate arguments. Also cover the checks job 01 could not unit-test: a forced persistent frame
+failure ends the XR session, and `renderer.info.memory` returns to baseline after create/dispose/create.

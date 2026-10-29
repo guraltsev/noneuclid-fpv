@@ -20,7 +20,7 @@ renamed to the new owners.
 - Marmot heading: [64](../64_mover_integration_bugs_xr_slide_marmot_heading_object_trap.md).
 - XR input and palette: [20](../../.agents/jobs/19_vr_palette_and_in_headset_debug.md).
 - Per-frame palette serialisation: [75](../75_frame_loop_allocation_and_per_object_draw_calls.md).
-- Texture lifetimes: [74](../74_frame_loop_error_containment_and_dispose_leaks.md).
+- Texture lifetimes: [74](74_frame_loop_error_containment_and_dispose_leaks.md).
 - `DesktopFlagEditor`, dead code, duplication and naming: [38](../../.agents/jobs/33_decompose_runtime_monoliths.md).
 - Layering debt: [78](../78_enforce_layer_dag_and_move_domain_logic_out_of_render.md).
 

@@ -1,10 +1,46 @@
 # 74 - Frame loop has no error containment; dispose misses runtime objects
 
-Status: open; re-verified 2026-10-28.
+Status: closed on 2026-10-28.
 
 Priority: P2 (robustness). In VR, a single throw freezes the headset image.
 
-Jobs: [01](../.agents/jobs/01_frame_loop_error_containment_and_dispose.md).
+Jobs: [01](../../.agents/jobs/_done/01_frame_loop_error_containment_and_dispose.md).
+
+## Outcome
+
+Fixed by job 01. `renderFrame` now runs through a frame error guard (`src/render/three/frameErrorGuard.ts`). A throw is
+reported once per distinct message, to the console and to runtime diagnostics. The frame is still drawn if it failed
+before the draw, and the loop keeps running. After 30 consecutive failed frames, an immersive session is ended. Each
+creature update, curve shortening, the tooltips and the UI refresh run as contained phases. `dispose()` now frees:
+
+- the creatures;
+- the measured-length and protractor runtimes;
+- the rover;
+- the geodesic render sources;
+- the portal-label canvas textures, which are also freed on every cell-mesh rebuild.
+
+`main.ts` disposes the preloaded assets after each app on restart.
+
+## Closing evidence
+
+- `tests/render-contract/frameErrorGuard.test.ts` (5 tests) covers:
+  - the loop continues after a throw, which is reported once;
+  - repeats are counted but not re-reported;
+  - the persistent-failure signal fires once per streak, at the threshold;
+  - a failing phase does not fail the frame;
+  - the guard never throws.
+- `tests/render-contract/runtimeSceneDispose.test.ts` has "disposeCanvasTextures frees canvas maps only".
+- `tests/render-contract/preloadWorldAssets.test.ts` has "frees every loaded texture, configured clone and glTF
+  resource on dispose, once".
+- Headless Edge smoke test (`scripts/smoke/browser-smoke.mjs`) of a production build: cube, dodecahedron and
+  torus-moduli all pass with no frame errors.
+- Not covered by an automated test:
+  - the wiring inside `createThreeApp` (it needs WebGL): `session.end()` after the threshold, and the
+    `renderer.info.memory` baseline after create/dispose/create;
+  - the `onBeforeRender` closures and warm-up state, which are released with the app closure rather than disposed
+    explicitly.
+
+  The browser checks belong with job 04 (local smoke coverage).
 
 ## Status update 2026-10-28
 

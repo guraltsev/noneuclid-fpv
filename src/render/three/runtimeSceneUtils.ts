@@ -1,7 +1,7 @@
 /**
  * Small scene-graph, geometry, and pose helpers shared by the app shell.
  * Covers traversal helpers (disable culling/shadows, dispose), planar cell helpers (center, warm-up views), and yaw/pose utilities. Positions are meters in the cell-local frame (x right, y forward, z up) unless a function says it works on Three.js objects; yaw is radians about +z.
- * `disposeObject3D`/`disposeMaterial` free GPU geometry and materials only; the `...WithTextures` variants also dispose material `map` textures and must only be used on textures the caller created. None of them remove objects from their parent.
+ * `disposeObject3D`/`disposeMaterial` free GPU geometry and materials only; the `...WithTextures` variants also dispose material `map` textures and must only be used on textures the caller created; `disposeCanvasTextures` frees only canvas-texture maps, which are never shared with preloaded assets. None of them remove objects from their parent.
  */
 import * as THREE from "three";
 import { type AppState } from "../../appState";
@@ -120,6 +120,25 @@ export function disposeObject3DWithTextures(object: THREE.Object3D): void {
     if (child instanceof THREE.Mesh || child instanceof THREE.Sprite) {
       child.geometry?.dispose();
       disposeMaterialWithTextures(child.material);
+    }
+  });
+}
+
+/**
+ * Disposes every `CanvasTexture` used as a material `map` under object (for example portal debug labels), leaving
+ * geometries, materials and all other textures alone. Canvas textures are generated per mesh, so they are safe to free
+ * even where image textures are shared with preloaded assets.
+ */
+export function disposeCanvasTextures(object: THREE.Object3D): void {
+  object.traverse((child) => {
+    if (!(child instanceof THREE.Mesh || child instanceof THREE.Sprite)) {
+      return;
+    }
+    const materials = Array.isArray(child.material) ? child.material : [child.material];
+    for (const material of materials) {
+      if ("map" in material && material.map instanceof THREE.CanvasTexture) {
+        material.map.dispose();
+      }
     }
   });
 }

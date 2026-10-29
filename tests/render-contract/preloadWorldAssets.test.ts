@@ -9,6 +9,7 @@ import {
   preloadWorldAssets,
   type PreparedKtx2Loader,
 } from "../../src/render/three/preloadWorldAssets";
+import { PORTAL_WALL_TEXTURE_FILE } from "../../src/render/three/portalWallTexture";
 import { standardUserRobotObject } from "../../src/world-objects/library";
 
 const loadTextureAsync = vi.fn(async (_url: string) => new THREE.Texture());
@@ -112,6 +113,45 @@ describe("preloadWorldAssets", () => {
     });
 
     expect(assets.getTexture("textures/forest_leaves_02_4k/runtime/forest_leaves_02_color.ktx2")).toBeUndefined();
+  });
+
+  it("frees every loaded texture, configured clone and glTF resource on dispose, once", async () => {
+    const resources: Array<{ dispose(): void }> = [];
+    const trackedTexture = () => {
+      const texture = new THREE.Texture();
+      resources.push(texture);
+      return texture;
+    };
+    loadTextureAsync.mockImplementation(async () => trackedTexture());
+    loadGltfAsync.mockImplementation(async () => {
+      const geometry = new THREE.BoxGeometry();
+      const material = new THREE.MeshStandardMaterial({ map: trackedTexture() });
+      resources.push(geometry, material);
+      const scene = new THREE.Group();
+      scene.add(new THREE.Mesh(geometry, material));
+      return { scene, animations: [] };
+    });
+    const assets = await preloadWorldAssets(compileCellComplex(cube), {
+      async createKtx2Loader(): Promise<PreparedKtx2Loader> {
+        return { loadAsync: async () => trackedTexture(), dispose() {} };
+      },
+    });
+    const configured = assets.getConfiguredTexture({
+      assetPath: PORTAL_WALL_TEXTURE_FILE,
+      colorSpace: THREE.SRGBColorSpace,
+      repeatX: 2,
+      repeatY: 2,
+    });
+    expect(configured).toBeDefined();
+    resources.push(configured!);
+    const spies = resources.map((resource) => vi.spyOn(resource, "dispose"));
+
+    assets.dispose();
+    assets.dispose();
+
+    for (const spy of spies) {
+      expect(spy).toHaveBeenCalledTimes(1);
+    }
   });
 });
 

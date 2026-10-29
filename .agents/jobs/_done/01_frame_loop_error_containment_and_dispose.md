@@ -1,7 +1,7 @@
 # Job 01 - Contain frame-loop errors and release everything on dispose
 
-Status: queued.
-Resolves: issue [74](../../_issues/74_frame_loop_error_containment_and_dispose_leaks.md).
+Status: done on 2026-10-28.
+Resolves: issue [74](../../../_issues/_closed/74_frame_loop_error_containment_and_dispose_leaks.md).
 
 ## Goal
 
@@ -21,4 +21,9 @@ One exception in a frame must not stop the render loop, and `dispose()` must rel
 
 - Unit test: a frame callback that throws once is followed by a frame that renders; the error is reported once.
 - Unit test: after `dispose()`, the disposed-resource counters (or spies on `dispose`) cover every family above.
-- Acceptance criteria of [issue 74](../../_issues/74_frame_loop_error_containment_and_dispose_leaks.md).
+- Acceptance criteria of [issue 74](../../../_issues/_closed/74_frame_loop_error_containment_and_dispose_leaks.md).
+
+## Result
+
+All steps are done; issue 74 is closed with its evidence. Deviation: the per-family dispose check is a set of
+unit tests on the helpers and the asset owner, not one test of `createThreeApp.dispose()`, which needs WebGL.

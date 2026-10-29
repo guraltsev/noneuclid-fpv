@@ -1354,6 +1354,16 @@ Frame-timing smoothing, WebGL render-info capture, and the initial XR debug stat
 | function | `smoothNumber` | Moves previous 15 percent of the way toward next. |
 | function | `createInitialXrDebugState` | Creates the XR/location debug state at startup: desktop input, no blocked movement, and the player's current cell, position (meters) and yaw (radians). |
 
+### `render/three/frameErrorGuard.ts`
+
+Error containment for the animation loop.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `FrameErrorGuardOptions` | Configuration for {@link createFrameErrorGuard}. |
+| interface | `FrameErrorGuard` | Handle created by {@link createFrameErrorGuard}; owned by the frame loop that calls it. |
+| function | `createFrameErrorGuard` | Creates a guard with an empty failure history. |
+
 ### `render/three/geodesicCannonAimTarget.ts`
 
 Computes the yaw a geodesic cannon should adopt to face a target point.
@@ -1590,6 +1600,7 @@ Asset preloading and instancing for the Three.js renderer.
 | interface | `PreparedTextureRequest` | Describes a derived texture variant: a preloaded source texture plus colour space, tiling and wrapping. |
 | interface | `PreparedGltfAsset` | A fresh instance of a preloaded glTF: its scene graph and animation clips. |
 | interface | `PreparedWorldAssets` | Synchronous lookup of everything {@link preloadWorldAssets} loaded. |
+| interface | `OwnedPreparedWorldAssets` | The owner's view of {@link PreparedWorldAssets}: whoever called {@link preloadWorldAssets} must call `dispose()` once. |
 | type | `AssetPreloadKind` | Loader category chosen for an asset path from its extension. |
 | interface | `PreparedKtx2Loader` | Minimal KTX2 loader surface (injectable for tests) that must be disposed when done. |
 | interface | `PreloadWorldAssetsOptions` | Options for {@link preloadWorldAssets}. |
@@ -1764,6 +1775,7 @@ Small scene-graph, geometry, and pose helpers shared by the app shell.
 | function | `disposeMaterial` | Disposes one material or each material of an array. |
 | function | `disposeMaterialWithTextures` | Like `disposeMaterial`, but also disposes the material's `map` texture when it has one. |
 | function | `disposeObject3DWithTextures` | Disposes geometry, materials and material `map` textures of every Mesh and Sprite under object (including object itself). |
+| function | `disposeCanvasTextures` | Disposes every `CanvasTexture` used as a material `map` under object (for example portal debug labels), leaving geometries, materials and all other textures alone. |
 | function | `distanceSquared` | Returns the squared Euclidean distance between two points, in square meters. |
 | function | `yawFromPose` | Extracts the yaw (radians, about +z, atan2 of m10 and m00) from a pose's rotation matrix. |
 | function | `transformYawWithMap` | Returns the yaw (radians) of a yaw-only pose at atPoint after pushing it through a deformation map. |

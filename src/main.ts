@@ -18,7 +18,7 @@ import { loadAppConfig, readAppConfigName } from "./glue/appConfig";
 import { createLoadingStatus } from "./glue/loadingStatus";
 import { readLaunchOptions, type LaunchOptions } from "./glue/readLaunchOptions";
 import { createThreeApp, type ThreeApp } from "./render/three/createThreeApp";
-import { preloadWorldAssets } from "./render/three/preloadWorldAssets";
+import { type OwnedPreparedWorldAssets, preloadWorldAssets } from "./render/three/preloadWorldAssets";
 import { installRuntimeDiagnostics } from "./render/three/runtimeDiagnostics";
 import "./style.css";
 
@@ -33,6 +33,8 @@ const initialAppConfigName = readAppConfigName(initialLaunchLocation);
 let launchOptions = readLaunchOptions(initialLaunchLocation, undefined, initialAppConfigName);
 replaceVisibleUrlWithoutLaunchOptions(window);
 let activeApp: ThreeApp | undefined;
+// Preloaded assets of the active app; owned here and disposed after the app on every restart.
+let activeAssets: OwnedPreparedWorldAssets | undefined;
 let activeRunId = 0;
 
 void startApp(appElement, initialLaunchLocation);
@@ -61,10 +63,14 @@ async function restartApp(container: HTMLDivElement, nextLaunchOptions: LaunchOp
   activeRunId += 1;
   const runId = activeRunId;
 
+  // The app goes first: it may still reference the assets until its loop stops.
   activeApp?.dispose();
   activeApp = undefined;
+  activeAssets?.dispose();
+  activeAssets = undefined;
 
   const loadingStatus = createLoadingStatus(container);
+  let assets: OwnedPreparedWorldAssets | undefined;
   try {
     loadingStatus.setPhase("Reading launch options");
     const geometrySpec = await loadingStatus.track("Loading world description", () =>
@@ -77,7 +83,8 @@ async function restartApp(container: HTMLDivElement, nextLaunchOptions: LaunchOp
       portalPanelMode: launchOptions.portalPanelMode,
       debugOptions: launchOptions.debugOptions,
     });
-    const assets = await loadingStatus.track("Loading objects", () => preloadWorldAssets(world));
+    const loadedAssets = await loadingStatus.track("Loading objects", () => preloadWorldAssets(world));
+    assets = loadedAssets;
     loadingStatus.setPhase("Placing player");
     const appState = createInitialAppState(world);
     const nextApp = await loadingStatus.track("Preparing renderer", () =>
@@ -93,7 +100,7 @@ async function restartApp(container: HTMLDivElement, nextLaunchOptions: LaunchOp
         vrComfortOptions: launchOptions.vrComfortOptions,
         appConfigName: launchOptions.appConfigName,
         appConfig: launchOptions.appConfig,
-        assets,
+        assets: loadedAssets,
         onWorldChangeRequested(worldId) {
           void restartApp(container, {
             ...launchOptions,
@@ -120,13 +127,16 @@ async function restartApp(container: HTMLDivElement, nextLaunchOptions: LaunchOp
 
     if (runId !== activeRunId) {
       nextApp.dispose();
+      loadedAssets.dispose();
       loadingStatus.dispose();
       return;
     }
 
     activeApp = nextApp;
+    activeAssets = loadedAssets;
     loadingStatus.dispose();
   } catch (error) {
+    assets?.dispose();
     if (runId !== activeRunId) {
       loadingStatus.dispose();
       return;

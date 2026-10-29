@@ -7,7 +7,7 @@
  * extension (KTX2, EXR, common image formats); anything else is treated as glTF. Floor colour textures are optional (a failed
  * load is tolerated) whereas every other asset, including the portal wall texture, is required and rejects the whole preload.
  * glTF scenes are cloned per instance with skeleton-aware cloning; geometries and materials stay shared with the preloaded
- * original. Loaded textures are never disposed by this module.
+ * original. Nothing is freed until the owner calls `dispose()` on the returned {@link OwnedPreparedWorldAssets}.
  */
 import * as THREE from "three";
 import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex";
@@ -58,6 +58,16 @@ export interface PreparedWorldAssets {
   getConfiguredTexture(request: PreparedTextureRequest): THREE.Texture | undefined;
   /** Returns a new clone of the preloaded glTF scene for `assetPath`, or `undefined` if it was not preloaded. */
   instantiateGltf(assetPath: string): PreparedGltfAsset | undefined;
+}
+
+/** The owner's view of {@link PreparedWorldAssets}: whoever called {@link preloadWorldAssets} must call `dispose()` once. */
+export interface OwnedPreparedWorldAssets extends PreparedWorldAssets {
+  /**
+   * Frees the GPU resources of every loaded texture, every configured texture clone, and the geometries, materials and
+   * textures of every preloaded glTF. Call only after the app that used the assets has been disposed; a second call is
+   * a no-op. Lookups after disposal still return objects, but three would have to upload them again.
+   */
+  dispose(): void;
 }
 
 /** Loader category chosen for an asset path from its extension. */
@@ -145,11 +155,12 @@ export function classifyAssetPreloadKind(assetPath: string): AssetPreloadKind {
 export async function preloadWorldAssets(
   world: CompiledCellComplex,
   options: PreloadWorldAssetsOptions = {},
-): Promise<PreparedWorldAssets> {
+): Promise<OwnedPreparedWorldAssets> {
   const diagnostics = runtimeDiagnostics();
   const textures = new Map<string, THREE.Texture>();
   const configuredTextures = new Map<string, THREE.Texture>();
   const gltfs = new Map<string, GLTF>();
+  let disposed = false;
   const assetPaths = collectWorldAssetPaths(world);
   const optionalTexturePaths = collectOptionalFloorTexturePaths(world);
   const gltfLoader = new GLTFLoader();
@@ -255,7 +266,38 @@ export async function preloadWorldAssets(
         animations: gltf.animations,
       };
     },
+    dispose() {
+      if (disposed) {
+        return;
+      }
+      disposed = true;
+      for (const texture of [...textures.values(), ...configuredTextures.values()]) {
+        texture.dispose();
+      }
+      for (const gltf of gltfs.values()) {
+        disposeGltfScene(gltf.scene);
+      }
+    },
   };
+}
+
+// Frees every geometry, material and material texture (any texture-valued property, not only `map`) under a glTF scene.
+function disposeGltfScene(scene: THREE.Object3D): void {
+  scene.traverse((child) => {
+    if (!(child instanceof THREE.Mesh)) {
+      return;
+    }
+    child.geometry.dispose();
+    const materials: THREE.Material[] = Array.isArray(child.material) ? child.material : [child.material];
+    for (const material of materials) {
+      for (const value of Object.values(material)) {
+        if (value instanceof THREE.Texture) {
+          value.dispose();
+        }
+      }
+      material.dispose();
+    }
+  });
 }
 
 // Only floor colour textures are optional; normal/bump/roughness maps are still treated as required.
