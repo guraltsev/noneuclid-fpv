@@ -1,4 +1,4 @@
-# Jobs
+﻿# Jobs
 
 A **job** is a work order: carry out this change, in this scope, and verify it like this. An **issue**
 (`_issues/`) describes something that is wrong: the defect, the evidence and the impact. Small fixes and mitigation
@@ -95,7 +95,7 @@ Resolves: issue [NN](../../_issues/NN_....md).
 | [11](_done/11_property_tests_for_geometry_core.md) | ~~Property-based tests for the geometry core~~ (done, needs review) | - | 79 |
 | [12](_done/12_segment_walk_kernel.md) | ~~Shared segment-walk kernel and developed-disk atlas~~ (done) | [62](../../_issues/62_segment_based_portal_traversal_and_swept_motion.md) |  |
 | [13](_done/13_swept_collide_and_slide.md) | ~~Swept collide-and-slide on the segment-walk kernel~~ (done, needs review) | [62](../../_issues/62_segment_based_portal_traversal_and_swept_motion.md), [61](../../_issues/61_wall_response_lets_bodies_escape_through_corners.md), [63](../../_issues/63_collision_ignores_cells_a_straddling_body_overlaps.md) |  |
-| [14](14_movement_numerics.md) | Movement numerics: crossing at rest, pose drift, tolerances | [65](../../_issues/65_movement_numerics_boundary_hysteresis_and_pose_drift.md) |  |
+| [14](_done/14_movement_numerics.md) | ~~Movement numerics: crossing at rest, pose drift, tolerances~~ (done) | [65](../../_issues/_closed/65_movement_numerics_boundary_hysteresis_and_pose_drift.md) |  |
 | [15](15_geodesic_tracing_on_kernel.md) | Geodesic tracing on the segment-walk kernel | [69](../../_issues/69_geodesic_tracing_kernel_numerics.md) |  |
 | [16](16_aim_picking_by_portal_ray_walk.md) | Aim picking by portal ray walk | [72](../../_issues/72_aim_picking_uses_camera_clip_polygons_not_portal_ray_walk.md) |  |
 | [17](17_multi_hop_ghosts_and_eye_rerooting.md) | Multi-hop portal ghosts and XR eye re-rooting | [73](../../_issues/73_portal_ghosts_and_xr_eye_rerooting_are_single_hop.md) |  |
@@ -116,5 +116,5 @@ Resolves: issue [NN](../../_issues/NN_....md).
 | [32](32_layer_dag.md) | Make the layer rule a real DAG | [78](../../_issues/78_enforce_layer_dag_and_move_domain_logic_out_of_render.md) |  |
 | [33](33_decompose_runtime_monoliths.md) | Decompose runtime monoliths and retire legacy paths | - | 38 |
 | [34](34_type_strictness_lint_bundle.md) | Type strictness, linting and bundle configuration | - | 80 |
-| [35](35_torus_family_as_teichmuller_space.md) | Treat the torus family as Teichmüller space | - | 54 |
+| [35](35_torus_family_as_teichmuller_space.md) | Treat the torus family as TeichmÃ¼ller space | - | 54 |
 | [36](36_creatures_detour_and_resume_geodesic.md) | Creatures detour around obstacles and resume their geodesic | - |  |

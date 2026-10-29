@@ -5,7 +5,7 @@
 
 This reference is produced from the source code. For the *meaning* of the modules — the mathematical model they implement — read [../MATHEMATICAL_MODEL.md](../MATHEMATICAL_MODEL.md) and [../ARCHITECTURE.md](../ARCHITECTURE.md). For every exported symbol see [API_REFERENCE.md](API_REFERENCE.md).
 
-**163 modules, 45,215 lines** under `src/`.
+**163 modules, 45,216 lines** under `src/`.
 
 ## Layers
 
@@ -14,7 +14,7 @@ A module belongs to the layer named by its first path segment under `src/`. "May
 | Layer | Modules | Lines | May import | Purpose |
 | --- | ---: | ---: | --- | --- |
 | `math` | 6 | 630 | nothing | Vectors, rigid transforms, planes, polygons, tolerances. Pure; imports nothing. |
-| `cell-complex` | 14 | 3,759 | `math` | Prism-cell specs, compilation, portal transforms, portal-path tables, static visibility culling. |
+| `cell-complex` | 14 | 3,760 | `math` | Prism-cell specs, compilation, portal transforms, portal-path tables, static visibility culling. |
 | `movement` | 10 | 1,645 | `math`, `cell-complex` | Player body, collision, movement and portal crossing in compiled cell complexes. |
 | `world-assets` | 1 | 201 | `cell-complex`, `glue` | Floor-texture and asset descriptors. |
 | `world-objects` | 11 | 8,765 | `math`, `cell-complex`, `movement`, `world-assets`, `glue` | Placeable runtime objects: registry, geodesic emitters, measurement tools, flags, creatures. |
@@ -117,7 +117,7 @@ These imports break the intended layering. They are frozen in `scripts/docs/laye
 | Module | Lines | Summary | Imports |
 | --- | ---: | --- | --- |
 | `cell-complex/compileCellComplex.ts` | 60 | Top-level compiler from an authored cell-complex spec to the runtime geometry used by movement and rendering. | `cell-complex/compilePortalTransforms`, `cell-complex/prismCells`, `cell-complex/specs`, `cell-complex/validateCellComplexSpec` |
-| `cell-complex/compilePortalTransforms.ts` | 90 | Derives the rigid gluing map of every portal from the geometry of the two sides it joins. | `cell-complex/prismCells`, `cell-complex/specs`, `math/rigidTransform3`, `math/vec3` |
+| `cell-complex/compilePortalTransforms.ts` | 91 | Derives the rigid gluing map of every portal from the geometry of the two sides it joins. | `cell-complex/prismCells`, `cell-complex/specs`, `math/rigidTransform3`, `math/vec3` |
 | `cell-complex/describeGeometry.ts` | 48 | Human-readable text summary of an authored cell-complex spec, for logging and debugging. | `cell-complex/specs` |
 | `cell-complex/developedDisk.ts` | 298 | Developed-disk atlas: lists every cell copy that a disk of radius rho around a point overlaps. | `cell-complex/compileCellComplex`, `cell-complex/prismCells`, `math/polygons`, `math/rigidTransform3`, `math/tolerances`, `math/vec3` |
 | `cell-complex/floorUv.ts` | 49 | Floor texture coordinates. | — |
