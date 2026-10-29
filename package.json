@@ -6,7 +6,7 @@
   "scripts": {
     "prepare": "node scripts/setup-git-hooks.mjs",
     "setup:hooks": "node scripts/setup-git-hooks.mjs",
-    "dev": "vite",
+    "dev": "vite --open \"/?config=full\"",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",

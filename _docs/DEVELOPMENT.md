@@ -19,9 +19,9 @@ npm ci
 npm run dev
 ```
 
-Vite prints the local URL. Visit it, choose a scenario with `?config=001`,
-`?config=002`, `?config=default`, or `?config=full`, and confirm that the world
-loads and that the menu and a placed tool work.
+`npm run dev` opens the browser on `?config=full` (every world, tool and the debug menu). Choose another scenario with
+`?config=001`, `?config=002` or `?config=default`, and confirm that the world loads and that the menu and a placed
+tool work.
 
 `git push` runs `npm run typecheck` and `npm test` through the pre-push hook in
 `.githooks/` (enabled by `npm install`, or by hand with `npm run setup:hooks`,
