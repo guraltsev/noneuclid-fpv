@@ -1,9 +1,9 @@
 # Job 12 - Shared segment-walk kernel and developed-disk atlas
 
-Status: in progress.
+Status: done on 2026-10-29.
 Revised on 2026-10-29 for a less capable implementing model (design prototyped and checked on every example world).
-Resolves: the kernel part of issue [62](../../_issues/62_segment_based_portal_traversal_and_swept_motion.md) and the
-"local atlas" part of issue [63](../../_issues/63_collision_ignores_cells_a_straddling_body_overlaps.md). It closes no
+Resolves: the kernel part of issue [62](../../../_issues/62_segment_based_portal_traversal_and_swept_motion.md) and the
+"local atlas" part of issue [63](../../../_issues/63_collision_ignores_cells_a_straddling_body_overlaps.md). It closes no
 issue by itself; jobs 13, 15, 16 and 17 move the callers onto it and close the issues.
 
 ## Goal
@@ -16,7 +16,7 @@ Add two pure modules in `src/cell-complex` and nothing else:
 2. `developedDisk.ts`: list every cell copy that a disk of radius ρ around a point overlaps, with the developing
    transform of each copy and the angular wedge (seen from the centre) that belongs to that copy.
 
-No existing caller changes in this job. This is theme 1 of [issue 50](../../_issues/50_deep_code_audit_2026_10_09_index.md).
+No existing caller changes in this job. This is theme 1 of [issue 50](../../../_issues/50_deep_code_audit_2026_10_09_index.md).
 
 ## Depends on
 
@@ -89,7 +89,7 @@ copies.
    caller (movement, world-objects, render) may import `cell-complex`. Alternative: `src/math`; rejected because the
    kernel needs `CompiledCellComplex`.
 2. **No `Iso2` type.** Decided: use `RigidTransform3` and `Vec2xy` as they are. Why: issue 55 shows composition cost is
-   not a problem at this scale, and a new transform type would touch every caller; [job 30](30_deformation_rebuild_pipeline.md)
+   not a problem at this scale, and a new transform type would touch every caller; [job 30](../30_deformation_rebuild_pipeline.md)
    owns `Iso2`. Record this in issue 55 (step 6).
 3. **Vertex tie rule.** Decided: the counterclockwise-successor rule above, with tie tolerance
    `segmentWalkVertexTieMeters = 1e-9`. The piece records `throughVertexIndex` (the index of the shared vertex in the
@@ -107,7 +107,7 @@ copies.
    Sides parallel to the ray are never exits.
 7. **Transforms are composed, not re-projected.** Decided: `cellFromStart` of the next cell is
    `composeRigidTransform3(portal.transformToTarget, cellFromStart)`. Measured: after 217 torus crossings the lifted
-   end point differs from the developed one by 0. Re-projection of rotations is [job 14](14_movement_numerics.md).
+   end point differs from the developed one by 0. Re-projection of rotations is [job 14](../14_movement_numerics.md).
 8. **Atlas centre on a side.** Decided: before building the atlas, if the centre is within 1e-7 m of any side of its
    cell, move it 1e-7 m inward along the sum of those sides' inward normals (normalized) and add 1e-7 m to ρ. Why: rule
    (1) of the disk needs c strictly inside; otherwise a body centred exactly on a portal would miss the neighbour.
@@ -398,3 +398,27 @@ Create `tests/cell-complex/developedDisk.test.ts`:
 - Both modules exist with the exported names above, header comments and JSDoc.
 - All tests of step 4 pass; `npm test` and `npm run docs:check` pass.
 - Issues 55, 62 and 63 carry the status lines of step 6.
+
+## Report
+
+### Done
+- `src/math/tolerances.ts`: added `segmentWalkVertexTieMeters`, `cellContainmentToleranceMeters`, `segmentWalkOutgoingDotTolerance`.
+- `src/cell-complex/segmentWalk.ts`: `walkDevelopedSegment`, `locateDevelopedPoint` and the walk types, as specified (vertex rule, zero-length pieces, status values).
+- `src/cell-complex/developedDisk.ts`: `collectDevelopedDisk`, `wedgeContainsDirection`, `intersectWedges`, `clipSegmentToWedge`, `distanceToWedge`, `distancePointToSegment2`, plus the result type `DevelopedDiskResult`.
+- Tests: `tests/cell-complex/segmentWalk.test.ts` (9), `segmentWalk.property.test.ts` (14, all ten example worlds at 300 runs, sampling on cube/icosahedron/torusModuli, 3040 m torus lift), `developedDisk.test.ts` (10, tiling exactly once on the six worlds with at most 8 nodes).
+- Docs: `_docs/MATHEMATICAL_MODEL.md` section 4 "Segment walk" paragraph and three rows in section 10; regenerated `_docs/generated/*`; one-line status notes in issues 55, 62, 63.
+- Commit: 592443b (code, tests, docs, issue notes). Job file move and README row: second commit.
+
+### Deviations
+- Added result type `DevelopedDiskResult` and extra JSDoc blocks (needed by `docs:check`'s exported-JSDoc rule).
+- The torus lift test uses 3040 m at angle 0.07 rad on `torusModuli` (cell `torus-room`), maxCrossings 1000.
+
+### Uncertain
+- None known. Issues 62 and 63 are not closed (the job says callers close them).
+
+### Not done
+- Nothing.
+
+### Checks
+- Baseline: typecheck clean; `npm test` 780 passed, 8 skipped.
+- Final: `npm run typecheck` clean; `npm test` 813 passed, 8 skipped (111 files); `npm run docs:check` all ok (after adding JSDoc and `docs:generate`; the first run failed on five missing JSDoc blocks).
