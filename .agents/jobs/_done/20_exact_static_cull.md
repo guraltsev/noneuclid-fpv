@@ -1,6 +1,6 @@
 # Job 20 - Exact static cull by oriented line stabbing
 
-Status: queued.
+Status: done, needs review on 2026-10-30 (commits 2715562, 051ea4d, 727f6a6).
 Split from issue 56 on 2026-10-28; rewritten on 2026-10-29 for a less capable implementing model (line numbers re-checked
 at commit `0b468e1`).
 Resolves: issue [56](../../_issues/56_exact_static_cull_by_oriented_line_stabbing.md) (including its "Merged from issue 41"
@@ -508,3 +508,58 @@ walls; deep views must not lose pieces compared with the previous build.
 - Issue 56 is moved to `_issues/_closed/` with an Outcome (exact cone cull, best-first budget, unequal heights out of
   scope) and Closing evidence (commit hashes, test names, comparison table). The queue row in `.agents/jobs/README.md`
   is struck through and the job moves to `_done/` with its report (see README).
+
+## Report
+
+### Done
+- Part A (`2715562`): `src/cell-complex/orientedPortal.ts` (`OrientedPortalSegment`, `developPortalSegment`), `src/cell-complex/staticLineCone.ts` (`LineCone`, `portalConstraintVectors`, `lineConeForTwoPortals`, `clipLineConeByPortal`, `lineConeMeasure`, tolerance constants), `tests/cell-complex/staticLineCone.test.ts` (10 tests: hand-computed crossed-strings/shared-endpoint/impossible/clip cases, 200-sample brute-force clip check, 50-cone numeric Crofton oracle), `tests/cell-complex/staticCullBenchmark.test.ts` (skipped unless `STATIC_CULL_BENCH`), `tests/support/portalWordWitness.ts` (`mulberry32`, `wordSignature`, `walkedWordPrefixes`, `sampleLineInCone`, `lineStartThroughPortal`).
+- Part B (`051ea4d`): `PortalRenderPath.newestPortalInRoot` (filled in `buildPortalPathTableForRoot` and the culled builder); both culls use the cone test (`testChild`); legacy builder kept temporarily; `tests/support/arbitraries.ts#arbConeFanWorldSpec` (+ compile test); property tests `tests/cell-complex/staticPortalPathCull.property.test.ts` (example worlds 200 runs each, cone fans 100 runs, kept-cone witness test 50 paths per world); temporary comparison test; existing tests updated (see Deviations).
+- Part C (`727f6a6`): `staticPortalPathCull.ts` rewritten (about 1 640 lines down to about 560): all tau/sigma, aperture and projective code, `debugTauSigmaDisagreements`, `onDepthComplete`/`StaticPortalPathDepthStatus` and the legacy builder deleted; `StaticPortalPathRejectReason` is `"no-static-line-transversal" | "static-path-budget"`; best-first budget with a private binary max-heap; `onRootComplete`/`StaticPortalPathRootStatus`; `portalDebugRuntime.ts` logs one line per root; docs (`_docs/MATHEMATICAL_MODEL.md` Section 4 and the Section 11 culling bullet, `_docs/ARCHITECTURE.md`, regenerated references). `git grep "tauSigma\|rejectGeometrically\|rejectAgainstPortalAperture" src` is empty.
+- Issues to close (coordinator): issue 56 (including its "Merged from issue 41" section), with Outcome "exact cone cull, best-first budget, unequal heights out of scope" and the commit hashes and tables below.
+
+### Deviations
+- `staticPortalPathCull.test.ts`: deleted "rejects impossible bounds against ancestor portal apertures..." (Part B step 6); renamed the cube touching test to "rejects cube paths whose only transversal runs along a cell edge" with `rejectionReason: "no-static-line-transversal"` (kept `0 3`, `0 3 2`); replaced the hand-broken-transform test by the structural check (cube `maxDepth: 4`, at least one inherited rejection); compare sorted signatures in "can apply static culling while expanding the path tree"; budget test renamed "spends the path budget best-first by line measure" with 12 budget rejections; progress test replaced by "reports per-root progress" (`[1, 4, 12]`, budget not exhausted). The dodecahedron bound (`<= 12_000`) needed no change.
+- `portalPathDebug.test.ts` needed no change. `portalDebugRuntime.ts` log line text changed ("root complete").
+- `tests/support/portalWordWitness.ts#walkedWordPrefixes` truncates to `maxCrossings` crossings (the walk kernel records one more crossing than `maxCrossings` before reporting `crossing-limit`).
+- The comparison test's `oldOnly` check samples random lines through the first portal (2000 attempts, first 50 words per world per root) as specified.
+
+### Uncertain
+- Comparison table (Part B, `maxDepth: 6`, `toleranceMeters: 1e-6`, no budget, kept words summed over all roots). `newOnly` = kept by the new cull only (fixed false rejections), `oldOnly` = kept by the legacy cull only:
+
+| world | legacy kept | new kept | newOnly | oldOnly |
+| --- | --- | --- | --- | --- |
+| basicCube | 1974 | 1974 | 0 | 0 |
+| basicTetrahedron | 448 | 448 | 0 | 0 |
+| cube | 1974 | 1974 | 0 | 0 |
+| dodecahedron | 9312 | 7992 | 0 | 1320 |
+| genus2Torus | 3329 | 2337 | 0 | 992 |
+| icosahedron | 2240 | 2240 | 0 | 0 |
+| octahedron | 896 | 896 | 0 | 0 |
+| tetrahedron | 448 | 448 | 0 | 0 |
+| torus | 329 | 329 | 0 | 0 |
+| torusModuli | 329 | 329 | 0 | 0 |
+
+  So at depth 6 the legacy cull produced no false rejections in these worlds (no word fixed), and it kept 1320 (dodecahedron) and 992 (genus-2 torus) words that no line can realise (no random line reproduced any of the sampled ones). Fixed false rejections may exist at greater depth or in other worlds; the cone fan property test covers cone points.
+- The 1e-9 m measure floor is untested against a case where a genuinely visible word has measure just above 1e-9; all property tests passed (no sound word was dropped).
+- Manual checks not run, see below.
+
+### Not done
+- Nothing from the steps was skipped. The comparison table above is the only trace of the deleted comparison test.
+
+### Checks
+- Baseline before changes: `npm run typecheck`, `npm test` (976 tests), `npm run docs:check` all green.
+- Benchmark `STATIC_CULL_BENCH` (depth 10, `maxKeptPathsPerRoot: 50_000`, median of 3, ms) before (old cull) versus after, and kept count per root:
+
+| world | before | after | kept per root before | after |
+| --- | --- | --- | --- | --- |
+| cube | 494 | 46 | 1793 | 1793 |
+| icosahedron | 311 | 28 | 496 | 496 |
+| torusModuli | 70 | 5 | 1793 | 1793 |
+| genus2Torus | 2146 | 96 | 22913 | 15665 |
+| dodecahedron | 2984 | 207 | 4536 | 3936 |
+
+  Every world is well inside 1.1 times its baseline (about 10 to 20 times faster).
+- Final: `npm run typecheck` ok; `npm test` 989 passed, 1 skipped (benchmark); `npm run docs:check` ok; `npm run build` ok. `npm run smoke -- --world cube,icosahedron,torus-moduli,genus-2-torus`: the first two full runs failed with "loading screen still present after 60000 ms" on icosahedron, torus-moduli and genus-2-torus (cube OK, no console output) right after the build; icosahedron alone, then torus-moduli + genus-2-torus alone, passed, and a third full run passed (4 of 4 OK). Treated as the known load flake.
+
+### Manual checks not run
+- `npm run dev`, open `?world=cube` and `?world=genus-2-torus`, walk to a corner and look along the walls at depth 10; compare against the previous build (`git stash` or the commit `fe0223e`): no piece of the visible view may disappear. Also open with debug option `portal-static-cull-debug` and confirm one `Portal path debug root complete:` line per root appears.

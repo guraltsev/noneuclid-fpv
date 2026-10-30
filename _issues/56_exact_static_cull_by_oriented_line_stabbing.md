@@ -1,6 +1,6 @@
 # 56 - The static cull is not provably conservative
 
-Status: open; re-verified 2026-10-28.
+Status: open; implemented by job 20, which ended "done, needs review" (manual check not run); see the Report in `.agents/jobs/_done/20_exact_static_cull.md`. Re-verified 2026-10-28.
 
 Priority: P1 (correctness / design). This proposes the fix for the "static visibility cull is not provably conservative"
 item in issue 41. It does not file that defect again.
