@@ -1,6 +1,6 @@
 # Job 22 - GPU portal clipping with clip planes
 
-Status: queued.
+Status: done, needs review on 2026-10-30 (commits d94e46a, ae61b56, 43df83f).
 Rewritten on 2026-10-29 for a less capable implementing model (line numbers re-checked at commit `0b468e1`).
 Resolves: issue [58](../../_issues/58_gpu_portal_clip_overflow_and_clip_planes.md).
 
@@ -314,3 +314,75 @@ acceptance):
 - Issue 58 is closed (`_issues/_closed/`) with an Outcome (planes, hardware/fallback modes, union slots, unpatched
   root) and Closing evidence (commits, tests, the manual timing numbers or "not measured"). Job moved to `_done/` with
   its report; queue row updated.
+
+## Report
+
+### Done
+Commits: Part A `d94e46a`, Part B `ae61b56`, Part C `43df83f`.
+- Part A: `transformClipPlanes` in `portalEyeFrameTransforms.ts` (used by `transformVisiblePortalResultToRenderFrame`);
+  `portalClipData.ts` rewritten (1024-wide plane texture, `portalClipPlaneTexelIndex`, `writeAlwaysInsidePlanes` /
+  `writeAlwaysOutsidePlanes` exported for job 23, slots = rank in the union over eyes, unseen eyes get always-outside rows,
+  `maxClipSlots = maxVisiblePaths x eyes`); `portalClipMaterial.ts` rewritten (vertex-stage `texelFetch` of 4 planes, per-vertex
+  distances, `vPortalClipDistances` varying + single `discard` in the fragment stage, cache key `portal-clip-planes:<eyes>:frag|hw`);
+  removed viewport uniforms/functions, both polygon modes, `smoothClipEdges`, `portalClipEdgeSmoothingEnabled`,
+  `RenderQualityState.portalClipEdgeSmoothing`, debug fields `clipPolygonVertexCountsByPath` / `clipPolygonOverflowPathIds`;
+  `omitPathsWithoutClipSlot` (renderPortalInstances.ts) removes slot-less paths before instancing (mono and stereo), with a
+  once-per-session `console.warn`; the overlay line now shows `visiblePathOverflowCount` and the clip mode. `applyViewport`
+  became an optional hook of `createPortalEyeActivator` (nothing passes it now).
+- Part B: `createPortalClipDistanceToggle`; patched cell and runtime-object archetype meshes enable the four clip distances at
+  the end of `onBeforeRender` and disable them in `onAfterRender`; `hardwareClipDistances` is `toggle !== undefined`;
+  `material.extensions.clipCullDistance = true` in hardware mode; `portalClipMode` in `PortalInstanceRenderDebugState`;
+  `console.info("Portal clip mode: ...")` once.
+- Part C: `CellRenderArchetype.rootMesh` (shared geometry, unpatched material clone, hidden, added to/removed from the scene,
+  disposed); `updateCellRenderArchetypeInstances(..., { separateRoot })` (true for mono and shared-root stereo, false in the
+  split-root branch); `renderedInstanceCount` in the debug state counts a visible root mesh as one; `prerenderCells` also
+  shows the hidden root meshes during warm-up so their programs compile before play; `_docs/MATHEMATICAL_MODEL.md`
+  Instancing / Clipping on the GPU rewritten; generated docs regenerated.
+- Tests: new `portalClipPlanes.test.ts` (transform invariance with 100 random rigid maps, CPU emulation of the shader,
+  20 000-pixel leakage check, a camera sweep that includes polygons with an edge under 2 px); rewritten
+  `portalClipData.test.ts` and `portalClipMaterial.test.ts`; root-mesh tests in `portalInstanceBuffers.test.ts` and
+  `cellRenderArchetypes.test.ts`.
+- Issue to close (coordinator): 58 (`_issues/58_gpu_portal_clip_overflow_and_clip_planes.md`). Note for job 23: only the
+  archetype-capacity part of its union-budget item remains (slots now cover the union).
+
+### Deviations
+- Removed tests (Rule 5, the job rewrote these files): in `portalClipMaterial.test.ts` the `viewportPixelsToNdc` test, the
+  smoothed-discard shader-string test and the hard-mode shader-string test; in `portalClipData.test.ts` the polygon-row,
+  vertex-overflow-hiding and per-eye polygon-row tests (replaced by the plane-layout tests). In `frameAllocations.test.ts` the
+  test of `updatePortalClipMaterialViewportFromRenderer` was replaced by a no-allocation test of
+  `updatePortalClipMaterialTextureEye`. In `renderQuality.test.ts` the two `portalClipEdgeSmoothing: false` expectations were
+  dropped (field removed per Decision 7). The `createArchetype` fixture of `portalInstanceBuffers.test.ts` gained a `rootMesh`.
+- `createPortalEyeActivator`'s `applyViewport` dependency became optional (not in the job text) because Decision 7 removes the
+  only function it called.
+- `prerenderCells.ts` was touched (not in the job text) so the new hidden root meshes get warmed up.
+- `renderedInstanceCount` counts the root mesh (so the overlay numbers do not drop by one); not in the job text.
+
+### Uncertain
+- The smoke browser (headless Chromium) ran in hardware mode: `Portal clip mode: hardware clip distances` for all four worlds, no
+  console errors. Smoke does not compare pixels, so visual correctness of the hardware path (and of the fragment path) is only
+  covered by the CPU emulation tests, not by a GPU image.
+- The fragment-fallback path was smoked in Part A only (before the toggle existed); after Part B the smoke browser always
+  takes the hardware path, so the fallback is not exercised by smoke since then.
+- `gl_ClipDistance` writes use constant indices 0..3 without redeclaring the array; this compiled in the smoke browser (ANGLE).
+  Other drivers are untested.
+
+### Not done
+- Manual browser/GPU checks, see below. No timing measured ("not measured").
+
+### Checks
+- Baseline: typecheck and `npm test` green (1006 tests).
+- After each Part: `npm run typecheck`, `npm test` (final 1022 passed, 1 skipped), `npm run docs:check`, `npm run build`,
+  `npm run smoke -- --world cube,icosahedron,torus-moduli,genus-2-torus` (SMOKE OK for all four worlds; Part A fragment mode,
+  Parts B and C hardware mode). One `npm test` run in Part C failed only because the generated docs were stale; it passed after
+  `docs:generate`.
+
+### Manual checks not run
+- Desktop Chrome, `npm run dev`, `?config=full` with the debug overlay: the archetype line should show `hardware clip`; walk
+  `cube`, `icosahedron`, `genus-2-torus`; check that no portal view leaks outside its doorway, no doorway view is missing, no
+  z-fighting at portal frames, and that the `clip` counter stays 0 while turning quickly near corners.
+- Force the fallback: temporarily make `createPortalClipDistanceToggle` return `undefined` (do not commit) and repeat the walk;
+  the overlay should show `fragment clip`.
+- Timing: same world and viewpoint (default world, depth 10, standing still), compare the overlay frame time / `portal ms`
+  between `f7277ef` and `43df83f` on desktop and Quest; use `EXT_disjoint_timer_query_webgl2` if available. Also check whether the
+  fallback path is noticeably slower in the root cell (static assets are runtime objects and keep `-2`, Decision 8 note).
+- Quest: stand in a doorway, move the head sideways; edges should stay stable in both eyes.
