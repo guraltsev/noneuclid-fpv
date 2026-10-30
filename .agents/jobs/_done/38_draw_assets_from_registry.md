@@ -1,6 +1,6 @@
 # Job 38 - Draw static assets from their registry record
 
-Status: queued.
+Status: done, needs review on 2026-10-29 (commits 1c3b1e5, 6039c20, dd1f507).
 Written on 2026-10-29 after job 37 was checked against the source. Resolves: no open issue (completes job 37's goal
 "`placeAt` moves any positioned object" for the visible model of static assets).
 
@@ -228,3 +228,32 @@ Manual browser check (write it under `### Manual checks not run` if you cannot r
 - `placeAt`, a deformation commit and a reset move model, collision and tooltip together (tests; manual check listed).
 - Unchanged asset records reuse their render records between syncs.
 - Three commits `Job 38 Part A/B/C: ...` exist; Report written per [README](README.md).
+
+
+## Report
+
+### Done
+- Part A (1c3b1e5): new `src/render/three/staticAssetRenderRoot.ts` (`buildStaticAssetRenderRoot`); `PlainWorldObject.reset()` plus an authored pose that `transformGeometry` maps with the same maps (no push-out); the creation loop in `createThreeApp.ts` makes a record and owner for every asset (collision condition dropped). Tests: `tests/render-contract/staticAssetRenderRoot.test.ts` (parity to 1e-9 for the four specs, a non-collidable asset has a record and is not collidable), reset tests in `tests/world-objects/worldObjectOwner.test.ts`.
+- Part B (6039c20): `createRuntimeStaticAssetObject` is `portalRenderable: true`; each asset root is registered in `runtimeObjectRootsById` (not in the scene) in the creation loop before the startup sync and `prerenderCells`; `buildCellMesh` draws no objects; `"static-object"` removed from `CellRenderArchetypeKind` (and the unused `hasAncestorNamed`); dispose removes and disposes asset roots; `resetRuntimeWorld` calls `owner.reset()` for every static asset owner; debug helper `placeObjectAt(id, cellId, x, y, yawDegrees)` on `window.noneuclidDebug` and as a window global (`appDebugHelpers.ts`, `debugPlaceObjectAt` in `createThreeApp.ts`, wired into both `installGeneralDebugHelpers` calls). Tests in `runtimeObjectInstanceSync.test.ts`: asset drawn at its record pose and following a published pose; unchanged asset record causes 1 ghost computation over 3 syncs. Generated docs regenerated.
+- Part C (dd1f507): `_docs/ARCHITECTURE.md` "Runtime objects" bullet updated. I did not add the four-sets table.
+
+### Deviations
+- Existing tests changed as the job says: `cellRenderArchetypes.test.ts` renamed to "...no static-object archetypes..." and expects `false` (compares `entry.kind as string` because the kind no longer exists in the type); `portalInstanceBuffers.test.ts` fixture uses `kind: "floor"`.
+- A non-collidable asset with `displayHelpMessage` now gets a tooltip (Decision 1, accepted side effect).
+- Generated docs (`_docs/generated/*`) were stale after Part A and were regenerated and committed with Part B.
+- Asset matrix tests in the sync test use `toBeCloseTo` (6 digits), since instance matrices are float32.
+- Parity test for "carries the model rigidly" is a weak sanity check only.
+
+### Uncertain
+- Decision 7 (warm-up): job 29 has not landed, so there is no empty-archetype hiding to check. Asset archetypes are created in the startup sync before `prerenderCells`.
+- The smoke test passes but does not compare pixels, so "every asset looks as before" is only covered by the parity unit test.
+
+### Not done
+- The four-sets table in ARCHITECTURE.md (optional, "if room").
+
+### Checks
+- Baseline `npm run typecheck`, `npm test` (938 tests) passed.
+- Final: `npm run typecheck` ok; `npm test` 129 files, all pass after regenerating docs (one run failed only on the stale generated docs check); `npm run docs:check` ok; `npm run build` ok; `npm run smoke -- --world cube,icosahedron,torus-moduli,genus-2-torus` SMOKE OK (4 pages), first run.
+
+### Manual checks not run
+No browser run. Steps: `npm run dev`, open the cube world with debug on and compare assets to a baseline screenshot (also through portals). In the console run `placeObjectAt("<asset id>", "<its cell id>", 0, 0, 45)`: model, debug collision wireframe and tooltip move together. In `torus-moduli`, place an asset, commit a deformation in the geometry computer: the model stays with its collision. Use "Reset world": the asset returns to its authored (deformation-mapped) position.
