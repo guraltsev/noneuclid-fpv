@@ -17,6 +17,7 @@ import { simpleCollisionCylinder, type DynamicObjectState } from "../../src/move
 import { collectGeodesicCreatureDebugDump } from "../../src/render/three/geodesicCreatureDebug";
 import type { PreparedWorldAssets } from "../../src/render/three/preloadWorldAssets";
 import { createRuntimeObjectRegistry } from "../../src/world-objects/runtimeObjectRegistry";
+import { createObjectHost } from "../../src/world-objects/worldObjectOwner";
 import {
   applyForbiddenZoneSideRule,
   geodesicSideOfPoint,
@@ -325,7 +326,7 @@ describe("leader and detour", () => {
         .map((column) => ({ column, distance: Math.hypot(column.center.x - mine.x, column.center.y - mine.y) }))
         .sort((a, b) => a.distance - b.distance)[0];
     };
-    return { runtime, pose, leaderInCreatureFrame, lag, nearestColumn, world };
+    return { runtime, registry, pose, leaderInCreatureFrame, lag, nearestColumn, world };
   }
 
   /** Signed angle of the creature around the nearest zone centre, measured from the leader's forward direction (frame independent). */
@@ -527,6 +528,71 @@ describe("leader and detour", () => {
     }
     expect(c.lag()).toBeLessThan(1e-6);
     expectCoincide(c, 1e-6);
+  });
+
+  it("7a. host.placeAt re-seeds the leader and the creature walks the geodesic from the placed pose", () => {
+    const world = compileCellComplex(cube);
+    const c = makeCreature(world, "front", 0, 0, -90);
+    const host = createObjectHost();
+    host.register(c.runtime);
+    for (let tick = 0; tick < 30; tick += 1) c.runtime.update(world, dt);
+
+    const placed = yawRigidTransform3(0.3, { x: 0, y: -5, z: 0 });
+    expect(host.placeAt("m", "front", placed)).toBe(true);
+    expect(c.registry.get("m")!.localPose).toEqual(placed);
+    expect(c.registry.get("m")!.cellId).toBe("front");
+    const leader = c.runtime.leaderForDebug();
+    expect(leader.creatureFromLeader.translation).toEqual({ x: 0, y: 0, z: 0 });
+    expect(Math.abs(leader.creatureFromLeader.rotation.m00 - 1)).toBeLessThan(1e-12);
+    expect(Math.abs(leader.creatureFromLeader.rotation.m10)).toBeLessThan(1e-12);
+
+    const fresh = makeCreature(world, "front", 0, -5, (0.3 * 180) / Math.PI);
+    for (let tick = 0; tick < 100; tick += 1) {
+      c.runtime.update(world, dt);
+      fresh.runtime.update(world, dt);
+      const mine = c.pose();
+      const reference = fresh.pose();
+      expect(mine.cellId).toBe(reference.cellId);
+      expect(Math.hypot(
+        mine.pose.translation.x - reference.pose.translation.x,
+        mine.pose.translation.y - reference.pose.translation.y,
+      )).toBeLessThan(1e-9);
+    }
+  });
+
+  it("7b. host.placeAt into another cell moves the registry record and the three.js parent", () => {
+    const world = compileCellComplex(cube);
+    const c = makeCreature(world, "front", 0, 0, -90);
+    const host = createObjectHost();
+    host.register(c.runtime);
+    const otherId = world.cells.find((cell) => cell.id !== "front")!.id;
+    const cellRoots = new Map<string, THREE.Object3D>(world.cells.map((cell) => [cell.id, new THREE.Group()]));
+    c.runtime.syncParent(cellRoots);
+    expect(c.runtime.root.parent).toBe(cellRoots.get("front"));
+
+    host.placeAt("m", otherId, yawRigidTransform3(0, { x: 1, y: 2, z: 0 }));
+
+    expect(c.registry.get("m")!.cellId).toBe(otherId);
+    expect(c.runtime.cellId).toBe(otherId);
+    expect(c.registry.getObjectsInCell("front").map((object) => object.id)).not.toContain("m");
+    c.runtime.syncParent(cellRoots);
+    expect(c.runtime.root.parent).toBe(cellRoots.get(otherId));
+  });
+
+  it("7c. a direct registry.update of a creature throws and leaves its pose unchanged", () => {
+    const world = compileCellComplex(cube);
+    const c = makeCreature(world, "front", 0, 0, -90);
+    const record = c.registry.get("m")!;
+    const rootX = c.runtime.root.position.x;
+    const rootY = c.runtime.root.position.y;
+    const rootZ = c.runtime.root.position.z;
+
+    expect(() => c.registry.update({ ...record, localPose: yawRigidTransform3(0, { x: 3, y: 3, z: 0 }) })).toThrow(/is owned/);
+
+    expect(c.registry.get("m")!.localPose).toBe(record.localPose);
+    expect(c.runtime.root.position.x).toBe(rootX);
+    expect(c.runtime.root.position.y).toBe(rootY);
+    expect(c.runtime.root.position.z).toBe(rootZ);
   });
 
   it("8. reset and transformGeometry put the leader back on the creature", () => {

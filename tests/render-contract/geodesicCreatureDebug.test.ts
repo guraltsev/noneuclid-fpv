@@ -63,6 +63,8 @@ describe("geodesic creature debug dump", () => {
     }
 
     roomBRoot.add(runtime.root);
+    // The test fakes a registry that disagrees with the runtime; releasing ownership is the only legal way to do that.
+    registry.releaseOwnership("mouse");
     registry.update({ ...object, cellId: "room-b" });
 
     const dump = collectGeodesicCreatureDebugDump({

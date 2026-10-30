@@ -683,7 +683,6 @@ Simple geodesic creatures: the mouse and the butterfly, autonomous walkers that 
 | interface | `SimpleGeoCreatureAuthoringParams` | Author-facing parameters for the mouse and butterfly library entries. |
 | interface | `SimpleGeoCreatureRuntime` | Per-creature runtime handle owned by the renderer. |
 | const | `creatureLeashMeters` | The leader advances only while the creature lags it by less than this many meters, so it waits for a blocked creature. |
-| const | `creatureLostMeters` | When the creature lags its leader by more than this many meters (for example after a teleport), the leader is re-seeded on the creature. |
 | function | `createSimpleGeoCreature` | Creates the authored spec for a mouse or butterfly. |
 | function | `isSimpleGeoCreatureObjectSpec` | Type guard: true for geo-mouse and geo-butterfly specs. |
 | function | `createSimpleGeoCreatureRuntime` | Creates the runtime (three.js model instance, state, registry entry) for a creature starting in `startCellId`. |

@@ -32,6 +32,7 @@ import {
 } from "../render/three/debugCollisionWireframes";
 import type { PreparedWorldAssets } from "../render/three/preloadWorldAssets";
 import { applyWorldRigidTransform } from "../render/three/worldAxes";
+import type { WorldObjectOwner } from "./worldObjectOwner";
 import { transformPoseWithCellMaps, type CellDeformationMap } from "../runtime/worldGeometryDeformations";
 import { degreesToRadians } from "./staticAssets";
 import type { RuntimeObjectRegistry } from "./runtimeObjectRegistry";
@@ -74,7 +75,7 @@ export interface SimpleGeoCreatureAuthoringParams {
  * Per-creature runtime handle owned by the renderer.
  * `root` is the three.js group (reparented into the current cell's root by `syncParent`); `cellId` reports the creature's current cell.
  */
-export interface SimpleGeoCreatureRuntime {
+export interface SimpleGeoCreatureRuntime extends WorldObjectOwner {
   readonly root: THREE.Object3D;
   readonly objectId: string;
   readonly cellId: string;
@@ -94,8 +95,6 @@ export interface SimpleGeoCreatureRuntime {
 
 /** The leader advances only while the creature lags it by less than this many meters, so it waits for a blocked creature. */
 export const creatureLeashMeters = 0.5;
-/** When the creature lags its leader by more than this many meters (for example after a teleport), the leader is re-seeded on the creature. */
-export const creatureLostMeters = 3;
 /** The creature may move toward its leader at up to this multiple of its speed, so it catches up after a detour. */
 const creatureCatchUpFactor = 1.5;
 /** Margin added to the sum of radii when deciding that a creature touches a forbidden zone, in meters. */
@@ -178,7 +177,7 @@ export function isSimpleGeoCreatureObjectSpec(objectSpec: CellObjectSpec): objec
 
 /**
  * Creates the runtime (three.js model instance, state, registry entry) for a creature starting in `startCellId`.
- * Throws if the model was not preloaded in `assets`. Registers the object in `registry` when given (throwing if the id already exists). Each creature owns an invisible leader that advances at the spec speed along its forward axis exactly on the geodesic (while the creature is within `creatureLeashMeters` of it); the creature moves toward the leader plus the lateral wobble and butterfly bob, so with nothing in the way its path is the geodesic plus a bounded oscillation, and after a detour it returns to the same geodesic.
+ * Throws if the model was not preloaded in `assets`. Registers the object in `registry` when given (throwing if the id already exists) and claims ownership of its registry record, so only the creature itself writes the record afterwards; `place` (the `WorldObjectOwner` placement command), `reset` and `transformGeometry` re-seed the leader on the creature. Each creature owns an invisible leader that advances at the spec speed along its forward axis exactly on the geodesic (while the creature is within `creatureLeashMeters` of it); the creature moves toward the leader plus the lateral wobble and butterfly bob, so with nothing in the way its path is the geodesic plus a bounded oscillation, and after a detour it returns to the same geodesic.
  */
 export function createSimpleGeoCreatureRuntime(
   objectSpec: SimpleGeoCreatureObjectSpec,
@@ -205,6 +204,8 @@ export function createSimpleGeoCreatureRuntime(
   root.add(prepared.scene);
   const initialObject = createRuntimeCreatureObject(objectSpec, startCellId);
   registry?.add(initialObject);
+  const publish = registry ? registry.claimOwnership(objectSpec.id) : (): void => {};
+  let record: RuntimeCreatureObject = initialObject;
   let initialState = runtimeObjectToDynamicObjectState(initialObject);
   let state = initialState;
   const collisionWireframe = buildObjectCollisionWireframe(objectSpec.id, state);
@@ -230,6 +231,10 @@ export function createSimpleGeoCreatureRuntime(
   const seedLeaderOnCreature = (): void => {
     leader = { cellId: state.cellId, localPose: state.localPose };
     creatureFromLeader = identityRigidTransform3;
+  };
+  const publishState = (): void => {
+    record = { ...record, cellId: state.cellId, localPose: state.localPose, collision: state.collision };
+    publish(record);
   };
   const advanceLeader = (world: CompiledCellComplex, lengthMeters: number): void => {
     const pose = leader.localPose;
@@ -272,6 +277,7 @@ export function createSimpleGeoCreatureRuntime(
   return {
     root,
     objectId: objectSpec.id,
+    id: objectSpec.id,
     get cellId() {
       return state.cellId;
     },
@@ -311,9 +317,7 @@ export function createSimpleGeoCreatureRuntime(
       };
 
       const lagBefore = lagMeters();
-      if (lagBefore > creatureLostMeters) {
-        seedLeaderOnCreature();
-      } else if (lagBefore < creatureLeashMeters && stepMeters > 0) {
+      if (lagBefore < creatureLeashMeters && stepMeters > 0) {
         advanceLeader(world, stepMeters);
       }
 
@@ -376,7 +380,15 @@ export function createSimpleGeoCreatureRuntime(
         }
       }
 
-      syncRegistryObject(registry, objectSpec.id, state);
+      publishState();
+      applyObjectPose(root, state.localPose);
+      refreshCollisionWireframe();
+    },
+    place(cellId, localPose) {
+      state = { ...state, cellId, localPose };
+      seedLeaderOnCreature();
+      lastLateralOffsetMeters = 0;
+      publishState();
       applyObjectPose(root, state.localPose);
       refreshCollisionWireframe();
     },
@@ -416,7 +428,7 @@ export function createSimpleGeoCreatureRuntime(
         initialState = depenetrateDynamicObject(nextWorld, initialState).object;
       }
       seedLeaderOnCreature();
-      syncRegistryObject(registry, objectSpec.id, state);
+      publishState();
       applyObjectPose(root, state.localPose);
       refreshCollisionWireframe();
     },
@@ -427,7 +439,7 @@ export function createSimpleGeoCreatureRuntime(
       verticalBaselineMeters = butterflyVerticalOscillationHeightOffset(objectSpec, verticalOscillationPhaseRadians);
       state = initialState;
       seedLeaderOnCreature();
-      syncRegistryObject(registry, objectSpec.id, state);
+      publishState();
       applyObjectPose(root, state.localPose);
       refreshCollisionWireframe();
       const targetRoot = cellRoots.get(state.cellId);
@@ -468,28 +480,6 @@ function createRuntimeCreatureObject(objectSpec: SimpleGeoCreatureObjectSpec, ce
       rangeMeters: 2.25,
     },
   };
-}
-
-function syncRegistryObject(
-  registry: RuntimeObjectRegistry | undefined,
-  id: string,
-  state: DynamicObjectState,
-): void {
-  if (!registry) {
-    return;
-  }
-
-  const object = registry.get(id);
-  if (!object || (object.kind !== "geo-mouse" && object.kind !== "geo-butterfly")) {
-    return;
-  }
-
-  registry.update({
-    ...object,
-    cellId: state.cellId,
-    localPose: state.localPose,
-    collision: state.collision,
-  });
 }
 
 function lateralOscillationOffset(objectSpec: SimpleGeoCreatureObjectSpec, elapsedSeconds: number): number {

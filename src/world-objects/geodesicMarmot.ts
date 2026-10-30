@@ -10,7 +10,6 @@ import type { CellObjectSpec, GeodesicMarmotObjectSpec } from "../cell-complex/s
 import { yawRigidTransform3, transformDirection3, type RigidTransform3 } from "../math/rigidTransform3";
 import { vec3 } from "../math/vec3";
 import { depenetrateDynamicObject } from "../movement/depenetrateDynamicObject";
-import type { DynamicObjectState } from "../movement/dynamicObject";
 import {
   AUTONOMOUS_DYNAMIC_OBJECT_PORTAL_CROSSING_MODE,
   moveDynamicObject,
@@ -23,6 +22,7 @@ import {
 import { runtimeDiagnostics } from "../render/three/runtimeDiagnostics";
 import type { PreparedWorldAssets } from "../render/three/preloadWorldAssets";
 import { applyWorldRigidTransform } from "../render/three/worldAxes";
+import type { WorldObjectOwner } from "./worldObjectOwner";
 import { transformPoseWithCellMaps, type CellDeformationMap } from "../runtime/worldGeometryDeformations";
 import type { RuntimeObjectRegistry } from "./runtimeObjectRegistry";
 import { runtimeObjectToDynamicObjectState, type RuntimeCreatureObject } from "./runtimeObjectRegistry";
@@ -48,7 +48,7 @@ export interface CreateGeodesicMarmotOptions {
  * Per-marmot runtime handle owned by the renderer.
  * `root` is the three.js group (reparented into the current cell's root by `syncParent`); `cellId` reports the marmot's current cell.
  */
-export interface GeodesicMarmotRuntime {
+export interface GeodesicMarmotRuntime extends WorldObjectOwner {
   readonly root: THREE.Object3D;
   readonly objectId: string;
   readonly cellId: string;
@@ -97,7 +97,7 @@ export function isGeodesicMarmotObjectSpec(objectSpec: CellObjectSpec): objectSp
 
 /**
  * Creates the runtime (three.js group, state machine, registry entry) for a marmot starting in `startCellId`.
- * Registers the object in `registry` when given (so it throws if the id already exists there). The visual is a static proxy mesh, not the glTF in `objectSpec.assetPath`, so the `_assets` argument is unused. Movement follows the current heading in the cell's local frame, so the path is a geodesic: it stays straight as portals re-express the frame.
+ * Registers the object in `registry` when given (so it throws if the id already exists there) and claims ownership of its registry record, so only the marmot itself writes the record afterwards. The visual is a static proxy mesh, not the glTF in `objectSpec.assetPath`, so the `_assets` argument is unused. Movement follows the current heading in the cell's local frame, so the path is a geodesic: it stays straight as portals re-express the frame.
  */
 export function createGeodesicMarmotRuntime(
   objectSpec: GeodesicMarmotObjectSpec,
@@ -114,6 +114,8 @@ export function createGeodesicMarmotRuntime(
   root.add(visual);
   const initialObject = createRuntimeCreatureObject(objectSpec, startCellId);
   registry?.add(initialObject);
+  const publish = registry ? registry.claimOwnership(objectSpec.id) : (): void => {};
+  let record: RuntimeCreatureObject = initialObject;
   let initialState = runtimeObjectToDynamicObjectState(initialObject);
   let state = initialState;
   const collisionWireframe = buildObjectCollisionWireframe(objectSpec.id, state);
@@ -126,6 +128,10 @@ export function createGeodesicMarmotRuntime(
     collisionWireframe.visible = collisionWireframeRequested && collisionWireframe.visible;
   };
   refreshCollisionWireframe();
+  const publishState = (): void => {
+    record = { ...record, cellId: state.cellId, localPose: state.localPose, collision: state.collision };
+    publish(record);
+  };
   const forwardSpeedMetersPerSecond = Math.hypot(objectSpec.velocity.x, objectSpec.velocity.y);
   const diagnostics = runtimeDiagnostics();
 
@@ -136,6 +142,7 @@ export function createGeodesicMarmotRuntime(
   return {
     root,
     objectId: objectSpec.id,
+    id: objectSpec.id,
     get cellId() {
       return state.cellId;
     },
@@ -155,7 +162,13 @@ export function createGeodesicMarmotRuntime(
       state = result.blocked && result.blockingReason === "forbidden-zone"
         ? { ...state, localPose: turnAwayFromNearestForbiddenZone(state.localPose, world.cellsById.get(state.cellId)) }
         : result.object;
-      syncRegistryObject(registry, objectSpec.id, state);
+      publishState();
+      applyObjectPose(root, state.localPose);
+      refreshCollisionWireframe();
+    },
+    place(cellId, localPose) {
+      state = { ...state, cellId, localPose };
+      publishState();
       applyObjectPose(root, state.localPose);
       refreshCollisionWireframe();
     },
@@ -191,13 +204,13 @@ export function createGeodesicMarmotRuntime(
         state = depenetrateDynamicObject(nextWorld, state).object;
         initialState = depenetrateDynamicObject(nextWorld, initialState).object;
       }
-      syncRegistryObject(registry, objectSpec.id, state);
+      publishState();
       applyObjectPose(root, state.localPose);
       refreshCollisionWireframe();
     },
     reset(cellRoots) {
       state = initialState;
-      syncRegistryObject(registry, objectSpec.id, state);
+      publishState();
       applyObjectPose(root, state.localPose);
       refreshCollisionWireframe();
       const targetRoot = cellRoots.get(state.cellId);
@@ -238,28 +251,6 @@ function createRuntimeCreatureObject(objectSpec: GeodesicMarmotObjectSpec, cellI
       rangeMeters: 2.25,
     },
   };
-}
-
-function syncRegistryObject(
-  registry: RuntimeObjectRegistry | undefined,
-  id: string,
-  state: DynamicObjectState,
-): void {
-  if (!registry) {
-    return;
-  }
-
-  const object = registry.get(id);
-  if (!object || object.kind !== "geodesci-marmot") {
-    return;
-  }
-
-  registry.update({
-    ...object,
-    cellId: state.cellId,
-    localPose: state.localPose,
-    collision: state.collision,
-  });
 }
 
 // Forward is the body +y axis R·e_y = (-sin yaw, cos yaw); yaw = atan2(-vx, vy) makes it point along the velocity.

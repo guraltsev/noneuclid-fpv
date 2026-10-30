@@ -157,6 +157,7 @@ import {
   createSimpleGeoCreatureRuntime,
   isSimpleGeoCreatureObjectSpec,
 } from "../../world-objects/simpleGeoCreature";
+import { createObjectHost } from "../../world-objects/worldObjectOwner";
 import { createDesktopFlagEditor } from "../dom/desktopFlagEditor";
 import { createDesktopToolIndicator } from "../dom/desktopToolIndicator";
 import { createFloatingObjectTooltip } from "../dom/floatingObjectTooltip";
@@ -525,6 +526,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   const xrScenePaletteInput = createXrScenePaletteInput();
   const xrControllerHandModels = createXrControllerHandModels(scene);
   const runtimeObjectRegistry = createRuntimeObjectRegistry();
+  const objectHost = createObjectHost();
   const desktopFlagEditor = createDesktopFlagEditor(document.body, {
     onMessageChanged(flagId, message) {
       const flag = runtimeObjectRegistry.get(flagId);
@@ -1158,6 +1160,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
         const runtime = createGeodesicMarmotRuntime(objectSpec, cell.id, options.assets, runtimeObjectRegistry);
         runtime.syncParent(cellMeshes);
         dynamicObjectRuntimes.push(runtime);
+        objectHost.register(runtime);
         runtimeObjectRootsById.set(runtime.objectId, runtime.root);
         syncDynamicObjectDebugWireframes();
         continue;
@@ -1167,6 +1170,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
         const runtime = createSimpleGeoCreatureRuntime(objectSpec, cell.id, options.assets, runtimeObjectRegistry);
         runtime.syncParent(cellMeshes);
         dynamicObjectRuntimes.push(runtime);
+        objectHost.register(runtime);
         runtimeObjectRootsById.set(runtime.objectId, runtime.root);
         syncDynamicObjectDebugWireframes();
         continue;
@@ -1965,6 +1969,8 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       // Runtime objects are detached before their cell meshes are freed. Their textures belong to the preloaded
       // assets, which the caller disposes.
       for (const runtime of dynamicObjectRuntimes) {
+        objectHost.unregister(runtime.id);
+        runtimeObjectRegistry.releaseOwnership(runtime.id);
         runtime.root.removeFromParent();
         disposeObject3D(runtime.root);
       }
