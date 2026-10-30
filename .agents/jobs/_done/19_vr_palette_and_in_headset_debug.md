@@ -1,6 +1,6 @@
 # Job 19 - Fix the XR input defects and add an in-headset debug panel
 
-Status: queued.
+Status: done, needs review on 2026-10-30 (commits 1af5ddd, 31e3557).
 Former issue: 20 (converted to a job on 2026-10-28). Rewritten on 2026-10-29 for a less capable implementing model;
 the legacy blueprint was dropped because everything in it except the items below is done (shared palette definition,
 `@pmndrs/uikit` palette, header actions, placement, pointer input, hand models, settings page; see `git log` before
@@ -278,3 +278,36 @@ Manual headset checks (Quest or similar, `?config=full` and debug mode on). If y
 - Typecheck, tests, docs check, build and smoke pass after each part; two commits (Part A, Part B).
 - Report written per [README](README.md), with `### Manual checks not run` when no headset was used. Move the job to
   `_done/` and mark its queue row.
+
+## Report
+
+### Done
+Part A (1af5ddd): `xrControls.ts` binds button 4 to carry (`carryFaceButtonIndex`, `isCarryActionPressed` reads it; header and `XrControls` doc updated). `xrScenePaletteInput.ts`: the controller cache is now per instance, `createControllerSources` is non-exported and takes the cache, the dead `menuTogglePressed` computation and `isMenuTogglePressed` are removed, and the file keeps `menuTogglePressed: false` with a comment naming `openContextMenuFromAim`. `onGeometryComputerSetTargetRequested` is deleted from the adapter options, the controller options and pass-through, and the `createThreeApp.ts` handler. The now-unused `setGeometryComputerPendingTarget` destructure in `createThreeApp.ts` is removed, and the function stays in `geometryComputerMenu.ts`. All 22 `userData.xrPaletteItemId` and `xrPaletteAction` writes and the fallback reads in `scenePaletteController.ts` and `scenePointers.ts` are gone, and the comments are fixed. Grep finds no `xrPalette*` hits outside the markdown notes. Tests: "maps button 4 to carry edges" and a new per-instance cache test.
+
+Part B (31e3557): `formatDebugOverlayLines` is extracted in `debugOverlay.ts` and used by `createDebugOverlay`. `PortalDebugRuntime.updateVisiblePortalPaths()` now returns the `DebugOverlayState`. New `src/render/three/xrDebugPanel.ts` follows Decision 7. It is created next to the tooltip controller, updated in the `"ui"` phase with a freshly resolved head pose, and disposed next to `debugOverlay.dispose()`. `syncXrDebugState` sets `inputMode` via `describeXrInputMode` while presenting. New tests `tests/render-contract/xrDebugPanel.test.ts` and `tests/render-contract/debugOverlay.test.ts`. Docs updated in `010-webxr-vr-runtime.md` and `011-vr-hand-tools-palette.md`; `docs:generate` was run for both parts.
+
+### Deviations
+- Replaced the test "does not map face buttons to carry shortcuts" with "maps button 4 to carry edges" (Step A1).
+- In `xrScenePaletteInput.test.ts` test 1, removed the two `isMenuTogglePressed` assertions and the face-button block (Step A2).
+- `tests/render-contract/debugOverlay.test.ts` did not exist, so it was created.
+- Step A3 and the Part A line-number references in the job were stale; I searched by name.
+
+### Uncertain
+- Wrapping packs parts greedily with " / " up to `maxChars`. The job's examples pass, but whether the headset text looks right is unverified.
+- The stereo path-count line (job 23) is not present; job 23 has not landed. The panel picks it up through the shared formatter.
+
+### Not done
+- XR hint "Y = next focus target" in `src/ui/inputIntents.ts` is wrong (no XR button cycles focus; button 5 is help). Follow-up only, per the job.
+
+### Manual checks not run
+No headset was available. In a Quest browser with `?config=full` and debug mode on, run the job's checks 1-7:
+1. Enter VR with the palette closed.
+2. Press the side trigger on each controller with nothing aimed to open the palette; press it again to close it.
+3. Hover, select, settings -> back -> close, and hand tracking.
+4. In Debug settings, turn "UI overlay" on: the panel appears in the upper left. Close the palette: the panel stays. Turn the overlay off: it disappears.
+5. The text is readable, updates (fps) without flicker, and does not shake while walking or turning.
+6. Aim at a geodesic emitter and press A (X on the left): carry starts; press again: it drops.
+7. With the palette closed, stick locomotion, turning and stick-press reset still work.
+
+### Checks
+Baseline typecheck and tests were green. After each part: `npm run typecheck` ok; `npm test` ok (Part B: 142 files passed, 1031 tests, 1 skipped); `npm run docs:check` ok after `npm run docs:generate` (stale generated docs were regenerated after each part); `npm run build` ok; `npm run smoke -- --world cube,icosahedron,torus-moduli,genus-2-torus` gave SMOKE OK (4 pages) on the first run both times.

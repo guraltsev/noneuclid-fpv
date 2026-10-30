@@ -101,7 +101,7 @@ Resolves: issue [NN](../../_issues/NN_....md).
 | [17](_done/17_multi_hop_ghosts_and_eye_rerooting.md) | ~~Multi-hop portal ghosts and XR eye re-rooting~~ (done, needs review) | [73](../../_issues/73_portal_ghosts_and_xr_eye_rerooting_are_single_hop.md) |  |
 | [00](00_coordinate_jobs_19_23_25_29_37.md) | Coordinate jobs 37, 38, 25-29 and 19-23 in four phases (phase commits and tags) | - |  |
 | [18](18_vertex_classes_and_gluing_validation.md) | Compile-time vertex classes, cone angles and gluing validation | [52](../../_issues/52_compile_time_vertex_classes_and_gluing_validation.md) |  |
-| [19](19_vr_palette_and_in_headset_debug.md) | Fix the XR input defects and add an in-headset debug panel | - | 20 |
+| [19](_done/19_vr_palette_and_in_headset_debug.md) | ~~Fix the XR input defects and add an in-headset debug panel~~ (done, needs review) | - | 20 |
 | [20](_done/20_exact_static_cull.md) | ~~Exact static cull by oriented line stabbing~~ (done, needs review) | [56](../../_issues/56_exact_static_cull_by_oriented_line_stabbing.md) |  |
 | [21](_done/21_per_frame_visibility_funnel.md) | ~~Per-frame visibility: visible-parent traversal and the exact funnel~~ (done, needs review) | [57](../../_issues/57_per_frame_portal_visibility_funnel_and_traversal.md) |  |
 | [22](_done/22_gpu_portal_clip_planes.md) | ~~GPU portal clipping with clip planes~~ (done, needs review) | [58](../../_issues/58_gpu_portal_clip_overflow_and_clip_planes.md) |  |
