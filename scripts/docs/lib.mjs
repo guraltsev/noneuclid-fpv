@@ -282,6 +282,11 @@ export const moduleImportRules = [
     reason: "portal development is pure and may only use math and cell-complex",
   },
   {
+    module: "world-objects/geodesic/sleeve.ts",
+    mayImportOnly: ["math/", "cell-complex/", "world-objects/geodesic/objects.ts", "world-objects/geodesic/development.ts"],
+    reason: "the sleeve and taut-string geometry is pure and may only use math, cell-complex, the geodesic object types and portal development",
+  },
+  {
     module: "world-objects/geodesic/trace.ts",
     mayImportOnly: ["math/", "cell-complex/", "movement/", "world-objects/geodesic/objects.ts", "world-objects/runtimeObjectRegistry.ts"],
     reason: "tracing may only use math, cell-complex, movement, the geodesic object types and the registry type",

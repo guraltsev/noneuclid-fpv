@@ -673,6 +673,27 @@ Derived geodesic segments: lookup by geodesic, building segments from traces wit
 | function | `totalGeodesicLengthFromSegments` | Sum of the lengths of the given segments, in meters. |
 | function | `removeGeodesicSegments` | Removes all derived segments of a geodesic and refreshes the intersection markers. |
 
+### `world-objects/geodesic/sleeve.ts`
+
+Sleeve of a portal word and the taut string through it: developed apertures, the point funnel, disk tangents and the shortest path that wraps the forbidden-zone disks; pure.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| const | `geodesicCornerClearanceMeters` | Extra radius (meters) added to the forbidden disk so that taut tangent pieces keep a clearance from the real circle and never count as zone hits. |
+| interface | `SleeveAperture` | One developed portal aperture: the portal's two side endpoints in the developed frame and the ids of their forbidden junction disks. |
+| interface | `DevelopedSleeve` | A developed portal word: the endpoints, the apertures between them, and the map from the end cell's frame into the start frame. |
+| type | `DevelopSleeveResult` | Result of {@link developSleeve}. |
+| function | `developSleeve` | Develops `word` starting in `startCellId` into the frame of that cell. |
+| interface | `FunnelApex` | A corner of the point funnel: the aperture endpoint (left or right side of the travel direction) that the shortest path touches. |
+| function | `funnelPointApexes` | Simple-stupid-funnel on the aperture endpoints (radius 0): returns the corners of the shortest polyline from `sleeve.start` to `sleeve.end` through every aperture, in travel order. |
+| interface | `TangentPiece` | A straight tangent piece: it runs from `from` to `to` in the unit `direction`. |
+| function | `tangentFromPointToDisk` | Tangent from `point` to the disk (`center`, `rho`) that lies on `side` of the path (a "left" disk is passed with the disk on the left, so the path turns left around it). |
+| function | `tangentFromDiskToPoint` | Tangent from the disk (`center`, `rho`) on `side` of the path to `point`: the piece runs from the tangent point to `point`. |
+| function | `tangentBetweenDisks` | Common tangent of two disks of equal radius `rho` that the path wraps on `firstSide` and `secondSide`: the outer tangent when the sides agree, the inner tangent otherwise. |
+| interface | `TautApex` | A wrapped disk of the taut string. |
+| type | `TautPathResult` | Result of {@link solveTautPath}. |
+| function | `solveTautPath` | Shortest path from `sleeve.start` to `sleeve.end` that crosses every aperture between its two disks of radius `rho`. |
+
 ### `world-objects/geodesic/trace.ts`
 
 Tracing a horizontal geodesic ray through a compiled cell complex: the single-cell tracer, the multi-cell walk on the segment-walk kernel, and forbidden-zone (open-disk) and emitter hits.
