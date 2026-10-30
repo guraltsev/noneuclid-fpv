@@ -704,6 +704,18 @@ Static asset authoring helper: converts author-facing parameters for a glTF deco
 | function | `createStaticAssetObject` | Builds an AssetObjectSpec from authoring parameters. |
 | function | `degreesToRadians` | Converts degrees to radians. |
 
+### `world-objects/worldObjectOwner.ts`
+
+World object owners: the single authority on the pose of an object that can be moved (creatures, the marmot, collidable static assets).
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `WorldObjectOwner` | The only authority on the pose of one object. |
+| interface | `ObjectHost` | Registry of owners by id, used to move or remap owned objects without knowing what they are. |
+| function | `createObjectHost` | Creates an empty object host. |
+| interface | `PlainWorldObject` | Default owner for objects that need no logic (houses, bikes): holds `{ cellId, localPose }` and publishes it. |
+| function | `createPlainWorldObject` | Creates the default owner for `initial`: adds the record if the registry has none, then claims it. |
+
 ## `authoring`
 
 ### `authoring/compileWorldScript.ts`

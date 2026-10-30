@@ -11,6 +11,7 @@
     "world-objects/simpleGeoCreature.ts -> render/three/preloadWorldAssets.ts",
     "world-objects/simpleGeoCreature.ts -> render/three/runtimeDiagnostics.ts",
     "world-objects/simpleGeoCreature.ts -> render/three/worldAxes.ts",
-    "world-objects/simpleGeoCreature.ts -> runtime/worldGeometryDeformations.ts"
+    "world-objects/simpleGeoCreature.ts -> runtime/worldGeometryDeformations.ts",
+    "world-objects/worldObjectOwner.ts -> runtime/worldGeometryDeformations.ts"
   ]
 }

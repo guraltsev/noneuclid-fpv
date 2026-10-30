@@ -3,6 +3,8 @@
  * Authored specs (CellObjectSpec) are turned into RuntimeWorldObject values, which carry a cell id plus a pose in that cell's local frame (meters; cell-local x right, y forward, z up; yaw in radians about +z). Creatures, static assets, placed signs, geodesic cannons and the geodesic/measurement tool results all live here as one discriminated union keyed by `kind`.
  * Renderers, movement/collision, aiming and UI query the registry by cell (collidable, player-blocking, interactable, tooltip subsets) instead of walking specs.
  * Invariants: ids are unique registry-wide; the by-cell index always matches each object's current `cellId`; objects are treated as immutable values and changed by `update` with a replacement.
+ * For objects with an owner (creatures, the marmot, collidable static assets) the registry is a read model: only the owner's publisher (from `claimOwnership`) may replace the record; `update`, `moveToCell` and `remove` throw for owned ids.
+ * Bulk fragments (bullets, stars and other particles) must not go through the registry per particle; per-tick immutable replacement allocates too much.
  */
 import type { RigidTransform3 } from "../math/rigidTransform3";
 import type { DynamicObjectState, SimpleCollisionCylinder } from "../movement/dynamicObject";
@@ -126,10 +128,14 @@ export type RuntimeWorldObject =
 export interface RuntimeObjectRegistry {
   /** Adds an object; throws if its id is already registered. */
   add(object: RuntimeWorldObject): void;
-  /** Replaces the stored object with the same id (re-indexing if its cell changed); throws if the id is unknown. */
+  /** Replaces the stored object with the same id (re-indexing if its cell changed); throws if the id is unknown or owned. */
   update(object: RuntimeWorldObject): void;
-  /** Removes the object with this id; silently does nothing if absent. */
+  /** Removes the object with this id; silently does nothing if absent. Throws if the object is owned. */
   remove(id: string): void;
+  /** Marks `id` as owned and returns the only function allowed to replace it afterwards (same re-indexing as `update`; throws if the object's id differs). Throws if the id is unknown or already owned. */
+  claimOwnership(id: string): (object: RuntimeWorldObject) => void;
+  /** Makes `id` unowned again so ordinary writes work; no-op if it is not owned. */
+  releaseOwnership(id: string): void;
   /** Re-homes an object into `cellId`, optionally with a new cell-local pose (otherwise the old pose is kept verbatim, which is only meaningful if the caller already transformed it); returns the updated object or undefined if the id is unknown. */
   moveToCell(id: string, cellId: string, localPose?: RigidTransform3): RuntimeWorldObject | undefined;
   /** Looks up an object by id. */
@@ -175,6 +181,22 @@ export function createRuntimeObjectRegistry(
     }
   }
 
+  const ownedIds = new Set<string>();
+
+  function ownedError(id: string): Error {
+    return new Error(`Runtime object "${id}" is owned; use its owner.`);
+  }
+
+  // The one write path for replacing a stored object.
+  function replaceObject(previous: RuntimeWorldObject, next: RuntimeWorldObject): void {
+    if (previous.cellId !== next.cellId) {
+      unindexObject(previous);
+      indexObject(next);
+    }
+
+    objectsById.set(next.id, next);
+  }
+
   const registry: RuntimeObjectRegistry = {
     add(object) {
       if (objectsById.has(object.id)) {
@@ -185,19 +207,22 @@ export function createRuntimeObjectRegistry(
       indexObject(object);
     },
     update(object) {
+      if (ownedIds.has(object.id)) {
+        throw ownedError(object.id);
+      }
+
       const previous = objectsById.get(object.id);
       if (!previous) {
         throw new Error(`Cannot update missing runtime object "${object.id}".`);
       }
 
-      if (previous.cellId !== object.cellId) {
-        unindexObject(previous);
-        indexObject(object);
-      }
-
-      objectsById.set(object.id, object);
+      replaceObject(previous, object);
     },
     remove(id) {
+      if (ownedIds.has(id)) {
+        throw ownedError(id);
+      }
+
       const object = objectsById.get(id);
       if (!object) {
         return;
@@ -206,7 +231,32 @@ export function createRuntimeObjectRegistry(
       unindexObject(object);
       objectsById.delete(id);
     },
+    claimOwnership(id) {
+      if (!objectsById.has(id)) {
+        throw new Error(`Cannot claim missing runtime object "${id}".`);
+      }
+
+      if (ownedIds.has(id)) {
+        throw new Error(`Runtime object "${id}" is already owned.`);
+      }
+
+      ownedIds.add(id);
+      return (object) => {
+        if (object.id !== id) {
+          throw new Error(`Publisher for "${id}" cannot write "${object.id}".`);
+        }
+
+        replaceObject(objectsById.get(id)!, object);
+      };
+    },
+    releaseOwnership(id) {
+      ownedIds.delete(id);
+    },
     moveToCell(id, cellId, localPose) {
+      if (ownedIds.has(id)) {
+        throw ownedError(id);
+      }
+
       const object = objectsById.get(id);
       if (!object) {
         return undefined;

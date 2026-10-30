@@ -159,4 +159,30 @@ describe("runtimeObjectRegistry", () => {
     expect(registry.getInteractableObjectsInCell("cell-a").map((object) => object.id)).toEqual(["question-a"]);
     expect(registry.getTooltipObjectsInCell("cell-a").map((object) => object.id)).toEqual(["question-a"]);
   });
+
+  it("rejects writes to an owned id except through its publisher", () => {
+    const registry = createRuntimeObjectRegistry([creature("mouse-a", "cell-a")]);
+    const publish = registry.claimOwnership("mouse-a");
+
+    expect(() => registry.update(creature("mouse-a", "cell-b"))).toThrow(/is owned; use its owner/);
+    expect(() => registry.moveToCell("mouse-a", "cell-b")).toThrow(/is owned; use its owner/);
+    expect(() => registry.remove("mouse-a")).toThrow(/is owned; use its owner/);
+
+    publish(creature("mouse-a", "cell-b"));
+    expect(registry.getObjectsInCell("cell-a")).toEqual([]);
+    expect(registry.getObjectsInCell("cell-b").map((object) => object.id)).toEqual(["mouse-a"]);
+    expect(() => publish(creature("mouse-z", "cell-b"))).toThrow(/cannot write/);
+  });
+
+  it("claiming an unknown or already claimed id throws, and release restores writes", () => {
+    const registry = createRuntimeObjectRegistry([creature("mouse-a", "cell-a")]);
+
+    expect(() => registry.claimOwnership("ghost")).toThrow(/missing/);
+    registry.claimOwnership("mouse-a");
+    expect(() => registry.claimOwnership("mouse-a")).toThrow(/already owned/);
+
+    registry.releaseOwnership("mouse-a");
+    registry.update(creature("mouse-a", "cell-c"));
+    expect(registry.get("mouse-a")!.cellId).toBe("cell-c");
+  });
 });
