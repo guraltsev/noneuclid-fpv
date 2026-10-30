@@ -1,6 +1,6 @@
 # Job 37 - Objects own their position; `placeAt` moves any positioned object
 
-Status: queued.
+Status: done, needs review on 2026-10-29 (commits e0bb652, f484226, 0c8d93c).
 Written on 2026-10-29 after a design discussion with the maintainer (decisions below are theirs). Resolves: no open issue.
 
 This job runs **first** in the coordinated batch [00_coordinate_jobs_19_23_25_29_37](00_coordinate_jobs_19_23_25_29_37.md)
@@ -419,3 +419,23 @@ Run `npx vitest run <file>` after each step and `npm run typecheck`.
 - Three commits `Job 37 Part A/B/C: ...` exist.
 - Report written per [README](README.md), noting under `### Done` that asset models follow `placeAt` only after
   [job 38](38_draw_assets_from_registry.md).
+
+
+## Report
+
+### Done
+Three commits: `e0bb652` Part A, `f484226` Part B, `0c8d93c` Part C.
+- Part A: `runtimeObjectRegistry.ts` gets `ownedIds`, a private `replaceObject` (the single write path, for job 28's version bump), `claimOwnership`/`releaseOwnership`; `update`, `moveToCell`, `remove` throw `Runtime object "<id>" is owned; use its owner.` for owned ids. New `src/world-objects/worldObjectOwner.ts` (`WorldObjectOwner`, `ObjectHost` with `register`/`unregister`/`placeAt`/`transformGeometry`, `createObjectHost`, `PlainWorldObject`, `createPlainWorldObject`). Tests in `runtimeObjectRegistry.test.ts` and new `worldObjectOwner.test.ts`.
+- Part B: `simpleGeoCreature.ts` and `geodesicMarmot.ts` implement `WorldObjectOwner` (`id`, `place`), claim ownership, publish via `publishState`; `syncRegistryObject` and `creatureLostMeters` with the lost-leader branch deleted. `createThreeApp.ts`: `objectHost` declared right after the registry (line 528), runtimes registered, unregistered/released in `dispose`. Tests 7a-7c, a marmot ownership test, and the `geodesicCreatureDebug.test.ts` fix.
+- Part C: collidable assets get a `PlainWorldObject` owner (`staticAssetOwners`, declared next to `dynamicObjectRuntimes`); `transformRuntimeObjectsForGeometryCommit` now calls `objectHost.transformGeometry(mapByCellId, snapshot.world)`; the asset removal loop and `rebuildStaticAssetRegistryObjects` are gone; `dispose` releases asset owners. Test in `worldGeometryRuntimeTransforms.test.ts` (bench maps to x = 2.78; a `placeAt` placement survives the commit as (0.4, 3)). Docs: `MATHEMATICAL_MODEL.md` §5 sentence, `ARCHITECTURE.md` Runtime objects bullet, regenerated `_docs/generated`.
+- Asset models follow `placeAt` only after [job 38](38_draw_assets_from_registry.md) (they are drawn from the spec, not the registry).
+### Deviations
+- `tests/render-contract/geodesicCreatureDebug.test.ts`: added `registry.releaseOwnership("mouse");` before the direct `registry.update` (as the job prescribes).
+- `scripts/docs/layering-baseline.json`: added the edge `world-objects/worldObjectOwner.ts -> runtime/worldGeometryDeformations.ts`. `docs:check` rejects the new import (world-objects may not import runtime), but the job requires `transformPoseWithCellMaps` and `CellDeformationMap` there, exactly as `simpleGeoCreature.ts` and `geodesicMarmot.ts` already do (both baselined). Moving those two helpers down a layer is the real fix (job 32).
+- Removed the now-unused `DynamicObjectState` import from `geodesicMarmot.ts`.
+### Uncertain
+- Static assets are now mapped by their `PlainWorldObject` owner on a geometry commit (pose through the cell maps plus depenetration) instead of being rebuilt from the deformed spec as before. For the torus skew the two agree (checked in the test); for a deformation whose spec mapping differs from the dynamic-object maps, assets could differ slightly from the spec position until job 38.
+### Not done
+Nothing.
+### Checks
+Baseline `npm run typecheck` and `npm test` (883 passed) green. After Part A: typecheck, targeted tests, docs:check green. After Part B: build, smoke on cube, icosahedron, torus-moduli, genus-2-torus passed. Final after Part C: typecheck, `npm test` (117 files, 894 passed, 8 skipped), `docs:check`, `npm run build`, and smoke on all four worlds all passed, first attempt. One intermediate `npm test` run failed only because the generated docs were stale; fixed with `npm run docs:generate`.

@@ -119,5 +119,5 @@ Resolves: issue [NN](../../_issues/NN_....md).
 | [34](34_type_strictness_lint_bundle.md) | Type strictness, linting and bundle configuration | - | 80 |
 | [35](35_torus_family_as_teichmuller_space.md) | Treat the torus family as TeichmÃ¼ller space | - | 54 |
 | [36](_done/36_creatures_detour_and_resume_geodesic.md) | ~~Creatures detour around obstacles and resume their geodesic~~ (done, needs review) | - |  |
-| [37](37_object_owners_and_place_at.md) | Objects own their position; `placeAt` moves any positioned object | - |  |
+| [37](_done/37_object_owners_and_place_at.md) | ~~Objects own their position; `placeAt` moves any positioned object~~ (done, needs review) | - |  |
 | [38](38_draw_assets_from_registry.md) | Draw static assets from their registry record | - |  |
