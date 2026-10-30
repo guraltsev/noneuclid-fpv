@@ -2146,6 +2146,14 @@ Per-source ray pointers that drive hover and select events on the XR scene palet
 | function | `createScenePointers` | Creates the pointer manager. |
 | function | `chooseActiveScenePointer` | Picks the single pointer that should drive palette UI: first a pressed one, then a hovering dominant one, then any hovering one, then any dominant one, then the first. |
 
+### `render/three/staticAssetRenderRoot.ts`
+
+Render root of a static asset: the template that the runtime-object render path turns into instanced meshes drawn at the asset's registry pose.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| function | `buildStaticAssetRenderRoot` | Builds the render root of a static asset: an identity group whose single child is the decoration model, placed so that drawing the root at `record.localPose` reproduces the authored decoration exactly. |
+
 ### `render/three/staticObjectCollisionWireframes.ts`
 
 Debug overlay builder for the collision shapes of static asset objects in one cell.

@@ -388,7 +388,7 @@ export function runtimeObjectToDynamicObjectState(object: RuntimeWorldObjectBase
 
 /**
  * Builds the registry record for an authored static asset placed in `cellId`.
- * The pose is a yaw (`turnRadians`, falling back to `yawRadians`, else 0) at the spec's cell-local position. Assets of class "geometry-computer" get a fixed 3 m tooltip and the "open-geometry-computer" interaction; "question-cube" assets with tutorial or goal pages get a "Help hub" tooltip and the "open-tutorial" interaction (range from `autoDisplayHelpRangeMeters`, default 2.5 m). Static assets are never portal-renderable via this registry record.
+ * The pose is a yaw (`turnRadians`, falling back to `yawRadians`, else 0) at the spec's cell-local position. Assets of class "geometry-computer" get a fixed 3 m tooltip and the "open-geometry-computer" interaction; "question-cube" assets with tutorial or goal pages get a "Help hub" tooltip and the "open-tutorial" interaction (range from `autoDisplayHelpRangeMeters`, default 2.5 m). The record is portal-renderable: the renderer draws the asset model from it once a render root is registered for the id.
  */
 export function createRuntimeStaticAssetObject(
   objectSpec: AssetObjectSpec,
@@ -426,7 +426,7 @@ export function createRuntimeStaticAssetObject(
     collision: objectSpec.collision,
     class: objectSpec.class,
     do_not_collide_with: objectSpec.do_not_collide_with,
-    portalRenderable: false,
+    portalRenderable: true,
     displayHelpMessage: objectSpec.displayHelpMessage ?? (geometryComputer
       ? "Use this computer to change world deformation when the current world supports live geometry changes."
       : undefined),

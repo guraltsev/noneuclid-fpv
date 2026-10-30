@@ -14,7 +14,7 @@ import {
 import type { PreparedWorldAssets } from "../../src/render/three/preloadWorldAssets";
 
 describe("planCellRenderArchetypes", () => {
-  it("builds floor, portal-frame, solid-wall, and static-object archetypes while excluding sky caps and marmots", () => {
+  it("builds floor, portal-frame, solid-wall, and no static-object archetypes while excluding sky caps and marmots", () => {
     const world = compileCellComplex(createStaticObjectWorld());
     const planned = planCellRenderArchetypes(world, {
       debugLevel: "basic",
@@ -33,7 +33,7 @@ describe("planCellRenderArchetypes", () => {
 
     expect(planned.some((entry) => entry.kind === "solid-wall")).toBe(true);
     expect(planned.some((entry) => entry.kind === "portal-frame")).toBe(true);
-    expect(planned.some((entry) => entry.kind === "static-object")).toBe(true);
+    expect(planned.some((entry) => (entry.kind as string) === "static-object")).toBe(false);
     expect(planned.some((entry) => entry.kind === "debug-wireframe")).toBe(false);
     expect(planned.some((entry) => entry.sourceObjectName?.includes("marmot"))).toBe(false);
   });

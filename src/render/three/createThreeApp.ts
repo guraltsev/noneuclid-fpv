@@ -73,6 +73,7 @@ import { type DebugSettings } from "../../glue/debugSettings";
 import { type PortalPanelModeId } from "../../glue/portalPanelMode";
 import { type LaunchOptions } from "../../glue/readLaunchOptions";
 import { yawRigidTransform3 } from "../../math/rigidTransform3";
+import { buildStaticAssetRenderRoot } from "./staticAssetRenderRoot";
 import { simpleCollisionCylinder } from "../../movement/dynamicObject";
 import { movePlayer } from "../../movement/movePlayer";
 import { DEFAULT_PLAYER_EYE_HEIGHT_METERS } from "../../movement/playerBody";
@@ -1183,6 +1184,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     dumpAllGeodesics: dumpAllGeodesics,
     dumpGeodesicPath: dumpGeodesicPath,
     dumpLockedGeodesicWords: dumpLockedGeodesicWords,
+    placeObjectAt: debugPlaceObjectAt,
   });
   installGeometryDebugHelpersIfAvailable();
   syncDesktopPalette();
@@ -1215,6 +1217,14 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
         const owner = createPlainWorldObject(runtimeObjectRegistry, createRuntimeStaticAssetObject(objectSpec, cell.id));
         objectHost.register(owner);
         staticAssetOwners.push(owner);
+        // The model is drawn from the registry record through this root; it is a template and stays out of the scene.
+        const record = runtimeObjectRegistry.get(objectSpec.id);
+        if (record) {
+          runtimeObjectRootsById.set(
+            objectSpec.id,
+            buildStaticAssetRenderRoot(cell.id, objectSpec, record.localPose, options.assets),
+          );
+        }
       }
     }
   }
@@ -1888,6 +1898,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       dumpAllGeodesics: dumpAllGeodesics,
       dumpGeodesicPath: dumpGeodesicPath,
       dumpLockedGeodesicWords: dumpLockedGeodesicWords,
+      placeObjectAt: debugPlaceObjectAt,
     });
     installGeometryDebugHelpersIfAvailable();
     for (const runtime of dynamicObjectRuntimes) {
@@ -2012,6 +2023,11 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       for (const owner of staticAssetOwners) {
         objectHost.unregister(owner.id);
         owner.dispose();
+        const assetRoot = runtimeObjectRootsById.get(owner.id);
+        if (assetRoot) {
+          runtimeObjectRootsById.delete(owner.id);
+          disposeObject3D(assetRoot);
+        }
       }
       staticAssetOwners.length = 0;
       for (const runtime of measuredGeodesicLengthRuntimes.values()) {
@@ -3008,9 +3024,18 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     }
   }
 
+  function debugPlaceObjectAt(id: string, cellId: string, x: number, y: number, yawDegrees: number): boolean {
+    const placed = objectHost.placeAt(id, cellId, yawRigidTransform3((yawDegrees * Math.PI) / 180, { x, y, z: 0 }));
+    console.log(`placeObjectAt(${id}): ${placed}`);
+    return placed;
+  }
+
   function resetRuntimeWorld(): void {
     for (const runtime of dynamicObjectRuntimes) {
       runtime.reset(cellMeshes);
+    }
+    for (const owner of staticAssetOwners) {
+      owner.reset();
     }
     removePlacedFlags();
     removeGeodesicRuntimeObjects();

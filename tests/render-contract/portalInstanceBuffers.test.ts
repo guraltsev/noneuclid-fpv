@@ -168,7 +168,7 @@ function createArchetype(cellId: string, archetypeId: string, capacity: number):
   return {
     cellId,
     archetypeId,
-    kind: "static-object",
+    kind: "floor",
     mesh,
     portalPathIdAttribute,
     portalClipIndexAttribute,

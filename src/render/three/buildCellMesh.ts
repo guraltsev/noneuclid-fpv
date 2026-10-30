@@ -5,10 +5,9 @@
  * `heightMeters`. The returned group is authored directly in Three.js axes (world (x, y, z) becomes (x, z, -y), see
  * `worldAxes`): a textured floor at y = 0, a ceiling at y = height, one wall per side (a solid wall, or a portal
  * wall via `buildPortalMesh` for sides with a portal), optional portal debug panels, optional forbidden-zone
- * wireframes and one decoration per static object spec. Floor UVs are metric (one texture tile = `tileSizeMeters`) or lattice UVs when a `floorUvFrame` is given (see `floorUv`). Meshes carry names (`floor:`, `ceiling:`, `wall:`) and
+ * wireframes. Objects are not part of a cell mesh: creatures and static assets are runtime objects drawn from the registry. Floor UVs are metric (one texture tile = `tileSizeMeters`) or lattice UVs when a `floorUvFrame` is given (see `floorUv`). Meshes carry names (`floor:`, `ceiling:`, `wall:`) and
  * `userData.kind` tags that `cellRenderArchetypes` uses to classify them for instancing. Walls are nudged 1 cm
- * toward the cell interior along the inward normal to avoid z-fighting with coplanar surfaces. Creature object specs are skipped here
- * because they are runtime objects. Called once per cell at load time; not a per-frame path.
+ * toward the cell interior along the inward normal to avoid z-fighting with coplanar surfaces. Called once per cell at load time; not a per-frame path.
  */
 
 import * as THREE from "three";
@@ -21,10 +20,7 @@ import {
   shouldRenderPortalWall,
   type PortalPanelModeId,
 } from "../../glue/portalPanelMode";
-import { buildDecorationMesh } from "./buildDecorationMesh";
 import { buildPortalMesh } from "./buildPortalMesh";
-import { isGeodesicMarmotObjectSpec } from "../../world-objects/geodesicMarmot";
-import { isSimpleGeoCreatureObjectSpec } from "../../world-objects/simpleGeoCreature";
 import type { PreparedWorldAssets } from "./preloadWorldAssets";
 import { SCENE_BACKGROUND_COLOR } from "./sceneColors";
 import { buildForbiddenZoneWireframe } from "./debugCollisionWireframes";
@@ -70,14 +66,6 @@ export function buildCellMesh(cell: CompiledPrismCell, options: BuildCellMeshOpt
 
   if (options.debugLevel !== "off" && options.showForbiddenZoneWireframes) {
     group.add(buildForbiddenZoneWireframes(cell));
-  }
-
-  for (const objectSpec of cell.objects) {
-    if (isGeodesicMarmotObjectSpec(objectSpec) || isSimpleGeoCreatureObjectSpec(objectSpec)) {
-      continue;
-    }
-
-    group.add(buildDecorationMesh(cell.id, objectSpec, options.assets));
   }
 
   return group;

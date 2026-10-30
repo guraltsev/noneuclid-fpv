@@ -97,6 +97,8 @@ export interface GeneralDebugHelpers {
   DumpGeodesicPath(geodesicId?: string): GeodesicPathDebugDump | undefined;
   dump_locked_geodesic_words(): readonly GeodesicWordDebugDump[];
   DumpLockedGeodesicWords(): readonly GeodesicWordDebugDump[];
+  /** Moves the owned object `id` to `cellId` at cell-local (x, y) meters with the given yaw in degrees; logs and returns whether the object has an owner. */
+  placeObjectAt(id: string, cellId: string, x: number, y: number, yawDegrees: number): boolean;
 }
 
 /** Implementations supplied by createThreeApp#shell to {@link installGeneralDebugHelpers}; each callback is stored as given. */
@@ -106,6 +108,7 @@ export interface GeneralDebugHelperCallbacks {
   readonly dumpAllGeodesics: () => AllGeodesicsDebugDump;
   readonly dumpGeodesicPath: (geodesicId?: string) => GeodesicPathDebugDump | undefined;
   readonly dumpLockedGeodesicWords: () => readonly GeodesicWordDebugDump[];
+  readonly placeObjectAt: (id: string, cellId: string, x: number, y: number, yawDegrees: number) => boolean;
 }
 
 /** The window object augmented with the optional general debug globals. */
@@ -115,6 +118,7 @@ export type WindowWithGeneralDebugHelpers = typeof window & {
   dump_all_geodesics?: () => AllGeodesicsDebugDump;
   dump_geodesic_path?: (geodesicId?: string) => GeodesicPathDebugDump | undefined;
   dump_locked_geodesic_words?: () => readonly GeodesicWordDebugDump[];
+  placeObjectAt?: GeneralDebugHelpers["placeObjectAt"];
   noneuclidDebug?: GeneralDebugHelpers;
 };
 
@@ -311,6 +315,7 @@ export function installGeneralDebugHelpers(callbacks: GeneralDebugHelperCallback
     DumpGeodesicPath: callbacks.dumpGeodesicPath,
     dump_locked_geodesic_words: callbacks.dumpLockedGeodesicWords,
     DumpLockedGeodesicWords: callbacks.dumpLockedGeodesicWords,
+    placeObjectAt: callbacks.placeObjectAt,
   };
 
   target.debug_help = helpers.debug_help;
@@ -318,6 +323,7 @@ export function installGeneralDebugHelpers(callbacks: GeneralDebugHelperCallback
   target.dump_all_geodesics = helpers.dump_all_geodesics;
   target.dump_geodesic_path = helpers.dump_geodesic_path;
   target.dump_locked_geodesic_words = helpers.dump_locked_geodesic_words;
+  target.placeObjectAt = helpers.placeObjectAt;
   target.noneuclidDebug = helpers;
 }
 
@@ -330,6 +336,7 @@ export function uninstallGeneralDebugHelpers(): void {
   delete target.dump_all_geodesics;
   delete target.dump_geodesic_path;
   delete target.dump_locked_geodesic_words;
+  delete target.placeObjectAt;
   delete target.noneuclidDebug;
 }
 

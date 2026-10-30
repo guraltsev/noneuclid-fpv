@@ -30,7 +30,6 @@ export type CellRenderArchetypeKind =
   | "floor"
   | "solid-wall"
   | "portal-frame"
-  | "static-object"
   | "debug-wireframe";
 
 /** An instanced mesh of one cell part with its per-instance portal attributes. */
@@ -279,25 +278,7 @@ function classifyObjectKind(object: THREE.Mesh): CellRenderArchetypeKind | undef
     return "debug-wireframe";
   }
 
-  if (hasAncestorNamed(object, "decoration:") || hasAncestorNamed(object, "asset:")) {
-    return "static-object";
-  }
-
   return undefined;
-}
-
-function hasAncestorNamed(object: THREE.Object3D, prefix: string): boolean {
-  let current: THREE.Object3D | null = object;
-
-  while (current) {
-    if (current.name.startsWith(prefix)) {
-      return true;
-    }
-
-    current = current.parent;
-  }
-
-  return false;
 }
 
 function cloneMaterial(

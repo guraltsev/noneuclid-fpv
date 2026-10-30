@@ -13,7 +13,13 @@ import {
 import { createRuntimeObjectInstanceSync } from "../../src/render/three/runtimeObjectInstanceSync";
 import type { RuntimeObjectRenderSourceMesh } from "../../src/render/three/runtimeObjectRenderRecords";
 import { rigidTransformToThreeMatrix } from "../../src/render/three/worldAxes";
-import { createRuntimeObjectRegistry, type RuntimeCreatureObject } from "../../src/world-objects/runtimeObjectRegistry";
+import {
+  createRuntimeObjectRegistry,
+  createRuntimeStaticAssetObject,
+  type RuntimeCreatureObject,
+  type RuntimeWorldObject,
+} from "../../src/world-objects/runtimeObjectRegistry";
+import { createPlainWorldObject } from "../../src/world-objects/worldObjectOwner";
 import type { PlayerPose } from "../../src/movement/playerPose";
 import type { VisiblePortalPath } from "../../src/render/three/visiblePortalPaths";
 
@@ -77,7 +83,7 @@ function snapshot(
   });
 }
 
-function setup(objects: RuntimeCreatureObject[], rover?: PlayerRoverRenderModel) {
+function setup(objects: RuntimeWorldObject[], rover?: PlayerRoverRenderModel) {
   const world = compileCellComplex(twoRoomsWithPortal());
   const registry = createRuntimeObjectRegistry(objects);
   const roots = new Map(objects.map((object) => [object.id, boxRoot() as THREE.Object3D]));
@@ -209,5 +215,35 @@ describe("runtimeObjectInstanceSync", () => {
     expect(second.mesh.count).toBe(1);
     expect(readMatrix(first.mesh, 0).elements).toEqual(rigidTransformToThreeMatrix(mouse("mouse-1", -0.5).localPose).elements);
     expect(readMatrix(second.mesh, 0).elements).toEqual(rigidTransformToThreeMatrix(mouse("mouse-10", 0.5).localPose).elements);
+  });
+
+  it("draws a static asset at its record pose and follows a published pose", () => {
+    const spec = { id: "house", kind: "asset" as const, assetPath: "models/house.glb", position: { x: 0.2, y: 0, z: 0 } };
+    const record = { ...createRuntimeStaticAssetObject(spec, "room-b"), localPose: yawRigidTransform3(0.3, { x: 0.2, y: 0.1, z: 0 }) };
+    const { sync, registry, renderArchetypesByKey } = setup([record]);
+    const owner = createPlainWorldObject(registry, record);
+    const snap = snapshot({ "room-b": [path("room-b", 0, 0)] });
+
+    sync.sync(snap);
+    const archetype = renderArchetypesByKey.get("asset:house:mesh:0");
+    expect(archetype.mesh.count).toBe(1);
+    readMatrix(archetype.mesh, 0).elements.forEach((value, i) => expect(value).toBeCloseTo(rigidTransformToThreeMatrix(record.localPose).elements[i], 6));
+
+    const moved = yawRigidTransform3(1, { x: -0.4, y: 0.3, z: 0 });
+    owner.place("room-b", moved);
+    sync.sync(snap);
+    readMatrix(archetype.mesh, 0).elements.forEach((value, i) => expect(value).toBeCloseTo(rigidTransformToThreeMatrix(moved).elements[i], 6));
+  });
+
+  it("does not walk ghosts again for an unchanged static asset record", () => {
+    const spec = { id: "house", kind: "asset" as const, assetPath: "models/house.glb", position: { x: 0, y: 0, z: 0 } };
+    const { sync } = setup([createRuntimeStaticAssetObject(spec, "room-b")]);
+    const snap = snapshot({ "room-b": [path("room-b", 0, 0)] });
+
+    sync.sync(snap);
+    sync.sync(snap);
+    sync.sync(snap);
+
+    expect(sync.stats.ghostComputations).toBe(1);
   });
 });
