@@ -126,7 +126,7 @@ import {
 import { type CellDeformationMap, transformPoseWithCellMaps } from "../../runtime/worldGeometryDeformations";
 import { type WorldGeometrySnapshot, createWorldGeometrySession } from "../../runtime/worldGeometrySession";
 import { createHelpLensDefinition } from "../../ui/helpLensDefinition";
-import { createPaletteDefinition } from "../../ui/paletteDefinition";
+import { type PaletteDefinition, createPaletteDefinitionCache } from "../../ui/paletteDefinition";
 import { type GeodesicCarryPortalTransition } from "../../world-objects/geodesic/objects";
 import { advanceCurveShorteningPairs } from "../../world-objects/geodesic/curveShortening";
 import { pruneMissingGeodesicIntersectionObjects } from "../../world-objects/geodesic/intersections";
@@ -939,6 +939,10 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   const runtimeObjectCameraPositionScratch: THREE.Vector3[] = [];
   const frameCameraPositions: THREE.Vector3[] = [];
   scene.onBeforeRender = () => portalEyeActivator.beginRender();
+  // Inputs of the last per-frame refreshMeasuredGeodesicLengths run (version -1: never run).
+  const measuredLengthsRefreshed = { version: -1, cellId: "", x: Number.NaN, y: Number.NaN, z: Number.NaN };
+  // The palette definition is rebuilt only when the menu state, input mode or reload-confirmation flag changes.
+  const paletteDefinitionCache = createPaletteDefinitionCache(appConfig);
   // Append-only log of the player's portal crossings, newest last, at most 64 entries. Serials increase by 1 per
   // crossing and are never reused, so consumers (geodesic cannon carry) can fold every crossing they have not seen.
   let playerPortalTransitionLog: { readonly serial: number; readonly transition: GeodesicCarryPortalTransition }[] = [];
@@ -1071,6 +1075,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       runtimeObjectRegistry,
       geodesicEmitterLabelsByKey,
       getPlayerPose: () => playerPose,
+      getRegistryVersion: () => runtimeObjectRegistry.getVersion(),
     });
 
   const { updateXrObjectTooltip, clearXrObjectTooltip } = createXrObjectTooltipController({ scene, camera });
@@ -1557,7 +1562,22 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       removeProtractorAnglesForMissingVertices(pruneMissingGeodesicIntersectionObjects(runtimeObjectRegistry));
       requestSelectableHitboxDebugSync();
     }
-    refreshMeasuredGeodesicLengths();
+    // Skipped while nothing it reads changed: registry contents, the player's cell and exact position.
+    if (
+      runtimeObjectRegistry.getVersion() !== measuredLengthsRefreshed.version ||
+      playerPose.cellId !== measuredLengthsRefreshed.cellId ||
+      playerPose.position.x !== measuredLengthsRefreshed.x ||
+      playerPose.position.y !== measuredLengthsRefreshed.y ||
+      playerPose.position.z !== measuredLengthsRefreshed.z
+    ) {
+      refreshMeasuredGeodesicLengths();
+      // Stored after the run: the refresh itself may update the registry.
+      measuredLengthsRefreshed.version = runtimeObjectRegistry.getVersion();
+      measuredLengthsRefreshed.cellId = playerPose.cellId;
+      measuredLengthsRefreshed.x = playerPose.position.x;
+      measuredLengthsRefreshed.y = playerPose.position.y;
+      measuredLengthsRefreshed.z = playerPose.position.z;
+    }
     const frameAfterObjectsMs = performance.now();
     const frameBeforeCameraMs = frameAfterObjectsMs;
 
@@ -2193,6 +2213,14 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
 
   // Feeds the scene palette (menu) from XR controllers or desktop pointer input and positions it; in XR also
   // updates the controller hand models. Called once per frame in the UI phase.
+  function paletteDefinitionFrame(inputMode: "xr" | "desktop"): {
+    readonly definition: PaletteDefinition;
+    readonly definitionVersion: number;
+  } {
+    const cached = paletteDefinitionCache.get(menuState, inputMode);
+    return { definition: cached.definition, definitionVersion: cached.version };
+  }
+
   function updateScenePalette(
     xrActive: boolean,
     xrFrame: XRFrame | undefined,
@@ -2220,7 +2248,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
           referenceSpaceToWorldMatrix: xrRig.root.matrixWorld,
           inputSources,
         }),
-        definition: createPaletteDefinition(menuState, appConfig, "xr"),
+        ...paletteDefinitionFrame("xr"),
         placement,
       });
       xrControllerHandModels.update({
@@ -2252,7 +2280,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
         isOpen: menuState.isOpen,
         placement,
       }),
-      definition: createPaletteDefinition(menuState, appConfig, "desktop"),
+      ...paletteDefinitionFrame("desktop"),
       placement,
     });
   }

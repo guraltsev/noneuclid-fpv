@@ -4,6 +4,7 @@
  * Renderers, movement/collision, aiming and UI query the registry by cell (collidable, player-blocking, interactable, tooltip subsets) instead of walking specs.
  * Invariants: ids are unique registry-wide; the by-cell index always matches each object's current `cellId`; objects are treated as immutable values and changed by `update` with a replacement; `getVersion` increases by one per content change (add, update, remove of an existing id, moveToCell, owner publish).
  * For objects with an owner (creatures, the marmot, collidable static assets) the registry is a read model: only the owner's publisher (from `claimOwnership`) may replace the record; `update`, `moveToCell` and `remove` throw for owned ids.
+ * Query results (`getAll`, the per-cell queries) are cached and frozen: the same array is returned until a change touches it, a later change returns a new array, and callers must never mutate one.
  * Bulk fragments (bullets, stars and other particles) must not go through the registry per particle; per-tick immutable replacement allocates too much.
  */
 import type { RigidTransform3 } from "../math/rigidTransform3";
@@ -125,7 +126,7 @@ export type RuntimeWorldObject =
 
 /**
  * Mutable id- and cell-indexed collection of runtime objects.
- * Objects are replaced, never mutated in place. Per-cell query results are fresh arrays in insertion order of the cell's id set; they are snapshots that do not track later changes.
+ * Objects are replaced, never mutated in place. Per-cell query results are frozen arrays in insertion order of the cell's id set, shared between calls until the next change that touches the cell (`getAll` until any change); a later change returns a new array and never alters one already returned, so an old array is a snapshot that does not track later changes. Callers must not mutate them.
  */
 export interface RuntimeObjectRegistry {
   /** Number of successful content changes since creation; starts at 0. Equal versions mean equal contents. */
@@ -226,6 +227,33 @@ export function createRuntimeObjectRegistry(
   const ownedIds = new Set<string>();
   let version = 0;
 
+  // Query caches: each array is built on first request, frozen, and shared until a change touches it.
+  let allObjects: readonly RuntimeWorldObject[] | undefined;
+  const cellQueries = new Map<string, {
+    all?: readonly RuntimeWorldObject[];
+    collidable?: readonly RuntimeWorldObject[];
+    playerBlocking?: readonly RuntimeWorldObject[];
+    interactable?: readonly RuntimeWorldObject[];
+    tooltip?: readonly RuntimeWorldObject[];
+  }>();
+
+  function cellQueriesFor(cellId: string) {
+    let queries = cellQueries.get(cellId);
+    if (!queries) {
+      queries = {};
+      cellQueries.set(cellId, queries);
+    }
+    return queries;
+  }
+
+  // Called by every content change (add, remove and the shared replace path, which also serves owner publishers).
+  function invalidateQueries(...cellIds: string[]): void {
+    allObjects = undefined;
+    for (const cellId of cellIds) {
+      cellQueries.delete(cellId);
+    }
+  }
+
   function ownedError(id: string): Error {
     return new Error(`Runtime object "${id}" is owned; use its owner.`);
   }
@@ -246,6 +274,7 @@ export function createRuntimeObjectRegistry(
 
     objectsById.set(next.id, next);
     version += 1;
+    invalidateQueries(previous.cellId, next.cellId);
   }
 
   const registry: RuntimeObjectRegistry = {
@@ -261,6 +290,7 @@ export function createRuntimeObjectRegistry(
       objectsById.set(object.id, object);
       indexObject(object);
       indexKinds(object);
+      invalidateQueries(object.cellId);
     },
     update(object) {
       if (ownedIds.has(object.id)) {
@@ -288,6 +318,7 @@ export function createRuntimeObjectRegistry(
       unindexKinds(object);
       objectsById.delete(id);
       version += 1;
+      invalidateQueries(object.cellId);
     },
     claimOwnership(id) {
       if (!objectsById.has(id)) {
@@ -332,28 +363,43 @@ export function createRuntimeObjectRegistry(
       return objectsById.get(id);
     },
     getObjectsInCell(cellId) {
-      return [...(objectIdsByCellId.get(cellId) ?? [])]
-        .map((id) => objectsById.get(id))
-        .filter((object): object is RuntimeWorldObject => object !== undefined);
+      const queries = cellQueriesFor(cellId);
+      return (queries.all ??= Object.freeze(
+        [...(objectIdsByCellId.get(cellId) ?? [])]
+          .map((id) => objectsById.get(id))
+          .filter((object): object is RuntimeWorldObject => object !== undefined),
+      ));
     },
     getCollidableObjectsInCell(cellId) {
-      return registry.getObjectsInCell(cellId).filter((object) => object.collision !== undefined);
+      const queries = cellQueriesFor(cellId);
+      return (queries.collidable ??= Object.freeze(
+        registry.getObjectsInCell(cellId).filter((object) => object.collision !== undefined),
+      ));
     },
     getPlayerBlockingObjectsInCell(cellId) {
-      return registry.getCollidableObjectsInCell(cellId).filter(
-        (object) => object.kind !== "geodesic-cannon" && !object.do_not_collide_with?.includes(userObjectClass),
-      );
+      const queries = cellQueriesFor(cellId);
+      return (queries.playerBlocking ??= Object.freeze(
+        registry.getCollidableObjectsInCell(cellId).filter(
+          (object) => object.kind !== "geodesic-cannon" && !object.do_not_collide_with?.includes(userObjectClass),
+        ),
+      ));
     },
     getInteractableObjectsInCell(cellId) {
-      return registry.getObjectsInCell(cellId).filter((object) => object.interactable !== undefined);
+      const queries = cellQueriesFor(cellId);
+      return (queries.interactable ??= Object.freeze(
+        registry.getObjectsInCell(cellId).filter((object) => object.interactable !== undefined),
+      ));
     },
     getTooltipObjectsInCell(cellId) {
-      return registry.getObjectsInCell(cellId).filter(
-        (object) => object.tooltip !== undefined || object.interactable !== undefined,
-      );
+      const queries = cellQueriesFor(cellId);
+      return (queries.tooltip ??= Object.freeze(
+        registry.getObjectsInCell(cellId).filter(
+          (object) => object.tooltip !== undefined || object.interactable !== undefined,
+        ),
+      ));
     },
     getAll() {
-      return [...objectsById.values()];
+      return (allObjects ??= Object.freeze([...objectsById.values()]));
     },
     getObjectsOfKind<K extends RuntimeWorldObject["kind"]>(kind: K) {
       return [...(objectIdsByKind.get(kind) ?? [])]

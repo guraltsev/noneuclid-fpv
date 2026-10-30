@@ -38,6 +38,8 @@ export interface GeodesicEmitterLabelControllerDeps {
   readonly geodesicEmitterLabelsByKey: Map<string, GeodesicEmitterLabel>;
   /** Getter (not a value) because the shell reassigns the player pose each frame. */
   getPlayerPose(): PlayerPose;
+  /** Current registry version; the create/remove sweep runs only when it differs from the last sweep's. */
+  getRegistryVersion(): number;
 }
 
 /**
@@ -54,7 +56,14 @@ export function createGeodesicEmitterLabelController(deps: GeodesicEmitterLabelC
   const activeLabelKeys = new Set<string>();
   const cameraQuaternion = new THREE.Quaternion();
 
+  let lastSweepRegistryVersion = -1;
+
   function updateGeodesicEmitterLabels(): void {
+    // Label creation, text updates and removal depend only on registry contents, so that sweep runs once per
+    // registry version; visibility and placement of the labels run every frame.
+    const registryVersion = deps.getRegistryVersion();
+    const sweep = registryVersion !== lastSweepRegistryVersion;
+    lastSweepRegistryVersion = registryVersion;
     activeLabelKeys.clear();
     camera.getWorldQuaternion(cameraQuaternion);
 
@@ -73,8 +82,8 @@ export function createGeodesicEmitterLabelController(deps: GeodesicEmitterLabelC
       object.geodesicIds.forEach((geodesicId) => {
         const key = getGeodesicEmitterLabelKey(object.id, geodesicId);
         activeLabelKeys.add(key);
-        const text = getGeodesicDisplayName(geodesicId);
-        const label = syncGeodesicEmitterLabelObject(key, text);
+        const label = (!sweep && geodesicEmitterLabelsByKey.get(key)) ||
+          syncGeodesicEmitterLabelObject(key, getGeodesicDisplayName(geodesicId));
         label.root.visible = visible;
         if (!visible) {
           return;
@@ -84,6 +93,10 @@ export function createGeodesicEmitterLabelController(deps: GeodesicEmitterLabelC
         label.root.quaternion.copy(cameraQuaternion);
         label.root.updateMatrixWorld(true);
       });
+    }
+
+    if (!sweep) {
+      return;
     }
 
     // Sweep labels whose cannon or geodesic no longer exists (deleting the current Map entry while iterating is safe).

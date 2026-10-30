@@ -231,6 +231,66 @@ describe("runtimeObjectRegistry", () => {
     expect(registry.getObjectsOfKind("geo-butterfly").map((object) => object.id)).toEqual(["mouse-a"]);
   });
 
+  describe("cached queries", () => {
+    it("returns the same frozen array until a change touches the cell", () => {
+      const registry = createRuntimeObjectRegistry([creature("a", "cell-a"), creature("b", "cell-b")]);
+      const first = registry.getObjectsInCell("cell-a");
+      const other = registry.getObjectsInCell("cell-b");
+
+      expect(registry.getObjectsInCell("cell-a")).toBe(first);
+      expect(Object.isFrozen(first)).toBe(true);
+      expect(Object.isFrozen(registry.getAll())).toBe(true);
+      expect(registry.getAll()).toBe(registry.getAll());
+
+      const replacement = creature("a", "cell-a", { portalRenderable: false });
+      registry.update(replacement);
+
+      expect(registry.getObjectsInCell("cell-a")).not.toBe(first);
+      expect(registry.getObjectsInCell("cell-a")).toEqual([replacement]);
+      expect(first[0]).not.toBe(replacement);
+      expect(registry.getObjectsInCell("cell-b")).toBe(other);
+    });
+
+    it("keeps derived queries per cell and refreshes both cells when an object moves", () => {
+      const registry = createRuntimeObjectRegistry([creature("a", "cell-a", { collision: simpleCollisionCylinder(0.1, 1) })]);
+      const collidable = registry.getCollidableObjectsInCell("cell-a");
+
+      expect(registry.getCollidableObjectsInCell("cell-a")).toBe(collidable);
+      expect(registry.getPlayerBlockingObjectsInCell("cell-a")).toBe(registry.getPlayerBlockingObjectsInCell("cell-a"));
+      registry.moveToCell("a", "cell-b");
+
+      expect(registry.getCollidableObjectsInCell("cell-a")).toEqual([]);
+      expect(registry.getCollidableObjectsInCell("cell-b").map((object) => object.id)).toEqual(["a"]);
+    });
+
+    it("lets an old getAll array be iterated while every object is removed", () => {
+      const registry = createRuntimeObjectRegistry([creature("a", "c"), creature("b", "c"), creature("d", "c")]);
+      const visited: string[] = [];
+
+      for (const object of registry.getAll()) {
+        visited.push(object.id);
+        registry.remove(object.id);
+      }
+
+      expect(visited).toEqual(["a", "b", "d"]);
+      expect(registry.getAll()).toEqual([]);
+    });
+
+    it("an owner publisher write invalidates like update", () => {
+      const registry = createRuntimeObjectRegistry([creature("a", "cell-a")]);
+      const publish = registry.claimOwnership("a");
+      const before = registry.getObjectsInCell("cell-a");
+      const allBefore = registry.getAll();
+
+      publish(creature("a", "cell-b"));
+
+      expect(registry.getObjectsInCell("cell-a")).toEqual([]);
+      expect(registry.getObjectsInCell("cell-a")).not.toBe(before);
+      expect(registry.getObjectsInCell("cell-b").map((object) => object.id)).toEqual(["a"]);
+      expect(registry.getAll()).not.toBe(allBefore);
+    });
+  });
+
   describe("version", () => {
     it("counts each content change exactly once", () => {
       const registry = createRuntimeObjectRegistry();

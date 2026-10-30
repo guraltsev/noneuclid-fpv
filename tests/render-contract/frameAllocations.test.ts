@@ -141,6 +141,7 @@ describe("per-frame allocation", () => {
       runtimeObjectRegistry: { getAll: () => [] } as never,
       geodesicEmitterLabelsByKey: new Map(),
       getPlayerPose: () => ({ cellId: "a", position: { x: 0, y: 0, z: 0 }, yawRadians: 0 }) as never,
+      getRegistryVersion: () => 0,
     });
 
     controller.updateGeodesicEmitterLabels();

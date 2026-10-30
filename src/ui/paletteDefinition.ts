@@ -258,8 +258,9 @@ export function createPaletteDefinition(
   state: RuntimeMenuState,
   appConfig: AppConfig = defaultAppConfig,
   inputMode: InputMode = "desktop",
+  nowMs: number = Date.now(),
 ): PaletteDefinition {
-  const reloadConfirmationActive = (state.reloadConfirmUntilMs ?? 0) > Date.now();
+  const reloadConfirmationActive = (state.reloadConfirmUntilMs ?? 0) > nowMs;
 
   // A "debug-settings" request while the debug section is disabled deliberately falls through to the
   // main page at the end of this function (the same fallback used for pages missing their payload).
@@ -448,6 +449,55 @@ export function createPaletteDefinition(
       selectedTool: state.selectedTool,
       placeFlagType: state.placeFlagOptions.flagType,
       toolOptions: createToolOptions(appConfig),
+    },
+  };
+}
+
+/** Caches `createPaletteDefinition` so an unchanged menu state yields the same definition object and version. */
+export interface PaletteDefinitionCache {
+  /**
+   * Returns the cached definition, rebuilding it (version + 1) only when `state` (by reference), `inputMode` or the
+   * reload-confirmation flag at `nowMs` differ from the last call.
+   */
+  get(
+    state: RuntimeMenuState,
+    inputMode: InputMode,
+    nowMs?: number,
+  ): { readonly definition: PaletteDefinition; readonly version: number };
+}
+
+/**
+ * Creates a definition cache for one `appConfig` (fixed for the app's lifetime). The menu state is replaced
+ * immutably, so reference equality of `state` is a complete change test; the clock enters only through the
+ * reload-confirmation flag, which is part of the key.
+ */
+export function createPaletteDefinitionCache(appConfig: AppConfig): PaletteDefinitionCache {
+  let lastState: RuntimeMenuState | undefined;
+  let lastInputMode: InputMode | undefined;
+  let lastReloadConfirmationActive = false;
+  let definition: PaletteDefinition | undefined;
+  let version = 0;
+  let result: { readonly definition: PaletteDefinition; readonly version: number } | undefined;
+
+  return {
+    get(state, inputMode, nowMs = Date.now()) {
+      const reloadConfirmationActive = (state.reloadConfirmUntilMs ?? 0) > nowMs;
+
+      if (
+        result === undefined ||
+        state !== lastState ||
+        inputMode !== lastInputMode ||
+        reloadConfirmationActive !== lastReloadConfirmationActive
+      ) {
+        lastState = state;
+        lastInputMode = inputMode;
+        lastReloadConfirmationActive = reloadConfirmationActive;
+        definition = createPaletteDefinition(state, appConfig, inputMode, nowMs);
+        version += 1;
+        result = { definition, version };
+      }
+
+      return result;
     },
   };
 }

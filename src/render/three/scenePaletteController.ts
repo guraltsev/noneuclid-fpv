@@ -1,7 +1,7 @@
 /**
  * Controller that owns the in-scene palette's scene graph and routes pointer input to palette actions, for both desktop and XR.
  * Each frame the shell calls update() with a ScenePaletteInputFrame, the renderer-neutral PaletteDefinition (src/ui/paletteDefinition.ts) and the panel placement;
- * the controller rebuilds the library adapter (vrPaletteLibraryAdapter.ts) when the definition changes, ray-casts the active pointer against the panel, shows a hit marker and hover tooltip,
+ * the controller rebuilds the library adapter (vrPaletteLibraryAdapter.ts) when the definition version changes (never by comparing content), ray-casts the active pointer against the panel, shows a hit marker and hover tooltip,
  * and invokes the hit item's action on the select-pressed edge reported by scenePointers.ts. Actions are mapped to the ScenePaletteControllerOptions callbacks.
  * All scene objects live in the Three.js world frame, in meters. The controller adds objects to options.scene and removes them in dispose().
  */
@@ -110,8 +110,10 @@ export interface ScenePaletteControllerOptions {
 export interface ScenePaletteControllerUpdate {
   /** Input for this frame from the desktop or XR input module. */
   readonly input: ScenePaletteInputFrame;
-  /** Current palette content; compared to the last one by JSON signature, so it must be JSON-serializable. */
+  /** Current palette content; compared by `definitionVersion`, not by content. */
   readonly definition: PaletteDefinition;
+  /** Changes whenever `definition` changes (see `createPaletteDefinitionCache`); the panel is rebuilt only on a new value. */
+  readonly definitionVersion: number;
   /** World-space panel pose for this frame, in meters (Three.js frame). */
   readonly placement: ScenePalettePlacement;
 }
@@ -222,15 +224,14 @@ export function createScenePaletteController(options: ScenePaletteControllerOpti
   const paletteTooltip = createPaletteTooltip();
   options.scene.add(paletteTooltip.root);
   const scenePointers = createScenePointers(options.getCamera);
-  let currentDefinitionSignature = "";
+  let currentDefinitionVersion = -1;
   let previousMenuTogglePressed = false;
 
   return {
     update(frame) {
-      // Rebuild panel content only when the serialized definition changed.
-      const definitionSignature = JSON.stringify(frame.definition);
-      if (definitionSignature !== currentDefinitionSignature) {
-        currentDefinitionSignature = definitionSignature;
+      // Rebuild panel content only when the definition version changed.
+      if (frame.definitionVersion !== currentDefinitionVersion) {
+        currentDefinitionVersion = frame.definitionVersion;
         adapter.setDefinition(frame.definition);
       }
 

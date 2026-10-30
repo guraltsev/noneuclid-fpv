@@ -1157,6 +1157,8 @@ Renderer-neutral definition of the tool/settings palette: createPaletteDefinitio
 | const | `questionHelpHubBody` | Body text of the help hub page (the shared home guidance). |
 | interface | `PaletteDefinition` | Complete renderer-neutral description of the palette for the current menu state. |
 | function | `createPaletteDefinition` | Builds the PaletteDefinition for the menu state: falls back to the main page when the requested page lacks its payload or is gated off (debug-settings needs appConfig.menu.debugSectionEnabled); reload confirmation is ev… |
+| interface | `PaletteDefinitionCache` | Caches `createPaletteDefinition` so an unchanged menu state yields the same definition object and version. |
+| function | `createPaletteDefinitionCache` | Creates a definition cache for one `appConfig` (fixed for the app's lifetime). |
 
 ### `ui/paletteTooltips.ts`
 
