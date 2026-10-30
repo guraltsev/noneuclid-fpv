@@ -7,7 +7,8 @@
  * (1) re-expressed in a shared render frame by left-multiplying `renderFromRoot` (Three.js `Matrix4.multiply`
  * applies the right operand first, so `renderFromRoot * rootFromDestination` is `renderFromDestination`),
  * (2) given globally unique path ids per `(rootCellId, localPathId)` so that identical paths seen by both eyes share an id
- * and different roots never collide, and (3) merged into a union by path id. Polygons stay in each eye's own NDC.
+ * and different roots never collide, and (3) merged into a union by path id. Clip planes are mapped into the render
+ * frame together with the matrices (`transformClipPlanes`); screen polygons stay in each eye's own NDC.
  */
 /** Re-expresses per-eye visible-portal results in one shared render frame for stereo (VR) rendering. */
 import * as THREE from "three";
@@ -51,16 +52,47 @@ export function transformVisiblePortalResultToRenderFrame(
     return result;
   }
 
-  const paths = result.paths.map((path) => ({
-    ...path,
-    rootFromDestinationMatrix: renderFromRootMatrix.clone().multiply(path.rootFromDestinationMatrix),
-  }));
+  const paths = result.paths.map((path) => {
+    const clipPlanes = new Float64Array(path.clipPlanes.length);
+
+    transformClipPlanes(path.clipPlanes, renderFromRootMatrix, clipPlanes);
+
+    return {
+      ...path,
+      rootFromDestinationMatrix: renderFromRootMatrix.clone().multiply(path.rootFromDestinationMatrix),
+      clipPlanes,
+    };
+  });
 
   return {
     ...result,
     paths,
     visiblePathById: new Map(paths.map((path) => [path.pathId, path])),
   };
+}
+
+/**
+ * Maps clip planes `(nx, ny, nz, d)` (inside where `n . X + d >= 0`) through the rigid map `X' = Q X + t` given by
+ * `renderFromRoot`: the plane becomes `(Q n, d - (Q n) . t)`. `planes` and `out` hold groups of 4 numbers and may be
+ * the same array; `(0, 0, 0, +-1)` rows ("always inside" / "always outside") map to themselves.
+ */
+export function transformClipPlanes(planes: Float64Array, renderFromRoot: THREE.Matrix4, out: Float64Array): void {
+  const e = renderFromRoot.elements;
+
+  for (let offset = 0; offset + 3 < planes.length; offset += 4) {
+    const nx = planes[offset];
+    const ny = planes[offset + 1];
+    const nz = planes[offset + 2];
+    const d = planes[offset + 3];
+    const qx = e[0] * nx + e[4] * ny + e[8] * nz;
+    const qy = e[1] * nx + e[5] * ny + e[9] * nz;
+    const qz = e[2] * nx + e[6] * ny + e[10] * nz;
+
+    out[offset] = qx;
+    out[offset + 1] = qy;
+    out[offset + 2] = qz;
+    out[offset + 3] = d - (qx * e[12] + qy * e[13] + qz * e[14]);
+  }
 }
 
 function isExactIdentity(matrix: THREE.Matrix4): boolean {

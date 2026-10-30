@@ -138,10 +138,9 @@ export function formatPortalInstanceLine(state: PortalInstanceRenderState): stri
   return `portal instances: ${state.renderedInstanceCount} / ${state.totalCapacity} slots`;
 }
 
-/** Formats archetype count, capacity overflow and clip overflow (clip polygon overflow plus visible-path overflow). */
+/** Formats archetype count, capacity overflow, clip-slot overflow (paths without a slot) and the portal clip mode. */
 export function formatPortalArchetypeLine(state: PortalInstanceRenderState): string {
-  const clipOverflow = state.clipPolygonOverflowPathIds.length + state.visiblePathOverflowCount;
-  return `archetypes: ${state.archetypeCount} / overflow ${state.capacityOverflowCount} / clip ${clipOverflow}`;
+  return `archetypes: ${state.archetypeCount} / overflow ${state.capacityOverflowCount} / clip ${state.visiblePathOverflowCount} / ${state.portalClipMode} clip`;
 }
 
 /** Formats the player's cell, position, yaw, XR session status and movement-block state, with optional input mode, visible path count, last crossed portal and XR root cell. */

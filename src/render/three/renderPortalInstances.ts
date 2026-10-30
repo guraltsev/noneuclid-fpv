@@ -6,11 +6,13 @@
  * `rootFromDestinationMatrix`, i.e. the rigid transform placing the destination cell in the ROOT cell's Three.js
  * frame; runtime objects use `rootFromDestination * record.localMatrix` (three.js `multiplyMatrices(a, b)` = a*b,
  * so the object's cell-local matrix is applied first). Two per-instance attributes accompany the matrix:
- * `portalPathId` and `portalClipIndex`, the row of the clip-polygon texture (`portalClipData`) that the fragment
- * shader (`portalClipMaterial`) uses to discard fragments outside the path's NDC polygon.
+ * `portalPathId` and `portalClipIndex`, the slot of the clip-plane texture (`portalClipData`) whose 4 world-space planes
+ * the vertex shader (`portalClipMaterial`) evaluates to clip the instance to the path's visible region.
  *
- * Clip-index sentinels: `unclippedPortalClipIndex` (-2) marks the root instance (never clipped); -1 marks a path
- * that has no clip slot (budget or vertex-count overflow) and is therefore fully discarded. Instances beyond an
+ * Clip-index sentinels: `unclippedPortalClipIndex` (-2) marks the root instance (never clipped); -1 is only the
+ * "unknown" default of a path missing from the slot map and is fully clipped. Callers never give a visible path -1:
+ * `omitPathsWithoutClipSlot` removes the (impossible by construction) paths without a slot before instancing, so
+ * they are not drawn at all. Instances beyond an
  * archetype's capacity are dropped and recorded in `PortalInstanceDiagnostics`. This module also builds the debug
  * state shown by the overlay. All work is CPU-side, linear in the number of visible paths per frame.
  *
@@ -56,14 +58,10 @@ export interface PortalInstanceRenderDebugState {
     readonly pathId: number;
     readonly destinationCellId: string;
   }[];
-  readonly clipPolygonVertexCountsByPath: readonly {
-    readonly pathId: number;
-    readonly vertexCount: number;
-  }[];
-  /** Paths hidden because their clip polygon had more vertices than the clip texture holds. */
-  readonly clipPolygonOverflowPathIds: readonly number[];
-  /** Visible paths that did not fit in the clip texture's rows. */
+  /** Visible paths that found no clip slot and were therefore not drawn (0 by construction). */
   readonly visiblePathOverflowCount: number;
+  /** How portal clipping runs: `hardware` = `gl_ClipDistance` in the vertex stage, `fragment` = one compare and `discard`. */
+  readonly portalClipMode: "hardware" | "fragment";
 }
 
 /** Per-frame collector of archetypes whose instance capacity was exceeded. */
@@ -197,6 +195,43 @@ export function flattenVisiblePortalPathGroups(
   }
 
   return [...visiblePathById.values()].sort((left, right) => left.pathId - right.pathId);
+}
+
+/**
+ * Removes depth > 0 paths that have no clip slot, so they get no instance at all instead of being drawn fully clipped.
+ *
+ * Slots cover the union of all eyes, so this never removes anything in practice; it returns `visiblePathsByDestinationCell`
+ * itself (no allocation) when every path has a slot.
+ */
+export function omitPathsWithoutClipSlot(
+  visiblePathsByDestinationCell: ReadonlyMap<string, readonly VisiblePortalPath[]>,
+  clipIndexByPathId: ReadonlyMap<number, number>,
+): ReadonlyMap<string, readonly VisiblePortalPath[]> {
+  let allHaveSlots = true;
+
+  for (const paths of visiblePathsByDestinationCell.values()) {
+    for (const path of paths) {
+      if (path.depth > 0 && !clipIndexByPathId.has(path.pathId)) {
+        allHaveSlots = false;
+      }
+    }
+  }
+
+  if (allHaveSlots) {
+    return visiblePathsByDestinationCell;
+  }
+
+  const filtered = new Map<string, readonly VisiblePortalPath[]>();
+
+  for (const [cellId, paths] of visiblePathsByDestinationCell) {
+    const kept = paths.filter((path) => path.depth === 0 || clipIndexByPathId.has(path.pathId));
+
+    if (kept.length > 0) {
+      filtered.set(cellId, kept);
+    }
+  }
+
+  return filtered;
 }
 
 /**
@@ -456,9 +491,8 @@ export function createPortalInstanceRenderDebugState(
     readonly showCellPathRendersInstances: boolean;
     readonly normalVisiblePathRenderingActive?: boolean;
     readonly visiblePaths?: readonly VisiblePortalPath[];
-    readonly clipPolygonVertexCountsByPathId?: ReadonlyMap<number, number>;
-    readonly clipPolygonOverflowPathIds?: readonly number[];
     readonly visiblePathOverflowCount?: number;
+    readonly portalClipMode?: "hardware" | "fragment";
   },
 ): PortalInstanceRenderDebugState {
   const totalCapacity = archetypes.reduce((sum, archetype) => sum + archetype.capacity, 0);
@@ -495,11 +529,8 @@ export function createPortalInstanceRenderDebugState(
       pathId: path.pathId,
       destinationCellId: path.destinationCellId,
     })),
-    clipPolygonVertexCountsByPath: [...(options.clipPolygonVertexCountsByPathId ?? new Map()).entries()]
-      .map(([pathId, vertexCount]) => ({ pathId, vertexCount }))
-      .sort((left, right) => left.pathId - right.pathId),
-    clipPolygonOverflowPathIds: options.clipPolygonOverflowPathIds ?? [],
     visiblePathOverflowCount: options.visiblePathOverflowCount ?? 0,
+    portalClipMode: options.portalClipMode ?? "fragment",
   };
 }
 

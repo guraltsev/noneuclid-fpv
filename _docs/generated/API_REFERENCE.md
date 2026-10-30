@@ -1591,7 +1591,7 @@ Text-only HUD overlay (a div with class debug-overlay) listing frame timing, Web
 | function | `formatVisiblePortalPathLine` | Formats visible, kept and maximum visible portal path counts, appending "budget" if the path budget was exhausted. |
 | function | `formatPortalEyeLine` | Formats visible-path count and maximum depth for each portal eye as eyeIndex:count@depth. |
 | function | `formatPortalInstanceLine` | Formats rendered portal instance count against total instance capacity. |
-| function | `formatPortalArchetypeLine` | Formats archetype count, capacity overflow and clip overflow (clip polygon overflow plus visible-path overflow). |
+| function | `formatPortalArchetypeLine` | Formats archetype count, capacity overflow, clip-slot overflow (paths without a slot) and the portal clip mode. |
 | function | `formatLocationLine` | Formats the player's cell, position, yaw, XR session status and movement-block state, with optional input mode, visible path count, last crossed portal and XR root cell. |
 | function | `formatGeometryLine` | Formats the live geometry state: version, deformation kind, current and target geometry, build status, last build time and last error. |
 
@@ -1819,27 +1819,28 @@ Render model for the player's own rover avatar.
 
 ### `render/three/portalClipData.ts`
 
-CPU side of the per-path clip-polygon texture that lets the GPU clip each portal instance to its visible aperture.
+CPU side of the per-path clip-plane texture that lets the GPU clip each portal instance to its visible aperture.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
-| const | `defaultMaxClipVerticesPerPath` | Default width of the clip texture: polygons with more than 8 vertices are not representable and get hidden. |
-| interface | `PortalClipData` | The clip-polygon texture together with its layout parameters and the per-frame path-to-row bookkeeping. |
-| function | `createPortalClipData` | Allocates the clip texture and returns an updatable `PortalClipData`. |
+| const | `portalClipPlaneTextureWidth` | Texels per row of the clip-plane texture. |
+| const | `portalClipEpsilonMeters` | Inside tolerance in meters added to every plane distance in the shader. |
+| function | `portalClipPlaneTexelIndex` | Texel holding plane `plane` (0..3) of clip slot `slot` for eye `eye`. |
+| function | `writeAlwaysInsidePlanes` | Writes the 4 "always inside" planes `(0, 0, 0, 1)` into `out` starting at `offset`. |
+| function | `writeAlwaysOutsidePlanes` | Writes the 4 "always outside" planes `(0, 0, 0, -1)` into `out` starting at `offset`. |
+| interface | `PortalClipData` | The clip-plane texture together with its layout parameters and the per-frame path-to-slot bookkeeping. |
+| function | `createPortalClipData` | Allocates the clip-plane texture and returns an updatable `PortalClipData`. |
 
 ### `render/three/portalClipMaterial.ts`
 
-Patches Three.js materials so instanced portal geometry is clipped, per fragment, to its path's convex NDC polygon.
+Patches Three.js materials so instanced portal geometry is clipped to its path's four world-space clip planes.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
 | interface | `PortalClipMaterialState` | Shared uniform bundle and settings referenced by every patched material, so one update reaches all of them. |
-| function | `createPortalClipMaterialState` | Creates the shared uniform state for `clipData`, initially with a zero viewport origin and eye 0. |
-| function | `updatePortalClipMaterialViewport` | Sets the viewport size and lower-left origin (physical pixels) used to map fragment coordinates to NDC. |
-| function | `updatePortalClipMaterialTextureEye` | Selects which eye's polygon rows the shader reads; the index is floored and clamped to [0, maxClipTextureEyes - 1]. |
-| function | `updatePortalClipMaterialViewportFromRenderer` | Reads the renderer's current viewport (already scaled by pixel ratio, as WebGL sees it) and applies it via `updatePortalClipMaterialViewport`. |
+| function | `createPortalClipMaterialState` | Creates the shared uniform state for `clipData`, initially for eye 0. |
+| function | `updatePortalClipMaterialTextureEye` | Selects which eye's planes the shader reads; the index is floored and clamped to [0, maxClipTextureEyes - 1]. |
 | function | `patchPortalClipMaterial` | Installs portal clipping into a material (or each material of an array) and returns it. |
-| function | `viewportPixelsToNdc` | Maps a pixel position relative to the viewport origin (y up) to NDC in [-1,1]; a zero-sized axis maps to 0. |
 
 ### `render/three/portalClipPolygonOverlay.ts`
 
@@ -1865,7 +1866,7 @@ Portal-path debug runtime: installs window.noneuclidPortalDebug, manages cell-pa
 
 ### `render/three/portalEyeActivation.ts`
 
-Selects the portal-clip eye and viewport once per rendered eye instead of once per mesh.
+Selects the portal-clip eye (and runs an optional viewport hook) once per rendered eye instead of once per mesh.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
@@ -1882,6 +1883,7 @@ Utilities for combining the per-eye visibility results of stereo (VR) rendering 
 | interface | `PortalEyeRenderState` | One eye's camera and its visibility result, tagged with the eye index and the cell that eye is rooted in. |
 | function | `buildUnionVisiblePathById` | Merges the paths of all eyes into one map keyed by path id, keeping the first eye's entry when several eyes see the same id. |
 | function | `transformVisiblePortalResultToRenderFrame` | Returns a copy of `result` whose path matrices are premultiplied by `renderFromRootMatrix`, so they place cells in the shared render frame; polygons and statistics are unchanged. |
+| function | `transformClipPlanes` | Maps clip planes `(nx, ny, nz, d)` (inside where `n . |
 | function | `remapStereoPortalPathIds` | Reassigns path ids consecutively (from 0, in first-seen order) so equal `(rootCellId, pathId)` pairs share an id across eyes and different roots stay distinct; the input is not modified. |
 
 ### `render/three/portalFunnel.ts`
@@ -2000,6 +2002,7 @@ Fills the per-frame instance buffers that draw each visible portal path as an in
 | function | `groupVisiblePortalPathsByDestinationCell` | Groups visible paths by `destinationCellId`, preserving input order within each group. |
 | function | `buildVisiblePathsByDestinationCell` | Joins the statically kept path lists per destination cell with the currently visible paths. |
 | function | `flattenVisiblePortalPathGroups` | Merges grouped visible paths back into one list, de-duplicated by `pathId` and sorted ascending by id. |
+| function | `omitPathsWithoutClipSlot` | Removes depth > 0 paths that have no clip slot, so they get no instance at all instead of being drawn fully clipped. |
 | function | `updateCellRenderArchetypeInstances` | Writes instance matrices and clip attributes for every cell archetype from the visible paths of its cell. |
 | function | `updateRuntimeObjectRenderArchetypeInstances` | Writes instances for runtime objects (flags, markers, creatures...) once per visible path of the cell containing each record. |
 | function | `createPortalInstanceRenderDebugState` | Assembles a `PortalInstanceRenderDebugState` from the archetypes' current counts, overflow diagnostics and optional clip-data statistics. |
@@ -2012,7 +2015,6 @@ Render-resolution policy and the pixel sizes that portal clipping depends on.
 | Kind | Name | Summary |
 | --- | --- | --- |
 | const | `renderAntialiasRequested` | Whether MSAA antialiasing is requested when creating the WebGL renderer. |
-| const | `portalClipEdgeSmoothingEnabled` | Master switch for dithered anti-aliasing of portal clip edges; false means hard per-fragment clip tests. |
 | const | `defaultMaxDevicePixelRatio` | Upper bound applied to the device pixel ratio when none is supplied (1.25). |
 | interface | `ViewportPixels` | A width and height in pixels. |
 | interface | `RenderQualityState` | Snapshot of the render-quality settings and the canvas/buffer sizes currently in effect. |

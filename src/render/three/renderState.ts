@@ -139,10 +139,6 @@ export interface PortalInstanceRenderState {
     readonly pathId: number;
     readonly destinationCellId: string;
   }[];
-  readonly clipPolygonVertexCountsByPath: readonly {
-    readonly pathId: number;
-    readonly vertexCount: number;
-  }[];
-  readonly clipPolygonOverflowPathIds: readonly number[];
   readonly visiblePathOverflowCount: number;
+  readonly portalClipMode: "hardware" | "fragment";
 }

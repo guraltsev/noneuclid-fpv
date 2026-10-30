@@ -4,16 +4,13 @@
  * `resolveRenderPixelRatio` caps the device pixel ratio (default 1.25) to bound fill cost on high-DPI screens; with
  * quality disabled the ratio is 1. Three sizes are distinguished: the CSS canvas size (layout pixels), the drawing
  * buffer size (CSS size x pixel ratio, physical pixels), and the portal viewport size, which is the drawing buffer
- * because the clip shader works with `gl_FragCoord` in physical pixels and visibility areas are measured in them.
- * Clip-edge smoothing is currently compiled off (`portalClipEdgeSmoothingEnabled = false`).
+ * because visibility areas are measured in physical pixels.
  */
 
 import * as THREE from "three";
 
 /** Whether MSAA antialiasing is requested when creating the WebGL renderer. */
 export const renderAntialiasRequested = true;
-/** Master switch for dithered anti-aliasing of portal clip edges; false means hard per-fragment clip tests. */
-export const portalClipEdgeSmoothingEnabled = false;
 /** Upper bound applied to the device pixel ratio when none is supplied (1.25). */
 export const defaultMaxDevicePixelRatio = 1.25;
 
@@ -25,12 +22,10 @@ export interface ViewportPixels {
 
 /** Snapshot of the render-quality settings and the canvas/buffer sizes currently in effect. */
 export interface RenderQualityState {
-  /** Whether quality features (pixel ratio above 1, edge smoothing) are enabled. */
+  /** Whether quality features (pixel ratio above 1) are enabled. */
   readonly enabled: boolean;
   /** Echo of `renderAntialiasRequested`. */
   readonly antialiasRequested: boolean;
-  /** True only if quality is enabled and clip-edge smoothing is globally on. */
-  readonly portalClipEdgeSmoothing: boolean;
   /** Pixel ratio applied to the renderer. */
   readonly pixelRatio: number;
   /** Cap that was used when choosing `pixelRatio`. */
@@ -39,7 +34,7 @@ export interface RenderQualityState {
   readonly cssCanvasSize: ViewportPixels;
   /** Renderer drawing-buffer size in physical pixels. */
   readonly drawingBufferSize: ViewportPixels;
-  /** Pixel size used for portal visibility areas and the clip shader; equals `drawingBufferSize`. */
+  /** Pixel size used for portal visibility areas; equals `drawingBufferSize`. */
   readonly portalViewportPixels: ViewportPixels;
 }
 
@@ -106,7 +101,6 @@ export function createRenderQualityState(
   return {
     enabled,
     antialiasRequested: renderAntialiasRequested,
-    portalClipEdgeSmoothing: enabled && portalClipEdgeSmoothingEnabled,
     pixelRatio,
     maxDevicePixelRatio,
     cssCanvasSize,

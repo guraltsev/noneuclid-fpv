@@ -367,17 +367,25 @@ its own funnel (`computeIndependentVisiblePortalPaths`); there is no cross-eye u
 `InstancedMesh` whose geometry is baked in the cell's local frame
 (`src/render/three/cellRenderArchetypes.ts#buildCellRenderArchetypes`). Every frame
 `src/render/three/renderPortalInstances.ts#updateCellRenderArchetypeInstances` writes, for each visible path ending at the
-cell, the matrix $M_p$ plus two attributes: the path id and a *clip index* (`-2` = unclipped root, `-1` = no clip slot, so the
-instance is discarded). Capacity of a cell archetype is the largest number of statically kept paths that end at it over all
-roots (`src/render/three/cellRenderArchetypes.ts#deriveCellRenderArchetypeCapacities`).
+cell, the matrix $M_p$ plus two attributes: the path id and a *clip index* (`-2` = unclipped root; otherwise the path's clip
+slot, `-1` only for a path missing from the slot map, which is fully clipped). A visible path that finds no slot is not
+instanced at all (`src/render/three/renderPortalInstances.ts#omitPathsWithoutClipSlot`); slots cover the union of all eyes,
+so this cannot happen in practice. Capacity of a cell archetype is the largest number of statically kept paths that end at it
+over all roots (`src/render/three/cellRenderArchetypes.ts#deriveCellRenderArchetypeCapacities`).
 
-**Clipping on the GPU.** The clip polygons of all visible paths are packed in a float texture, one row per
-(eye, clip index), one texel per vertex (`src/render/three/portalClipData.ts#createPortalClipData`). A patched Three.js
-material (`src/render/three/portalClipMaterial.ts#patchPortalClipMaterial`) converts `gl_FragCoord` to NDC with the current
-(per-eye) viewport and discards a fragment when its cross product with any polygon edge, multiplied by the polygon's winding
-sign, is below $-10^{-5}$. Clipped instances are pushed slightly back in depth in the vertex shader so portal-seen
-geometry never z-fights the wall that frames it. (A dithered smooth-edge variant exists but is disabled by
-`src/render/three/renderQuality.ts#portalClipEdgeSmoothingEnabled`.)
+**Clipping on the GPU.** The visible region of each path is four half-spaces through the eye, so the GPU clips by four
+world-space planes $(n,d)$, inside where $n\cdot X+d\ge 0$ (render frame; a rigid map $X'=QX+t$ sends the plane to
+$(Qn,\,d-(Qn)\cdot t)$, `src/render/three/portalEyeFrameTransforms.ts#transformClipPlanes`). The planes of all visible paths
+are packed in a float texture, four texels per (clip slot, eye)
+(`src/render/three/portalClipData.ts#createPortalClipData`, `portalClipPlaneTexelIndex`); slots are the ranks of the paths of
+the union over all eyes, and an eye that does not see a union path gets "always outside" planes $(0,0,0,-1)$. A patched
+Three.js material (`src/render/three/portalClipMaterial.ts#patchPortalClipMaterial`) evaluates $n\cdot X+d+10^{-5}$ **once per
+vertex** at $X=$ `modelMatrix * instanceMatrix * position`. The value is affine in $X$, and perspective-correct interpolation
+of an affine function is exact, so the clip follows each plane precisely. With `WEBGL_clip_cull_distance` the four values are
+written to `gl_ClipDistance[0..3]`: triangles are clipped before rasterisation, the fragment shader has no `discard`, and
+early depth rejection stays on (the distances are enabled only around patched draws). Without the extension the values go to a `vec4` varying and the fragment shader does one compare and
+`discard`; there is no texture fetch, loop or winding sum in the fragment stage. Clipped instances are pushed slightly back in
+depth in the vertex shader so portal-seen geometry never z-fights the wall that frames it.
 
 **Stereo (WebXR).** The two eyes may be rooted in different cells. Each eye's visible set is expressed in a shared render
 frame by left-multiplying `renderFromRoot` onto every path matrix

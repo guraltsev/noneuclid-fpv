@@ -39,7 +39,7 @@ import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
 import type { CellComplexSpec } from "../../src/cell-complex/specs";
 import {
   createPortalClipMaterialState,
-  updatePortalClipMaterialViewportFromRenderer,
+  updatePortalClipMaterialTextureEye,
 } from "../../src/render/three/portalClipMaterial";
 import { createPortalClipData } from "../../src/render/three/portalClipData";
 import {
@@ -56,22 +56,15 @@ import { createXrPortalEyeRenderRootTarget, resolveXrPortalEyeRenderRoot } from 
 import { worldPointToThree } from "../../src/render/three/worldAxes";
 
 describe("per-frame allocation", () => {
-  it("reads the viewport into a scratch Vector4 and sets the uniforms in place", () => {
-    const state = createPortalClipMaterialState(createPortalClipData({ maxVisiblePaths: 4, maxClipVerticesPerPath: 8 }), {
-      width: 1,
-      height: 1,
-    });
-    const renderer = {
-      getCurrentViewport: (target: THREE.Vector4) => target.set(10, 20, 300, 400),
-    } as unknown as THREE.WebGLRenderer;
+  it("selects the clip eye in place without allocating", () => {
+    const state = createPortalClipMaterialState(createPortalClipData({ maxVisiblePaths: 4 }));
 
-    updatePortalClipMaterialViewportFromRenderer(state, renderer);
+    updatePortalClipMaterialTextureEye(state, 1);
     resetCounts();
-    updatePortalClipMaterialViewportFromRenderer(state, renderer);
+    updatePortalClipMaterialTextureEye(state, 0);
 
     expect(counts.Vector4).toBe(0);
-    expect(state.uniforms.portalViewportOriginPixels.value.toArray()).toEqual([10, 20]);
-    expect(state.uniforms.portalViewportPixels.value.toArray()).toEqual([300, 400]);
+    expect(state.uniforms.portalClipEyeIndex.value).toBe(0);
   });
 
   it("resolves an eye root without allocating math objects", () => {

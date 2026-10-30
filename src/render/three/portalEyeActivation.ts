@@ -1,5 +1,5 @@
 /**
- * Selects the portal-clip eye and viewport once per rendered eye instead of once per mesh.
+ * Selects the portal-clip eye (and runs an optional viewport hook) once per rendered eye instead of once per mesh.
  * three renders an XR frame by calling `renderScene` once per persistent sub-camera of the XR `ArrayCamera`, in XR view
  * order, which is also the order of the per-eye portal render states. Every archetype mesh's `onBeforeRender` calls
  * `beforeMesh`; the activator remembers the last camera and does the work only when the camera changes (or after
@@ -13,10 +13,10 @@ import * as THREE from "three";
 export interface PortalEyeActivatorDeps {
   /** `portalEyeRenderStates.length`. */
   getEyeCount(): number;
-  /** Sets the active eye index and the clip texture row offset. */
+  /** Sets the active eye index (the clip planes of that eye are read by the shader). */
   applyEye(eyeIndex: number): void;
-  /** Reads the renderer's current viewport into the clip uniforms. */
-  applyViewport(renderer: THREE.WebGLRenderer): void;
+  /** Optional hook run after `applyEye` with the renderer, when the camera changes. */
+  applyViewport?(renderer: THREE.WebGLRenderer): void;
 }
 
 /** Per-render eye/viewport activation shared by every archetype mesh's `onBeforeRender`. */
@@ -69,7 +69,7 @@ export function createPortalEyeActivator(deps: PortalEyeActivatorDeps): PortalEy
 
       lastCamera = renderCamera;
       deps.applyEye(resolveEye(renderer, renderCamera, deps.getEyeCount()));
-      deps.applyViewport(renderer);
+      deps.applyViewport?.(renderer);
     },
   };
 }

@@ -212,8 +212,6 @@ import { createPortalClipData } from "./portalClipData";
 import {
   createPortalClipMaterialState,
   updatePortalClipMaterialTextureEye,
-  updatePortalClipMaterialViewport,
-  updatePortalClipMaterialViewportFromRenderer,
 } from "./portalClipMaterial";
 import { createPortalClipPolygonOverlay } from "./portalClipPolygonOverlay";
 import { PortalDebugRuntimeDeps, createPortalDebugRuntime } from "./portalDebugRuntime";
@@ -238,12 +236,12 @@ import {
   createPortalInstanceDiagnostics,
   createPortalInstanceRenderDebugState,
   groupVisiblePortalPathsByDestinationCell,
+  omitPathsWithoutClipSlot,
   updateCellRenderArchetypeInstances,
 } from "./renderPortalInstances";
 import {
   getPortalViewportPixels,
   getWindowCssCanvasSize,
-  portalClipEdgeSmoothingEnabled,
   renderAntialiasRequested,
   resolveRenderQualityPixelRatio,
 } from "./renderQuality";
@@ -881,11 +879,8 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   const playerRoverRenderModel = createPlayerRoverRenderModel(options.assets);
   const portalInstanceDiagnostics = createPortalInstanceDiagnostics();
   const portalClipData = createPortalClipData({ maxVisiblePaths });
-  const portalClipMaterialState = createPortalClipMaterialState(
-    portalClipData,
-    getPortalViewportPixels(renderer),
-    { smoothClipEdges: options.renderQualityEnabled && portalClipEdgeSmoothingEnabled },
-  );
+  const portalClipMaterialState = createPortalClipMaterialState(portalClipData);
+  let portalClipOverflowWarned = false;
   // Everything declared here, before the setup calls below, is safe to use from setup code: a const or let declared
   // further down is still in its temporal dead zone when setup calls the functions that use it.
   // Brings runtime-object instances up to date from the frame snapshot; called once per frame, at setup and from
@@ -941,7 +936,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       activePortalEyeIndex = eyeIndex;
       updatePortalClipMaterialTextureEye(portalClipMaterialState, eyeIndex);
     },
-    applyViewport: (activeRenderer) => updatePortalClipMaterialViewportFromRenderer(portalClipMaterialState, activeRenderer),
   });
   // One persistent camera and matrix per XR eye for re-rooted eyes (see resolveXrPortalEyeRenderRoot).
   const portalEyeRootTargets: XrPortalEyeRenderRootTarget[] = [];
@@ -979,9 +973,8 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     normalVisiblePathRenderingActive: false,
     visiblePathIds: [],
     visiblePathDestinations: [],
-    clipPolygonVertexCountsByPath: [],
-    clipPolygonOverflowPathIds: [],
     visiblePathOverflowCount: 0,
+    portalClipMode: portalClipMaterialState.hardwareClipDistances ? "hardware" : "fragment",
   };
   let cellRenderArchetypes: readonly CellRenderArchetype[] = [];
   let portalInstanceDebugRenderer: PortalInstanceDebugRenderer | undefined;
@@ -1316,17 +1309,13 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     visibleCellId = playerPose.cellId;
   }
 
-  // Window resize handler: updates camera aspect, renderer size and the portal clip viewport (pixels).
+  // Window resize handler: updates camera aspect and renderer size.
   function onResize(): void {
     const canvasSize = getWindowCssCanvasSize(window);
     camera.aspect = canvasSize.width / canvasSize.height;
     camera.updateProjectionMatrix();
     renderer.setPixelRatio(pixelRatio);
     renderer.setSize(canvasSize.width, canvasSize.height);
-    updatePortalClipMaterialViewport(
-      portalClipMaterialState,
-      getPortalViewportPixels(renderer),
-    );
   }
 
   /**
@@ -2590,11 +2579,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     portalEyeRenderStates = [];
     activePortalEyeIndex = 0;
     updatePortalClipMaterialTextureEye(portalClipMaterialState, activePortalEyeIndex);
-    updatePortalClipMaterialViewport(
-      portalClipMaterialState,
-      getPortalViewportPixels(renderer),
-    );
-    const table = activeStaticCull().tables.tablesByRootCellId.get(renderRoot.rootCellId);
+    const table =activeStaticCull().tables.tablesByRootCellId.get(renderRoot.rootCellId);
 
     if (!table) {
       latestVisibleResult = undefined;
@@ -2628,11 +2613,11 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       ...renderedComputed,
       summary,
     };
-    const visiblePathsByDestinationCell = buildVisiblePathsByDestinationCell(
-      table.pathsByDestinationCellId,
-      latestVisibleResult.visiblePathById,
-    );
     portalClipData.update(latestVisibleResult.paths);
+    const visiblePathsByDestinationCell = omitPathsWithoutClipSlot(
+      buildVisiblePathsByDestinationCell(table.pathsByDestinationCellId, latestVisibleResult.visiblePathById),
+      portalClipData.clipIndexByPathId,
+    );
     updatePortalVisiblePathInstances(visiblePathsByDestinationCell);
     latestFrameSnapshot = createFrameRenderSnapshot({
       serial: aimFrameSerial,
@@ -2653,10 +2638,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   // only. If any eye's root cell lacks a cull table, visibility is cleared as in the mono pass.
   function syncStereoPortalInstanceRender(renderRoots: readonly XrPortalEyeRenderRoot[]): void {
     portalInstanceDiagnostics.reset();
-    updatePortalClipMaterialViewport(
-      portalClipMaterialState,
-      getPortalViewportPixels(renderer),
-    );
     const hasTables = renderRoots.every((renderRoot) =>
       activeStaticCull().tables.tablesByRootCellId.has(renderRoot.rootCellId)
     );
@@ -2750,7 +2731,10 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       });
       const cameraPositions = frameCameraPositions;
       portalClipData.updateStereo(portalEyeRenderStates.map((state) => state.result.paths));
-      const visiblePathsByDestinationCell = groupVisiblePortalPathsByDestinationCell(unionVisiblePaths);
+      const visiblePathsByDestinationCell = omitPathsWithoutClipSlot(
+        groupVisiblePortalPathsByDestinationCell(unionVisiblePaths),
+        portalClipData.clipIndexByPathId,
+      );
       updatePortalVisiblePathInstances(visiblePathsByDestinationCell);
       latestFrameSnapshot = createFrameRenderSnapshot({
         serial: aimFrameSerial,
@@ -2787,6 +2771,13 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   function updatePortalVisiblePathInstances(
     visiblePathsByDestinationCell: ReadonlyMap<string, readonly VisiblePortalPath[]>,
   ): void {
+    if (portalClipData.visiblePathOverflowCount > 0 && !portalClipOverflowWarned) {
+      portalClipOverflowWarned = true;
+      console.warn(
+        `Portal clip slots exhausted: ${portalClipData.visiblePathOverflowCount} visible paths are not drawn.`,
+      );
+    }
+
     updateCellRenderArchetypeInstances(
       cellRenderArchetypes,
       visiblePathsByDestinationCell,
@@ -2809,9 +2800,8 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
         showCellPathRendersInstances,
         normalVisiblePathRenderingActive,
         visiblePaths: result.paths,
-        clipPolygonVertexCountsByPathId: portalClipData.polygonVertexCountsByPathId,
-        clipPolygonOverflowPathIds: portalClipData.polygonVertexOverflowPathIds,
         visiblePathOverflowCount: portalClipData.visiblePathOverflowCount,
+        portalClipMode: portalClipMaterialState.hardwareClipDistances ? "hardware" : "fragment",
       },
     );
   }
