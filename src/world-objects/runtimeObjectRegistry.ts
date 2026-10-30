@@ -2,7 +2,7 @@
  * Runtime object registry: the per-cell, id-indexed store of every live (non-terrain) object in the world.
  * Authored specs (CellObjectSpec) are turned into RuntimeWorldObject values, which carry a cell id plus a pose in that cell's local frame (meters; cell-local x right, y forward, z up; yaw in radians about +z). Creatures, static assets, placed signs, geodesic cannons and the geodesic/measurement tool results all live here as one discriminated union keyed by `kind`.
  * Renderers, movement/collision, aiming and UI query the registry by cell (collidable, player-blocking, interactable, tooltip subsets) instead of walking specs.
- * Invariants: ids are unique registry-wide; the by-cell index always matches each object's current `cellId`; objects are treated as immutable values and changed by `update` with a replacement.
+ * Invariants: ids are unique registry-wide; the by-cell index always matches each object's current `cellId`; objects are treated as immutable values and changed by `update` with a replacement; `getVersion` increases by one per content change (add, update, remove of an existing id, moveToCell, owner publish).
  * For objects with an owner (creatures, the marmot, collidable static assets) the registry is a read model: only the owner's publisher (from `claimOwnership`) may replace the record; `update`, `moveToCell` and `remove` throw for owned ids.
  * Bulk fragments (bullets, stars and other particles) must not go through the registry per particle; per-tick immutable replacement allocates too much.
  */
@@ -128,6 +128,8 @@ export type RuntimeWorldObject =
  * Objects are replaced, never mutated in place. Per-cell query results are fresh arrays in insertion order of the cell's id set; they are snapshots that do not track later changes.
  */
 export interface RuntimeObjectRegistry {
+  /** Number of successful content changes since creation; starts at 0. Equal versions mean equal contents. */
+  getVersion(): number;
   /** Adds an object; throws if its id is already registered. */
   add(object: RuntimeWorldObject): void;
   /** Replaces the stored object with the same id (re-indexing if its cell changed); throws if the id is unknown or owned. */
@@ -222,6 +224,7 @@ export function createRuntimeObjectRegistry(
   }
 
   const ownedIds = new Set<string>();
+  let version = 0;
 
   function ownedError(id: string): Error {
     return new Error(`Runtime object "${id}" is owned; use its owner.`);
@@ -242,14 +245,19 @@ export function createRuntimeObjectRegistry(
     }
 
     objectsById.set(next.id, next);
+    version += 1;
   }
 
   const registry: RuntimeObjectRegistry = {
+    getVersion() {
+      return version;
+    },
     add(object) {
       if (objectsById.has(object.id)) {
         throw new Error(`Runtime object "${object.id}" already exists.`);
       }
 
+      version += 1;
       objectsById.set(object.id, object);
       indexObject(object);
       indexKinds(object);
@@ -279,6 +287,7 @@ export function createRuntimeObjectRegistry(
       unindexObject(object);
       unindexKinds(object);
       objectsById.delete(id);
+      version += 1;
     },
     claimOwnership(id) {
       if (!objectsById.has(id)) {

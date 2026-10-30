@@ -230,4 +230,44 @@ describe("runtimeObjectRegistry", () => {
     expect(registry.getObjectsOfKind("geo-mouse")).toEqual([]);
     expect(registry.getObjectsOfKind("geo-butterfly").map((object) => object.id)).toEqual(["mouse-a"]);
   });
+
+  describe("version", () => {
+    it("counts each content change exactly once", () => {
+      const registry = createRuntimeObjectRegistry();
+      expect(registry.getVersion()).toBe(0);
+      registry.add(creature("a", "cell-a"));
+      expect(registry.getVersion()).toBe(1);
+      registry.update(creature("a", "cell-a", { portalRenderable: false }));
+      expect(registry.getVersion()).toBe(2);
+      registry.moveToCell("a", "cell-b");
+      expect(registry.getVersion()).toBe(3);
+      registry.remove("a");
+      expect(registry.getVersion()).toBe(4);
+      registry.remove("a");
+      expect(registry.getVersion()).toBe(4);
+      expect(() => registry.update(creature("missing", "cell-a"))).toThrow();
+      expect(registry.getVersion()).toBe(4);
+    });
+
+    it("is not changed by reads and counts the initial list", () => {
+      const registry = createRuntimeObjectRegistry([creature("a", "c"), creature("b", "c"), creature("d", "c")]);
+      expect(registry.getVersion()).toBe(3);
+      registry.get("a");
+      registry.getAll();
+      registry.getObjectsInCell("c");
+      expect(registry.getVersion()).toBe(3);
+    });
+
+    it("counts owner publishes but not claim, release or rejected writes", () => {
+      const registry = createRuntimeObjectRegistry([creature("a", "c")]);
+      const publish = registry.claimOwnership("a");
+      expect(registry.getVersion()).toBe(1);
+      publish(creature("a", "c", { portalRenderable: false }));
+      expect(registry.getVersion()).toBe(2);
+      expect(() => registry.update(creature("a", "c"))).toThrow();
+      expect(registry.getVersion()).toBe(2);
+      registry.releaseOwnership("a");
+      expect(registry.getVersion()).toBe(2);
+    });
+  });
 });

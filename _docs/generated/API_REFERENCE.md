@@ -1631,6 +1631,16 @@ Error containment for the animation loop.
 | interface | `FrameErrorGuard` | Handle created by {@link createFrameErrorGuard}; owned by the frame loop that calls it. |
 | function | `createFrameErrorGuard` | Creates a guard with an empty failure history. |
 
+### `render/three/frameRenderSnapshot.ts`
+
+Frame render snapshot: the portal-render values of one frame, computed once where the cell instances are written.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `FrameRenderSnapshot` | Portal-render values of one frame, computed once where the cell instances are written. |
+| function | `createFrameRenderSnapshot` | Builds a snapshot; derives `objectPaths` and `objectPathsByDestinationCell` from `visiblePathsByDestinationCell`. |
+| function | `createEmptyFrameRenderSnapshot` | Snapshot with no visible paths (no cull table, no result, or before the first visibility pass). |
+
 ### `render/three/geodesicCannonAimTarget.ts`
 
 Computes the yaw a geodesic cannon should adopt to face a target point.
@@ -1780,7 +1790,6 @@ Render model for the player's own rover avatar.
 | --- | --- | --- |
 | const | `playerRoverAssetPath` | Asset path of the rover glTF (taken from the standard user robot object definition). |
 | interface | `PlayerRoverRenderModel` | Handle for the player rover avatar: its source scene graph and a per-frame record generator. |
-| interface | `PlayerRoverRenderRecordOptions` | Optional extras for rover record collection (currently ignored by the implementation). |
 | function | `createPlayerRoverRenderModel` | Creates the rover render model, or returns `undefined` if the rover glTF was not preloaded. |
 
 ### `render/three/portalClipData.ts`
@@ -2004,6 +2013,16 @@ Creates "ghost" render records so a dynamic object that overlaps a portal is dra
 | type | `PortalGhostRenderableObject` | A dynamic object with an id, i.e. |
 | interface | `PortalGhostRuntimeObjectRenderRecordRequest` | Input for ghost-record collection. |
 | function | `collectPortalGhostRuntimeObjectRenderRecords` | Returns ghost render records, in every cell copy the object's footprint reaches (empty if none, or if the cell, footprint or key list is missing). |
+
+### `render/three/runtimeObjectInstanceSync.ts`
+
+Runtime-object instance sync: brings the instanced render archetypes of runtime objects up to date and writes their instances from one {@link FrameRenderSnapshot}.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `RuntimeObjectInstanceSyncDeps` | Inputs of {@link createRuntimeObjectInstanceSync}; the maps are shared with the tool object runtimes and mutated here. |
+| interface | `RuntimeObjectInstanceSync` | Handle returned by {@link createRuntimeObjectInstanceSync}. |
+| function | `createRuntimeObjectInstanceSync` | Creates the instance sync. |
 
 ### `render/three/runtimeObjectRenderArchetypes.ts`
 

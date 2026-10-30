@@ -55,9 +55,9 @@ export interface ToolObjectRuntimesDeps {
   resetProtractorToolState(): void;
   /** Removes the in-scene protractor preview feedback. */
   clearProtractorToolFeedback(): void;
-  /** Rebuilds the instanced copies of runtime objects seen through portals. */
+  /** Requests a sync of the instanced copies of runtime objects seen through portals; the frame performs it. */
   syncRuntimeObjectPortalInstances(): void;
-  /** Refreshes the selectable-hitbox debug wireframes. */
+  /** Requests a refresh of the selectable-hitbox debug wireframes; the frame performs it. */
   syncSelectableHitboxDebug(): void;
 }
 

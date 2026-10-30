@@ -157,9 +157,9 @@ export interface GeodesicCannonToolsDeps {
   getGeodesicLabelsById(geodesicIds: readonly string[]): Readonly<Record<string, string>>;
   /** Re-syncs the desktop tool palette after tool or menu changes. */
   syncDesktopPalette(): void;
-  /** Rebuilds instanced copies of runtime objects seen through portals after registry changes. */
+  /** Requests a sync of the instanced copies of runtime objects seen through portals after registry changes; the frame performs it. */
   syncRuntimeObjectPortalInstances(): void;
-  /** Refreshes selectable-hitbox debug wireframes after registry changes. */
+  /** Requests a refresh of the selectable-hitbox debug wireframes after registry changes; the frame performs it. */
   syncSelectableHitboxDebug(): void;
   /** Recomputes measured lengths attached to a geodesic. */
   refreshMeasuredGeodesicLengthsForGeodesic(geodesicId: string): void;

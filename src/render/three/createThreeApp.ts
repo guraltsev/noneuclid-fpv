@@ -27,9 +27,13 @@
  * 3. Portal visibility: `updateVisibleCell` shows only the player's cell mesh, the culling cameras are placed
  *    (one per eye in stereo XR), and `computeVisiblePortalPaths` (inside `syncPortalInstanceRender` /
  *    `syncStereoPortalInstanceRender`) selects visible portal paths from the static per-root cull tables.
+ *    The portal pass builds one `FrameRenderSnapshot` (rendered root cell, visible paths, clip rows, viewer
+ *    positions) and stores it as `latestFrameSnapshot`.
  * 4. Instance sync: visible paths become per-cell instanced-mesh transforms and clip-plane data
  *    (`updateCellRenderArchetypeInstances`, `portalClipData`); runtime objects (and their portal ghosts) are
- *    synced the same way by `syncRuntimeObjectPortalInstances`. UI overlays, labels, tooltips, the scene
+ *    written exactly once per frame from that snapshot by `runtimeObjectInstanceSync.sync` (also once at setup
+ *    and once in `applyDebugSettings`). Tools and menus only request a sync. The selectable-hitbox debug meshes
+ *    are rebuilt by `syncSelectableHitboxDebugIfChanged`. UI overlays, labels, tooltips, the scene
  *    palette and debug state are refreshed here too.
  * 5. Render: a single `renderer.render(scene, camera)`; per-frame phase timings are then recorded.
  *
@@ -42,7 +46,7 @@
  * ## State ownership
  * All mutable state lives in the `createThreeApp` closure and is mutated only by it (or through the
  * setter callbacks it hands to the factories above). `playerPose`, `menuState`, `activeWorldBundle`,
- * `latestVisibleResult` and the tool states are replaced immutably (never edited in place). `appState`
+ * `latestVisibleResult`, `latestFrameSnapshot` and the tool states are replaced immutably (never edited in place). `appState`
  * supplies the initial pose, world and player body; after startup the shell's `playerPose` is authoritative
  * and `appState.playerPose` is not written back. `cellMeshes`, the render archetypes and the runtime object
  * registry are owned here and disposed by `dispose()`.
@@ -193,10 +197,8 @@ import {
   createInitialXrDebugState,
   smoothFramePerformance,
 } from "./frameDiagnostics";
-import {
-  collectGeodesicRuntimeRenderRecords,
-  createGeodesicRuntimeRenderSources,
-} from "./geodesicCannonRenderer";
+import { type FrameRenderSnapshot, createEmptyFrameRenderSnapshot, createFrameRenderSnapshot } from "./frameRenderSnapshot";
+import { createGeodesicRuntimeRenderSources } from "./geodesicCannonRenderer";
 import { GeodesicCannonToolState, createGeodesicCannonTools } from "./geodesicCannonTools";
 import { resolveGeodesicCarryPortalTransitionsFromCrossings } from "./geodesicCarryPortalTransition";
 import { createGeodesicDebugDumps } from "./geodesicDebugDumps";
@@ -235,10 +237,8 @@ import {
   buildVisiblePathsByDestinationCell,
   createPortalInstanceDiagnostics,
   createPortalInstanceRenderDebugState,
-  flattenVisiblePortalPathGroups,
   groupVisiblePortalPathsByDestinationCell,
   updateCellRenderArchetypeInstances,
-  updateRuntimeObjectRenderArchetypeInstances,
 } from "./renderPortalInstances";
 import {
   getPortalViewportPixels,
@@ -257,21 +257,14 @@ import {
 import { RootAimRay } from "./rootAimRay";
 import { createFrameErrorGuard } from "./frameErrorGuard";
 import { installRuntimeDiagnostics, runtimeDiagnostics } from "./runtimeDiagnostics";
-import { collectPortalGhostRuntimeObjectRenderRecords } from "./runtimeObjectGhostRecords";
+import { createRuntimeObjectInstanceSync } from "./runtimeObjectInstanceSync";
 import {
   RuntimeObjectRenderArchetype,
   buildRuntimeObjectRenderArchetype,
   createRuntimeObjectRenderArchetypeDiagnostics,
-  deriveRuntimeObjectRenderArchetypeCapacity,
   disposeRuntimeObjectRenderArchetypes,
-  groupRuntimeObjectRenderRecordsByArchetype,
 } from "./runtimeObjectRenderArchetypes";
-import {
-  RuntimeObjectRenderRecord,
-  RuntimeObjectRenderSourceMesh,
-  collectRuntimeObjectRenderSourceMeshes,
-  computeRenderSourceFootprintRadius,
-} from "./runtimeObjectRenderRecords";
+import { RuntimeObjectRenderSourceMesh } from "./runtimeObjectRenderRecords";
 import {
   buildCurrentCellForbiddenZoneWireframes,
   createCellWarmupViews,
@@ -280,7 +273,6 @@ import {
   disposeCanvasTextures,
   disposeObject3D,
   isGeodesicRuntimeRenderObject,
-  runtimeObjectArchetypeKeyPrefix,
   transformYawWithMap,
   yawFromPose,
 } from "./runtimeSceneUtils";
@@ -305,7 +297,6 @@ import {
   isArtificialLocomotionActive,
 } from "./vrComfort";
 import { resolveVrPalettePlacement } from "./vrPalettePlacement";
-import { rigidTransformToThreeMatrix } from "./worldAxes";
 import { createXrControllerHandModels } from "./xrControllerHandModels";
 import { createXrControls } from "./xrControls";
 import { createXrEntryUi } from "./xrEntryUi";
@@ -555,7 +546,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
 
       runtimeObjectRegistry.remove(flagId);
       removePlacedFlagRuntime(flagId);
-      syncRuntimeObjectPortalInstances();
+      requestRuntimeObjectInstanceSync();
     },
     onClosed() {
       menuState = setRuntimeMenuEditingFlagId(menuState, undefined);
@@ -680,7 +671,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       }
       if (toolId !== "geodesic-cannon-tie-detach") {
         syncTieAndDetachSelectionHighlights([]);
-        syncRuntimeObjectPortalInstances();
+        requestRuntimeObjectInstanceSync();
         activeGeodesicCannonToolState = {
           ...activeGeodesicCannonToolState,
           tieAndDetachEndpointSelections: undefined,
@@ -856,10 +847,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   scene.add(runtimeObjectRenderRoot);
   const runtimeObjectRootsById = new Map<string, THREE.Object3D>();
   const runtimeObjectRenderSourcesByKey = new Map<string, RuntimeObjectRenderSourceMesh>();
-  // Footprint radius per archetype-key prefix, recomputed when the cached source meshes of the prefix are replaced
-  // (sources are dropped and rebuilt on invalidation, so the identity of the first source detects that).
-  // Declared here, not next to its use: record collection runs during setup, before the later lines execute.
-  const runtimeObjectFootprintCache = new Map<string, { readonly first: RuntimeObjectRenderSourceMesh | undefined; readonly count: number; readonly radius: number }>();
   const runtimeObjectRenderArchetypesByKey = new Map<string, RuntimeObjectRenderArchetype>();
   const staticObjectCollisionWireframeGroupsByCellId = new Map<string, THREE.Group>();
   const selectableHitboxDebugGroupsByCellId = new Map<string, THREE.Group>();
@@ -879,6 +866,49 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     getPortalViewportPixels(renderer),
     { smoothClipEdges: options.renderQualityEnabled && portalClipEdgeSmoothingEnabled },
   );
+  // Everything declared here, before the setup calls below, is safe to use from setup code: a const or let declared
+  // further down is still in its temporal dead zone when setup calls the functions that use it.
+  // Brings runtime-object instances up to date from the frame snapshot; called once per frame, at setup and from
+  // applyDebugSettings only. Everything else requests a sync (the flags below).
+  const runtimeObjectInstanceSync = createRuntimeObjectInstanceSync({
+    registry: runtimeObjectRegistry,
+    runtimeObjectRootsById,
+    renderSourcesByKey: runtimeObjectRenderSourcesByKey,
+    renderArchetypesByKey: runtimeObjectRenderArchetypesByKey,
+    renderRoot: runtimeObjectRenderRoot,
+    geodesicRenderSources: geodesicRuntimeRenderSources,
+    geodesicArchetypeKeys: geodesicRuntimeArchetypeKeys,
+    playerRoverRenderModel,
+    maxVisiblePaths,
+    diagnostics: runtimeObjectRenderDiagnostics,
+    getWorld: activeWorld,
+    getPlayerPose: () => playerPose,
+    buildArchetype: (source, capacity) => {
+      const archetype = buildRuntimeObjectRenderArchetype(source, capacity, portalClipMaterialState);
+      archetype.mesh.onBeforeRender = (renderer, _scene, renderCamera) => {
+        activatePortalRenderStateForCamera(renderCamera, renderer);
+        updatePortalClipMaterialViewportFromRenderer(portalClipMaterialState, renderer);
+      };
+      return archetype;
+    },
+  });
+  // Portal-render values of the current frame, built once by the portal pass (see frameRenderSnapshot.ts).
+  let latestFrameSnapshot: FrameRenderSnapshot | undefined;
+  // Event-driven requests; the frame performs the sync and clears the flags. Tools call these through their
+  // `syncRuntimeObjectPortalInstances` / `syncSelectableHitboxDebug` deps.
+  let runtimeObjectInstanceSyncRequested = false;
+  let selectableHitboxDebugSyncRequested = false;
+  // Incremented whenever the cell root groups are rebuilt (the hitbox debug groups hang under them).
+  let cellRootsGeneration = 0;
+  function requestRuntimeObjectInstanceSync(): void {
+    runtimeObjectInstanceSyncRequested = true;
+  }
+  function requestSelectableHitboxDebugSync(): void {
+    selectableHitboxDebugSyncRequested = true;
+  }
+  function currentFrameSnapshot(): FrameRenderSnapshot {
+    return latestFrameSnapshot ?? createEmptyFrameRenderSnapshot(aimFrameSerial, playerPose.cellId);
+  }
   // Portal visibility results for the current frame. Written by syncPortalInstanceRender /
   // syncStereoPortalInstanceRender (and cleared on geometry commit); read by debug and tooltip code.
   let latestVisibleResult: ComputeVisiblePortalPathsResult | undefined;
@@ -956,7 +986,12 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     syncDesktopPalette,
   });
 
-  const { syncDynamicObjectDebugWireframes, syncStaticObjectCollisionWireframes, syncSelectableHitboxDebug } =
+  const {
+    syncDynamicObjectDebugWireframes,
+    syncStaticObjectCollisionWireframes,
+    syncSelectableHitboxDebug,
+    syncSelectableHitboxDebugIfChanged,
+  } =
     createDebugVisualization({
       runtimeObjectRegistry,
       dynamicObjectRuntimes,
@@ -1002,8 +1037,8 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       activeProtractorToolState = {};
     },
     clearProtractorToolFeedback,
-    syncRuntimeObjectPortalInstances,
-    syncSelectableHitboxDebug,
+    syncRuntimeObjectPortalInstances: requestRuntimeObjectInstanceSync,
+    syncSelectableHitboxDebug: requestSelectableHitboxDebugSync,
   });
 
   const { updateGeodesicEmitterLabels, getGeodesicDisplayName, getGeodesicLabelsById } =
@@ -1092,8 +1127,8 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     findFocusedRuntimeObject,
     getGeodesicLabelsById,
     syncDesktopPalette,
-    syncRuntimeObjectPortalInstances,
-    syncSelectableHitboxDebug,
+    syncRuntimeObjectPortalInstances: requestRuntimeObjectInstanceSync,
+    syncSelectableHitboxDebug: requestSelectableHitboxDebugSync,
     refreshMeasuredGeodesicLengthsForGeodesic,
     removeMeasuredGeodesicLengthsForGeodesic,
     removeProtractorAnglesForGeodesic,
@@ -1184,7 +1219,14 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     }
   }
   syncStaticObjectCollisionWireframes();
-  syncRuntimeObjectPortalInstances();
+  runtimeObjectInstanceSync.sync(currentFrameSnapshot());
+  syncSelectableHitboxDebugIfChanged({
+    registryVersion: runtimeObjectRegistry.getVersion(),
+    cellRootsGeneration,
+    forced: true,
+  });
+  runtimeObjectInstanceSyncRequested = false;
+  selectableHitboxDebugSyncRequested = false;
   disableFrustumCulling(scene);
   disableShadows(scene);
 
@@ -1481,7 +1523,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     }
     if (straightenedGeodesicIds.length > 0) {
       removeProtractorAnglesForMissingVertices(pruneMissingGeodesicIntersectionObjects(runtimeObjectRegistry));
-      syncSelectableHitboxDebug();
+      requestSelectableHitboxDebugSync();
     }
     refreshMeasuredGeodesicLengths();
     const frameAfterObjectsMs = performance.now();
@@ -1521,8 +1563,18 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
         renderFromRootMatrix: new THREE.Matrix4(),
       });
     }
-    // Phase 4 (objects): runtime-object instances for every visible portal path.
-    syncRuntimeObjectPortalInstances();
+    // Phase 4 (objects): the only runtime-object instance write of the frame, from the snapshot the portal pass built.
+    runtimeObjectInstanceSync.sync(currentFrameSnapshot());
+    syncSelectableHitboxDebugIfChanged({
+      registryVersion: runtimeObjectRegistry.getVersion(),
+      cellRootsGeneration,
+      forced: selectableHitboxDebugSyncRequested,
+    });
+    // The instance sync runs every frame; the request flag is kept (and only cleared) so a later job can skip
+    // frames in which nothing asked for a sync.
+    void runtimeObjectInstanceSyncRequested;
+    runtimeObjectInstanceSyncRequested = false;
+    selectableHitboxDebugSyncRequested = false;
     const frameAfterPortalMs = performance.now();
     const frameBeforeUiMs = frameAfterPortalMs;
 
@@ -1608,11 +1660,11 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     for (const runtime of placedFlagRuntimes.values()) {
       runtime.syncParent(cellMeshes);
     }
+    // Cell instances of the new world are written now; the objects and the hitbox debug are synced later in this
+    // same frame (the commit runs at frame start), so this does not write them.
     syncPortalInstanceRender();
-    syncRuntimeObjectPortalInstances();
     syncDynamicObjectDebugWireframes();
     syncStaticObjectCollisionWireframes();
-    syncSelectableHitboxDebug();
     applyDesktopCameraPose();
     portalDebugRuntime.dispose();
     portalDebugRuntime = createPortalDebugRuntime(portalDebugRuntimeDeps);
@@ -1843,8 +1895,10 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     }
     syncDynamicObjectDebugWireframes();
     syncStaticObjectCollisionWireframes();
-    syncRuntimeObjectPortalInstances();
+    runtimeObjectInstanceSync.sync(currentFrameSnapshot());
     syncSelectableHitboxDebug();
+    runtimeObjectInstanceSyncRequested = false;
+    selectableHitboxDebugSyncRequested = false;
     applyDesktopCameraPose();
     renderer.render(scene, camera);
   }
@@ -2272,7 +2326,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     syncTieAndDetachSelectionHighlights([]);
     clearProtractorToolFeedback();
     menuState = closeRuntimeMenu(setRuntimeMenuSelectedTool(menuState, "none"));
-    syncRuntimeObjectPortalInstances();
+    requestRuntimeObjectInstanceSync();
     syncDesktopPalette();
   }
 
@@ -2365,6 +2419,8 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   // Tears down and recreates the per-cell groups and instanced render archetypes for the active world,
   // preserving which cell is visible. Called at startup, on geometry commit and on debug-setting changes.
   function rebuildCellMeshes(): void {
+    // The hitbox debug groups hang under the cell roots disposed below, so the gated hitbox sync must rebuild.
+    cellRootsGeneration += 1;
     const currentlyVisibleCellId = visibleCellId ?? playerPose.cellId;
 
     portalInstanceDebugRenderer?.dispose();
@@ -2466,6 +2522,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
 
     if (!table) {
       latestVisibleResult = undefined;
+      latestFrameSnapshot = createEmptyFrameRenderSnapshot(aimFrameSerial, renderRoot.rootCellId);
       portalClipData.update([]);
       updateCellRenderArchetypeInstances(cellRenderArchetypes, new Map(), portalInstanceDiagnostics);
       portalInstanceRenderState = createPortalInstanceRenderDebugState(
@@ -2501,15 +2558,21 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       ...renderedComputed,
       summary,
     };
-    applyPortalVisibleResult(
-      renderRoot.rootCellId,
-      latestVisibleResult.paths,
+    const visiblePathsByDestinationCell = buildVisiblePathsByDestinationCell(
+      table.pathsByDestinationCellId,
       latestVisibleResult.visiblePathById,
-      true,
-      [runtimeObjectCameraPosition(renderRoot.camera, renderRoot.renderFromRootMatrix)],
     );
+    portalClipData.update(latestVisibleResult.paths);
+    updatePortalVisiblePathInstances(visiblePathsByDestinationCell);
+    latestFrameSnapshot = createFrameRenderSnapshot({
+      serial: aimFrameSerial,
+      rootCellId: renderRoot.rootCellId,
+      visiblePathsByDestinationCell,
+      clipIndexByPathId: portalClipData.clipIndexByPathId,
+      cameraPositions: [runtimeObjectCameraPosition(renderRoot.camera, renderRoot.renderFromRootMatrix)],
+    });
     portalInstanceRenderState = createPortalInstanceRenderStateFromVisibleResult(
-      renderRoot.rootCellId,
+      latestFrameSnapshot.visiblePathsByDestinationCell,
       latestVisibleResult,
       true,
     );
@@ -2530,6 +2593,10 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
 
     if (!hasTables) {
       latestVisibleResult = undefined;
+      latestFrameSnapshot = createEmptyFrameRenderSnapshot(
+        aimFrameSerial,
+        renderRoots[0]?.rootCellId ?? playerPose.cellId,
+      );
       portalEyeRenderStates = [];
       activePortalEyeIndex = 0;
       updatePortalClipMaterialTextureEye(portalClipMaterialState, activePortalEyeIndex);
@@ -2619,13 +2686,25 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
         runtimeObjectCameraPosition(renderRoot.camera, renderRoot.renderFromRootMatrix)
       );
       portalClipData.updateStereo(portalEyeRenderStates.map((state) => state.result.paths));
-      applyPortalVisiblePaths(unionVisiblePaths, false, cameraPositions);
+      const visiblePathsByDestinationCell = groupVisiblePortalPathsByDestinationCell(unionVisiblePaths);
+      updatePortalVisiblePathInstances(visiblePathsByDestinationCell);
+      latestFrameSnapshot = createFrameRenderSnapshot({
+        serial: aimFrameSerial,
+        rootCellId: portalEyeRenderStates[0]?.rootCellId ?? playerPose.cellId,
+        visiblePathsByDestinationCell,
+        clipIndexByPathId: portalClipData.clipIndexByPathId,
+        cameraPositions,
+      });
       portalInstanceRenderState = createPortalInstanceRenderStateFromVisibleResult(
-        portalEyeRenderStates[0]?.rootCellId ?? playerPose.cellId,
+        latestFrameSnapshot.visiblePathsByDestinationCell,
         latestVisibleResult,
         true,
       );
     } else {
+      latestFrameSnapshot = createEmptyFrameRenderSnapshot(
+        aimFrameSerial,
+        renderRoots[0]?.rootCellId ?? playerPose.cellId,
+      );
       portalClipData.update([]);
       updateCellRenderArchetypeInstances(cellRenderArchetypes, new Map(), portalInstanceDiagnostics);
       portalInstanceRenderState = createPortalInstanceRenderDebugState(
@@ -2657,36 +2736,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     updatePortalClipMaterialTextureEye(portalClipMaterialState, state.eyeIndex);
   }
 
-  function applyPortalVisibleResult(
-    rootCellId: string,
-    visiblePaths: readonly VisiblePortalPath[],
-    visiblePathById: ReadonlyMap<number, VisiblePortalPath>,
-    updateClipData = true,
-    cameraPositions: readonly THREE.Vector3[] = [runtimeObjectCameraPosition()],
-  ): void {
-    if (updateClipData) {
-      portalClipData.update(visiblePaths);
-    }
-    const visiblePathsByDestinationCell = buildVisiblePathsByDestinationCell(
-      activeStaticCull().tables.tablesByRootCellId.get(rootCellId)?.pathsByDestinationCellId ?? new Map(),
-      visiblePathById,
-    );
-    updatePortalVisiblePathInstances(visiblePathsByDestinationCell);
-    syncRuntimeObjectPortalInstances(flattenVisiblePortalPathGroups(visiblePathsByDestinationCell), cameraPositions);
-  }
-
-  function applyPortalVisiblePaths(
-    visiblePaths: readonly VisiblePortalPath[],
-    updateClipData = true,
-    cameraPositions: readonly THREE.Vector3[] = [runtimeObjectCameraPosition()],
-  ): void {
-    if (updateClipData) {
-      portalClipData.update(visiblePaths);
-    }
-    updatePortalVisiblePathInstances(groupVisiblePortalPathsByDestinationCell(visiblePaths));
-    syncRuntimeObjectPortalInstances(visiblePaths, cameraPositions);
-  }
-
   function updatePortalVisiblePathInstances(
     visiblePathsByDestinationCell: ReadonlyMap<string, readonly VisiblePortalPath[]>,
   ): void {
@@ -2699,15 +2748,10 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   }
 
   function createPortalInstanceRenderStateFromVisibleResult(
-    rootCellId: string,
+    visiblePathsByDestinationCell: ReadonlyMap<string, readonly VisiblePortalPath[]>,
     result: ComputeVisiblePortalPathsResult,
     normalVisiblePathRenderingActive: boolean,
   ): PortalInstanceRenderDebugState {
-    const visiblePathsByDestinationCell = buildVisiblePathsByDestinationCell(
-      activeStaticCull().tables.tablesByRootCellId.get(rootCellId)?.pathsByDestinationCellId ?? new Map(),
-      result.visiblePathById,
-    );
-
     return createPortalInstanceRenderDebugState(
       cellRenderArchetypes,
       visiblePathsByDestinationCell,
@@ -2753,26 +2797,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     return portalEyeRenderStates[0];
   }
 
-  function syncRuntimeObjectPortalInstances(
-    visiblePaths: readonly VisiblePortalPath[] = getRuntimeObjectVisiblePaths(),
-    cameraPositions: readonly THREE.Vector3[] = [runtimeObjectCameraPosition()],
-  ): void {
-    syncRuntimeObjectRenderSources();
-    const records = collectRuntimeObjectRenderRecords();
-    const recordsByArchetypeKey = groupRuntimeObjectRenderRecordsByArchetype(records);
-    const visiblePathsByDestinationCell = groupVisiblePortalPathsByDestinationCell(visiblePaths);
-    runtimeObjectRenderDiagnostics.reset();
-    updateRuntimeObjectRenderArchetypeInstances(
-      [...runtimeObjectRenderArchetypesByKey.values()],
-      recordsByArchetypeKey,
-      visiblePathsByDestinationCell,
-      runtimeObjectRenderDiagnostics,
-      portalClipData.clipIndexByPathId,
-      { cameraPositions },
-    );
-    syncSelectableHitboxDebug();
-  }
-
   function runtimeObjectCameraPosition(
     renderCamera: THREE.Camera = camera,
     renderFromRootMatrix?: THREE.Matrix4,
@@ -2780,177 +2804,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     renderCamera.updateMatrixWorld(true);
     const position = new THREE.Vector3().setFromMatrixPosition(renderCamera.matrixWorld);
     return renderFromRootMatrix ? position.applyMatrix4(renderFromRootMatrix) : position;
-  }
-
-  function syncRuntimeObjectRenderSources(): void {
-    const activeKeys = new Set<string>();
-    const hasGeodesicRuntimeObjects = runtimeObjectRegistry.getAll().some(
-      (object) => object.portalRenderable && isGeodesicRuntimeRenderObject(object),
-    );
-
-    if (hasGeodesicRuntimeObjects) {
-      for (const source of geodesicRuntimeRenderSources) {
-        activeKeys.add(source.archetypeKey);
-        if (!runtimeObjectRenderSourcesByKey.has(source.archetypeKey)) {
-          runtimeObjectRenderSourcesByKey.set(source.archetypeKey, source);
-        }
-      }
-    }
-
-    if (playerRoverRenderModel) {
-      for (const source of playerRoverRenderModel.collectSources()) {
-        activeKeys.add(source.archetypeKey);
-        if (!runtimeObjectRenderSourcesByKey.has(source.archetypeKey)) {
-          runtimeObjectRenderSourcesByKey.set(source.archetypeKey, source);
-        }
-      }
-    }
-
-    for (const object of runtimeObjectRegistry.getAll()) {
-      if (!object.portalRenderable) {
-        continue;
-      }
-
-      if (isGeodesicRuntimeRenderObject(object)) {
-        continue;
-      }
-
-      const root = runtimeObjectRootsById.get(object.id);
-      if (!root) {
-        continue;
-      }
-
-      const prefix = runtimeObjectArchetypeKeyPrefix(object);
-      for (const source of collectRuntimeObjectRenderSourceMeshes(object.id, root, prefix)) {
-        activeKeys.add(source.archetypeKey);
-        if (!runtimeObjectRenderSourcesByKey.has(source.archetypeKey)) {
-          runtimeObjectRenderSourcesByKey.set(source.archetypeKey, source);
-        }
-      }
-    }
-
-    for (const [key, archetype] of [...runtimeObjectRenderArchetypesByKey]) {
-      if (activeKeys.has(key)) {
-        continue;
-      }
-
-      runtimeObjectRenderRoot.remove(archetype.mesh);
-      disposeRuntimeObjectRenderArchetypes([archetype]);
-      runtimeObjectRenderArchetypesByKey.delete(key);
-      runtimeObjectRenderSourcesByKey.delete(key);
-    }
-
-    const recordsByArchetypeKey = groupRuntimeObjectRenderRecordsByArchetype(collectRuntimeObjectRenderRecords());
-    for (const key of activeKeys) {
-      const capacity = deriveRuntimeObjectRenderArchetypeCapacity(
-        recordsByArchetypeKey.get(key)?.length ?? 1,
-        maxVisiblePaths,
-      );
-      const existing = runtimeObjectRenderArchetypesByKey.get(key);
-      if (existing && existing.capacity >= capacity) {
-        continue;
-      }
-
-      const source = runtimeObjectRenderSourcesByKey.get(key);
-      if (!source) {
-        continue;
-      }
-
-      if (existing) {
-        runtimeObjectRenderRoot.remove(existing.mesh);
-        disposeRuntimeObjectRenderArchetypes([existing]);
-        runtimeObjectRenderArchetypesByKey.delete(key);
-      }
-
-      const archetype = buildRuntimeObjectRenderArchetype(source, capacity, portalClipMaterialState);
-      archetype.mesh.onBeforeRender = (renderer, _scene, renderCamera) => {
-        activatePortalRenderStateForCamera(renderCamera, renderer);
-        updatePortalClipMaterialViewportFromRenderer(portalClipMaterialState, renderer);
-      };
-      runtimeObjectRenderArchetypesByKey.set(key, archetype);
-      runtimeObjectRenderRoot.add(archetype.mesh);
-    }
-  }
-
-  function runtimeObjectFootprintRadius(prefix: string, archetypeKeys: readonly string[]): number {
-    const sources = archetypeKeys
-      .map((key) => runtimeObjectRenderSourcesByKey.get(key))
-      .filter((source): source is RuntimeObjectRenderSourceMesh => source !== undefined);
-    const cached = runtimeObjectFootprintCache.get(prefix);
-
-    if (cached && cached.first === sources[0] && cached.count === sources.length) {
-      return cached.radius;
-    }
-
-    const radius = computeRenderSourceFootprintRadius(sources);
-    runtimeObjectFootprintCache.set(prefix, { first: sources[0], count: sources.length, radius });
-    return radius;
-  }
-
-  function collectRuntimeObjectRenderRecords(): readonly RuntimeObjectRenderRecord[] {
-    const records = runtimeObjectRegistry.getAll().flatMap((object) => {
-      if (object.portalRenderable && isGeodesicRuntimeRenderObject(object)) {
-        return collectGeodesicRuntimeRenderRecords(object, geodesicRuntimeArchetypeKeys);
-      }
-
-      if (!object.portalRenderable || !runtimeObjectRootsById.has(object.id)) {
-        return [];
-      }
-
-      const localMatrix = rigidTransformToThreeMatrix(object.localPose);
-      const prefix = runtimeObjectArchetypeKeyPrefix(object);
-      const archetypeKeys = [...runtimeObjectRenderSourcesByKey.keys()]
-        .filter((key) => key.startsWith(`${prefix}:mesh:`));
-      const baseRecords = archetypeKeys.map((archetypeKey) => ({
-        objectId: object.id,
-        cellId: object.cellId,
-        archetypeKey,
-        localMatrix,
-      }));
-
-      return [
-        ...baseRecords,
-        ...collectPortalGhostRuntimeObjectRenderRecords({
-          world: activeWorld(),
-          object,
-          archetypeKeys,
-          footprintRadiusMeters: runtimeObjectFootprintRadius(prefix, archetypeKeys),
-        }),
-      ];
-    });
-
-    return playerRoverRenderModel
-      ? [
-          ...records,
-          ...playerRoverRenderModel.collectRecords(playerPose, runtimeObjectRenderSourcesByKey.keys(), {
-            ghostWorld: activeWorld(),
-            collision: createPlayerCollisionState(playerPose).collision,
-          }),
-        ]
-      : records;
-  }
-
-  function getRuntimeObjectVisiblePaths(): readonly VisiblePortalPath[] {
-    if (portalEyeRenderStates.length <= 1) {
-      if (!latestVisibleResult) {
-        return [];
-      }
-
-      return flattenVisiblePortalPathGroups(buildVisiblePathsByDestinationCell(
-        activeStaticCull().tables.tablesByRootCellId.get(playerPose.cellId)?.pathsByDestinationCellId ?? new Map(),
-        latestVisibleResult.visiblePathById,
-      ));
-    }
-
-    const visiblePathsById = new Map<number, VisiblePortalPath>();
-
-    for (const state of portalEyeRenderStates) {
-      for (const path of state.result.paths) {
-        visiblePathsById.set(path.pathId, path);
-      }
-    }
-
-    return [...visiblePathsById.values()].sort((left, right) => left.pathId - right.pathId);
   }
 
   function syncDesktopPalette(): void {
@@ -3010,7 +2863,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     if (flag?.kind === "placed-flag") {
       runtimeObjectRegistry.remove(editState.flagId);
       removePlacedFlagRuntime(editState.flagId);
-      syncRuntimeObjectPortalInstances();
+      requestRuntimeObjectInstanceSync();
     }
     menuState = closeRuntimeMenu(menuState);
     syncDesktopPalette();
@@ -3055,7 +2908,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       syncPlacedFlagRuntime(result.object);
       menuState = setRuntimeMenuSelectedTool(menuState, "none");
       syncDesktopPalette();
-      syncSelectableHitboxDebug();
+      requestSelectableHitboxDebugSync();
     }
   }
 
@@ -3095,7 +2948,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     syncMeasuredGeodesicLengthRuntime(measurement);
     menuState = setRuntimeMenuSelectedTool(menuState, "none");
     syncDesktopPalette();
-    syncSelectableHitboxDebug();
+    requestSelectableHitboxDebugSync();
   }
 
   function requestConfirmedReload(): void {
@@ -3218,7 +3071,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     clearProtractorToolFeedback();
     menuState = setRuntimeMenuSelectedTool(menuState, "none");
     syncDesktopPalette();
-    syncSelectableHitboxDebug();
+    requestSelectableHitboxDebugSync();
   }
 
   function tryRemoveFocusedProtractorAngle(ray?: RootAimRay): boolean {
@@ -3229,8 +3082,8 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
 
     runtimeObjectRegistry.remove(focused.object.id);
     removeProtractorAngleRuntime(focused.object.id);
-    syncRuntimeObjectPortalInstances();
-    syncSelectableHitboxDebug();
+    requestRuntimeObjectInstanceSync();
+    requestSelectableHitboxDebugSync();
     return true;
   }
 
@@ -3242,8 +3095,8 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
 
     runtimeObjectRegistry.remove(focused.object.id);
     removeMeasuredGeodesicLengthRuntime(focused.object.id);
-    syncRuntimeObjectPortalInstances();
-    syncSelectableHitboxDebug();
+    requestRuntimeObjectInstanceSync();
+    requestSelectableHitboxDebugSync();
     return true;
   }
 
@@ -3652,8 +3505,8 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       }
     }
     activeGeodesicCannonToolState = {};
-    syncRuntimeObjectPortalInstances();
-    syncSelectableHitboxDebug();
+    requestRuntimeObjectInstanceSync();
+    requestSelectableHitboxDebugSync();
   }
 
   function dispatchRuntimeCommand(command: RuntimeCommand): void {

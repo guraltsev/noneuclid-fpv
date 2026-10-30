@@ -8,10 +8,8 @@
  * camera is within 2 m so the avatar does not obstruct the first-person view.
  */
 import * as THREE from "three";
-import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex";
 import { yawRigidTransform3 } from "../../math/rigidTransform3";
 import type { PlayerPose } from "../../movement/playerPose";
-import type { DynamicObjectState } from "../../movement/dynamicObject";
 import type { PreparedWorldAssets } from "./preloadWorldAssets";
 import {
   collectRuntimeObjectRenderSourceMeshes,
@@ -38,19 +36,11 @@ export interface PlayerRoverRenderModel {
   collectSources(): readonly RuntimeObjectRenderSourceMesh[];
   /**
    * Returns one render record per rover mesh whose archetype key is in `archetypeKeys`, all sharing the pose matrix of `playerPose`.
-   * The `options` argument is currently accepted but unused.
    */
   collectRecords(
     playerPose: PlayerPose,
     archetypeKeys: Iterable<string>,
-    options?: PlayerRoverRenderRecordOptions,
   ): readonly RuntimeObjectRenderRecord[];
-}
-
-/** Optional extras for rover record collection (currently ignored by the implementation). */
-export interface PlayerRoverRenderRecordOptions {
-  readonly ghostWorld?: CompiledCellComplex;
-  readonly collision?: DynamicObjectState["collision"];
 }
 
 /**

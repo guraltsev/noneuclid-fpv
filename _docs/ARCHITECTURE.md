@@ -141,7 +141,10 @@ Order of work in each frame (`renderFrame`):
    (`src/world-objects/geodesic/curveShortening.ts#advanceCurveShorteningPairs`), refresh dependent measurements and angles.
 6. Place the camera(s); for XR also the per-eye culling cameras.
 7. **Portal visibility and instances**: compute visible portal paths from the camera, update the instanced cell meshes
-   (one draw per cell archetype, one instance per visible path) and the instanced runtime objects.
+   (one draw per cell archetype, one instance per visible path). This pass builds one frame snapshot (rendered root
+   cell, visible paths, clip rows, viewer positions); the instanced runtime objects are then written exactly once from
+   that snapshot (`src/render/three/runtimeObjectInstanceSync.ts`), so they always use the root that is rendered.
+   Tools only request a sync.
 8. UI overlays: aim marker, labels, floating tooltips, palette, debug overlay.
 9. `renderer.render`, then frame-timing bookkeeping.
 
