@@ -19,6 +19,16 @@ to `maxVisiblePaths` (`portalClipData.ts:129-131`). Archetype capacity is still 
 (`deriveCellRenderArchetypeCapacities`, `cellRenderArchetypes.ts:146-165`). Line numbers below have been updated. No
 test of the split-root case exists yet.
 
+## Status update 2026-10-29
+
+Re-verified at 0b468e1; still open, nothing implemented. Line numbers moved: `syncStereoPortalInstanceRender` is at
+`createThreeApp.ts:2530` (split branch 2591-2618), the runtime-object -2 write at `renderPortalInstances.ts:309`, and
+`resolveXrPortalEyeRenderRoot` at `xrPortalEye.ts:40-86` (rewritten by job 17). Two new findings, both handled in job
+[23](../.agents/jobs/23_stereo_split_root_correctness.md): (1) the shared-root test compares root ids only, so in a
+self-glued cell (`torus-moduli`) an eye re-rooted to the same id with a +15 m translation is treated as shared and draws
+the other eye's placements; (2) job 17's runtime-object placement dedupe would hide objects in one eye once split
+roots are clipped, unless the dedupe key includes the eye's root.
+
 ## Summary
 
 When the two eyes resolve to different root cells (the head straddles a portal, `xrPortalEye.ts:53-74`), both roots'

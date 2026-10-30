@@ -6,6 +6,14 @@ Priority: P2 (performance + design). Complements issue 38 (decompose monoliths) 
 
 Jobs: [27](../.agents/jobs/27_geodesic_rebuild_performance.md).
 
+## Status update 2026-10-29
+
+Job 27 was rewritten against commit `0b468e1` with re-verified evidence; the line numbers below are stale. Corrections:
+a carry frame runs two intersection passes per incident locked interval (not one plus a removal elsewhere), the
+`{...input}` spread per trace step is gone (job 15), and a crossing that lies exactly on a portal side is reported
+twice, once per cell, rather than missed (merged issue-41 item). Item 4 needs no code (job 15 caches inverse portal
+transforms; job 26 builds a sleeve once per pair). The module directory is `src/world-objects/geodesic/` (job 25).
+
 ## Status update 2026-10-28
 
 Nothing has been done. `getGeodesicSegments` still copies the registry (`src/world-objects/geodesicCannon.ts:1037-1045`),

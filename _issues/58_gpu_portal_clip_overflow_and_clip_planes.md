@@ -6,6 +6,14 @@ Priority: P2 (correctness for the overflow; performance for the rest).
 
 Jobs: [22](../.agents/jobs/22_gpu_portal_clip_planes.md).
 
+## Status update 2026-10-29
+
+Re-checked at `0b468e1`: unchanged. Stale references: the runtime-object clip index is `renderPortalInstances.ts:309`
+(not `:275`); `portalClipEdgeSmoothingEnabled` is `false` (`renderQuality.ts:16`), so the smooth mode is compiled off
+and only the hard mode runs; the smoothing flag is read at `createThreeApp.ts:878` (not `:853`) and the overflow ids
+reach debug state at `:2730` (not `:2597`). three r0.164 supports `material.extensions.clipCullDistance` but never
+calls `gl.enable(CLIP_DISTANCEi)`; job 22 handles that.
+
 ## Status update 2026-10-28
 
 Nothing in the proposal is implemented. Clips are still NDC polygons of at most 8 vertices in a float texture. Overflow

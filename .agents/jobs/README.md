@@ -99,14 +99,15 @@ Resolves: issue [NN](../../_issues/NN_....md).
 | [15](_done/15_geodesic_tracing_on_kernel.md) | ~~Geodesic tracing on the segment-walk kernel~~ (done, needs review) | [69](../../_issues/69_geodesic_tracing_kernel_numerics.md) |  |
 | [16](_done/16_aim_picking_by_portal_ray_walk.md) | ~~Aim picking by portal ray walk~~ (done, needs review) | [72](../../_issues/72_aim_picking_uses_camera_clip_polygons_not_portal_ray_walk.md) |  |
 | [17](_done/17_multi_hop_ghosts_and_eye_rerooting.md) | ~~Multi-hop portal ghosts and XR eye re-rooting~~ (done, needs review) | [73](../../_issues/73_portal_ghosts_and_xr_eye_rerooting_are_single_hop.md) |  |
+| [00](00_coordinate_jobs_19_23_25_29_37.md) | Coordinate jobs 37, 38, 25-29 and 19-23 in four phases (phase commits and tags) | - |  |
 | [18](18_vertex_classes_and_gluing_validation.md) | Compile-time vertex classes, cone angles and gluing validation | [52](../../_issues/52_compile_time_vertex_classes_and_gluing_validation.md) |  |
-| [19](19_vr_palette_and_in_headset_debug.md) | Finish the VR palette and add an in-headset debug readout | - | 20 |
+| [19](19_vr_palette_and_in_headset_debug.md) | Fix the XR input defects and add an in-headset debug panel | - | 20 |
 | [20](20_exact_static_cull.md) | Exact static cull by oriented line stabbing | [56](../../_issues/56_exact_static_cull_by_oriented_line_stabbing.md) |  |
 | [21](21_per_frame_visibility_funnel.md) | Per-frame visibility: visible-parent traversal and the exact funnel | [57](../../_issues/57_per_frame_portal_visibility_funnel_and_traversal.md) |  |
 | [22](22_gpu_portal_clip_planes.md) | GPU portal clipping with clip planes | [58](../../_issues/58_gpu_portal_clip_overflow_and_clip_planes.md) |  |
 | [23](23_stereo_split_root_correctness.md) | Correct stereo rendering with split eye roots | [59](../../_issues/59_stereo_split_root_unclipped_roots_and_union_budget.md) |  |
 | [24](24_lazy_path_trie.md) | Replace per-root path tables with a lazy path trie | - | 60 |
-| [25](25_split_geodesic_cannon_modules.md) | Split geodesicCannon.ts and geodesicCannonTools.ts | - | 76 |
+| [25](25_split_geodesic_cannon_modules.md) | Split geodesicCannon.ts into modules under src/world-objects/geodesic/ | - | 76 |
 | [26](26_exact_curve_shortening.md) | Exact curve shortening via the sleeve/funnel | [67](../../_issues/67_exact_curve_shortening_via_sleeve_funnel.md) |  |
 | [27](27_geodesic_rebuild_performance.md) | Per-frame cost of geodesic rebuilds | [70](../../_issues/70_geodesic_module_performance_and_split.md) |  |
 | [28](28_frame_snapshot_instance_sync.md) | Sync runtime-object instances once per frame against the rendered root | [71](../../_issues/71_runtime_object_instance_sync_runs_twice_with_stale_root.md) |  |
@@ -119,3 +120,4 @@ Resolves: issue [NN](../../_issues/NN_....md).
 | [35](35_torus_family_as_teichmuller_space.md) | Treat the torus family as TeichmÃ¼ller space | - | 54 |
 | [36](_done/36_creatures_detour_and_resume_geodesic.md) | ~~Creatures detour around obstacles and resume their geodesic~~ (done, needs review) | - |  |
 | [37](37_object_owners_and_place_at.md) | Objects own their position; `placeAt` moves any positioned object | - |  |
+| [38](38_draw_assets_from_registry.md) | Draw static assets from their registry record | - |  |

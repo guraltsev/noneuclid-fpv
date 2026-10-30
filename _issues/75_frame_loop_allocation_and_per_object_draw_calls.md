@@ -6,6 +6,14 @@ Priority: P2 (performance; matters most at 72-120 Hz in XR).
 
 Jobs: [29](../.agents/jobs/29_frame_loop_allocation_and_draw_calls.md).
 
+## Status update 2026-10-29
+
+Re-checked at `0b468e1`. "Aim calls `getRuntimeObjectVisiblePaths` 3-6 times per frame" is fixed by job 16 (aim walks
+the ray). Job 17 moved lines (`renderPortalInstances.ts:316-318` for the object `needsUpdate`, `runtimeSceneUtils.ts:180-186`
+for the key prefix, `xrPortalEye.ts:49/58/75/84/89/95` for the eye allocations) and added a `Map`, a `Set` and a key
+string per candidate instance (placement dedupe). The marmot proxy has 12 meshes, not 13. Everything else holds; job
+[29](../.agents/jobs/29_frame_loop_allocation_and_draw_calls.md) was rewritten with the per-item table and the fix.
+
 ## Status update 2026-10-28
 
 Nothing in this issue has been fixed. Every allocation and draw-call item below was re-checked against the current

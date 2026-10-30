@@ -9,6 +9,13 @@ stall bug.
 
 Jobs: [26](../.agents/jobs/26_exact_curve_shortening.md).
 
+## Status update 2026-10-29
+
+Job 26 was rewritten against commit `0b468e1`; the line numbers below are from 2026-10-28 and are stale (the file is now
+6,160 lines and job 25 splits it). The planned directory is `src/world-objects/geodesic/` (not `geodesics/`). Job 26
+decides: one-tick resolution without animation, corners as a new `geodesic-corner` anchor kind, deletion (with a notice)
+of free loops whose holonomy rotates.
+
 ## Status update 2026-10-28
 
 Not started: there is no `src/world-objects/geodesics/` directory and no sleeve or funnel code. Curve shortening is

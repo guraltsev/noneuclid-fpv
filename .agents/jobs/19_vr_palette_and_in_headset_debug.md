@@ -1,289 +1,280 @@
-# Job 19 - Finish the VR palette and add an in-headset debug readout
+# Job 19 - Fix the XR input defects and add an in-headset debug panel
 
 Status: queued.
-Former issue: 20 (converted to a job on 2026-10-28).
-
-Priority: P2 for manual verification only.
-
-## Status update 2026-10-28
-
-Done:
-
-- Shared definition: `src/ui/paletteDefinition.ts` drives both the desktop in-scene palette and the VR palette
-  (`scenePaletteController.ts`, `scenePaletteLibraryAdapter.ts`, `vrPaletteLibraryAdapter.ts`). The DOM palette of
-  issue 19 is gone; desktop also uses the in-scene palette (`desktopScenePaletteInput.ts`).
-- Library: `@pmndrs/uikit`, `@pmndrs/uikit-default` and `@pmndrs/uikit-lucide` in `package.json`, used through the
-  vanilla Three.js path. The cog is the lucide `Settings` icon, and the header also uses `X`, `ArrowLeft`,
-  `ChevronLeft`/`ChevronRight`.
-- Header actions: `tests/render-contract/vrPaletteHeaderActions.test.ts` checks settings plus close on the main page,
-  and back plus close on the settings and debug submenus.
-- Placement: `vrPalettePlacement.ts`, tested in `vrPalettePlacement.test.ts`.
-- Input: `xrScenePaletteInput.ts` (`isSelectPressed`, `isMenuTogglePressed` on the side trigger) and
-  `scenePointers.ts`, tested in `xrScenePaletteInput.test.ts` and `scenePointers.test.ts`.
-- Hands: `xrControllerHandModels.ts` loads `lowpolyhands/Lowpolyhands.glb`, tested in
-  `xrControllerHandModels.test.ts`.
-- Settings content: world selector, reload, and a "UI overlay" toggle with per-item toggles
-  (`vrPaletteLibraryAdapter.ts`, debug settings page).
-- Superseded: "main page has no selectable tools" and "empty content area" no longer apply. Issues 27 and 30 put
-  tools (geodesic cannon, flags, help) on the main page.
-
-Remaining:
-
-- **In-XR debug readout (step 7).** `xrDebugPanel.ts` was removed, and the only debug overlay is the DOM element from
-  `debugOverlay.ts`. That element is not visible in an immersive session (the session requests no `dom-overlay`
-  feature). The VR "UI overlay" toggle therefore changes state, but nothing appears in the headset. The two
-  acceptance items "debug overlay can be toggled in immersive VR" and "remains visible independent of menu open/closed
-  state" are not met. Either add a small head-locked Three.js/uikit text panel fed from `DebugOverlayState`, or drop
-  these items explicitly.
-- Manual headset check of the items in step 9: hover/select, menu toggle from either controller, menu closed at
-  session start, hand tracking of the models, and text readability. No headset result is recorded.
-
-Shared definitions, scene UI rendering, controller pointer/select behavior,
-tracked hand models, page headers, world/debug settings, and contract tests now
-exist. Issues 27 and 30 subsequently generalized the UI beyond a VR-only
-palette. Record a brief headset result and archive this implementation blueprint.
+Former issue: 20 (converted to a job on 2026-10-28). Rewritten on 2026-10-29 for a less capable implementing model;
+the legacy blueprint was dropped because everything in it except the items below is done (shared palette definition,
+`@pmndrs/uikit` palette, header actions, placement, pointer input, hand models, settings page; see `git log` before
+0b468e1 and the tests named in "Before you start").
+Resolves: no open issue (issue 41, whose XR input items are fixed here, is already closed).
 
 ## Goal
 
-Port the FPS palette menu to immersive VR by reusing the shared menu definition from issue 19 and rendering it with a VR-capable UI library.
-
-This issue should not recreate widgets from scratch. It should evaluate and integrate a library-backed VR UI path for buttons, toggles, dropdown/list behavior, text, focus/hover/active states, clipping, and controller selection.
-
-Supersedes the closed DOM-first proposal in
-[[job 19](../../_issues/_closed/19_fps_dom_palette_menu.md)](../../_issues/_closed/19_fps_dom_palette_menu.md).
-
-Design reference: [_docs/design/011-vr-hand-tools-palette.md](../../_docs/design/011-vr-hand-tools-palette.md).
-
-## Scope
-
-Bring the existing menu into VR:
-
-- use the same shared palette/menu definition created for FPS mode,
-- render the main page in VR:
-  - empty rectangular content area with no placeholder text,
-  - upper-left cogwheel/settings button rendered as a recognizable cog, not a missing-glyph rectangle,
-  - upper-right `X` close button,
-- render the settings page in VR:
-  - `<-` back button for submenu navigation,
-  - `X` close button available alongside back,
-  - world selector,
-  - reload button,
-  - debug overlay toggle,
-- toggle the VR menu with the side/menu button on either controller,
-- show the `Lowpolyhands.glb` hand models on the tracked left and right controller poses,
-- support controller ray hover and select,
-- keep the VR menu closed when entering XR until the user toggles it open,
-- preserve controller locomotion, reset, collision, and portal traversal,
-- avoid hand-written widget implementations where the selected UI library can provide them.
-
-## Library Direction
-
-Default spike target: `@pmndrs/uikit`, specifically its vanilla Three.js path.
-
-Fallback: `three-mesh-ui` if UIKit integration is too heavy or incompatible with the current renderer.
-
-Do not migrate the app to React Three Fiber solely for this menu. `@react-three/xr` and `@react-three/uikit` are useful references, but this app currently uses plain Three.js and should stay there unless a larger renderer migration is explicitly approved.
-
-## Required Files
-
-Likely touched files:
-
-- `package.json`
-- `package-lock.json`
-- `src/render/three/createThreeApp.ts`
-- `src/render/three/xrControls.ts`
-- `src/render/three/xrPlayerRig.ts`
-- `src/render/three/xrSessionState.ts`
-
-Likely new files:
-
-- `src/render/three/vrPaletteLibraryAdapter.ts`
-- ~~`src/render/three/vrPaletteController.ts`~~ removed; the live path is `scenePaletteController.ts`
-- `src/render/three/vrPalettePlacement.ts`
-- `src/render/three/xrControllerHandModels.ts`
-- ~~`src/render/three/xrPointers.ts`~~ removed; pointers live in `scenePointers.ts` and `xrScenePaletteInput.ts`
-- ~~`src/render/three/xrDebugPanel.ts`~~ removed as unused; no in-XR debug panel exists (see status update)
-
-Likely tests:
-
-- ~~`tests/render-contract/vrPaletteController.test.ts`~~ not created; see `scenePaletteLibraryAdapter.test.ts`, `vrPaletteHeaderActions.test.ts`
-- `tests/render-contract/vrPalettePlacement.test.ts`
-- ~~`tests/render-contract/xrPointers.test.ts`~~ not created; see `scenePointers.test.ts`, `xrScenePaletteInput.test.ts`
-
-## Implementation Plan
-
-### 1. Run a UI-library spike
-
-Before wiring the full menu, prove the chosen library can support:
-
-- a panel attached to a Three.js scene,
-- readable text at VR menu distance,
-- a button with hover/active/click states,
-- a toggle control,
-- a dropdown or dropdown-equivalent selector,
-- a scrollable list or clipped list for long world menus,
-- controller ray hover and select,
-- clean per-frame update inside `renderer.setAnimationLoop(...)`,
-- clean disposal when exiting XR or disposing the app.
-
-If `@pmndrs/uikit` cannot satisfy these without substantial architecture churn, evaluate `three-mesh-ui`.
-
-### 2. Keep the shared menu definition authoritative
-
-The VR implementation should consume the same palette definition as the FPS DOM menu.
-
-Do not fork menu content into a separate VR-only hierarchy. The library adapter may translate the shared definition into UI components, but the app-visible actions and item ids must remain shared.
-
-### 3. Add VR placement
-
-First placement target:
-
-- place the palette in front of the headset/player at a comfortable fixed distance,
-- face the panel toward the headset,
-- smooth pose changes to reduce jitter,
-- freeze or stabilize while the user is actively selecting.
-
-Fallback placement:
-
-- keep the menu head-relative even if controller pose data is unavailable; controller tracking is for rays/select only.
-
-### 4. Add VR input abstraction
-
-Add one pointer abstraction for:
-
-- controller target rays,
-- select started/ended edges,
-- hover target id,
-- active pointer source.
-
-The pointer abstraction should produce menu events and commands, not mutate world/menu state directly.
-
-### 5. Wire controller ray selection
-
-Use the selected UI library's event or hit-testing model if possible.
-
-The side/menu button on either controller should toggle the VR menu. Pointer rays should work from tracked controllers, with whichever controller is actively selecting treated as the active pointer source.
-
-If manual ray bridging is still required:
-
-- raycast against the library's interactive objects,
-- map hits to shared item/action ids,
-- dispatch the same commands used by the desktop menu.
-
-### 6. Render settings behavior
-
-The VR menu must match the FPS menu behavior:
-
-- main page has no selectable tools,
-- main page content remains empty, matching the desktop palette; do not add VR-only placeholder copy such as `Tool area reserved`,
-- left and right controller poses render the `Lowpolyhands.glb` visual hand models,
-- menu remains closed on XR session start until toggled open,
-- cog opens settings,
-- `X` closes main page,
-- settings page offers `<-` back without removing the `X` close button,
-- every VR menu page has an `X` close button,
-- VR submenu pages may also have a `<-` back button,
-- world selector uses the shared world catalog,
-- reload dispatches `reload-world`,
-- debug overlay toggle dispatches `set-debug-overlay`.
-
-### 7. Add XR debug overlay rendering
-
-The DOM debug overlay is not visible in immersive VR. Add a renderer-side debug panel that can be toggled from the menu.
-
-Place the VR debug panel in the upper-left of the headset view so it remains visible when enabled. Its visibility should follow debug mode and the debug overlay toggle, not whether the palette is currently open.
-
-The first version can show compact state:
-
-- current cell id,
-- XR session state,
-- input mode,
-- last blocked movement reason,
-- visible portal path count if available.
-
-### 8. Preserve VR runtime behavior
-
-Do not regress:
-
-- joystick locomotion,
-- continuous turn,
-- reset,
-- room-scale collision approval,
-- forbidden-zone blocking,
-- portal traversal,
-- desktop fallback.
-
-### 9. Add tests and manual headset checks
-
-Contract tests should cover pure menu and input behavior without requiring a headset.
-
-Manual checks should cover:
-
-- menu opens in headset,
-- main page content is empty, with no placeholder text,
-- cogwheel icon renders as a recognizable cog instead of a missing-glyph rectangle,
-- left and right controller hand models appear and track the controller poses,
-- menu starts closed when entering XR,
-- menu toggles from the side/menu button on either controller,
-- controller ray hover works,
-- controller select works,
-- settings page back behavior,
-- world selector behavior,
-- reload behavior,
-- debug overlay toggle visibility,
-- debug overlay remains visible after closing the menu when debug mode and UI overlay are enabled,
-- locomotion still works when the menu is closed.
-
-## Acceptance Criteria
-
-- ~~The VR menu uses the shared palette definition from issue 19.~~ done: `src/ui/paletteDefinition.ts`.
-- ~~A VR UI library handles widget rendering/layout rather than local custom widgets.~~ done: `@pmndrs/uikit`.
-- ~~The main VR menu shows an empty rectangular content area with no selectable tools and no placeholder text.~~ superseded by issues 27 and 30 (the main page now holds tools).
-- ~~The cog/settings button renders as a recognizable cogwheel icon, not a missing-glyph rectangle.~~ done: lucide `Settings` icon.
-- ~~The `Lowpolyhands.glb` models render as left and right controller-tracked hand visuals.~~ done in code (`xrControllerHandModels.ts`); headset check pending.
-- Entering XR does not auto-open the VR menu.
-- The side/menu button on either controller toggles the VR menu.
-- The cog opens settings.
-- ~~The `X` closes every VR menu page.~~ done: `vrPaletteHeaderActions.test.ts`.
-- ~~The settings page uses `<-` back while still keeping an `X` close button available.~~ done: `vrPaletteHeaderActions.test.ts`.
-- ~~Settings include a world selector, reload button, and debug overlay toggle.~~ done.
-- Controller ray hover/select works.
-- The debug overlay can be toggled in immersive VR. **Not met:** the toggle exists, but no overlay renders in XR.
-- The debug overlay remains visible independent of menu open/closed state when enabled. **Not met** in XR (see status update).
-- Existing VR locomotion, collision, reset, and portal traversal still work.
-- ~~Desktop FPS menu from issue 19 still works.~~ superseded: the DOM menu was replaced by the shared in-scene palette.
-- `npm run typecheck`, `npm test`, and `npm run build` pass.
-
-## Non-goals
-
-- Do not implement geometry tools.
-- Do not implement marker, ray, measurement, or path-trace behavior.
-- Do not write custom dropdown, toggle, button, or scrolling widgets from scratch unless the library spike fails and the fallback is explicitly approved.
-- Do not migrate the app to React Three Fiber as part of this issue.
-- Do not implement hand tracking or hand-pinch input for this issue.
-- Do not hot-swap worlds inside the current XR session unless it naturally falls out of existing URL/reload behavior.
-
-## Risks
-
-- `@pmndrs/uikit` may require more integration work than expected in a plain Three.js app.
-- Dropdown behavior in VR may be better represented as a compact scrollable list than as a literal desktop-style dropdown.
-- Text readability and transparent panel ordering need headset testing, not only desktop inspection.
-
-## Merged from issues 21 and 41 (2026-10-28)
-
-From issue 41 (XR input and palette):
-
-- `isCarryActionPressed` (`render/three/xrControls.ts`) always returns false, so carry cannot be reached from XR. This
-  needs a button-binding decision.
-- `menuTogglePressed` is always false in both palette input modules: `xrScenePaletteInput.ts` computes it in
-  `createControllerSources`, but `createXrScenePaletteInput` returns `false`.
-- `xrScenePaletteInput` shares a module-level `controllerObjects` set across instances.
-- `onGeometryComputerSetTargetRequested` is wired through `scenePaletteController.ts` but never invoked by
-  `vrPaletteLibraryAdapter.ts`.
-- Legacy `xrPalette*` userData keys still exist beside `scenePalette*`: the writers are in
-  `vrPaletteLibraryAdapter.ts`, and fallback readers are in `scenePaletteController.ts` and `scenePointers.ts`.
-
-From issue 21 (stereo debugging):
-
-- The in-headset debug readout is the one missing piece for the stereo headset checks in issue
-  [59](../../_issues/59_stereo_split_root_unclipped_roots_and_union_budget.md). When it exists, it should show per-eye, union, left-only, right-only and both-eye path counts.
+1. **Part A - XR input defects** (merged from issue 41):
+   1. XR can request carry: button 4 (A on the right controller, X on the left) sets `carryActionRequested`.
+   2. The dead menu-toggle computation in `xrScenePaletteInput.ts` is removed; the side trigger keeps toggling the menu
+      through the runtime interact path, as today.
+   3. Each `XrScenePaletteInput` owns its own controller-object cache (no module-level state).
+   4. The unused `onGeometryComputerSetTargetRequested` dependency is deleted.
+   5. The legacy `xrPaletteItemId` / `xrPaletteAction` userData keys are gone; only `scenePalette*` keys remain.
+2. **Part B - in-headset debug panel:** a head-locked text panel in the upper left of the headset view shows the same
+   lines as the desktop debug overlay. It is visible exactly when XR is presenting, debug mode is on and the "UI
+   overlay" toggle is on, whether or not the palette is open. Once job 23 lands, it also shows the stereo path counts
+   (job 23 adds them to the shared formatter; this job only has to use that formatter).
+
+## Depends on
+
+Nothing hard. Batch order: 37, 25 -> 26 -> 27, 28 -> 29, 20 -> 21 -> 22, **then 19**, then 23. Job 23's headset checks
+need this job's panel.
+
+Jobs that run earlier touch the same files. Search by function name, not line number:
+
+- Job 28 changes the frame loop in `createThreeApp.ts` (runtime-object sync, frame snapshot).
+- Job 29 replaces the per-frame palette serialisation in `scenePaletteController.ts` with a version counter, and
+  removes allocations in the frame loop.
+- Jobs 21/22 change the portal pass, not the UI phase. The debug-overlay state they feed is read through
+  `portalDebugRuntime.updateVisiblePortalPaths`.
+
+## Before you start
+
+Line numbers are from commit `0b468e1`. They drift after jobs 28/29; search by name.
+
+| File | Lines | What |
+| --- | --- | --- |
+| `src/render/three/xrControls.ts` | 41, 46-50, 57-95, 103-128, 210-217 | `XrControls` doc ("carry ... always false"), button index constants (0 trigger, 1 side trigger, 3 stick, 5 help), `createXrControls`, `createXrInputFrame`, `isCarryActionPressed` (placeholder returning false) |
+| `src/render/three/xrScenePaletteInput.ts` | 1-5, 31-59, 66-112, 131-136 | header ("menu toggle is computed but not forwarded"), module-level `controllerObjects`, `createXrScenePaletteInput` (returns `menuTogglePressed: false`), `createControllerSources` (computes `menuTogglePressed` that nobody reads), `isMenuTogglePressed` |
+| `src/render/three/createThreeApp.ts` | 525, 2093, 2133-2139 | `createXrScenePaletteInput()`, its `reset()` on session end, its `update(...)` in `updateScenePalette` |
+| `src/render/three/createThreeApp.ts` | 1395-1399, 1439-1441, 3283-3295 | carry dispatch (`frame.carryActionRequested`), interact dispatch, `openContextMenuFromAim` (closes the palette if open, else opens the focused object's menu, else opens the palette) |
+| `src/render/three/createThreeApp.ts` | 738-740, 945 | `onGeometryComputerSetTargetRequested` handler; destructured `setGeometryComputerPendingTarget` |
+| `src/render/three/scenePaletteController.ts` | 91, 204, 469-495 | the option and its pass-through; `xrPaletteAction` / `xrPaletteItemId` fallback reads |
+| `src/render/three/vrPaletteLibraryAdapter.ts` | 5, 67, 1935, 1976 and 21 more `userData.xrPaletteItemId =` lines | legacy writers (every one sits next to the `scenePalette*` writer with the same value); option `onGeometryComputerSetTargetRequested` (declared, never called) |
+| `src/render/three/scenePointers.ts` | 6, 143-148 | `xrPaletteItemId` fallback read |
+| `src/render/three/geometryComputerMenu.ts` | 64, 100, 153 | `setGeometryComputerPendingTarget` (still used by `stepGeometryComputerPendingTarget`; keep it) |
+| `src/render/three/debugOverlay.ts` | 17-32, 43-88, 90-164 | `DebugOverlayState`, `createDebugOverlay` (builds the text inline), the exported `format*Line` functions |
+| `src/render/three/portalDebugRuntime.ts` | 101-103, 418-445 | `PortalDebugRuntime.updateVisiblePortalPaths(): void`, which builds the `DebugOverlayState` (gated by `menuState.debugEnabled && menuState.debugOverlayEnabled` and the items `fps`, `location`, `portal-quantities`) |
+| `src/render/three/createThreeApp.ts` | 1016, 1385, 1493-1497, 1527-1534, 2009, 2179-2190, 2337-2359 | tooltip controller creation (place the panel next to it), first head pose, second rig sync, the `"ui"` phase, `debugOverlay.dispose()`, `resolveXrHeadWorldPose`, `syncXrDebugState` |
+| `src/render/three/xrObjectTooltipMesh.ts` | all (68) | precedent for a canvas-texture text plane in XR (`depthTest: false`, `renderOrder`, `frustumCulled = false`) |
+| `src/render/three/renderState.ts` | 42-66 | `XrDebugRenderState` (`inputMode` exists but is never set) |
+| `src/render/three/carriedGeodesicCannon.ts` | 21 | `XrHeadWorldPose` |
+| `tests/render-contract/xrControls.test.ts` | 173-186 | "does not map face buttons to carry shortcuts" (replaced in Step A1) |
+| `tests/render-contract/xrScenePaletteInput.test.ts` | all (73) | two tests; the first uses `isMenuTogglePressed` |
+
+Baseline: `npm run typecheck`, `npm test`, `npm run docs:check`.
+
+## Background
+
+- WebXR `xr-standard` gamepad buttons: 0 trigger, 1 squeeze (the "side trigger"), 3 thumbstick press, 4 A/X (lower
+  face button), 5 B/Y (upper face button). Today 0 = primary action, 1 = interact (context menu and menu toggle),
+  3 = reset, 5 = help. Button 4 is unused. Desktop carry is the `G` key (`desktopControls.ts`).
+- The XR palette toggle works today: the side trigger sets `interactRequested`, and `openContextMenuFromAim` toggles.
+  The palette input module also computes a toggle level and throws it away. Removing that dead code changes no
+  behaviour.
+- The debug overlay is a DOM element. Immersive sessions request no `dom-overlay`, so nothing shows in the headset.
+  The vitest environment is `node` (no canvas), so the panel is split into pure, tested functions and a thin
+  Three.js wrapper that only runs in the browser.
+
+## Decisions
+
+1. **Carry button.** Decided: button 4 (A on the right controller, X on the left), on any controller, rising edge, like
+   every other XR action in `createXrControls` (`sources.some(...)`). The carried target is still the one under the
+   active aim ray (right controller preferred), unchanged. Why: squeeze (1) is taken by interact/menu toggle, 0, 3 and
+   5 are taken; 4 is the only free standard button on Quest controllers. The task suggestion "squeeze on the aiming
+   controller" was rejected because it would collide with the menu toggle. Keep the signature
+   `isCarryActionPressed(source: XrInputSourceLike)`; read `source.gamepad?.buttons?.[4]?.pressed === true`. Add a
+   constant `carryFaceButtonIndex = 4` next to the others and update the module header and the `XrControls` doc.
+2. **Menu toggle.** Decided: the XR palette toggle stays on the interact path (side trigger, either controller ->
+   `openContextMenuFromAim`). `createXrScenePaletteInput` keeps returning `menuTogglePressed: false` (the field is
+   required by `ScenePaletteInputFrame`, and the desktop input uses it), with a one-line comment naming
+   `openContextMenuFromAim`. Delete the dead parts: the `menuTogglePressed` computation and return field of
+   `createControllerSources`, and the export `isMenuTogglePressed`. Why: two toggles from one button would fire twice.
+3. **Controller cache.** Decided: move `controllerObjects` into the closure of `createXrScenePaletteInput`; pass it to
+   `createControllerSources` as a parameter (`controllerObjects: Map<string, THREE.Object3D>`). Make
+   `createControllerSources` non-exported (nothing outside the file imports it).
+4. **Geometry-computer target.** Decided: **delete** the dead dependency. Remove `onGeometryComputerSetTargetRequested`
+   from `VrPaletteLibraryAdapterOptions` (adapter line 67), from the controller options (line 91) and the
+   pass-through (line 204), and the handler in `createThreeApp.ts` (738-740). Keep `setGeometryComputerPendingTarget`
+   in `geometryComputerMenu.ts` (the step action uses it); remove it from the destructuring in `createThreeApp.ts`
+   (line 945) only if it becomes unused there. Why: the parallelogram diagram is display-only, the step buttons and
+   "Go" cover the use, and no UI or test calls it. Wiring a drag-on-diagram editor is new UI, not a fix.
+5. **Legacy keys.** Decided: delete every `userData.xrPaletteItemId = ...` and `userData.xrPaletteAction = ...` write in
+   `vrPaletteLibraryAdapter.ts` and the `?? ...xrPalette...` fallbacks in `scenePaletteController.ts` and
+   `scenePointers.ts`. Fix the comments that mention the legacy alias (adapter lines 5 and 1935, `scenePointers.ts`
+   line 6, controller lines 469 and 484).
+6. **Panel technology.** Decided: a `THREE.CanvasTexture` on a `PlaneGeometry`, like `xrObjectTooltipMesh.ts`, not
+   `@pmndrs/uikit`. Why: the text changes several times a second; a canvas redraw is cheap and needs no font atlas;
+   the tooltip already proves the approach in the headset.
+7. **Panel file and API.** New file `src/render/three/xrDebugPanel.ts` with header comment and JSDoc on every export:
+
+   ```ts
+   /** Panel centre in the head frame (Three axes: x right, y up, -z forward), meters. */
+   export const xrDebugPanelOffsetMeters = { x: -0.17, y: 0.1, z: -0.55 } as const;
+   export const xrDebugPanelSizeMeters = { width: 0.36, height: 0.18 } as const;
+   export const xrDebugPanelCanvasPixels = { width: 1024, height: 512 } as const;
+   export const xrDebugPanelMaxLines = 14;
+   export const xrDebugPanelMaxLineChars = 64;
+   export const xrDebugPanelMinRedrawIntervalMs = 250;   // at most 4 redraws per second
+   export const xrDebugPanelRenderOrder = 1100;          // above the palette (1000-1010) and tooltip (960)
+
+   /** Splits each line at " / " so no line exceeds maxChars; a part without separator longer than maxChars is cut
+    *  to maxChars. If the result has more than maxLines lines, keeps maxLines - 1 and appends "... (+K lines)". */
+   export function wrapXrDebugPanelLines(lines: readonly string[], maxChars?: number, maxLines?: number): readonly string[];
+   /** World pose of the panel: head.position + offset rotated by head.quaternion; quaternion = head.quaternion. */
+   export function resolveXrDebugPanelPose(head: XrHeadWorldPose): { position: THREE.Vector3; quaternion: THREE.Quaternion };
+   /** xrActive && debugEnabled && debugOverlayEnabled. The palette's open state is deliberately not an input. */
+   export function isXrDebugPanelVisible(input: { xrActive: boolean; debugEnabled: boolean; debugOverlayEnabled: boolean }): boolean;
+   /** Redraw gate: shouldRedraw(text, nowMs) is true iff text differs from the last drawn text and either nothing was
+    *  drawn yet or nowMs - lastDrawnMs >= minIntervalMs; when true it records text and nowMs. */
+   export function createXrDebugPanelRedrawGate(minIntervalMs?: number): { shouldRedraw(text: string, nowMs: number): boolean };
+   /** "none" (no sources), "controllers", "hands" (every source has .hand), or "hybrid". */
+   export function describeXrInputMode(sources: readonly { readonly hand?: unknown }[]): "none" | "controllers" | "hands" | "hybrid";
+   export interface XrDebugPanel {
+     readonly object: THREE.Object3D;
+     update(input: { visible: boolean; state: DebugOverlayState; head: XrHeadWorldPose | undefined; nowMs: number }): void;
+     dispose(): void;
+   }
+   export function createXrDebugPanel(): XrDebugPanel;
+   ```
+
+   `createXrDebugPanel` creates the canvas, a `CanvasTexture` (`colorSpace = SRGBColorSpace`), a `MeshBasicMaterial`
+   (`transparent: true, depthTest: false, depthWrite: false, toneMapped: false`), and a mesh named `xr-debug-panel`
+   with `renderOrder = xrDebugPanelRenderOrder`, `frustumCulled = false`, `visible = false`. `update`: if `!visible`
+   or `head` is undefined or the wrapped lines are empty, hide the mesh and return. Otherwise set the pose from
+   `resolveXrDebugPanelPose(head)` every call, and redraw the canvas only when the gate says so (text = wrapped lines
+   joined by `\n`). Drawing: clear; fill a rounded rectangle (`roundRect` from `canvasDrawing.ts`) with
+   `rgba(10, 17, 20, 0.78)`; text `#e2f3f5`, font `24px ui-monospace, Menlo, Consolas, monospace`, left-aligned,
+   `textBaseline = "top"`, 20 px padding, 30 px line height; then `texture.needsUpdate = true`. `dispose` frees
+   geometry, material and texture.
+8. **Content.** Decided: the panel shows exactly the lines of the desktop overlay, from one shared function. Extract
+   `export function formatDebugOverlayLines(state: DebugOverlayState): readonly string[]` from `createDebugOverlay`
+   (same sections, same order: fps, frame ms, webgl, visible paths, portal eyes when more than one eye, portal
+   instances, archetypes, location, geometry, inspected path). `createDebugOverlay` uses it; its DOM output must not
+   change. The `location` line carries cell id, position, yaw, XR session status, blocked reason, input mode and visible
+   path count, so these appear in the headset. Which sections appear is decided by the existing per-item toggles
+   (`fps`, `location`, `portal-quantities`) in `portalDebugRuntime`; do not add a second gating.
+   **Stereo counts:** do not add them here. Job 23 adds `DebugOverlayState.stereoPortalPaths`
+   (`StereoPortalPathRenderState`: `splitRoots`, `leftRootCellId`, `rightRootCellId`, `leftPathCount`,
+   `rightPathCount`, `unionPathCount`, `leftOnlyPathCount`, `rightOnlyPathCount`, `bothEyesPathCount`,
+   `droppedLeftPathCount`, `droppedRightPathCount`) and a line from `formatStereoPortalPathLine`, inserted by
+   `formatDebugOverlayLines` right after the portal-eyes line. The panel then shows it with no change here.
+9. **State source.** Decided: `PortalDebugRuntime.updateVisiblePortalPaths()` returns the `DebugOverlayState` it built
+   (return type `DebugOverlayState` instead of `void`), and still updates the DOM overlay. `createThreeApp.ts` passes
+   that object to the panel.
+10. **Input mode.** Decided: `syncXrDebugState` sets `inputMode: describeXrInputMode([...session.inputSources])` while
+    `renderer.xr.isPresenting` (the session is `renderer.xr.getSession()`), else leaves it undefined.
+11. **Head pose.** Decided: in the `"ui"` phase call `resolveXrHeadWorldPose(xrViewerPose)` again right before updating
+    the panel (the value computed at line 1385 predates the second `xrRig.syncXrRig` at line 1493; a stale pose makes
+    a head-locked panel shake while walking). The result aliases scratch vectors; use it immediately.
+12. **Commits.** One commit per part: Part A, Part B.
+
+## Steps
+
+Run `npx vitest run <file>` after each step and `npm run typecheck`.
+
+### Part A: XR input defects
+
+1. **Carry (Decision 1).** Edit `xrControls.ts`. Replace the test "does not map face buttons to carry shortcuts"
+   (`tests/render-contract/xrControls.test.ts:173-186`; record under `### Deviations`) with
+   "maps button 4 to carry edges":
+   - gamepad with only button 4 pressed: `isCarryActionPressed` is true for `handedness: "right"` and for `"left"`;
+   - only button 1 pressed: false; only button 5 pressed: false; no gamepad: false;
+   - `createXrControls().consumeFrame`: released -> false, pressed -> true, held -> false, released -> false;
+   - `createXrInputFrame([pressed], 1).carryActionRequested` is true.
+   Run `npx vitest run tests/render-contract/xrControls.test.ts`.
+2. **Menu toggle and cache (Decisions 2-3).** Edit `xrScenePaletteInput.ts` (update the module header). In
+   `tests/render-contract/xrScenePaletteInput.test.ts` test 1, remove the two `isMenuTogglePressed` assertions and keep
+   the `isSelectPressed` one (record under `### Deviations`); keep test 2 as is. Add test 3: two inputs from
+   `createXrScenePaletteInput()` updated with the same right-hand source give pointer objects that are **not** the same
+   object; after `a.reset()`, `b.update(...)` returns the same object as its previous update. Run
+   `npx vitest run tests/render-contract/xrScenePaletteInput.test.ts`.
+3. **Geometry-computer target (Decision 4).** Run `npx vitest run tests/render-contract/scenePaletteLibraryAdapter.test.ts tests/render-contract/vrPaletteHeaderActions.test.ts`.
+4. **Legacy keys (Decision 5).** Then Grep `src` and `tests` for `xrPaletteItemId|xrPaletteAction`: no hits. Run
+   `npx vitest run tests/render-contract/scenePointers.test.ts tests/render-contract/scenePaletteLibraryAdapter.test.ts tests/render-contract/scenePaletteTooltip.test.ts tests/render-contract/vrPaletteHeaderActions.test.ts`.
+5. Finish the part: `npm run typecheck`, `npm test`, `npm run docs:check` (`npm run docs:generate` if stale),
+   `npm run build`, `npm run smoke -- --world cube,icosahedron,torus-moduli,genus-2-torus`. Commit Part A.
+
+### Part B: in-headset debug panel
+
+1. **Shared formatter (Decision 8).** Add `formatDebugOverlayLines` to `debugOverlay.ts`; make `createDebugOverlay`
+   use it (keep its `hasContent` rule unchanged). New tests in `tests/render-contract/debugOverlay.test.ts`:
+   - a state with `location` and `portalEyes` of two eyes gives, in order, the portal-eyes line then the location line;
+     the location line equals `formatLocationLine(state.location)`;
+   - with one eye the portal-eyes line is absent;
+   - `visible: false` does not change the returned lines (visibility is not the formatter's business).
+2. **Return the state (Decision 9).** Change `updateVisiblePortalPaths` in `portalDebugRuntime.ts`. Typecheck.
+3. **Panel module (Decision 7).** Create `xrDebugPanel.ts`. New `tests/render-contract/xrDebugPanel.test.ts`:
+   - `wrapXrDebugPanelLines(["aaaa / bbbb / cccc"], 11)` returns `["aaaa / bbbb", "cccc"]`; a 70-character line with
+     no separator becomes one line of exactly 64 characters; 20 one-word lines with `maxLines` 14 give 14 lines, the
+     last `... (+7 lines)`;
+   - `resolveXrDebugPanelPose`: head at (1, 1.6, 2), identity quaternion -> position (0.83, 1.7, 1.45), quaternion
+     identity; head at the same place turned by +pi/2 about +y (`setFromAxisAngle(new Vector3(0, 1, 0), Math.PI / 2)`)
+     -> position (0.45, 1.7, 2.17) and quaternion equal to the head's; all within 1e-9;
+   - `isXrDebugPanelVisible`: true only when all three inputs are true (check all 8 combinations);
+   - redraw gate with interval 250: `("a", 0)` true, `("a", 100)` false, `("b", 100)` false, `("b", 260)` true,
+     `("b", 600)` false, `("c", 600)` true;
+   - `describeXrInputMode`: `[]` -> `"none"`; two `{}` -> `"controllers"`; two `{ hand: {} }` -> `"hands"`; one of
+     each -> `"hybrid"`.
+   Run `npx vitest run tests/render-contract/xrDebugPanel.test.ts tests/render-contract/debugOverlay.test.ts`.
+4. **Input mode (Decision 10).** Edit `syncXrDebugState`.
+5. **Wire it in `createThreeApp.ts`.**
+   - Create `const xrDebugPanel = createXrDebugPanel(); scene.add(xrDebugPanel.object);` right after the
+     `createXrObjectTooltipController(...)` line. Declare it **before** any setup code that could read it (the job 17
+     temporal-dead-zone crash came from a late `const`); the smoke run checks this.
+   - In the `"ui"` phase replace `portalDebugRuntime.updateVisiblePortalPaths();` with:
+
+     ```ts
+     const overlayState = portalDebugRuntime.updateVisiblePortalPaths();
+     xrDebugPanel.update({
+       visible: isXrDebugPanelVisible({
+         xrActive,
+         debugEnabled: menuState.debugEnabled,
+         debugOverlayEnabled: menuState.debugOverlayEnabled,
+       }),
+       state: overlayState,
+       head: xrActive ? resolveXrHeadWorldPose(xrViewerPose) : undefined,
+       nowMs: performance.now(),
+     });
+     ```
+
+   - In the dispose block next to `debugOverlay.dispose()`: `scene.remove(xrDebugPanel.object); xrDebugPanel.dispose();`.
+6. **Docs.** `_docs/design/011-vr-hand-tools-palette.md`: in "Debug Overlay", one paragraph saying it is implemented in
+   `xrDebugPanel.ts` (placement, visibility rule, 4 Hz redraw); in the status note at the top (line 6) remove
+   `xrDebugPanel` from the list of files that do not exist. `_docs/design/010-webxr-vr-runtime.md` "Debug And
+   Diagnostics": one sentence pointing to the panel, and the XR button map of Background (with A/X = carry).
+7. Finish the part: `npm run typecheck`, `npm test`, `npm run docs:check` (`npm run docs:generate` if stale),
+   `npm run build`, `npm run smoke -- --world cube,icosahedron,torus-moduli,genus-2-torus`. Commit Part B.
+
+## Tests and checks
+
+All tests named in the steps, plus `npm run typecheck`, `npm test`, `npm run docs:check`, `npm run build` and the
+smoke command, after each part.
+
+Manual headset checks (Quest or similar, `?config=full` and debug mode on). If you have no headset, list them under
+`### Manual checks not run` in the report. **Not running them does not make this job "needs review"**: with empty
+`### Uncertain` and `### Not done`, set `Status: done on <date>.`
+
+1. Enter VR: the palette is closed.
+2. Side trigger on the left controller with nothing aimed opens the palette; again closes it. Same on the right.
+3. Ray hover highlights a button; trigger selects it; settings -> back -> close work; the hands track both controllers.
+4. Debug settings page: turn "UI overlay" on. The panel appears in the upper left. Close the palette: the panel stays.
+   Turn the overlay off: the panel disappears.
+5. The panel text is readable, updates (fps changes) without flicker, and does not shake while walking and turning.
+6. Aim at a geodesic emitter and press A: carry starts; press A again: it is dropped.
+7. With the palette closed, stick locomotion, turning and stick-press reset still work.
+
+## Do not
+
+- Do not change the button of any existing XR action, or desktop controls.
+- Do not render the panel through `@pmndrs/uikit` or the DOM, and do not add `dom-overlay` to the session request.
+- Do not add stereo counts or change `DebugOverlayState` beyond what Decision 8 says (job 23 does that).
+- Do not touch the portal pass, `portalClipData.ts` or `renderPortalInstances.ts`.
+- Do not fix the XR hint "Y = next focus target" in `src/ui/inputIntents.ts` (no XR button cycles focus; button 5 on
+  either controller is help). Write it under `### Not done` as a follow-up.
+
+## Done when
+
+- Button 4 requests carry in XR; the dead toggle code, the module-level cache, the unused geometry-computer option and
+  every `xrPalette*` userData key are gone.
+- `xrDebugPanel.ts` exists with the tests above; in XR the panel follows the visibility rule independent of the
+  palette, and shows the lines of `formatDebugOverlayLines`.
+- Typecheck, tests, docs check, build and smoke pass after each part; two commits (Part A, Part B).
+- Report written per [README](README.md), with `### Manual checks not run` when no headset was used. Move the job to
+  `_done/` and mark its queue row.

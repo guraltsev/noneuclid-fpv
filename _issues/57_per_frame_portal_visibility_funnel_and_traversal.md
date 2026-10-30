@@ -7,6 +7,14 @@ the concrete algorithmic replacement.
 
 Jobs: [21](../.agents/jobs/21_per_frame_visibility_funnel.md).
 
+## Status update 2026-10-29
+
+Re-checked at `0b468e1`: unchanged; `visiblePortalPaths.ts` line references below still hold. Stale references: the
+16 px threshold is now at `createThreeApp.ts:2502` (mono), `:2573` (shared-root stereo) and `:2602` (split-root
+stereo); `maxKeptPathsPerRoot` is at `createThreeApp.ts:788`. Job 21 decides that the terminal fill is the scene
+background, which already equals the fog colour (`createThreeApp.ts:420-422`), and that zero allocation per *returned*
+path is left to job 24 (per *examined* path it is zero).
+
 ## Status update 2026-10-28
 
 Nothing in the proposal is implemented. `computeVisiblePortalPaths` and `computeIndependentVisiblePortalPaths`

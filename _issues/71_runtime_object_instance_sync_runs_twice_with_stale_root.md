@@ -6,6 +6,15 @@ Priority: P2 (performance, with a correctness defect in single-view XR and on po
 
 Jobs: [28](../.agents/jobs/28_frame_snapshot_instance_sync.md).
 
+## Status update 2026-10-29
+
+Re-checked at `0b468e1`; line numbers below are stale (the second sync is now `createThreeApp.ts:1522`, the collections
+`:2770` and `:2852`, `getRuntimeObjectVisiblePaths` `:2942-2963`). Evidence item 2 ("aim, tooltip and tool dispatch join
+last frame's result") is fixed for aim by job 16; on desktop the final sync is correct, so the wrong-root output remains
+only in single-view XR with a re-rooted eye. Also new: tools sync on their own during the frame (every frame while a
+cannon is carried, `geodesicCannonTools.ts:877`). Job [28](../.agents/jobs/28_frame_snapshot_instance_sync.md) was
+rewritten with the full claim table and the fix.
+
 ## Status update 2026-10-28
 
 Nothing in this issue has been fixed. Re-checked against the current `src/render/three/createThreeApp.ts` (3,555

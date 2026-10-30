@@ -7,6 +7,13 @@ item in issue 41. It does not file that defect again.
 
 Jobs: [20](../.agents/jobs/20_exact_static_cull.md).
 
+## Status update 2026-10-29
+
+Re-checked at `0b468e1`: unchanged, all `staticPortalPathCull.ts` line references below still hold. Stale references:
+the budget constant is now `createThreeApp.ts:788` (`portalPathOptions`, not `:767`) and `cellRenderArchetypes.ts:179`
+(not `:176`). Job 20 was rewritten with the full design (cone module, measure floor 1e-9 m, best-first budget, unequal
+heights out of scope).
+
 ## Status update 2026-10-28
 
 Nothing in the proposal is implemented. `src/cell-complex/staticPortalPathCull.ts` (1639 lines) still uses the
