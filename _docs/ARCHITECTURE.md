@@ -129,7 +129,7 @@ Order of work in each frame (`renderFrame`):
    action to the selected tool (place flag, emit geodesic, measure, protractor, tie-and-detach, carry, rotate, aim, or the
    focused object's own interaction).
 5. Advance the world: creature runtimes, curve-shortening pairs
-   (`src/world-objects/geodesicCannon.ts#advanceCurveShorteningPairs`), refresh dependent measurements and angles.
+   (`src/world-objects/geodesic/curveShortening.ts#advanceCurveShorteningPairs`), refresh dependent measurements and angles.
 6. Place the camera(s); for XR also the per-eye culling cameras.
 7. **Portal visibility and instances**: compute visible portal paths from the camera, update the instanced cell meshes
    (one draw per cell archetype, one instance per visible path) and the instanced runtime objects.

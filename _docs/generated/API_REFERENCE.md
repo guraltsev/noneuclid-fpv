@@ -447,6 +447,46 @@ Floor texture library: the named floor appearances world scripts can use, via th
 
 ## `world-objects`
 
+### `world-objects/geodesic/cannon.ts`
+
+Emitter (cannon) operations: shooting, extending and re-aiming geodesics, connecting a geodesic to an emitter, rebuilding locked geodesics between emitters, and placing cannons on the floor, on a geodesic or at a geodesic vertex.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `ShootGeodesicInput` | Input for `shootGeodesic`: aim a cannon's geodesic along the cannon's yaw and trace it for `maxLengthMeters`. |
+| interface | `ExtendGeodesicInput` | Input for `extendGeodesic`: lengthen an aimable free geodesic by `maxLengthMeters` along its emitter tangent. |
+| interface | `RebuildGeodesicToLengthInput` | Input for `rebuildGeodesicToLength`: re-shoot a geodesic from its cannon with a new total length. |
+| interface | `PlaceGeodesicCannonAtFloorPointRequest` | Request for `placeGeodesicCannonAtFloorPoint`: put a new cannon with id `id` on the floor of `cellId`. |
+| interface | `PlaceGeodesicCannonOnGeodesicRequest` | Request for `placeGeodesicCannonOnGeodesic`: put a new cannon on a segment of an existing free geodesic, splitting it there. |
+| interface | `PlaceGeodesicCannonAtGeodesicVertexRequest` | Request for `placeGeodesicCannonAtGeodesicVertex`: put a cannon at a point where geodesics cross in a cell, cutting each passing geodesic there. |
+| interface | `ConnectGeodesicToEmitterRequest` | Request for `connectGeodesicToEmitter`: close a free geodesic onto a second emitter. |
+| interface | `RebuildConnectedGeodesicBetweenEmittersRequest` | Request for `rebuildConnectedGeodesicBetweenEmitters`: recompute a locked geodesic after one of its emitters moved. |
+| function | `placeGeodesicCannonAtFloorPoint` | Adds a new cannon standing on the floor at `floorPoint` unless the spot is blocked. |
+| function | `shootGeodesic` | Emits (or re-aims) a free geodesic from a cannon along its yaw and returns its first derived segment. |
+| function | `extendGeodesic` | Lengthens an aimable free geodesic by re-aiming it from its emitter along the current tangent, and returns its new last segment. |
+| function | `rebuildGeodesicToLength` | Re-shoots a geodesic from its cannon so that its total length is `totalLengthMeters`, returning the new segments. |
+| function | `connectGeodesicToEmitter` | Tries to close a free geodesic onto the emitter `incomingEmitterId`, producing a locked geodesic. |
+| function | `rebuildConnectedGeodesicBetweenEmitters` | Recomputes a locked geodesic after one of its emitters moved, keeping its homotopy class when possible. |
+| function | `placeGeodesicCannonOnGeodesic` | Places a new cannon at a point of a free geodesic and splits the geodesic there into two intervals. |
+| function | `placeGeodesicCannonAtGeodesicVertex` | Places a cannon at a vertex where segments pass and cuts every passing geodesic there, connecting the pieces to the new cannon. |
+
+### `world-objects/geodesic/curveShortening.ts`
+
+Curve shortening: tie-and-detach of two endpoint roles into a curve-shortening pair, and the per-tick advance, fusion and failure handling of pairs.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `TieAndDetachGeodesicEndpointsRequest` | Request for `tieAndDetachGeodesicEndpoints`: detach two endpoint roles from one emitter and tie them at a new shared free end. |
+| interface | `AdvanceCurveShorteningPairsRequest` | Request for `advanceCurveShorteningPairs`: advance every moving pair by `deltaSeconds`. |
+| const | `curveShorteningDefaultSpeedMetersPerSecond` | Default speed (m/s) at which a curve-shortening pair's shared free end moves downhill. |
+| const | `curveShorteningFuseAngleToleranceRadians` | Turn-angle tolerance (radians) below which the free end counts as locally straight, so the pair is ready to fuse. |
+| const | `curveShorteningFuseStepToleranceMeters` | Length tolerance (meters): a two-arc pair whose shorter arc is below this is absorbed into one geodesic (`absorbShortCurveShorteningHalf`); slightly above the minimum geodesic length. |
+| const | `curveShorteningMinStepMeters` | Floor (meters) applied to the arc lengths in the curve-shortening step's distance-to-straight estimate, so that a vanishing arc cannot divide by zero. |
+| const | `curveShorteningLengthIncreaseToleranceMeters` | Length tolerance (meters) for the monotone-descent check of curve shortening: a previewed step is committed only if the new total length of the pair's arcs is at most `previousTotalLengthMeters + curveShorteningLengthIn… |
+| function | `tieAndDetachGeodesicEndpoints` | Detaches two endpoint roles from one emitter and ties them to a new shared free end, starting a curve-shortening pair. |
+| function | `advanceCurveShorteningPairs` | Advances every curve-shortening pair by one tick of `deltaSeconds`, sliding its shared free end downhill, and returns the changed ids. |
+| function | `fuseCurveShorteningPair` | Finishes a curve-shortening pair: merges its moving arcs into one stable geodesic and deletes the pair and its free end. |
+
 ### `world-objects/geodesic/development.ts`
 
 Development of portal words: inverse portal transforms, cached per compiled portal (a compiled world is immutable, so a WeakMap keyed by portal is always valid); pure.
@@ -486,6 +526,41 @@ Geodesic intersection markers: crossings of segments in the same cell, stable ma
 | function | `updateGeodesicIntersectionObjects` | Recomputes all intersection markers (where segments of two different geodesics cross in a cell) and returns them. |
 | function | `getRememberedGeodesicIntersectionObject` | Returns the last known intersection marker with this id even if it has since disappeared from the registry, or `undefined`. |
 | function | `pruneMissingGeodesicIntersectionObjects` | Forgets remembered intersection markers that are no longer in the registry; returns the forgotten ids. |
+
+### `world-objects/geodesic/intervals.ts`
+
+Interval rebuilds: realizing an interval's lifted chord, aiming free geodesics, splitting at a segment hit, rebuilding locked intervals after a carried anchor moved, and side-effect-free previews.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| function | `traceGeodesicFromLiftedChord` | Realizes an interval's geometry by tracing the lifted chord, and replaces the interval's derived segments with it. |
+| function | `aimFreeGeodesicFromEndpoint` | Re-aims a free geodesic (emitter at one role, a singly attached free end at the other) toward a target point. |
+| function | `rebuildDerivedGeodesicSegments` | Regenerates an interval's segments from its endpoint anchors and portal word (the fundamental "development" step). |
+| function | `lockedIntervalRebuildHitsForbiddenZone` | True when rebuilding a locked interval would hit a forbidden zone; false when the lift fails or the chord is degenerate. |
+| function | `splitGeodesicIntervalAtSegmentHit` | Splits a free geodesic at a point on one of its segments, ending the first part at a newly placed emitter. |
+| function | `rebuildLockedGeodesicFromEndpointsAndPortalWord` | Rebuilds a locked (emitter-to-emitter) interval after an endpoint was carried, updating its portal word first. |
+| function | `updateLockedGeodesicPortalWordForCarriedAnchorTraversal` | Extends an interval's stored portal word with one portal crossing made by a carried anchor, and saves it. |
+| function | `updateLockedGeodesicPortalWordForCarriedAnchorTraversals` | Same as {@link updateLockedGeodesicPortalWordForCarriedAnchorTraversal} for a chain of traversals the carried anchor made in one frame, in order. |
+| function | `updatePortalWordForMovedEndpoint` | Returns the interval's portal word after one of its endpoints crossed a portal, or `undefined` if the result is inconsistent. |
+| function | `previewRebuildGeodesicInterval` | Computes the segments an interval would have, without touching the registry (rollback-safe). |
+| function | `previewGeodesicIntervalHitsForbiddenZone` | Read-only: would the previewed interval hit a forbidden zone or be shorter than the minimum length? |
+| function | `previewGeodesicIntervalIsDegenerate` | Read-only: is the lifted start-to-end chord shorter than `GEODESIC_MIN_LENGTH_METERS`? |
+
+### `world-objects/geodesic/legacyConnection.ts`
+
+Legacy: the retired emitter-connection and same-cell straightening model; only the importers listed in `scripts/docs/lib.mjs` (`moduleImportRules`) may import it, and job 26 deletes it.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `TieAndDetachIncidentGeodesicsRequest` | Legacy: request for `tieAndDetachIncidentGeodesics`, the geodesic-id-keyed entry point kept for the retired straightening model. |
+| interface | `AdvanceStraighteningGeodesicsRequest` | Legacy: request for `advanceStraighteningGeodesics`; same shape as `AdvanceCurveShorteningPairsRequest` without the debug sink. |
+| const | `geodesicStraighteningSpeedMetersPerSecond` | Legacy: default speed (m/s) of the retired same-cell straightening model. |
+| function | `isGeodesicStraightening` | Legacy: true when the geodesic (or any segment) is in the retired `"straightening"` connection state. |
+| function | `hasStraighteningIncidentGeodesic` | Legacy: true when any geodesic incident on the emitter is in the retired straightening state. |
+| function | `tieAndDetachIncidentGeodesics` | Legacy entry point of tie-and-detach, keyed by geodesic ids; forwards to the endpoint-role API when it can. |
+| function | `advanceStraighteningGeodesics` | Legacy: advances curve-shortening pairs, and only if none changed, the retired same-cell straightening polylines. |
+| function | `markGeodesicConnected` | Records `"connected"` connection state on the source emitter's geodesic (legacy connection model). |
+| function | `rebuildLegacyConnectedGeodesic` | Legacy: rebuilds a non-interval connected geodesic between two emitters. |
 
 ### `world-objects/geodesic/lifecycle.ts`
 
@@ -617,50 +692,7 @@ Tracing a horizontal geodesic ray through a compiled cell complex: the single-ce
 
 Facade that re-exports the geodesic modules of `src/world-objects/geodesic/` under their old names while they are being split (job 25); it will be deleted.
 
-| Kind | Name | Summary |
-| --- | --- | --- |
-| interface | `ShootGeodesicInput` | Input for `shootGeodesic`: aim a cannon's geodesic along the cannon's yaw and trace it for `maxLengthMeters`. |
-| interface | `ExtendGeodesicInput` | Input for `extendGeodesic`: lengthen an aimable free geodesic by `maxLengthMeters` along its emitter tangent. |
-| interface | `RebuildGeodesicToLengthInput` | Input for `rebuildGeodesicToLength`: re-shoot a geodesic from its cannon with a new total length. |
-| interface | `PlaceGeodesicCannonAtFloorPointRequest` | Request for `placeGeodesicCannonAtFloorPoint`: put a new cannon with id `id` on the floor of `cellId`. |
-| interface | `PlaceGeodesicCannonOnGeodesicRequest` | Request for `placeGeodesicCannonOnGeodesic`: put a new cannon on a segment of an existing free geodesic, splitting it there. |
-| interface | `PlaceGeodesicCannonAtGeodesicVertexRequest` | Request for `placeGeodesicCannonAtGeodesicVertex`: put a cannon at a point where geodesics cross in a cell, cutting each passing geodesic there. |
-| interface | `ConnectGeodesicToEmitterRequest` | Request for `connectGeodesicToEmitter`: close a free geodesic onto a second emitter. |
-| interface | `RebuildConnectedGeodesicBetweenEmittersRequest` | Request for `rebuildConnectedGeodesicBetweenEmitters`: recompute a locked geodesic after one of its emitters moved. |
-| interface | `TieAndDetachIncidentGeodesicsRequest` | Legacy: request for `tieAndDetachIncidentGeodesics`, the geodesic-id-keyed entry point kept for the retired straightening model. |
-| interface | `TieAndDetachGeodesicEndpointsRequest` | Request for `tieAndDetachGeodesicEndpoints`: detach two endpoint roles from one emitter and tie them at a new shared free end. |
-| interface | `AdvanceStraighteningGeodesicsRequest` | Legacy: request for `advanceStraighteningGeodesics`; same shape as `AdvanceCurveShorteningPairsRequest` without the debug sink. |
-| interface | `AdvanceCurveShorteningPairsRequest` | Request for `advanceCurveShorteningPairs`: advance every moving pair by `deltaSeconds`. |
-| const | `geodesicStraighteningSpeedMetersPerSecond` | Legacy: default speed (m/s) of the retired same-cell straightening model. |
-| const | `curveShorteningDefaultSpeedMetersPerSecond` | Default speed (m/s) at which a curve-shortening pair's shared free end moves downhill. |
-| const | `curveShorteningFuseAngleToleranceRadians` | Turn-angle tolerance (radians) below which the free end counts as locally straight, so the pair is ready to fuse. |
-| const | `curveShorteningFuseStepToleranceMeters` | Length tolerance (meters): a two-arc pair whose shorter arc is below this is absorbed into one geodesic (`absorbShortCurveShorteningHalf`); slightly above the minimum geodesic length. |
-| const | `curveShorteningMinStepMeters` | Floor (meters) applied to the arc lengths in the curve-shortening step's distance-to-straight estimate, so that a vanishing arc cannot divide by zero. |
-| const | `curveShorteningLengthIncreaseToleranceMeters` | Length tolerance (meters) for the monotone-descent check of curve shortening: a previewed step is committed only if the new total length of the pair's arcs is at most `previousTotalLengthMeters + curveShorteningLengthIn… |
-| function | `placeGeodesicCannonAtFloorPoint` | Adds a new cannon standing on the floor at `floorPoint` unless the spot is blocked. |
-| function | `isGeodesicStraightening` | Legacy: true when the geodesic (or any segment) is in the retired `"straightening"` connection state. |
-| function | `hasStraighteningIncidentGeodesic` | Legacy: true when any geodesic incident on the emitter is in the retired straightening state. |
-| function | `traceGeodesicFromLiftedChord` | Realizes an interval's geometry by tracing the lifted chord, and replaces the interval's derived segments with it. |
-| function | `aimFreeGeodesicFromEndpoint` | Re-aims a free geodesic (emitter at one role, a singly attached free end at the other) toward a target point. |
-| function | `rebuildDerivedGeodesicSegments` | Regenerates an interval's segments from its endpoint anchors and portal word (the fundamental "development" step). |
-| function | `splitGeodesicIntervalAtSegmentHit` | Splits a free geodesic at a point on one of its segments, ending the first part at a newly placed emitter. |
-| function | `rebuildLockedGeodesicFromEndpointsAndPortalWord` | Rebuilds a locked (emitter-to-emitter) interval after an endpoint was carried, updating its portal word first. |
-| function | `updateLockedGeodesicPortalWordForCarriedAnchorTraversal` | Extends an interval's stored portal word with one portal crossing made by a carried anchor, and saves it. |
-| function | `updateLockedGeodesicPortalWordForCarriedAnchorTraversals` | Same as {@link updateLockedGeodesicPortalWordForCarriedAnchorTraversal} for a chain of traversals the carried anchor made in one frame, in order. |
-| function | `updatePortalWordForMovedEndpoint` | Returns the interval's portal word after one of its endpoints crossed a portal, or `undefined` if the result is inconsistent. |
-| function | `previewRebuildGeodesicInterval` | Computes the segments an interval would have, without touching the registry (rollback-safe). |
-| function | `shootGeodesic` | Emits (or re-aims) a free geodesic from a cannon along its yaw and returns its first derived segment. |
-| function | `extendGeodesic` | Lengthens an aimable free geodesic by re-aiming it from its emitter along the current tangent, and returns its new last segment. |
-| function | `rebuildGeodesicToLength` | Re-shoots a geodesic from its cannon so that its total length is `totalLengthMeters`, returning the new segments. |
-| function | `connectGeodesicToEmitter` | Tries to close a free geodesic onto the emitter `incomingEmitterId`, producing a locked geodesic. |
-| function | `rebuildConnectedGeodesicBetweenEmitters` | Recomputes a locked geodesic after one of its emitters moved, keeping its homotopy class when possible. |
-| function | `tieAndDetachIncidentGeodesics` | Legacy entry point of tie-and-detach, keyed by geodesic ids; forwards to the endpoint-role API when it can. |
-| function | `tieAndDetachGeodesicEndpoints` | Detaches two endpoint roles from one emitter and ties them to a new shared free end, starting a curve-shortening pair. |
-| function | `advanceStraighteningGeodesics` | Legacy: advances curve-shortening pairs, and only if none changed, the retired same-cell straightening polylines. |
-| function | `advanceCurveShorteningPairs` | Advances every curve-shortening pair by one tick of `deltaSeconds`, sliding its shared free end downhill, and returns the changed ids. |
-| function | `fuseCurveShorteningPair` | Finishes a curve-shortening pair: merges its moving arcs into one stable geodesic and deletes the pair and its free end. |
-| function | `placeGeodesicCannonOnGeodesic` | Places a new cannon at a point of a free geodesic and splits the geodesic there into two intervals. |
-| function | `placeGeodesicCannonAtGeodesicVertex` | Places a cannon at a vertex where segments pass and cuts every passing geodesic there, connecting the pieces to the new cannon. |
+_No exports._
 
 ### `world-objects/geodesicMarmot.ts`
 

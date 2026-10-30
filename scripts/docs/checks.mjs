@@ -6,7 +6,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import { newLayerViolations, repoRoot, scanProject, toPosix } from "./lib.mjs";
+import { moduleImportRuleViolations, newLayerViolations, repoRoot, scanProject, toPosix } from "./lib.mjs";
 import { renderApiReference, renderArchitectureReference } from "./render.mjs";
 
 export const generatedFiles = {
@@ -52,6 +52,10 @@ export function checkLayering(modules) {
   return newLayerViolations(modules).map(
     (v) => `src/${v.from} imports src/${v.to} (${v.edge}); this violates the layering rules in scripts/docs/lib.mjs.`,
   );
+}
+
+export function checkModuleImportRules(modules) {
+  return moduleImportRuleViolations(modules).map((v) => `src/${v.from} imports src/${v.to}; ${v.reason}`);
 }
 
 export function checkGeneratedFresh(modules) {
@@ -101,6 +105,7 @@ export function runAllChecks() {
       "module headers": checkModuleHeaders(modules),
       "exported JSDoc": checkExportDocs(modules),
       "layering": checkLayering(modules),
+      "module import rules": checkModuleImportRules(modules),
       "generated documents": checkGeneratedFresh(modules),
       "document references": checkDocReferences(modules),
     },

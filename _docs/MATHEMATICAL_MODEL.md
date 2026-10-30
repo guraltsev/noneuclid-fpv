@@ -230,7 +230,7 @@ not grow with the number of crossings (rounding only). Each piece is then cut at
 connecting emitters, emitter hit. A line through a portal-junction vertex (the walk's vertex tie rule) ends the geodesic as
 a `forbidden-zone-hit` with `junctionId` `<cellId>:vertex-<index>`.
 
-The result (`src/world-objects/geodesicCannon.ts#traceGeodesicFromLiftedChord` and the emitter-aware variants) is the
+The result (`src/world-objects/geodesic/intervals.ts#traceGeodesicFromLiftedChord` and the emitter-aware variants) is the
 per-cell **segments** of a geodesic; the ordered list of portals crossed is its **portal word**
 (`src/world-objects/geodesic/objects.ts#GeodesicPortalTraversal`).
 
@@ -248,14 +248,14 @@ last portal back to the first). Its length is $|\tilde b-a|$ (nonzero lift requi
 `src/world-objects/geodesic/endpoints.ts#geodesicHasNonzeroLiftedDisplacement`, minimum
 `src/world-objects/geodesic/objects.ts#GEODESIC_MIN_LENGTH_METERS` $=0.15$ m). The direction at $a$ is the direction of
 $\tilde b-a$, and re-tracing from $a$ in that direction for length $|\tilde b-a|$ must reproduce the word —
-this is how `src/world-objects/geodesicCannon.ts#rebuildLockedGeodesicFromEndpointsAndPortalWord` rebuilds a *locked*
+this is how `src/world-objects/geodesic/intervals.ts#rebuildLockedGeodesicFromEndpointsAndPortalWord` rebuilds a *locked*
 geodesic when its endpoints move. The reverse word (`src/world-objects/geodesic/portalWord.ts#reverseGeodesicPortalWord`) reads
 the arc from the other end: reverse the order and swap source/target of each step.
 
 **Why words, not just positions.** In a quotient space such as the torus two anchors are joined by infinitely many
 geodesics, distinguished by the sequence of portals crossed. Keeping the word makes a rebuilt arc a continuous
 deformation of the previous one rather than a jump to a different homotopy class
-(`src/world-objects/geodesicCannon.ts#updatePortalWordForMovedEndpoint` appends the crossed portal p when the `end`
+(`src/world-objects/geodesic/intervals.ts#updatePortalWordForMovedEndpoint` appends the crossed portal p when the `end`
 anchor crosses it, prepends p⁻¹ when the `start` anchor crosses it, and does both when one anchor holds both ends of
 a loop. The loop's word then becomes the conjugate $p^{-1}wp$, the same loop read from the new base point. Words are
 always freely reduced.)
@@ -265,31 +265,31 @@ always freely reduced.)
 Tying two geodesic ends and releasing them produces a *moving pair*
 (`src/world-objects/geodesic/objects.ts#CurveShorteningPairObject`): two arcs meeting at a **free vertex** $X$, whose other
 ends $A$, $B$ are fixed by their anchors. The pair is advanced by
-`src/world-objects/geodesicCannon.ts#advanceCurveShorteningPairs` as a discrete **gradient descent of the total length**
+`src/world-objects/geodesic/curveShortening.ts#advanceCurveShorteningPairs` as a discrete **gradient descent of the total length**
 $$L(X)=|X-\tilde A|+|X-\tilde B|$$
 measured in the developed frame (Section 6). With $u_A,u_B$ the unit tangents at $X$ pointing *away* from $X$ along the
 two arcs, $\nabla_X L=-(u_A+u_B)$, so the descent direction is $u_A+u_B$ and the stationary condition is
 $u_A+u_B=0$: the two arcs form a single straight line through $X$. Concretely each tick:
 
 1. If the turn angle between $-u_A$ and $u_B$ is within
-   `src/world-objects/geodesicCannon.ts#curveShorteningFuseAngleToleranceRadians` of $\pi$ (or $|u_A+u_B|\le10^{-7}$) the
+   `src/world-objects/geodesic/curveShortening.ts#curveShorteningFuseAngleToleranceRadians` of $\pi$ (or $|u_A+u_B|\le10^{-7}$) the
    pair is marked *ready to fuse*; fusion
-   (`src/world-objects/geodesicCannon.ts#fuseCurveShorteningPair`) replaces the two arcs by one locked geodesic whose
+   (`src/world-objects/geodesic/curveShortening.ts#fuseCurveShorteningPair`) replaces the two arcs by one locked geodesic whose
    portal word is the role-aware composition of the two words.
 2. Otherwise $X$ moves by $\min\big(v\,\Delta t,\ \tfrac14\,\ell_{\min},\ \delta/(1/a+1/b)\big)$, where $\delta$ is the angle deficit and $a, b$ are the arc lengths. The last term estimates the distance to the straight position, so the step never jumps across it, and there is no lower bound, so the result does not depend on the frame rate ($v=0.4$ m/s by default,
-   `src/world-objects/geodesicCannon.ts#curveShorteningDefaultSpeedMetersPerSecond`) along $(u_A+u_B)/|u_A+u_B|$, using the
+   `src/world-objects/geodesic/curveShortening.ts#curveShorteningDefaultSpeedMetersPerSecond`) along $(u_A+u_B)/|u_A+u_B|$, using the
    ordinary body motion of Section 5 so that crossing a portal updates the words.
-3. Every affected arc is *previewed* (`src/world-objects/geodesicCannon.ts#previewRebuildGeodesicInterval`) before anything is
+3. Every affected arc is *previewed* (`src/world-objects/geodesic/intervals.ts#previewRebuildGeodesicInterval`) before anything is
    committed: the candidate chord must re-trace to the stored portal word (the **homotopy check**, which changes only when
    the free vertex crosses a portal) without hitting a wall or a forbidden zone. A failed preview leaves state untouched
    and is not reported as a change, except that a forbidden-zone hit replaces the affected arc's free end by a new one at the
    last good point. The total length is also kept monotone: if the previewed total exceeds `previousTotalLengthMeters` by
-   more than `src/world-objects/geodesicCannon.ts#curveShorteningLengthIncreaseToleranceMeters` ($10^{-4}$ m), the step is
+   more than `src/world-objects/geodesic/curveShortening.ts#curveShorteningLengthIncreaseToleranceMeters` ($10^{-4}$ m), the step is
    not committed (free vertex, arcs and recorded length stay as they were) and the tick is skipped; the recorded length is
    updated only by a committed tick. A pair whose fusion fails without a forbidden-zone hit reverts from *ready to fuse*
    to *moving*.
 4. Geometry decides when an arc is gone. A two-arc pair whose shorter arc is below
-   `src/world-objects/geodesicCannon.ts#curveShorteningFuseStepToleranceMeters` (0.165 m) is absorbed into one
+   `src/world-objects/geodesic/curveShortening.ts#curveShorteningFuseStepToleranceMeters` (0.165 m) is absorbed into one
    geodesic (`absorbShortCurveShorteningHalf`), and a free loop shorter than
    `src/world-objects/geodesic/objects.ts#GEODESIC_MIN_LENGTH_METERS` is deleted. A refused absorption does not stop the
    descent.
@@ -438,8 +438,8 @@ positions, and any that cannot be re-solved are deleted and reported. Tool selec
 | player radius / height | 0.25 m / 1.6 m | `src/movement/playerBody.ts#DEFAULT_PLAYER_RADIUS_METERS` | body cylinder |
 | beam height | 1.08 m | `src/world-objects/geodesic/objects.ts#geodesicRayBeamHeightMeters` | height at which geodesics are traced and drawn |
 | minimum geodesic length | 0.15 m | `src/world-objects/geodesic/objects.ts#GEODESIC_MIN_LENGTH_METERS` | shorter arcs are rejected |
-| curve-shortening speed | 0.4 m/s | `src/world-objects/geodesicCannon.ts#curveShorteningDefaultSpeedMetersPerSecond` | descent speed of the free vertex |
-| fuse angle tolerance | 0.03 rad | `src/world-objects/geodesicCannon.ts#curveShorteningFuseAngleToleranceRadians` | deviation from a straight angle that still counts as straight |
+| curve-shortening speed | 0.4 m/s | `src/world-objects/geodesic/curveShortening.ts#curveShorteningDefaultSpeedMetersPerSecond` | descent speed of the free vertex |
+| fuse angle tolerance | 0.03 rad | `src/world-objects/geodesic/curveShortening.ts#curveShorteningFuseAngleToleranceRadians` | deviation from a straight angle that still counts as straight |
 | segment-walk vertex tie | $10^{-9}$ m | `src/math/tolerances.ts#segmentWalkVertexTieMeters` | crossings closer than this are a pass through a shared vertex |
 | cell containment tolerance | $10^{-6}$ m | `src/math/tolerances.ts#cellContainmentToleranceMeters` | a walk start or atlas centre this far outside its cell still counts as inside |
 | outgoing dot tolerance | $10^{-12}$ | `src/math/tolerances.ts#segmentWalkOutgoingDotTolerance` | a side is crossed outward when dot(direction, inward normal) is below minus this |

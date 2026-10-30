@@ -257,6 +257,60 @@ export function layerViolations(modules) {
   return violations;
 }
 
+/**
+ * Module-level import rules, for constraints that the layer table cannot express (it works per layer).
+ *
+ * Two shapes, with paths relative to `src/` using forward slashes:
+ * - `{ module, allowedImporters, reason }`: any module that imports `module` and is not listed is a violation.
+ * - `{ module, mayImportOnly, reason }`: any import of `module` whose path does not start with one of the prefixes
+ *   (or equal a listed file) is a violation.
+ */
+export const moduleImportRules = [
+  {
+    module: "world-objects/geodesic/legacyConnection.ts",
+    allowedImporters: ["world-objects/geodesicCannon.ts", "world-objects/geodesic/cannon.ts"],
+    reason: "retired geodesic connection model; job 26 deletes it - do not add importers",
+  },
+  {
+    module: "world-objects/geodesic/portalWord.ts",
+    mayImportOnly: ["math/", "cell-complex/", "world-objects/geodesic/objects.ts"],
+    reason: "the portal-word algebra is pure and may only use math, cell-complex and the geodesic object types",
+  },
+  {
+    module: "world-objects/geodesic/development.ts",
+    mayImportOnly: ["math/", "cell-complex/"],
+    reason: "portal development is pure and may only use math and cell-complex",
+  },
+  {
+    module: "world-objects/geodesic/trace.ts",
+    mayImportOnly: ["math/", "cell-complex/", "movement/", "world-objects/geodesic/objects.ts", "world-objects/runtimeObjectRegistry.ts"],
+    reason: "tracing may only use math, cell-complex, movement, the geodesic object types and the registry type",
+  },
+];
+
+/** Violations of {@link moduleImportRules}: `{ from, to, reason }` for every import that breaks a rule. */
+export function moduleImportRuleViolations(modules) {
+  const violations = [];
+  for (const rule of moduleImportRules) {
+    if (rule.allowedImporters) {
+      for (const mod of modules.values()) {
+        if (!mod.imports.includes(rule.module)) continue;
+        if (rule.allowedImporters.includes(mod.path)) continue;
+        violations.push({ from: mod.path, to: rule.module, reason: rule.reason });
+      }
+    }
+    if (rule.mayImportOnly) {
+      const mod = modules.get(rule.module);
+      if (!mod) continue;
+      for (const dep of mod.imports) {
+        if (rule.mayImportOnly.some((allowed) => dep === allowed || (allowed.endsWith("/") && dep.startsWith(allowed)))) continue;
+        violations.push({ from: mod.path, to: dep, reason: rule.reason });
+      }
+    }
+  }
+  return violations;
+}
+
 /** Path of the frozen layering-debt baseline: module-level edges that violate {@link layers} today. */
 export const layeringBaselinePath = path.join(repoRoot, "scripts", "docs", "layering-baseline.json");
 
