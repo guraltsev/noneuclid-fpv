@@ -31,6 +31,7 @@ import {
   resolveProtractorCenterSelection,
   resolveProtractorDirectedGeodesicSelection,
 } from "../../../src/world-objects/protractorTool";
+import { geodesicPerfCounters, resetGeodesicPerfCounters } from "../../../src/world-objects/geodesic/perfCounters";
 import { getGeodesicEndpointAttachmentsForAnchor } from "../../../src/world-objects/geodesic/endpoints";
 import { getGeodesicSegments } from "../../../src/world-objects/geodesic/segments";
 import {
@@ -380,6 +381,18 @@ describe("geodesic cannon world objects: curve shortening", () => {
   });
 
   describe("exact resolution", () => {
+    it("C4: resolving a pair traces each result chord once (preview only, no rebuild)", () => {
+      const { world, registry } = createCornerScenario();
+
+      resetGeodesicPerfCounters();
+      const result = resolveCurveShorteningPair({ world, registry, pairId: "pair" });
+
+      expect(result).toMatchObject({ status: "resolved", geodesicIds: ["g1", "g1:piece:1"] });
+      expect(geodesicPerfCounters.chordTraces).toBe(2);
+      expect(getGeodesicSegments(registry, "g1").length).toBeGreaterThan(0);
+      expect(getGeodesicSegments(registry, "g1:piece:1").length).toBeGreaterThan(0);
+    });
+
     it("B1: wraps the junction disk with one corner when the chord would pass too close to it", () => {
       const { world, registry } = createCornerScenario();
       const notices: CurveShorteningNotice[] = [];

@@ -22,6 +22,7 @@ import {
   getOppositeEndRole,
   intersectionTolerance,
   isFreeGeodesicEndObject,
+  type LiftedGeodesicEndpoint,
   minGeodesicSegmentLengthMeters,
   type TraceGeodesicSegmentResult,
 } from "./objects";
@@ -38,7 +39,6 @@ import { requestGeodesicIntersectionUpdate, withDeferredGeodesicIntersections } 
 import {
   getGeodesicEndpointAttachmentsForAnchor,
   isAimableFreeGeodesic,
-  liftGeodesicEndpoint,
   liftGeodesicEndpointWithAnchors,
   portalWordMatchesCurrentEndpointCells,
   removeUnusedFreeGeodesicEnds,
@@ -87,39 +87,149 @@ function traceGeodesicFromLiftedChordNow(input: Parameters<typeof traceGeodesicF
   if (interval?.kind !== "geodesic-interval" || input.lengthMeters < minGeodesicSegmentLengthMeters) {
     return undefined;
   }
-  // Emitter connection is disabled for this trace (chord already encodes the endpoint), so the id is only used for bookkeeping.
-  const sourceAnchorId = interval.start.anchorObjectId;
+  const classified = traceAndClassifyChord({
+    world: input.world,
+    registry: input.registry,
+    interval,
+    sourceCellId: input.sourceCellId,
+    sourcePoint: input.sourcePoint,
+    yawRadians: input.yawRadians,
+    lengthMeters: input.lengthMeters,
+    expectedPortalWord: input.expectedPortalWord,
+    allowUnexpectedPortalWord: input.allowUnexpectedPortalWord,
+  });
+  if (classified.kind !== "ok") {
+    return undefined;
+  }
+  return commitRealizedTraces(input.registry, interval, classified.traces);
+}
+
+/**
+ * Outcome of tracing the chord of one interval exactly once (see {@link realizeIntervalChord}).
+ *
+ * `ok`: the chord crosses the stored portal word and meets no wall or forbidden zone; `lifted` is the lifted endpoint it follows.
+ * `lift-failed`: the endpoints cannot be lifted (missing anchors, inconsistent word, unknown portal). `degenerate`: the lifted chord is
+ * shorter than `GEODESIC_MIN_LENGTH_METERS`. `zone`: some piece ends in a forbidden zone (this wins over the other failures).
+ * `wall`: some piece ends at a wall. `word-mismatch`: the chord realizes a different portal word. The failing kinds carry the traces.
+ */
+export type IntervalChordRealization =
+  | { readonly kind: "ok"; readonly lifted: LiftedGeodesicEndpoint; readonly traces: readonly TraceGeodesicSegmentResult[] }
+  | { readonly kind: "lift-failed" }
+  | { readonly kind: "degenerate"; readonly lengthMeters: number }
+  | { readonly kind: "zone"; readonly junctionId: string; readonly traces: readonly TraceGeodesicSegmentResult[] }
+  | { readonly kind: "wall"; readonly sideIndex: number; readonly traces: readonly TraceGeodesicSegmentResult[] }
+  | {
+      readonly kind: "word-mismatch";
+      readonly realizedWord: readonly GeodesicPortalTraversal[];
+      readonly traces: readonly TraceGeodesicSegmentResult[];
+    };
+
+/**
+ * Lifts the interval's far endpoint into its start cell and traces the straight chord exactly once, without touching the registry.
+ *
+ * The one place where a chord is lifted, traced and classified; previews, rebuilds and the locked-carry rebuild are built on it, so a
+ * chord is never traced twice, also when it fails. Anchors in `candidateAnchorsById` shadow the registry. The realized word must equal the
+ * stored word unless `allowUnexpectedPortalWord`.
+ */
+export function realizeIntervalChord(input: {
+  readonly world: CompiledCellComplex;
+  readonly registry: RuntimeObjectRegistry;
+  readonly interval: GeodesicIntervalObject;
+  readonly candidateAnchorsById?: ReadonlyMap<string, RuntimeWorldObject>;
+  readonly allowUnexpectedPortalWord?: boolean;
+}): IntervalChordRealization {
+  const lifted = liftGeodesicEndpointWithAnchors({
+    world: input.world,
+    registry: input.registry,
+    interval: input.interval,
+    sourceRole: "start",
+    candidateAnchorsById: input.candidateAnchorsById,
+  });
+  if (!lifted) {
+    return { kind: "lift-failed" };
+  }
+  // Chord of the development: direction yaw = atan2(dy, dx) and length = |(dx, dy)| (horizontal; heights are equal by construction).
+  // A chord shorter than the minimum means the endpoints (essentially) coincide in the development.
+  const dx = lifted.targetPointInSourceCell.x - lifted.sourcePoint.x;
+  const dy = lifted.targetPointInSourceCell.y - lifted.sourcePoint.y;
+  const lengthMeters = Math.hypot(dx, dy);
+  if (lengthMeters < GEODESIC_MIN_LENGTH_METERS - intersectionTolerance) {
+    return { kind: "degenerate", lengthMeters };
+  }
+  const classified = traceAndClassifyChord({
+    world: input.world,
+    registry: input.registry,
+    interval: input.interval,
+    sourceCellId: lifted.sourceCellId,
+    sourcePoint: lifted.sourcePoint,
+    yawRadians: Math.atan2(dy, dx),
+    lengthMeters,
+    expectedPortalWord: lifted.portalWordFromSourceToTarget,
+    allowUnexpectedPortalWord: input.allowUnexpectedPortalWord,
+  });
+  return classified.kind === "ok" ? { kind: "ok", lifted, traces: classified.traces } : classified;
+}
+
+// Traces one chord (a single call of the tracer) and classifies it: a forbidden-zone hit anywhere, else a wall hit, else a realized word
+// different from the expected one (unless allowed), else ok. Emitter connection is disabled (the chord already encodes the endpoint), so
+// the interval's start anchor is only used for bookkeeping.
+function traceAndClassifyChord(input: {
+  readonly world: CompiledCellComplex;
+  readonly registry: RuntimeObjectRegistry;
+  readonly interval: GeodesicIntervalObject;
+  readonly sourceCellId: string;
+  readonly sourcePoint: Vec3;
+  readonly yawRadians: number;
+  readonly lengthMeters: number;
+  readonly expectedPortalWord?: readonly GeodesicPortalTraversal[];
+  readonly allowUnexpectedPortalWord?: boolean;
+}):
+  | { readonly kind: "ok"; readonly traces: readonly TraceGeodesicSegmentResult[] }
+  | Exclude<IntervalChordRealization, { readonly kind: "ok" | "lift-failed" | "degenerate" }> {
   const traces = traceGeodesicPathForConnectionMode({
     connectEmitters: false,
     world: input.world,
     registry: input.registry,
-    geodesicId: input.geodesicId,
-    sourceEmitterId: sourceAnchorId,
+    geodesicId: input.interval.id,
+    sourceEmitterId: input.interval.start.anchorObjectId,
     cellId: input.sourceCellId,
     start: input.sourcePoint,
     direction: directionFromYaw(input.yawRadians),
     maxLengthMeters: input.lengthMeters,
   });
-  const portalWord = collectPortalWordFromTraces(input.world, traces);
+  for (const trace of traces) {
+    if (trace.terminal.kind === "forbidden-zone-hit") {
+      return { kind: "zone", junctionId: trace.terminal.junctionId, traces };
+    }
+  }
+  for (const trace of traces) {
+    if (trace.terminal.kind === "wall-hit") {
+      return { kind: "wall", sideIndex: trace.terminal.sideIndex, traces };
+    }
+  }
   // Homotopy check: the straight chord must cross exactly the portals of the stored word, else it realizes a different class and is refused.
-  if (input.expectedPortalWord && !input.allowUnexpectedPortalWord && !samePortalWord(portalWord, input.expectedPortalWord)) {
-    return undefined;
+  const realizedWord = collectPortalWordFromTraces(input.world, traces);
+  if (
+    input.expectedPortalWord && !input.allowUnexpectedPortalWord &&
+    !samePortalWord(realizedWord, input.expectedPortalWord)
+  ) {
+    return { kind: "word-mismatch", realizedWord, traces };
   }
-  if (traces.some((trace) => trace.terminal.kind === "forbidden-zone-hit" || trace.terminal.kind === "wall-hit")) {
-    return undefined;
-  }
+  return { kind: "ok", traces };
+}
 
-  // Commit: the segments are replaced only after all checks passed.
-  const realizedTraces = withAnchoredTargetTerminal(input.registry, interval, traces);
-  const segments = replaceDerivedSegmentsFromTraces({
-    registry: input.registry,
-    geodesicId: input.geodesicId,
-    traces: realizedTraces,
-  });
+// Commit: replaces the interval's segments by the traces (an `open` last piece becomes `emitter-hit` if the end anchor is an emitter).
+function commitRealizedTraces(
+  registry: RuntimeObjectRegistry,
+  interval: GeodesicIntervalObject,
+  traces: readonly TraceGeodesicSegmentResult[],
+): GeodesicTraceBuildResult {
+  const realizedTraces = withAnchoredTargetTerminal(registry, interval, traces);
+  const segments = replaceDerivedSegmentsFromTraces({ registry, geodesicId: interval.id, traces: realizedTraces });
   return {
     interval,
     segments,
-    terminal: traceTerminalToBuildTerminalForInterval(interval, realizedTraces.at(-1), input.registry),
+    terminal: traceTerminalToBuildTerminalForInterval(interval, realizedTraces.at(-1), registry),
   };
 }
 
@@ -261,90 +371,44 @@ export function rebuildDerivedGeodesicSegments(input: {
   readonly geodesicId: string;
   readonly allowUnexpectedPortalWord?: boolean;
 }): GeodesicTraceBuildResult | undefined {
-  return withDeferredGeodesicIntersections(input.registry, () => rebuildDerivedGeodesicSegmentsNow(input));
+  return rebuildDerivedGeodesicSegmentsDetailed(input).result;
 }
 
-function rebuildDerivedGeodesicSegmentsNow(input: Parameters<typeof rebuildDerivedGeodesicSegments>[0]): GeodesicTraceBuildResult | undefined {
-  const interval = input.registry.get(input.geodesicId);
-  if (interval?.kind !== "geodesic-interval") {
-    return undefined;
-  }
-  const lifted = liftGeodesicEndpoint({
-    world: input.world,
-    registry: input.registry,
-    interval,
-    sourceRole: "start",
-  });
-  if (!lifted) {
-    return undefined;
-  }
-  // Chord of the development: direction yaw = atan2(dy, dx) and length = |(dx, dy)| (horizontal; heights are equal by construction).
-  // A chord shorter than the minimum means the endpoints (essentially) coincide in the development: the geodesic is degenerate, so the
-  // interval and everything derived from it is DELETED (destructive failure path).
-  const dx = lifted.targetPointInSourceCell.x - lifted.sourcePoint.x;
-  const dy = lifted.targetPointInSourceCell.y - lifted.sourcePoint.y;
-  const lengthMeters = Math.hypot(dx, dy);
-  if (lengthMeters < GEODESIC_MIN_LENGTH_METERS - intersectionTolerance) {
-    removeGeodesicIntervalAndDerivedObjects(input.registry, input.geodesicId);
-    return undefined;
-  }
-  // Trace the chord through the world. Success requires crossing exactly the stored portal word (unless explicitly allowed otherwise).
-  return traceGeodesicFromLiftedChord({
-    world: input.world,
-    registry: input.registry,
-    geodesicId: input.geodesicId,
-    sourceCellId: lifted.sourceCellId,
-    sourcePoint: lifted.sourcePoint,
-    yawRadians: Math.atan2(dy, dx),
-    lengthMeters,
-    expectedPortalWord: lifted.portalWordFromSourceToTarget,
-    allowUnexpectedPortalWord: input.allowUnexpectedPortalWord,
-  });
-}
-
-// Read-only dry run of the rebuild trace: true if the chord realizing the interval would enter a forbidden zone.
-// Returns false (not "unknown") when the lift fails or the chord is degenerate; callers must treat that as "no zone hit".
-/** True when rebuilding a locked interval would hit a forbidden zone; false when the lift fails or the chord is degenerate. */
-export function lockedIntervalRebuildHitsForbiddenZone(input: {
+/**
+ * Like `rebuildDerivedGeodesicSegments`, and also returns how the chord was realized, so a caller can tell why a rebuild failed
+ * (for example a forbidden-zone hit) without tracing the chord again. `realization` is `undefined` when `geodesicId` is not an interval;
+ * `result` is `undefined` unless the realization is `ok`. A `degenerate` realization deletes the interval, as in the plain function.
+ */
+export function rebuildDerivedGeodesicSegmentsDetailed(input: {
   readonly world: CompiledCellComplex;
   readonly registry: RuntimeObjectRegistry;
   readonly geodesicId: string;
-}): boolean {
-  const interval = input.registry.get(input.geodesicId);
-  if (interval?.kind !== "geodesic-interval") {
-    return false;
-  }
-  const lifted = liftGeodesicEndpoint({
-    world: input.world,
-    registry: input.registry,
-    interval,
-    sourceRole: "start",
+  readonly allowUnexpectedPortalWord?: boolean;
+}): {
+  readonly realization: IntervalChordRealization | undefined;
+  readonly result: GeodesicTraceBuildResult | undefined;
+} {
+  return withDeferredGeodesicIntersections(input.registry, () => {
+    const interval = input.registry.get(input.geodesicId);
+    if (interval?.kind !== "geodesic-interval") {
+      return { realization: undefined, result: undefined };
+    }
+    const realization = realizeIntervalChord({
+      world: input.world,
+      registry: input.registry,
+      interval,
+      allowUnexpectedPortalWord: input.allowUnexpectedPortalWord,
+    });
+    if (realization.kind === "degenerate") {
+      // The endpoints coincide in the development: the geodesic is degenerate, so the interval and everything derived from it is DELETED.
+      removeGeodesicIntervalAndDerivedObjects(input.registry, input.geodesicId);
+    }
+    return {
+      realization,
+      result: realization.kind === "ok" ? commitRealizedTraces(input.registry, interval, realization.traces) : undefined,
+    };
   });
-  if (!lifted) {
-    return false;
-  }
-
-  const dx = lifted.targetPointInSourceCell.x - lifted.sourcePoint.x;
-  const dy = lifted.targetPointInSourceCell.y - lifted.sourcePoint.y;
-  const lengthMeters = Math.hypot(dx, dy);
-  if (lengthMeters < GEODESIC_MIN_LENGTH_METERS - intersectionTolerance) {
-    return false;
-  }
-
-  const traces = traceGeodesicPathForConnectionMode({
-    connectEmitters: false,
-    world: input.world,
-    registry: input.registry,
-    geodesicId: input.geodesicId,
-    sourceEmitterId: interval.start.anchorObjectId,
-    cellId: lifted.sourceCellId,
-    start: lifted.sourcePoint,
-    direction: directionFromYaw(Math.atan2(dy, dx)),
-    maxLengthMeters: lengthMeters,
-  });
-  return traces.some((trace) => trace.terminal.kind === "forbidden-zone-hit");
 }
-
 /**
  * Splits a free geodesic at a point on one of its segments, ending the first part at a newly placed emitter.
  *
@@ -489,13 +553,25 @@ export function rebuildLockedGeodesicFromEndpointsAndPortalWord(input: {
   readonly carriedPortalWord?: readonly GeodesicPortalTraversal[];
   readonly allowOutOfBoundsCarriedEndpoint?: boolean;
 }): GeodesicTraceBuildResult | undefined {
-  return withDeferredGeodesicIntersections(input.registry, () => rebuildLockedGeodesicFromEndpointsAndPortalWordNow(input));
+  return rebuildLockedGeodesicFromEndpointsAndPortalWordDetailed(input).result;
 }
 
-function rebuildLockedGeodesicFromEndpointsAndPortalWordNow(input: Parameters<typeof rebuildLockedGeodesicFromEndpointsAndPortalWord>[0]): GeodesicTraceBuildResult | undefined {
+/**
+ * Like `rebuildLockedGeodesicFromEndpointsAndPortalWord`, and also returns how the chord was realized (`undefined` when `geodesicId` is
+ * not an interval), so that the caller can tell a forbidden-zone failure from the other failures without tracing the chord again.
+ */
+export function rebuildLockedGeodesicFromEndpointsAndPortalWordDetailed(
+  input: Parameters<typeof rebuildLockedGeodesicFromEndpointsAndPortalWord>[0],
+): ReturnType<typeof rebuildDerivedGeodesicSegmentsDetailed> {
+  return withDeferredGeodesicIntersections(input.registry, () => rebuildLockedGeodesicDetailedNow(input));
+}
+
+function rebuildLockedGeodesicDetailedNow(
+  input: Parameters<typeof rebuildLockedGeodesicFromEndpointsAndPortalWord>[0],
+): ReturnType<typeof rebuildDerivedGeodesicSegmentsDetailed> {
   const interval = input.registry.get(input.geodesicId);
   if (interval?.kind !== "geodesic-interval") {
-    return undefined;
+    return { realization: undefined, result: undefined };
   }
 
   // Step 1: decide the portal word after the move (explicit word, inferred or reported portal traversal, else unchanged).
@@ -524,15 +600,15 @@ function rebuildLockedGeodesicFromEndpointsAndPortalWordNow(input: Parameters<ty
   }
 
   // Step 2: re-develop the interval with the (possibly updated) word and the anchors' current positions.
-  const result = rebuildDerivedGeodesicSegments({
+  const rebuilt = rebuildDerivedGeodesicSegmentsDetailed({
     ...input,
     allowUnexpectedPortalWord: input.allowOutOfBoundsCarriedEndpoint,
   });
-  if (result) {
+  if (rebuilt.result) {
     syncLegacyEmitterGeodesicFields(input.registry, input.geodesicId);
     requestGeodesicIntersectionUpdate(input.registry);
   }
-  return result;
+  return rebuilt;
 }
 
 /**
@@ -629,46 +705,21 @@ export function previewRebuildGeodesicInterval(input: {
   readonly registry: RuntimeObjectRegistry;
   readonly interval: GeodesicIntervalObject;
   readonly candidateAnchorsById?: ReadonlyMap<string, RuntimeWorldObject>;
-}): GeodesicTraceBuildResult | undefined {
-  const lifted = liftGeodesicEndpointWithAnchors({
+}): GeodesicIntervalPreview | undefined {
+  // The realized path must cross exactly the stored word; a wall hit or zone hit anywhere along the way also rejects the preview.
+  const realization = realizeIntervalChord({
     world: input.world,
     registry: input.registry,
     interval: input.interval,
-    sourceRole: "start",
     candidateAnchorsById: input.candidateAnchorsById,
   });
-  if (!lifted) {
-    return undefined;
-  }
-  const dx = lifted.targetPointInSourceCell.x - lifted.sourcePoint.x;
-  const dy = lifted.targetPointInSourceCell.y - lifted.sourcePoint.y;
-  const lengthMeters = Math.hypot(dx, dy);
-  if (lengthMeters < GEODESIC_MIN_LENGTH_METERS - intersectionTolerance) {
-    return undefined;
-  }
-  const traces = traceGeodesicPathForConnectionMode({
-    connectEmitters: false,
-    world: input.world,
-    registry: input.registry,
-    geodesicId: input.interval.id,
-    sourceEmitterId: input.interval.start.anchorObjectId,
-    cellId: lifted.sourceCellId,
-    start: lifted.sourcePoint,
-    direction: directionFromYaw(Math.atan2(dy, dx)),
-    maxLengthMeters: lengthMeters,
-  });
-  // The realized path must cross exactly the stored word; a wall hit or zone hit anywhere along the way also rejects the preview.
-  const portalWord = collectPortalWordFromTraces(input.world, traces);
-  if (!samePortalWord(portalWord, lifted.portalWordFromSourceToTarget)) {
-    return undefined;
-  }
-  if (traces.some((trace) => trace.terminal.kind === "forbidden-zone-hit" || trace.terminal.kind === "wall-hit")) {
+  if (realization.kind !== "ok") {
     return undefined;
   }
   const realizedTraces = withAnchoredTargetTerminalForAnchors(
     input.registry,
     input.interval,
-    traces,
+    realization.traces,
     input.candidateAnchorsById,
   );
   return {
@@ -679,9 +730,15 @@ export function previewRebuildGeodesicInterval(input: {
       traces: realizedTraces,
     }),
     terminal: traceTerminalToBuildTerminalForInterval(input.interval, realizedTraces.at(-1), input.registry),
+    traces: realizedTraces,
   };
 }
 
+/** A previewed interval: the build result plus the traces it was built from, so that a caller can commit them without tracing again. */
+export interface GeodesicIntervalPreview extends GeodesicTraceBuildResult {
+  /** The realized traces (last piece relabelled as `emitter-hit` where the end anchor is an emitter). */
+  readonly traces: readonly TraceGeodesicSegmentResult[];
+}
 // Determines the new portal word of an interval whose endpoint anchor was carried. Precedence: explicit word (reduced and
 // validated) > traversal inferred from the anchor's motion > traversal reported by the mover > undefined (no change).
 // The traversal is appended for the `end` anchor and prepended inverted for the `start` anchor (both for a loop, which
@@ -889,43 +946,4 @@ function rebuildContinuationFromCut(input: {
     geodesicId: input.geodesicId,
     traces,
   });
-}
-
-// Read-only: would tracing this interval (with optional candidate anchors) enter a forbidden zone? False if the lift fails or the chord
-// is shorter than the minimum length.
-/** Read-only: would the previewed interval hit a forbidden zone or be shorter than the minimum length? */
-export function previewGeodesicIntervalHitsForbiddenZone(input: {
-  readonly world: CompiledCellComplex;
-  readonly registry: RuntimeObjectRegistry;
-  readonly interval: GeodesicIntervalObject;
-  readonly candidateAnchorsById?: ReadonlyMap<string, RuntimeWorldObject>;
-}): boolean {
-  const lifted = liftGeodesicEndpointWithAnchors({
-    world: input.world,
-    registry: input.registry,
-    interval: input.interval,
-    sourceRole: "start",
-    candidateAnchorsById: input.candidateAnchorsById,
-  });
-  if (!lifted) {
-    return false;
-  }
-  const dx = lifted.targetPointInSourceCell.x - lifted.sourcePoint.x;
-  const dy = lifted.targetPointInSourceCell.y - lifted.sourcePoint.y;
-  const lengthMeters = Math.hypot(dx, dy);
-  if (lengthMeters < GEODESIC_MIN_LENGTH_METERS - intersectionTolerance) {
-    return false;
-  }
-  const traces = traceGeodesicPathForConnectionMode({
-    connectEmitters: false,
-    world: input.world,
-    registry: input.registry,
-    geodesicId: input.interval.id,
-    sourceEmitterId: input.interval.start.anchorObjectId,
-    cellId: lifted.sourceCellId,
-    start: lifted.sourcePoint,
-    direction: directionFromYaw(Math.atan2(dy, dx)),
-    maxLengthMeters: lengthMeters,
-  });
-  return traces.some((trace) => trace.terminal.kind === "forbidden-zone-hit");
 }

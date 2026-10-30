@@ -46,8 +46,7 @@ import {
 import { isGeodesicLocked, removeGeodesic } from "./lifecycle";
 import {
   aimFreeGeodesicFromEndpoint,
-  lockedIntervalRebuildHitsForbiddenZone,
-  rebuildLockedGeodesicFromEndpointsAndPortalWord,
+  rebuildLockedGeodesicFromEndpointsAndPortalWordDetailed,
   splitGeodesicIntervalAtSegmentHit,
 } from "./intervals";
 
@@ -524,7 +523,7 @@ function connectGeodesicToEmitterNow(
  * Recomputes a locked geodesic after one of its emitters moved, keeping its homotopy class when possible.
  *
  * Interval path: delegates to `rebuildLockedGeodesicFromEndpointsAndPortalWord`. On failure the geodesic is deleted if the new chord
- * would hit a forbidden zone (checked read-only by `lockedIntervalRebuildHitsForbiddenZone`), kept as is when
+ * would hit a forbidden zone (read off the single trace of the rebuild), kept as is when
  * `preserveGeodesicOnRebuildFailure`, and otherwise deleted. Returns the segments (empty when deleted).
  * A non-interval id changes nothing and returns its current segments.
  */
@@ -542,7 +541,7 @@ function rebuildConnectedGeodesicBetweenEmittersNow(
     if (!isGeodesicLocked(request.registry, request.geodesicId)) {
       return getGeodesicSegments(request.registry, request.geodesicId);
     }
-    const result = rebuildLockedGeodesicFromEndpointsAndPortalWord({
+    const { realization, result } = rebuildLockedGeodesicFromEndpointsAndPortalWordDetailed({
       world: request.world,
       registry: request.registry,
       geodesicId: request.geodesicId,
@@ -553,11 +552,8 @@ function rebuildConnectedGeodesicBetweenEmittersNow(
       allowOutOfBoundsCarriedEndpoint: request.allowOutOfBoundsCarriedEndpoint,
     });
     if (!result) {
-      if (lockedIntervalRebuildHitsForbiddenZone({
-        world: request.world,
-        registry: request.registry,
-        geodesicId: request.geodesicId,
-      })) {
+      // The chord was traced once; a forbidden-zone hit deletes the geodesic even when a failed live carry would otherwise keep it.
+      if (realization?.kind === "zone") {
         removeGeodesic(request.registry, request.geodesicId);
         return [];
       }

@@ -34,6 +34,7 @@ import {
   getAnchorBeamPoint,
   getGeodesicCannonEmitterPoint,
   getOppositeEndRole,
+  type TraceGeodesicSegmentResult,
 } from "./objects";
 import {
   getPortalWordBetweenEndpointRoles,
@@ -47,6 +48,7 @@ import {
   getGeodesicSegments,
   removeGeodesicIntervalAndDerivedObjects,
   removeGeodesicSegments,
+  replaceDerivedSegmentsFromTraces,
   syncLegacyEmitterGeodesicFields,
 } from "./segments";
 import { isGeodesicLocked } from "./lifecycle";
@@ -560,10 +562,13 @@ function resolveCurveShorteningPairNow(input: Parameters<typeof resolveCurveShor
     motionState: "stable",
   }));
   const candidateAnchorsById = new Map<string, RuntimeWorldObject>(corners.map((corner) => [corner.id, corner]));
+  const previewTraces: (readonly TraceGeodesicSegmentResult[])[] = [];
   for (const interval of intervals) {
-    if (!previewRebuildGeodesicInterval({ world, registry, interval, candidateAnchorsById })) {
+    const preview = previewRebuildGeodesicInterval({ world, registry, interval, candidateAnchorsById });
+    if (!preview) {
       return fail("preview");
     }
+    previewTraces.push(preview.traces);
   }
 
   if (intervals.length === 1 && !isLoop) {
@@ -591,8 +596,9 @@ function resolveCurveShorteningPairNow(input: Parameters<typeof resolveCurveShor
   if (!isLoop) {
     registry.remove(freeEnd.id);
   }
-  for (const interval of intervals) {
-    rebuildDerivedGeodesicSegments({ world, registry, geodesicId: interval.id });
+  // The previewed traces are committed as they are: each chord was traced once, by its preview.
+  for (const [index, interval] of intervals.entries()) {
+    replaceDerivedSegmentsFromTraces({ registry, geodesicId: interval.id, traces: previewTraces[index] });
     syncLegacyEmitterGeodesicFields(registry, interval.id);
   }
   requestGeodesicIntersectionUpdate(registry);

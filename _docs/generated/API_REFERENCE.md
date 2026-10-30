@@ -533,16 +533,19 @@ Interval rebuilds: realizing an interval's lifted chord, aiming free geodesics, 
 | Kind | Name | Summary |
 | --- | --- | --- |
 | function | `traceGeodesicFromLiftedChord` | Realizes an interval's geometry by tracing the lifted chord, and replaces the interval's derived segments with it. |
+| type | `IntervalChordRealization` | Outcome of tracing the chord of one interval exactly once (see {@link realizeIntervalChord}). |
+| function | `realizeIntervalChord` | Lifts the interval's far endpoint into its start cell and traces the straight chord exactly once, without touching the registry. |
 | function | `aimFreeGeodesicFromEndpoint` | Re-aims a free geodesic (emitter at one role, a singly attached free end at the other) toward a target point. |
 | function | `rebuildDerivedGeodesicSegments` | Regenerates an interval's segments from its endpoint anchors and portal word (the fundamental "development" step). |
-| function | `lockedIntervalRebuildHitsForbiddenZone` | True when rebuilding a locked interval would hit a forbidden zone; false when the lift fails or the chord is degenerate. |
+| function | `rebuildDerivedGeodesicSegmentsDetailed` | Like `rebuildDerivedGeodesicSegments`, and also returns how the chord was realized, so a caller can tell why a rebuild failed (for example a forbidden-zone hit) without tracing the chord again. |
 | function | `splitGeodesicIntervalAtSegmentHit` | Splits a free geodesic at a point on one of its segments, ending the first part at a newly placed emitter. |
 | function | `rebuildLockedGeodesicFromEndpointsAndPortalWord` | Rebuilds a locked (emitter-to-emitter) interval after an endpoint was carried, updating its portal word first. |
+| function | `rebuildLockedGeodesicFromEndpointsAndPortalWordDetailed` | Like `rebuildLockedGeodesicFromEndpointsAndPortalWord`, and also returns how the chord was realized (`undefined` when `geodesicId` is not an interval), so that the caller can tell a forbidden-zone failure from the other… |
 | function | `updateLockedGeodesicPortalWordForCarriedAnchorTraversal` | Extends an interval's stored portal word with one portal crossing made by a carried anchor, and saves it. |
 | function | `updateLockedGeodesicPortalWordForCarriedAnchorTraversals` | Same as {@link updateLockedGeodesicPortalWordForCarriedAnchorTraversal} for a chain of traversals the carried anchor made in one frame, in order. |
 | function | `updatePortalWordForMovedEndpoint` | Returns the interval's portal word after one of its endpoints crossed a portal, or `undefined` if the result is inconsistent. |
 | function | `previewRebuildGeodesicInterval` | Computes the segments an interval would have, without touching the registry (rollback-safe). |
-| function | `previewGeodesicIntervalHitsForbiddenZone` | Read-only: would the previewed interval hit a forbidden zone or be shorter than the minimum length? |
+| interface | `GeodesicIntervalPreview` | A previewed interval: the build result plus the traces it was built from, so that a caller can commit them without tracing again. |
 
 ### `world-objects/geodesic/lifecycle.ts`
 
