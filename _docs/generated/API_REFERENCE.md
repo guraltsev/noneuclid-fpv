@@ -1585,6 +1585,7 @@ Text-only HUD overlay (a div with class debug-overlay) listing frame timing, Web
 | interface | `DebugOverlayState` | Content of one overlay update; sections whose field is undefined are omitted from the text. |
 | interface | `DebugOverlay` | Handle to the debug HUD created by {@link createDebugOverlay}; the creator must call dispose(). |
 | function | `createDebugOverlay` | Creates a hidden debug HUD element and appends it to container; style comes from the debug-overlay CSS class. |
+| function | `formatDebugOverlayLines` | Formats the lines of one overlay update, in display order, omitting sections whose field is undefined. |
 | function | `formatFrameRateLine` | Formats the smoothed frame rate and the frame time derived from it (frameRateFps must be positive). |
 | function | `formatFramePerformanceLine` | Formats the per-phase frame timings in milliseconds (total, move, objects, portal, render, ui). |
 | function | `formatWebGlRenderInfoLine` | Formats draw calls, triangle count, viewport size, megapixels and pixel ratio of the last render. |
@@ -2387,6 +2388,27 @@ WebXR gamepad input -> `RuntimeInputFrame` (the XR input path for locomotion and
 | function | `isCarryActionPressed` | True while the lower face button (button 4: A on the right controller, X on the left) is held on `source`. |
 | function | `isHelpPressed` | True while the help face button (button 5) is held. |
 | function | `emptyXrInputFrame` | Returns a fresh neutral XR input frame (zero motion, no requests, `source: "xr"`), for frames with no usable input. |
+
+### `render/three/xrDebugPanel.ts`
+
+Head-locked debug text panel for immersive XR sessions: shows the lines of the desktop debug overlay (see `formatDebugOverlayLines`) on a canvas-textured plane in the upper left of the headset view.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| const | `xrDebugPanelOffsetMeters` | Panel centre in the head frame (Three axes: x right, y up, -z forward), meters. |
+| const | `xrDebugPanelSizeMeters` | Panel plane size in meters. |
+| const | `xrDebugPanelCanvasPixels` | Canvas resolution in pixels. |
+| const | `xrDebugPanelMaxLines` | Maximum number of text lines drawn. |
+| const | `xrDebugPanelMaxLineChars` | Maximum characters per drawn line. |
+| const | `xrDebugPanelMinRedrawIntervalMs` | Minimum time between canvas redraws in milliseconds (at most 4 redraws per second). |
+| const | `xrDebugPanelRenderOrder` | Three.js `renderOrder` of the panel; above the palette (1000-1010) and the tooltip (960). |
+| function | `wrapXrDebugPanelLines` | Splits each line at " / " so no line exceeds `maxChars` (parts are packed greedily); a part without separator longer than `maxChars` is cut to `maxChars`. |
+| function | `resolveXrDebugPanelPose` | World pose of the panel: head.position + offset rotated by head.quaternion; quaternion = head.quaternion. |
+| function | `isXrDebugPanelVisible` | xrActive && debugEnabled && debugOverlayEnabled. |
+| function | `createXrDebugPanelRedrawGate` | Redraw gate: shouldRedraw(text, nowMs) is true iff text differs from the last drawn text and either nothing was drawn yet or nowMs - lastDrawnMs >= minIntervalMs; when true it records text and nowMs. |
+| function | `describeXrInputMode` | "none" (no sources), "controllers", "hands" (every source has .hand), or "hybrid". |
+| interface | `XrDebugPanel` | Handle to the in-headset debug panel; the creator adds `object` to the scene and must call dispose(). |
+| function | `createXrDebugPanel` | Creates the hidden panel mesh `xr-debug-panel`. |
 
 ### `render/three/xrEntryUi.ts`
 

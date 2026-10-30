@@ -302,6 +302,7 @@ import { createXrControllerHandModels } from "./xrControllerHandModels";
 import { createXrControls } from "./xrControls";
 import { createXrEntryUi } from "./xrEntryUi";
 import { createXrObjectTooltipController } from "./xrObjectTooltipController";
+import { createXrDebugPanel, describeXrInputMode, isXrDebugPanelVisible } from "./xrDebugPanel";
 import {
   createXrPlayerRig,
   headLocalMetersFromViewerPose,
@@ -1091,6 +1092,8 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     });
 
   const { updateXrObjectTooltip, clearXrObjectTooltip } = createXrObjectTooltipController({ scene, camera });
+  const xrDebugPanel = createXrDebugPanel();
+  scene.add(xrDebugPanel.object);
 
   const {
     resolveCurrentAimTarget,
@@ -1645,7 +1648,19 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       updateGeodesicEmitterLabels();
       syncXrDebugState(frame.source, moveResult);
       updateScenePalette(xrActive, xrFrame, xrReferenceSpace, xrHeadWorldPose, deltaSeconds, frame);
-      portalDebugRuntime.updateVisiblePortalPaths();
+      const overlayState = portalDebugRuntime.updateVisiblePortalPaths();
+      // Resolve the head pose again: the rig was synced a second time after the first pose was computed, and a stale
+      // pose would make the head-locked panel shake while walking. The pose aliases scratch vectors; use it at once.
+      xrDebugPanel.update({
+        visible: isXrDebugPanelVisible({
+          xrActive,
+          debugEnabled: menuState.debugEnabled,
+          debugOverlayEnabled: menuState.debugOverlayEnabled,
+        }),
+        state: overlayState,
+        head: xrActive ? resolveXrHeadWorldPose(xrViewerPose) : undefined,
+        nowMs: performance.now(),
+      });
     });
     const frameAfterUiMs = performance.now();
     // Phase 5: draw. In XR the renderer renders each eye from `camera` as updated by the WebXR manager.
@@ -2119,6 +2134,8 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       uninstallGeometryDebugHelpers();
       geometrySession.dispose();
       debugOverlay.dispose();
+      scene.remove(xrDebugPanel.object);
+      xrDebugPanel.dispose();
       xrEntryUi.dispose();
       clipPolygonOverlay.dispose();
       disposeStylizedSceneLighting(sceneLighting, scene);
@@ -2470,6 +2487,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       lastMovementBlocked: moveResult?.blocked ?? xrDebugState.lastMovementBlocked,
       lastBlockingReason: moveResult?.blockingReason ?? xrDebugState.lastBlockingReason,
       lastCrossedPortalId: moveResult?.crossedPortalId ?? xrDebugState.lastCrossedPortalId,
+      inputMode: renderer.xr.isPresenting ? describeXrInputMode([...(renderer.xr.getSession()?.inputSources ?? [])]) : undefined,
       sharedRenderRootCellId: renderer.xr.isPresenting ? xrRig.getSharedRenderRootCellId(playerPose) : undefined,
       visiblePortalPathCount: latestVisibleResult?.paths.length,
       visiblePortalPaths: latestVisibleResult ? visibleSummaryToRenderState(latestVisibleResult.summary) : undefined,

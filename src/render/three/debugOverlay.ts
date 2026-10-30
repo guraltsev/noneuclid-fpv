@@ -66,25 +66,31 @@ export function createDebugOverlay(container: HTMLElement): DebugOverlay {
         return;
       }
 
-      root.textContent = [
-        state.frameRateFps !== undefined ? formatFrameRateLine(state.frameRateFps) : undefined,
-        state.framePerformance ? formatFramePerformanceLine(state.framePerformance) : undefined,
-        state.webGlRenderInfo ? formatWebGlRenderInfoLine(state.webGlRenderInfo) : undefined,
-        state.visiblePortalPaths ? formatVisiblePortalPathLine(state.visiblePortalPaths) : undefined,
-        state.portalEyes && state.portalEyes.length > 1 ? formatPortalEyeLine(state.portalEyes) : undefined,
-        state.portalInstances ? formatPortalInstanceLine(state.portalInstances) : undefined,
-        state.portalInstances ? formatPortalArchetypeLine(state.portalInstances) : undefined,
-        state.location ? formatLocationLine(state.location) : undefined,
-        state.geometry ? formatGeometryLine(state.geometry) : undefined,
-        state.inspectedPathLine,
-      ]
-        .filter((line): line is string => Boolean(line))
-        .join("\n");
+      root.textContent = formatDebugOverlayLines(state).join("\n");
     },
     dispose() {
       root.remove();
     },
   };
+}
+
+/**
+ * Formats the lines of one overlay update, in display order, omitting sections whose field is undefined.
+ * Shared by the DOM overlay and the in-headset panel; `state.visible` is deliberately ignored.
+ */
+export function formatDebugOverlayLines(state: DebugOverlayState): readonly string[] {
+  return [
+    state.frameRateFps !== undefined ? formatFrameRateLine(state.frameRateFps) : undefined,
+    state.framePerformance ? formatFramePerformanceLine(state.framePerformance) : undefined,
+    state.webGlRenderInfo ? formatWebGlRenderInfoLine(state.webGlRenderInfo) : undefined,
+    state.visiblePortalPaths ? formatVisiblePortalPathLine(state.visiblePortalPaths) : undefined,
+    state.portalEyes && state.portalEyes.length > 1 ? formatPortalEyeLine(state.portalEyes) : undefined,
+    state.portalInstances ? formatPortalInstanceLine(state.portalInstances) : undefined,
+    state.portalInstances ? formatPortalArchetypeLine(state.portalInstances) : undefined,
+    state.location ? formatLocationLine(state.location) : undefined,
+    state.geometry ? formatGeometryLine(state.geometry) : undefined,
+    state.inspectedPathLine,
+  ].filter((line): line is string => Boolean(line));
 }
 
 /** Formats the smoothed frame rate and the frame time derived from it (frameRateFps must be positive). */

@@ -293,7 +293,9 @@ Desktop debug state should include:
 - last blocked reason,
 - last crossed portal id.
 
-In VR, debug text should be optional and minimal. Prefer the desktop mirror and browser console for detailed diagnostics.
+In VR, debug text should be optional and minimal. Prefer the desktop mirror and browser console for detailed diagnostics. When debug mode and the "UI overlay" toggle are on, a head-locked panel (`src/render/three/xrDebugPanel.ts`) shows the same lines as the desktop overlay inside the headset.
+
+XR button map (`xr-standard` gamepad, any controller, rising edge): 0 trigger = primary action, 1 side trigger = interact (context menu and palette toggle), 3 thumbstick press = reset, 4 A/X = carry, 5 B/Y = help.
 
 The existing `window.noneuclidPortalDebug` helpers can remain desktop-first. Do not force them into an in-world VR panel in this stage.
 

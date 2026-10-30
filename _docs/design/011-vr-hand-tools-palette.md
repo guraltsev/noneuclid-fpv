@@ -3,7 +3,7 @@
 > **Status: historical design record.** The palette shipped as a shared
 > in-scene UI (`src/ui/paletteDefinition.ts`, `src/render/three/scenePalette*.ts`,
 > `src/render/three/vrPalette*.ts`). The DOM palette, `desktopPaletteInput`,
-> `vrPaletteController`, `xrPointers`, `xrDebugPanel`, `src/tools/*`, and
+> `vrPaletteController`, `xrPointers`, `src/tools/*`, and
 > `renderLaunchControls` modules named below were removed as dead code; the
 > file lists in this document describe the original plan, not the current tree.
 
@@ -533,6 +533,8 @@ Recommended first-pass overlay:
 - portal instance count;
 - last blocked movement reason;
 - XR input mode: hands/controllers/hybrid.
+
+Implemented in `src/render/three/xrDebugPanel.ts`: a canvas-textured plane, head-locked about 0.55 m ahead, 0.17 m left and 0.1 m above the head, that shows the same lines as the desktop overlay (`formatDebugOverlayLines`). It is visible exactly when XR is presenting, debug mode is on and the "UI overlay" toggle is on, independent of the palette's open state, and its canvas is redrawn at most four times per second.
 
 Use the existing `runtimeDiagnostics()` and `RenderState`/`XrDebugRenderState` concepts where possible, but render the XR overlay as Three.js text or simple bitmap/canvas texture. Do not try to reuse DOM overlays inside immersive XR.
 

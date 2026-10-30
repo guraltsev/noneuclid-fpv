@@ -29,7 +29,7 @@ import {
   visibleSummaryToRenderState,
 } from "./appDebugHelpers";
 import { logPortalDebugInstall, logPortalOverlayGuide } from "./appDebugLogging";
-import { createDebugOverlay } from "./debugOverlay";
+import { createDebugOverlay, type DebugOverlayState } from "./debugOverlay";
 import {
   createPathTraceOverlay,
   hideCellPathOverlays,
@@ -99,8 +99,8 @@ export interface PortalDebugRuntimeDeps {
 
 /** Handle returned by {@link createPortalDebugRuntime}. */
 export interface PortalDebugRuntime {
-  /** Per-frame update: refreshes the debug overlay text and the tracked clip polygons from the latest visibility result. */
-  updateVisiblePortalPaths(): void;
+  /** Per-frame update: refreshes the debug overlay text and the tracked clip polygons from the latest visibility result. Returns the overlay state it pushed, for the in-headset panel. */
+  updateVisiblePortalPaths(): DebugOverlayState;
   /** Re-applies the active ShowCellPath overlay after the player's root cell changed, clearing it if the path is no longer valid. */
   syncRootCell(): void;
   /** Removes all overlays, hides the debug overlay, clears tracked clip polygons, and uninstalls the window.noneuclidPortalDebug helpers. */
@@ -424,7 +424,7 @@ export function createPortalDebugRuntime(deps: PortalDebugRuntimeDeps): PortalDe
       const showLocation = deps.live().menuState.debugOverlayItems.includes("location");
       const showPortalQuantities = deps.live().menuState.debugOverlayItems.includes("portal-quantities");
 
-      debugOverlay.update({
+      const overlayState: DebugOverlayState = {
         visible: showDebugOverlay,
         frameRateFps: showFps ? deps.live().smoothedFrameRateFps : undefined,
         framePerformance: showFps ? deps.live().smoothedFramePerformance : undefined,
@@ -437,8 +437,10 @@ export function createPortalDebugRuntime(deps: PortalDebugRuntimeDeps): PortalDe
         inspectedPathLine: showPortalQuantities
           ? formatInspectedPathLine(activeOverlayPathText, activeOverlayPathCheck, deps.live().latestVisibleResult)
           : undefined,
-      });
+      };
+      debugOverlay.update(overlayState);
       updateSelectedClipPolygonOverlay();
+      return overlayState;
     },
     syncRootCell() {
       if (activeOverlayPathText === undefined) {
