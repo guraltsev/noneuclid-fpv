@@ -5,7 +5,7 @@
 
 This reference is produced from the source code. For the *meaning* of the modules — the mathematical model they implement — read [../MATHEMATICAL_MODEL.md](../MATHEMATICAL_MODEL.md) and [../ARCHITECTURE.md](../ARCHITECTURE.md). For every exported symbol see [API_REFERENCE.md](API_REFERENCE.md).
 
-**181 modules, 46,451 lines** under `src/`.
+**183 modules, 46,760 lines** under `src/`.
 
 ## Layers
 
@@ -14,7 +14,7 @@ A module belongs to the layer named by its first path segment under `src/`. "May
 | Layer | Modules | Lines | May import | Purpose |
 | --- | ---: | ---: | --- | --- |
 | `math` | 7 | 694 | nothing | Vectors, rigid transforms, planes, polygons, tolerances. Pure; imports nothing. |
-| `cell-complex` | 14 | 3,760 | `math` | Prism-cell specs, compilation, portal transforms, portal-path tables, static visibility culling. |
+| `cell-complex` | 16 | 4,069 | `math` | Prism-cell specs, compilation, portal transforms, portal-path tables, static visibility culling. |
 | `movement` | 10 | 1,645 | `math`, `cell-complex` | Player body, collision, movement and portal crossing in compiled cell complexes. |
 | `world-assets` | 1 | 201 | `cell-complex`, `glue` | Floor-texture and asset descriptors. |
 | `world-objects` | 24 | 9,046 | `math`, `cell-complex`, `movement`, `world-assets`, `glue` | Placeable runtime objects: registry, geodesic emitters, measurement tools, flags, creatures. |
@@ -45,7 +45,7 @@ flowchart LR
   authoring -->|6| cell_complex
   authoring -->|2| world_assets
   authoring -->|4| world_objects
-  cell_complex -->|15| math
+  cell_complex -->|19| math
   glue -->|2| authoring
   glue -->|3| runtime
   movement -->|11| cell_complex
@@ -124,12 +124,14 @@ These imports break the intended layering. They are frozen in `scripts/docs/laye
 | `cell-complex/developedDisk.ts` | 298 | Developed-disk atlas: lists every cell copy that a disk of radius rho around a point overlaps. | `cell-complex/compileCellComplex`, `cell-complex/prismCells`, `math/polygons`, `math/rigidTransform3`, `math/tolerances`, `math/vec3` |
 | `cell-complex/floorUv.ts` | 49 | Floor texture coordinates. | — |
 | `cell-complex/forbiddenZones.ts` | 47 | Constants and types for forbidden zones: vertical cylinders at cell base vertices where portal sides meet. | — |
+| `cell-complex/orientedPortal.ts` | 50 | Oriented portal segments: a portal side developed into a root cell's plan, with its left and right endpoints as seen when leaving the source cell through it. | `cell-complex/compileCellComplex`, `math/polygons`, `math/rigidTransform3`, `math/vec3` |
 | `cell-complex/portalPathDebug.ts` | 235 | Debugging helpers that explain what happened to a portal path during table construction and static culling. | `cell-complex/compileCellComplex`, `cell-complex/portalPaths`, `cell-complex/staticPortalPathCull` |
 | `cell-complex/portalPaths.ts` | 254 | Portal-path tables: for each root cell, every portal word (sequence of portals crossed) up to a depth limit, with the rigid transforms that place the destination cell in the root cell's frame. | `cell-complex/compileCellComplex`, `cell-complex/specs`, `math/rigidTransform3` |
 | `cell-complex/prismBase.ts` | 107 | Type-level and runtime validation of the base polygon of a prism cell. | `math/tolerances` |
 | `cell-complex/prismCells.ts` | 185 | Compiled runtime representation of a single prism cell and its sides. | `cell-complex/forbiddenZones`, `cell-complex/specs` |
 | `cell-complex/segmentWalk.ts` | 286 | Shared segment-walk kernel: walks a straight segment, given in the frame of its start cell, through the glued convex cells. | `cell-complex/compileCellComplex`, `cell-complex/prismCells`, `cell-complex/specs`, `math/polygons`, `math/rigidTransform3`, `math/tolerances`, `math/vec3` |
 | `cell-complex/specs.ts` | 235 | Authoring-level data model for a cell complex: the plain-data spec that world files produce and the compiler consumes. | `math/rigidTransform3` |
+| `cell-complex/staticLineCone.ts` | 259 | Convex cones of oriented plan-view lines that cross a sequence of developed portals in order, in the forward sense. | `cell-complex/orientedPortal`, `math/vec3` |
 | `cell-complex/staticPortalPathCull.ts` | 1640 | Static, view-independent culling of portal-path tables: discards portal words through which no sight line from the root cell could reach the destination cell. | `cell-complex/compileCellComplex`, `cell-complex/forbiddenZones`, `cell-complex/portalPaths`, `cell-complex/prismCells`, `cell-complex/specs`, `math/rigidTransform3`, `math/vec3` |
 | `cell-complex/validateCellComplexSpec.ts` | 225 | Cell-complex spec validator: structural checks on a CellComplexSpec before it is compiled (authoring spec -> compiled complex stage). | `cell-complex/specs` |
 
@@ -343,5 +345,7 @@ These imports break the intended layering. They are frozen in `scripts/docs/laye
 Modules not reachable from `src/main.ts`. They are exercised only by tests; review whether they are still needed.
 
 - `authoring/validateAuthoringSpec.ts`
+- `cell-complex/orientedPortal.ts`
+- `cell-complex/staticLineCone.ts`
 - `math/intersections.ts`
 - `math/planes.ts`

@@ -190,6 +190,15 @@ Constants and types for forbidden zones: vertical cylinders at cell base vertice
 | interface | `ForbiddenZone` | Pairs a junction id with the collision cylinder that excludes bodies from it. |
 | interface | `SingularityCollisionCylinder` | Invisible vertical cylinder used for collision around a portal junction. |
 
+### `cell-complex/orientedPortal.ts`
+
+Oriented portal segments: a portal side developed into a root cell's plan, with its left and right endpoints as seen when leaving the source cell through it.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `OrientedPortalSegment` | A portal side developed into a root frame's plan; `left`/`right` as seen when leaving the source cell through it. |
+| function | `developPortalSegment` | Develops side `sideIndex` of cell `sourceCellId` into the root frame with `rootFromSource` (z of the side vertices is taken as 0). |
+
 ### `cell-complex/portalPathDebug.ts`
 
 Debugging helpers that explain what happened to a portal path during table construction and static culling.
@@ -277,6 +286,20 @@ Authoring-level data model for a cell complex: the plain-data spec that world fi
 | interface | `GeodesicMarmotObjectSpec` | Autonomous marmot that moves along locally straight paths with a given velocity. |
 | interface | `SimpleGeoCreatureObjectSpec` | Autonomous creature (mouse or butterfly) moving at constant speed with an oscillation added. |
 | type | `CellObjectSpec` | Union of all object kinds that may appear in a cell's `visuals.objects`, discriminated by `kind`. |
+
+### `cell-complex/staticLineCone.ts`
+
+Convex cones of oriented plan-view lines that cross a sequence of developed portals in order, in the forward sense.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| type | `LineCone` | Extreme rays (unit Vec3, x = a, y = b, z = c) of a pointed cone of oriented lines, in cyclic order. |
+| const | `staticLineConeInsideTolerance` | A ray r satisfies constraint h when h . |
+| const | `staticLineConeMinMeasureMeters` | A word whose cone has measure below this (meters, = meter-radians) is rejected as invisible from every eye position except a cell corner. |
+| function | `portalConstraintVectors` | The two constraint vectors [hL, hR] of a portal whose segment is lengthened by `wideningMeters` at both ends. |
+| function | `lineConeForTwoPortals` | Cone of the lines that cross `first` and then `second` forward, by enumerating the extreme rays of the four half-spaces. |
+| function | `clipLineConeByPortal` | Clips `cone` by the two constraints of `portal` (widened by `wideningMeters`): the lines of the cone that also cross `portal` forward. |
+| function | `lineConeMeasure` | Crofton measure of the cone in meters (meter-radians): the area of its image in (normal angle, signed offset) space, by Green's theorem over the faces. |
 
 ### `cell-complex/staticPortalPathCull.ts`
 
