@@ -13,6 +13,11 @@
  * that has no clip slot (budget or vertex-count overflow) and is therefore fully discarded. Instances beyond an
  * archetype's capacity are dropped and recorded in `PortalInstanceDiagnostics`. This module also builds the debug
  * state shown by the overlay. All work is CPU-side, linear in the number of visible paths per frame.
+ *
+ * Uploads are dirty-checked: each instance is compared with the value already in the CPU buffer (floats compared after
+ * `Math.fround`) and only a buffer that changed is flagged `needsUpdate`, with an update range covering the written
+ * prefix `[0, count * itemSize)`. An archetype with no instances is hidden (`mesh.visible = false`) so it costs no draw
+ * call; `prerenderCells` shows such archetypes while compiling so their shaders are still warmed up.
  */
 
 import * as THREE from "three";
@@ -202,20 +207,24 @@ export function updateCellRenderArchetypeInstances(
     const paths = visiblePathsByDestinationCell.get(archetype.cellId) ?? [];
     const count = Math.min(paths.length, archetype.capacity);
 
+    changes.matrix = false;
+    changes.pathId = false;
+    changes.clipIndex = false;
+
     for (let index = 0; index < count; index += 1) {
       const path = paths[index];
-      archetype.mesh.setMatrixAt(index, path.rootFromDestinationMatrix);
-      archetype.portalPathIdAttribute.setX(index, path.pathId);
-      archetype.portalClipIndexAttribute.setX(
+      writeInstanceIfChanged(
+        archetype,
         index,
+        path.rootFromDestinationMatrix,
+        path.pathId,
         path.depth === 0 ? unclippedPortalClipIndex : clipIndexByPathId.get(path.pathId) ?? -1,
       );
     }
 
     archetype.mesh.count = count;
-    archetype.mesh.instanceMatrix.needsUpdate = true;
-    archetype.portalPathIdAttribute.needsUpdate = true;
-    archetype.portalClipIndexAttribute.needsUpdate = true;
+    archetype.mesh.visible = count > 0;
+    flagChangedBuffers(archetype, count);
 
     if (paths.length > archetype.capacity) {
       diagnostics.recordCapacityOverflow(archetype, paths.length);
@@ -279,6 +288,10 @@ export function updateRuntimeObjectRenderArchetypeInstances(
       }
     }
 
+    changes.matrix = false;
+    changes.pathId = false;
+    changes.clipIndex = false;
+
     for (const record of records) {
       const paths = visiblePathsByDestinationCell.get(record.cellId) ?? [];
 
@@ -304,10 +317,11 @@ export function updateRuntimeObjectRenderArchetypeInstances(
           continue;
         }
 
-        archetype.mesh.setMatrixAt(count, composedMatrix);
-        archetype.portalPathIdAttribute.setX(count, path.pathId);
-        archetype.portalClipIndexAttribute.setX(
+        writeInstanceIfChanged(
+          archetype,
           count,
+          composedMatrix,
+          path.pathId,
           path.depth === 0 ? unclippedPortalClipIndex : clipIndexByPathId.get(path.pathId) ?? -1,
         );
         count += 1;
@@ -315,14 +329,81 @@ export function updateRuntimeObjectRenderArchetypeInstances(
     }
 
     archetype.mesh.count = count;
-    archetype.mesh.instanceMatrix.needsUpdate = true;
-    archetype.portalPathIdAttribute.needsUpdate = true;
-    archetype.portalClipIndexAttribute.needsUpdate = true;
+    archetype.mesh.visible = count > 0;
+    flagChangedBuffers(archetype, count);
 
     if (requestedCount > archetype.capacity) {
       diagnostics.recordCapacityOverflow(archetype, requestedCount);
     }
   }
+}
+
+// Which of an archetype's three buffers received a different value in the current update (reset per archetype).
+const changes = { matrix: false, pathId: false, clipIndex: false };
+
+interface InstancedArchetypeBuffers {
+  readonly mesh: THREE.InstancedMesh;
+  readonly portalPathIdAttribute: THREE.InstancedBufferAttribute;
+  readonly portalClipIndexAttribute: THREE.InstancedBufferAttribute;
+}
+
+// Writes one instance, touching a buffer (and recording the change) only when a value differs. The buffers are
+// Float32Arrays, so values are compared after Math.fround.
+function writeInstanceIfChanged(
+  archetype: InstancedArchetypeBuffers,
+  index: number,
+  matrix: THREE.Matrix4,
+  pathId: number,
+  clipIndex: number,
+): void {
+  const matrixArray = archetype.mesh.instanceMatrix.array;
+  const base = 16 * index;
+  const elements = matrix.elements;
+
+  for (let k = 0; k < 16; k += 1) {
+    if (matrixArray[base + k] !== Math.fround(elements[k])) {
+      matrix.toArray(matrixArray, base);
+      changes.matrix = true;
+      break;
+    }
+  }
+
+  if (archetype.portalPathIdAttribute.getX(index) !== Math.fround(pathId)) {
+    archetype.portalPathIdAttribute.setX(index, pathId);
+    changes.pathId = true;
+  }
+
+  if (archetype.portalClipIndexAttribute.getX(index) !== Math.fround(clipIndex)) {
+    archetype.portalClipIndexAttribute.setX(index, clipIndex);
+    changes.clipIndex = true;
+  }
+}
+
+// Schedules an upload of the written prefix for each buffer that changed. Pending ranges (not yet uploaded because
+// no draw happened in between) are merged into one range from 0 so no earlier change is lost.
+function flagChangedBuffers(archetype: InstancedArchetypeBuffers, count: number): void {
+  if (changes.matrix) {
+    flagUploadPrefix(archetype.mesh.instanceMatrix, count * 16);
+  }
+  if (changes.pathId) {
+    flagUploadPrefix(archetype.portalPathIdAttribute, count);
+  }
+  if (changes.clipIndex) {
+    flagUploadPrefix(archetype.portalClipIndexAttribute, count);
+  }
+}
+
+function flagUploadPrefix(attribute: THREE.BufferAttribute, elementCount: number): void {
+  const ranges = attribute.updateRanges;
+
+  if (ranges.length === 1 && ranges[0].start === 0) {
+    ranges[0].count = Math.max(ranges[0].count, elementCount);
+  } else {
+    attribute.clearUpdateRanges();
+    attribute.addUpdateRange(0, elementCount);
+  }
+
+  attribute.needsUpdate = true;
 }
 
 // Scratch for updateRuntimeObjectRenderArchetypeInstances; cleared or fully overwritten before each use.

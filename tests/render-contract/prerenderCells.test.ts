@@ -37,4 +37,30 @@ describe("prerenderCells", () => {
     expect(inactiveCell.userData.prerendered).toBe(true);
     expect(inactiveCell.userData.previousVisible).toBe(false);
   });
+
+  it("shows hidden instanced archetypes while compiling and hides them again", () => {
+    const scene = new THREE.Scene();
+    const archetype = new THREE.InstancedMesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial(), 1);
+    archetype.visible = false;
+    scene.add(archetype);
+    const visibleAtCompile: boolean[] = [];
+    const renderer = {
+      compile: vi.fn(() => {
+        visibleAtCompile.push(archetype.visible);
+        return new Set<THREE.Material>();
+      }),
+      render: vi.fn(),
+    };
+
+    prerenderCells({
+      renderer,
+      scene,
+      camera: new THREE.PerspectiveCamera(),
+      cellMeshes: new Map([["room-a", new THREE.Group()]]),
+      activeCellId: "room-a",
+    });
+
+    expect(visibleAtCompile).toEqual([true]);
+    expect(archetype.visible).toBe(false);
+  });
 });

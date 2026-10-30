@@ -20,6 +20,7 @@ import {
   type RuntimeWorldObject,
 } from "../../src/world-objects/runtimeObjectRegistry";
 import { createPlainWorldObject } from "../../src/world-objects/worldObjectOwner";
+import { createPlacedFlagObject } from "../../src/world-objects/placedFlags";
 import type { PlayerPose } from "../../src/movement/playerPose";
 import type { VisiblePortalPath } from "../../src/render/three/visiblePortalPaths";
 
@@ -83,10 +84,14 @@ function snapshot(
   });
 }
 
-function setup(objects: RuntimeWorldObject[], rover?: PlayerRoverRenderModel) {
+function setup(
+  objects: RuntimeWorldObject[],
+  rover?: PlayerRoverRenderModel,
+  rootFor: (object: RuntimeWorldObject) => THREE.Object3D = () => boxRoot(),
+) {
   const world = compileCellComplex(twoRoomsWithPortal());
   const registry = createRuntimeObjectRegistry(objects);
-  const roots = new Map(objects.map((object) => [object.id, boxRoot() as THREE.Object3D]));
+  const roots = new Map(objects.map((object) => [object.id, rootFor(object)]));
   const renderSourcesByKey = new Map<string, RuntimeObjectRenderSourceMesh>();
   const renderArchetypesByKey = new Map();
   const sync = createRuntimeObjectInstanceSync({
@@ -248,6 +253,59 @@ describe("runtimeObjectInstanceSync", () => {
     sync.sync(snap);
     expect(traverse).toHaveBeenCalledTimes(2);
     expect(renderSourcesByKey.has("geo-mouse:mouse-1:mesh:0")).toBe(true);
+  });
+
+  it("shares model archetypes between placed flags of one type and keeps text planes per flag", () => {
+    const flags = ["f1", "f2", "f3"].map((id, index) =>
+      createPlacedFlagObject({
+        id,
+        cellId: "room-b",
+        localPose: yawRigidTransform3(0, { x: index * 0.3, y: 0, z: 0 }),
+        flagType: "WoodenSign1",
+      })
+    );
+    const flagRoot = (object: RuntimeWorldObject): THREE.Object3D => {
+      const root = new THREE.Group();
+      for (const name of ["fake-sign-board", "fake-sign-post"]) {
+        const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.1));
+        mesh.name = name;
+        root.add(mesh);
+      }
+      for (const side of ["front", "back"]) {
+        const plane = new THREE.Mesh(new THREE.PlaneGeometry(0.1, 0.1));
+        plane.name = `placed-flag-text-plane:${object.id}:${side}`;
+        root.add(plane);
+      }
+      return root;
+    };
+    const { sync, registry, roots, renderSourcesByKey, renderArchetypesByKey } = setup(flags, undefined, flagRoot);
+    const snap = snapshot({ "room-b": [path("room-b", 0, 0)] });
+
+    sync.sync(snap);
+
+    expect(renderArchetypesByKey.size).toBe(2 + 3 * 2);
+    const modelKeys = [...renderArchetypesByKey.keys()].filter((key) => key.includes(":model:mesh:"));
+    expect(modelKeys).toHaveLength(2);
+    for (const key of modelKeys) {
+      expect(renderArchetypesByKey.get(key).mesh.count).toBe(3);
+    }
+
+    // Remove the flag that provided the shared sources, the way toolObjectRuntimes does.
+    registry.remove("f1");
+    roots.delete("f1");
+    for (const [key, source] of [...renderSourcesByKey]) {
+      if (source.objectId === "f1") {
+        renderSourcesByKey.delete(key);
+        const archetype = renderArchetypesByKey.get(key);
+        archetype?.mesh.removeFromParent();
+        renderArchetypesByKey.delete(key);
+      }
+    }
+    sync.sync(snap);
+
+    for (const key of modelKeys) {
+      expect(renderArchetypesByKey.get(key).mesh.count).toBe(2);
+    }
   });
 
   it("does not walk ghosts again for an unchanged static asset record", () => {

@@ -29,8 +29,10 @@ import {
 import {
   type RuntimeObjectRenderRecord,
   type RuntimeObjectRenderSourceMesh,
+  collectPlacedFlagRenderSourceMeshes,
   collectRuntimeObjectRenderSourceMeshes,
   computeRenderSourceFootprintRadius,
+  placedFlagModelArchetypeKeyPrefix,
 } from "./runtimeObjectRenderRecords";
 import { isGeodesicRuntimeRenderObject, runtimeObjectArchetypeKeyPrefix } from "./runtimeSceneUtils";
 import { rigidTransformToThreeMatrix } from "./worldAxes";
@@ -136,6 +138,17 @@ export function createRuntimeObjectInstanceSync(deps: RuntimeObjectInstanceSyncD
     archetypeKeysByPrefix = index;
   }
 
+  // A placed flag draws its own text planes plus the model archetypes shared by all flags of its type.
+  function archetypeKeysForObject(object: RuntimeWorldObject, prefix: string): readonly string[] {
+    const own = archetypeKeysByPrefix.get(prefix) ?? noKeys;
+    if (object.kind !== "placed-flag") {
+      return own;
+    }
+
+    const model = archetypeKeysByPrefix.get(placedFlagModelArchetypeKeyPrefix(object.flagType)) ?? noKeys;
+    return model.length === 0 ? own : [...own, ...model];
+  }
+
   function syncSources(objects: readonly RuntimeWorldObject[]): ReadonlySet<string> {
     const activeKeys = new Set<string>();
     const addSource = (source: RuntimeObjectRenderSourceMesh): void => {
@@ -192,7 +205,9 @@ export function createRuntimeObjectInstanceSync(deps: RuntimeObjectInstanceSyncD
       }
 
       addCachedOrCollect(`object:${object.id}`, root, () =>
-        collectRuntimeObjectRenderSourceMeshes(object.id, root, runtimeObjectArchetypeKeyPrefix(object))
+        object.kind === "placed-flag"
+          ? collectPlacedFlagRenderSourceMeshes(object.id, object.flagType, root, runtimeObjectArchetypeKeyPrefix(object))
+          : collectRuntimeObjectRenderSourceMeshes(object.id, root, runtimeObjectArchetypeKeyPrefix(object))
       );
     }
 
@@ -229,7 +244,7 @@ export function createRuntimeObjectInstanceSync(deps: RuntimeObjectInstanceSyncD
 
       seenIds.add(object.id);
       const prefix = geodesic ? "" : runtimeObjectArchetypeKeyPrefix(object);
-      const archetypeKeys = geodesic ? deps.geodesicArchetypeKeys : archetypeKeysByPrefix.get(prefix) ?? noKeys;
+      const archetypeKeys = geodesic ? deps.geodesicArchetypeKeys : archetypeKeysForObject(object, prefix);
       const cached = recordCacheByObjectId.get(object.id);
 
       if (cached && cached.object === object && cached.world === world && sameStrings(cached.archetypeKeys, archetypeKeys)) {

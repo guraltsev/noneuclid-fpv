@@ -7,6 +7,9 @@
  * `portalPathId` and `portalClipIndex` used by the clip shader. Capacity is fixed at creation
  * (`recordCount * maxVisiblePaths`, at least 1); instances beyond it are dropped and reported through
  * `RuntimeObjectRenderArchetypeDiagnostics`. Frustum culling is off because instance bounds are not tracked.
+ * Placed flags of one type share the archetypes of their glTF model meshes (keys under
+ * `placedFlagModelArchetypeKeyPrefix`, see `runtimeObjectRenderRecords`), so N flags cost one draw call per model mesh;
+ * only each flag's text planes keep archetypes of their own.
  */
 
 import * as THREE from "three";

@@ -300,6 +300,47 @@ describe("updateRuntimeObjectRenderArchetypeInstances", () => {
     expect(archetype.mesh.count).toBe(2);
   });
 
+  it("uploads only changed buffers and hides empty archetypes", () => {
+    const archetype = createArchetype("mouse-body", 4);
+    const diagnostics = createRuntimeObjectRenderArchetypeDiagnostics();
+    const recordsByKey = groupRuntimeObjectRenderRecordsByArchetype([
+      { objectId: "mouse-a", cellId: "room-a", archetypeKey: "mouse-body", localMatrix: new THREE.Matrix4() },
+    ]);
+    const pathsFor = (x: number) =>
+      new Map([
+        [
+          "room-a",
+          [
+            createRootVisiblePortalPath("room-a"),
+            { ...createRootVisiblePortalPath("room-a"), depth: 1, pathId: 2, rootFromDestinationMatrix: new THREE.Matrix4().makeTranslation(x, 0, 0) },
+          ],
+        ],
+      ]);
+    const run = (x: number, clip: number) =>
+      updateRuntimeObjectRenderArchetypeInstances([archetype], recordsByKey, pathsFor(x), diagnostics, new Map([[2, clip]]));
+    const versions = () => [
+      archetype.mesh.instanceMatrix.version,
+      archetype.portalPathIdAttribute.version,
+      archetype.portalClipIndexAttribute.version,
+    ];
+
+    run(5, 0);
+    expect(archetype.mesh.visible).toBe(true);
+    const first = versions();
+    run(5, 0);
+    expect(versions()).toEqual(first);
+
+    run(6, 0);
+    expect(versions()).toEqual([first[0] + 1, first[1], first[2]]);
+    expect(archetype.mesh.instanceMatrix.updateRanges).toEqual([{ start: 0, count: 2 * 16 }]);
+
+    run(6, 3);
+    expect(versions()).toEqual([first[0] + 1, first[1], first[2] + 1]);
+
+    updateRuntimeObjectRenderArchetypeInstances([archetype], recordsByKey, new Map(), diagnostics);
+    expect(archetype.mesh.visible).toBe(false);
+  });
+
   it("flattens statically-kept visible path groups for runtime object rendering", () => {
     const rootPath = createRootVisiblePortalPath("room-a");
     const portalPath = {

@@ -7,6 +7,7 @@
  * is meant to be added to the owning cell's root node. Throws if the asset was not preloaded.
  */
 import * as THREE from "three";
+import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import type { AssetObjectSpec, CellObjectSpec } from "../../cell-complex/specs";
 import { runtimeDiagnostics } from "./runtimeDiagnostics";
 import type { PreparedGltfAsset, PreparedWorldAssets } from "./preloadWorldAssets";
@@ -88,6 +89,7 @@ function buildStaticAssetMesh(
 
 /**
  * Builds a small procedural marmot (boxes for body, head, muzzle, tail, ears, eyes and legs) used in place of the legacy marmot glTF.
+ * The 12 boxes are merged into one vertex-coloured mesh `marmot:<objectId>`, so the marmot is a single draw call.
  *
  * Dimensions are in meters in the model's local Three.js frame, with the animal roughly 1 m long, facing +z, feet on y = 0.
  * Named `asset:<objectId>`; the caller owns the geometries and materials.
@@ -96,59 +98,52 @@ export function buildStaticMarmotProxy(objectId: string): THREE.Object3D {
   const root = new THREE.Group();
   root.name = `asset:${objectId}`;
 
-  const bodyMaterial = new THREE.MeshStandardMaterial({
-    color: 0x8c6a43,
-    roughness: 0.95,
-  });
-  const accentMaterial = new THREE.MeshStandardMaterial({
-    color: 0xe4d6bb,
-    roughness: 1,
-  });
-  const eyeMaterial = new THREE.MeshStandardMaterial({
-    color: 0x111111,
-    roughness: 0.6,
-  });
+  const bodyColor = new THREE.Color(0x8c6a43);
+  const accentColor = new THREE.Color(0xe4d6bb);
+  const eyeColor = new THREE.Color(0x111111);
+  const boxes: THREE.BufferGeometry[] = [];
+  // One box with its position baked in and a per-vertex colour, so all boxes merge into a single draw call.
+  const addBox = (
+    size: readonly [number, number, number],
+    position: readonly [number, number, number],
+    color: THREE.Color,
+  ): void => {
+    const geometry = new THREE.BoxGeometry(size[0], size[1], size[2]);
+    geometry.translate(position[0], position[1], position[2]);
+    const colors = new Float32Array(geometry.getAttribute("position").count * 3);
+    for (let offset = 0; offset < colors.length; offset += 3) {
+      colors[offset] = color.r;
+      colors[offset + 1] = color.g;
+      colors[offset + 2] = color.b;
+    }
+    geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+    boxes.push(geometry);
+  };
 
-  const body = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.24, 0.62), bodyMaterial);
-  body.position.set(0, 0.18, 0);
-  body.name = `marmot-body:${objectId}`;
-  root.add(body);
+  addBox([0.34, 0.24, 0.62], [0, 0.18, 0], bodyColor); // body
+  addBox([0.22, 0.2, 0.2], [0, 0.24, 0.34], bodyColor); // head
+  addBox([0.12, 0.09, 0.08], [0, 0.2, 0.46], accentColor); // muzzle
+  addBox([0.14, 0.14, 0.2], [0, 0.16, -0.36], bodyColor); // tail
 
-  const head = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.2, 0.2), bodyMaterial.clone());
-  head.position.set(0, 0.24, 0.34);
-  head.name = `marmot-head:${objectId}`;
-  root.add(head);
-
-  const muzzle = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.09, 0.08), accentMaterial);
-  muzzle.position.set(0, 0.2, 0.46);
-  muzzle.name = `marmot-muzzle:${objectId}`;
-  root.add(muzzle);
-
-  const tail = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.14, 0.2), bodyMaterial.clone());
-  tail.position.set(0, 0.16, -0.36);
-  tail.name = `marmot-tail:${objectId}`;
-  root.add(tail);
-
-  for (const [index, x] of [-0.09, 0.09].entries()) {
-    const ear = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.08, 0.04), bodyMaterial.clone());
-    ear.position.set(x, 0.37, 0.31);
-    ear.name = `marmot-ear:${objectId}:${index}`;
-    root.add(ear);
-
-    const eye = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.025, 0.025), eyeMaterial.clone());
-    eye.position.set(x * 0.7, 0.24, 0.45);
-    eye.name = `marmot-eye:${objectId}:${index}`;
-    root.add(eye);
+  for (const x of [-0.09, 0.09]) {
+    addBox([0.06, 0.08, 0.04], [x, 0.37, 0.31], bodyColor); // ear
+    addBox([0.025, 0.025, 0.025], [x * 0.7, 0.24, 0.45], eyeColor); // eye
   }
 
-  for (const [index, x] of [-0.1, 0.1].entries()) {
-    for (const [innerIndex, z] of [-0.16, 0.16].entries()) {
-      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.16, 0.08), bodyMaterial.clone());
-      leg.position.set(x, 0.08, z);
-      leg.name = `marmot-leg:${objectId}:${index}:${innerIndex}`;
-      root.add(leg);
+  for (const x of [-0.1, 0.1]) {
+    for (const z of [-0.16, 0.16]) {
+      addBox([0.08, 0.16, 0.08], [x, 0.08, z], bodyColor); // leg
     }
   }
+
+  const merged = mergeGeometries(boxes);
+  for (const box of boxes) {
+    box.dispose();
+  }
+
+  const marmot = new THREE.Mesh(merged, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 }));
+  marmot.name = `marmot:${objectId}`;
+  root.add(marmot);
 
   return root;
 }

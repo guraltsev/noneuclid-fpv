@@ -5,7 +5,7 @@
 
 This reference is produced from the source code. For the *meaning* of the modules — the mathematical model they implement — read [../MATHEMATICAL_MODEL.md](../MATHEMATICAL_MODEL.md) and [../ARCHITECTURE.md](../ARCHITECTURE.md). For every exported symbol see [API_REFERENCE.md](API_REFERENCE.md).
 
-**181 modules, 46,294 lines** under `src/`.
+**181 modules, 46,451 lines** under `src/`.
 
 ## Layers
 
@@ -22,7 +22,7 @@ A module belongs to the layer named by its first path segment under `src/`. "May
 | `runtime` | 10 | 2,681 | `math`, `cell-complex`, `movement`, `world-objects`, `authoring`, `ui`, `glue` | Runtime menu state, command dispatch, geometry session/worker and deformation families. |
 | `ui` | 6 | 1,324 | `math`, `cell-complex`, `runtime`, `world-objects`, `authoring`, `glue` | Renderer-neutral palette, help, tooltip and input-intent definitions. |
 | `glue` | 11 | 997 | `authoring`, `runtime`, `ui` | Launch options, debug settings, asset URLs, app configuration. |
-| `render` | 91 | 25,041 | anything | Three.js / DOM / WebXR rendering and input adapters (the application shell). |
+| `render` | 91 | 25,198 | anything | Three.js / DOM / WebXR rendering and input adapters (the application shell). |
 | `root` | 2 | 234 | anything | Entry point and application state. |
 
 ## Layer dependency graph
@@ -248,7 +248,7 @@ These imports break the intended layering. They are frozen in `scripts/docs/laye
 | `render/three/appDebugHelpers.ts` | 611 | Browser-console debug surface for the app: window-level helper installation, the shapes of the JSON dumps they return, and small number/portal-word formatters. | `cell-complex/portalPathDebug`, `cell-complex/portalPaths`, `cell-complex/staticPortalPathCull`, `math/vec3`, `movement/playerBody`, `movement/playerPose`, `render/three/geodesicCreatureDebug`, `render/three/renderPortalInstances`, `render/three/renderQuality`, `render/three/renderState`, `render/three/visiblePortalPaths`, `render/three/worldAxes`, `runtime/runtimeMenuState`, `runtime/worldGeometrySession`, `world-objects/geodesic/lifecycle`, `world-objects/geodesic/objects`, `world-objects/runtimeObjectRegistry` |
 | `render/three/appDebugLogging.ts` | 112 | Console guides printed when debug options are enabled. | `cell-complex/portalPaths`, `cell-complex/staticPortalPathCull`, `glue/debugLevels`, `glue/debugOptions` |
 | `render/three/buildCellMesh.ts` | 347 | Builds the Three.js geometry of one prism cell in the cell's own local frame (which the portal pipeline later places). | `cell-complex/floorUv`, `cell-complex/prismCells`, `glue/debugLevels`, `glue/portalPanelMode`, `render/three/buildPortalMesh`, `render/three/debugCollisionWireframes`, `render/three/preloadWorldAssets`, `render/three/sceneColors` |
-| `render/three/buildDecorationMesh.ts` | 187 | Builds the Three.js node for a static decoration (asset object) declared in a cell spec. | `cell-complex/specs`, `render/three/preloadWorldAssets`, `render/three/runtimeDiagnostics`, `render/three/worldAxes` |
+| `render/three/buildDecorationMesh.ts` | 182 | Builds the Three.js node for a static decoration (asset object) declared in a cell spec. | `cell-complex/specs`, `render/three/preloadWorldAssets`, `render/three/runtimeDiagnostics`, `render/three/worldAxes` |
 | `render/three/buildPortalMesh.ts` | 75 | Builds the visible wall panel of a portal side (the textured "doorway" surface) in a cell's local frame. | `render/three/portalWallTexture`, `render/three/preloadWorldAssets` |
 | `render/three/canvasDrawing.ts` | 28 | Canvas 2D drawing helpers used to build text-label textures. | — |
 | `render/three/carriedGeodesicCannon.ts` | 165 | Pure placement, glow, and naming helpers for carrying and aiming geodesic emitters. | `math/vec3`, `render/three/rootAimRay`, `render/three/worldAxes`, `world-objects/geodesic/objects`, `world-objects/runtimeObjectRegistry` |
@@ -287,19 +287,19 @@ These imports break the intended layering. They are frozen in `scripts/docs/laye
 | `render/three/portalInstanceDebug.ts` | 87 | Debug renderer that draws a single instance of a cell's archetypes at a chosen `rootFromDestination` matrix. | `render/three/cellRenderArchetypes`, `render/three/runtimeSceneUtils` |
 | `render/three/portalWallTexture.ts` | 97 | Material factory for the debug portal wall: a repeating checkerboard on a double-sided standard material. | `render/three/preloadWorldAssets` |
 | `render/three/preloadWorldAssets.ts` | 366 | Asset preloading and instancing for the Three.js renderer. | `cell-complex/compileCellComplex`, `glue/assetUrls`, `render/three/geodesicCannonRenderer`, `render/three/playerRoverModel`, `render/three/portalWallTexture`, `render/three/runtimeDiagnostics`, `world-objects/placedFlags` |
-| `render/three/prerenderCells.ts` | 112 | Warms up GPU resources by rendering every cell once before play so shader compilation and texture upload do not hitch later. | `render/three/worldAxes` |
+| `render/three/prerenderCells.ts` | 127 | Warms up GPU resources by rendering every cell once before play so shader compilation and texture upload do not hitch later. | `render/three/worldAxes` |
 | `render/three/protractorAngleRenderer.ts` | 226 | Renderer for the protractor tool's measured-angle marker. | `render/three/runtimeSceneUtils`, `render/three/worldAxes`, `render/three/worldResultBadge`, `world-objects/protractorTool` |
 | `render/three/protractorToolFeedback.ts` | 253 | In-scene feedback shown while the protractor tool is half-way through a measurement. | `math/vec3`, `render/three/worldAxes`, `world-objects/protractorTool` |
 | `render/three/renderCameraClip.ts` | 19 | Camera near clip distance in meters (0.03). | — |
-| `render/three/renderPortalInstances.ts` | 430 | Fills the per-frame instance buffers that draw each visible portal path as an instance of its destination cell. | `cell-complex/portalPaths`, `render/three/cellRenderArchetypes`, `render/three/runtimeObjectRenderArchetypes`, `render/three/runtimeObjectRenderRecords`, `render/three/visiblePortalPaths` |
+| `render/three/renderPortalInstances.ts` | 511 | Fills the per-frame instance buffers that draw each visible portal path as an instance of its destination cell. | `cell-complex/portalPaths`, `render/three/cellRenderArchetypes`, `render/three/runtimeObjectRenderArchetypes`, `render/three/runtimeObjectRenderRecords`, `render/three/visiblePortalPaths` |
 | `render/three/renderQuality.ts` | 124 | Render-resolution policy and the pixel sizes that portal clipping depends on. | — |
 | `render/three/renderState.ts` | 147 | Plain-data snapshots of runtime and render diagnostics, shared between the Three.js app, the debug overlay, the XR debug panel and the console debug helpers. | `math/vec3` |
 | `render/three/rootAimRay.ts` | 73 | Aim-ray value type and pure aim helpers shared by desktop and XR interaction code. | `math/vec3`, `render/three/aimTarget`, `render/three/worldAxes`, `world-objects/runtimeObjectRegistry` |
 | `render/three/runtimeDiagnostics.ts` | 425 | Optional runtime diagnostics: asset load tracking, portal transition log, slow-frame warnings and a browser long-task watcher. | `cell-complex/compileCellComplex`, `glue/debugLevels` |
 | `render/three/runtimeObjectGhostRecords.ts` | 108 | Creates "ghost" render records so a dynamic object that overlaps a portal is drawn on every side of it. | `cell-complex/compileCellComplex`, `cell-complex/developedDisk`, `math/rigidTransform3`, `math/vec3`, `movement/collision`, `movement/dynamicObject`, `render/three/runtimeObjectRenderRecords`, `render/three/worldAxes` |
-| `render/three/runtimeObjectInstanceSync.ts` | 343 | Runtime-object instance sync: brings the instanced render archetypes of runtime objects up to date and writes their instances from one {@link FrameRenderSnapshot}. | `cell-complex/compileCellComplex`, `movement/playerPose`, `render/three/frameRenderSnapshot`, `render/three/geodesicCannonRenderer`, `render/three/playerRoverModel`, `render/three/renderPortalInstances`, `render/three/runtimeObjectGhostRecords`, `render/three/runtimeObjectRenderArchetypes`, `render/three/runtimeObjectRenderRecords`, `render/three/runtimeSceneUtils`, `render/three/worldAxes`, `world-objects/runtimeObjectRegistry` |
-| `render/three/runtimeObjectRenderArchetypes.ts` | 153 | Instanced-mesh archetypes for runtime objects: one `THREE.InstancedMesh` per source mesh, drawn once per visible portal path. | `render/three/portalClipMaterial`, `render/three/runtimeObjectRenderRecords`, `render/three/runtimeSceneUtils` |
-| `render/three/runtimeObjectRenderRecords.ts` | 112 | Data records describing where runtime (non-static) objects should be drawn, and the source meshes they instance. | — |
+| `render/three/runtimeObjectInstanceSync.ts` | 358 | Runtime-object instance sync: brings the instanced render archetypes of runtime objects up to date and writes their instances from one {@link FrameRenderSnapshot}. | `cell-complex/compileCellComplex`, `movement/playerPose`, `render/three/frameRenderSnapshot`, `render/three/geodesicCannonRenderer`, `render/three/playerRoverModel`, `render/three/renderPortalInstances`, `render/three/runtimeObjectGhostRecords`, `render/three/runtimeObjectRenderArchetypes`, `render/three/runtimeObjectRenderRecords`, `render/three/runtimeSceneUtils`, `render/three/worldAxes`, `world-objects/runtimeObjectRegistry` |
+| `render/three/runtimeObjectRenderArchetypes.ts` | 156 | Instanced-mesh archetypes for runtime objects: one `THREE.InstancedMesh` per source mesh, drawn once per visible portal path. | `render/three/portalClipMaterial`, `render/three/runtimeObjectRenderRecords`, `render/three/runtimeSceneUtils` |
+| `render/three/runtimeObjectRenderRecords.ts` | 160 | Data records describing where runtime (non-static) objects should be drawn, and the source meshes they instance. | — |
 | `render/three/runtimeSceneUtils.ts` | 192 | Small scene-graph, geometry, and pose helpers shared by the app shell. | `appState`, `cell-complex/prismCells`, `math/vec3`, `movement/playerBody`, `render/three/debugCollisionWireframes`, `runtime/worldGeometryDeformations`, `world-objects/runtimeObjectRegistry` |
 | `render/three/sceneColors.ts` | 8 | Shared scene colour constants for the Three.js renderer. | — |
 | `render/three/sceneLighting.ts` | 70 | Lighting rig for the stylized (non-physical) look of the scene. | — |

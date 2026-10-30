@@ -69,6 +69,54 @@ export function collectRuntimeObjectRenderSourceMeshes(
   return sources;
 }
 
+/** Archetype-key prefix shared by the glTF model meshes of all placed flags of one `flagType`. */
+export function placedFlagModelArchetypeKeyPrefix(flagType: string): string {
+  return `placed-flag:${flagType}:model`;
+}
+
+const placedFlagTextPlanePrefix = "placed-flag-text-plane:";
+
+/**
+ * Like {@link collectRuntimeObjectRenderSourceMeshes}, but meshes named `placed-flag-text-plane:*` get keys under
+ * `ownPrefix` and every other mesh under the shared model prefix of `flagType`; both are numbered separately in
+ * traversal order. Placed flags of one type thereby share the archetypes (and draw calls) of their model meshes while
+ * each keeps its own text planes. Same side effects as the plain collector (updates world matrices, hides meshes).
+ */
+export function collectPlacedFlagRenderSourceMeshes(
+  flagId: string,
+  flagType: string,
+  root: THREE.Object3D,
+  ownPrefix: string,
+): readonly RuntimeObjectRenderSourceMesh[] {
+  root.updateMatrixWorld(true);
+  const modelPrefix = placedFlagModelArchetypeKeyPrefix(flagType);
+  const sources: RuntimeObjectRenderSourceMesh[] = [];
+  let modelIndex = 0;
+  let ownIndex = 0;
+
+  root.traverse((child) => {
+    if (!(child instanceof THREE.Mesh)) {
+      return;
+    }
+
+    const isTextPlane = child.name.startsWith(placedFlagTextPlanePrefix);
+    sources.push({
+      objectId: flagId,
+      archetypeKey: isTextPlane ? `${ownPrefix}:mesh:${ownIndex}` : `${modelPrefix}:mesh:${modelIndex}`,
+      mesh: child,
+      root,
+    });
+    child.visible = false;
+    if (isTextPlane) {
+      ownIndex += 1;
+    } else {
+      modelIndex += 1;
+    }
+  });
+
+  return sources;
+}
+
 /**
  * Horizontal render footprint radius of an object: the largest horizontal distance (Three x and z) from the object
  * root to any corner of any source mesh's bounding box, expressed in the root's frame. Zero when there are no sources.

@@ -129,6 +129,65 @@ describe("updateCellRenderArchetypeInstances", () => {
   });
 });
 
+describe("updateCellRenderArchetypeInstances uploads", () => {
+  function paths(translation: number, pathId = 4) {
+    return groupVisiblePortalPathsByDestinationCell([
+      {
+        ...createRootVisiblePortalPath("room-b"),
+        depth: 1,
+        pathId,
+        rootFromDestinationMatrix: new THREE.Matrix4().makeTranslation(translation, 0, 0),
+      },
+      {
+        ...createRootVisiblePortalPath("room-b"),
+        depth: 1,
+        pathId: 9,
+        rootFromDestinationMatrix: new THREE.Matrix4().makeTranslation(7, 0, 0),
+      },
+    ]);
+  }
+
+  it("flags buffers only when their content changed, uploading the written prefix", () => {
+    const archetype = createArchetype("room-b", "room-b:floor:0", 4);
+    const diagnostics = createPortalInstanceDiagnostics();
+    const clip = new Map([[4, 0], [9, 1]]);
+    const versions = () => [
+      archetype.mesh.instanceMatrix.version,
+      archetype.portalPathIdAttribute.version,
+      archetype.portalClipIndexAttribute.version,
+    ];
+
+    updateCellRenderArchetypeInstances([archetype], paths(1), diagnostics, clip);
+    const afterFirst = versions();
+    updateCellRenderArchetypeInstances([archetype], paths(1), diagnostics, clip);
+    expect(versions()).toEqual(afterFirst);
+
+    updateCellRenderArchetypeInstances([archetype], paths(2), diagnostics, clip);
+    const afterMatrix = versions();
+    expect(afterMatrix[0]).toBe(afterFirst[0] + 1);
+    expect(afterMatrix[1]).toBe(afterFirst[1]);
+    expect(afterMatrix[2]).toBe(afterFirst[2]);
+    expect(archetype.mesh.instanceMatrix.updateRanges).toEqual([{ start: 0, count: 2 * 16 }]);
+
+    updateCellRenderArchetypeInstances([archetype], paths(2), diagnostics, new Map([[4, 3], [9, 1]]));
+    const afterClip = versions();
+    expect(afterClip[0]).toBe(afterMatrix[0]);
+    expect(afterClip[1]).toBe(afterMatrix[1]);
+    expect(afterClip[2]).toBe(afterMatrix[2] + 1);
+  });
+
+  it("hides an archetype without paths and shows it with one", () => {
+    const archetype = createArchetype("room-b", "room-b:floor:0", 2);
+    const diagnostics = createPortalInstanceDiagnostics();
+
+    updateCellRenderArchetypeInstances([archetype], new Map(), diagnostics);
+    expect(archetype.mesh.visible).toBe(false);
+
+    updateCellRenderArchetypeInstances([archetype], paths(1), diagnostics);
+    expect(archetype.mesh.visible).toBe(true);
+  });
+});
+
 describe("createPortalInstanceDebugRenderer", () => {
   it("renders one debug instance per archetype for a selected cell and clears them on demand", () => {
     const scene = new THREE.Scene();

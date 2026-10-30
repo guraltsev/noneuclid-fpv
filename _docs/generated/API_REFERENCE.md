@@ -2060,6 +2060,8 @@ Data records describing where runtime (non-static) objects should be drawn, and 
 | interface | `RuntimeObjectRenderRecord` | Request to draw one archetype of one runtime object at a cell-local pose. |
 | interface | `RuntimeObjectRenderSourceMesh` | A mesh of a runtime object's source hierarchy, to be baked into an instanced archetype. |
 | function | `collectRuntimeObjectRenderSourceMeshes` | Collects every `Mesh` under `root` as an instancing source and hides the originals. |
+| function | `placedFlagModelArchetypeKeyPrefix` | Archetype-key prefix shared by the glTF model meshes of all placed flags of one `flagType`. |
+| function | `collectPlacedFlagRenderSourceMeshes` | Like {@link collectRuntimeObjectRenderSourceMeshes}, but meshes named `placed-flag-text-plane:*` get keys under `ownPrefix` and every other mesh under the shared model prefix of `flagType`; both are numbered separately … |
 | function | `computeRenderSourceFootprintRadius` | Horizontal render footprint radius of an object: the largest horizontal distance (Three x and z) from the object root to any corner of any source mesh's bounding box, expressed in the root's frame. |
 
 ### `render/three/runtimeSceneUtils.ts`
