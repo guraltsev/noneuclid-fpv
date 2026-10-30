@@ -88,6 +88,16 @@ export function distanceVec3(a: Vec3, b: Vec3): number {
 }
 
 /**
+ * Returns the squared Euclidean distance between points a and b.
+ */
+export function distanceSquaredVec3(a: Vec3, b: Vec3): number {
+  const dx = a.x - b.x;
+  const dy = a.y - b.y;
+  const dz = a.z - b.z;
+  return dx * dx + dy * dy + dz * dz;
+}
+
+/**
  * Returns true if every component of a and b differs by at most `tolerance`.
  * This is a per-component (Chebyshev) comparison, not a Euclidean-norm test.
  */

@@ -206,10 +206,10 @@ Every gluing rotation is a yaw, so after every crossing the pose (and each compo
 ## 6. Geodesics
 
 A **geodesic** here is a locally straight horizontal path at the constant beam height
-`src/world-objects/geodesicCannon.ts#geodesicRayBeamHeightMeters` $=1.08$ m: in each cell it is a Euclidean line
+`src/world-objects/geodesic/objects.ts#geodesicRayBeamHeightMeters` $=1.08$ m: in each cell it is a Euclidean line
 segment, and at a portal it continues straight in the target cell after applying the gluing map.
 
-**Tracing one segment.** `src/world-objects/geodesicCannon.ts#traceGeodesicSegment` takes a start point $a$ and unit
+**Tracing one segment.** `src/world-objects/geodesic/trace.ts#traceGeodesicSegment` takes a start point $a$ and unit
 direction $d$ in a cell and returns the first event along $a+td$, $0<t\le L$:
 
 - Against a side with endpoints $v,w$ (edge vector $e=w-v$): $t = \dfrac{(v-a)\times e}{d\times e}$ and
@@ -219,7 +219,7 @@ direction $d$ in a cell and returns the first event along $a+td$, $0<t\le L$:
   a start strictly inside the disk, or on the circle ($\bigl||o|-r\bigr|\le 10^{-9}$ m) moving inward, is a hit at
   $t=0$; a start on the circle moving outward or tangentially is not a hit.
 - The nearest event wins and yields one of four **terminals**
-  (`src/world-objects/geodesicCannon.ts#GeodesicSegmentTerminal`): `open` (length exhausted), `wall-hit`,
+  (`src/world-objects/geodesic/objects.ts#GeodesicSegmentTerminal`): `open` (length exhausted), `wall-hit`,
   `forbidden-zone-hit`, or `portal-hit`. A portal hit records the continuation: target start $g(a+td)$ and target
   direction $Rd$, exactly, with no nudge (a restart must skip the target side by `entrySideIndex`).
 
@@ -232,10 +232,10 @@ a `forbidden-zone-hit` with `junctionId` `<cellId>:vertex-<index>`.
 
 The result (`src/world-objects/geodesicCannon.ts#traceGeodesicFromLiftedChord` and the emitter-aware variants) is the
 per-cell **segments** of a geodesic; the ordered list of portals crossed is its **portal word**
-(`src/world-objects/geodesicCannon.ts#GeodesicPortalTraversal`).
+(`src/world-objects/geodesic/objects.ts#GeodesicPortalTraversal`).
 
 **Intervals and endpoints.** A `GeodesicIntervalObject` is a geodesic arc with a `start` and an `end`
-*attachment* (`src/world-objects/geodesicCannon.ts#GeodesicEndpointAttachment`): each end is attached to an
+*attachment* (`src/world-objects/geodesic/objects.ts#GeodesicEndpointAttachment`): each end is attached to an
 *anchor object* — an emitter ("cannon"), or a `FreeGeodesicEndObject` (a loose end that can be aimed). The interval stores
 its portal word, so the arc is determined by (anchor positions, word) alone. This is the "geodesic end model" of
 `_issues/_closed/31_geodesic_end_model_and_curve_shortening_rehaul.md`.
@@ -246,10 +246,10 @@ $$\tilde b \;=\; g_1^{-1}\circ g_2^{-1}\circ\cdots\circ g_k^{-1}\,(b)$$
 in the frame of $C_0$ (`src/world-objects/geodesicCannon.ts#liftGeodesicEndpoint`; the inverses are applied from the
 last portal back to the first). Its length is $|\tilde b-a|$ (nonzero lift required:
 `src/world-objects/geodesicCannon.ts#geodesicHasNonzeroLiftedDisplacement`, minimum
-`src/world-objects/geodesicCannon.ts#GEODESIC_MIN_LENGTH_METERS` $=0.15$ m). The direction at $a$ is the direction of
+`src/world-objects/geodesic/objects.ts#GEODESIC_MIN_LENGTH_METERS` $=0.15$ m). The direction at $a$ is the direction of
 $\tilde b-a$, and re-tracing from $a$ in that direction for length $|\tilde b-a|$ must reproduce the word —
 this is how `src/world-objects/geodesicCannon.ts#rebuildLockedGeodesicFromEndpointsAndPortalWord` rebuilds a *locked*
-geodesic when its endpoints move. The reverse word (`src/world-objects/geodesicCannon.ts#reverseGeodesicPortalWord`) reads
+geodesic when its endpoints move. The reverse word (`src/world-objects/geodesic/portalWord.ts#reverseGeodesicPortalWord`) reads
 the arc from the other end: reverse the order and swap source/target of each step.
 
 **Why words, not just positions.** In a quotient space such as the torus two anchors are joined by infinitely many
@@ -263,7 +263,7 @@ always freely reduced.)
 ## 7. Curve shortening
 
 Tying two geodesic ends and releasing them produces a *moving pair*
-(`src/world-objects/geodesicCannon.ts#CurveShorteningPairObject`): two arcs meeting at a **free vertex** $X$, whose other
+(`src/world-objects/geodesic/objects.ts#CurveShorteningPairObject`): two arcs meeting at a **free vertex** $X$, whose other
 ends $A$, $B$ are fixed by their anchors. The pair is advanced by
 `src/world-objects/geodesicCannon.ts#advanceCurveShorteningPairs` as a discrete **gradient descent of the total length**
 $$L(X)=|X-\tilde A|+|X-\tilde B|$$
@@ -291,7 +291,7 @@ $u_A+u_B=0$: the two arcs form a single straight line through $X$. Concretely ea
 4. Geometry decides when an arc is gone. A two-arc pair whose shorter arc is below
    `src/world-objects/geodesicCannon.ts#curveShorteningFuseStepToleranceMeters` (0.165 m) is absorbed into one
    geodesic (`absorbShortCurveShorteningHalf`), and a free loop shorter than
-   `src/world-objects/geodesicCannon.ts#GEODESIC_MIN_LENGTH_METERS` is deleted. A refused absorption does not stop the
+   `src/world-objects/geodesic/objects.ts#GEODESIC_MIN_LENGTH_METERS` is deleted. A refused absorption does not stop the
    descent.
 
 This is local descent, not a global shortest-path solver: it finds *a* locally shortest geodesic in the current homotopy
@@ -436,8 +436,8 @@ positions, and any that cannot be re-solved are deleted and reported. Tool selec
 | geometry tolerance | $10^{-8}$ m | `src/math/tolerances.ts#geometryTolerance` | default absolute tolerance for math primitives |
 | junction exclusion radius | 0.15 m | `src/cell-complex/forbiddenZones.ts#forbiddenPortalJunctionRadiusMeters` | radius of the cylinder around portal-incident vertices |
 | player radius / height | 0.25 m / 1.6 m | `src/movement/playerBody.ts#DEFAULT_PLAYER_RADIUS_METERS` | body cylinder |
-| beam height | 1.08 m | `src/world-objects/geodesicCannon.ts#geodesicRayBeamHeightMeters` | height at which geodesics are traced and drawn |
-| minimum geodesic length | 0.15 m | `src/world-objects/geodesicCannon.ts#GEODESIC_MIN_LENGTH_METERS` | shorter arcs are rejected |
+| beam height | 1.08 m | `src/world-objects/geodesic/objects.ts#geodesicRayBeamHeightMeters` | height at which geodesics are traced and drawn |
+| minimum geodesic length | 0.15 m | `src/world-objects/geodesic/objects.ts#GEODESIC_MIN_LENGTH_METERS` | shorter arcs are rejected |
 | curve-shortening speed | 0.4 m/s | `src/world-objects/geodesicCannon.ts#curveShorteningDefaultSpeedMetersPerSecond` | descent speed of the free vertex |
 | fuse angle tolerance | 0.03 rad | `src/world-objects/geodesicCannon.ts#curveShorteningFuseAngleToleranceRadians` | deviation from a straight angle that still counts as straight |
 | segment-walk vertex tie | $10^{-9}$ m | `src/math/tolerances.ts#segmentWalkVertexTieMeters` | crossings closer than this are a pass through a shared vertex |

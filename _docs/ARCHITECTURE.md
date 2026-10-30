@@ -43,7 +43,7 @@ See [Keeping the documentation true](#keeping-the-documentation-true).
 3. **Path tables** (`src/cell-complex/portalPaths.ts#buildPortalPathTables`) enumerate developing maps for every root cell;
    `src/cell-complex/staticPortalPathCull.ts#buildStaticallyCulledPortalPathTables` prunes the impossible ones.
 4. **Simulation** is purely functional geometry: `src/movement/movePlayer.ts#movePlayer` for bodies,
-   `src/world-objects/geodesicCannon.ts#traceGeodesicSegment` and friends for rays. Nothing in these modules knows about
+   `src/world-objects/geodesic/trace.ts#traceGeodesicSegment` and friends for rays. Nothing in these modules knows about
    Three.js, the DOM or WebXR.
 5. **Presentation** (`src/render/three`) draws the current cell plus every visible destination cell through portals,
    adapts desktop/WebXR input to the runtime, and renders menus.

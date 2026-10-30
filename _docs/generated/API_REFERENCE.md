@@ -89,6 +89,20 @@ Shared absolute tolerance for geometric comparisons.
 | const | `ceilingHeightSlackMeters` | A neighbouring cell counts as lower than the body top only if it is lower by more than this (meters). |
 | const | `approachDotToleranceMeters` | Tolerance (meters, a dot product of a displacement with a unit normal) for a remaining displacement still approaching an earlier contact. |
 
+### `math/vec2.ts`
+
+Two-dimensional vector helpers on `Vec2xy` ({ x, y }, meters): sum, difference, scaling, dot and cross products, length.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| function | `crossXY` | Two-dimensional cross product `ax * by - ay * bx` of the vectors (ax, ay) and (bx, by). |
+| function | `addVec2` | Returns the sum `a + b`. |
+| function | `subVec2` | Returns the difference `a - b`. |
+| function | `scaleVec2` | Returns `v` scaled by `s`. |
+| function | `dotVec2` | Returns the dot product of `a` and `b`. |
+| function | `crossVec2` | Returns the two-dimensional cross product `a.x * b.y - a.y * b.x`. |
+| function | `lengthVec2` | Returns the Euclidean length of `v`. |
+
 ### `math/vec3.ts`
 
 Immutable 3D vector type and the small set of free functions used throughout the engine.
@@ -105,6 +119,7 @@ Immutable 3D vector type and the small set of free functions used throughout the
 | function | `lengthVec3` | Returns the Euclidean norm of v. |
 | function | `normalizeVec3` | Returns v scaled to unit length. |
 | function | `distanceVec3` | Returns the Euclidean distance between points a and b. |
+| function | `distanceSquaredVec3` | Returns the squared Euclidean distance between points a and b. |
 | function | `almostEqualVec3` | Returns true if every component of a and b differs by at most `tolerance`. |
 
 ## `cell-complex`
@@ -432,7 +447,15 @@ Floor texture library: the named floor appearances world scripts can use, via th
 
 ## `world-objects`
 
-### `world-objects/geodesicCannon.ts`
+### `world-objects/geodesic/development.ts`
+
+Development of portal words: inverse portal transforms, cached per compiled portal (a compiled world is immutable, so a WeakMap keyed by portal is always valid); pure.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| function | `inversePortalTransform` | Inverse of the portal's `transformToTarget`, cached per compiled portal. |
+
+### `world-objects/geodesic/objects.ts`
 
 Geodesic emitters ("cannons"), geodesic intervals and curve shortening on a glued cell complex.
 
@@ -455,9 +478,73 @@ Geodesic emitters ("cannons"), geodesic intervals and curve shortening on a glue
 | interface | `GeodesicIntersectionObject` | A computed marker where two distinct geodesics' segments cross in the same cell. |
 | type | `GeodesicSegmentTerminal` | How a single per-cell segment ends. |
 | interface | `CreateGeodesicCannonOptions` | Construction options for `createGeodesicCannonObject`; omitted optional fields get the defaults documented there. |
+| interface | `TraceGeodesicSegmentResult` | One traced piece: the cell, the (normalized) ray used, the length actually travelled, and why it stopped. |
+| interface | `PlaceGeodesicCannonResult` | Result of the cannon placement functions: the placed (registry) cannon, or `placed: false` with a coarse `reason`. |
+| const | `geodesicRayBeamHeightMeters` | Height of the geodesic beam above an emitter's floor point, in meters. |
+| const | `geodesicRayBeamStartOffsetMeters` | Horizontal distance (meters) by which a beam starts away from its emitter center along the launch direction; currently 0. |
+| const | `GEODESIC_MIN_LENGTH_METERS` | Smallest lifted chord length (meters) of a valid interval; shorter intervals are degenerate and are deleted or rejected. |
+| const | `defaultTraceLengthMeters` | Default total trace length (meters) when a caller passes no `maxLengthMeters`. |
+| const | `intersectionTolerance` | Numerical tolerance for ray/side parallelism, hit parameters and length comparisons (meters / unitless). |
+| const | `minGeodesicSegmentLengthMeters` | Smallest segment/continuation length (meters) worth creating when splitting or building free geodesics. |
+| const | `emitterConnectionToleranceMeters` | Perpendicular distance (meters) within which a ray counts as hitting an emitter; equal to the cannon collision radius. |
+| function | `createGeodesicCannonObject` | Builds a geodesic emitter object from options, filling defaults. |
+| function | `isGeodesicSegmentObject` | Type guard: true when the object is a `GeodesicSegmentObject` (`kind === "geodesic-segment"`). |
+| function | `isGeodesicIntersectionObject` | Type guard: true when the object is a `GeodesicIntersectionObject`. |
+| function | `isGeodesicCannonObject` | Type guard: true when the object is a `GeodesicCannonObject`. |
+| function | `isGeodesicIntervalObject` | Type guard: true when the object is a `GeodesicIntervalObject`. |
+| function | `isFreeGeodesicEndObject` | Type guard: true when the object is a `FreeGeodesicEndObject`. |
+| function | `isCurveShorteningPairObject` | Type guard: true when the object is a `CurveShorteningPairObject`. |
+| function | `createFreeGeodesicEndObject` | Builds a free-end anchor at `point` (cell-local meters, including its beam height in z) in cell `cellId`. |
+| function | `createGeodesicIntervalObject` | Builds a geodesic interval from two anchor ids, a start cell and an optional portal word. |
+| function | `createCurveShorteningPairObject` | Builds a curve-shortening pair object (see `CurveShorteningPairObject`); `state` defaults to `"moving"`. |
+| function | `getGeodesicSegmentEnd` | Returns the segment's end point, `start + direction * lengthMeters`, in the segment's cell frame (meters). |
+| function | `canExtendGeodesicSegment` | True unless the segment ended at a wall, forbidden zone or emitter (those terminals cannot be continued). |
+| function | `resolveGeodesicCannonAimYawRadians` | Yaw (radians, normalized by `sanitizeYaw`) from the cannon toward a cell-local target point. |
+| function | `getGeodesicCannonEmitterPoint` | Point where the cannon's beam starts, in the cannon's cell frame. |
+| function | `canObjectAttachGeodesics` | True when the object may be the anchor of a geodesic interval endpoint. |
+| function | `getAnchorBeamPoint` | Beam-height point of an anchor object in its cell frame. |
+| function | `getOppositeEndRole` | The other endpoint role: `start` for `end` and `end` for `start`. |
+| function | `directionFromYaw` | Unit horizontal direction of a yaw (radians counter-clockwise from +x). |
+| function | `normalizeHorizontalDirection` | Normalizes the horizontal part of a direction; the result has `z = 0`. |
+| function | `sanitizeYaw` | Wraps an angle to (-pi, pi] via atan2(sin, cos); non-finite input becomes 0. |
+
+### `world-objects/geodesic/portalWord.ts`
+
+Portal-word algebra of geodesic intervals: reversal, free reduction, comparison, role-aware sub-words and the update of a word when an anchor crosses a portal; pure, no registry access.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| function | `reverseGeodesicPortalWord` | Returns the inverse portal word: reversed order, with each traversal's source and target swapped. |
+| function | `getPortalWordBetweenEndpointRoles` | Returns the interval's portal word read from `sourceRole` to `targetRole`: the stored word, its inverse, or empty when the roles are equal. |
+| function | `collectPortalWordFromTraces` | Portal word recorded by the `portal-hit` pieces of a trace. |
+| function | `samePortalWord` | Element-wise equality of two portal words. |
+| function | `portalTraversalFromCarryTransition` | The portal traversal that a carry portal transition records. |
+| function | `getPortalTraversalFromSource` | The portal traversal that leaves `sourceCellId` through the given portal. |
+| function | `portalWordAfterAnchorCrossing` | Portal word of an interval after one of its anchors crossed a portal. |
+| function | `applyAnchorCrossingTraversals` | Applies {@link portalWordAfterAnchorCrossing} once per traversal, in order, feeding each resulting word into the next. |
+| function | `reduceAdjacentInversePortalTraversals` | Freely reduces a portal word by cancelling adjacent inverse traversals. |
+
+### `world-objects/geodesic/trace.ts`
+
+Tracing a horizontal geodesic ray through a compiled cell complex: the single-cell tracer, the multi-cell walk on the segment-walk kernel, and forbidden-zone (open-disk) and emitter hits.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
 | interface | `TraceGeodesicSegmentInput` | Input for `traceGeodesicSegment`: trace one ray inside one cell, up to `maxLengthMeters`. |
 | interface | `TraceGeodesicSegmentWithEmittersInput` | Input for `traceGeodesicSegmentWithEmitters`: a plain trace that also stops at emitters near the ray. |
-| interface | `TraceGeodesicSegmentResult` | One traced piece: the cell, the (normalized) ray used, the length actually travelled, and why it stopped. |
+| function | `traceGeodesicSegment` | Traces one straight ray inside a single cell and reports where and why it stops. |
+| function | `traceGeodesicSegmentWithEmitters` | Like `traceGeodesicSegment`, but shortens the result to an `emitter-hit` when an eligible emitter lies on the ray. |
+| function | `findNearestEmitterHitOnTrace` | Finds the closest emitter in the cell lying within `emitterConnectionToleranceMeters` of the ray and ahead of its start. |
+| function | `geodesicTerminalFromWalkPiece` | Converts one piece of a developed-segment walk into a segment terminal. |
+| function | `traceGeodesicPathForConnectionMode` | Traces a geodesic through the cell complex, restarting in the target cell at each portal hit. |
+| function | `traceTerminalToBuildTerminal` | Maps the terminal of a trace tail to the terminal of a build result. |
+
+### `world-objects/geodesicCannon.ts`
+
+Facade that re-exports the geodesic modules of `src/world-objects/geodesic/` under their old names while they are being split (job 25); it will be deleted.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
 | interface | `ShootGeodesicInput` | Input for `shootGeodesic`: aim a cannon's geodesic along the cannon's yaw and trace it for `maxLengthMeters`. |
 | interface | `ExtendGeodesicInput` | Input for `extendGeodesic`: lengthen an aimable free geodesic by `maxLengthMeters` along its emitter tangent. |
 | interface | `RebuildGeodesicToLengthInput` | Input for `rebuildGeodesicToLength`: re-shoot a geodesic from its cannon with a new total length. |
@@ -470,34 +557,18 @@ Geodesic emitters ("cannons"), geodesic intervals and curve shortening on a glue
 | interface | `TieAndDetachGeodesicEndpointsRequest` | Request for `tieAndDetachGeodesicEndpoints`: detach two endpoint roles from one emitter and tie them at a new shared free end. |
 | interface | `AdvanceStraighteningGeodesicsRequest` | Legacy: request for `advanceStraighteningGeodesics`; same shape as `AdvanceCurveShorteningPairsRequest` without the debug sink. |
 | interface | `AdvanceCurveShorteningPairsRequest` | Request for `advanceCurveShorteningPairs`: advance every moving pair by `deltaSeconds`. |
-| interface | `PlaceGeodesicCannonResult` | Result of the cannon placement functions: the placed (registry) cannon, or `placed: false` with a coarse `reason`. |
-| const | `geodesicRayBeamHeightMeters` | Height of the geodesic beam above an emitter's floor point, in meters. |
-| const | `geodesicRayBeamStartOffsetMeters` | Horizontal distance (meters) by which a beam starts away from its emitter center along the launch direction; currently 0. |
-| const | `GEODESIC_MIN_LENGTH_METERS` | Smallest lifted chord length (meters) of a valid interval; shorter intervals are degenerate and are deleted or rejected. |
-| const | `minGeodesicSegmentLengthMeters` | Smallest segment/continuation length (meters) worth creating when splitting or building free geodesics. |
 | const | `geodesicStraighteningSpeedMetersPerSecond` | Legacy: default speed (m/s) of the retired same-cell straightening model. |
 | const | `curveShorteningDefaultSpeedMetersPerSecond` | Default speed (m/s) at which a curve-shortening pair's shared free end moves downhill. |
 | const | `curveShorteningFuseAngleToleranceRadians` | Turn-angle tolerance (radians) below which the free end counts as locally straight, so the pair is ready to fuse. |
 | const | `curveShorteningFuseStepToleranceMeters` | Length tolerance (meters): a two-arc pair whose shorter arc is below this is absorbed into one geodesic (`absorbShortCurveShorteningHalf`); slightly above the minimum geodesic length. |
 | const | `curveShorteningMinStepMeters` | Floor (meters) applied to the arc lengths in the curve-shortening step's distance-to-straight estimate, so that a vanishing arc cannot divide by zero. |
 | const | `curveShorteningLengthIncreaseToleranceMeters` | Length tolerance (meters) for the monotone-descent check of curve shortening: a previewed step is committed only if the new total length of the pair's arcs is at most `previousTotalLengthMeters + curveShorteningLengthIn… |
-| function | `createGeodesicCannonObject` | Builds a geodesic emitter object from options, filling defaults. |
 | function | `placeGeodesicCannonAtFloorPoint` | Adds a new cannon standing on the floor at `floorPoint` unless the spot is blocked. |
-| function | `isGeodesicSegmentObject` | Type guard: true when the object is a `GeodesicSegmentObject` (`kind === "geodesic-segment"`). |
-| function | `isGeodesicIntersectionObject` | Type guard: true when the object is a `GeodesicIntersectionObject`. |
-| function | `isGeodesicCannonObject` | Type guard: true when the object is a `GeodesicCannonObject`. |
-| function | `isGeodesicIntervalObject` | Type guard: true when the object is a `GeodesicIntervalObject`. |
-| function | `isFreeGeodesicEndObject` | Type guard: true when the object is a `FreeGeodesicEndObject`. |
-| function | `isCurveShorteningPairObject` | Type guard: true when the object is a `CurveShorteningPairObject`. |
-| function | `createFreeGeodesicEndObject` | Builds a free-end anchor at `point` (cell-local meters, including its beam height in z) in cell `cellId`. |
-| function | `createGeodesicIntervalObject` | Builds a geodesic interval from two anchor ids, a start cell and an optional portal word. |
-| function | `createCurveShorteningPairObject` | Builds a curve-shortening pair object (see `CurveShorteningPairObject`); `state` defaults to `"moving"`. |
 | function | `getGeodesicEndpointAttachmentsForAnchor` | Lists every interval endpoint attachment (start or end of any interval) whose anchor is `anchorObjectId`. |
 | function | `getGeodesicEndpoints` | Returns `[start, end]` attachments of the interval `geodesicId`, or `undefined` if no such interval exists. |
 | function | `replaceGeodesicEndpointAttachment` | Re-attaches one endpoint role of an interval to another anchor object and returns the updated interval. |
 | function | `removeGeodesicIntervalAndDerivedObjects` | Deletes an interval together with everything derived from or pointing at it. |
 | function | `getGeodesicPortalWord` | Returns the stored portal word of an interval (ordered `start` -> `end`), or `undefined` if `geodesicId` is not an interval. |
-| function | `reverseGeodesicPortalWord` | Returns the inverse portal word: reversed order, with each traversal's source and target swapped. |
 | function | `liftGeodesicEndpoint` | Develops an interval into the source endpoint's cell: pulls the opposite endpoint back through the inverse portal transforms. |
 | function | `geodesicHasNonzeroLiftedDisplacement` | True when the interval's lifted start-to-end chord is at least `GEODESIC_MIN_LENGTH_METERS` long (horizontally). |
 | function | `getGeodesicSegments` | Returns the derived segments of a geodesic sorted by `segmentIndex` (empty if none). |
@@ -511,13 +582,6 @@ Geodesic emitters ("cannons"), geodesic intervals and curve shortening on a glue
 | function | `removeUnlockedGeodesicsFromCannon` | Removes every non-locked geodesic listed on the cannon and returns the removed ids (empty if the id is not a cannon). |
 | function | `hasStraighteningIncidentGeodesic` | Legacy: true when any geodesic incident on the emitter is in the retired straightening state. |
 | function | `removeGeodesicCannonAndSegments` | Deletes a cannon and every geodesic that starts, ends, or connects (as incoming emitter) on it. |
-| function | `getGeodesicSegmentEnd` | Returns the segment's end point, `start + direction * lengthMeters`, in the segment's cell frame (meters). |
-| function | `canExtendGeodesicSegment` | True unless the segment ended at a wall, forbidden zone or emitter (those terminals cannot be continued). |
-| function | `resolveGeodesicCannonAimYawRadians` | Yaw (radians, normalized by `sanitizeYaw`) from the cannon toward a cell-local target point. |
-| function | `traceGeodesicSegment` | Traces one straight ray inside a single cell and reports where and why it stops. |
-| function | `traceGeodesicSegmentWithEmitters` | Like `traceGeodesicSegment`, but shortens the result to an `emitter-hit` when an eligible emitter lies on the ray. |
-| function | `findNearestEmitterHitOnTrace` | Finds the closest emitter in the cell lying within `emitterConnectionToleranceMeters` of the ray and ahead of its start. |
-| function | `geodesicTerminalFromWalkPiece` | Converts one piece of a developed-segment walk into a segment terminal. |
 | function | `traceGeodesicFromLiftedChord` | Realizes an interval's geometry by tracing the lifted chord, and replaces the interval's derived segments with it. |
 | function | `aimFreeGeodesicFromEndpoint` | Re-aims a free geodesic (emitter at one role, a singly attached free end at the other) toward a target point. |
 | function | `rebuildDerivedGeodesicSegments` | Regenerates an interval's segments from its endpoint anchors and portal word (the fundamental "development" step). |
@@ -528,11 +592,9 @@ Geodesic emitters ("cannons"), geodesic intervals and curve shortening on a glue
 | function | `rebuildLockedGeodesicFromEndpointsAndPortalWord` | Rebuilds a locked (emitter-to-emitter) interval after an endpoint was carried, updating its portal word first. |
 | function | `updateLockedGeodesicPortalWordForCarriedAnchorTraversal` | Extends an interval's stored portal word with one portal crossing made by a carried anchor, and saves it. |
 | function | `updateLockedGeodesicPortalWordForCarriedAnchorTraversals` | Same as {@link updateLockedGeodesicPortalWordForCarriedAnchorTraversal} for a chain of traversals the carried anchor made in one frame, in order. |
-| function | `getPortalWordBetweenEndpointRoles` | Returns the interval's portal word read from `sourceRole` to `targetRole`: the stored word, its inverse, or empty when the roles are equal. |
 | function | `updatePortalWordForMovedEndpoint` | Returns the interval's portal word after one of its endpoints crossed a portal, or `undefined` if the result is inconsistent. |
 | function | `previewRebuildGeodesicInterval` | Computes the segments an interval would have, without touching the registry (rollback-safe). |
 | function | `collectGeodesicMenuRowsForEmitter` | Lists one menu row (`G<n>` label) per distinct geodesic attached to the emitter, in attachment order. |
-| function | `applyAnchorCrossingTraversals` | Applies {@link portalWordAfterAnchorCrossing} once per traversal, in order, feeding each resulting word into the next. |
 | function | `shootGeodesic` | Emits (or re-aims) a free geodesic from a cannon along its yaw and returns its first derived segment. |
 | function | `extendGeodesic` | Lengthens an aimable free geodesic by re-aiming it from its emitter along the current tangent, and returns its new last segment. |
 | function | `rebuildGeodesicToLength` | Re-shoots a geodesic from its cannon so that its total length is `totalLengthMeters`, returning the new segments. |
