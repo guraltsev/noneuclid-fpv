@@ -688,12 +688,6 @@ Tracing a horizontal geodesic ray through a compiled cell complex: the single-ce
 | function | `traceGeodesicPathForConnectionMode` | Traces a geodesic through the cell complex, restarting in the target cell at each portal hit. |
 | function | `traceTerminalToBuildTerminal` | Maps the terminal of a trace tail to the terminal of a build result. |
 
-### `world-objects/geodesicCannon.ts`
-
-Facade that re-exports the geodesic modules of `src/world-objects/geodesic/` under their old names while they are being split (job 25); it will be deleted.
-
-_No exports._
-
 ### `world-objects/geodesicMarmot.ts`
 
 Geodesic marmot: an autonomous creature that walks in a straight line (a locally straight geodesic) through the cell complex, crossing portals.

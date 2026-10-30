@@ -6,15 +6,15 @@
 import { yawRigidTransform3 } from "../math/rigidTransform3";
 import { dotVec3, type Vec3 } from "../math/vec3";
 import {
-  getGeodesicEndpointAttachmentsForAnchor,
   geodesicRayBeamHeightMeters,
-  getRememberedGeodesicIntersectionObject,
-  resolveEndpointTangentAtAnchor,
   type GeodesicEndRole,
   type GeodesicCannonObject,
   type GeodesicIntersectionObject,
   type GeodesicSegmentObject,
-} from "./geodesicCannon";
+} from "./geodesic/objects";
+import { getRememberedGeodesicIntersectionObject } from "./geodesic/intersections";
+import { getGeodesicEndpointAttachmentsForAnchor } from "./geodesic/endpoints";
+import { resolveEndpointTangentAtAnchor } from "./geodesic/segments";
 import type { RuntimeObjectRegistry, RuntimeWorldObjectBase } from "./runtimeObjectRegistry";
 
 /**

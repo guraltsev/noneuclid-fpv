@@ -17,7 +17,7 @@ import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex"
 import type { CompiledPrismCell } from "../../cell-complex/prismCells";
 import { dotVec3, normalizeVec3, subVec3, type Vec3 } from "../../math/vec3";
 import { getDynamicObjectCollisionBounds, signedDistanceToSide, type SimpleCylinderBounds } from "../../movement/collision";
-import { geodesicRayBeamHeightMeters, geodesicRayBeamStartOffsetMeters } from "../../world-objects/geodesicCannon";
+import { geodesicRayBeamHeightMeters, geodesicRayBeamStartOffsetMeters } from "../../world-objects/geodesic/objects";
 import { createProtractorAngleLabelHitbox } from "../../world-objects/protractorTool";
 import { runtimeObjectToDynamicObjectState, type RuntimeObjectRegistry, type RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
 import { locateDevelopedPoint, walkDevelopedSegment, type SegmentWalkPiece } from "../../cell-complex/segmentWalk";

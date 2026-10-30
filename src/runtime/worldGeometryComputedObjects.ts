@@ -5,12 +5,9 @@
  */
 import type { CompiledCellComplex } from "../cell-complex/compileCellComplex";
 import type { Vec3 } from "../math/vec3";
-import {
-  isGeodesicLocked,
-  pruneMissingGeodesicIntersectionObjects,
-  rebuildConnectedGeodesicBetweenEmitters,
-  removeGeodesic,
-} from "../world-objects/geodesicCannon";
+import { pruneMissingGeodesicIntersectionObjects } from "../world-objects/geodesic/intersections";
+import { isGeodesicLocked, removeGeodesic } from "../world-objects/geodesic/lifecycle";
+import { rebuildConnectedGeodesicBetweenEmitters } from "../world-objects/geodesic/cannon";
 import {
   refreshMeasuredGeodesicLengthObject,
   type MeasuredGeodesicLengthObject,

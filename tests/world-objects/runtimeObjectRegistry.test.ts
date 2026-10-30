@@ -6,7 +6,7 @@ import {
   createRuntimeStaticAssetObject,
   type RuntimeCreatureObject,
 } from "../../src/world-objects/runtimeObjectRegistry";
-import type { GeodesicCannonObject } from "../../src/world-objects/geodesicCannon";
+import type { GeodesicCannonObject } from "../../src/world-objects/geodesic/objects";
 import { userObjectClass } from "../../src/world-objects/library";
 
 function creature(id: string, cellId: string, extra: Partial<RuntimeCreatureObject> = {}): RuntimeCreatureObject {

@@ -11,14 +11,9 @@ import { type CompiledCellComplex } from "../../cell-complex/compileCellComplex"
 import { type DebugLevelId } from "../../glue/debugLevels";
 import { addVec3, scaleVec3 } from "../../math/vec3";
 import { type RuntimeMenuState } from "../../runtime/runtimeMenuState";
-import {
-  type GeodesicCarryPortalTransition,
-  type GeodesicPortalTraversal,
-  collectGeodesicPortalWord,
-  getGeodesicConnection,
-  getGeodesicSegments,
-  isGeodesicLocked,
-} from "../../world-objects/geodesicCannon";
+import { type GeodesicCarryPortalTransition, type GeodesicPortalTraversal } from "../../world-objects/geodesic/objects";
+import { collectGeodesicPortalWord, getGeodesicSegments } from "../../world-objects/geodesic/segments";
+import { getGeodesicConnection, isGeodesicLocked } from "../../world-objects/geodesic/lifecycle";
 import { type GeodesicMarmotRuntime } from "../../world-objects/geodesicMarmot";
 import { type RuntimeObjectRegistry, type RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
 import { type SimpleGeoCreatureRuntime } from "../../world-objects/simpleGeoCreature";

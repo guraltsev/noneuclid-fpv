@@ -17,7 +17,7 @@ import type {
   GeodesicIntersectionObject,
   GeodesicIntervalObject,
   GeodesicSegmentObject,
-} from "./geodesicCannon";
+} from "./geodesic/objects";
 import type { MeasuredGeodesicLengthObject } from "./measureLengthTool";
 import type { PlacedFlagObject } from "./placedFlags";
 import type { ProtractorAngleObject } from "./protractorTool";

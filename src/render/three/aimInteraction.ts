@@ -14,7 +14,8 @@ import {
   createWorldFocusMessageDefinition,
   formatWorldFocusMessageTextForLegacyFallback,
 } from "../../ui/worldInteractionDefinition";
-import { canExtendGeodesicSegment, isGeodesicLocked } from "../../world-objects/geodesicCannon";
+import { canExtendGeodesicSegment } from "../../world-objects/geodesic/objects";
+import { isGeodesicLocked } from "../../world-objects/geodesic/lifecycle";
 import { type RuntimeObjectRegistry, type RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
 import { AimTarget, resolveAimTargets as defaultResolveAimTargets } from "./aimTarget";
 import { formatVec3, roundNumber } from "./appDebugHelpers";

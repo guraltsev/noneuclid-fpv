@@ -3,14 +3,10 @@ import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
 import { yawRigidTransform3 } from "../../src/math/rigidTransform3";
 import { vec3 } from "../../src/math/vec3";
 import { applyGeometryCommitComputedObjectPolicy } from "../../src/runtime/worldGeometryComputedObjects";
-import {
-  createGeodesicCannonObject,
-  geodesicRayBeamHeightMeters,
-  getGeodesicSegments,
-  getGeodesicTail,
-  isGeodesicLocked,
-  shootGeodesic,
-} from "../../src/world-objects/geodesicCannon";
+import { createGeodesicCannonObject, geodesicRayBeamHeightMeters } from "../../src/world-objects/geodesic/objects";
+import { getGeodesicSegments, getGeodesicTail } from "../../src/world-objects/geodesic/segments";
+import { isGeodesicLocked } from "../../src/world-objects/geodesic/lifecycle";
+import { shootGeodesic } from "../../src/world-objects/geodesic/cannon";
 import { createMeasuredGeodesicLengthObject } from "../../src/world-objects/measureLengthTool";
 import {
   createProtractorAngleObject,

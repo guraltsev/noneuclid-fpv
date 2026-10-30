@@ -12,7 +12,7 @@ import {
   geodesicRayBeamHeightMeters,
   type GeodesicIntersectionObject,
   type GeodesicSegmentObject,
-} from "../../src/world-objects/geodesicCannon";
+} from "../../src/world-objects/geodesic/objects";
 import { createProtractorAngleObject } from "../../src/world-objects/protractorTool";
 import {
   getGeodesicEmitterAimCylinderBounds,

@@ -12,11 +12,11 @@ import {
 } from "../../src/world-objects/protractorTool";
 import {
   geodesicRayBeamHeightMeters,
-  updateGeodesicIntersectionObjects,
   type GeodesicCannonObject,
   type GeodesicIntersectionObject,
   type GeodesicSegmentObject,
-} from "../../src/world-objects/geodesicCannon";
+} from "../../src/world-objects/geodesic/objects";
+import { updateGeodesicIntersectionObjects } from "../../src/world-objects/geodesic/intersections";
 
 describe("protractor tool objects", () => {
   it("uses the ray emitter height as the center for emitter selections", () => {

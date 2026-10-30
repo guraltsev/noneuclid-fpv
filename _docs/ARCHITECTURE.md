@@ -48,6 +48,16 @@ See [Keeping the documentation true](#keeping-the-documentation-true).
 5. **Presentation** (`src/render/three`) draws the current cell plus every visible destination cell through portals,
    adapts desktop/WebXR input to the runtime, and renders menus.
 
+The geodesic emitter code lives in `src/world-objects/geodesic/`, one module per concern, listed lowest first (a module
+imports only modules before it): `src/math/vec2.ts` (2-D helpers), `objects.ts` (object types, constants, constructors),
+`portalWord.ts` (pure portal-word algebra), `development.ts` (cached inverse portal transforms), `trace.ts` (single-cell
+and multi-cell ray tracing), `intersections.ts` (crossing markers), `endpoints.ts` (endpoint attachments and lifting),
+`segments.ts` (derived segments), `lifecycle.ts` (locked queries and removal), `intervals.ts` (interval rebuilds and
+previews), `curveShortening.ts` (tie-and-detach, per-tick advance, fusion), `legacyConnection.ts` (the retired
+emitter-connection and straightening model; only `src/world-objects/geodesic/cannon.ts` and
+`src/render/three/geodesicCannonTools.ts` may import it, enforced by `npm run docs:check`) and `cannon.ts` (shooting,
+extending, connecting and placing cannons).
+
 ## Layers and the dependency rule
 
 Dependencies point downward; lower layers never import higher ones.

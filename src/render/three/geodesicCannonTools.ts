@@ -2,7 +2,7 @@
  * Geodesic emitter (cannon) tools: place, rotate, aim, carry, tie-and-detach, and delete geodesics.
  *
  * This module is the interaction layer between the aim/menu systems and the geodesic world-object logic in
- * `world-objects/geodesicCannon`. It mutates the runtime object registry (cannons, geodesic segments/intervals) and
+ * `world-objects/geodesic/`. It mutates the runtime object registry (cannons, geodesic segments/intervals) and
  * the shell-owned cannon tool state and menu state through getter/setter dependencies, then triggers the
  * follow-up syncs (palette, portal instances, hitbox debug, dependent measurements and protractor angles).
  * Poses and distances are cell-local (meters; x right, y forward, z up) with yaws in radians
@@ -27,28 +27,33 @@ import {
   type GeodesicCarryPortalTransition,
   type GeodesicEndpointSelection,
   type GeodesicPortalTraversal,
-  collectGeodesicPortalWord,
-  collectLockedIncidentGeodesicIdsForEmitter,
-  extendGeodesic,
-  getGeodesicConnection,
+} from "../../world-objects/geodesic/objects";
+import { pruneMissingGeodesicIntersectionObjects } from "../../world-objects/geodesic/intersections";
+import {
   getGeodesicEndpointAttachmentsForAnchor,
-  hasStraighteningIncidentGeodesic,
+  resolveGeodesicEndpointSelectionFromSegmentHit,
+} from "../../world-objects/geodesic/endpoints";
+import { collectGeodesicPortalWord } from "../../world-objects/geodesic/segments";
+import {
+  collectLockedIncidentGeodesicIdsForEmitter,
+  getGeodesicConnection,
   isGeodesicLocked,
-  isGeodesicStraightening,
-  placeGeodesicCannonAtFloorPoint,
-  placeGeodesicCannonAtGeodesicVertex,
-  placeGeodesicCannonOnGeodesic,
-  pruneMissingGeodesicIntersectionObjects,
-  rebuildConnectedGeodesicBetweenEmitters,
-  rebuildGeodesicToLength,
   removeGeodesic,
   removeGeodesicCannonAndSegments,
   removeUnlockedGeodesicsFromCannon,
-  resolveGeodesicEndpointSelectionFromSegmentHit,
+} from "../../world-objects/geodesic/lifecycle";
+import { updateLockedGeodesicPortalWordForCarriedAnchorTraversals } from "../../world-objects/geodesic/intervals";
+import { tieAndDetachGeodesicEndpoints } from "../../world-objects/geodesic/curveShortening";
+import { hasStraighteningIncidentGeodesic, isGeodesicStraightening } from "../../world-objects/geodesic/legacyConnection";
+import {
+  extendGeodesic,
+  placeGeodesicCannonAtFloorPoint,
+  placeGeodesicCannonAtGeodesicVertex,
+  placeGeodesicCannonOnGeodesic,
+  rebuildConnectedGeodesicBetweenEmitters,
+  rebuildGeodesicToLength,
   shootGeodesic,
-  tieAndDetachGeodesicEndpoints,
-  updateLockedGeodesicPortalWordForCarriedAnchorTraversals,
-} from "../../world-objects/geodesicCannon";
+} from "../../world-objects/geodesic/cannon";
 import {
   type RuntimeObjectRegistry,
   type RuntimeWorldObject,

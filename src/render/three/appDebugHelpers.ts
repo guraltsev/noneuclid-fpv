@@ -16,8 +16,8 @@ import {
   type GeodesicCarryPortalTransition,
   type GeodesicPortalTraversal,
   geodesicRayBeamHeightMeters,
-  getGeodesicConnection,
-} from "../../world-objects/geodesicCannon";
+} from "../../world-objects/geodesic/objects";
+import { getGeodesicConnection } from "../../world-objects/geodesic/lifecycle";
 import { type RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
 import { type GeodesicCreatureDebugDump } from "./geodesicCreatureDebug";
 import { type PortalInstanceRenderDebugState } from "./renderPortalInstances";

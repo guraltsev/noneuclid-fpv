@@ -7,7 +7,7 @@
  */
 import * as THREE from "three";
 import { type Vec3 } from "../../math/vec3";
-import { geodesicRayBeamHeightMeters } from "../../world-objects/geodesicCannon";
+import { geodesicRayBeamHeightMeters } from "../../world-objects/geodesic/objects";
 import { type RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
 import { RootAimRay } from "./rootAimRay";
 import { threePointToWorld } from "./worldAxes";

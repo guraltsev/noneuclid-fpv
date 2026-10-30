@@ -88,7 +88,7 @@ Prefer small public modules named after behavior or concepts:
 ```text
 src/cell-complex/compileCellComplex.ts
 src/movement/movePlayer.ts
-src/world-objects/geodesicCannon.ts
+src/world-objects/geodesic/trace.ts
 src/render/three/buildCellMesh.ts
 ```
 

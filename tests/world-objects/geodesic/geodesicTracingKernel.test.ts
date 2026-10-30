@@ -6,17 +6,14 @@ import { identityRigidTransform3, invertRigidTransform3, transformPoint3, yawRig
 import {
   createGeodesicCannonObject,
   createGeodesicIntervalObject,
-  collectGeodesicPortalWord,
   geodesicRayBeamHeightMeters,
-  geodesicTerminalFromWalkPiece,
   getGeodesicSegmentEnd,
-  getGeodesicSegments,
-  rebuildConnectedGeodesicBetweenEmitters,
-  shootGeodesic,
-  traceGeodesicSegment,
-  updateGeodesicIntersectionObjects,
   type GeodesicSegmentObject,
-} from "../../../src/world-objects/geodesicCannon";
+} from "../../../src/world-objects/geodesic/objects";
+import { geodesicTerminalFromWalkPiece, traceGeodesicSegment } from "../../../src/world-objects/geodesic/trace";
+import { updateGeodesicIntersectionObjects } from "../../../src/world-objects/geodesic/intersections";
+import { collectGeodesicPortalWord, getGeodesicSegments } from "../../../src/world-objects/geodesic/segments";
+import { rebuildConnectedGeodesicBetweenEmitters, shootGeodesic } from "../../../src/world-objects/geodesic/cannon";
 import { createRuntimeObjectRegistry } from "../../../src/world-objects/runtimeObjectRegistry";
 import { exampleWorldSpecs } from "../../support/arbitraries";
 

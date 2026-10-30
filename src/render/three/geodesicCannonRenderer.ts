@@ -15,7 +15,7 @@ import {
   type GeodesicCannonObject,
   type GeodesicIntersectionObject,
   type GeodesicSegmentObject,
-} from "../../world-objects/geodesicCannon";
+} from "../../world-objects/geodesic/objects";
 import { yawRigidTransform3 } from "../../math/rigidTransform3";
 import { collectRuntimeObjectRenderSourceMeshes, type RuntimeObjectRenderRecord, type RuntimeObjectRenderSourceMesh } from "./runtimeObjectRenderRecords";
 import type { PreparedWorldAssets } from "./preloadWorldAssets";

@@ -5,7 +5,7 @@ import {
   refreshMeasuredGeodesicLengthObject,
 } from "../../src/world-objects/measureLengthTool";
 import { createRuntimeObjectRegistry } from "../../src/world-objects/runtimeObjectRegistry";
-import type { GeodesicSegmentObject } from "../../src/world-objects/geodesicCannon";
+import type { GeodesicSegmentObject } from "../../src/world-objects/geodesic/objects";
 
 describe("measure length tool objects", () => {
   it("measures the full geodesic length and places the label near the player in the current segment cell", () => {

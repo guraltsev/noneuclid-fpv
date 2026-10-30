@@ -5,7 +5,7 @@
  */
 import { yawRigidTransform3 } from "../math/rigidTransform3";
 import type { Vec3 } from "../math/vec3";
-import type { GeodesicSegmentObject } from "./geodesicCannon";
+import type { GeodesicSegmentObject } from "./geodesic/objects";
 import type { RuntimeObjectRegistry, RuntimeWorldObjectBase } from "./runtimeObjectRegistry";
 
 /**

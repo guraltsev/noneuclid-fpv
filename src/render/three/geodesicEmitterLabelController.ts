@@ -8,7 +8,7 @@
  */
 import * as THREE from "three";
 import { type PlayerPose } from "../../movement/playerPose";
-import { resolveGeodesicNumber } from "../../world-objects/geodesicCannon";
+import { resolveGeodesicNumber } from "../../world-objects/geodesic/segments";
 import { type RuntimeObjectRegistry } from "../../world-objects/runtimeObjectRegistry";
 import {
   createGeodesicEmitterLabel,

@@ -3,7 +3,7 @@ import { createMeasuredGeodesicLengthRuntime } from "../../src/render/three/meas
 import { createMeasuredGeodesicLengthObject } from "../../src/world-objects/measureLengthTool";
 import { createRuntimeObjectRegistry } from "../../src/world-objects/runtimeObjectRegistry";
 import { yawRigidTransform3 } from "../../src/math/rigidTransform3";
-import type { GeodesicSegmentObject } from "../../src/world-objects/geodesicCannon";
+import type { GeodesicSegmentObject } from "../../src/world-objects/geodesic/objects";
 
 describe("measure length renderer", () => {
   it("creates portal-renderable source meshes for the floating length label", () => {

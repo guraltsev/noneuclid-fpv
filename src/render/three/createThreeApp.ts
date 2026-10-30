@@ -122,10 +122,8 @@ import { type CellDeformationMap, transformPoseWithCellMaps } from "../../runtim
 import { type WorldGeometrySnapshot, createWorldGeometrySession } from "../../runtime/worldGeometrySession";
 import { createHelpLensDefinition } from "../../ui/helpLensDefinition";
 import { createPaletteDefinition } from "../../ui/paletteDefinition";
-import {
-  type GeodesicCarryPortalTransition,
-  advanceCurveShorteningPairs,
-} from "../../world-objects/geodesicCannon";
+import { type GeodesicCarryPortalTransition } from "../../world-objects/geodesic/objects";
+import { advanceCurveShorteningPairs } from "../../world-objects/geodesic/curveShortening";
 import {
   type GeodesicMarmotRuntime,
   createGeodesicMarmotRuntime,

@@ -16,7 +16,11 @@ import {
   getGeodesicRayArchetypeKeys,
 } from "../../src/render/three/geodesicCannonRenderer";
 import type { PreparedWorldAssets } from "../../src/render/three/preloadWorldAssets";
-import type { GeodesicCannonObject, GeodesicIntersectionObject, GeodesicSegmentObject } from "../../src/world-objects/geodesicCannon";
+import type {
+  GeodesicCannonObject,
+  GeodesicIntersectionObject,
+  GeodesicSegmentObject,
+} from "../../src/world-objects/geodesic/objects";
 import { yawRigidTransform3 } from "../../src/math/rigidTransform3";
 
 describe("geodesic cannon renderer", () => {

@@ -6,7 +6,7 @@ import {
   resolveProtractorCenterSelection,
 } from "../../src/world-objects/protractorTool";
 import { yawRigidTransform3 } from "../../src/math/rigidTransform3";
-import type { GeodesicCannonObject } from "../../src/world-objects/geodesicCannon";
+import type { GeodesicCannonObject } from "../../src/world-objects/geodesic/objects";
 
 describe("protractor angle renderer", () => {
   it("creates portal-renderable source meshes for the highlighted angle", () => {

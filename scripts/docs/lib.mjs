@@ -268,7 +268,7 @@ export function layerViolations(modules) {
 export const moduleImportRules = [
   {
     module: "world-objects/geodesic/legacyConnection.ts",
-    allowedImporters: ["world-objects/geodesicCannon.ts", "world-objects/geodesic/cannon.ts"],
+    allowedImporters: ["render/three/geodesicCannonTools.ts", "world-objects/geodesic/cannon.ts"],
     reason: "retired geodesic connection model; job 26 deletes it - do not add importers",
   },
   {
