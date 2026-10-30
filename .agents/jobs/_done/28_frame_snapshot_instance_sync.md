@@ -1,6 +1,6 @@
 # Job 28 - Sync runtime-object instances once per frame against the rendered root
 
-Status: queued.
+Status: done, needs review on 2026-10-29 (commit f63528d).
 Revised on 2026-10-29 for a less capable implementing model.
 Resolves: issue [71](../../_issues/71_runtime_object_instance_sync_runs_twice_with_stale_root.md).
 
@@ -449,3 +449,40 @@ leave issue 71 open with a one-line pointer, as the README says.
 - [ ] Hitbox debug rebuilds only through `syncSelectableHitboxDebugIfChanged` in the frame (or the unconditional call in `applyDebugSettings`).
 - [ ] All new tests pass; `npm run typecheck`, `npm test`, `npm run docs:check`, `npm run build` and the smoke on four worlds pass.
 - [ ] Issue 71 closed (or left open with a pointer, see Bookkeeping); report written per [README](README.md).
+
+
+## Report
+
+### Done
+Commit `f63528d` (Job 28: single commit, the job has no parts).
+- `src/world-objects/runtimeObjectRegistry.ts`: `getVersion()`; the counter is bumped in `add`, `remove` (existing id only) and inside `replaceObject`, the one write path used by `update`, `moveToCell` (via `update`, once) and job 37's owner publisher. Claim/release and throwing calls do not bump.
+- New `src/render/three/frameRenderSnapshot.ts` (`FrameRenderSnapshot`, `createFrameRenderSnapshot`, `createEmptyFrameRenderSnapshot`).
+- New `src/render/three/runtimeObjectInstanceSync.ts`: moved sources sync, record collection and footprint cache out of `createThreeApp.ts`; records collected once per sync, prefix index per sync, per-object record cache (object identity + world + keys), `stats` counters, rover no longer gets the unused options.
+- `createThreeApp.ts`: `latestFrameSnapshot` built in `syncPortalInstanceRender` / `syncStereoPortalInstanceRender` and the empty branches; `getRuntimeObjectVisiblePaths`, `applyPortalVisibleResult`, `applyPortalVisiblePaths`, `syncRuntimeObjectPortalInstances`, `syncRuntimeObjectRenderSources`, `collectRuntimeObjectRenderRecords`, `runtimeObjectFootprintRadius` removed. `runtimeObjectInstanceSync.sync(` has exactly 3 call sites (setup, frame, `applyDebugSettings`). Tools/menus/frame code request syncs through `requestRuntimeObjectInstanceSync` / `requestSelectableHitboxDebugSync` (passed under the old dep names; dep doc comments updated in `toolObjectRuntimes.ts` and `geodesicCannonTools.ts`). `cellRootsGeneration` is bumped at the start of `rebuildCellMeshes`. All new `let`/`const` are declared before the setup calls. `commitWorldGeometrySnapshot` no longer syncs objects or hitboxes. Module header, `_docs/ARCHITECTURE.md` and generated docs updated.
+- `debugVisualization.ts`: `syncSelectableHitboxDebugIfChanged`.
+- `playerRoverModel.ts`: removed `options` and `PlayerRoverRenderRecordOptions`.
+- Tests: `tests/render-contract/frameRenderSnapshot.test.ts` (2), `runtimeObjectInstanceSync.test.ts` (6, covering Tests 1-6 of Step 3 incl. mono-XR re-root), `debugVisualization.test.ts` (1 test with the 5 checks), `tests/world-objects/runtimeObjectRegistry.test.ts` (new `describe("version")`, 3 tests).
+
+Issues the Done-when says to close: issue 71 (`_issues/71_runtime_object_instance_sync_runs_twice_with_stale_root.md`), but see Not done (headset/manual checks), so it should stay open with a pointer unless the coordinator accepts that.
+
+### Deviations
+- `tests/render-contract/playerRoverModel.test.ts`: dropped the third `collectRecords` argument (and the then-unused world/imports), because Decision 7 removes the parameter; assertions unchanged.
+- `void runtimeObjectInstanceSyncRequested;` in the frame: the flag is otherwise write-only and `noUnusedLocals` rejects that; it is kept for job 29 as the job says.
+- The unconditional `syncSelectableHitboxDebug` clears the stored key (it has no registry version to store), so the next gated call rebuilds once more instead of "updating the stored key".
+- The stereo debug state is now built from the union-grouped map (as the job intends), not eye 0's table join.
+
+### Uncertain
+- Behaviour in a live browser with debug hitboxes on and in XR is covered only by unit tests plus the smoke run; the mono-XR re-root fix is verified in `runtimeObjectInstanceSync.test.ts` only.
+- Geodesic objects use the same per-object record cache; their records are pure functions of the object, so this should be safe.
+
+### Not done
+### Manual checks not run
+- Frame-time numbers (no browser): open `?config=full&world=cube&debugLevel=basic&debugOverlay=1&debugOverlayItems=fps`, place 40 flags with the place-flag tool in the start cell, stand still 10 s, note `objects` and `portal` from the `frame ms:` line; repeat on parent commit `0673b75`.
+- Headset check: single-view XR, lean the head through a portal next to a flag; the flag must stay in place.
+
+### Checks
+- `npm run typecheck`: pass.
+- `npm test`: 128 files, 938 tests pass (first run failed only on stale generated docs; `npm run docs:generate` fixed it).
+- `npm run docs:check`: pass after `docs:generate`.
+- `npm run build`: pass (chunk size warning only).
+- `npm run smoke -- --world cube,icosahedron,torus-moduli,genus-2-torus`: SMOKE OK (4 pages), no TDZ crash.

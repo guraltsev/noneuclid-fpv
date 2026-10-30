@@ -110,7 +110,7 @@ Resolves: issue [NN](../../_issues/NN_....md).
 | [25](_done/25_split_geodesic_cannon_modules.md) | ~~Split geodesicCannon.ts into modules under src/world-objects/geodesic/~~ (done, needs review) | - | 76 |
 | [26](_done/26_exact_curve_shortening.md) | ~~Exact curve shortening via the sleeve/funnel~~ (done, needs review) | [67](../../_issues/67_exact_curve_shortening_via_sleeve_funnel.md) |  |
 | [27](_done/27_geodesic_rebuild_performance.md) | ~~Per-frame cost of geodesic rebuilds~~ (done, needs review) | [70](../../_issues/70_geodesic_module_performance_and_split.md) |  |
-| [28](28_frame_snapshot_instance_sync.md) | Sync runtime-object instances once per frame against the rendered root | [71](../../_issues/71_runtime_object_instance_sync_runs_twice_with_stale_root.md) |  |
+| [28](_done/28_frame_snapshot_instance_sync.md) | ~~Sync runtime-object instances once per frame against the rendered root~~ (done, needs review) | [71](../../_issues/71_runtime_object_instance_sync_runs_twice_with_stale_root.md) |  |
 | [29](29_frame_loop_allocation_and_draw_calls.md) | Frame-loop allocation and per-object draw calls | [75](../../_issues/75_frame_loop_allocation_and_per_object_draw_calls.md) |  |
 | [30](30_deformation_rebuild_pipeline.md) | Incremental deformation rebuild pipeline | [55](../../_issues/55_live_deformation_rebuild_cost_and_se2_transforms.md), [82](../../_issues/82_deformation_commit_rebuilds_whole_scene_and_reuploads_floor_texture.md) |  |
 | [31](31_app_shell_state_holder.md) | One state holder and one command path for the app shell | - | 77 |
