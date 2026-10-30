@@ -21,7 +21,10 @@
     "docs:generate": "node scripts/docs/cli.mjs generate",
     "docs:check": "node scripts/docs/cli.mjs check",
     "docs:coverage": "node scripts/docs/cli.mjs coverage",
-    "smoke": "node scripts/smoke/browser-smoke.mjs"
+    "smoke": "node scripts/smoke/browser-smoke.mjs",
+    "serve": "vite --port 5173",
+    "edge": "node scripts/debug/edge.mjs",
+    "cdp": "node scripts/debug/cdp.mjs"
   },
   "dependencies": {
     "@pmndrs/pointer-events": "^6.6.30",

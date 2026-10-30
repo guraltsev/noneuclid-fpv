@@ -26,6 +26,10 @@ Both hand-written documents contain machine-checked references to the code
   verification, and issue-tracking workflow.
 - [DEPLOYMENT.md](DEPLOYMENT.md) records GitHub Pages, HTTPS, WebXR, and release
   checks without placing them in the learner-facing README.
+- [interactive-browser-debugging.md](interactive-browser-debugging.md) sets up
+  a live Edge session attached over the DevTools Protocol, so a person moves
+  through the world while an assistant records values, reads the console and
+  takes screenshots.
 - [Development_guide.md](Development_guide.md) gives the project overview,
   repository map, stack summary, deployment notes, and links to the focused
   guides.
