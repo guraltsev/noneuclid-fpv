@@ -63,6 +63,8 @@ export interface XrDebugRenderState {
   readonly portalInstances?: PortalInstanceRenderState;
   /** Per-eye visibility results for stereo rendering. */
   readonly portalEyes?: readonly PortalEyeRenderDebugState[];
+  /** Left/right/union path counts of the stereo frame; undefined on mono frames. */
+  readonly stereoPortalPaths?: StereoPortalPathRenderState;
 }
 
 /** Minimal render-loop state: a frame counter plus the latest portal statistics. */
@@ -103,6 +105,26 @@ export interface PortalEyeRenderDebugState {
   readonly rootCellId: string;
   readonly visiblePathCount: number;
   readonly maxVisibleDepth: number;
+}
+
+/** Stereo path statistics; eye 0 is labelled left (WebXR lists the left view first on Quest). */
+export interface StereoPortalPathRenderState {
+  /** True when the eyes have different root identities (cell id or frame), see `stereoPortalFrame`. */
+  readonly splitRoots: boolean;
+  readonly leftRootCellId: string;
+  readonly rightRootCellId: string;
+  /** Paths in each eye's own list, before the union budget. */
+  readonly leftPathCount: number;
+  readonly rightPathCount: number;
+  /** Distinct remapped path ids over both eyes, before the union budget. */
+  readonly unionPathCount: number;
+  /** Cell copies (same destination cell at the same render-frame placement) seen only by eye 0, only by eye 1, or by both. */
+  readonly leftOnlyPathCount: number;
+  readonly rightOnlyPathCount: number;
+  readonly bothEyesPathCount: number;
+  /** Paths of each eye's list not accepted by the union budget. */
+  readonly droppedLeftPathCount: number;
+  readonly droppedRightPathCount: number;
 }
 
 /** Serializable copy of `VisiblePortalPathDebugSummary` without the root cell id. */

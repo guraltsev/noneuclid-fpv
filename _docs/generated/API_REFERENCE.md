@@ -1887,7 +1887,9 @@ Utilities for combining the per-eye visibility results of stereo (VR) rendering 
 | function | `buildUnionVisiblePathById` | Merges the paths of all eyes into one map keyed by path id, keeping the first eye's entry when several eyes see the same id. |
 | function | `transformVisiblePortalResultToRenderFrame` | Returns a copy of `result` whose path matrices are premultiplied by `renderFromRootMatrix`, so they place cells in the shared render frame; polygons and statistics are unchanged. |
 | function | `transformClipPlanes` | Maps clip planes `(nx, ny, nz, d)` (inside where `n . |
-| function | `remapStereoPortalPathIds` | Reassigns path ids consecutively (from 0, in first-seen order) so equal `(rootCellId, pathId)` pairs share an id across eyes and different roots stay distinct; the input is not modified. |
+| function | `remapStereoPortalPathIds` | Reassigns path ids consecutively (from 0, in first-seen order) so equal `(root, pathId)` pairs share an id across eyes and different roots stay distinct; the input is not modified. |
+| function | `rankStereoUnionPaths` | Union of the eyes' paths, ranked round-robin: eye 0's next unseen path, eye 1's next unseen path, and so on. |
+| function | `countStereoPortalPaths` | Path statistics of a two-eye frame for the debug state (undefined unless there are exactly 2 eyes). |
 
 ### `render/three/portalFunnel.ts`
 
@@ -2000,6 +2002,7 @@ Fills the per-frame instance buffers that draw each visible portal path as an in
 | interface | `PortalInstanceRenderDebugState` | Snapshot of instanced portal rendering for the debug overlay and console helpers. |
 | interface | `PortalInstanceDiagnostics` | Per-frame collector of archetypes whose instance capacity was exceeded. |
 | const | `unclippedPortalClipIndex` | Clip index meaning "do not clip" (the root cell instance); -1 means "no clip slot, discard everything". |
+| function | `resolvePortalInstanceClipIndex` | Clip index of an instance of `path`: -2 for a depth-0 path when `unclippedRoot` is true; otherwise the path's clip slot, or -1 if it has none. |
 | function | `createPortalInstanceDiagnostics` | Creates an empty overflow collector keyed by archetype id. |
 | function | `createRootVisiblePortalPath` | Builds the synthetic depth-0 path for the root cell: identity placement, full-screen clip, infinite pixel area. |
 | function | `groupVisiblePortalPathsByDestinationCell` | Groups visible paths by `destinationCellId`, preserving input order within each group. |
@@ -2041,6 +2044,7 @@ Plain-data snapshots of runtime and render diagnostics, shared between the Three
 | interface | `FramePerformanceRenderState` | Per-frame CPU timings in milliseconds, split by pipeline stage. |
 | interface | `WebGlRenderInfoState` | Per-frame WebGL counters from `renderer.info` plus the viewport they were taken at. |
 | interface | `PortalEyeRenderDebugState` | Visibility statistics for one eye of a stereo frame. |
+| interface | `StereoPortalPathRenderState` | Stereo path statistics; eye 0 is labelled left (WebXR lists the left view first on Quest). |
 | interface | `VisiblePortalPathRenderState` | Serializable copy of `VisiblePortalPathDebugSummary` without the root cell id. |
 | interface | `PortalInstanceRenderState` | Serializable mirror of `PortalInstanceRenderDebugState`: instanced-portal counts, overflow and clip-polygon statistics. |
 

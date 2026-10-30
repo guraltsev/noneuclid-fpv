@@ -5,7 +5,8 @@
  * where `n . X + d >= 0`. The planes live in a float RGBA data texture of width `portalClipPlaneTextureWidth` (1024):
  * texel `t` sits at `(t % 1024, floor(t / 1024))` and holds one plane in its RGBA channels. The texel of plane `p`
  * (0..3) of clip slot `s` for eye `e` is `portalClipPlaneTexelIndex(s, e, p, eyeCount)`. A path's slot is its rank
- * among the paths of the union over all eyes (sorted by path id), so one slot addresses the same path in every eye;
+ * among the paths of the union over all eyes (one eye: ascending path id; several eyes: round-robin over the eyes'
+ * lists, see `rankStereoUnionPaths`), so one slot addresses the same path in every eye;
  * a union path that one eye does not see is fully clipped in that eye ("always outside" planes).
  *
  * Capacity: `maxClipSlots = maxVisiblePaths * maxClipTextureEyes` slots, and each eye holds at most `maxVisiblePaths`
@@ -16,6 +17,7 @@
  */
 
 import * as THREE from "three";
+import { rankStereoUnionPaths } from "./portalEyeFrameTransforms";
 import type { VisiblePortalPath } from "./visiblePortalPaths";
 
 /** Texels per row of the clip-plane texture. */
@@ -66,8 +68,12 @@ export interface PortalClipData {
   readonly textureRows: number;
   /** Path id to clip slot for the latest update; paths without a slot are absent. */
   readonly clipIndexByPathId: ReadonlyMap<number, number>;
-  /** Inverse of `clipIndexByPathId`: path id at each clip slot, in ascending path-id order. */
+  /** Inverse of `clipIndexByPathId`: path id at each clip slot, in rank order (ascending id for one eye). */
   readonly pathIdByClipIndex: readonly number[];
+  /** Path ids that received a slot in the latest update (the keys of `clipIndexByPathId`). */
+  readonly acceptedPathIds: ReadonlySet<number>;
+  /** The accepted paths in rank order (slot order); the first eye's entry is kept for a path several eyes see. */
+  readonly rankedAcceptedPaths: readonly VisiblePortalPath[];
   /** How many union paths found no slot in the latest update; 0 by construction. */
   readonly visiblePathOverflowCount: number;
   /** Single-eye update; equivalent to `updateStereo([paths])`. */
@@ -109,6 +115,8 @@ export function createPortalClipData(options: {
 
   let clipIndexByPathId = new Map<number, number>();
   let pathIdByClipIndex: number[] = [];
+  let acceptedPathIds = new Set<number>();
+  let rankedAcceptedPaths: VisiblePortalPath[] = [];
   let visiblePathOverflowCount = 0;
 
   return {
@@ -123,6 +131,12 @@ export function createPortalClipData(options: {
     get pathIdByClipIndex() {
       return pathIdByClipIndex;
     },
+    get acceptedPathIds() {
+      return acceptedPathIds;
+    },
+    get rankedAcceptedPaths() {
+      return rankedAcceptedPaths;
+    },
     get visiblePathOverflowCount() {
       return visiblePathOverflowCount;
     },
@@ -132,20 +146,25 @@ export function createPortalClipData(options: {
     updateStereo(pathsByEye) {
       clipIndexByPathId = new Map();
       pathIdByClipIndex = [];
-      const unionPathIds = new Set<number>();
+      acceptedPathIds = new Set();
+      rankedAcceptedPaths = [];
 
-      for (const paths of pathsByEye) {
-        for (const path of paths) {
-          unionPathIds.add(path.pathId);
-        }
-      }
+      // One eye keeps ascending path-id order; several eyes are ranked round-robin so that a full budget drops
+      // paths fairly (each eye's own list starts with its root, so both roots keep a slot).
+      const ranked =
+        pathsByEye.length > 1
+          ? rankStereoUnionPaths(pathsByEye)
+          : [...new Map((pathsByEye[0] ?? []).map((path) => [path.pathId, path] as const)).values()].sort(
+              (left, right) => left.pathId - right.pathId,
+            );
 
-      const sortedPathIds = [...unionPathIds].sort((left, right) => left - right);
-      visiblePathOverflowCount = Math.max(0, sortedPathIds.length - maxClipSlots);
+      visiblePathOverflowCount = Math.max(0, ranked.length - maxClipSlots);
 
-      for (const pathId of sortedPathIds.slice(0, maxClipSlots)) {
-        clipIndexByPathId.set(pathId, pathIdByClipIndex.length);
-        pathIdByClipIndex.push(pathId);
+      for (const path of ranked.slice(0, maxClipSlots)) {
+        clipIndexByPathId.set(path.pathId, pathIdByClipIndex.length);
+        pathIdByClipIndex.push(path.pathId);
+        acceptedPathIds.add(path.pathId);
+        rankedAcceptedPaths.push(path);
       }
 
       // Every (slot, eye) in use starts fully clipped; each eye then overwrites the paths it sees.

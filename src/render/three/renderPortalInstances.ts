@@ -87,6 +87,23 @@ const fullScreenPolygonNdc = [
 /** Clip index meaning "do not clip" (the root cell instance); -1 means "no clip slot, discard everything". */
 export const unclippedPortalClipIndex = -2;
 
+/**
+ * Clip index of an instance of `path`: -2 for a depth-0 path when `unclippedRoot` is true; otherwise the path's clip
+ * slot, or -1 if it has none. Split-root stereo passes `unclippedRoot = false` so each eye's root is clipped to the
+ * eye that owns it (the other eye's slot rows for it are "always outside").
+ */
+export function resolvePortalInstanceClipIndex(
+  path: VisiblePortalPath,
+  clipIndexByPathId: ReadonlyMap<number, number>,
+  unclippedRoot: boolean,
+): number {
+  if (unclippedRoot && path.depth === 0) {
+    return unclippedPortalClipIndex;
+  }
+
+  return clipIndexByPathId.get(path.pathId) ?? -1;
+}
+
 /** Creates an empty overflow collector keyed by archetype id. */
 export function createPortalInstanceDiagnostics(): PortalInstanceDiagnostics {
   const capacityOverflowArchetypes = new Set<string>();
@@ -251,8 +268,10 @@ export function updateCellRenderArchetypeInstances(
   visiblePathsByDestinationCell: ReadonlyMap<string, readonly VisiblePortalPath[]>,
   diagnostics: PortalInstanceDiagnostics,
   clipIndexByPathId: ReadonlyMap<number, number> = new Map(),
-  options: { readonly separateRoot: boolean } = { separateRoot: false },
+  options: { readonly separateRoot: boolean; readonly unclippedRoot?: boolean } = { separateRoot: false },
 ): void {
+  const unclippedRoot = options.unclippedRoot ?? true;
+
   for (const archetype of archetypes) {
     const paths = visiblePathsByDestinationCell.get(archetype.cellId) ?? [];
     let requestedCount = 0;
@@ -280,7 +299,7 @@ export function updateCellRenderArchetypeInstances(
         count,
         path.rootFromDestinationMatrix,
         path.pathId,
-        path.depth === 0 ? unclippedPortalClipIndex : clipIndexByPathId.get(path.pathId) ?? -1,
+        resolvePortalInstanceClipIndex(path, clipIndexByPathId, unclippedRoot),
       );
       count += 1;
     }
@@ -312,7 +331,8 @@ export function updateCellRenderArchetypeInstances(
  * (meters) to any of `options.cameraPositions` (root Three frame), which hides objects around the viewer's own head.
  * Instances of one object that land on the same place in the root frame (same translation and first column, rounded
  * to 1e-4) are written once, from the path with the smallest depth (ties: first), so a real object and its ghost do
- * not z-fight. Overflow is counted by requested (not stored) instances.
+ * not z-fight; with `rootGroupByPathId` only instances of one root group merge. `unclippedRoot` as in
+ * `resolvePortalInstanceClipIndex`. Overflow is counted by requested (not stored) instances.
  */
 export function updateRuntimeObjectRenderArchetypeInstances(
   archetypes: readonly RuntimeObjectRenderArchetype[],
@@ -322,8 +342,14 @@ export function updateRuntimeObjectRenderArchetypeInstances(
   clipIndexByPathId: ReadonlyMap<number, number> = new Map(),
   options: {
     readonly cameraPositions?: readonly THREE.Vector3[];
+    /** Whether a depth-0 instance skips the clip test (default true). False in split-root stereo. */
+    readonly unclippedRoot?: boolean;
+    /** Root group per path id (split-root stereo): copies of different groups never merge, they are drawn in different eyes. */
+    readonly rootGroupByPathId?: ReadonlyMap<number, number>;
   } = {},
 ): void {
+  const unclippedRoot = options.unclippedRoot ?? true;
+  const rootGroupByPathId = options.rootGroupByPathId;
   const composedMatrix = composedMatrixScratch;
   const composedPosition = composedPositionScratch;
   const lowestDepthByPlacement = lowestDepthByPlacementScratch;
@@ -351,7 +377,7 @@ export function updateRuntimeObjectRenderArchetypeInstances(
           continue;
         }
 
-        const key = runtimeObjectPlacementKey(record.objectId, composedMatrix);
+        const key = placementKeyForPath(record, path, composedMatrix, rootGroupByPathId);
         const lowest = lowestDepthByPlacement.get(key);
         if (lowest === undefined || path.depth < lowest) {
           lowestDepthByPlacement.set(key, path.depth);
@@ -376,7 +402,7 @@ export function updateRuntimeObjectRenderArchetypeInstances(
           continue;
         }
 
-        const key = runtimeObjectPlacementKey(record.objectId, composedMatrix);
+        const key = placementKeyForPath(record, path, composedMatrix, rootGroupByPathId);
         if (path.depth !== lowestDepthByPlacement.get(key) || writtenPlacements.has(key)) {
           continue;
         }
@@ -393,7 +419,7 @@ export function updateRuntimeObjectRenderArchetypeInstances(
           count,
           composedMatrix,
           path.pathId,
-          path.depth === 0 ? unclippedPortalClipIndex : clipIndexByPathId.get(path.pathId) ?? -1,
+          resolvePortalInstanceClipIndex(path, clipIndexByPathId, unclippedRoot),
         );
         count += 1;
       }
@@ -489,6 +515,16 @@ function runtimeObjectPlacementKey(objectId: string, matrix: THREE.Matrix4): str
   const r = (value: number): number => Math.round(value * 1e4);
 
   return `${objectId}|${r(e[12])},${r(e[13])},${r(e[14])}|${r(e[0])},${r(e[1])},${r(e[2])}`;
+}
+
+// Dedupe key of an instance: the root group of its path (split-root stereo only) plus the placement.
+function placementKeyForPath(
+  record: RuntimeObjectRenderRecord,
+  path: VisiblePortalPath,
+  composedMatrix: THREE.Matrix4,
+  rootGroupByPathId: ReadonlyMap<number, number> | undefined,
+): string {
+  return `${rootGroupByPathId?.get(path.pathId) ?? 0}|${runtimeObjectPlacementKey(record.objectId, composedMatrix)}`;
 }
 
 // Uses the translation column of the composed matrix as the object origin; squared distances avoid sqrt.

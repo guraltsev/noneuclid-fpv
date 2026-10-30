@@ -4,6 +4,7 @@ import {
   buildVisiblePathsByDestinationCell,
   createRootVisiblePortalPath,
   flattenVisiblePortalPathGroups,
+  resolvePortalInstanceClipIndex,
   unclippedPortalClipIndex,
   updateRuntimeObjectRenderArchetypeInstances,
 } from "../../src/render/three/renderPortalInstances";
@@ -339,6 +340,66 @@ describe("updateRuntimeObjectRenderArchetypeInstances", () => {
 
     updateRuntimeObjectRenderArchetypeInstances([archetype], recordsByKey, new Map(), diagnostics);
     expect(archetype.mesh.visible).toBe(false);
+  });
+
+  it("resolves the clip index of a depth-0 path by the unclippedRoot flag", () => {
+    const root = createRootVisiblePortalPath("room-a");
+
+    expect(resolvePortalInstanceClipIndex(root, new Map([[0, 3]]), true)).toBe(unclippedPortalClipIndex);
+    expect(resolvePortalInstanceClipIndex(root, new Map([[0, 3]]), false)).toBe(3);
+    expect(resolvePortalInstanceClipIndex(root, new Map(), false)).toBe(-1);
+  });
+
+  it("merges coinciding copies only within one root group and clips the root when asked", () => {
+    const records: RuntimeObjectRenderRecord[] = [
+      { objectId: "mouse-a", cellId: "room-c", archetypeKey: "mouse-body", localMatrix: new THREE.Matrix4() },
+    ];
+    const paths = new Map([
+      [
+        "room-c",
+        [
+          { ...createRootVisiblePortalPath("room-c"), pathId: 0, depth: 0 },
+          { ...createRootVisiblePortalPath("room-c"), pathId: 5, depth: 1 },
+        ],
+      ],
+    ]);
+    const run = (options: Parameters<typeof updateRuntimeObjectRenderArchetypeInstances>[5]) => {
+      const archetype = createArchetype("mouse-body", 4);
+
+      updateRuntimeObjectRenderArchetypeInstances(
+        [archetype],
+        groupRuntimeObjectRenderRecordsByArchetype(records),
+        paths,
+        createRuntimeObjectRenderArchetypeDiagnostics(),
+        new Map([
+          [0, 1],
+          [5, 2],
+        ]),
+        options,
+      );
+
+      return archetype;
+    };
+
+    expect(run({}).mesh.count).toBe(1);
+    expect(
+      run({
+        rootGroupByPathId: new Map([
+          [0, 1],
+          [5, 0],
+        ]),
+      }).mesh.count,
+    ).toBe(2);
+
+    const clipped = run({
+      unclippedRoot: false,
+      rootGroupByPathId: new Map([
+        [0, 1],
+        [5, 0],
+      ]),
+    });
+
+    expect([clipped.portalClipIndexAttribute.getX(0), clipped.portalClipIndexAttribute.getX(1)].sort()).toEqual([1, 2]);
   });
 
   it("flattens statically-kept visible path groups for runtime object rendering", () => {

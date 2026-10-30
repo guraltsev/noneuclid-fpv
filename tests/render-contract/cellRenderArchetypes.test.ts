@@ -78,6 +78,27 @@ describe("deriveCellRenderArchetypeCapacities", () => {
 
     expect(Math.max(...world.cells.map((cell) => uncapped.get(cell.id) ?? 0))).toBeGreaterThan(1);
   });
+
+  it("covers the union of two roots when asked for two eyes", () => {
+    const world = compileCellComplex(cube);
+    const staticCull = buildStaticallyCulledPortalPathTables(world, {
+      maxDepth: 3,
+      skipImmediateReverse: false,
+      toleranceMeters: 1e-6,
+      maxKeptPathsPerRoot: 50_000,
+    });
+    const oneEye = deriveCellRenderArchetypeCapacities(world, staticCull);
+    const twoEyes = deriveCellRenderArchetypeCapacities(world, staticCull, undefined, 2);
+
+    for (const cell of world.cells) {
+      const counts = [...staticCull.tables.tablesByRootCellId.values()]
+        .map((table) => table.pathsByDestinationCellId.get(cell.id)?.length ?? 0)
+        .sort((left, right) => right - left);
+
+      expect(twoEyes.get(cell.id)).toBe(Math.max(1, counts[0] + (counts[1] ?? 0)));
+      expect(oneEye.get(cell.id)).toBe(Math.max(1, counts[0]));
+    }
+  });
 });
 
 describe("buildCellRenderArchetypes floor UV frames", () => {

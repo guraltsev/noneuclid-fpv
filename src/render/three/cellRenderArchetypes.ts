@@ -153,27 +153,42 @@ export function planCellRenderArchetypes(
 /**
  * Computes per-cell instance capacities from statically culled path tables.
  *
- * Capacity of a cell = max over all root cells of the number of kept paths whose destination is that cell, clamped
- * to `maxVisiblePaths` when given, and at least 1.
+ * Capacity of a cell = the sum of the `eyes` largest per-root counts of kept paths whose destination is that cell
+ * (`eyes = 1`: the maximum over roots; `eyes = 2`: two eyes rooted in different cells, or in one cell at different
+ * frames, see issue 59), clamped to `maxVisiblePaths` when given, and at least 1.
  */
 export function deriveCellRenderArchetypeCapacities(
   world: CompiledCellComplex,
   staticCull: StaticPortalPathCullResult,
   maxVisiblePaths?: number,
+  eyes = 1,
 ): ReadonlyMap<string, number> {
-  const capacities = new Map(world.cells.map((cell) => [cell.id, 0]));
+  const countsByCell = new Map<string, number[]>(world.cells.map((cell) => [cell.id, []]));
+  const eyeCount = Math.max(1, Math.floor(eyes));
 
   for (const table of staticCull.tables.tablesByRootCellId.values()) {
     for (const [cellId, paths] of table.pathsByDestinationCellId) {
-      capacities.set(cellId, Math.max(capacities.get(cellId) ?? 0, paths.length));
+      const counts = countsByCell.get(cellId);
+
+      if (counts) {
+        counts.push(paths.length);
+      } else {
+        countsByCell.set(cellId, [paths.length]);
+      }
     }
   }
 
-  for (const cell of world.cells) {
-    const capacity = capacities.get(cell.id) ?? 0;
+  const capacities = new Map<string, number>();
+
+  for (const [cellId, counts] of countsByCell) {
+    const capacity = counts
+      .sort((left, right) => right - left)
+      .slice(0, eyeCount)
+      .reduce((sum, count) => sum + count, 0);
     const clampedCapacity =
       maxVisiblePaths === undefined ? capacity : Math.min(capacity, Math.max(0, maxVisiblePaths));
-    capacities.set(cell.id, Math.max(1, clampedCapacity));
+
+    capacities.set(cellId, Math.max(1, clampedCapacity));
   }
 
   return capacities;

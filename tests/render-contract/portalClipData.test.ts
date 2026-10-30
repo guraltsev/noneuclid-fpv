@@ -126,6 +126,53 @@ describe("portal clip data", () => {
     clipData.dispose();
   });
 
+  it("ranks a full stereo union round-robin so each eye loses the same number of paths", () => {
+    const clipData = createPortalClipData({ maxVisiblePaths: 3 });
+    const eye0 = Array.from({ length: 10 }, (_, id) => createVisiblePath(id, undefined, id === 0 ? 0 : 1));
+    const eye1 = Array.from({ length: 10 }, (_, id) => createVisiblePath(10 + id, undefined, id === 0 ? 0 : 1));
+
+    clipData.updateStereo([eye0, eye1]);
+
+    // maxVisiblePaths 3 gives 6 slots.
+    expect(clipData.pathIdByClipIndex).toEqual([0, 10, 1, 11, 2, 12]);
+    expect(clipData.rankedAcceptedPaths.map((path) => path.pathId)).toEqual([0, 10, 1, 11, 2, 12]);
+    expect(clipData.clipIndexByPathId.get(12)).toBe(5);
+    const dropped = (paths: VisiblePortalPath[]) => paths.filter((path) => !clipData.acceptedPathIds.has(path.pathId)).length;
+    expect(dropped(eye0)).toBe(7);
+    expect(dropped(eye1)).toBe(7);
+    expect(clipData.visiblePathOverflowCount).toBe(14);
+
+    clipData.dispose();
+  });
+
+  it("drops overlapping lists fairly", () => {
+    const clipData = createPortalClipData({ maxVisiblePaths: 2 });
+    const eye0 = [0, 1, 2, 3].map((id) => createVisiblePath(id));
+    const eye1 = [0, 1, 4, 5].map((id) => createVisiblePath(id));
+
+    clipData.updateStereo([eye0, eye1]);
+
+    expect([...clipData.acceptedPathIds].sort()).toEqual([0, 1, 2, 4]);
+    expect(eye0.filter((path) => !clipData.acceptedPathIds.has(path.pathId))).toHaveLength(1);
+    expect(eye1.filter((path) => !clipData.acceptedPathIds.has(path.pathId))).toHaveLength(1);
+
+    clipData.dispose();
+  });
+
+  it("keeps a root seen by one eye only inside in that eye and outside in the other", () => {
+    const clipData = createPortalClipData({ maxVisiblePaths: 2 });
+    const eye0 = [createRootVisiblePortalPath("room-a")];
+    const eye1 = [{ ...createRootVisiblePortalPath("room-a"), pathId: 9 }];
+
+    clipData.updateStereo([eye0, eye1]);
+
+    const slot = clipData.clipIndexByPathId.get(9)!;
+    expect(readPlanes(clipData, slot, 1, 2)).toEqual([0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1]);
+    expect(readPlanes(clipData, slot, 0, 2)).toEqual([0, 0, 0, -1, 0, 0, 0, -1, 0, 0, 0, -1, 0, 0, 0, -1]);
+
+    clipData.dispose();
+  });
+
   it("provides always-inside and always-outside plane rows", () => {
     const out = new Float32Array(16);
 
@@ -152,11 +199,12 @@ function distinctPlanes(seed: number): Float64Array {
 function createVisiblePath(
   pathId: number,
   clipPlanes: Float64Array = new Float64Array([0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1]),
+  depth = 1,
 ): VisiblePortalPath {
   return {
     pathId,
     destinationCellId: "room-b",
-    depth: 1,
+    depth,
     rootFromDestinationMatrix: new THREE.Matrix4(),
     clipPlanes,
     terminal: false,
