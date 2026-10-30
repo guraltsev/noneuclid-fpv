@@ -55,6 +55,44 @@ export function createPortalClipMaterialState(
   };
 }
 
+/** Switches the four hardware clip distances on and off around patched draws. */
+export interface PortalClipDistanceToggle {
+  /** Enables `CLIP_DISTANCE0..3` (call at the end of a patched mesh's `onBeforeRender`). */
+  enable(): void;
+  /** Disables them again (call from the mesh's `onAfterRender`). */
+  disable(): void;
+}
+
+/**
+ * Returns a toggle for the four hardware clip distances, or `undefined` when the renderer lacks
+ * `WEBGL_clip_cull_distance` (the material then uses the fragment fallback).
+ *
+ * WebGL requires `gl.enable(CLIP_DISTANCEi_WEBGL)` and Three.js never calls it; enabling a distance a program does not
+ * write is undefined, so the clip distances must only be on while patched programs draw.
+ */
+export function createPortalClipDistanceToggle(renderer: THREE.WebGLRenderer): PortalClipDistanceToggle | undefined {
+  if (!renderer.extensions.has("WEBGL_clip_cull_distance")) {
+    return undefined;
+  }
+
+  const extension = renderer.extensions.get("WEBGL_clip_cull_distance") as { readonly CLIP_DISTANCE0_WEBGL: number };
+  const gl = renderer.getContext();
+  const base = extension.CLIP_DISTANCE0_WEBGL;
+
+  return {
+    enable() {
+      for (let index = 0; index < 4; index += 1) {
+        gl.enable(base + index);
+      }
+    },
+    disable() {
+      for (let index = 0; index < 4; index += 1) {
+        gl.disable(base + index);
+      }
+    },
+  };
+}
+
 /** Selects which eye's planes the shader reads; the index is floored and clamped to [0, maxClipTextureEyes - 1]. */
 export function updatePortalClipMaterialTextureEye(
   state: PortalClipMaterialState,

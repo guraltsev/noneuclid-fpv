@@ -383,7 +383,8 @@ Three.js material (`src/render/three/portalClipMaterial.ts#patchPortalClipMateri
 vertex** at $X=$ `modelMatrix * instanceMatrix * position`. The value is affine in $X$, and perspective-correct interpolation
 of an affine function is exact, so the clip follows each plane precisely. With `WEBGL_clip_cull_distance` the four values are
 written to `gl_ClipDistance[0..3]`: triangles are clipped before rasterisation, the fragment shader has no `discard`, and
-early depth rejection stays on (the distances are enabled only around patched draws). Without the extension the values go to a `vec4` varying and the fragment shader does one compare and
+early depth rejection stays on (`src/render/three/portalClipMaterial.ts#createPortalClipDistanceToggle` enables the
+distances only around patched draws). Without the extension the values go to a `vec4` varying and the fragment shader does one compare and
 `discard`; there is no texture fetch, loop or winding sum in the fragment stage. Clipped instances are pushed slightly back in
 depth in the vertex shader so portal-seen geometry never z-fights the wall that frames it.
 

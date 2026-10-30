@@ -210,6 +210,7 @@ import { PlacedFlagRuntime } from "./placedFlagRenderer";
 import { createPlayerRoverRenderModel } from "./playerRoverModel";
 import { createPortalClipData } from "./portalClipData";
 import {
+  createPortalClipDistanceToggle,
   createPortalClipMaterialState,
   updatePortalClipMaterialTextureEye,
 } from "./portalClipMaterial";
@@ -879,8 +880,18 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   const playerRoverRenderModel = createPlayerRoverRenderModel(options.assets);
   const portalInstanceDiagnostics = createPortalInstanceDiagnostics();
   const portalClipData = createPortalClipData({ maxVisiblePaths });
-  const portalClipMaterialState = createPortalClipMaterialState(portalClipData);
+  // Hardware clip distances (WEBGL_clip_cull_distance) when available, otherwise a fragment compare and discard.
+  const portalClipDistanceToggle = createPortalClipDistanceToggle(renderer);
+  const portalClipMaterialState = createPortalClipMaterialState(portalClipData, {
+    hardwareClipDistances: portalClipDistanceToggle !== undefined,
+  });
+  console.info(
+    portalClipDistanceToggle ? "Portal clip mode: hardware clip distances" : "Portal clip mode: fragment discard",
+  );
   let portalClipOverflowWarned = false;
+  // Clip distances may only be enabled while patched programs draw: onBeforeRender / onAfterRender of patched meshes.
+  const enablePortalClipDistances = (): void => portalClipDistanceToggle?.enable();
+  const disablePortalClipDistances = (): void => portalClipDistanceToggle?.disable();
   // Everything declared here, before the setup calls below, is safe to use from setup code: a const or let declared
   // further down is still in its temporal dead zone when setup calls the functions that use it.
   // Brings runtime-object instances up to date from the frame snapshot; called once per frame, at setup and from
@@ -902,7 +913,9 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       const archetype = buildRuntimeObjectRenderArchetype(source, capacity, portalClipMaterialState);
       archetype.mesh.onBeforeRender = (renderer, _scene, renderCamera) => {
         portalEyeActivator.beforeMesh(renderer, renderCamera);
+        enablePortalClipDistances();
       };
+      archetype.mesh.onAfterRender = disablePortalClipDistances;
       return archetype;
     },
   });
@@ -2544,7 +2557,9 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     for (const archetype of cellRenderArchetypes) {
       archetype.mesh.onBeforeRender = (renderer, _scene, renderCamera) => {
         portalEyeActivator.beforeMesh(renderer, renderCamera);
+        enablePortalClipDistances();
       };
+      archetype.mesh.onAfterRender = disablePortalClipDistances;
       scene.add(archetype.mesh);
     }
     portalInstanceDebugRenderer = createPortalInstanceDebugRenderer(scene, cellRenderArchetypes);

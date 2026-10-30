@@ -1839,6 +1839,8 @@ Patches Three.js materials so instanced portal geometry is clipped to its path's
 | --- | --- | --- |
 | interface | `PortalClipMaterialState` | Shared uniform bundle and settings referenced by every patched material, so one update reaches all of them. |
 | function | `createPortalClipMaterialState` | Creates the shared uniform state for `clipData`, initially for eye 0. |
+| interface | `PortalClipDistanceToggle` | Switches the four hardware clip distances on and off around patched draws. |
+| function | `createPortalClipDistanceToggle` | Returns a toggle for the four hardware clip distances, or `undefined` when the renderer lacks `WEBGL_clip_cull_distance` (the material then uses the fragment fallback). |
 | function | `updatePortalClipMaterialTextureEye` | Selects which eye's planes the shader reads; the index is floored and clamped to [0, maxClipTextureEyes - 1]. |
 | function | `patchPortalClipMaterial` | Installs portal clipping into a material (or each material of an array) and returns it. |
 
