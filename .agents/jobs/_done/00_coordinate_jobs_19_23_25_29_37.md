@@ -1,6 +1,6 @@
 # Job 00 - Coordinate jobs 37, 38, 25-29 and 19-23 in four phases
 
-Status: queued.
+Status: done, needs review on 2026-10-30 (all twelve jobs done, each needing review; see `_reports/batch_19_23_25_29_37.md`).
 Written on 2026-10-29. Coordinates: jobs [37](37_object_owners_and_place_at.md),
 [25](25_split_geodesic_cannon_modules.md), [26](26_exact_curve_shortening.md),
 [27](27_geodesic_rebuild_performance.md), [28](28_frame_snapshot_instance_sync.md),

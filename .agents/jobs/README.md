@@ -99,7 +99,7 @@ Resolves: issue [NN](../../_issues/NN_....md).
 | [15](_done/15_geodesic_tracing_on_kernel.md) | ~~Geodesic tracing on the segment-walk kernel~~ (done, needs review) | [69](../../_issues/69_geodesic_tracing_kernel_numerics.md) |  |
 | [16](_done/16_aim_picking_by_portal_ray_walk.md) | ~~Aim picking by portal ray walk~~ (done, needs review) | [72](../../_issues/72_aim_picking_uses_camera_clip_polygons_not_portal_ray_walk.md) |  |
 | [17](_done/17_multi_hop_ghosts_and_eye_rerooting.md) | ~~Multi-hop portal ghosts and XR eye re-rooting~~ (done, needs review) | [73](../../_issues/73_portal_ghosts_and_xr_eye_rerooting_are_single_hop.md) |  |
-| [00](00_coordinate_jobs_19_23_25_29_37.md) | Coordinate jobs 37, 38, 25-29 and 19-23 in four phases (phase commits and tags) | - |  |
+| [00](_done/00_coordinate_jobs_19_23_25_29_37.md) | ~~Coordinate jobs 37, 38, 25-29 and 19-23 in four phases (phase commits and tags)~~ (done, needs review) | - |  |
 | [18](18_vertex_classes_and_gluing_validation.md) | Compile-time vertex classes, cone angles and gluing validation | [52](../../_issues/52_compile_time_vertex_classes_and_gluing_validation.md) |  |
 | [19](_done/19_vr_palette_and_in_headset_debug.md) | ~~Fix the XR input defects and add an in-headset debug panel~~ (done, needs review) | - | 20 |
 | [20](_done/20_exact_static_cull.md) | ~~Exact static cull by oriented line stabbing~~ (done, needs review) | [56](../../_issues/56_exact_static_cull_by_oriented_line_stabbing.md) |  |
