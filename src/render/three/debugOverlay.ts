@@ -7,6 +7,7 @@ import type {
   FramePerformanceRenderState,
   PortalEyeRenderDebugState,
   PortalInstanceRenderState,
+  StereoPortalPathRenderState,
   VisiblePortalPathRenderState,
   WebGlRenderInfoState,
   XrDebugRenderState,
@@ -23,6 +24,8 @@ export interface DebugOverlayState {
   readonly visiblePortalPaths?: VisiblePortalPathRenderState;
   /** Per-eye stats; only displayed when there is more than one eye. */
   readonly portalEyes?: readonly PortalEyeRenderDebugState[];
+  /** Left/right/union path counts of a stereo frame; shown right after the portal-eyes line. */
+  readonly stereoPortalPaths?: StereoPortalPathRenderState;
   readonly portalInstances?: PortalInstanceRenderState;
   /** Player location, XR session and movement-block diagnostics. */
   readonly location?: XrDebugRenderState;
@@ -54,6 +57,7 @@ export function createDebugOverlay(container: HTMLElement): DebugOverlay {
         || state.webGlRenderInfo
         || state.visiblePortalPaths
         || state.portalEyes
+        || state.stereoPortalPaths
         || state.portalInstances
         || state.location
         || state.geometry
@@ -85,6 +89,7 @@ export function formatDebugOverlayLines(state: DebugOverlayState): readonly stri
     state.webGlRenderInfo ? formatWebGlRenderInfoLine(state.webGlRenderInfo) : undefined,
     state.visiblePortalPaths ? formatVisiblePortalPathLine(state.visiblePortalPaths) : undefined,
     state.portalEyes && state.portalEyes.length > 1 ? formatPortalEyeLine(state.portalEyes) : undefined,
+    state.stereoPortalPaths ? formatStereoPortalPathLine(state.stereoPortalPaths) : undefined,
     state.portalInstances ? formatPortalInstanceLine(state.portalInstances) : undefined,
     state.portalInstances ? formatPortalArchetypeLine(state.portalInstances) : undefined,
     state.location ? formatLocationLine(state.location) : undefined,
@@ -137,6 +142,27 @@ export function formatPortalEyeLine(states: readonly PortalEyeRenderDebugState[]
     .join(" / ");
 
   return `portal eyes: ${counts}`;
+}
+
+/**
+ * Formats the stereo path statistics: left/right/union path counts, cell copies seen by one eye only or by both,
+ * paths dropped by the union budget per eye, and the eyes' root cells with `split` or `shared`.
+ */
+export function formatStereoPortalPathLine(state: StereoPortalPathRenderState): string {
+  const roots = state.splitRoots
+    ? `roots ${state.leftRootCellId}|${state.rightRootCellId} split`
+    : `roots ${state.leftRootCellId} shared`;
+
+  return [
+    `stereo: L ${state.leftPathCount}`,
+    `R ${state.rightPathCount}`,
+    `union ${state.unionPathCount}`,
+    `L-only ${state.leftOnlyPathCount}`,
+    `R-only ${state.rightOnlyPathCount}`,
+    `both ${state.bothEyesPathCount}`,
+    `dropped ${state.droppedLeftPathCount}|${state.droppedRightPathCount}`,
+    roots,
+  ].join(" / ");
 }
 
 /** Formats rendered portal instance count against total instance capacity. */

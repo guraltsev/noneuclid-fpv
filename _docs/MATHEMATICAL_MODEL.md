@@ -374,8 +374,10 @@ so this cannot happen in practice. When all eyes share one root (mono and shared
 instance: each archetype also owns a plain `rootMesh` with an unpatched material clone, which
 `updateCellRenderArchetypeInstances` shows with the root matrix, so the root cell is drawn without clipping code and keeps
 early depth rejection even in the fragment-discard mode (`src/render/three/cellRenderArchetypes.ts#buildCellRenderArchetypes`).
-Eyes rooted in different cells still draw the root as an instance with clip index $-2$. Capacity of a cell archetype is the largest number of statically kept paths that end at it
-over all roots (`src/render/three/cellRenderArchetypes.ts#deriveCellRenderArchetypeCapacities`).
+Eyes with different root identities (see *Stereo* below) draw each root as a clipped instance instead (clip index = its own slot,
+`src/render/three/renderPortalInstances.ts#resolvePortalInstanceClipIndex`). Capacity of a cell archetype is the sum of the two
+largest numbers (one for a single eye) of statically kept paths that end at it over the roots, so two eyes rooted differently
+never overflow it (`src/render/three/cellRenderArchetypes.ts#deriveCellRenderArchetypeCapacities`).
 
 **Clipping on the GPU.** The visible region of each path is four half-spaces through the eye, so the GPU clips by four
 world-space planes $(n,d)$, inside where $n\cdot X+d\ge 0$ (render frame; a rigid map $X'=QX+t$ sends the plane to
@@ -395,9 +397,17 @@ depth in the vertex shader so portal-seen geometry never z-fights the wall that 
 **Stereo (WebXR).** The two eyes may be rooted in different cells. Each eye's visible set is expressed in a shared render
 frame by left-multiplying `renderFromRoot` onto every path matrix
 (`src/render/three/portalEyeFrameTransforms.ts#transformVisiblePortalResultToRenderFrame`), path ids are remapped per
-(root cell, path id) so equal paths in both eyes share one instance
+(root group, path id) so equal paths in both eyes share one instance
 (`src/render/three/portalEyeFrameTransforms.ts#remapStereoPortalPathIds`), and the union is rendered once with per-eye
-clip rows (`src/render/three/portalEyeFrameTransforms.ts#buildUnionVisiblePathById`).
+clip rows. An eye's *root identity* is the pair (root cell, `renderFromRoot`); two eyes share a root only when the cell is
+the same and the matrices agree to $10^{-9}$, so a cell glued to itself (the single torus room) with the eyes on either side
+of the glued side counts as split (`src/render/three/stereoPortalFrame.ts#buildStereoPortalFrame`). With split roots each
+eye's root cell is clipped to its own eye (the other eye's rows for it are "always outside"), so one eye never draws the
+other's root over its whole view and sees that cell only through its own portal paths. When the union exceeds the clip
+slots, paths are kept round-robin over the eyes' lists, each in its own order with the root first, so every eye loses at
+most one path more than the other and both roots survive
+(`src/render/three/portalEyeFrameTransforms.ts#rankStereoUnionPaths`). Runtime-object copies are merged by placement only
+within one root group.
 
 **Objects seen through portals.** Runtime objects are drawn once per visible path of the cell they are in, with matrix
 $M_p\cdot\text{local}$. Ghosts come from the developed disk (`src/cell-complex/developedDisk.ts#collectDevelopedDisk`) of radius
@@ -417,7 +427,9 @@ object and a ghost that coincide on screen do not z-fight.
 walking the segment from the player's position to the eye through the portals
 (`src/render/three/xrPortalEye.ts#resolveXrPortalEyeRenderRoot`, using `locateDevelopedPoint`); a walk that ends in another
 cell re-roots there, with the camera carried through the walk's transform. A wall, or an eye outside the cell's height range,
-keeps the source cell.
+keeps the source cell. A walk that ends in the same cell with a non-identity transform also re-roots (the
+torus-room case above). The debug state `stereoPortalPaths` reports the eyes' path counts, the cell copies seen by one eye
+or both (by placement) and the paths dropped by the budget.
 
 **Aiming uses the same visibility.** `src/render/three/aimTarget.ts#resolveAimTargets` maps the camera's centre ray into each
 visible destination cell by $M_p^{-1}$ for every path whose clip polygon contains the screen centre, intersects it with the

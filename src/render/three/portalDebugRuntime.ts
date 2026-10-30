@@ -391,6 +391,7 @@ export function createPortalDebugRuntime(deps: PortalDebugRuntimeDeps): PortalDe
         ...createPortalPathDebugState(deps.live().playerPose.cellId, candidateTables, staticCull),
         visiblePortalPaths: deps.live().latestVisibleResult?.summary,
         portalInstances: deps.live().portalInstanceRenderState,
+        stereoPortalPaths: deps.live().xrDebugState.stereoPortalPaths,
         renderQuality: createRenderQualityState(renderer, pixelRatio, options.renderQualityEnabled),
         ShowCellPathRendersInstances: deps.live().showCellPathRendersInstances,
       };
@@ -431,6 +432,7 @@ export function createPortalDebugRuntime(deps: PortalDebugRuntimeDeps): PortalDe
         webGlRenderInfo: showFps ? deps.live().latestWebGlRenderInfo : undefined,
         visiblePortalPaths: showPortalQuantities ? visibleSummary : undefined,
         portalEyes: showPortalQuantities ? createPortalEyeDebugStates() : undefined,
+        stereoPortalPaths: showPortalQuantities ? deps.live().xrDebugState.stereoPortalPaths : undefined,
         portalInstances: showPortalQuantities ? deps.live().portalInstanceRenderState : undefined,
         location: showLocation ? deps.live().xrDebugState : undefined,
         geometry: showLocation ? geometrySession.state : undefined,

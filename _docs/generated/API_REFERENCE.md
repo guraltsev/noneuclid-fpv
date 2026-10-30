@@ -1591,6 +1591,7 @@ Text-only HUD overlay (a div with class debug-overlay) listing frame timing, Web
 | function | `formatWebGlRenderInfoLine` | Formats draw calls, triangle count, viewport size, megapixels and pixel ratio of the last render. |
 | function | `formatVisiblePortalPathLine` | Formats visible, kept and maximum visible portal path counts, appending "budget" if the path budget was exhausted. |
 | function | `formatPortalEyeLine` | Formats visible-path count and maximum depth for each portal eye as eyeIndex:count@depth. |
+| function | `formatStereoPortalPathLine` | Formats the stereo path statistics: left/right/union path counts, cell copies seen by one eye only or by both, paths dropped by the union budget per eye, and the eyes' root cells with `split` or `shared`. |
 | function | `formatPortalInstanceLine` | Formats rendered portal instance count against total instance capacity. |
 | function | `formatPortalArchetypeLine` | Formats archetype count, capacity overflow, clip-slot overflow (paths without a slot) and the portal clip mode. |
 | function | `formatLocationLine` | Formats the player's cell, position, yaw, XR session status and movement-block state, with optional input mode, visible path count, last crossed portal and XR root cell. |

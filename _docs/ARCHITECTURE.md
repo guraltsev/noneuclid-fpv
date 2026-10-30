@@ -160,6 +160,9 @@ polygon through which that path is visible. Visibility is computed by
 the newest portal's top and bottom edges, giving four clip planes per path) traversed from the visible parents only (details and the stereo variant are documented in that module and summarised in
 [MATHEMATICAL_MODEL.md](MATHEMATICAL_MODEL.md)). Objects that straddle a portal or a vertex are drawn as "ghosts" in every cell copy their footprint reaches
 (`src/render/three/runtimeObjectGhostRecords.ts#collectPortalGhostRuntimeObjectRenderRecords`).
+In stereo XR, `src/render/three/stereoPortalFrame.ts#buildStereoPortalFrame` computes both eyes' visible paths, groups the
+eyes by root identity (cell and frame) and remaps path ids; `src/render/three/portalClipData.ts#createPortalClipData` ranks the
+union of the eyes' paths round-robin into clip slots, and eyes with different roots clip each other's root cell away.
 
 ## Input, tools and menus
 
