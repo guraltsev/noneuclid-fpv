@@ -41,7 +41,7 @@ import {
   reverseGeodesicPortalWord,
   samePortalWord,
 } from "./portalWord";
-import { updateGeodesicIntersectionObjects } from "./intersections";
+import { requestGeodesicIntersectionUpdate, withDeferredGeodesicIntersections } from "./intersections";
 import { removeUnusedFreeGeodesicEnds } from "./endpoints";
 import {
   getGeodesicSegments,
@@ -87,6 +87,12 @@ export interface AdvanceCurveShorteningPairsRequest {
  * delete a geodesic. Ids come from `createFreeEndId`/`createPairId`, each called at most once.
  */
 export function tieAndDetachGeodesicEndpoints(
+  request: TieAndDetachGeodesicEndpointsRequest,
+): CurveShorteningPairObject | undefined {
+  return withDeferredGeodesicIntersections(request.registry, () => tieAndDetachGeodesicEndpointsNow(request));
+}
+
+function tieAndDetachGeodesicEndpointsNow(
   request: TieAndDetachGeodesicEndpointsRequest,
 ): CurveShorteningPairObject | undefined {
   if (
@@ -151,7 +157,7 @@ export function tieAndDetachGeodesicEndpoints(
       restoreGeodesicIntervalsAndSegments(request.registry, affected, originalSegmentsByGeodesicId);
       request.registry.remove(freeEnd.id);
       removeUnusedFreeGeodesicEnds(request.registry);
-      updateGeodesicIntersectionObjects(request.registry);
+      requestGeodesicIntersectionUpdate(request.registry);
       return undefined;
     }
     syncLegacyEmitterGeodesicFields(request.registry, interval.id);
@@ -167,7 +173,7 @@ export function tieAndDetachGeodesicEndpoints(
     lastGoodFreeEndPoint: getAnchorBeamPoint(freeEnd),
   });
   request.registry.add(pair);
-  updateGeodesicIntersectionObjects(request.registry);
+  requestGeodesicIntersectionUpdate(request.registry);
   return pair;
 }
 
@@ -188,6 +194,10 @@ export function tieAndDetachGeodesicEndpoints(
 export function advanceCurveShorteningPairs(
   request: AdvanceCurveShorteningPairsRequest,
 ): readonly string[] {
+  return withDeferredGeodesicIntersections(request.registry, () => advanceCurveShorteningPairsNow(request));
+}
+
+function advanceCurveShorteningPairsNow(request: AdvanceCurveShorteningPairsRequest): readonly string[] {
   if (!(request.deltaSeconds > 0)) {
     return [];
   }
@@ -211,7 +221,7 @@ export function advanceCurveShorteningPairs(
     }
   }
   if (changed.length > 0) {
-    updateGeodesicIntersectionObjects(request.registry);
+    requestGeodesicIntersectionUpdate(request.registry);
   }
   return [...new Set(changed)];
 }
@@ -261,7 +271,7 @@ function discardCurveShorteningPairInFavorOf(
   if (registry.get(pair.id)) {
     registry.remove(pair.id);
   }
-  updateGeodesicIntersectionObjects(registry);
+  requestGeodesicIntersectionUpdate(registry);
   return existing;
 }
 
@@ -310,7 +320,7 @@ function cleanupCurveShorteningFailure(
   if (pairId) {
     registry.remove(pairId);
   }
-  updateGeodesicIntersectionObjects(registry);
+  requestGeodesicIntersectionUpdate(registry);
 }
 
 // Rollback helper: puts back saved interval objects (re-adding any that were deleted) together with their saved segment chains.
@@ -372,6 +382,10 @@ export function resolveCurveShorteningPair(input: {
   readonly pairId: string;
   readonly onNotice?: (notice: CurveShorteningNotice) => void;
 }): CurveShorteningResolution {
+  return withDeferredGeodesicIntersections(input.registry, () => resolveCurveShorteningPairNow(input));
+}
+
+function resolveCurveShorteningPairNow(input: Parameters<typeof resolveCurveShorteningPair>[0]): CurveShorteningResolution {
   const { world, registry } = input;
   const pair = registry.get(input.pairId);
   if (pair?.kind !== "curve-shortening-pair") {
@@ -581,7 +595,7 @@ export function resolveCurveShorteningPair(input: {
     rebuildDerivedGeodesicSegments({ world, registry, geodesicId: interval.id });
     syncLegacyEmitterGeodesicFields(registry, interval.id);
   }
-  updateGeodesicIntersectionObjects(registry);
+  requestGeodesicIntersectionUpdate(registry);
 
   return { status: "resolved", geodesicIds: intervals.map(({ id }) => id), removedIds };
 }

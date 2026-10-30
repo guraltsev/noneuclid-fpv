@@ -7,6 +7,7 @@ import { transformDirection3, transformPoint3 } from "../../math/rigidTransform3
 import { crossXY } from "../../math/vec2";
 import { addVec3, scaleVec3, type Vec3 } from "../../math/vec3";
 import type { RuntimeObjectRegistry } from "../runtimeObjectRegistry";
+import { geodesicPerfCounters } from "./perfCounters";
 import {
   emitterConnectionToleranceMeters,
   type GeodesicCannonObject,
@@ -326,6 +327,7 @@ export function traceGeodesicPathForConnectionMode(
   if (!(input.maxLengthMeters > intersectionTolerance)) {
     return [];
   }
+  geodesicPerfCounters.chordTraces += 1;
 
   const direction = normalizeHorizontalDirection(input.direction);
   const walk = walkDevelopedSegment({

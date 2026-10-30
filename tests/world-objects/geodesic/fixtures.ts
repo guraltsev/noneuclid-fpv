@@ -17,6 +17,7 @@ import { getGeodesicSegments } from "../../../src/world-objects/geodesic/segment
 import { rebuildConnectedGeodesicBetweenEmitters } from "../../../src/world-objects/geodesic/cannon";
 import { rebuildDerivedGeodesicSegments } from "../../../src/world-objects/geodesic/intervals";
 import { yawRigidTransform3 } from "../.././../src/math/rigidTransform3";
+import { walkDevelopedSegment } from "../../../src/cell-complex/segmentWalk";
 
 export function createSegment(overrides: Partial<GeodesicSegmentObject> = {}): GeodesicSegmentObject {
   return {
@@ -394,4 +395,47 @@ export function createSymmetricPairScenario(halfWidth: number, height: number) {
     lastGoodFreeEndPoint: { x: 0, y: height, z: geodesicRayBeamHeightMeters },
   }));
   return { world, registry };
+}
+
+// One 15 m torus cell, one emitter at (-2, 1.95), ten loops (a, b) = (18 - j, j) through it, about 200 segments.
+export function createTorusLoopBenchmarkScene() {
+  const world = compileTorusLoopWorld();
+  const registry = createRuntimeObjectRegistry();
+  registry.add(createGeodesicCannonObject({
+    id: "e",
+    cellId: "torus-room",
+    localPose: yawRigidTransform3(0, { x: -2, y: 1.95, z: 0 }),
+  }));
+  const words = new Map<string, unknown>();
+  for (let j = 0; j < 10; j += 1) {
+    const a = 18 - j;
+    const b = j;
+    const norm = Math.hypot(a, b);
+    const walk = walkDevelopedSegment({
+      world,
+      cellId: "torus-room",
+      start: { x: -2, y: 1.95 },
+      direction: { x: a / norm, y: b / norm },
+      lengthMeters: 15 * norm,
+      maxCrossings: 64,
+    });
+    expect(walk.status).toBe("end");
+    expect(walk.crossings.length).toBe(18);
+    const portalWord = walk.crossings.map((crossing) => ({
+      sourceCellId: crossing.sourceCellId,
+      sourcePortalId: crossing.portalId,
+      targetCellId: crossing.targetCellId,
+      targetPortalId: crossing.targetPortalId,
+    }));
+    registry.add(createGeodesicIntervalObject({
+      id: `loop-${j}`,
+      startAnchorObjectId: "e",
+      endAnchorObjectId: "e",
+      startCellId: "torus-room",
+      portalWord,
+    }));
+    words.set(`loop-${j}`, portalWord);
+    expect(rebuildConnectedGeodesicBetweenEmitters({ world, registry, geodesicId: `loop-${j}` }).length).toBeGreaterThan(0);
+  }
+  return { world, registry, words };
 }

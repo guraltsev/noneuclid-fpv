@@ -3,7 +3,7 @@
  */
 import type { RuntimeObjectRegistry } from "../runtimeObjectRegistry";
 import type { GeodesicEmitterConnection } from "./objects";
-import { updateGeodesicIntersectionObjects } from "./intersections";
+import { requestGeodesicIntersectionUpdate, withDeferredGeodesicIntersections } from "./intersections";
 import {
   collectIncidentGeodesicIdsForEmitter,
   findSourceEmitterForGeodesic,
@@ -92,17 +92,28 @@ export function collectLockedIncidentGeodesicIdsForEmitter(
 
 /** Removes a geodesic and its derived objects (interval path via `removeGeodesicIntervalAndDerivedObjects`; legacy path removes segments and emitter associations), then refreshes intersections. */
 export function removeGeodesic(registry: RuntimeObjectRegistry, geodesicId: string): void {
+  withDeferredGeodesicIntersections(registry, () => removeGeodesicNow(registry, geodesicId));
+}
+
+function removeGeodesicNow(registry: RuntimeObjectRegistry, geodesicId: string): void {
   if (registry.get(geodesicId)?.kind === "geodesic-interval") {
     removeGeodesicIntervalAndDerivedObjects(registry, geodesicId);
     return;
   }
   removeGeodesicSegments(registry, geodesicId);
   removeGeodesicAssociations(registry, geodesicId);
-  updateGeodesicIntersectionObjects(registry);
+  requestGeodesicIntersectionUpdate(registry);
 }
 
 /** Removes every non-locked geodesic listed on the cannon and returns the removed ids (empty if the id is not a cannon). */
 export function removeUnlockedGeodesicsFromCannon(
+  registry: RuntimeObjectRegistry,
+  cannonId: string,
+): readonly string[] {
+  return withDeferredGeodesicIntersections(registry, () => removeUnlockedGeodesicsFromCannonNow(registry, cannonId));
+}
+
+function removeUnlockedGeodesicsFromCannonNow(
   registry: RuntimeObjectRegistry,
   cannonId: string,
 ): readonly string[] {
@@ -131,6 +142,10 @@ export function removeUnlockedGeodesicsFromCannon(
  * remove and intersection refresh run).
  */
 export function removeGeodesicCannonAndSegments(registry: RuntimeObjectRegistry, cannonId: string): void {
+  withDeferredGeodesicIntersections(registry, () => removeGeodesicCannonAndSegmentsNow(registry, cannonId));
+}
+
+function removeGeodesicCannonAndSegmentsNow(registry: RuntimeObjectRegistry, cannonId: string): void {
   const cannon = registry.get(cannonId);
   if (cannon?.kind === "geodesic-cannon") {
     const geodesicIds = new Set(getGeodesicEndpointAttachmentsForAnchor(registry, cannonId).map((attachment) => attachment.geodesicId));
@@ -159,5 +174,5 @@ export function removeGeodesicCannonAndSegments(registry: RuntimeObjectRegistry,
     }
   }
   registry.remove(cannonId);
-  updateGeodesicIntersectionObjects(registry);
+  requestGeodesicIntersectionUpdate(registry);
 }

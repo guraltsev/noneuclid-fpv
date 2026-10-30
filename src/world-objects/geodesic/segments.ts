@@ -16,7 +16,7 @@ import {
   sanitizeYaw,
   type TraceGeodesicSegmentResult,
 } from "./objects";
-import { updateGeodesicIntersectionObjects } from "./intersections";
+import { requestGeodesicIntersectionUpdate, withDeferredGeodesicIntersections } from "./intersections";
 import {
   getGeodesicEndpointAttachmentsForAnchor,
   getGeodesicPortalWord,
@@ -32,6 +32,13 @@ import {
  * No-op for unknown ids (the sweeps simply find nothing).
  */
 export function removeGeodesicIntervalAndDerivedObjects(
+  registry: RuntimeObjectRegistry,
+  geodesicId: string,
+): void {
+  withDeferredGeodesicIntersections(registry, () => removeGeodesicIntervalAndDerivedObjectsNow(registry, geodesicId));
+}
+
+function removeGeodesicIntervalAndDerivedObjectsNow(
   registry: RuntimeObjectRegistry,
   geodesicId: string,
 ): void {
@@ -61,7 +68,7 @@ export function removeGeodesicIntervalAndDerivedObjects(
   }
   removeGeodesicAssociations(registry, geodesicId);
   removeUnusedFreeGeodesicEnds(registry);
-  updateGeodesicIntersectionObjects(registry);
+  requestGeodesicIntersectionUpdate(registry);
 }
 
 // ---- Derived-segment and connection queries ----
@@ -468,7 +475,7 @@ export function removeGeodesicSegments(registry: RuntimeObjectRegistry, geodesic
   for (const segment of getGeodesicSegments(registry, geodesicId)) {
     registry.remove(segment.id);
   }
-  updateGeodesicIntersectionObjects(registry);
+  requestGeodesicIntersectionUpdate(registry);
 }
 
 // Assigns display numbers: already numbered segments keep theirs; the remaining ids (cannon lists, segments, intervals, then the requested id)

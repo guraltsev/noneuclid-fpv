@@ -29,7 +29,7 @@ import {
   sanitizeYaw,
 } from "./objects";
 import { findNearestEmitterHitOnTrace, traceGeodesicSegment } from "./trace";
-import { updateGeodesicIntersectionObjects } from "./intersections";
+import { requestGeodesicIntersectionUpdate, withDeferredGeodesicIntersections } from "./intersections";
 import { isAimableFreeGeodesic } from "./endpoints";
 import {
   canConnectGeodesicSegmentAtDistance,
@@ -227,6 +227,10 @@ export function placeGeodesicCannonAtFloorPoint(
  * geodesic, or the length is below the minimum). Units: meters, radians.
  */
 export function shootGeodesic(input: ShootGeodesicInput): GeodesicSegmentObject {
+  return withDeferredGeodesicIntersections(input.registry, () => shootGeodesicNow(input));
+}
+
+function shootGeodesicNow(input: ShootGeodesicInput): GeodesicSegmentObject {
   const aimYawRadians = sanitizeYaw(input.cannon.aimYawRadians);
   const direction = directionFromYaw(aimYawRadians);
   const start = getGeodesicCannonEmitterPoint(input.cannon);
@@ -279,7 +283,7 @@ export function shootGeodesic(input: ShootGeodesicInput): GeodesicSegmentObject 
     },
   });
   syncLegacyEmitterGeodesicFields(input.registry, input.geodesicId);
-  updateGeodesicIntersectionObjects(input.registry);
+  requestGeodesicIntersectionUpdate(input.registry);
   return segment;
 }
 
@@ -291,6 +295,10 @@ export function shootGeodesic(input: ShootGeodesicInput): GeodesicSegmentObject 
  * missing, the tail segment ended at a wall/zone/emitter (see `canExtendGeodesicSegment`), or the re-aim fails.
  */
 export function extendGeodesic(input: ExtendGeodesicInput): GeodesicSegmentObject | undefined {
+  return withDeferredGeodesicIntersections(input.registry, () => extendGeodesicNow(input));
+}
+
+function extendGeodesicNow(input: ExtendGeodesicInput): GeodesicSegmentObject | undefined {
   const interval = input.registry.get(input.geodesicId);
   if (interval?.kind !== "geodesic-interval" || !isAimableFreeGeodesic(input.registry, interval)) {
     return undefined;
@@ -335,7 +343,7 @@ export function rebuildGeodesicToLength(input: RebuildGeodesicToLengthInput): re
     return getGeodesicSegments(input.registry, input.geodesicId);
   }
 
-  return rebuildUnlockedGeodesicToLength(input);
+  return withDeferredGeodesicIntersections(input.registry, () => rebuildUnlockedGeodesicToLength(input));
 }
 
 // Core of `rebuildGeodesicToLength`: optionally snap the aim to an emitter, delete the old segments, re-shoot, and optionally
@@ -368,7 +376,7 @@ function rebuildUnlockedGeodesicToLength(input: RebuildGeodesicToLengthInput): r
     removeGeodesic(input.registry, input.geodesicId);
     return [];
   }
-  updateGeodesicIntersectionObjects(input.registry);
+  requestGeodesicIntersectionUpdate(input.registry);
   return getGeodesicSegments(input.registry, input.geodesicId);
 }
 
@@ -454,6 +462,12 @@ function resolveCannonForGeodesic(cannon: GeodesicCannonObject, geodesicId: stri
 export function connectGeodesicToEmitter(
   request: ConnectGeodesicToEmitterRequest,
 ): readonly GeodesicSegmentObject[] {
+  return withDeferredGeodesicIntersections(request.registry, () => connectGeodesicToEmitterNow(request));
+}
+
+function connectGeodesicToEmitterNow(
+  request: ConnectGeodesicToEmitterRequest,
+): readonly GeodesicSegmentObject[] {
   const interval = request.registry.get(request.geodesicId);
   const incoming = request.registry.get(request.incomingEmitterId);
   if (interval?.kind === "geodesic-interval") {
@@ -499,7 +513,7 @@ export function connectGeodesicToEmitter(
       return getGeodesicSegments(request.registry, request.geodesicId);
     }
     syncLegacyEmitterGeodesicFields(request.registry, request.geodesicId);
-    updateGeodesicIntersectionObjects(request.registry);
+    requestGeodesicIntersectionUpdate(request.registry);
     return getGeodesicSegments(request.registry, request.geodesicId);
   }
 
@@ -515,6 +529,12 @@ export function connectGeodesicToEmitter(
  * A non-interval id changes nothing and returns its current segments.
  */
 export function rebuildConnectedGeodesicBetweenEmitters(
+  request: RebuildConnectedGeodesicBetweenEmittersRequest,
+): readonly GeodesicSegmentObject[] {
+  return withDeferredGeodesicIntersections(request.registry, () => rebuildConnectedGeodesicBetweenEmittersNow(request));
+}
+
+function rebuildConnectedGeodesicBetweenEmittersNow(
   request: RebuildConnectedGeodesicBetweenEmittersRequest,
 ): readonly GeodesicSegmentObject[] {
   const interval = request.registry.get(request.geodesicId);
@@ -565,6 +585,12 @@ export function rebuildConnectedGeodesicBetweenEmitters(
  * for a too-near cut or refused split, or the collision reasons of the floor placement. Mutates the registry; does not throw.
  */
 export function placeGeodesicCannonOnGeodesic(
+  request: PlaceGeodesicCannonOnGeodesicRequest,
+): PlaceGeodesicCannonResult {
+  return withDeferredGeodesicIntersections(request.registry, () => placeGeodesicCannonOnGeodesicNow(request));
+}
+
+function placeGeodesicCannonOnGeodesicNow(
   request: PlaceGeodesicCannonOnGeodesicRequest,
 ): PlaceGeodesicCannonResult {
   const segment = request.registry.get(request.segmentId);
@@ -622,6 +648,12 @@ export function placeGeodesicCannonOnGeodesic(
  * Mutates the registry; does not throw. Geodesics matched at this vertex are processed in geodesic-id order.
  */
 export function placeGeodesicCannonAtGeodesicVertex(
+  request: PlaceGeodesicCannonAtGeodesicVertexRequest,
+): PlaceGeodesicCannonResult {
+  return withDeferredGeodesicIntersections(request.registry, () => placeGeodesicCannonAtGeodesicVertexNow(request));
+}
+
+function placeGeodesicCannonAtGeodesicVertexNow(
   request: PlaceGeodesicCannonAtGeodesicVertexRequest,
 ): PlaceGeodesicCannonResult {
   const connectedSegments = findSegmentsPassingThroughVertex(
@@ -719,7 +751,7 @@ export function placeGeodesicCannonAtGeodesicVertex(
     }
   }
 
-  updateGeodesicIntersectionObjects(request.registry);
+  requestGeodesicIntersectionUpdate(request.registry);
   const placed = request.registry.get(result.object.id);
   return placed?.kind === "geodesic-cannon" ? { placed: true, object: placed } : result;
 }

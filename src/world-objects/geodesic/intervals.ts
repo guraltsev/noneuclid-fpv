@@ -34,7 +34,7 @@ import {
   samePortalWord,
 } from "./portalWord";
 import { traceGeodesicPathForConnectionMode, traceTerminalToBuildTerminal } from "./trace";
-import { updateGeodesicIntersectionObjects } from "./intersections";
+import { requestGeodesicIntersectionUpdate, withDeferredGeodesicIntersections } from "./intersections";
 import {
   getGeodesicEndpointAttachmentsForAnchor,
   isAimableFreeGeodesic,
@@ -79,6 +79,10 @@ export function traceGeodesicFromLiftedChord(input: {
   readonly expectedPortalWord?: readonly GeodesicPortalTraversal[];
   readonly allowUnexpectedPortalWord?: boolean;
 }): GeodesicTraceBuildResult | undefined {
+  return withDeferredGeodesicIntersections(input.registry, () => traceGeodesicFromLiftedChordNow(input));
+}
+
+function traceGeodesicFromLiftedChordNow(input: Parameters<typeof traceGeodesicFromLiftedChord>[0]): GeodesicTraceBuildResult | undefined {
   const interval = input.registry.get(input.geodesicId);
   if (interval?.kind !== "geodesic-interval" || input.lengthMeters < minGeodesicSegmentLengthMeters) {
     return undefined;
@@ -137,6 +141,10 @@ export function aimFreeGeodesicFromEndpoint(input: {
   readonly targetPointInEmitterCell: Vec3;
   readonly connectEmitters?: boolean;
 }): GeodesicTraceBuildResult | undefined {
+  return withDeferredGeodesicIntersections(input.registry, () => aimFreeGeodesicFromEndpointNow(input));
+}
+
+function aimFreeGeodesicFromEndpointNow(input: Parameters<typeof aimFreeGeodesicFromEndpoint>[0]): GeodesicTraceBuildResult | undefined {
   const interval = input.registry.get(input.geodesicId);
   if (interval?.kind !== "geodesic-interval") {
     return undefined;
@@ -213,7 +221,7 @@ export function aimFreeGeodesicFromEndpoint(input: {
     });
     if (rebuilt) {
       syncLegacyEmitterGeodesicFields(input.registry, input.geodesicId);
-      updateGeodesicIntersectionObjects(input.registry);
+      requestGeodesicIntersectionUpdate(input.registry);
       return {
         interval: rebuilt.interval,
         segments: rebuilt.segments,
@@ -228,7 +236,7 @@ export function aimFreeGeodesicFromEndpoint(input: {
     traces,
   });
   syncLegacyEmitterGeodesicFields(input.registry, input.geodesicId);
-  updateGeodesicIntersectionObjects(input.registry);
+  requestGeodesicIntersectionUpdate(input.registry);
   return {
     interval: nextInterval,
     segments,
@@ -253,6 +261,10 @@ export function rebuildDerivedGeodesicSegments(input: {
   readonly geodesicId: string;
   readonly allowUnexpectedPortalWord?: boolean;
 }): GeodesicTraceBuildResult | undefined {
+  return withDeferredGeodesicIntersections(input.registry, () => rebuildDerivedGeodesicSegmentsNow(input));
+}
+
+function rebuildDerivedGeodesicSegmentsNow(input: Parameters<typeof rebuildDerivedGeodesicSegments>[0]): GeodesicTraceBuildResult | undefined {
   const interval = input.registry.get(input.geodesicId);
   if (interval?.kind !== "geodesic-interval") {
     return undefined;
@@ -353,6 +365,10 @@ export function splitGeodesicIntervalAtSegmentHit(input: {
   readonly placedEmitterId: string;
   readonly createContinuationGeodesicId: (sourceGeodesicId: string, sideIndex: number) => string;
 }): readonly GeodesicIntervalObject[] {
+  return withDeferredGeodesicIntersections(input.registry, () => splitGeodesicIntervalAtSegmentHitNow(input));
+}
+
+function splitGeodesicIntervalAtSegmentHitNow(input: Parameters<typeof splitGeodesicIntervalAtSegmentHit>[0]): readonly GeodesicIntervalObject[] {
   const interval = input.registry.get(input.geodesicId);
   const segment = input.registry.get(input.segmentId);
   const placed = input.registry.get(input.placedEmitterId);
@@ -448,7 +464,7 @@ export function splitGeodesicIntervalAtSegmentHit(input: {
   if (continuationId) {
     syncLegacyEmitterGeodesicFields(input.registry, continuationId);
   }
-  updateGeodesicIntersectionObjects(input.registry);
+  requestGeodesicIntersectionUpdate(input.registry);
   return [input.registry.get(input.geodesicId), continuationId ? input.registry.get(continuationId) : undefined]
     .filter((object): object is GeodesicIntervalObject => object?.kind === "geodesic-interval");
 }
@@ -473,6 +489,10 @@ export function rebuildLockedGeodesicFromEndpointsAndPortalWord(input: {
   readonly carriedPortalWord?: readonly GeodesicPortalTraversal[];
   readonly allowOutOfBoundsCarriedEndpoint?: boolean;
 }): GeodesicTraceBuildResult | undefined {
+  return withDeferredGeodesicIntersections(input.registry, () => rebuildLockedGeodesicFromEndpointsAndPortalWordNow(input));
+}
+
+function rebuildLockedGeodesicFromEndpointsAndPortalWordNow(input: Parameters<typeof rebuildLockedGeodesicFromEndpointsAndPortalWord>[0]): GeodesicTraceBuildResult | undefined {
   const interval = input.registry.get(input.geodesicId);
   if (interval?.kind !== "geodesic-interval") {
     return undefined;
@@ -510,7 +530,7 @@ export function rebuildLockedGeodesicFromEndpointsAndPortalWord(input: {
   });
   if (result) {
     syncLegacyEmitterGeodesicFields(input.registry, input.geodesicId);
-    updateGeodesicIntersectionObjects(input.registry);
+    requestGeodesicIntersectionUpdate(input.registry);
   }
   return result;
 }

@@ -521,6 +521,8 @@ Geodesic intersection markers: crossings of segments in the same cell, stable ma
 | Kind | Name | Summary |
 | --- | --- | --- |
 | function | `updateGeodesicIntersectionObjects` | Recomputes all intersection markers (where segments of two different geodesics cross in a cell) and returns them. |
+| function | `requestGeodesicIntersectionUpdate` | Marks the intersection markers stale and recomputes them now, unless a deferral scope is open for this registry (see `withDeferredGeodesicIntersections`), in which case the recomputation happens once when the outermost … |
+| function | `withDeferredGeodesicIntersections` | Runs `body`; every `requestGeodesicIntersectionUpdate` inside it (also from nested scopes) is coalesced into one `updateGeodesicIntersectionObjects` when the outermost scope exits, also when `body` throws. |
 | function | `getRememberedGeodesicIntersectionObject` | Returns the last known intersection marker with this id even if it has since disappeared from the registry, or `undefined`. |
 | function | `pruneMissingGeodesicIntersectionObjects` | Forgets remembered intersection markers that are no longer in the registry; returns the forgotten ids. |
 
@@ -610,6 +612,15 @@ Geodesic emitters ("cannons"), geodesic intervals and curve shortening on a glue
 | function | `directionFromYaw` | Unit horizontal direction of a yaw (radians counter-clockwise from +x). |
 | function | `normalizeHorizontalDirection` | Normalizes the horizontal part of a direction; the result has `z = 0`. |
 | function | `sanitizeYaw` | Wraps an angle to (-pi, pi] via atan2(sin, cos); non-finite input becomes 0. |
+
+### `world-objects/geodesic/perfCounters.ts`
+
+Counters of the expensive geodesic operations, read by the performance tests.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| const | `geodesicPerfCounters` | Number of intersection passes (`findGeodesicIntersections`) and chord traces (`traceGeodesicPathForConnectionMode`) since the last reset. |
+| function | `resetGeodesicPerfCounters` | Sets both counters to zero. |
 
 ### `world-objects/geodesic/portalWord.ts`
 

@@ -283,8 +283,8 @@ export const moduleImportRules = [
   },
   {
     module: "world-objects/geodesic/trace.ts",
-    mayImportOnly: ["math/", "cell-complex/", "movement/", "world-objects/geodesic/objects.ts", "world-objects/runtimeObjectRegistry.ts"],
-    reason: "tracing may only use math, cell-complex, movement, the geodesic object types and the registry type",
+    mayImportOnly: ["math/", "cell-complex/", "movement/", "world-objects/geodesic/objects.ts", "world-objects/geodesic/perfCounters.ts", "world-objects/runtimeObjectRegistry.ts"],
+    reason: "tracing may only use math, cell-complex, movement, the geodesic object types, the performance counters and the registry type",
   },
 ];
 

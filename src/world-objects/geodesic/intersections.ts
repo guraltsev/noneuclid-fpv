@@ -12,6 +12,7 @@ import {
   getGeodesicSegmentEnd,
   intersectionTolerance,
 } from "./objects";
+import { geodesicPerfCounters } from "./perfCounters";
 
 /** Maximum distance (meters) between two geodesic points for them to count as one vertex when placing at a vertex; deliberately generous. */
 const vertexContinuityToleranceMeters = 10;
@@ -58,6 +59,45 @@ export function updateGeodesicIntersectionObjects(registry: RuntimeObjectRegistr
   return intersections;
 }
 
+/** Per-registry deferral state: how many scopes are open and whether a request arrived inside them. */
+const geodesicIntersectionDeferralByRegistry = new WeakMap<RuntimeObjectRegistry, { depth: number; dirty: boolean }>();
+
+/**
+ * Marks the intersection markers stale and recomputes them now, unless a deferral scope is open for this registry
+ * (see `withDeferredGeodesicIntersections`), in which case the recomputation happens once when the outermost scope exits.
+ */
+export function requestGeodesicIntersectionUpdate(registry: RuntimeObjectRegistry): void {
+  const state = geodesicIntersectionDeferralByRegistry.get(registry);
+  if (state && state.depth > 0) {
+    state.dirty = true;
+    return;
+  }
+  updateGeodesicIntersectionObjects(registry);
+}
+
+/**
+ * Runs `body`; every `requestGeodesicIntersectionUpdate` inside it (also from nested scopes) is coalesced into one
+ * `updateGeodesicIntersectionObjects` when the outermost scope exits, also when `body` throws. Markers are therefore
+ * current again whenever the outermost scope has returned, but may be stale inside it.
+ */
+export function withDeferredGeodesicIntersections<T>(registry: RuntimeObjectRegistry, body: () => T): T {
+  let state = geodesicIntersectionDeferralByRegistry.get(registry);
+  if (!state) {
+    state = { depth: 0, dirty: false };
+    geodesicIntersectionDeferralByRegistry.set(registry, state);
+  }
+  state.depth += 1;
+  try {
+    return body();
+  } finally {
+    state.depth -= 1;
+    if (state.depth === 0 && state.dirty) {
+      state.dirty = false;
+      updateGeodesicIntersectionObjects(registry);
+    }
+  }
+}
+
 /** Returns the last known intersection marker with this id even if it has since disappeared from the registry, or `undefined`. */
 export function getRememberedGeodesicIntersectionObject(
   registry: RuntimeObjectRegistry,
@@ -82,73 +122,82 @@ export function pruneMissingGeodesicIntersectionObjects(registry: RuntimeObjectR
   return prunedIds;
 }
 
-// Pairwise crossing search over all segments in the registry (O(n^2)). Only segments of different geodesics in the same cell count;
-// a crossing at an emitter is dropped, and duplicates (same rounded point and geodesic pair) are removed. Segments in different cells
-// never intersect here, even if they are adjacent through a portal.
+// Pairwise crossing search inside each cell (cost: the sum over cells of n_c^2). Only segments of different geodesics in the same cell
+// count; a crossing at an emitter is dropped, and duplicates (same rounded point and geodesic pair) are removed. Segments in different
+// cells never intersect here, even if they are adjacent through a portal: a crossing exactly on a portal side is reported once, in the
+// cell the geodesics enter (see `crossingIsAtGeodesicAnchor`).
 function findGeodesicIntersections(registry: RuntimeObjectRegistry): readonly GeodesicIntersectionObject[] {
+  geodesicPerfCounters.intersectionPasses += 1;
   const segments = registry.getObjectsOfKind("geodesic-segment");
   const intersections: GeodesicIntersectionObject[] = [];
   const seenKeys = new Set<string>();
   const lastSegmentIndexByGeodesic = new Map<string, number>();
+  const segmentsByCellId = new Map<string, GeodesicSegmentObject[]>();
   for (const segment of segments) {
     lastSegmentIndexByGeodesic.set(
       segment.geodesicId,
       Math.max(lastSegmentIndexByGeodesic.get(segment.geodesicId) ?? 0, segment.segmentIndex),
     );
+    const bucket = segmentsByCellId.get(segment.cellId);
+    if (bucket) {
+      bucket.push(segment);
+    } else {
+      segmentsByCellId.set(segment.cellId, [segment]);
+    }
   }
 
-  for (let leftIndex = 0; leftIndex < segments.length; leftIndex += 1) {
-    for (let rightIndex = leftIndex + 1; rightIndex < segments.length; rightIndex += 1) {
-      const left = segments[leftIndex];
-      const right = segments[rightIndex];
-      if (left.cellId !== right.cellId) {
-        continue;
-      }
-      // Adjacent segments of one geodesic share an endpoint; only pairs two or more apart can cross.
-      if (left.geodesicId === right.geodesicId && Math.abs(left.segmentIndex - right.segmentIndex) < 2) {
-        continue;
-      }
+  for (const bucket of segmentsByCellId.values()) {
+    for (let leftIndex = 0; leftIndex < bucket.length; leftIndex += 1) {
+      for (let rightIndex = leftIndex + 1; rightIndex < bucket.length; rightIndex += 1) {
+        const left = bucket[leftIndex];
+        const right = bucket[rightIndex];
+        // Adjacent segments of one geodesic share an endpoint; only pairs two or more apart can cross.
+        if (left.geodesicId === right.geodesicId && Math.abs(left.segmentIndex - right.segmentIndex) < 2) {
+          continue;
+        }
 
-      const intersection = intersectHorizontalSegments(left, right);
-      if (!intersection) {
-        continue;
-      }
-      if (
-        crossingIsAtGeodesicAnchor(left, intersection.leftT, intersection.leftLengthMeters, lastSegmentIndexByGeodesic) ||
-        crossingIsAtGeodesicAnchor(right, intersection.rightT, intersection.rightLengthMeters, lastSegmentIndexByGeodesic)
-      ) {
-        continue;
-      }
+        const intersection = intersectHorizontalSegments(left, right);
+        if (!intersection) {
+          continue;
+        }
+        if (
+          crossingIsAtGeodesicAnchor(left, intersection.leftT, intersection.leftLengthMeters, lastSegmentIndexByGeodesic) ||
+          crossingIsAtGeodesicAnchor(right, intersection.rightT, intersection.rightLengthMeters, lastSegmentIndexByGeodesic)
+        ) {
+          continue;
+        }
 
-      const pointKey = `${left.cellId}:${intersection.point.x.toFixed(5)}:${intersection.point.y.toFixed(5)}`;
-      const sortedGeodesicIds = [left.geodesicId, right.geodesicId].sort();
-      const geodesicIds: [string, string] = [sortedGeodesicIds[0], sortedGeodesicIds[1]];
-      const key = `${pointKey}:${geodesicIds.join(":")}`;
-      if (seenKeys.has(key)) {
-        continue;
-      }
+        const pointKey = `${left.cellId}:${intersection.point.x.toFixed(5)}:${intersection.point.y.toFixed(5)}`;
+        const sortedGeodesicIds = [left.geodesicId, right.geodesicId].sort();
+        const geodesicIds: [string, string] = [sortedGeodesicIds[0], sortedGeodesicIds[1]];
+        const key = `${pointKey}:${geodesicIds.join(":")}`;
+        if (seenKeys.has(key)) {
+          continue;
+        }
 
-      seenKeys.add(key);
-      intersections.push(createGeodesicIntersectionObject({
-        id: createGeodesicIntersectionId(left.cellId, geodesicIds, intersection.point),
-        cellId: left.cellId,
-        balloonPoint: {
-          x: intersection.point.x,
-          y: intersection.point.y,
-          z: geodesicRayBeamHeightMeters + geodesicIntersectionBalloonHeightOffsetMeters,
-        },
-        targetPoint: intersection.point,
-        geodesicIds: [geodesicIds[0], geodesicIds[1]],
-        segmentIds: [left.id, right.id],
-      }));
+        seenKeys.add(key);
+        intersections.push(createGeodesicIntersectionObject({
+          id: createGeodesicIntersectionId(left.cellId, geodesicIds, intersection.point),
+          cellId: left.cellId,
+          balloonPoint: {
+            x: intersection.point.x,
+            y: intersection.point.y,
+            z: geodesicRayBeamHeightMeters + geodesicIntersectionBalloonHeightOffsetMeters,
+          },
+          targetPoint: intersection.point,
+          geodesicIds: [geodesicIds[0], geodesicIds[1]],
+          segmentIds: [left.id, right.id],
+        }));
+      }
     }
   }
 
   return intersections;
 }
 
-// True when a crossing lies within 1e-6 m of the geodesic's anchor: the start of its first segment or the end of its last one.
-// Geodesics that share an emitter meet there and that meeting is not a vertex.
+// True when a crossing is not reported for this segment: it lies within 1e-6 m of the geodesic's anchor (the start of its first segment or
+// the end of its last one; geodesics that share an emitter meet there and that meeting is not a vertex), or at the end of a segment that
+// continues through a portal (the continuation in the target cell starts at the same point and reports the crossing there).
 function crossingIsAtGeodesicAnchor(
   segment: GeodesicSegmentObject,
   t: number,
@@ -159,6 +208,9 @@ function crossingIsAtGeodesicAnchor(
   if (segment.segmentIndex === 0 && t <= toleranceT) {
     return true;
   }
+  if (segment.terminal.kind === "portal-hit" && t >= 1 - toleranceT) {
+    return true;
+  }
 
   return segment.segmentIndex === (lastSegmentIndexByGeodesic.get(segment.geodesicId) ?? 0) && t >= 1 - toleranceT;
 }
@@ -167,9 +219,23 @@ function assignGeodesicIntersectionIdentities(
   intersections: readonly GeodesicIntersectionObject[],
   previousById: ReadonlyMap<string, GeodesicIntersectionObject>,
 ): readonly GeodesicIntersectionObject[] {
+  const previousByKey = new Map<string, GeodesicIntersectionObject[]>();
+  for (const previous of previousById.values()) {
+    const key = identityMatchKey(previous);
+    const list = previousByKey.get(key);
+    if (list) {
+      list.push(previous);
+    } else {
+      previousByKey.set(key, [previous]);
+    }
+  }
   const usedPreviousIds = new Set<string>();
   return intersections.map((intersection) => {
-    const match = findContinuityMatchedIntersection(intersection, previousById, usedPreviousIds);
+    const match = findContinuityMatchedIntersection(
+      intersection,
+      previousByKey.get(identityMatchKey(intersection)) ?? [],
+      usedPreviousIds,
+    );
     if (!match) {
       return intersection;
     }
@@ -182,19 +248,20 @@ function assignGeodesicIntersectionIdentities(
   });
 }
 
-// Matches a fresh marker to the nearest unused previous marker of the same cell and geodesic pair within `vertexContinuityToleranceMeters`.
+// Previous markers can only be matched by a fresh marker of the same cell and geodesic pair.
+function identityMatchKey(intersection: GeodesicIntersectionObject): string {
+  return `${intersection.cellId}|${intersection.geodesicIds[0]}|${intersection.geodesicIds[1]}`;
+}
+
+// Matches a fresh marker to the nearest unused previous marker (from the list of the same cell and geodesic pair) within `vertexContinuityToleranceMeters`.
 function findContinuityMatchedIntersection(
   intersection: GeodesicIntersectionObject,
-  previousById: ReadonlyMap<string, GeodesicIntersectionObject>,
+  candidates: readonly GeodesicIntersectionObject[],
   usedPreviousIds: ReadonlySet<string>,
 ): GeodesicIntersectionObject | undefined {
   let best: { readonly object: GeodesicIntersectionObject; readonly distance: number } | undefined;
-  for (const previous of previousById.values()) {
-    if (
-      usedPreviousIds.has(previous.id) ||
-      previous.cellId !== intersection.cellId ||
-      !sameGeodesicPair(previous.geodesicIds, intersection.geodesicIds)
-    ) {
+  for (const previous of candidates) {
+    if (usedPreviousIds.has(previous.id)) {
       continue;
     }
 
@@ -208,11 +275,6 @@ function findContinuityMatchedIntersection(
 
   return best?.object;
 }
-
-function sameGeodesicPair(left: readonly [string, string], right: readonly [string, string]): boolean {
-  return left[0] === right[0] && left[1] === right[1];
-}
-
 function distanceBetweenIntersectionTargets(left: GeodesicIntersectionObject, right: GeodesicIntersectionObject): number {
   const leftPoint = left.aimStickyTarget?.localPoint ?? left.localPose.translation;
   const rightPoint = right.aimStickyTarget?.localPoint ?? right.localPose.translation;

@@ -28,7 +28,10 @@ import {
   type GeodesicEndpointSelection,
   type GeodesicPortalTraversal,
 } from "../../world-objects/geodesic/objects";
-import { pruneMissingGeodesicIntersectionObjects } from "../../world-objects/geodesic/intersections";
+import {
+  pruneMissingGeodesicIntersectionObjects,
+  withDeferredGeodesicIntersections,
+} from "../../world-objects/geodesic/intersections";
 import {
   getGeodesicEndpointAttachmentsForAnchor,
   resolveGeodesicEndpointSelectionFromSegmentHit,
@@ -864,22 +867,27 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
 
     if (lockedIncidentGeodesicIds.length > 0) {
       const rebuiltGeodesicIds: string[] = [];
-      for (const incidentGeodesicId of lockedIncidentGeodesicIds) {
-        updateCarriedGeodesicPortalWord(cannon, previousCannon, incidentGeodesicId);
-        const carriedPortalWord = resolveCarriedGeodesicPortalWordForRebuild(incidentGeodesicId);
-        rebuildConnectedGeodesicBetweenEmitters({
-          world: deps.getWorld(),
-          registry: runtimeObjectRegistry,
-          geodesicId: incidentGeodesicId,
-          carriedEmitterId: cannon.id,
-          carriedEmitterBeforeMove: previousCannon,
-          carriedEmitterPortalTransition: deps.getLatestPlayerPortalTransition(),
-          carriedPortalWord,
-          preserveGeodesicOnRebuildFailure: options.preserveGeodesicOnRebuildFailure,
-          allowOutOfBoundsCarriedEndpoint: options.preserveGeodesicOnRebuildFailure,
-        });
-        rebuiltGeodesicIds.push(incidentGeodesicId);
-        refreshMeasuredGeodesicLengthsForGeodesic(incidentGeodesicId);
+      // One scope per carry frame: the intersection markers are recomputed once, after all incident geodesics are rebuilt.
+      withDeferredGeodesicIntersections(runtimeObjectRegistry, () => {
+        for (const incidentGeodesicId of lockedIncidentGeodesicIds) {
+          updateCarriedGeodesicPortalWord(cannon, previousCannon, incidentGeodesicId);
+          const carriedPortalWord = resolveCarriedGeodesicPortalWordForRebuild(incidentGeodesicId);
+          rebuildConnectedGeodesicBetweenEmitters({
+            world: deps.getWorld(),
+            registry: runtimeObjectRegistry,
+            geodesicId: incidentGeodesicId,
+            carriedEmitterId: cannon.id,
+            carriedEmitterBeforeMove: previousCannon,
+            carriedEmitterPortalTransition: deps.getLatestPlayerPortalTransition(),
+            carriedPortalWord,
+            preserveGeodesicOnRebuildFailure: options.preserveGeodesicOnRebuildFailure,
+            allowOutOfBoundsCarriedEndpoint: options.preserveGeodesicOnRebuildFailure,
+          });
+          rebuiltGeodesicIds.push(incidentGeodesicId);
+        }
+      });
+      for (const rebuiltGeodesicId of rebuiltGeodesicIds) {
+        refreshMeasuredGeodesicLengthsForGeodesic(rebuiltGeodesicId);
       }
       refreshProtractorAnglesForGeodesics(rebuiltGeodesicIds);
     } else if (geodesicId && isGeodesicLocked(runtimeObjectRegistry, geodesicId)) {
