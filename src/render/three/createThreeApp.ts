@@ -2107,6 +2107,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       disposeObject3D(underCellInfinityFloor);
       for (const archetype of cellRenderArchetypes) {
         scene.remove(archetype.mesh);
+        scene.remove(archetype.rootMesh);
       }
       disposeCellRenderArchetypes(cellRenderArchetypes);
       portalInstanceDebugRenderer?.dispose();
@@ -2505,6 +2506,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     portalInstanceDebugRenderer = undefined;
     for (const archetype of cellRenderArchetypes) {
       scene.remove(archetype.mesh);
+      scene.remove(archetype.rootMesh);
     }
     disposeCellRenderArchetypes(cellRenderArchetypes);
     cellRenderArchetypes = [];
@@ -2561,6 +2563,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       };
       archetype.mesh.onAfterRender = disablePortalClipDistances;
       scene.add(archetype.mesh);
+      scene.add(archetype.rootMesh);
     }
     portalInstanceDebugRenderer = createPortalInstanceDebugRenderer(scene, cellRenderArchetypes);
     for (const runtime of placedFlagRuntimes.values()) {
@@ -2633,7 +2636,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       buildVisiblePathsByDestinationCell(table.pathsByDestinationCellId, latestVisibleResult.visiblePathById),
       portalClipData.clipIndexByPathId,
     );
-    updatePortalVisiblePathInstances(visiblePathsByDestinationCell);
+    updatePortalVisiblePathInstances(visiblePathsByDestinationCell, true);
     latestFrameSnapshot = createFrameRenderSnapshot({
       serial: aimFrameSerial,
       rootCellId: renderRoot.rootCellId,
@@ -2750,7 +2753,8 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
         groupVisiblePortalPathsByDestinationCell(unionVisiblePaths),
         portalClipData.clipIndexByPathId,
       );
-      updatePortalVisiblePathInstances(visiblePathsByDestinationCell);
+      // Split-root stereo (eyes in different cells) keeps the root as a clipped instance; job 23 revisits it.
+      updatePortalVisiblePathInstances(visiblePathsByDestinationCell, sharedRootCellId !== undefined);
       latestFrameSnapshot = createFrameRenderSnapshot({
         serial: aimFrameSerial,
         rootCellId: portalEyeRenderStates[0]?.rootCellId ?? playerPose.cellId,
@@ -2783,8 +2787,10 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     }
   }
 
+  // `separateRoot`: draw the depth-0 path with each archetype's unpatched root mesh (valid when all eyes share one root).
   function updatePortalVisiblePathInstances(
     visiblePathsByDestinationCell: ReadonlyMap<string, readonly VisiblePortalPath[]>,
+    separateRoot: boolean,
   ): void {
     if (portalClipData.visiblePathOverflowCount > 0 && !portalClipOverflowWarned) {
       portalClipOverflowWarned = true;
@@ -2798,6 +2804,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       visiblePathsByDestinationCell,
       portalInstanceDiagnostics,
       portalClipData.clipIndexByPathId,
+      { separateRoot },
     );
   }
 

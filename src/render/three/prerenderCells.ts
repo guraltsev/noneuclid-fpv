@@ -3,8 +3,8 @@
  *
  * All cell meshes are temporarily made visible, the scene is compiled and rendered, and optionally rendered again
  * from supplied camera views per cell (yaw 0 faces +y in the world frame, forward = (-sin yaw, cos yaw), positions in
- * world frame converted with `worldPointToThree`). Instanced archetypes hidden because they are empty are shown for
- * the warm-up (so `compile` sees them) and hidden again. Afterwards only the active cell is visible and the camera's
+ * world frame converted with `worldPointToThree`). Instanced archetypes hidden because they are empty, and the hidden
+ * unclipped root meshes of the cell archetypes, are shown for the warm-up (so `compile` sees them) and hidden again. Afterwards only the active cell is visible and the camera's
  * position, rotation order and orientation are restored. Visibility is recorded in each mesh's `userData`.
  * One-time cost at startup; renders to whatever target the renderer currently has.
  */
@@ -55,7 +55,10 @@ export function prerenderCells(options: PrerenderCellsOptions): void {
   // objects, so they are made visible for the warm-up and hidden again afterwards.
   const hiddenInstancedMeshes: THREE.Object3D[] = [];
   options.scene.traverse((object) => {
-    if ((object as THREE.InstancedMesh).isInstancedMesh && !object.visible) {
+    const isArchetypeMesh =
+      (object as THREE.InstancedMesh).isInstancedMesh || object.userData?.kind === "cell-render-archetype-root";
+
+    if (isArchetypeMesh && !object.visible) {
       object.visible = true;
       hiddenInstancedMeshes.push(object);
     }

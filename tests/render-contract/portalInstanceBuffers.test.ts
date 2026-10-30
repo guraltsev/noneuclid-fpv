@@ -188,6 +188,79 @@ describe("updateCellRenderArchetypeInstances uploads", () => {
   });
 });
 
+describe("updateCellRenderArchetypeInstances separate root", () => {
+  function pathsWithRoot() {
+    return groupVisiblePortalPathsByDestinationCell([
+      { ...createRootVisiblePortalPath("room-b"), rootFromDestinationMatrix: new THREE.Matrix4().makeTranslation(0, 3, 0) },
+      {
+        ...createRootVisiblePortalPath("room-b"),
+        depth: 1,
+        pathId: 4,
+        rootFromDestinationMatrix: new THREE.Matrix4().makeTranslation(1, 0, 0),
+      },
+    ]);
+  }
+
+  it("draws the depth-0 path with the root mesh and leaves it out of the instances", () => {
+    const archetype = createArchetype("room-b", "room-b:floor:0", 4);
+    const diagnostics = createPortalInstanceDiagnostics();
+
+    updateCellRenderArchetypeInstances([archetype], pathsWithRoot(), diagnostics, new Map([[4, 0]]), { separateRoot: true });
+
+    expect(archetype.rootMesh.visible).toBe(true);
+    expect(archetype.rootMesh.matrix.elements).toEqual(new THREE.Matrix4().makeTranslation(0, 3, 0).elements);
+    expect(archetype.mesh.count).toBe(1);
+    expect(readAttribute(archetype.portalPathIdAttribute, 0)).toBe(4);
+    expect(readAttribute(archetype.portalClipIndexAttribute, 0)).toBe(0);
+    expect(diagnostics.capacityOverflowCount).toBe(0);
+
+    const debugState = createPortalInstanceRenderDebugState([archetype], pathsWithRoot(), diagnostics, {
+      enabled: true,
+      showCellPathRendersInstances: false,
+    });
+
+    expect(debugState.renderedInstanceCount).toBe(2);
+  });
+
+  it("keeps the root as a clipped-index -2 instance when the root is not separated", () => {
+    const archetype = createArchetype("room-b", "room-b:floor:0", 4);
+
+    updateCellRenderArchetypeInstances([archetype], pathsWithRoot(), createPortalInstanceDiagnostics(), new Map([[4, 0]]), {
+      separateRoot: false,
+    });
+
+    expect(archetype.rootMesh.visible).toBe(false);
+    expect(archetype.mesh.count).toBe(2);
+    expect(readAttribute(archetype.portalClipIndexAttribute, 0)).toBe(unclippedPortalClipIndex);
+  });
+
+  it("hides the root mesh when no depth-0 path is visible, and a root-only archetype draws no instance", () => {
+    const archetype = createArchetype("room-b", "room-b:floor:0", 4);
+    const diagnostics = createPortalInstanceDiagnostics();
+
+    updateCellRenderArchetypeInstances([archetype], pathsWithRoot(), diagnostics, new Map([[4, 0]]), { separateRoot: true });
+    updateCellRenderArchetypeInstances(
+      [archetype],
+      groupVisiblePortalPathsByDestinationCell([{ ...createRootVisiblePortalPath("room-b"), depth: 1, pathId: 4 }]),
+      diagnostics,
+      new Map([[4, 0]]),
+      { separateRoot: true },
+    );
+    expect(archetype.rootMesh.visible).toBe(false);
+
+    updateCellRenderArchetypeInstances(
+      [archetype],
+      groupVisiblePortalPathsByDestinationCell([createRootVisiblePortalPath("room-b")]),
+      diagnostics,
+      new Map(),
+      { separateRoot: true },
+    );
+    expect(archetype.rootMesh.visible).toBe(true);
+    expect(archetype.mesh.count).toBe(0);
+    expect(archetype.mesh.visible).toBe(false);
+  });
+});
+
 describe("createPortalInstanceDebugRenderer", () => {
   it("renders one debug instance per archetype for a selected cell and clears them on demand", () => {
     const scene = new THREE.Scene();
@@ -224,11 +297,16 @@ function createArchetype(cellId: string, archetypeId: string, capacity: number):
   mesh.geometry.setAttribute("portalPathId", portalPathIdAttribute);
   mesh.geometry.setAttribute("portalClipIndex", portalClipIndexAttribute);
 
+  const rootMesh = new THREE.Mesh(mesh.geometry, new THREE.MeshStandardMaterial({ color: 0xffffff }));
+  rootMesh.matrixAutoUpdate = false;
+  rootMesh.visible = false;
+
   return {
     cellId,
     archetypeId,
     kind: "floor",
     mesh,
+    rootMesh,
     portalPathIdAttribute,
     portalClipIndexAttribute,
     capacity,

@@ -6,7 +6,9 @@
  * cloned geometry in the cell's local frame and becomes an `InstancedMesh` whose instances are the visible
  * portal paths ending in that cell (`renderPortalInstances`). Instance capacity per cell is the largest number of
  * statically kept paths ending at that cell over all roots (optionally capped by the visible-path budget, at least 1).
- * Materials are cloned and, when a `PortalClipMaterialState` is given, patched for per-instance clipping.
+ * Materials are cloned and, when a `PortalClipMaterialState` is given, patched for per-instance clipping. Each
+ * archetype also owns a hidden plain `rootMesh` (shared geometry, unpatched material clone) that draws the unclipped
+ * root path with early depth rejection.
  * Archetypes are built once at load time and disposed with `disposeCellRenderArchetypes`.
  */
 
@@ -41,6 +43,11 @@ export interface CellRenderArchetype {
   readonly kind: CellRenderArchetypeKind;
   /** Instanced mesh; `mesh.count` is the number of instances drawn this frame. */
   readonly mesh: THREE.InstancedMesh;
+  /**
+   * Plain mesh of the same geometry with an unpatched material, used to draw the unclipped depth-0 (root) path so it
+   * keeps early depth rejection; hidden unless `updateCellRenderArchetypeInstances` is asked to `separateRoot` it.
+   */
+  readonly rootMesh: THREE.Mesh;
   /** Per-instance portal path id (float), read by the clip shader. */
   readonly portalPathIdAttribute: THREE.InstancedBufferAttribute;
   /** Per-instance clip-texture row, -2 for unclipped, -1 for no slot. */
@@ -104,11 +111,18 @@ export function buildCellRenderArchetypes(
         archetypeKind: source.kind,
         sourceObjectName: source.sourceObjectName,
       };
+      const rootMesh = new THREE.Mesh(source.geometry, source.rootMaterial);
+      rootMesh.name = `${source.archetypeId}:root`;
+      rootMesh.matrixAutoUpdate = false;
+      rootMesh.visible = false;
+      rootMesh.frustumCulled = false;
+      rootMesh.userData = { kind: "cell-render-archetype-root", cellId: source.cellId, archetypeId: source.archetypeId };
       archetypes.push({
         cellId: source.cellId,
         archetypeId: source.archetypeId,
         kind: source.kind,
         mesh,
+        rootMesh,
         portalPathIdAttribute,
         portalClipIndexAttribute,
         capacity: source.capacity,
@@ -186,6 +200,7 @@ export function disposeCellRenderArchetypes(archetypes: readonly CellRenderArche
   for (const archetype of archetypes) {
     archetype.mesh.geometry.dispose();
     disposeMaterial(archetype.mesh.material);
+    disposeMaterial(archetype.rootMesh.material);
   }
 }
 
@@ -195,6 +210,8 @@ interface CellArchetypeSource {
   readonly kind: CellRenderArchetypeKind;
   readonly geometry: THREE.BufferGeometry;
   readonly material: THREE.Material | THREE.Material[];
+  /** Unpatched clone of the source material, for `CellRenderArchetype.rootMesh`. */
+  readonly rootMaterial: THREE.Material | THREE.Material[];
   readonly capacity: number;
   readonly sourceObjectName?: string;
 }
@@ -231,6 +248,7 @@ function collectCellArchetypeSources(
     const geometry = object.geometry.clone();
     geometry.applyMatrix4(object.matrixWorld);
     const material = cloneMaterial(object.material, options.portalClipMaterialState);
+    const rootMaterial = cloneMaterial(object.material, undefined);
     const archetypeIndex = sources.length;
     sources.push({
       cellId: cell.id,
@@ -238,6 +256,7 @@ function collectCellArchetypeSources(
       kind,
       geometry,
       material,
+      rootMaterial,
       capacity,
       sourceObjectName: object.name || undefined,
     });

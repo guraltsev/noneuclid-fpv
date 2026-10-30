@@ -1,6 +1,8 @@
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import { cube } from "../../src/authoring/exampleWorlds";
+import { createPortalClipData } from "../../src/render/three/portalClipData";
+import { createPortalClipMaterialState } from "../../src/render/three/portalClipMaterial";
 import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
 import { floorLatticeUv } from "../../src/cell-complex/floorUv";
 import type { CellComplexSpec } from "../../src/cell-complex/specs";
@@ -117,6 +119,39 @@ describe("buildCellRenderArchetypes floor UV frames", () => {
       expect(uv.getY(i)).toBeCloseTo(t, 5);
     }
     disposeCellRenderArchetypes(archetypes);
+  });
+});
+
+describe("buildCellRenderArchetypes root mesh", () => {
+  it("gives every archetype a hidden root mesh with the shared geometry and an unpatched material", () => {
+    const world = compileCellComplex(cube);
+    const clipData = createPortalClipData({ maxVisiblePaths: 8 });
+    const archetypes = buildCellRenderArchetypes(world, {
+      debugLevel: "off",
+      portalPanelMode: "none",
+      eyeHeightMeters: 1.6,
+      assets: createPreparedAssets(),
+      capacitiesByCellId: new Map(),
+      portalClipMaterialState: createPortalClipMaterialState(clipData),
+    });
+
+    expect(archetypes.length).toBeGreaterThan(0);
+    for (const archetype of archetypes) {
+      const patchedMaterial = archetype.mesh.material as THREE.Material;
+      const rootMaterial = archetype.rootMesh.material as THREE.Material;
+
+      expect(archetype.rootMesh.visible).toBe(false);
+      expect(archetype.rootMesh.matrixAutoUpdate).toBe(false);
+      expect(archetype.rootMesh.frustumCulled).toBe(false);
+      expect(archetype.rootMesh.geometry).toBe(archetype.mesh.geometry);
+      expect(rootMaterial).not.toBe(patchedMaterial);
+      expect(patchedMaterial.customProgramCacheKey()).toContain("portal-clip-planes");
+      expect(rootMaterial.customProgramCacheKey()).not.toContain("portal-clip-planes");
+      expect(rootMaterial.customProgramCacheKey()).toBe(new (rootMaterial.constructor as new () => THREE.Material)().customProgramCacheKey());
+    }
+
+    disposeCellRenderArchetypes(archetypes);
+    clipData.dispose();
   });
 });
 

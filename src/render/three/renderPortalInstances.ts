@@ -9,7 +9,8 @@
  * `portalPathId` and `portalClipIndex`, the slot of the clip-plane texture (`portalClipData`) whose 4 world-space planes
  * the vertex shader (`portalClipMaterial`) evaluates to clip the instance to the path's visible region.
  *
- * Clip-index sentinels: `unclippedPortalClipIndex` (-2) marks the root instance (never clipped); -1 is only the
+ * When all eyes share one root, the depth-0 path is not an instance: the archetype's unpatched `rootMesh` draws it
+ * (`separateRoot`), keeping early depth rejection. Clip-index sentinels: `unclippedPortalClipIndex` (-2) marks the root instance (never clipped); -1 is only the
  * "unknown" default of a path missing from the slot map and is fully clipped. Callers never give a visible path -1:
  * `omitPathsWithoutClipSlot` removes the (impossible by construction) paths without a slot before instancing, so
  * they are not drawn at all. Instances beyond an
@@ -240,38 +241,64 @@ export function omitPathsWithoutClipSlot(
  * For archetype instance i: matrix = path.rootFromDestinationMatrix, `portalPathId` = path id, `portalClipIndex` =
  * -2 for depth 0 else `clipIndexByPathId.get(id) ?? -1`. Sets `mesh.count = min(paths, capacity)`, flags the GPU
  * buffers for upload, and records overflow in `diagnostics`. Allocation-free apart from the optional default map.
+ *
+ * With `options.separateRoot` a depth-0 path is not written as an instance: it is drawn by the archetype's unpatched
+ * `rootMesh` (shown with the path's matrix), so the unclipped root keeps early depth rejection even when clipping
+ * uses a fragment `discard`. Archetypes without a depth-0 path hide `rootMesh`.
  */
 export function updateCellRenderArchetypeInstances(
   archetypes: readonly CellRenderArchetype[],
   visiblePathsByDestinationCell: ReadonlyMap<string, readonly VisiblePortalPath[]>,
   diagnostics: PortalInstanceDiagnostics,
   clipIndexByPathId: ReadonlyMap<number, number> = new Map(),
+  options: { readonly separateRoot: boolean } = { separateRoot: false },
 ): void {
   for (const archetype of archetypes) {
     const paths = visiblePathsByDestinationCell.get(archetype.cellId) ?? [];
-    const count = Math.min(paths.length, archetype.capacity);
+    let requestedCount = 0;
+    let count = 0;
+    let rootPath: VisiblePortalPath | undefined;
 
     changes.matrix = false;
     changes.pathId = false;
     changes.clipIndex = false;
 
-    for (let index = 0; index < count; index += 1) {
-      const path = paths[index];
+    for (const path of paths) {
+      if (options.separateRoot && path.depth === 0) {
+        rootPath ??= path;
+        continue;
+      }
+
+      requestedCount += 1;
+
+      if (count >= archetype.capacity) {
+        continue;
+      }
+
       writeInstanceIfChanged(
         archetype,
-        index,
+        count,
         path.rootFromDestinationMatrix,
         path.pathId,
         path.depth === 0 ? unclippedPortalClipIndex : clipIndexByPathId.get(path.pathId) ?? -1,
       );
+      count += 1;
     }
 
     archetype.mesh.count = count;
     archetype.mesh.visible = count > 0;
     flagChangedBuffers(archetype, count);
 
-    if (paths.length > archetype.capacity) {
-      diagnostics.recordCapacityOverflow(archetype, paths.length);
+    if (rootPath) {
+      archetype.rootMesh.visible = true;
+      archetype.rootMesh.matrix.copy(rootPath.rootFromDestinationMatrix);
+      archetype.rootMesh.matrixWorldNeedsUpdate = true;
+    } else {
+      archetype.rootMesh.visible = false;
+    }
+
+    if (requestedCount > archetype.capacity) {
+      diagnostics.recordCapacityOverflow(archetype, requestedCount);
     }
   }
 }
@@ -496,11 +523,13 @@ export function createPortalInstanceRenderDebugState(
   },
 ): PortalInstanceRenderDebugState {
   const totalCapacity = archetypes.reduce((sum, archetype) => sum + archetype.capacity, 0);
-  const renderedInstanceCount = archetypes.reduce((sum, archetype) => sum + archetype.mesh.count, 0);
+  // The unclipped root drawn by an archetype's `rootMesh` counts as one rendered instance.
+  const drawnCount = (archetype: CellRenderArchetype): number => archetype.mesh.count + (archetype.rootMesh.visible ? 1 : 0);
+  const renderedInstanceCount = archetypes.reduce((sum, archetype) => sum + drawnCount(archetype), 0);
   const countsByCell = new Map<string, number>();
 
   for (const archetype of archetypes) {
-    countsByCell.set(archetype.cellId, (countsByCell.get(archetype.cellId) ?? 0) + archetype.mesh.count);
+    countsByCell.set(archetype.cellId, (countsByCell.get(archetype.cellId) ?? 0) + drawnCount(archetype));
   }
 
   for (const [cellId, paths] of visiblePathsByDestinationCell) {

@@ -370,7 +370,11 @@ its own funnel (`computeIndependentVisiblePortalPaths`); there is no cross-eye u
 cell, the matrix $M_p$ plus two attributes: the path id and a *clip index* (`-2` = unclipped root; otherwise the path's clip
 slot, `-1` only for a path missing from the slot map, which is fully clipped). A visible path that finds no slot is not
 instanced at all (`src/render/three/renderPortalInstances.ts#omitPathsWithoutClipSlot`); slots cover the union of all eyes,
-so this cannot happen in practice. Capacity of a cell archetype is the largest number of statically kept paths that end at it
+so this cannot happen in practice. When all eyes share one root (mono and shared-root stereo) the depth-0 path is not an
+instance: each archetype also owns a plain `rootMesh` with an unpatched material clone, which
+`updateCellRenderArchetypeInstances` shows with the root matrix, so the root cell is drawn without clipping code and keeps
+early depth rejection even in the fragment-discard mode (`src/render/three/cellRenderArchetypes.ts#buildCellRenderArchetypes`).
+Eyes rooted in different cells still draw the root as an instance with clip index $-2$. Capacity of a cell archetype is the largest number of statically kept paths that end at it
 over all roots (`src/render/three/cellRenderArchetypes.ts#deriveCellRenderArchetypeCapacities`).
 
 **Clipping on the GPU.** The visible region of each path is four half-spaces through the eye, so the GPU clips by four
