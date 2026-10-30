@@ -16,6 +16,9 @@ Job 26 was rewritten against commit `0b468e1`; the line numbers below are from 2
 decides: one-tick resolution without animation, corners as a new `geodesic-corner` anchor kind, deletion (with a notice)
 of free loops whose holonomy rotates.
 
+Job 26 Part E (2026-10-29) removed the eight skipped legacy tests of the emitter-connection / straightening model together with
+`legacyConnection.ts` (see the job's report and the acceptance criteria of job 33).
+
 ## Status update 2026-10-28
 
 Not started: there is no `src/world-objects/geodesics/` directory and no sleeve or funnel code. Curve shortening is

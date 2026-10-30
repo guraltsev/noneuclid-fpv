@@ -36,7 +36,6 @@ import {
 import { collectGeodesicPortalWord } from "../../world-objects/geodesic/segments";
 import {
   collectLockedIncidentGeodesicIdsForEmitter,
-  getGeodesicConnection,
   isGeodesicLocked,
   removeGeodesic,
   removeGeodesicCannonAndSegments,
@@ -44,7 +43,6 @@ import {
 } from "../../world-objects/geodesic/lifecycle";
 import { updateLockedGeodesicPortalWordForCarriedAnchorTraversals } from "../../world-objects/geodesic/intervals";
 import { tieAndDetachGeodesicEndpoints } from "../../world-objects/geodesic/curveShortening";
-import { hasStraighteningIncidentGeodesic, isGeodesicStraightening } from "../../world-objects/geodesic/legacyConnection";
 import {
   extendGeodesic,
   placeGeodesicCannonAtFloorPoint,
@@ -60,7 +58,7 @@ import {
   runtimeObjectToDynamicObjectState,
 } from "../../world-objects/runtimeObjectRegistry";
 import { AimTarget } from "./aimTarget";
-import { formatGeodesicPortalWord, reverseGeodesicPortalTraversal } from "./appDebugHelpers";
+import { formatGeodesicPortalWord } from "./appDebugHelpers";
 import {
   carriedGeodesicEmitterPoseToleranceMeters,
   createCarriedGeodesicCannonGlow,
@@ -175,30 +173,13 @@ export interface GeodesicCannonToolsDeps {
 }
 
 /**
- * Extends a carried connection's portal word by one crossing of the carried emitter.
- *
- * An `"incoming"` emitter is the end of the word, so the traversal is appended; an `"outgoing"` emitter is the start,
- * so the inverse traversal is prepended. Call once per crossing, in order, feeding the result into the next call.
- */
-export function applyCarriedPortalTransition(
-  word: readonly GeodesicPortalTraversal[],
-  transition: GeodesicPortalTraversal,
-  role: "incoming" | "outgoing",
-): readonly GeodesicPortalTraversal[] {
-  return role === "incoming"
-    ? [...word, transition]
-    : [reverseGeodesicPortalTraversal(transition), ...word];
-}
-
-/**
  * Creates the geodesic cannon tool controller and returns its operations.
  *
  * Entry points: `tryUseGeodesicCannonToolFromAim` (place a cannon, or add a geodesic to one, from an aim ray),
  * `tryExtendFocusedGeodesicFromAim`, `addGeodesicToCannon`, `deleteGeodesicFromCannon`, the mode starters
  * `startGeodesicCannonRotation`/`Aim`/`Carry`/`TieAndDetach`, the per-frame updaters
  * `updateActiveGeodesicCannonRotation`, `updateActiveGeodesicCannonAim`, and `updateCarriedGeodesicCannonPose`, and
- * `finishGeodesicCannonCarry`. Locked geodesics cannot be rotated or aimed, and cannons with a straightening incident
- * geodesic cannot be carried. Operations with missing or wrong-kind cannons close the menu and return
+ * `finishGeodesicCannonCarry`. Locked geodesics cannot be rotated or aimed. Operations with missing or wrong-kind cannons close the menu and return
  * without throwing. Placement helpers that need a horizontal facing silently do nothing when the aim ray is vertical.
  *
  * Lifecycle: the only owned GPU resource is the lazily created carried-emitter glow mesh, which is added to the
@@ -533,11 +514,6 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
   }
 
   function startGeodesicCannonCarry(cannonId: string, requestedGeodesicId?: string): void {
-    if (hasStraighteningIncidentGeodesic(runtimeObjectRegistry, cannonId)) {
-      syncDesktopPalette();
-      return;
-    }
-
     const cannon = prepareGeodesicCannonForLift(cannonId);
     if (cannon?.kind !== "geodesic-cannon") {
       deps.setMenuState(closeRuntimeMenu(deps.getMenuState()));
@@ -688,7 +664,6 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
   function canTieAndDetachGeodesicsFromCannon(cannonId: string): boolean {
     return getGeodesicEndpointAttachmentsForAnchor(runtimeObjectRegistry, cannonId)
       .filter((attachment) => isGeodesicLocked(runtimeObjectRegistry, attachment.geodesicId))
-      .filter((attachment) => !isGeodesicStraightening(runtimeObjectRegistry, attachment.geodesicId))
       .length >= 2;
   }
 
@@ -746,8 +721,7 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
 
   function resolveTieAndDetachEndpointFromAim(ray: RootAimRay, cannonId: string): GeodesicEndpointSelection | undefined {
     const selectable = getGeodesicEndpointAttachmentsForAnchor(runtimeObjectRegistry, cannonId)
-      .filter((attachment) => isGeodesicLocked(runtimeObjectRegistry, attachment.geodesicId))
-      .filter((attachment) => !isGeodesicStraightening(runtimeObjectRegistry, attachment.geodesicId));
+      .filter((attachment) => isGeodesicLocked(runtimeObjectRegistry, attachment.geodesicId));
     for (const target of resolveCurrentAimTargets(ray)) {
       if (!targetIsWithinInteractionRange(target)) {
         continue;
@@ -818,10 +792,6 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
   function prepareGeodesicCannonForLift(
     cannonId: string,
   ): Extract<RuntimeWorldObject, { readonly kind: "geodesic-cannon" }> | undefined {
-    if (hasStraighteningIncidentGeodesic(runtimeObjectRegistry, cannonId)) {
-      return undefined;
-    }
-
     const removed = removeUnlockedGeodesicsFromCannon(runtimeObjectRegistry, cannonId);
     if (removed.length > 0) {
       for (const geodesicId of removed) {
@@ -1005,49 +975,6 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
         });
       }
       return;
-    }
-
-    const connection = getGeodesicConnection(runtimeObjectRegistry, geodesicId);
-    const currentWord = deps.getCannonToolState().carryPortalWordsByGeodesicId?.[geodesicId] ??
-      (deps.getCannonToolState().activeGeodesicId === geodesicId
-        ? deps.getCannonToolState().carryPortalWord
-        : undefined) ??
-      collectGeodesicPortalWord(deps.getWorld(), runtimeObjectRegistry, geodesicId);
-    const role = connection?.incomingEmitterId === cannon.id
-      ? "incoming"
-      : connection?.outgoingEmitterId === cannon.id
-        ? "outgoing"
-        : undefined;
-    if (!role) {
-      return;
-    }
-    let nextWord = currentWord;
-    for (const transition of transitions) {
-      nextWord = applyCarriedPortalTransition(nextWord, transition, role);
-    }
-
-    deps.setCannonToolState({
-      ...deps.getCannonToolState(),
-      carryPortalWordsByGeodesicId: {
-        ...deps.getCannonToolState().carryPortalWordsByGeodesicId,
-        [geodesicId]: nextWord,
-      },
-      carryPortalWord: deps.getCannonToolState().activeGeodesicId === geodesicId
-        ? nextWord
-        : deps.getCannonToolState().carryPortalWord,
-      carryPortalTransitionSerial: finalSerial,
-      carryPortalTransitionSerialByGeodesicId: {
-        ...deps.getCannonToolState().carryPortalTransitionSerialByGeodesicId,
-        [geodesicId]: finalSerial,
-      },
-    });
-    if (deps.getDebugLevel() === "verbose") {
-      console.info("[noneuclid] carried geodesic portal word", {
-        geodesicId,
-        carriedEmitterId: cannon.id,
-        word: formatGeodesicPortalWord(nextWord),
-        transitions,
-      });
     }
   }
 

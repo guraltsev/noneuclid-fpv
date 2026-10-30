@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createRuntimeObjectRegistry } from "../.././../src/world-objects/runtimeObjectRegistry";
 import {
   createGeodesicCannonObject,
+  createGeodesicIntervalObject,
   geodesicRayBeamHeightMeters,
   minGeodesicSegmentLengthMeters,
 } from "../../../src/world-objects/geodesic/objects";
@@ -11,9 +12,9 @@ import {
   getGeodesicTail,
 } from "../../../src/world-objects/geodesic/segments";
 import {
-  connectGeodesicToEmitter,
   extendGeodesic,
   placeGeodesicCannonOnGeodesic,
+  rebuildConnectedGeodesicBetweenEmitters,
   rebuildGeodesicToLength,
   shootGeodesic,
 } from "../../../src/world-objects/geodesic/cannon";
@@ -308,28 +309,25 @@ describe("geodesic cannon world objects: cannon", () => {
   it("deleting a connected geodesic removes association from both emitters", () => {
     const world = compileLargeWorld();
     const registry = createRuntimeObjectRegistry();
-    const source = createGeodesicCannonObject({
+    registry.add(createGeodesicCannonObject({
       id: "cannon-a",
       cellId: "a",
-      activeGeodesicId: "g-a",
-      geodesicIds: ["g-a"],
-      geodesicEmitterYawRadiansById: { "g-a": 0 },
       localPose: yawRigidTransform3(0, { x: -1.5, y: 0, z: 0 }),
-    });
-    const incoming = createGeodesicCannonObject({
+    }));
+    registry.add(createGeodesicCannonObject({
       id: "cannon-b",
       cellId: "a",
       localPose: yawRigidTransform3(Math.PI, { x: 1, y: 0, z: 0 }),
-    });
-    registry.add(source);
-    registry.add(incoming);
-    connectGeodesicToEmitter({
-      world,
-      registry,
-      geodesicId: "g-a",
-      incomingEmitterId: "cannon-b",
-      totalLengthMeters: 2.3,
-    });
+    }));
+    registry.add(createGeodesicIntervalObject({
+      id: "g-a",
+      startAnchorObjectId: "cannon-a",
+      endAnchorObjectId: "cannon-b",
+      startCellId: "a",
+    }));
+    rebuildConnectedGeodesicBetweenEmitters({ world, registry, geodesicId: "g-a" });
+    expect(getCannonGeodesicIds(registry, "cannon-a")).toEqual(["g-a"]);
+    expect(getCannonGeodesicIds(registry, "cannon-b")).toEqual(["g-a"]);
 
     removeGeodesic(registry, "g-a");
 

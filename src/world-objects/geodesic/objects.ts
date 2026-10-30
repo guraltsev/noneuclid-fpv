@@ -55,8 +55,8 @@
  * keeps in line with the intervals.
  *
  * ## Legacy
- * The pre-interval model (emitter-to-emitter `geodesicConnectionsById`, `"straightening"` same-cell polylines, `tieAndDetachIncidentGeodesics`,
- * `advanceStraighteningGeodesics`) is still present in several functions; those parts are marked `Legacy:`.
+ * The pre-interval emitter-connection model was deleted (job 26). Its readers remain (`geodesicConnectionsById`, `GeodesicEmitterConnection`,
+ * `getGeodesicConnection`) and are marked `Legacy:`; the `"straightening"` connection state survives only as the display state of moving intervals.
  *
  * ## Constants
  * Meters unless stated. `GEODESIC_MIN_LENGTH_METERS` (0.15) minimum chord of a geodesic; `minGeodesicSegmentLengthMeters` (0.05) minimum
@@ -103,8 +103,8 @@ export interface GeodesicCannonObject extends RuntimeWorldObjectBase {
 /**
  * Legacy: connection record of the pre-interval model describing how a geodesic leaves and (maybe) re-enters emitters.
  *
- * In the current model this is derived from interval attachments by `getGeodesicConnection`; the stored `"straightening"`
- * state belongs to the retired same-cell straightening path (see `advanceStraighteningGeodesics`).
+ * In the current model this is derived from interval attachments by `getGeodesicConnection`; a stored `"straightening"`
+ * state belongs to the retired same-cell straightening path, which no longer exists.
  */
 export interface GeodesicEmitterConnection {
   readonly outgoingEmitterId: string;

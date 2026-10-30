@@ -5,7 +5,6 @@ import {
   resolveGeodesicCarryPortalTransitionFromMove,
   resolveGeodesicCarryPortalTransitionsFromCrossings,
 } from "../../src/render/three/geodesicCarryPortalTransition";
-import { applyCarriedPortalTransition } from "../../src/render/three/geodesicCannonTools";
 import type { SegmentWalkCrossing } from "../../src/cell-complex/segmentWalk";
 import { identityRigidTransform3 } from "../../src/math/rigidTransform3";
 
@@ -84,16 +83,4 @@ describe("geodesic carry portal transition", () => {
     expect(resolveGeodesicCarryPortalTransitionsFromCrossings([])).toEqual([]);
   });
 
-  it("extends a carried connection word once per crossing, in order", () => {
-    const [ab, bc] = resolveGeodesicCarryPortalTransitionsFromCrossings([
-      { sourceCellId: "a", portalId: "a-b", sourceSideIndex: 0, targetCellId: "b", targetPortalId: "b-a", targetSideIndex: 2, transformToTarget: identityRigidTransform3, tMeters: 1 },
-      { sourceCellId: "b", portalId: "b-c", sourceSideIndex: 0, targetCellId: "c", targetPortalId: "c-b", targetSideIndex: 2, transformToTarget: identityRigidTransform3, tMeters: 3 },
-    ]);
-
-    const incoming = applyCarriedPortalTransition(applyCarriedPortalTransition([], ab, "incoming"), bc, "incoming");
-    expect(incoming.map((t) => t.sourcePortalId)).toEqual(["a-b", "b-c"]);
-
-    const outgoing = applyCarriedPortalTransition(applyCarriedPortalTransition([], ab, "outgoing"), bc, "outgoing");
-    expect(outgoing.map((t) => t.sourcePortalId)).toEqual(["c-b", "b-a"]);
-  });
 });

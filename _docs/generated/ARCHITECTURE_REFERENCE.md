@@ -5,7 +5,7 @@
 
 This reference is produced from the source code. For the *meaning* of the modules — the mathematical model they implement — read [../MATHEMATICAL_MODEL.md](../MATHEMATICAL_MODEL.md) and [../ARCHITECTURE.md](../ARCHITECTURE.md). For every exported symbol see [API_REFERENCE.md](API_REFERENCE.md).
 
-**177 modules, 46,536 lines** under `src/`.
+**176 modules, 45,380 lines** under `src/`.
 
 ## Layers
 
@@ -17,12 +17,12 @@ A module belongs to the layer named by its first path segment under `src/`. "May
 | `cell-complex` | 14 | 3,760 | `math` | Prism-cell specs, compilation, portal transforms, portal-path tables, static visibility culling. |
 | `movement` | 10 | 1,645 | `math`, `cell-complex` | Player body, collision, movement and portal crossing in compiled cell complexes. |
 | `world-assets` | 1 | 201 | `cell-complex`, `glue` | Floor-texture and asset descriptors. |
-| `world-objects` | 24 | 9,824 | `math`, `cell-complex`, `movement`, `world-assets`, `glue` | Placeable runtime objects: registry, geodesic emitters, measurement tools, flags, creatures. |
+| `world-objects` | 23 | 8,741 | `math`, `cell-complex`, `movement`, `world-assets`, `glue` | Placeable runtime objects: registry, geodesic emitters, measurement tools, flags, creatures. |
 | `authoring` | 5 | 671 | `math`, `cell-complex`, `examples`, `world-assets`, `world-objects` | World builder DSL, world-script compiler, validation and world catalog. |
 | `runtime` | 10 | 2,681 | `math`, `cell-complex`, `movement`, `world-objects`, `authoring`, `ui`, `glue` | Runtime menu state, command dispatch, geometry session/worker and deformation families. |
 | `ui` | 6 | 1,274 | `math`, `cell-complex`, `runtime`, `world-objects`, `authoring`, `glue` | Renderer-neutral palette, help, tooltip and input-intent definitions. |
 | `glue` | 11 | 997 | `authoring`, `runtime`, `ui` | Launch options, debug settings, asset URLs, app configuration. |
-| `render` | 87 | 24,555 | anything | Three.js / DOM / WebXR rendering and input adapters (the application shell). |
+| `render` | 87 | 24,482 | anything | Three.js / DOM / WebXR rendering and input adapters (the application shell). |
 | `root` | 2 | 234 | anything | Entry point and application state. |
 
 ## Layer dependency graph
@@ -57,7 +57,7 @@ flowchart LR
   render -->|3| root
   render -->|22| runtime
   render -->|8| ui
-  render -->|69| world_objects
+  render -->|68| world_objects
   root -->|1| authoring
   root -->|3| cell_complex
   root -->|6| glue
@@ -72,8 +72,8 @@ flowchart LR
   ui -->|3| runtime
   ui -->|3| world_objects
   world_assets -->|1| cell_complex
-  world_objects -->|25| cell_complex
-  world_objects -->|37| math
+  world_objects -->|24| cell_complex
+  world_objects -->|35| math
   world_objects -->|12| movement
   world_objects -.->|9| render
   world_objects -.->|3| runtime
@@ -158,13 +158,12 @@ These imports break the intended layering. They are frozen in `scripts/docs/laye
 
 | Module | Lines | Summary | Imports |
 | --- | ---: | --- | --- |
-| `world-objects/geodesic/cannon.ts` | 795 | Emitter (cannon) operations: shooting, extending and re-aiming geodesics, connecting a geodesic to an emitter, rebuilding locked geodesics between emitters, and placing cannons on the floor, on a geodesic or at a geodes… | `cell-complex/compileCellComplex`, `math/rigidTransform3`, `math/vec3`, `movement/collision`, `world-objects/geodesic/endpoints`, `world-objects/geodesic/intersections`, `world-objects/geodesic/intervals`, `world-objects/geodesic/legacyConnection`, `world-objects/geodesic/lifecycle`, `world-objects/geodesic/objects`, `world-objects/geodesic/segments`, `world-objects/geodesic/trace`, `world-objects/runtimeObjectRegistry` |
+| `world-objects/geodesic/cannon.ts` | 758 | Emitter (cannon) operations: shooting, extending and re-aiming geodesics, connecting a geodesic to an emitter, rebuilding locked geodesics between emitters, and placing cannons on the floor, on a geodesic or at a geodes… | `cell-complex/compileCellComplex`, `math/rigidTransform3`, `math/vec3`, `movement/collision`, `world-objects/geodesic/endpoints`, `world-objects/geodesic/intersections`, `world-objects/geodesic/intervals`, `world-objects/geodesic/lifecycle`, `world-objects/geodesic/objects`, `world-objects/geodesic/segments`, `world-objects/geodesic/trace`, `world-objects/runtimeObjectRegistry` |
 | `world-objects/geodesic/curveShortening.ts` | 590 | Curve shortening: tie-and-detach of two endpoint roles into a curve-shortening pair, and its exact resolution in one tick. | `cell-complex/compileCellComplex`, `cell-complex/forbiddenZones`, `cell-complex/segmentWalk`, `math/rigidTransform3`, `math/vec2`, `math/vec3`, `world-objects/geodesic/endpoints`, `world-objects/geodesic/intersections`, `world-objects/geodesic/intervals`, `world-objects/geodesic/lifecycle`, `world-objects/geodesic/objects`, `world-objects/geodesic/portalWord`, `world-objects/geodesic/segments`, `world-objects/geodesic/sleeve`, `world-objects/runtimeObjectRegistry` |
 | `world-objects/geodesic/development.ts` | 21 | Development of portal words: inverse portal transforms, cached per compiled portal (a compiled world is immutable, so a WeakMap keyed by portal is always valid); pure. | `cell-complex/specs`, `math/rigidTransform3` |
 | `world-objects/geodesic/endpoints.ts` | 413 | Endpoint attachments of geodesic intervals: lookup by anchor, re-attachment, lifting the far endpoint into the source cell, word-against-cell-chain checks, and emitter cache cleanup. | `cell-complex/compileCellComplex`, `math/rigidTransform3`, `world-objects/geodesic/development`, `world-objects/geodesic/objects`, `world-objects/geodesic/portalWord`, `world-objects/runtimeObjectRegistry` |
 | `world-objects/geodesic/intersections.ts` | 328 | Geodesic intersection markers: crossings of segments in the same cell, stable marker identities between updates, and the per-registry marker memory. | `math/rigidTransform3`, `math/vec2`, `math/vec3`, `world-objects/geodesic/objects`, `world-objects/runtimeObjectRegistry` |
 | `world-objects/geodesic/intervals.ts` | 912 | Interval rebuilds: realizing an interval's lifted chord, aiming free geodesics, splitting at a segment hit, rebuilding locked intervals after a carried anchor moved, and side-effect-free previews. | `cell-complex/compileCellComplex`, `math/rigidTransform3`, `math/vec3`, `world-objects/geodesic/endpoints`, `world-objects/geodesic/intersections`, `world-objects/geodesic/objects`, `world-objects/geodesic/portalWord`, `world-objects/geodesic/segments`, `world-objects/geodesic/trace`, `world-objects/runtimeObjectRegistry` |
-| `world-objects/geodesic/legacyConnection.ts` | 1046 | Legacy: the retired emitter-connection and same-cell straightening model; only the importers listed in `scripts/docs/lib.mjs` (`moduleImportRules`) may import it, and job 26 deletes it. | `cell-complex/compileCellComplex`, `math/rigidTransform3`, `math/vec3`, `world-objects/geodesic/cannon`, `world-objects/geodesic/curveShortening`, `world-objects/geodesic/endpoints`, `world-objects/geodesic/intersections`, `world-objects/geodesic/lifecycle`, `world-objects/geodesic/objects`, `world-objects/geodesic/segments`, `world-objects/geodesic/trace`, `world-objects/runtimeObjectRegistry` |
 | `world-objects/geodesic/lifecycle.ts` | 169 | Queries whether a geodesic is locked or connected, and removal of geodesics and cannons together with their derived objects. | `world-objects/geodesic/endpoints`, `world-objects/geodesic/intersections`, `world-objects/geodesic/objects`, `world-objects/geodesic/segments`, `world-objects/runtimeObjectRegistry` |
 | `world-objects/geodesic/objects.ts` | 662 | Geodesic emitters ("cannons"), geodesic intervals and curve shortening on a glued cell complex. | `math/rigidTransform3`, `math/vec3`, `movement/dynamicObject`, `world-objects/geodesic/portalWord`, `world-objects/runtimeObjectRegistry` |
 | `world-objects/geodesic/portalWord.ts` | 184 | Portal-word algebra of geodesic intervals: reversal, free reduction, comparison, role-aware sub-words and the update of a word when an anchor crosses a portal; pure, no registry access. | `cell-complex/compileCellComplex`, `world-objects/geodesic/objects` |
@@ -265,7 +264,7 @@ These imports break the intended layering. They are frozen in `scripts/docs/laye
 | `render/three/frameErrorGuard.ts` | 102 | Error containment for the animation loop. | — |
 | `render/three/geodesicCannonAimTarget.ts` | 35 | Computes the yaw a geodesic cannon should adopt to face a target point. | `math/vec3` |
 | `render/three/geodesicCannonRenderer.ts` | 361 | Render sources and per-frame render records for geodesic cannons, geodesic segments and geodesic intersections. | `math/rigidTransform3`, `render/three/preloadWorldAssets`, `render/three/runtimeObjectRenderRecords`, `render/three/worldAxes`, `world-objects/geodesic/objects` |
-| `render/three/geodesicCannonTools.ts` | 1347 | Geodesic emitter (cannon) tools: place, rotate, aim, carry, tie-and-detach, and delete geodesics. | `cell-complex/compileCellComplex`, `cell-complex/segmentWalk`, `glue/debugLevels`, `math/rigidTransform3`, `math/vec3`, `movement/collision`, `movement/playerPose`, `render/three/aimInteraction`, `render/three/aimTarget`, `render/three/appDebugHelpers`, `render/three/carriedGeodesicCannon`, `render/three/desktopControls`, `render/three/geodesicCannonAimTarget`, `render/three/geodesicCarryPortalTransition`, `render/three/rootAimRay`, `render/three/runtimeSceneUtils`, `render/three/worldAxes`, `runtime/runtimeMenuState`, `world-objects/geodesic/cannon`, `world-objects/geodesic/curveShortening`, `world-objects/geodesic/endpoints`, `world-objects/geodesic/intersections`, `world-objects/geodesic/intervals`, `world-objects/geodesic/legacyConnection`, `world-objects/geodesic/lifecycle`, `world-objects/geodesic/objects`, `world-objects/geodesic/segments`, `world-objects/runtimeObjectRegistry` |
+| `render/three/geodesicCannonTools.ts` | 1274 | Geodesic emitter (cannon) tools: place, rotate, aim, carry, tie-and-detach, and delete geodesics. | `cell-complex/compileCellComplex`, `cell-complex/segmentWalk`, `glue/debugLevels`, `math/rigidTransform3`, `math/vec3`, `movement/collision`, `movement/playerPose`, `render/three/aimInteraction`, `render/three/aimTarget`, `render/three/appDebugHelpers`, `render/three/carriedGeodesicCannon`, `render/three/desktopControls`, `render/three/geodesicCannonAimTarget`, `render/three/geodesicCarryPortalTransition`, `render/three/rootAimRay`, `render/three/runtimeSceneUtils`, `render/three/worldAxes`, `runtime/runtimeMenuState`, `world-objects/geodesic/cannon`, `world-objects/geodesic/curveShortening`, `world-objects/geodesic/endpoints`, `world-objects/geodesic/intersections`, `world-objects/geodesic/intervals`, `world-objects/geodesic/lifecycle`, `world-objects/geodesic/objects`, `world-objects/geodesic/segments`, `world-objects/runtimeObjectRegistry` |
 | `render/three/geodesicCarryPortalTransition.ts` | 83 | Derives the portal-crossing record a carried geodesic cannon needs from a player move result. | `cell-complex/compileCellComplex`, `cell-complex/segmentWalk`, `movement/movePlayer`, `world-objects/geodesic/objects` |
 | `render/three/geodesicCreatureDebug.ts` | 257 | Consistency checker for geodesic creatures (marmot, mouse, butterfly) that produces a debug dump. | `cell-complex/compileCellComplex`, `movement/collision`, `render/three/worldAxes`, `world-objects/geodesicMarmot`, `world-objects/runtimeObjectRegistry`, `world-objects/simpleGeoCreature` |
 | `render/three/geodesicDebugDumps.ts` | 402 | Console debug dumps for geodesics and geodesic creatures, plus the periodic creature consistency check. | `cell-complex/compileCellComplex`, `glue/debugLevels`, `math/vec3`, `render/three/aimTarget`, `render/three/appDebugHelpers`, `render/three/carriedGeodesicCannon`, `render/three/geodesicCreatureDebug`, `runtime/runtimeMenuState`, `world-objects/geodesic/lifecycle`, `world-objects/geodesic/objects`, `world-objects/geodesic/segments`, `world-objects/geodesicMarmot`, `world-objects/runtimeObjectRegistry`, `world-objects/simpleGeoCreature` |

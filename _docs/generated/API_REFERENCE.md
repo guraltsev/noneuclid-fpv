@@ -542,22 +542,6 @@ Interval rebuilds: realizing an interval's lifted chord, aiming free geodesics, 
 | function | `previewRebuildGeodesicInterval` | Computes the segments an interval would have, without touching the registry (rollback-safe). |
 | function | `previewGeodesicIntervalHitsForbiddenZone` | Read-only: would the previewed interval hit a forbidden zone or be shorter than the minimum length? |
 
-### `world-objects/geodesic/legacyConnection.ts`
-
-Legacy: the retired emitter-connection and same-cell straightening model; only the importers listed in `scripts/docs/lib.mjs` (`moduleImportRules`) may import it, and job 26 deletes it.
-
-| Kind | Name | Summary |
-| --- | --- | --- |
-| interface | `TieAndDetachIncidentGeodesicsRequest` | Legacy: request for `tieAndDetachIncidentGeodesics`, the geodesic-id-keyed entry point kept for the retired straightening model. |
-| interface | `AdvanceStraighteningGeodesicsRequest` | Legacy: request for `advanceStraighteningGeodesics`; same shape as `AdvanceCurveShorteningPairsRequest` without the debug sink. |
-| const | `geodesicStraighteningSpeedMetersPerSecond` | Legacy: default speed (m/s) of the retired same-cell straightening model. |
-| function | `isGeodesicStraightening` | Legacy: true when the geodesic (or any segment) is in the retired `"straightening"` connection state. |
-| function | `hasStraighteningIncidentGeodesic` | Legacy: true when any geodesic incident on the emitter is in the retired straightening state. |
-| function | `tieAndDetachIncidentGeodesics` | Legacy entry point of tie-and-detach, keyed by geodesic ids; forwards to the endpoint-role API when it can. |
-| function | `advanceStraighteningGeodesics` | Legacy: advances curve-shortening pairs, and only if none changed, the retired same-cell straightening polylines. |
-| function | `markGeodesicConnected` | Records `"connected"` connection state on the source emitter's geodesic (legacy connection model). |
-| function | `rebuildLegacyConnectedGeodesic` | Legacy: rebuilds a non-interval connected geodesic between two emitters. |
-
 ### `world-objects/geodesic/lifecycle.ts`
 
 Queries whether a geodesic is locked or connected, and removal of geodesics and cannons together with their derived objects.
@@ -1669,7 +1653,6 @@ Geodesic emitter (cannon) tools: place, rotate, aim, carry, tie-and-detach, and 
 | --- | --- | --- |
 | interface | `GeodesicCannonToolState` | Editing state of the geodesic emitter (cannon) tools. |
 | interface | `GeodesicCannonToolsDeps` | Dependencies of the geodesic cannon tools, supplied by createThreeApp's shell. |
-| function | `applyCarriedPortalTransition` | Extends a carried connection's portal word by one crossing of the carried emitter. |
 | function | `createGeodesicCannonTools` | Creates the geodesic cannon tool controller and returns its operations. |
 
 ### `render/three/geodesicCarryPortalTransition.ts`

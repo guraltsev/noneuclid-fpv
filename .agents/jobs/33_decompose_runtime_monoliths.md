@@ -35,9 +35,15 @@ Still open:
   `syncLegacyEmitterGeodesicFields`. `geodesicCannonTools.ts` still filters
   with `isGeodesicStraightening` and guards with
   `hasStraighteningIncidentGeodesic`.
-- The eight skipped legacy tests are still skipped in
+- The eight skipped legacy tests were still skipped in
   `tests/world-objects/geodesicCannon.test.ts` (lines 621, 752, 836, 1600,
-  2361, 2406, 2445, 2497).
+  2361, 2406, 2445, 2497). Job 26 Part E deleted them together with
+  `legacyConnection.ts` and `tests/world-objects/geodesic/legacyConnection.test.ts`
+  (acceptance item below is met). `isGeodesicStraightening` and
+  `hasStraighteningIncidentGeodesic` are gone from `geodesicCannonTools.ts`;
+  `GeodesicEmitterConnection`, `getGeodesicConnection`, `geodesicConnectionsById`
+  and the segment `connectionState` (display state `"straightening"` of moving
+  intervals) remain for this job.
 - `createThreeApp.ts` still constructs `createDesktopFlagEditor` although
   nothing calls its `open()` (also listed in issue 41).
 - The `createThreeApp` split listed under Progress has not advanced, and no

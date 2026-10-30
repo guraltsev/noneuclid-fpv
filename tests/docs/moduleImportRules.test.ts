@@ -21,18 +21,22 @@ function modulesOf(...mods: FakeModule[]): Map<string, FakeModule> {
 }
 
 describe("module import rules", () => {
-  it("rejects importers of the legacy connection module that are not listed", async () => {
+  it("restricts what the pure sleeve module may import", async () => {
     const { moduleImportRuleViolations } = await loadLib();
-    const legacy = "world-objects/geodesic/legacyConnection.ts";
     const violations = moduleImportRuleViolations(
-      modulesOf(
-        { path: "a.ts", imports: [legacy] },
-        { path: "world-objects/geodesic/cannon.ts", imports: [legacy] },
-        { path: legacy, imports: [] },
-      ),
+      modulesOf({
+        path: "world-objects/geodesic/sleeve.ts",
+        imports: [
+          "math/vec2.ts",
+          "cell-complex/compileCellComplex.ts",
+          "world-objects/geodesic/objects.ts",
+          "world-objects/geodesic/development.ts",
+          "world-objects/geodesic/intervals.ts",
+        ],
+      }),
     );
     expect(violations).toHaveLength(1);
-    expect(violations[0]?.from).toBe("a.ts");
+    expect(violations[0]?.to).toBe("world-objects/geodesic/intervals.ts");
   });
 
   it("restricts what the pure portal-word module may import", async () => {

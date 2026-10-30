@@ -30,7 +30,7 @@ import {
 } from "./objects";
 import { findNearestEmitterHitOnTrace, traceGeodesicSegment } from "./trace";
 import { updateGeodesicIntersectionObjects } from "./intersections";
-import { findSourceEmitterForGeodesic, isAimableFreeGeodesic } from "./endpoints";
+import { isAimableFreeGeodesic } from "./endpoints";
 import {
   canConnectGeodesicSegmentAtDistance,
   distanceAlongSegment,
@@ -50,7 +50,6 @@ import {
   rebuildLockedGeodesicFromEndpointsAndPortalWord,
   splitGeodesicIntervalAtSegmentHit,
 } from "./intervals";
-import { markGeodesicConnected, rebuildLegacyConnectedGeodesic } from "./legacyConnection";
 
 /**
  * Input for `shootGeodesic`: aim a cannon's geodesic along the cannon's yaw and trace it for `maxLengthMeters`.
@@ -449,8 +448,7 @@ function resolveCannonForGeodesic(cannon: GeodesicCannonObject, geodesicId: stri
  *
  * Interval path: re-aims along the emitter tangent for `totalLengthMeters` with emitter connection enabled and only keeps the
  * result if the trace ends exactly at `incomingEmitterId` (otherwise the free geodesic is re-aimed but no connection is made;
- * the current segments are returned). Legacy: for non-interval geodesics it rebuilds the cannon's geodesic to the length,
- * forces the tail terminal to `emitter-hit` and marks the connection `"connected"`. Always returns the geodesic's segments
+ * the current segments are returned). A non-interval id changes nothing and returns its current segments. Always returns the geodesic's segments
  * (possibly empty); does not throw.
  */
 export function connectGeodesicToEmitter(
@@ -505,39 +503,6 @@ export function connectGeodesicToEmitter(
     return getGeodesicSegments(request.registry, request.geodesicId);
   }
 
-  const source = findSourceEmitterForGeodesic(request.registry, request.geodesicId);
-  if (!source || incoming?.kind !== "geodesic-cannon") {
-    return getGeodesicSegments(request.registry, request.geodesicId);
-  }
-
-  removeGeodesicSegments(request.registry, request.geodesicId);
-  const rebuilt = rebuildUnlockedGeodesicToLength({
-    world: request.world,
-    registry: request.registry,
-    cannon: source,
-    geodesicId: request.geodesicId,
-    totalLengthMeters: request.totalLengthMeters,
-  });
-  const tail = rebuilt.at(-1);
-  if (!tail) {
-    return rebuilt;
-  }
-
-  const adjustedTailLengthMeters = request.totalLengthMeters -
-    rebuilt.slice(0, -1).reduce((total, segment) => total + segment.lengthMeters, 0);
-  if (adjustedTailLengthMeters < minGeodesicSegmentLengthMeters - intersectionTolerance) {
-    removeGeodesicSegments(request.registry, request.geodesicId);
-    return [];
-  }
-
-  request.registry.update({
-    ...tail,
-    lengthMeters: adjustedTailLengthMeters,
-    terminal: { kind: "emitter-hit", emitterId: request.incomingEmitterId },
-    connectionState: "connected",
-  });
-  markGeodesicConnected(request.registry, request.geodesicId, source.id, request.incomingEmitterId);
-  updateGeodesicIntersectionObjects(request.registry);
   return getGeodesicSegments(request.registry, request.geodesicId);
 }
 
@@ -547,9 +512,7 @@ export function connectGeodesicToEmitter(
  * Interval path: delegates to `rebuildLockedGeodesicFromEndpointsAndPortalWord`. On failure the geodesic is deleted if the new chord
  * would hit a forbidden zone (checked read-only by `lockedIntervalRebuildHitsForbiddenZone`), kept as is when
  * `preserveGeodesicOnRebuildFailure`, and otherwise deleted. Returns the segments (empty when deleted).
- * Legacy: for non-interval connected geodesics the incoming emitter is unfolded into the source cell
- * (`unfoldIncomingEmitterPointToSourceCell`), the source is re-aimed at it, and the chord is retraced; a chord shorter
- * than `minGeodesicSegmentLengthMeters` deletes the geodesic unless an emitter is being carried (then the old segments stay).
+ * A non-interval id changes nothing and returns its current segments.
  */
 export function rebuildConnectedGeodesicBetweenEmitters(
   request: RebuildConnectedGeodesicBetweenEmittersRequest,
@@ -587,7 +550,7 @@ export function rebuildConnectedGeodesicBetweenEmitters(
     return result.segments;
   }
 
-  return rebuildLegacyConnectedGeodesic(request);
+  return getGeodesicSegments(request.registry, request.geodesicId);
 }
 
 // ---- Placing cannons on geodesics ----

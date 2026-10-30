@@ -267,11 +267,6 @@ export function layerViolations(modules) {
  */
 export const moduleImportRules = [
   {
-    module: "world-objects/geodesic/legacyConnection.ts",
-    allowedImporters: ["render/three/geodesicCannonTools.ts", "world-objects/geodesic/cannon.ts"],
-    reason: "retired geodesic connection model; job 26 deletes it - do not add importers",
-  },
-  {
     module: "world-objects/geodesic/portalWord.ts",
     mayImportOnly: ["math/", "cell-complex/", "world-objects/geodesic/objects.ts"],
     reason: "the portal-word algebra is pure and may only use math, cell-complex and the geodesic object types",
