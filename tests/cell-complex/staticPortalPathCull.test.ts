@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
 import { checkPortalPathString } from "../../src/cell-complex/portalPathDebug";
 import { buildPortalPathTables } from "../../src/cell-complex/portalPaths";
-import { buildStaticallyCulledPortalPathTables, staticallyCullPortalPathTables } from "../../src/cell-complex/staticPortalPathCull";
+import {
+  buildStaticallyCulledPortalPathTables,
+  staticallyCullPortalPathTables,
+  type StaticPortalPathRootStatus,
+} from "../../src/cell-complex/staticPortalPathCull";
 import { cube, dodecahedron } from "../../src/authoring/exampleWorlds";
 import { twoPrismLoop } from "../fixtures/twoPrismLoop";
 
@@ -147,7 +151,7 @@ describe("staticallyCullPortalPathTables", () => {
     expect(summary.rejectedPaths[0]?.details).toContain("static path budget");
   });
 
-  it("spends contextual path budget breadth-first", () => {
+  it("spends the path budget best-first by line measure", () => {
     const world = compileCellComplex(cube);
     const result = buildStaticallyCulledPortalPathTables(world, {
       maxDepth: 4,
@@ -159,40 +163,28 @@ describe("staticallyCullPortalPathTables", () => {
 
     expect(frontTable.paths.map((path) => path.depth)).toEqual([0, 1, 1, 1, 1]);
     expect(frontTable.paths.filter((path) => path.depth > 1)).toHaveLength(0);
-    expect(frontSummary.rejectedByReason.get("static-path-budget")).toBe(1);
+    // Each of the 4 kept depth-1 paths pushed 3 feasible depth-2 children, all cut by the budget.
+    expect(frontSummary.rejectedByReason.get("static-path-budget")).toBe(12);
   });
 
-  it("reports contextual path progress at the end of each depth", () => {
+  it("reports per-root progress", () => {
     const world = compileCellComplex(cube);
-    const statuses: {
-      readonly rootCellId: string;
-      readonly depth: number;
-      readonly processedPathCount: number;
-      readonly acceptedPathCount: number;
-      readonly rejectedPathCount: number;
-    }[] = [];
+    const statuses: StaticPortalPathRootStatus[] = [];
 
     buildStaticallyCulledPortalPathTables(world, {
       maxDepth: 2,
       toleranceMeters: 1e-6,
-      onDepthComplete(status) {
+      onRootComplete(status) {
         if (status.rootCellId === "front") {
           statuses.push(status);
         }
       },
     });
 
-    expect(statuses.map((status) => status.depth)).toEqual([0, 1, 2]);
-    expect(statuses[0]).toMatchObject({
-      processedPathCount: 1,
-      acceptedPathCount: 1,
-      rejectedPathCount: 0,
-    });
-    expect(statuses[1]).toMatchObject({
-      processedPathCount: 4,
-      acceptedPathCount: 4,
-      rejectedPathCount: 0,
-    });
+    expect(statuses).toHaveLength(1);
+    expect(statuses[0].keptPathCountByDepth).toEqual([1, 4, 12]);
+    expect(statuses[0].budgetExhausted).toBe(false);
+    expect(statuses[0].keptPathCount).toBe(17);
   });
 
   it("can apply static culling while expanding the path tree", () => {

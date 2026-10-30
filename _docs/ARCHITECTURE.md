@@ -41,7 +41,7 @@ See [Keeping the documentation true](#keeping-the-documentation-true).
 2. **Compilation** (`src/cell-complex/compileCellComplex.ts#compileCellComplex`) computes sides, inward normals, junction
    exclusion cylinders and the rigid gluing map of every portal. The result is immutable data.
 3. **Path tables** (`src/cell-complex/portalPaths.ts#buildPortalPathTables`) enumerate developing maps for every root cell;
-   `src/cell-complex/staticPortalPathCull.ts#buildStaticallyCulledPortalPathTables` prunes the impossible ones.
+   `src/cell-complex/staticPortalPathCull.ts#buildStaticallyCulledPortalPathTables` keeps exactly the words that some plan-view line can cross in order.
 4. **Simulation** is purely functional geometry: `src/movement/movePlayer.ts#movePlayer` for bodies,
    `src/world-objects/geodesic/trace.ts#traceGeodesicSegment` and friends for rays. Nothing in these modules knows about
    Three.js, the DOM or WebXR.

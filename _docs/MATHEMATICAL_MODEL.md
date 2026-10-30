@@ -131,27 +131,41 @@ bound (each `PortalRenderPath` stores its parent, its steps and both transforms,
 $D_{\text{child}}=g\circ D_{\text{parent}}$ via `composeRigidTransform3`). A step that immediately undoes the previous one
 (the reciprocal portal of the portal just used) is skipped when `skipImmediateReverse` is set. The number of paths
 grows like $(\deg-1)^{\text{depth}}$, so the table is pruned *statically* by
-`src/cell-complex/staticPortalPathCull.ts#buildStaticallyCulledPortalPathTables`. The cull is **intended** to discard a
-path only when no line of sight can run along it; what the code actually tests is:
+`src/cell-complex/staticPortalPathCull.ts#buildStaticallyCulledPortalPathTables`. The cull is **exact in plan view**: a
+word is kept if and only if some oriented plan-view line crosses its portals in order, each in the forward sense.
 
-1. **Aperture tests.** The destination prism's corners are mapped into each ancestor portal's frame. The path is rejected
-   if all corners lie behind an ancestor portal plane (`outside-ancestor-portal-plane`), or all lie below the floor or above
-   the ceiling (`outside-ancestor-vertical-range`). The slack is $\max(\texttt{toleranceMeters},\,r_{\text{junction}}/2)\ge 0.075$ m.
-2. **Plan-view transversal test** (words of three or more portals only; one- and two-portal words are never rejected by it).
-   Does a segment from a point $\tau$ on the first portal edge to a point $\sigma$ on the last one exist that meets every
-   intermediate portal edge (`no-static-line-transversal`)? It runs a conservative interval branch-and-bound first (at most
-   8 subdivisions, box diameter $10^{-3}$), then a projective stage: the map $(u,v)\mapsto(u/(u+v),\,1/(u+v))$ turns the
-   root and leaf edge lines into parallel lines, so orientation conditions become affine in $(\tau,\sigma)$ and feasibility
-   is a union of convex polygons, decided by convex clipping.
-3. **Budget.** At most `maxKeptPathsPerRoot` paths are kept per root (`static-path-budget`); this is the only rule that is
-   lossy by design.
+1. **Oriented constraints.** Develop each crossed portal side into the root's plan
+   (`src/cell-complex/orientedPortal.ts#developPortalSegment`): leaving a counterclockwise cell, the side's end vertex is
+   on the left and its start vertex on the right. An oriented line is a homogeneous triple $l=(a,b,c)$ with left side
+   $\{ax+by+c>0\}$. It crosses a portal $(L,R)$ forward iff $l\cdot(L,1)\ge 0$ and $l\cdot(R,1)\le 0$. Inside a convex cell
+   a line that enters through one side leaves through the next side it meets, so these $2k$ inequalities force the
+   crossings to happen in order. Any such line also passes through the root cell just before the first portal, so some eye
+   position sees along it; with equal cell heights every horizontal line at eye height passes every aperture, so the plan
+   test is exact in 3D.
+2. **The cone.** The admissible lines form a convex cone $K\subset\mathbb R^3$, stored by its extreme rays in cyclic order
+   (`src/cell-complex/staticLineCone.ts`). A child word adds two constraints, so its cone is the parent's clipped by two
+   half-spaces (Sutherland-Hodgman on the cyclic ray list, $O(|K|)$ per child). Depth-1 words are never rejected and carry no
+   cone; the depth-2 cone is found by enumerating the vertices of four half-spaces, which also handles portals sharing an
+   endpoint. Each segment is lengthened by `toleranceMeters` at both ends and a ray counts as inside a half-space up to
+   $10^{-12}$; both only enlarge $K$.
+3. **Rejection.** A word is rejected (`no-static-line-transversal`) when $K$ is empty or its Crofton measure $\mu(K)$ is
+   below $10^{-9}$ m. $\mu$ is the area of the image of $K$ in (normal angle $\theta$, offset $p$) coordinates, computed
+   exactly by Green's theorem over the faces of $K$; for two portals it is the crossed-strings length
+   $|L_1R_2|+|R_1L_2|-|L_1L_2|-|R_1R_2|$. The floor removes "touching" words, whose only transversals run along a cell edge
+   (for example `0 3 1` in the cube): their cone has measure zero but survives the tolerances as a numerical sliver, and
+   so would all their descendants. A set of lines of measure below $10^{-9}$ m is invisible from every eye position except a
+   cell corner, which lies inside a forbidden zone; genuine thin views (a one-pixel crack at depth 10) are about $10^{-6}$ m.
+4. **Budget.** At most `maxKeptPathsPerRoot` paths are kept per root (`static-path-budget`), the only rule that is lossy by
+   design. Expansion is best-first on $\mu(K)$ (a word's measure never exceeds its parent's, so parents come first), so the
+   budget drops the words with the fewest sight lines in every direction rather than a prefix of the portal order.
+   `paths` is therefore not ordered by depth.
 
 `src/cell-complex/staticPortalPathCull.ts#StaticPortalPathRejectReason` lists exactly the reasons the culler produces;
-`src/cell-complex/staticPortalPathCull.ts#staticallyCullPortalPathTables` also drops every descendant of a rejected path
-(with the parent's reason), so a kept path's parent is always kept. Two properties of the implementation weaken the "never removes a visible path" guarantee and are
-tracked in [Section 11](#11-assumptions-and-known-gaps): the aperture slack rejects *more* as it grows, and the projective
-stage does not test sight lines that cross the line sent to infinity. `buildStaticallyCulledPortalPathTables` gives kept paths new ids, so ids in its tables are sparse and differ from those of
-`buildPortalPathTables` (`staticallyCullPortalPathTables` keeps the original ids and drops every descendant of a rejected path).
+`src/cell-complex/staticPortalPathCull.ts#staticallyCullPortalPathTables` (used by tests and the path debugger) filters an
+existing table with the same test, keeps the original ids, applies its budget in table order and drops every descendant of
+a rejected path (with the parent's reason), so a kept path's parent is always kept. Every kept non-root path stores its
+newest portal developed into the root frame (`PortalRenderPath.newestPortalInRoot`). `buildStaticallyCulledPortalPathTables`
+gives kept paths new ids, so ids in its tables are sparse and differ from those of `buildPortalPathTables`.
 
 **Segment walk.** A straight segment from a point $A$ in the frame of its start cell with unit direction $d$ is the line $P(t)=A+t\,d$ in the developed frame of that cell; its piece in the $k$-th cell is $M_k(P(t))$ for $t\in[t_{\text{enter}},t_{\text{exit}}]$, where $M_k=g_k\circ\cdots\circ g_1$. In a convex cell the exit is the outgoing side ($\langle d_k,n_i\rangle<0$) with the smallest crossing parameter $t_i=d_i(A_k)/(-\langle d_k,n_i\rangle)$; the entry side is excluded by index. When two adjacent sides tie within $10^{-9}$ m the line passes through their shared vertex and the walk leaves through the side that *starts* at that vertex (the counterclockwise successor), which equals shifting the line infinitesimally to its left; the next cell may then be left at once, giving a zero-length piece. See [`src/cell-complex/segmentWalk.ts#walkDevelopedSegment`](../src/cell-complex/segmentWalk.ts) and, for the cell copies (each with its angular wedge) that a disk of radius $\rho$ overlaps, [`src/cell-complex/developedDisk.ts#collectDevelopedDisk`](../src/cell-complex/developedDisk.ts).
 
@@ -478,7 +492,10 @@ rather than discovered.
   carries the exclusion cylinder.
 - **Validation scope.** `validateCellComplexSpec` rejects shared portal sides, self-targeting portals, non-finite
   heights/vertices and unequal glued side lengths. Unequal cell heights across a portal are not rejected.
-- **Culling soundness.** See Section 4: the aperture slack and the projective stage can in principle cull a visible path.
+- **Culling soundness.** See Section 4: the static cull is exact in plan view (an oriented-line cone test). It ignores cell
+  heights, so with unequal heights across a portal it is conservative (the plan test is a necessary condition) and may
+  keep a word whose aperture is too low to see through. The only lossy rule is the per-root path budget, which is spent
+  best-first by line measure.
 - **Yaw conventions.** Rigid-transform yaw is $\operatorname{atan2}(R_{10},R_{00})$ and forward is $R e_y$. The marmot
   derives its yaw from its velocity as $\operatorname{atan2}(-v_x,v_y)$, so it walks along $v$. Geodesic cannon and
   protractor yaws are direction angles along $(\cos\psi,\sin\psi)$.

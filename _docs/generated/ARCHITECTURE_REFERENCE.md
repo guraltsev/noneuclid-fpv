@@ -5,7 +5,7 @@
 
 This reference is produced from the source code. For the *meaning* of the modules — the mathematical model they implement — read [../MATHEMATICAL_MODEL.md](../MATHEMATICAL_MODEL.md) and [../ARCHITECTURE.md](../ARCHITECTURE.md). For every exported symbol see [API_REFERENCE.md](API_REFERENCE.md).
 
-**183 modules, 47,024 lines** under `src/`.
+**183 modules, 45,699 lines** under `src/`.
 
 ## Layers
 
@@ -14,7 +14,7 @@ A module belongs to the layer named by its first path segment under `src/`. "May
 | Layer | Modules | Lines | May import | Purpose |
 | --- | ---: | ---: | --- | --- |
 | `math` | 7 | 694 | nothing | Vectors, rigid transforms, planes, polygons, tolerances. Pure; imports nothing. |
-| `cell-complex` | 16 | 4,333 | `math` | Prism-cell specs, compilation, portal transforms, portal-path tables, static visibility culling. |
+| `cell-complex` | 16 | 3,011 | `math` | Prism-cell specs, compilation, portal transforms, portal-path tables, static visibility culling. |
 | `movement` | 10 | 1,645 | `math`, `cell-complex` | Player body, collision, movement and portal crossing in compiled cell complexes. |
 | `world-assets` | 1 | 201 | `cell-complex`, `glue` | Floor-texture and asset descriptors. |
 | `world-objects` | 24 | 9,046 | `math`, `cell-complex`, `movement`, `world-assets`, `glue` | Placeable runtime objects: registry, geodesic emitters, measurement tools, flags, creatures. |
@@ -22,7 +22,7 @@ A module belongs to the layer named by its first path segment under `src/`. "May
 | `runtime` | 10 | 2,681 | `math`, `cell-complex`, `movement`, `world-objects`, `authoring`, `ui`, `glue` | Runtime menu state, command dispatch, geometry session/worker and deformation families. |
 | `ui` | 6 | 1,324 | `math`, `cell-complex`, `runtime`, `world-objects`, `authoring`, `glue` | Renderer-neutral palette, help, tooltip and input-intent definitions. |
 | `glue` | 11 | 997 | `authoring`, `runtime`, `ui` | Launch options, debug settings, asset URLs, app configuration. |
-| `render` | 91 | 25,198 | anything | Three.js / DOM / WebXR rendering and input adapters (the application shell). |
+| `render` | 91 | 25,195 | anything | Three.js / DOM / WebXR rendering and input adapters (the application shell). |
 | `root` | 2 | 234 | anything | Entry point and application state. |
 
 ## Layer dependency graph
@@ -45,7 +45,7 @@ flowchart LR
   authoring -->|6| cell_complex
   authoring -->|2| world_assets
   authoring -->|4| world_objects
-  cell_complex -->|19| math
+  cell_complex -->|18| math
   glue -->|2| authoring
   glue -->|3| runtime
   movement -->|11| cell_complex
@@ -132,7 +132,7 @@ These imports break the intended layering. They are frozen in `scripts/docs/laye
 | `cell-complex/segmentWalk.ts` | 286 | Shared segment-walk kernel: walks a straight segment, given in the frame of its start cell, through the glued convex cells. | `cell-complex/compileCellComplex`, `cell-complex/prismCells`, `cell-complex/specs`, `math/polygons`, `math/rigidTransform3`, `math/tolerances`, `math/vec3` |
 | `cell-complex/specs.ts` | 235 | Authoring-level data model for a cell complex: the plain-data spec that world files produce and the compiler consumes. | `math/rigidTransform3` |
 | `cell-complex/staticLineCone.ts` | 259 | Convex cones of oriented plan-view lines that cross a sequence of developed portals in order, in the forward sense. | `cell-complex/orientedPortal`, `math/vec3` |
-| `cell-complex/staticPortalPathCull.ts` | 1898 | Static, view-independent culling of portal-path tables: discards portal words through which no sight line from the root cell could reach the destination cell. | `cell-complex/compileCellComplex`, `cell-complex/forbiddenZones`, `cell-complex/orientedPortal`, `cell-complex/portalPaths`, `cell-complex/prismCells`, `cell-complex/specs`, `cell-complex/staticLineCone`, `math/rigidTransform3`, `math/vec3` |
+| `cell-complex/staticPortalPathCull.ts` | 576 | Static, view-independent culling of portal-path tables: discards portal words through which no sight line from the root cell could cross the portals in order. | `cell-complex/compileCellComplex`, `cell-complex/orientedPortal`, `cell-complex/portalPaths`, `cell-complex/specs`, `cell-complex/staticLineCone`, `math/rigidTransform3` |
 | `cell-complex/validateCellComplexSpec.ts` | 225 | Cell-complex spec validator: structural checks on a CellComplexSpec before it is compiled (authoring spec -> compiled complex stage). | `cell-complex/specs` |
 
 ### `movement`
@@ -283,7 +283,7 @@ These imports break the intended layering. They are frozen in `scripts/docs/laye
 | `render/three/portalClipData.ts` | 190 | CPU side of the per-path clip-polygon texture that lets the GPU clip each portal instance to its visible aperture. | `render/three/visiblePortalPaths` |
 | `render/three/portalClipMaterial.ts` | 381 | Patches Three.js materials so instanced portal geometry is clipped, per fragment, to its path's convex NDC polygon. | `render/three/portalClipData` |
 | `render/three/portalClipPolygonOverlay.ts` | 119 | Debug overlay that draws each visible portal path's NDC clip polygon as a labelled SVG polygon over the canvas. | `render/three/visiblePortalPaths` |
-| `render/three/portalDebugRuntime.ts` | 476 | Portal-path debug runtime: installs window.noneuclidPortalDebug, manages cell-path overlays and clip-polygon overlays, and feeds the on-screen debug overlay each frame. | `cell-complex/compileCellComplex`, `cell-complex/portalPathDebug`, `cell-complex/staticPortalPathCull`, `glue/debugLevels`, `glue/debugOptions`, `math/rigidTransform3`, `math/vec3`, `movement/playerPose`, `render/three/appDebugHelpers`, `render/three/appDebugLogging`, `render/three/debugOverlay`, `render/three/pathTraceOverlay`, `render/three/portalClipPolygonOverlay`, `render/three/portalInstanceDebug`, `render/three/renderPortalInstances`, `render/three/renderQuality`, `render/three/renderState`, `render/three/runtimeSceneUtils`, `render/three/visiblePortalPaths`, `render/three/worldAxes`, `runtime/runtimeMenuState`, `runtime/worldGeometrySession` |
+| `render/three/portalDebugRuntime.ts` | 473 | Portal-path debug runtime: installs window.noneuclidPortalDebug, manages cell-path overlays and clip-polygon overlays, and feeds the on-screen debug overlay each frame. | `cell-complex/compileCellComplex`, `cell-complex/portalPathDebug`, `cell-complex/staticPortalPathCull`, `glue/debugLevels`, `glue/debugOptions`, `math/rigidTransform3`, `math/vec3`, `movement/playerPose`, `render/three/appDebugHelpers`, `render/three/appDebugLogging`, `render/three/debugOverlay`, `render/three/pathTraceOverlay`, `render/three/portalClipPolygonOverlay`, `render/three/portalInstanceDebug`, `render/three/renderPortalInstances`, `render/three/renderQuality`, `render/three/renderState`, `render/three/runtimeSceneUtils`, `render/three/visiblePortalPaths`, `render/three/worldAxes`, `runtime/runtimeMenuState`, `runtime/worldGeometrySession` |
 | `render/three/portalEyeActivation.ts` | 76 | Selects the portal-clip eye and viewport once per rendered eye instead of once per mesh. | — |
 | `render/three/portalEyeFrameTransforms.ts` | 112 | Utilities for combining the per-eye visibility results of stereo (VR) rendering into one shared render frame. | `render/three/visiblePortalPaths`, `render/three/xrPortalEye` |
 | `render/three/portalInstanceDebug.ts` | 87 | Debug renderer that draws a single instance of a cell's archetypes at a chosen `rootFromDestination` matrix. | `render/three/cellRenderArchetypes`, `render/three/runtimeSceneUtils` |

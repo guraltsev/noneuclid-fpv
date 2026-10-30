@@ -145,21 +145,18 @@ export function createPortalDebugRuntime(deps: PortalDebugRuntimeDeps): PortalDe
         toleranceMeters: 1e-6,
         maxKeptPathsPerRoot: 50_000,
         keepRejectedPathDetails: true,
-        onDepthComplete(status) {
+        onRootComplete(status) {
           if (!portalPathDebugActive) {
             return;
           }
 
           console.info(
             [
-              "Portal path debug depth complete:",
+              "Portal path debug root complete:",
               `root=${status.rootCellId}`,
-              `depth=${status.depth}`,
-              `processed=${status.processedPathCount}`,
-              `accepted=${status.acceptedPathCount}`,
+              `kept=${status.keptPathCount}`,
               `rejected=${status.rejectedPathCount}`,
-              `keptTotal=${status.totalKeptPathCount}`,
-              `rejectedTotal=${status.totalRejectedPathCount}`,
+              `keptByDepth=${status.keptPathCountByDepth.join(",")}`,
               `budgetExhausted=${status.budgetExhausted}`,
             ].join(" "),
           );

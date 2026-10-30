@@ -303,20 +303,19 @@ Convex cones of oriented plan-view lines that cross a sequence of developed port
 
 ### `cell-complex/staticPortalPathCull.ts`
 
-Static, view-independent culling of portal-path tables: discards portal words through which no sight line from the root cell could reach the destination cell.
+Static, view-independent culling of portal-path tables: discards portal words through which no sight line from the root cell could cross the portals in order.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
 | interface | `StaticPortalPathCullOptions` | Tuning for static path culling. |
 | interface | `BuildStaticallyCulledPortalPathTablesOptions` | Options for {@link buildStaticallyCulledPortalPathTables}: the culling options plus the path-generation limits and a progress callback. |
-| interface | `StaticPortalPathDepthStatus` | Progress report for one root cell after finishing one depth level of the culled expansion. |
+| interface | `StaticPortalPathRootStatus` | Progress report for one root cell after the culled expansion finished. |
 | interface | `StaticPortalPathCullResult` | Culled tables and per-root summaries produced by static culling. |
 | interface | `StaticPortalPathCullSummary` | Per-root statistics of a culling run. |
 | type | `StaticPortalPathRejectReason` | Why a path was removed. |
 | interface | `RejectedPortalRenderPath` | Record of one rejected path: its id, the rejection reason and optional explanatory text. |
-| function | `buildStaticallyCulledPortalPathTables` | Generates portal-path tables breadth-first while culling by oriented line cones, so descendants of rejected paths are never created. |
-| function | `buildStaticallyCulledPortalPathTablesLegacy` | Legacy tau/sigma builder, kept temporarily for the old-versus-new comparison test. |
-| function | `staticallyCullPortalPathTables` | Filters existing portal-path tables, keeping each path only if it passes all geometric tests, preserving the original path ids. |
+| function | `buildStaticallyCulledPortalPathTables` | Generates portal-path tables while culling by oriented line cones, so descendants of rejected paths are never created. |
+| function | `staticallyCullPortalPathTables` | Filters existing portal-path tables, keeping each path only if its word passes the line-cone test, preserving the original path ids. |
 
 ### `cell-complex/validateCellComplexSpec.ts`
 
