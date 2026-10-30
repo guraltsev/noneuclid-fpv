@@ -15,7 +15,6 @@ import {
   type GeodesicPortalTraversal,
   getAnchorBeamPoint,
   intersectionTolerance,
-  isGeodesicIntervalObject,
   type LiftedGeodesicEndpoint,
 } from "./objects";
 import { reverseGeodesicPortalWord } from "./portalWord";
@@ -32,8 +31,7 @@ export function getGeodesicEndpointAttachmentsForAnchor(
   registry: RuntimeObjectRegistry,
   anchorObjectId: string,
 ): readonly GeodesicEndpointAttachment[] {
-  return registry.getAll()
-    .filter(isGeodesicIntervalObject)
+  return registry.getObjectsOfKind("geodesic-interval")
     .flatMap((interval) => [interval.start, interval.end])
     .filter((attachment) => attachment.anchorObjectId === anchorObjectId);
 }
@@ -299,8 +297,11 @@ export function isAimableFreeGeodesic(registry: RuntimeObjectRegistry, interval:
 
 /** Removes free-end and polygon-corner anchors that no interval attaches to any more. */
 export function removeUnusedFreeGeodesicEnds(registry: RuntimeObjectRegistry): void {
-  for (const object of registry.getAll()) {
-    if ((object.kind === "free-geodesic-end" || object.kind === "geodesic-corner") &&getGeodesicEndpointAttachmentsForAnchor(registry, object.id).length === 0) {
+  for (const object of [
+    ...registry.getObjectsOfKind("free-geodesic-end"),
+    ...registry.getObjectsOfKind("geodesic-corner"),
+  ]) {
+    if (getGeodesicEndpointAttachmentsForAnchor(registry, object.id).length === 0) {
       registry.remove(object.id);
     }
   }
@@ -326,10 +327,7 @@ export function collectIncidentGeodesicIdsForEmitter(
     }
   }
 
-  for (const object of registry.getAll()) {
-    if (object.kind !== "geodesic-cannon") {
-      continue;
-    }
+  for (const object of registry.getObjectsOfKind("geodesic-cannon")) {
     for (const [geodesicId, connection] of Object.entries(object.geodesicConnectionsById ?? {})) {
       if (connection.outgoingEmitterId === emitterId || connection.incomingEmitterId === emitterId) {
         ids.add(geodesicId);
@@ -342,10 +340,7 @@ export function collectIncidentGeodesicIdsForEmitter(
 
 /** Removes a geodesic id from the caches of every emitter. */
 export function removeGeodesicAssociations(registry: RuntimeObjectRegistry, geodesicId: string): void {
-  for (const object of registry.getAll()) {
-    if (object.kind !== "geodesic-cannon") {
-      continue;
-    }
+  for (const object of registry.getObjectsOfKind("geodesic-cannon")) {
     removeGeodesicAssociationFromEmitter(registry, object.id, geodesicId);
   }
 }
@@ -390,23 +385,17 @@ export function findSourceEmitterForGeodesic(
   registry: RuntimeObjectRegistry,
   geodesicId: string,
 ): GeodesicCannonObject | undefined {
-  for (const object of registry.getAll()) {
-    if (object.kind !== "geodesic-cannon") {
-      continue;
-    }
+  const cannons = registry.getObjectsOfKind("geodesic-cannon");
+  for (const object of cannons) {
     const connection = object.geodesicConnectionsById?.[geodesicId];
     if (connection?.outgoingEmitterId === object.id) {
       return object;
     }
   }
 
-  return registry.getAll().find((object): object is GeodesicCannonObject =>
-    object.kind === "geodesic-cannon" &&
+  return cannons.find((object) =>
     object.geodesicIds.includes(geodesicId) &&
     object.geodesicEmitterYawRadiansById?.[geodesicId] !== undefined
-  ) ?? registry.getAll().find((object): object is GeodesicCannonObject =>
-    object.kind === "geodesic-cannon" && object.activeGeodesicId === geodesicId
-  ) ?? registry.getAll().find((object): object is GeodesicCannonObject =>
-    object.kind === "geodesic-cannon" && object.geodesicIds.includes(geodesicId)
-  );
+  ) ?? cannons.find((object) => object.activeGeodesicId === geodesicId) ??
+    cannons.find((object) => object.geodesicIds.includes(geodesicId));
 }

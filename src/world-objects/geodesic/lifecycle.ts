@@ -43,11 +43,7 @@ export function getGeodesicConnection(
     }
   }
 
-  for (const object of registry.getAll()) {
-    if (object.kind !== "geodesic-cannon") {
-      continue;
-    }
-
+  for (const object of registry.getObjectsOfKind("geodesic-cannon")) {
     const connection = object.geodesicConnectionsById?.[geodesicId];
     if (connection) {
       return connection;
@@ -148,9 +144,8 @@ export function removeGeodesicCannonAndSegments(registry: RuntimeObjectRegistry,
       removeGeodesic(registry, geodesicId);
     }
   }
-  for (const object of registry.getAll()) {
+  for (const object of registry.getObjectsOfKind("geodesic-cannon")) {
     if (
-      object.kind === "geodesic-cannon" &&
       object.id !== cannonId &&
       object.geodesicIds.some((geodesicId) =>
         getGeodesicConnection(registry, geodesicId)?.incomingEmitterId === cannonId

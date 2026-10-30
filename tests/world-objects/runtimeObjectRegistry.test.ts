@@ -7,6 +7,7 @@ import {
   type RuntimeCreatureObject,
 } from "../../src/world-objects/runtimeObjectRegistry";
 import type { GeodesicCannonObject } from "../../src/world-objects/geodesic/objects";
+import { createSegment } from "./geodesic/fixtures";
 import { userObjectClass } from "../../src/world-objects/library";
 
 function creature(id: string, cellId: string, extra: Partial<RuntimeCreatureObject> = {}): RuntimeCreatureObject {
@@ -184,5 +185,49 @@ describe("runtimeObjectRegistry", () => {
     registry.releaseOwnership("mouse-a");
     registry.update(creature("mouse-a", "cell-c"));
     expect(registry.get("mouse-a")!.cellId).toBe("cell-c");
+  });
+
+  it("indexes objects by kind and segments by geodesic", () => {
+    const segment = (id: string, geodesicId: string, segmentIndex: number) =>
+      createSegment({ id, geodesicId, segmentIndex });
+    const registry = createRuntimeObjectRegistry([
+      emitter("e1", "a"),
+      segment("s1", "g1", 0),
+      creature("mouse-a", "a"),
+      segment("s2", "g1", 1),
+      emitter("e2", "a"),
+      segment("s3", "g2", 0),
+    ]);
+
+    expect(registry.getObjectsOfKind("geodesic-cannon").map((object) => object.id)).toEqual(["e1", "e2"]);
+    expect(registry.getSegmentsOfGeodesic("g1").map((object) => object.id).sort()).toEqual(["s1", "s2"]);
+    expect(registry.getObjectsOfKind("asset")).toEqual([]);
+    expect(registry.getSegmentsOfGeodesic("unknown")).toEqual([]);
+
+    registry.update(segment("s1", "g2", 1));
+    expect(registry.getSegmentsOfGeodesic("g1").map((object) => object.id)).toEqual(["s2"]);
+    expect(registry.getSegmentsOfGeodesic("g2").map((object) => object.id).sort()).toEqual(["s1", "s3"]);
+
+    registry.remove("s1");
+    expect(registry.getSegmentsOfGeodesic("g2").map((object) => object.id)).toEqual(["s3"]);
+    expect(registry.getObjectsOfKind("geodesic-segment").map((object) => object.id).sort()).toEqual(["s2", "s3"]);
+
+    registry.moveToCell("e1", "b");
+    registry.moveToCell("s2", "b");
+    expect(registry.getObjectsOfKind("geodesic-cannon").map((object) => object.id)).toEqual(["e1", "e2"]);
+    expect(registry.getSegmentsOfGeodesic("g1").map((object) => object.cellId)).toEqual(["b"]);
+  });
+
+  it("an ownership publisher re-indexes the same way as update", () => {
+    const registry = createRuntimeObjectRegistry([creature("mouse-a", "cell-a"), emitter("e1", "cell-a")]);
+    const publish = registry.claimOwnership("mouse-a");
+
+    publish(creature("mouse-a", "cell-b"));
+    publish({ ...creature("mouse-a", "cell-b"), kind: "geo-butterfly" });
+
+    expect(registry.getObjectsInCell("cell-a").map((object) => object.id)).toEqual(["e1"]);
+    expect(registry.getObjectsInCell("cell-b").map((object) => object.id)).toEqual(["mouse-a"]);
+    expect(registry.getObjectsOfKind("geo-mouse")).toEqual([]);
+    expect(registry.getObjectsOfKind("geo-butterfly").map((object) => object.id)).toEqual(["mouse-a"]);
   });
 });

@@ -11,7 +11,6 @@ import {
   type GeodesicSegmentObject,
   getGeodesicSegmentEnd,
   intersectionTolerance,
-  isGeodesicSegmentObject,
 } from "./objects";
 
 /** Maximum distance (meters) between two geodesic points for them to count as one vertex when placing at a vertex; deliberately generous. */
@@ -39,11 +38,9 @@ const geodesicIntersectionMemoryByRegistry = new WeakMap<RuntimeObjectRegistry, 
 export function updateGeodesicIntersectionObjects(registry: RuntimeObjectRegistry): readonly GeodesicIntersectionObject[] {
   const memory = getGeodesicIntersectionMemory(registry);
   const previous = new Map(memory);
-  for (const object of registry.getAll()) {
-    if (object.kind === "geodesic-intersection") {
-      previous.set(object.id, object);
-      registry.remove(object.id);
-    }
+  for (const object of registry.getObjectsOfKind("geodesic-intersection")) {
+    previous.set(object.id, object);
+    registry.remove(object.id);
   }
 
   const intersections = assignGeodesicIntersectionIdentities(findGeodesicIntersections(registry), previous);
@@ -89,7 +86,7 @@ export function pruneMissingGeodesicIntersectionObjects(registry: RuntimeObjectR
 // a crossing at an emitter is dropped, and duplicates (same rounded point and geodesic pair) are removed. Segments in different cells
 // never intersect here, even if they are adjacent through a portal.
 function findGeodesicIntersections(registry: RuntimeObjectRegistry): readonly GeodesicIntersectionObject[] {
-  const segments = registry.getAll().filter(isGeodesicSegmentObject);
+  const segments = registry.getObjectsOfKind("geodesic-segment");
   const intersections: GeodesicIntersectionObject[] = [];
   const seenKeys = new Set<string>();
   const lastSegmentIndexByGeodesic = new Map<string, number>();

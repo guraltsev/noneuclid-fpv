@@ -33,7 +33,7 @@ import {
   getGeodesicEndpointAttachmentsForAnchor,
   resolveGeodesicEndpointSelectionFromSegmentHit,
 } from "../../world-objects/geodesic/endpoints";
-import { collectGeodesicPortalWord } from "../../world-objects/geodesic/segments";
+import { collectGeodesicPortalWord, getGeodesicSegments } from "../../world-objects/geodesic/segments";
 import {
   collectLockedIncidentGeodesicIdsForEmitter,
   isGeodesicLocked,
@@ -767,11 +767,7 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
   }
 
   function syncTieAndDetachSelectionHighlights(selectedEndpoints: readonly GeodesicEndpointSelection[]): void {
-    for (const object of runtimeObjectRegistry.getAll()) {
-      if (object.kind !== "geodesic-segment") {
-        continue;
-      }
-
+    for (const object of runtimeObjectRegistry.getObjectsOfKind("geodesic-segment")) {
       const endpoint = resolveGeodesicEndpointSelectionFromSegmentHit(runtimeObjectRegistry, object.id);
       const nextHighlightState = endpoint && selectedEndpoints.some((selection) =>
         selection.geodesicId === endpoint.geodesicId && selection.role === endpoint.role
@@ -1046,10 +1042,7 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
       }
     }
 
-    for (const object of runtimeObjectRegistry.getAll()) {
-      if (object.kind !== "geodesic-cannon") {
-        continue;
-      }
+    for (const object of runtimeObjectRegistry.getObjectsOfKind("geodesic-cannon")) {
       for (const [geodesicId, connection] of Object.entries(object.geodesicConnectionsById ?? {})) {
         if (connection.outgoingEmitterId === cannonId || connection.incomingEmitterId === cannonId) {
           ids.add(geodesicId);
@@ -1222,10 +1215,7 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
   }
 
   function getGeodesicTotalLengthMeters(geodesicId: string): number {
-    return runtimeObjectRegistry.getAll()
-      .filter((object): object is Extract<RuntimeWorldObject, { readonly kind: "geodesic-segment" }> =>
-        object.kind === "geodesic-segment" && object.geodesicId === geodesicId
-      )
+    return getGeodesicSegments(runtimeObjectRegistry, geodesicId)
       .reduce((total, segment) => total + segment.lengthMeters, 0);
   }
 

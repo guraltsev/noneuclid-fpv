@@ -34,7 +34,6 @@ import {
   getAnchorBeamPoint,
   getGeodesicCannonEmitterPoint,
   getOppositeEndRole,
-  isCurveShorteningPairObject,
 } from "./objects";
 import {
   getPortalWordBetweenEndpointRoles,
@@ -193,7 +192,7 @@ export function advanceCurveShorteningPairs(
     return [];
   }
   const changed: string[] = [];
-  for (const pair of request.registry.getAll().filter(isCurveShorteningPairObject)) {
+  for (const pair of request.registry.getObjectsOfKind("curve-shortening-pair")) {
     if (pair.state !== "moving" || request.registry.get(pair.id)?.kind !== "curve-shortening-pair") {
       continue;
     }
@@ -228,8 +227,7 @@ function findEquivalentStableInterval(
   excludedIds: readonly string[],
 ): GeodesicIntervalObject | undefined {
   const reversedCandidateWord = reverseGeodesicPortalWord(candidate.portalWord);
-  return registry.getAll().find((object): object is GeodesicIntervalObject =>
-    object.kind === "geodesic-interval" &&
+  return registry.getObjectsOfKind("geodesic-interval").find((object) =>
     object.motionState === "stable" &&
     isGeodesicLocked(registry, object.id) &&
     !excludedIds.includes(object.id) &&

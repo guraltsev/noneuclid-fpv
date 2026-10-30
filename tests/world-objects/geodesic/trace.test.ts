@@ -13,7 +13,7 @@ import {
   resolveGeodesicEndpointSelectionFromSegmentHit,
 } from "../../../src/world-objects/geodesic/endpoints";
 import { getGeodesicSegments, resolveGeodesicNumber } from "../../../src/world-objects/geodesic/segments";
-import { removeUnlockedGeodesicsFromCannon } from "../../../src/world-objects/geodesic/lifecycle";
+import { removeGeodesic, removeUnlockedGeodesicsFromCannon } from "../../../src/world-objects/geodesic/lifecycle";
 import { traceGeodesicSegment } from "../../../src/world-objects/geodesic/trace";
 import { yawRigidTransform3 } from "../.././../src/math/rigidTransform3";
 import {
@@ -152,6 +152,35 @@ describe("geodesic cannon world objects: trace", () => {
 
     expect(resolveGeodesicNumber(registry, "g-b")).toBe(2);
     expect(resolveGeodesicNumber(registry, "g-c")).toBe(1);
+  });
+
+  it("keeps the display number of a rebuilt geodesic and reuses the lowest free number for a new one", () => {
+    const world = compileLargeWorld();
+    const registry = createRuntimeObjectRegistry();
+    registry.add(createGeodesicCannonObject({
+      id: "cannon-a",
+      cellId: "a",
+      localPose: yawRigidTransform3(0, { x: -1.5, y: 0, z: 0 }),
+    }));
+    const currentCannon = () => {
+      const cannon = registry.get("cannon-a");
+      if (cannon?.kind !== "geodesic-cannon") {
+        throw new Error("Expected geodesic cannon.");
+      }
+      return cannon;
+    };
+    for (const geodesicId of ["g-a", "g-b", "g-c"]) {
+      shootGeodesic({ world, registry, cannon: currentCannon(), geodesicId });
+    }
+    expect(["g-a", "g-b", "g-c"].map((id) => resolveGeodesicNumber(registry, id))).toEqual([1, 2, 3]);
+
+    removeGeodesic(registry, "g-a");
+    rebuildGeodesicToLength({ world, registry, cannon: currentCannon(), geodesicId: "g-c", totalLengthMeters: 2 });
+
+    expect(resolveGeodesicNumber(registry, "g-c")).toBe(3);
+    expect(getGeodesicSegments(registry, "g-c").every((segment) => segment.geodesicNumber === 3)).toBe(true);
+    const fourth = shootGeodesic({ world, registry, cannon: currentCannon(), geodesicId: "g-d" });
+    expect(fourth.geodesicNumber).toBe(1);
   });
 
   it("starts the first ray segment at the visual laser emitter", () => {

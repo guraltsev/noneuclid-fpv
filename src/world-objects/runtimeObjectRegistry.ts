@@ -154,6 +154,10 @@ export interface RuntimeObjectRegistry {
   getTooltipObjectsInCell(cellId: string): readonly RuntimeWorldObject[];
   /** Every registered object across all cells. */
   getAll(): readonly RuntimeWorldObject[];
+  /** Objects of one kind, in insertion order (a fresh array). */
+  getObjectsOfKind<K extends RuntimeWorldObject["kind"]>(kind: K): readonly (RuntimeWorldObject & { readonly kind: K })[];
+  /** The derived segments whose `geodesicId` is `geodesicId`, unsorted (a fresh array). */
+  getSegmentsOfGeodesic(geodesicId: string): readonly GeodesicSegmentObject[];
 }
 
 /**
@@ -183,6 +187,40 @@ export function createRuntimeObjectRegistry(
     }
   }
 
+  const objectIdsByKind = new Map<string, Set<string>>();
+  const segmentIdsByGeodesicId = new Map<string, Set<string>>();
+
+  function addToIndex(index: Map<string, Set<string>>, key: string, id: string): void {
+    let ids = index.get(key);
+    if (!ids) {
+      ids = new Set<string>();
+      index.set(key, ids);
+    }
+    ids.add(id);
+  }
+
+  function removeFromIndex(index: Map<string, Set<string>>, key: string, id: string): void {
+    const ids = index.get(key);
+    ids?.delete(id);
+    if (ids?.size === 0) {
+      index.delete(key);
+    }
+  }
+
+  function indexKinds(object: RuntimeWorldObject): void {
+    addToIndex(objectIdsByKind, object.kind, object.id);
+    if (object.kind === "geodesic-segment") {
+      addToIndex(segmentIdsByGeodesicId, object.geodesicId, object.id);
+    }
+  }
+
+  function unindexKinds(object: RuntimeWorldObject): void {
+    removeFromIndex(objectIdsByKind, object.kind, object.id);
+    if (object.kind === "geodesic-segment") {
+      removeFromIndex(segmentIdsByGeodesicId, object.geodesicId, object.id);
+    }
+  }
+
   const ownedIds = new Set<string>();
 
   function ownedError(id: string): Error {
@@ -196,6 +234,13 @@ export function createRuntimeObjectRegistry(
       indexObject(next);
     }
 
+    const previousGeodesicId = previous.kind === "geodesic-segment" ? previous.geodesicId : undefined;
+    const nextGeodesicId = next.kind === "geodesic-segment" ? next.geodesicId : undefined;
+    if (previous.kind !== next.kind || previousGeodesicId !== nextGeodesicId) {
+      unindexKinds(previous);
+      indexKinds(next);
+    }
+
     objectsById.set(next.id, next);
   }
 
@@ -207,6 +252,7 @@ export function createRuntimeObjectRegistry(
 
       objectsById.set(object.id, object);
       indexObject(object);
+      indexKinds(object);
     },
     update(object) {
       if (ownedIds.has(object.id)) {
@@ -231,6 +277,7 @@ export function createRuntimeObjectRegistry(
       }
 
       unindexObject(object);
+      unindexKinds(object);
       objectsById.delete(id);
     },
     claimOwnership(id) {
@@ -298,6 +345,16 @@ export function createRuntimeObjectRegistry(
     },
     getAll() {
       return [...objectsById.values()];
+    },
+    getObjectsOfKind<K extends RuntimeWorldObject["kind"]>(kind: K) {
+      return [...(objectIdsByKind.get(kind) ?? [])]
+        .map((id) => objectsById.get(id))
+        .filter((object): object is RuntimeWorldObject & { readonly kind: K } => object !== undefined);
+    },
+    getSegmentsOfGeodesic(geodesicId) {
+      return [...(segmentIdsByGeodesicId.get(geodesicId) ?? [])]
+        .map((id) => objectsById.get(id))
+        .filter((object): object is GeodesicSegmentObject => object?.kind === "geodesic-segment");
     },
   };
 

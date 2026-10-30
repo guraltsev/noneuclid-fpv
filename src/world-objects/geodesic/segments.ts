@@ -12,7 +12,6 @@ import {
   type GeodesicPortalTraversal,
   type GeodesicSegmentObject,
   intersectionTolerance,
-  isGeodesicSegmentObject,
   minGeodesicSegmentLengthMeters,
   sanitizeYaw,
   type TraceGeodesicSegmentResult,
@@ -37,16 +36,28 @@ export function removeGeodesicIntervalAndDerivedObjects(
   geodesicId: string,
 ): void {
   removeGeodesicSegments(registry, geodesicId);
-  for (const object of registry.getAll()) {
-    if (
-      (object.kind === "geodesic-interval" && object.id === geodesicId) ||
-      (object.kind === "measured-geodesic-length" && object.geodesicId === geodesicId) ||
-      (object.kind === "protractor-angle" &&
-        (object.first.geodesicId === geodesicId || object.second.geodesicId === geodesicId)) ||
-      (object.kind === "geodesic-intersection" && object.geodesicIds.includes(geodesicId))
-    ) {
-      registry.remove(object.id);
+  const doomed: RuntimeWorldObject[] = [];
+  const interval = registry.get(geodesicId);
+  if (interval?.kind === "geodesic-interval") {
+    doomed.push(interval);
+  }
+  for (const object of registry.getObjectsOfKind("measured-geodesic-length")) {
+    if (object.geodesicId === geodesicId) {
+      doomed.push(object);
     }
+  }
+  for (const object of registry.getObjectsOfKind("protractor-angle")) {
+    if (object.first.geodesicId === geodesicId || object.second.geodesicId === geodesicId) {
+      doomed.push(object);
+    }
+  }
+  for (const object of registry.getObjectsOfKind("geodesic-intersection")) {
+    if (object.geodesicIds.includes(geodesicId)) {
+      doomed.push(object);
+    }
+  }
+  for (const object of doomed) {
+    registry.remove(object.id);
   }
   removeGeodesicAssociations(registry, geodesicId);
   removeUnusedFreeGeodesicEnds(registry);
@@ -60,10 +71,7 @@ export function getGeodesicSegments(
   registry: RuntimeObjectRegistry,
   geodesicId: string,
 ): readonly GeodesicSegmentObject[] {
-  return registry.getAll()
-    .filter((object): object is GeodesicSegmentObject => object.kind === "geodesic-segment")
-    .filter((segment) => segment.geodesicId === geodesicId)
-    .sort((a, b) => a.segmentIndex - b.segmentIndex);
+  return [...registry.getSegmentsOfGeodesic(geodesicId)].sort((a, b) => a.segmentIndex - b.segmentIndex);
 }
 
 /** Returns the last (highest `segmentIndex`) segment of a geodesic, or `undefined` if it has none. */
@@ -76,6 +84,11 @@ export function getGeodesicTail(
 
 /** Returns the 1-based display number of a geodesic, defaulting to 1 when it has none. */
 export function resolveGeodesicNumber(registry: RuntimeObjectRegistry, geodesicId: string): number {
+  for (const segment of registry.getSegmentsOfGeodesic(geodesicId)) {
+    if (segment.geodesicNumber !== undefined) {
+      return segment.geodesicNumber;
+    }
+  }
   return getGlobalGeodesicNumbers(registry, geodesicId).get(geodesicId) ?? 1;
 }
 
@@ -224,8 +237,10 @@ export function replaceDerivedSegmentsFromTraces(input: {
   readonly geodesicId: string;
   readonly traces: readonly TraceGeodesicSegmentResult[];
 }): readonly GeodesicSegmentObject[] {
+  // Resolve the display number before the old segments go, so a rebuilt geodesic keeps its number.
+  const geodesicNumber = resolveGeodesicNumber(input.registry, input.geodesicId);
   removeGeodesicSegments(input.registry, input.geodesicId);
-  const splitSegments = buildDerivedSegmentsFromTraces(input);
+  const splitSegments = buildDerivedSegmentsFromTraces({ ...input, geodesicNumber });
   for (const segment of splitSegments) {
     input.registry.add(segment);
   }
@@ -239,8 +254,10 @@ export function buildDerivedSegmentsFromTraces(input: {
   readonly registry: RuntimeObjectRegistry;
   readonly geodesicId: string;
   readonly traces: readonly TraceGeodesicSegmentResult[];
+  /** Display number to use; resolved from the registry when absent. */
+  readonly geodesicNumber?: number;
 }): readonly GeodesicSegmentObject[] {
-  const geodesicNumber = resolveGeodesicNumber(input.registry, input.geodesicId);
+  const geodesicNumber = input.geodesicNumber ?? resolveGeodesicNumber(input.registry, input.geodesicId);
   const rawSegments = input.traces.map((trace, index) => createSegmentFromTrace({
     id: `${input.geodesicId}:segment:${index}`,
     geodesicId: input.geodesicId,
@@ -464,8 +481,7 @@ function getGlobalGeodesicNumbers(
   const usedNumbers = new Set<number>();
   const ids: string[] = [];
   const seenIds = new Set<string>();
-  const numberedSegments = registry.getAll()
-    .filter(isGeodesicSegmentObject)
+  const numberedSegments = [...registry.getObjectsOfKind("geodesic-segment")]
     .filter((segment) => segment.geodesicNumber !== undefined)
     .sort((left, right) => left.geodesicNumber! - right.geodesicNumber!);
 

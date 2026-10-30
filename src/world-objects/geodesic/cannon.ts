@@ -355,7 +355,7 @@ function rebuildUnlockedGeodesicToLength(input: RebuildGeodesicToLengthInput): r
     input.registry.update(cannon);
   }
 
-  removeGeodesicSegments(input.registry, input.geodesicId);
+  // The old segments are replaced by the re-shot (`replaceDerivedSegmentsFromTraces`), which keeps the display number.
   shootGeodesic({
     world: input.world,
     registry: input.registry,
