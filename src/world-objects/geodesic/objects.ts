@@ -173,6 +173,22 @@ export interface FreeGeodesicEndObject extends RuntimeWorldObjectBase {
 }
 
 /**
+ * A pinned, invisible anchor at a corner of a taut geodesic polygon, next to the forbidden disk it wraps.
+ *
+ * Created by the exact curve-shortening resolution (`resolveCurveShorteningPair`); its `localPose.translation` is the corner in cell
+ * `cellId` (cell-local meters, z = beam height). Unlike a free end it is never aimed or moved by the user and counts as a lock for
+ * `isGeodesicLocked`. It is deleted automatically once no interval refers to it (`removeUnusedFreeGeodesicEnds`).
+ */
+export interface GeodesicCornerObject extends RuntimeWorldObjectBase {
+  readonly kind: "geodesic-corner";
+  readonly canAttachGeodesics: true;
+  /** Junction id (`"<cellId>:vertex-<i>"`) of the disk this corner wraps, in the corner's own cell. */
+  readonly junctionId: string;
+  /** Side of the wrapped disk relative to the travel direction from the chain's start anchor to its end anchor. */
+  readonly side: "left" | "right";
+}
+
+/**
  * The authoritative description of one geodesic: two endpoint attachments plus the portal word joining them.
  *
  * Invariants: `start.geodesicId === end.geodesicId === id`; `startCellId` (= `cellId`) is the cell of the `start`
@@ -213,7 +229,7 @@ export interface CurveShorteningPairObject extends RuntimeWorldObjectBase {
   /** Cell-local position (meters) of the shared free end at the last committed tick; rollback target. */
   readonly lastGoodFreeEndPoint: Vec3;
   /** `"ready-to-fuse"` once the free end is (nearly) straight; `fuseCurveShorteningPair` consumes it. */
-  readonly state: "moving" | "ready-to-fuse";
+  readonly state: "moving" | "ready-to-fuse" | "unresolved";
 }
 
 /**
@@ -449,6 +465,35 @@ export function isFreeGeodesicEndObject(object: { readonly kind: string }): obje
   return object.kind === "free-geodesic-end";
 }
 
+/** Type guard: true when the object is a `GeodesicCornerObject`. */
+export function isGeodesicCornerObject(object: RuntimeWorldObject | undefined): object is GeodesicCornerObject {
+  return object?.kind === "geodesic-corner";
+}
+
+/**
+ * Builds a corner anchor at `point` (cell-local meters, z = beam height) in cell `cellId`, wrapping the disk `junctionId` on `side`.
+ *
+ * Pure; the caller adds it to the registry. The object is invisible, non-colliding and without a tooltip.
+ */
+export function createGeodesicCornerObject(input: {
+  readonly id: string;
+  readonly cellId: string;
+  readonly point: Vec3;
+  readonly junctionId: string;
+  readonly side: "left" | "right";
+}): GeodesicCornerObject {
+  return {
+    id: input.id,
+    kind: "geodesic-corner",
+    canAttachGeodesics: true,
+    cellId: input.cellId,
+    localPose: yawRigidTransform3(0, input.point),
+    portalRenderable: false,
+    junctionId: input.junctionId,
+    side: input.side,
+  };
+}
+
 /** Type guard: true when the object is a `CurveShorteningPairObject`. */
 export function isCurveShorteningPairObject(object: { readonly kind: string }): object is CurveShorteningPairObject {
   return object.kind === "curve-shortening-pair";
@@ -523,7 +568,7 @@ export function createCurveShorteningPairObject(input: {
   readonly previousTotalLengthMeters?: number;
   readonly lastGoodFreeEndCellId: string;
   readonly lastGoodFreeEndPoint: Vec3;
-  readonly state?: "moving" | "ready-to-fuse";
+  readonly state?: "moving" | "ready-to-fuse" | "unresolved";
 }): CurveShorteningPairObject {
   return {
     id: input.id,

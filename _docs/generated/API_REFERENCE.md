@@ -486,6 +486,9 @@ Curve shortening: tie-and-detach of two endpoint roles into a curve-shortening p
 | function | `tieAndDetachGeodesicEndpoints` | Detaches two endpoint roles from one emitter and ties them to a new shared free end, starting a curve-shortening pair. |
 | function | `advanceCurveShorteningPairs` | Advances every curve-shortening pair by one tick of `deltaSeconds`, sliding its shared free end downhill, and returns the changed ids. |
 | function | `fuseCurveShorteningPair` | Finishes a curve-shortening pair: merges its moving arcs into one stable geodesic and deletes the pair and its free end. |
+| type | `CurveShorteningNotice` | A user-visible event of the curve-shortening resolution; the shell logs it (there is no on-screen message system yet). |
+| type | `CurveShorteningResolution` | Outcome of {@link resolveCurveShorteningPair}. |
+| function | `resolveCurveShorteningPair` | Resolves one curve-shortening pair completely: replaces its two arcs (or its free loop) by the length-minimizing path of their homotopy class. |
 
 ### `world-objects/geodesic/development.ts`
 
@@ -512,7 +515,7 @@ Endpoint attachments of geodesic intervals: lookup by anchor, re-attachment, lif
 | function | `portalWordMatchesCurrentEndpointCells` | True when the interval's portal word leads from the start anchor's cell to the end anchor's cell. |
 | function | `portalWordMatchesEndpointCellsWithAnchors` | Like `portalWordMatchesCurrentEndpointCells`, with candidate anchors that may differ from the registry. |
 | function | `isAimableFreeGeodesic` | True for a stable interval with one emitter endpoint and one free end that no other geodesic uses. |
-| function | `removeUnusedFreeGeodesicEnds` | Removes free-end anchors that no interval attaches to any more. |
+| function | `removeUnusedFreeGeodesicEnds` | Removes free-end and polygon-corner anchors that no interval attaches to any more. |
 | function | `collectIncidentGeodesicIdsForEmitter` | Ids of all geodesics incident on an emitter. |
 | function | `removeGeodesicAssociations` | Removes a geodesic id from the caches of every emitter. |
 | function | `findSourceEmitterForGeodesic` | The emitter that a geodesic originates from, if any. |
@@ -569,7 +572,7 @@ Queries whether a geodesic is locked or connected, and removal of geodesics and 
 | Kind | Name | Summary |
 | --- | --- | --- |
 | function | `getGeodesicConnection` | Describes the emitter connection of a geodesic. |
-| function | `isGeodesicLocked` | True when both endpoints of the geodesic are emitters (a "locked" geodesic that cannot be extended or aimed freely). |
+| function | `isGeodesicLocked` | True when both endpoints of the geodesic are pinned anchors, each an emitter or a polygon corner (a "locked" geodesic that cannot be extended or aimed freely). |
 | function | `collectLockedIncidentGeodesicIdsForEmitter` | Lists the ids of locked geodesics (see `isGeodesicLocked`) that have an endpoint on the emitter. |
 | function | `removeGeodesic` | Removes a geodesic and its derived objects (interval path via `removeGeodesicIntervalAndDerivedObjects`; legacy path removes segments and emitter associations), then refreshes intersections. |
 | function | `removeUnlockedGeodesicsFromCannon` | Removes every non-locked geodesic listed on the cannon and returns the removed ids (empty if the id is not a cannon). |
@@ -590,6 +593,7 @@ Geodesic emitters ("cannons"), geodesic intervals and curve shortening on a glue
 | interface | `GeodesicEndpointAttachment` | Attachment of one endpoint role of one geodesic interval to an anchor object (emitter or free end). |
 | interface | `GeodesicEndpointSelection` | An endpoint attachment picked by the user (typically from a segment hit) as input to tie-and-detach. |
 | interface | `FreeGeodesicEndObject` | An invisible, non-colliding anchor object marking a geodesic endpoint that is not on an emitter. |
+| interface | `GeodesicCornerObject` | A pinned, invisible anchor at a corner of a taut geodesic polygon, next to the forbidden disk it wraps. |
 | interface | `GeodesicIntervalObject` | The authoritative description of one geodesic: two endpoint attachments plus the portal word joining them. |
 | interface | `CurveShorteningPairObject` | Bookkeeping object owning one curve-shortening process: two endpoint roles glued at a shared free end that slides downhill. |
 | interface | `LiftedGeodesicEndpoint` | An interval's far endpoint pulled back into the cell of a chosen source endpoint (the "development" of the interval). |
@@ -613,6 +617,8 @@ Geodesic emitters ("cannons"), geodesic intervals and curve shortening on a glue
 | function | `isGeodesicCannonObject` | Type guard: true when the object is a `GeodesicCannonObject`. |
 | function | `isGeodesicIntervalObject` | Type guard: true when the object is a `GeodesicIntervalObject`. |
 | function | `isFreeGeodesicEndObject` | Type guard: true when the object is a `FreeGeodesicEndObject`. |
+| function | `isGeodesicCornerObject` | Type guard: true when the object is a `GeodesicCornerObject`. |
+| function | `createGeodesicCornerObject` | Builds a corner anchor at `point` (cell-local meters, z = beam height) in cell `cellId`, wrapping the disk `junctionId` on `side`. |
 | function | `isCurveShorteningPairObject` | Type guard: true when the object is a `CurveShorteningPairObject`. |
 | function | `createFreeGeodesicEndObject` | Builds a free-end anchor at `point` (cell-local meters, including its beam height in z) in cell `cellId`. |
 | function | `createGeodesicIntervalObject` | Builds a geodesic interval from two anchor ids, a start cell and an optional portal word. |

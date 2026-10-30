@@ -274,7 +274,8 @@ function resolveDerivedSegmentConnectionState(
   }
   const start = registry.get(interval.start.anchorObjectId);
   const end = registry.get(interval.end.anchorObjectId);
-  return start?.kind === "geodesic-cannon" && end?.kind === "geodesic-cannon" ? "connected" : "open";
+  const pinned = (kind: string | undefined): boolean => kind === "geodesic-cannon" || kind === "geodesic-corner";
+  return pinned(start?.kind) && pinned(end?.kind) ? "connected" : "open";
 }
 
 /** Converts a derived segment back to the trace piece it was built from. */

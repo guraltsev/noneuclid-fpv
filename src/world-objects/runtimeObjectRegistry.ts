@@ -12,6 +12,7 @@ import type { AssetObjectSpec, TutorialPageSpec } from "../cell-complex/specs";
 import { yawRigidTransform3 } from "../math/rigidTransform3";
 import type {
   FreeGeodesicEndObject,
+  GeodesicCornerObject,
   CurveShorteningPairObject,
   GeodesicCannonObject,
   GeodesicIntersectionObject,
@@ -115,6 +116,7 @@ export type RuntimeWorldObject =
   | GeodesicCannonObject
   | GeodesicIntervalObject
   | FreeGeodesicEndObject
+  | GeodesicCornerObject
   | CurveShorteningPairObject
   | GeodesicSegmentObject
   | GeodesicIntersectionObject

@@ -58,16 +58,21 @@ export function getGeodesicConnection(
   return source ? { outgoingEmitterId: source.id, state: "open" } : undefined;
 }
 
+// Emitters and taut-polygon corners are pinned anchors; a free end is not.
+function isPinnedAnchorKind(kind: string | undefined): boolean {
+  return kind === "geodesic-cannon" || kind === "geodesic-corner";
+}
+
 /**
- * True when both endpoints of the geodesic are emitters (a "locked" geodesic that cannot be extended or aimed freely).
+ * True when both endpoints of the geodesic are pinned anchors, each an emitter or a polygon corner (a "locked" geodesic that cannot be extended or aimed freely).
  *
  * Legacy: for non-interval geodesics, falls back to `connected`/`straightening` connection state or an `emitter-hit` tail.
  */
 export function isGeodesicLocked(registry: RuntimeObjectRegistry, geodesicId: string): boolean {
   const interval = registry.get(geodesicId);
   if (interval?.kind === "geodesic-interval") {
-    return registry.get(interval.start.anchorObjectId)?.kind === "geodesic-cannon" &&
-      registry.get(interval.end.anchorObjectId)?.kind === "geodesic-cannon";
+    return isPinnedAnchorKind(registry.get(interval.start.anchorObjectId)?.kind) &&
+      isPinnedAnchorKind(registry.get(interval.end.anchorObjectId)?.kind);
   }
 
   const state = getGeodesicConnection(registry, geodesicId)?.state;

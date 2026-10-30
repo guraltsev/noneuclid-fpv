@@ -297,10 +297,10 @@ export function isAimableFreeGeodesic(registry: RuntimeObjectRegistry, interval:
     getGeodesicEndpointAttachmentsForAnchor(registry, freeEnd.id).length === 1;
 }
 
-/** Removes free-end anchors that no interval attaches to any more. */
+/** Removes free-end and polygon-corner anchors that no interval attaches to any more. */
 export function removeUnusedFreeGeodesicEnds(registry: RuntimeObjectRegistry): void {
   for (const object of registry.getAll()) {
-    if (object.kind === "free-geodesic-end" && getGeodesicEndpointAttachmentsForAnchor(registry, object.id).length === 0) {
+    if ((object.kind === "free-geodesic-end" || object.kind === "geodesic-corner") &&getGeodesicEndpointAttachmentsForAnchor(registry, object.id).length === 0) {
       registry.remove(object.id);
     }
   }

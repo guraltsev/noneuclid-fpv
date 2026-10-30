@@ -217,6 +217,36 @@ export function compileLargePortalWorld() {
   });
 }
 
+// Cell a (trapezoid) is glued to cell b through a 0.25 m portal: narrower than two forbidden-zone radii, so no word through it is feasible.
+export function compileNarrowPortalWorld() {
+  return compileCellComplex({
+    cells: [
+      {
+        id: "a",
+        heightMeters: 3,
+        baseVertices: [
+          { x: 0, y: 0 },
+          { x: 2, y: 0 },
+          { x: 2, y: 0.25 },
+          { x: 0, y: 2 },
+        ],
+        portals: [{ id: "ab", sideIndex: 1, targetCellId: "b", targetPortalId: "ba" }],
+      },
+      {
+        id: "b",
+        heightMeters: 3,
+        baseVertices: [
+          { x: 0, y: 0 },
+          { x: 2, y: 0 },
+          { x: 2, y: 2 },
+          { x: 0, y: 0.25 },
+        ],
+        portals: [{ id: "ba", sideIndex: 3, targetCellId: "a", targetPortalId: "ab" }],
+      },
+    ],
+  });
+}
+
 export function compileThreeCellPortalWorld() {
   return compileCellComplex({
     cells: [
