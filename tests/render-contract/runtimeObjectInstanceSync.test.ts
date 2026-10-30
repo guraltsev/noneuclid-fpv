@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
 import type { CellComplexSpec } from "../../src/cell-complex/specs";
 import { yawRigidTransform3 } from "../../src/math/rigidTransform3";
@@ -104,7 +104,7 @@ function setup(objects: RuntimeWorldObject[], rover?: PlayerRoverRenderModel) {
     getPlayerPose: () => ({ cellId: "room-b", position: { x: 0, y: 0, z: 0 }, yawRadians: 0 }) as unknown as PlayerPose,
     buildArchetype: (source, capacity) => buildRuntimeObjectRenderArchetype(source, capacity, undefined),
   });
-  return { registry, sync, renderArchetypesByKey };
+  return { registry, sync, renderArchetypesByKey, roots, renderSourcesByKey };
 }
 
 function readMatrix(mesh: THREE.InstancedMesh, index: number): THREE.Matrix4 {
@@ -233,6 +233,21 @@ describe("runtimeObjectInstanceSync", () => {
     owner.place("room-b", moved);
     sync.sync(snap);
     readMatrix(archetype.mesh, 0).elements.forEach((value, i) => expect(value).toBeCloseTo(rigidTransformToThreeMatrix(moved).elements[i], 6));
+  });
+
+  it("traverses an object's hierarchy once, and again only after one of its source keys is deleted", () => {
+    const { sync, roots, renderSourcesByKey } = setup([mouse("mouse-1")]);
+    const traverse = vi.spyOn(roots.get("mouse-1")!, "traverse");
+    const snap = snapshot({ "room-b": [path("room-b", 0, 0)] });
+
+    sync.sync(snap);
+    sync.sync(snap);
+    expect(traverse).toHaveBeenCalledTimes(1);
+
+    renderSourcesByKey.delete("geo-mouse:mouse-1:mesh:0");
+    sync.sync(snap);
+    expect(traverse).toHaveBeenCalledTimes(2);
+    expect(renderSourcesByKey.has("geo-mouse:mouse-1:mesh:0")).toBe(true);
   });
 
   it("does not walk ghosts again for an unchanged static asset record", () => {

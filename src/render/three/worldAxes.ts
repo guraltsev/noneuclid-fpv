@@ -53,10 +53,11 @@ export function worldYawRadiansToThree(yawRadians: number): number {
  * Converts a world-frame rigid transform into the equivalent Three.js `Matrix4` (basis-changed by B * M * B^-1).
  *
  * The transform maps destination-local points to source points, `p_source = R p + t`; the result applies the same
- * map to column vectors in Three axes, so it can be used directly as an object or instance matrix. Allocates a new matrix.
+ * map to column vectors in Three axes, so it can be used directly as an object or instance matrix. Allocates a new
+ * matrix unless `target` is given, in which case the result is written to (and returned as) `target`.
  */
-export function rigidTransformToThreeMatrix(transform: RigidTransform3): THREE.Matrix4 {
-  const worldMatrix = new THREE.Matrix4().set(
+export function rigidTransformToThreeMatrix(transform: RigidTransform3, target?: THREE.Matrix4): THREE.Matrix4 {
+  const worldMatrix = rigidTransformWorldMatrixScratch.set(
     transform.rotation.m00,
     transform.rotation.m01,
     transform.rotation.m02,
@@ -75,8 +76,11 @@ export function rigidTransformToThreeMatrix(transform: RigidTransform3): THREE.M
     1,
   );
 
-  return new THREE.Matrix4().multiplyMatrices(worldToThreeBasis, worldMatrix).multiply(threeToWorldBasis);
+  return (target ?? new THREE.Matrix4()).multiplyMatrices(worldToThreeBasis, worldMatrix).multiply(threeToWorldBasis);
 }
+
+// Inner matrix of rigidTransformToThreeMatrix; always fully overwritten, never escapes the function.
+const rigidTransformWorldMatrixScratch = new THREE.Matrix4();
 
 /** Sets an object's position and quaternion from a world-frame rigid transform (converted to Three axes); scale is left untouched. */
 export function applyWorldRigidTransform(object: THREE.Object3D, transform: RigidTransform3): void {

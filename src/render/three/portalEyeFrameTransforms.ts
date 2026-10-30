@@ -12,6 +12,7 @@
 /** Re-expresses per-eye visible-portal results in one shared render frame for stereo (VR) rendering. */
 import * as THREE from "three";
 import { ComputeVisiblePortalPathsResult, VisiblePortalPath } from "./visiblePortalPaths";
+import { identityRenderFromRootMatrix } from "./xrPortalEye";
 
 /** One eye's camera and its visibility result, tagged with the eye index and the cell that eye is rooted in. */
 export interface PortalEyeRenderState {
@@ -38,11 +39,18 @@ export function buildUnionVisiblePathById(
   return visiblePathById;
 }
 
-/** Returns a copy of `result` whose path matrices are premultiplied by `renderFromRootMatrix`, so they place cells in the shared render frame; polygons and statistics are unchanged. */
+/**
+ * Returns a copy of `result` whose path matrices are premultiplied by `renderFromRootMatrix`, so they place cells in the shared render frame; polygons and statistics are unchanged.
+ * An identity matrix (the shared `identityRenderFromRootMatrix`, or one equal to it exactly) returns `result` itself without allocating.
+ */
 export function transformVisiblePortalResultToRenderFrame(
   result: ComputeVisiblePortalPathsResult,
   renderFromRootMatrix: THREE.Matrix4,
 ): ComputeVisiblePortalPathsResult {
+  if (renderFromRootMatrix === identityRenderFromRootMatrix || isExactIdentity(renderFromRootMatrix)) {
+    return result;
+  }
+
   const paths = result.paths.map((path) => ({
     ...path,
     rootFromDestinationMatrix: renderFromRootMatrix.clone().multiply(path.rootFromDestinationMatrix),
@@ -53,6 +61,19 @@ export function transformVisiblePortalResultToRenderFrame(
     paths,
     visiblePathById: new Map(paths.map((path) => [path.pathId, path])),
   };
+}
+
+function isExactIdentity(matrix: THREE.Matrix4): boolean {
+  const elements = matrix.elements;
+  const identity = identityRenderFromRootMatrix.elements;
+
+  for (let index = 0; index < 16; index += 1) {
+    if (elements[index] !== identity[index]) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 /** Reassigns path ids consecutively (from 0, in first-seen order) so equal `(rootCellId, pathId)` pairs share an id across eyes and different roots stay distinct; the input is not modified. */

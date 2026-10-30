@@ -50,9 +50,12 @@ export interface GeodesicEmitterLabelControllerDeps {
 export function createGeodesicEmitterLabelController(deps: GeodesicEmitterLabelControllerDeps) {
   const { scene, camera, runtimeObjectRegistry, geodesicEmitterLabelsByKey } = deps;
 
+  // Reused every frame (cleared / overwritten before use).
+  const activeLabelKeys = new Set<string>();
+  const cameraQuaternion = new THREE.Quaternion();
+
   function updateGeodesicEmitterLabels(): void {
-    const activeLabelKeys = new Set<string>();
-    const cameraQuaternion = new THREE.Quaternion();
+    activeLabelKeys.clear();
     camera.getWorldQuaternion(cameraQuaternion);
 
     for (const object of runtimeObjectRegistry.getAll()) {
@@ -83,8 +86,8 @@ export function createGeodesicEmitterLabelController(deps: GeodesicEmitterLabelC
       });
     }
 
-    // Sweep labels whose cannon or geodesic no longer exists (iterate a copy since we delete).
-    for (const [key, label] of [...geodesicEmitterLabelsByKey]) {
+    // Sweep labels whose cannon or geodesic no longer exists (deleting the current Map entry while iterating is safe).
+    for (const [key, label] of geodesicEmitterLabelsByKey) {
       if (activeLabelKeys.has(key)) {
         continue;
       }

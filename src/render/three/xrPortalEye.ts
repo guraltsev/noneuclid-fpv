@@ -5,6 +5,8 @@
  * The cell is found by walking the straight segment from the player's anchor to the eye through the portals
  * (`locateDevelopedPoint`), so any number of crossings is handled and side order does not matter.
  * Positions are in cell-local world coordinates (meters; x right, y forward, z up); cameras are in the Three.js frame (via worldAxes).
+ * A caller that resolves every frame passes a persistent `XrPortalEyeRenderRootTarget` per eye so the re-rooted camera
+ * and matrix are reused instead of reallocated; the no-re-root result is the shared frozen `identityRenderFromRootMatrix`.
  */
 import * as THREE from "three";
 import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex";
@@ -19,15 +21,38 @@ import { rigidTransformToThreeMatrix, threePointToWorld } from "./worldAxes";
 export interface XrPortalEyeRenderRoot {
   /** Cell id to use as the render root (the source cell, or the cell the eye walked into). */
   readonly rootCellId: string;
-  /** Camera to render with: the input camera itself when no re-root, otherwise a clone moved into the root cell's frame. */
+  /** Camera to render with: the input camera itself when no re-root, otherwise a copy moved into the root cell's frame (the target's camera when a target is given). */
   readonly camera: THREE.Camera;
-  /** Three.js matrix mapping root-cell-frame content into the render frame; identity when no re-root, otherwise the inverse of the walk transform. */
+  /** Three.js matrix mapping root-cell-frame content into the render frame; `identityRenderFromRootMatrix` when no re-root, otherwise the inverse of the walk transform. Never mutate it. */
   readonly renderFromRootMatrix: THREE.Matrix4;
 }
+
+/** Persistent storage for one eye's re-rooted camera and matrix, reused across frames. */
+export interface XrPortalEyeRenderRootTarget {
+  /** Created on the first re-root, then reused. */
+  camera: THREE.Camera | undefined;
+  readonly renderFromRootMatrix: THREE.Matrix4;
+}
+
+/** Creates an empty per-eye target for `resolveXrPortalEyeRenderRoot`. */
+export function createXrPortalEyeRenderRootTarget(): XrPortalEyeRenderRootTarget {
+  return { camera: undefined, renderFromRootMatrix: new THREE.Matrix4() };
+}
+
+/**
+ * Shared identity matrix for "no re-root". Its elements are frozen, so a write through any `Matrix4` method throws;
+ * it is only ever read (right operand of `multiply`, `applyMatrix4`).
+ */
+export const identityRenderFromRootMatrix: THREE.Matrix4 = new THREE.Matrix4();
+Object.freeze(identityRenderFromRootMatrix.elements);
 
 // Slack in meters for the height test so an eye exactly on the floor or ceiling counts as inside.
 const portalPlaneToleranceMeters = 1e-5;
 const identityTolerance = 1e-9;
+const identityElements: readonly number[] = new THREE.Matrix4().elements.slice();
+const eyePositionScratch = new THREE.Vector3();
+const rootFromSourceScratch = new THREE.Matrix4();
+const walkMatrixScratch = new THREE.Matrix4();
 
 /**
  * Returns the render root for an eye: walks from `anchorPoint` (the player's position in `sourceCellId`) to the eye's
@@ -35,18 +60,20 @@ const identityTolerance = 1e-9;
  * transform), the result is re-rooted there with the camera carried through the walk's `cellFromStart`.
  * Falls back to the unchanged source cell and input camera (identity matrix) if the source cell id is unknown, the eye is
  * outside the cell height range, or the walk hits a wall or fails.
- * `camera` must have a valid world matrix (it is updated here); the returned camera is a clone when re-rooted, so the input is never mutated.
+ * `camera` must have a valid world matrix (it is updated here). The input is never mutated; the returned camera is a
+ * clone when re-rooted, or `target.camera` (overwritten each call) when a `target` is given.
  */
 export function resolveXrPortalEyeRenderRoot(input: {
   readonly world: CompiledCellComplex;
   readonly sourceCellId: string;
   readonly anchorPoint: Vec3;
   readonly camera: THREE.Camera;
+  readonly target?: XrPortalEyeRenderRootTarget;
 }): XrPortalEyeRenderRoot {
   const unchanged = (): XrPortalEyeRenderRoot => ({
     rootCellId: input.sourceCellId,
     camera: input.camera,
-    renderFromRootMatrix: new THREE.Matrix4(),
+    renderFromRootMatrix: identityRenderFromRootMatrix,
   });
   const sourceCell = input.world.cellsById.get(input.sourceCellId);
 
@@ -55,7 +82,7 @@ export function resolveXrPortalEyeRenderRoot(input: {
   }
 
   input.camera.updateMatrixWorld(true);
-  const eyePoint = threePointToWorld(new THREE.Vector3().setFromMatrixPosition(input.camera.matrixWorld));
+  const eyePoint = threePointToWorld(eyePositionScratch.setFromMatrixPosition(input.camera.matrixWorld));
 
   if (eyePoint.z < -portalPlaneToleranceMeters || eyePoint.z > sourceCell.heightMeters + portalPlaneToleranceMeters) {
     return unchanged();
@@ -72,28 +99,64 @@ export function resolveXrPortalEyeRenderRoot(input: {
     return unchanged();
   }
 
-  const rootFromSource = rigidTransformToThreeMatrix(located.cellFromStart);
+  const rootFromSource = rigidTransformToThreeMatrix(located.cellFromStart, rootFromSourceScratch);
 
   if (located.cellId === input.sourceCellId && isIdentity(rootFromSource)) {
     return unchanged();
   }
 
+  const target = input.target;
+
+  if (!target) {
+    return {
+      rootCellId: located.cellId,
+      camera: transformCamera(input.camera, located.cellFromStart, undefined),
+      renderFromRootMatrix: rootFromSource.clone().invert(),
+    };
+  }
+
+  target.renderFromRootMatrix.copy(rootFromSource).invert();
+
   return {
     rootCellId: located.cellId,
-    camera: transformCamera(input.camera, located.cellFromStart),
-    renderFromRootMatrix: rootFromSource.clone().invert(),
+    camera: transformCamera(input.camera, located.cellFromStart, target),
+    renderFromRootMatrix: target.renderFromRootMatrix,
   };
 }
 
 function isIdentity(matrix: THREE.Matrix4): boolean {
-  const identity = new THREE.Matrix4().elements;
-  return matrix.elements.every((value, index) => Math.abs(value - identity[index]) <= identityTolerance);
+  const elements = matrix.elements;
+
+  for (let index = 0; index < 16; index += 1) {
+    if (Math.abs(elements[index] - identityElements[index]) > identityTolerance) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
-// Clones the camera with a frozen world matrix premultiplied by the transform; projection is copied unchanged.
-function transformCamera(camera: THREE.Camera, cellFromStart: RigidTransform3): THREE.Camera {
-  const transformedCamera = camera.clone();
-  const matrixWorld = rigidTransformToThreeMatrix(cellFromStart).multiply(camera.matrixWorld);
+// Copies the camera with a frozen world matrix premultiplied by the transform; projection is copied unchanged.
+function transformCamera(
+  camera: THREE.Camera,
+  cellFromStart: RigidTransform3,
+  target: XrPortalEyeRenderRootTarget | undefined,
+): THREE.Camera {
+  let transformedCamera: THREE.Camera;
+
+  if (!target) {
+    transformedCamera = camera.clone();
+  } else {
+    if (!target.camera || target.camera.type !== camera.type) {
+      target.camera = camera.clone(false);
+    } else {
+      target.camera.copy(camera, false);
+    }
+
+    transformedCamera = target.camera;
+  }
+
+  const matrixWorld = rigidTransformToThreeMatrix(cellFromStart, walkMatrixScratch).multiply(camera.matrixWorld);
 
   transformedCamera.matrixAutoUpdate = false;
   transformedCamera.matrix.copy(matrixWorld);

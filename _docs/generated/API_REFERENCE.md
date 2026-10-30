@@ -1838,6 +1838,16 @@ Portal-path debug runtime: installs window.noneuclidPortalDebug, manages cell-pa
 | interface | `PortalDebugRuntime` | Handle returned by {@link createPortalDebugRuntime}. |
 | function | `createPortalDebugRuntime` | Creates the portal debug runtime and installs window.noneuclidPortalDebug. |
 
+### `render/three/portalEyeActivation.ts`
+
+Selects the portal-clip eye and viewport once per rendered eye instead of once per mesh.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `PortalEyeActivatorDeps` | Hooks the activator calls; `createThreeApp` supplies the portal-clip uniform updates. |
+| interface | `PortalEyeActivator` | Per-render eye/viewport activation shared by every archetype mesh's `onBeforeRender`. |
+| function | `createPortalEyeActivator` | Creates an activator over `deps`. |
+
 ### `render/three/portalEyeFrameTransforms.ts`
 
 Utilities for combining the per-eye visibility results of stereo (VR) rendering into one shared render frame.
@@ -1911,6 +1921,7 @@ In-scene feedback shown while the protractor tool is half-way through a measurem
 
 | Kind | Name | Summary |
 | --- | --- | --- |
+| function | `protractorToolFeedbackSignature` | The string that encodes every input affecting the drawing; equal signatures draw identically. |
 | function | `createProtractorToolFeedback` | Builds the feedback group for the protractor tool's current selection state. |
 | function | `createFeedbackCenterMarker` | Creates a ring-and-dot marker group centered on a cell-local point (meters). |
 | function | `createFeedbackRay` | Creates a thin cylinder from a cell-local point along the direction `yawRadians` (counter-clockwise from +x) for `lengthMeters`. |
@@ -2380,6 +2391,9 @@ Decides which cell an XR eye camera should render from when the eye has physical
 | Kind | Name | Summary |
 | --- | --- | --- |
 | interface | `XrPortalEyeRenderRoot` | Result of eye-root resolution: where to start rendering from and how to place content relative to it. |
+| interface | `XrPortalEyeRenderRootTarget` | Persistent storage for one eye's re-rooted camera and matrix, reused across frames. |
+| function | `createXrPortalEyeRenderRootTarget` | Creates an empty per-eye target for `resolveXrPortalEyeRenderRoot`. |
+| const | `identityRenderFromRootMatrix` | Shared identity matrix for "no re-root". |
 | function | `resolveXrPortalEyeRenderRoot` | Returns the render root for an eye: walks from `anchorPoint` (the player's position in `sourceCellId`) to the eye's horizontal position through the portals. |
 
 ### `render/three/xrScenePaletteInput.ts`

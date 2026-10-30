@@ -244,8 +244,10 @@ export function updateRuntimeObjectRenderArchetypeInstances(
     readonly cameraPositions?: readonly THREE.Vector3[];
   } = {},
 ): void {
-  const composedMatrix = new THREE.Matrix4();
-  const composedPosition = new THREE.Vector3();
+  const composedMatrix = composedMatrixScratch;
+  const composedPosition = composedPositionScratch;
+  const lowestDepthByPlacement = lowestDepthByPlacementScratch;
+  const writtenPlacements = writtenPlacementsScratch;
 
   for (const archetype of archetypes) {
     const records = recordsByArchetypeKey.get(archetype.archetypeKey) ?? [];
@@ -254,7 +256,8 @@ export function updateRuntimeObjectRenderArchetypeInstances(
 
     // Pass 1: the lowest path depth per placement. A real object and a ghost that land on the same place in the
     // root frame are drawn once, by the copy with the loosest clip (depth 0 is unclipped).
-    const lowestDepthByPlacement = new Map<string, number>();
+    lowestDepthByPlacement.clear();
+    writtenPlacements.clear();
     for (const record of records) {
       const paths = visiblePathsByDestinationCell.get(record.cellId) ?? [];
 
@@ -276,15 +279,14 @@ export function updateRuntimeObjectRenderArchetypeInstances(
       }
     }
 
-    const writtenPlacements = new Set<string>();
-
     for (const record of records) {
       const paths = visiblePathsByDestinationCell.get(record.cellId) ?? [];
-      const renderablePaths = record.omitRootVisiblePath
-        ? paths.filter((path) => path.depth !== 0)
-        : paths;
 
-      for (const path of renderablePaths) {
+      for (const path of paths) {
+        if (record.omitRootVisiblePath && path.depth === 0) {
+          continue;
+        }
+
         composedMatrix.multiplyMatrices(path.rootFromDestinationMatrix, record.localMatrix);
         if (isRuntimeObjectRecordSuppressedNearCamera(record, composedMatrix, composedPosition, options.cameraPositions)) {
           continue;
@@ -322,6 +324,12 @@ export function updateRuntimeObjectRenderArchetypeInstances(
     }
   }
 }
+
+// Scratch for updateRuntimeObjectRenderArchetypeInstances; cleared or fully overwritten before each use.
+const composedMatrixScratch = new THREE.Matrix4();
+const composedPositionScratch = new THREE.Vector3();
+const lowestDepthByPlacementScratch = new Map<string, number>();
+const writtenPlacementsScratch = new Set<string>();
 
 // Placement identity of an instance: object id, translation and first column of the composed matrix, rounded to 1e-4.
 function runtimeObjectPlacementKey(objectId: string, matrix: THREE.Matrix4): string {

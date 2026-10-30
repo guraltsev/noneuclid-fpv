@@ -171,7 +171,6 @@ import {
   GeometryDebugHelpers,
   WindowWithGeometryDebugHelpers,
   installGeneralDebugHelpers,
-  matricesNearlyEqual,
   mergeStaticPathCounts,
   uninstallGeneralDebugHelpers,
   uninstallGeometryDebugHelpers,
@@ -231,7 +230,7 @@ import {
 import { PreparedWorldAssets } from "./preloadWorldAssets";
 import { prerenderCells } from "./prerenderCells";
 import { ProtractorAngleRuntime } from "./protractorAngleRenderer";
-import { createProtractorToolFeedback } from "./protractorToolFeedback";
+import { createProtractorToolFeedback, protractorToolFeedbackSignature } from "./protractorToolFeedback";
 import { renderCameraFarMeters, renderCameraNearMeters } from "./renderCameraClip";
 import {
   PortalInstanceRenderDebugState,
@@ -308,7 +307,14 @@ import {
   headYawRadiansFromViewerPose,
   xrRigidTransformLocalMatrix,
 } from "./xrPlayerRig";
-import { XrPortalEyeRenderRoot, resolveXrPortalEyeRenderRoot } from "./xrPortalEye";
+import {
+  XrPortalEyeRenderRoot,
+  XrPortalEyeRenderRootTarget,
+  createXrPortalEyeRenderRootTarget,
+  identityRenderFromRootMatrix,
+  resolveXrPortalEyeRenderRoot,
+} from "./xrPortalEye";
+import { createPortalEyeActivator } from "./portalEyeActivation";
 import { createXrScenePaletteInput } from "./xrScenePaletteInput";
 import { createXrSessionRestartCoordinator } from "./xrSessionRestart";
 import {
@@ -395,6 +401,9 @@ const xrHeadWorldMatrix = new THREE.Matrix4();
 const xrHeadWorldPosition = new THREE.Vector3();
 const xrHeadWorldQuaternion = new THREE.Quaternion();
 const xrHeadWorldScale = new THREE.Vector3();
+// Desktop fallbacks of updateScenePalette's head pose; overwritten before each use.
+const paletteHeadPositionScratch = new THREE.Vector3();
+const paletteHeadQuaternionScratch = new THREE.Quaternion();
 
 /**
  * Creates the Three.js application shell inside `container` and starts its animation loop.
@@ -887,8 +896,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     buildArchetype: (source, capacity) => {
       const archetype = buildRuntimeObjectRenderArchetype(source, capacity, portalClipMaterialState);
       archetype.mesh.onBeforeRender = (renderer, _scene, renderCamera) => {
-        activatePortalRenderStateForCamera(renderCamera, renderer);
-        updatePortalClipMaterialViewportFromRenderer(portalClipMaterialState, renderer);
+        portalEyeActivator.beforeMesh(renderer, renderCamera);
       };
       return archetype;
     },
@@ -914,9 +922,23 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   // syncStereoPortalInstanceRender (and cleared on geometry commit); read by debug and tooltip code.
   let latestVisibleResult: ComputeVisiblePortalPathsResult | undefined;
   // Per-eye results in stereo XR (empty on desktop); activePortalEyeIndex is set while rendering each eye in
-  // onBeforeRender via activatePortalRenderStateForCamera.
+  // onBeforeRender via portalEyeActivator.
   let portalEyeRenderStates: readonly PortalEyeRenderState[] = [];
   let activePortalEyeIndex = 0;
+  const portalEyeActivator = createPortalEyeActivator({
+    getEyeCount: () => portalEyeRenderStates.length,
+    applyEye: (eyeIndex) => {
+      activePortalEyeIndex = eyeIndex;
+      updatePortalClipMaterialTextureEye(portalClipMaterialState, eyeIndex);
+    },
+    applyViewport: (activeRenderer) => updatePortalClipMaterialViewportFromRenderer(portalClipMaterialState, activeRenderer),
+  });
+  // One persistent camera and matrix per XR eye for re-rooted eyes (see resolveXrPortalEyeRenderRoot).
+  const portalEyeRootTargets: XrPortalEyeRenderRootTarget[] = [];
+  // Scratch positions per eye for the frame snapshot; alias scratch, valid until the next portal pass.
+  const runtimeObjectCameraPositionScratch: THREE.Vector3[] = [];
+  const frameCameraPositions: THREE.Vector3[] = [];
+  scene.onBeforeRender = () => portalEyeActivator.beginRender();
   // Append-only log of the player's portal crossings, newest last, at most 64 entries. Serials increase by 1 per
   // crossing and are never reused, so consumers (geodesic cannon carry) can fold every crossing they have not seen.
   let playerPortalTransitionLog: { readonly serial: number; readonly transition: GeodesicCarryPortalTransition }[] = [];
@@ -1567,10 +1589,10 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       syncStereoPortalInstanceRender(portalCullingCameras.map(resolvePortalEyeRenderRoot));
     } else {
       const cullingCamera = portalCullingCameras[0] ?? camera;
-      syncPortalInstanceRender(xrActive ? resolvePortalEyeRenderRoot(cullingCamera) : {
+      syncPortalInstanceRender(xrActive ? resolvePortalEyeRenderRoot(cullingCamera, 0) : {
         rootCellId: playerPose.cellId,
         camera: cullingCamera,
-        renderFromRootMatrix: new THREE.Matrix4(),
+        renderFromRootMatrix: identityRenderFromRootMatrix,
       });
     }
     // Phase 4 (objects): the only runtime-object instance write of the frame, from the snapshot the portal pass built.
@@ -2181,8 +2203,8 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   ): void {
     if (xrActive && xrFrame && xrReferenceSpace) {
       const inputSources = [...(renderer.xr.getSession()?.inputSources ?? [])];
-      const headPosition = xrHeadWorldPose?.position ?? camera.getWorldPosition(new THREE.Vector3());
-      const headQuaternion = xrHeadWorldPose?.quaternion ?? camera.getWorldQuaternion(new THREE.Quaternion());
+      const headPosition = xrHeadWorldPose?.position ?? camera.getWorldPosition(paletteHeadPositionScratch);
+      const headQuaternion = xrHeadWorldPose?.quaternion ?? camera.getWorldQuaternion(paletteHeadQuaternionScratch);
 
       const placement = resolveVrPalettePlacement({
         head: {
@@ -2494,8 +2516,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     });
     for (const archetype of cellRenderArchetypes) {
       archetype.mesh.onBeforeRender = (renderer, _scene, renderCamera) => {
-        activatePortalRenderStateForCamera(renderCamera, renderer);
-        updatePortalClipMaterialViewportFromRenderer(portalClipMaterialState, renderer);
+        portalEyeActivator.beforeMesh(renderer, renderCamera);
       };
       scene.add(archetype.mesh);
     }
@@ -2507,12 +2528,13 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     visibleCellId = currentlyVisibleCellId;
   }
 
-  function resolvePortalEyeRenderRoot(cullingCamera: THREE.Camera): XrPortalEyeRenderRoot {
+  function resolvePortalEyeRenderRoot(cullingCamera: THREE.Camera, eyeIndex: number): XrPortalEyeRenderRoot {
     return resolveXrPortalEyeRenderRoot({
       world: activeWorld(),
       sourceCellId: playerPose.cellId,
       anchorPoint: playerPose.position,
       camera: cullingCamera,
+      target: (portalEyeRootTargets[eyeIndex] ??= createXrPortalEyeRenderRootTarget()),
     });
   }
 
@@ -2523,7 +2545,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     renderRoot: XrPortalEyeRenderRoot = {
       rootCellId: playerPose.cellId,
       camera,
-      renderFromRootMatrix: new THREE.Matrix4(),
+      renderFromRootMatrix: identityRenderFromRootMatrix,
     },
   ): void {
     portalInstanceDiagnostics.reset();
@@ -2585,7 +2607,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       rootCellId: renderRoot.rootCellId,
       visiblePathsByDestinationCell,
       clipIndexByPathId: portalClipData.clipIndexByPathId,
-      cameraPositions: [runtimeObjectCameraPosition(renderRoot.camera, renderRoot.renderFromRootMatrix)],
+      cameraPositions: monoCameraPositions(renderRoot),
     });
     portalInstanceRenderState = createPortalInstanceRenderStateFromVisibleResult(
       latestFrameSnapshot.visiblePathsByDestinationCell,
@@ -2698,9 +2720,15 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     if (latestVisibleResult) {
       const unionVisiblePathById = buildUnionVisiblePathById(portalEyeRenderStates.map((state) => state.result));
       const unionVisiblePaths = [...unionVisiblePathById.values()].sort((left, right) => left.pathId - right.pathId);
-      const cameraPositions = renderRoots.map((renderRoot) =>
-        runtimeObjectCameraPosition(renderRoot.camera, renderRoot.renderFromRootMatrix)
-      );
+      frameCameraPositions.length = renderRoots.length;
+      renderRoots.forEach((renderRoot, eyeIndex) => {
+        frameCameraPositions[eyeIndex] = runtimeObjectCameraPosition(
+          renderRoot.camera,
+          renderRoot.renderFromRootMatrix,
+          eyeIndex,
+        );
+      });
+      const cameraPositions = frameCameraPositions;
       portalClipData.updateStereo(portalEyeRenderStates.map((state) => state.result.paths));
       const visiblePathsByDestinationCell = groupVisiblePortalPathsByDestinationCell(unionVisiblePaths);
       updatePortalVisiblePathInstances(visiblePathsByDestinationCell);
@@ -2736,22 +2764,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     }
   }
 
-  function activatePortalRenderStateForCamera(renderCamera: THREE.Camera, renderer: THREE.WebGLRenderer): void {
-    if (portalEyeRenderStates.length <= 1) {
-      updatePortalClipMaterialTextureEye(portalClipMaterialState, 0);
-      return;
-    }
-
-    const state = findPortalEyeRenderState(renderCamera, renderer);
-
-    if (!state || state.eyeIndex === activePortalEyeIndex) {
-      return;
-    }
-
-    activePortalEyeIndex = state.eyeIndex;
-    updatePortalClipMaterialTextureEye(portalClipMaterialState, state.eyeIndex);
-  }
-
   function updatePortalVisiblePathInstances(
     visiblePathsByDestinationCell: ReadonlyMap<string, readonly VisiblePortalPath[]>,
   ): void {
@@ -2784,42 +2796,24 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     );
   }
 
-  function findPortalEyeRenderState(
-    renderCamera: THREE.Camera,
-    renderer: THREE.WebGLRenderer,
-  ): PortalEyeRenderState | undefined {
-    const matrixMatched = portalEyeRenderStates.find((state) =>
-      matricesNearlyEqual(state.camera.matrixWorld, renderCamera.matrixWorld) &&
-      matricesNearlyEqual(state.camera.projectionMatrix, renderCamera.projectionMatrix)
-    );
-
-    if (matrixMatched) {
-      return matrixMatched;
-    }
-
-    const viewport = renderer.getCurrentViewport(new THREE.Vector4());
-    const drawingBuffer = renderer.getDrawingBufferSize(new THREE.Vector2());
-
-    if (drawingBuffer.x > 0 && viewport.z > 0) {
-      const viewportCenterX = viewport.x + viewport.z / 2;
-      const index = Math.min(
-        portalEyeRenderStates.length - 1,
-        Math.max(0, Math.floor((viewportCenterX / drawingBuffer.x) * portalEyeRenderStates.length)),
-      );
-
-      return portalEyeRenderStates[index];
-    }
-
-    return portalEyeRenderStates[0];
-  }
-
+  /**
+   * Viewer position in the render frame for eye `eyeIndex`. Aliases per-eye scratch: valid until the next portal pass.
+   */
   function runtimeObjectCameraPosition(
     renderCamera: THREE.Camera = camera,
     renderFromRootMatrix?: THREE.Matrix4,
+    eyeIndex = 0,
   ): THREE.Vector3 {
     renderCamera.updateMatrixWorld(true);
-    const position = new THREE.Vector3().setFromMatrixPosition(renderCamera.matrixWorld);
+    const position = (runtimeObjectCameraPositionScratch[eyeIndex] ??= new THREE.Vector3());
+    position.setFromMatrixPosition(renderCamera.matrixWorld);
     return renderFromRootMatrix ? position.applyMatrix4(renderFromRootMatrix) : position;
+  }
+
+  function monoCameraPositions(renderRoot: XrPortalEyeRenderRoot): readonly THREE.Vector3[] {
+    frameCameraPositions.length = 1;
+    frameCameraPositions[0] = runtimeObjectCameraPosition(renderRoot.camera, renderRoot.renderFromRootMatrix, 0);
+    return frameCameraPositions;
   }
 
   function syncDesktopPalette(): void {
@@ -3372,12 +3366,16 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
         !protractorSelectionsUseDifferentGeodesics(activeProtractorToolState.first, hoverSelection)
       ? undefined
       : hoverSelection;
-    const feedback = createProtractorToolFeedback({
+    const feedbackOptions = {
       center,
       centerLocked: Boolean(activeProtractorToolState.center),
       first: activeProtractorToolState.first,
       hover: validHoverSelection,
-    });
+    };
+    if (protractorToolFeedback?.signature === protractorToolFeedbackSignature(feedbackOptions)) {
+      return;
+    }
+    const feedback = createProtractorToolFeedback(feedbackOptions);
     if (!feedback) {
       clearProtractorToolFeedback();
       return;
@@ -3424,11 +3422,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     readonly cellId: string;
     readonly root: THREE.Group;
   }): void {
-    if (protractorToolFeedback?.signature === feedback.signature) {
-      disposeObject3D(feedback.root);
-      return;
-    }
-
     clearProtractorToolFeedback();
     const cellRoot = cellMeshes.get(feedback.cellId);
     if (!cellRoot) {

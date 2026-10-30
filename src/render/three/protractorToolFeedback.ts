@@ -14,6 +14,21 @@ import {
 } from "../../world-objects/protractorTool";
 import { worldPointToThree } from "./worldAxes";
 
+type ProtractorToolFeedbackOptions = Parameters<typeof createProtractorToolFeedback>[0];
+
+/** The string that encodes every input affecting the drawing; equal signatures draw identically. Cheap: allocates no Three objects. */
+export function protractorToolFeedbackSignature(options: ProtractorToolFeedbackOptions): string {
+  return [
+    options.center.cellId,
+    options.center.objectId,
+    options.centerLocked ? "locked" : "hover",
+    formatFeedbackNumber(options.first?.yawRadians),
+    options.first?.geodesicId ?? "",
+    formatFeedbackNumber(options.hover?.yawRadians),
+    options.hover?.geodesicId ?? "",
+  ].join(":");
+}
+
 /**
  * Builds the feedback group for the protractor tool's current selection state.
  *
@@ -36,15 +51,7 @@ export function createProtractorToolFeedback(options: {
 }): { readonly signature: string; readonly cellId: string; readonly root: THREE.Group } | undefined {
   const center = options.center;
   const point = center.point;
-  const signature = [
-    center.cellId,
-    center.objectId,
-    options.centerLocked ? "locked" : "hover",
-    formatFeedbackNumber(options.first?.yawRadians),
-    options.first?.geodesicId ?? "",
-    formatFeedbackNumber(options.hover?.yawRadians),
-    options.hover?.geodesicId ?? "",
-  ].join(":");
+  const signature = protractorToolFeedbackSignature(options);
   const root = new THREE.Group();
   root.name = "protractor-tool-feedback";
 

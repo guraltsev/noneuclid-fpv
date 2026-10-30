@@ -88,14 +88,14 @@ export function updatePortalClipMaterialViewportFromRenderer(
   state: PortalClipMaterialState,
   renderer: THREE.WebGLRenderer,
 ): void {
-  const viewport = renderer.getCurrentViewport(new THREE.Vector4());
+  const viewport = renderer.getCurrentViewport(viewportScratch);
 
-  updatePortalClipMaterialViewport(
-    state,
-    { width: viewport.z, height: viewport.w },
-    { x: viewport.x, y: viewport.y },
-  );
+  state.uniforms.portalViewportOriginPixels.value.set(viewport.x, viewport.y);
+  state.uniforms.portalViewportPixels.value.set(viewport.z, viewport.w);
 }
+
+// Reused for every call so the per-eye viewport read does not allocate.
+const viewportScratch = new THREE.Vector4();
 
 /**
  * Installs portal clipping into a material (or each material of an array) and returns it.

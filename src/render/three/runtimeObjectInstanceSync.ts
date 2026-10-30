@@ -94,6 +94,9 @@ export function createRuntimeObjectInstanceSync(deps: RuntimeObjectInstanceSyncD
     readonly radius: number;
   }>();
   const recordCacheByObjectId = new Map<string, CachedObjectRecords>();
+  // Source keys last collected per object (key `object:<id>`) and for the rover (`rover`), with the root they came from.
+  const sourceKeysByObjectId = new Map<string, { readonly root: THREE.Object3D; readonly keys: readonly string[] }>();
+  const seenSourceKeys = new Set<string>();
   let archetypeKeysByPrefix = new Map<string, string[]>();
   const stats = { syncs: 0, recordCollections: 0, ghostComputations: 0 };
 
@@ -148,10 +151,34 @@ export function createRuntimeObjectInstanceSync(deps: RuntimeObjectInstanceSyncD
       }
     }
 
-    if (deps.playerRoverRenderModel) {
-      for (const source of deps.playerRoverRenderModel.collectSources()) {
+    // Re-collects only when the root changed or one of the cached keys left the shared source map (the tool
+    // runtimes delete keys on invalidation, which is exactly the signal to traverse again).
+    const addCachedOrCollect = (
+      cacheKey: string,
+      root: THREE.Object3D,
+      collect: () => readonly RuntimeObjectRenderSourceMesh[],
+    ): void => {
+      seenSourceKeys.add(cacheKey);
+      const cached = sourceKeysByObjectId.get(cacheKey);
+
+      if (cached && cached.root === root && cached.keys.every((key) => renderSourcesByKey.has(key))) {
+        for (const key of cached.keys) {
+          activeKeys.add(key);
+        }
+        return;
+      }
+
+      const sources = collect();
+      for (const source of sources) {
         addSource(source);
       }
+      sourceKeysByObjectId.set(cacheKey, { root, keys: sources.map((source) => source.archetypeKey) });
+    };
+
+    seenSourceKeys.clear();
+    if (deps.playerRoverRenderModel) {
+      const rover = deps.playerRoverRenderModel;
+      addCachedOrCollect("rover", rover.root, () => rover.collectSources());
     }
 
     for (const object of objects) {
@@ -164,12 +191,14 @@ export function createRuntimeObjectInstanceSync(deps: RuntimeObjectInstanceSyncD
         continue;
       }
 
-      for (const source of collectRuntimeObjectRenderSourceMeshes(
-        object.id,
-        root,
-        runtimeObjectArchetypeKeyPrefix(object),
-      )) {
-        addSource(source);
+      addCachedOrCollect(`object:${object.id}`, root, () =>
+        collectRuntimeObjectRenderSourceMeshes(object.id, root, runtimeObjectArchetypeKeyPrefix(object))
+      );
+    }
+
+    for (const cacheKey of [...sourceKeysByObjectId.keys()]) {
+      if (!seenSourceKeys.has(cacheKey)) {
+        sourceKeysByObjectId.delete(cacheKey);
       }
     }
 

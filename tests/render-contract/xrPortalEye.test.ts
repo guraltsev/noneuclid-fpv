@@ -3,7 +3,11 @@ import { describe, expect, it } from "vitest";
 import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
 import { locateDevelopedPoint } from "../../src/cell-complex/segmentWalk";
 import type { CellComplexSpec } from "../../src/cell-complex/specs";
-import { resolveXrPortalEyeRenderRoot } from "../../src/render/three/xrPortalEye";
+import {
+  createXrPortalEyeRenderRootTarget,
+  identityRenderFromRootMatrix,
+  resolveXrPortalEyeRenderRoot,
+} from "../../src/render/three/xrPortalEye";
 import { rigidTransformToThreeMatrix, worldPointToThree } from "../../src/render/three/worldAxes";
 
 const baseVertices = [
@@ -89,6 +93,26 @@ describe("resolveXrPortalEyeRenderRoot", () => {
     expect(result.rootCellId).toBe("c");
     expect(result.camera).toBe(eye);
     expectMatricesClose(result.renderFromRootMatrix, new THREE.Matrix4());
+    expect(result.renderFromRootMatrix).toBe(identityRenderFromRootMatrix);
+  });
+
+  it("reuses the target's camera and matrix across re-rooting calls with the same result as without a target", () => {
+    const world = compileCellComplex(chainWorld(0));
+    const anchorPoint = { x: 0.8, y: 0.8, z: 0 };
+    const eye = camera(1.1, 1.05);
+    const target = createXrPortalEyeRenderRootTarget();
+    const plain = resolveXrPortalEyeRenderRoot({ world, sourceCellId: "c", anchorPoint, camera: eye });
+    const first = resolveXrPortalEyeRenderRoot({ world, sourceCellId: "c", anchorPoint, camera: eye, target });
+    const second = resolveXrPortalEyeRenderRoot({ world, sourceCellId: "c", anchorPoint, camera: eye, target });
+
+    expect(first.rootCellId).toBe("en");
+    expect(second.camera).toBe(target.camera);
+    expect(second.camera).toBe(first.camera);
+    expect(second.camera).not.toBe(eye);
+    expect(second.renderFromRootMatrix).toBe(target.renderFromRootMatrix);
+    expectMatricesClose(second.renderFromRootMatrix, plain.renderFromRootMatrix);
+    expectMatricesClose(second.camera.matrixWorld, plain.camera.matrixWorld);
+    expectMatricesClose(second.camera.projectionMatrix, plain.camera.projectionMatrix);
   });
 
   it("does not re-root an eye behind a wall", () => {
