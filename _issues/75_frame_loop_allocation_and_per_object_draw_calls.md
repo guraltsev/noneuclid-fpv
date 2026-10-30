@@ -1,6 +1,6 @@
 # 75 - Frame-loop allocation churn and per-object draw calls outside the portal-visibility core
 
-Status: open; re-verified 2026-10-28.
+Status: open; implemented by job 29, which ended "done, needs review" (manual checks not run); see the Report in `.agents/jobs/_done/29_frame_loop_allocation_and_draw_calls.md`. Re-verified 2026-10-28.
 
 Priority: P2 (performance; matters most at 72-120 Hz in XR).
 

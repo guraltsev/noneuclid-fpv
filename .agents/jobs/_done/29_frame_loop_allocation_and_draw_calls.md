@@ -1,6 +1,6 @@
 # Job 29 - Frame-loop allocation and per-object draw calls
 
-Status: queued.
+Status: done, needs review on 2026-10-30 (commits 8ce8798, 7004802, abe151f).
 Revised on 2026-10-29 for a less capable implementing model.
 Resolves: issue [75](../../_issues/75_frame_loop_allocation_and_per_object_draw_calls.md) (all seven items, plus the
 per-frame palette serialisation merged into it from issue [41](../../_issues/_closed/41_documentation_audit_findings.md)).
@@ -434,3 +434,46 @@ a manual check was not run, set the job to "done, needs review" and leave issue 
       flags share model archetypes; the marmot is one mesh; committed.
 - [ ] `npm run typecheck`, `npm test`, `npm run docs:check`, `npm run build` and the smoke on four worlds pass after each Part.
 - [ ] Issue 75 closed (or left open with a pointer); report written per [README](README.md), with the manual numbers.
+
+
+## Report
+
+### Done
+Commits: Part A `8ce8798`, Part B `7004802`, Part C `abe151f`.
+
+Part A (allocation churn): `portalClipMaterial.ts` viewport scratch `Vector4` and in-place uniform sets; new `portalEyeActivation.ts` (`createPortalEyeActivator`, eye picked by the camera's index in `renderer.xr.getCamera().cameras`, viewport-centre fallback with scratch objects; wired through `scene.onBeforeRender` and both archetype `onBeforeRender` hooks; `activatePortalRenderStateForCamera`, `findPortalEyeRenderState` and the `matricesNearlyEqual` import deleted); `xrPortalEye.ts` exports frozen `identityRenderFromRootMatrix`, `XrPortalEyeRenderRootTarget`/`createXrPortalEyeRenderRootTarget` and reuses per-eye cameras/matrices (scratch eye vector, constant identity array); `worldAxes.rigidTransformToThreeMatrix(transform, target?)` with a scratch inner matrix; `transformVisiblePortalResultToRenderFrame` identity fast path; mono roots use the shared identity; `protractorToolFeedbackSignature` computed before building and the dead equal-signature branch removed; module-scope scratch `Matrix4`/`Vector3`/`Map`/`Set` in `updateRuntimeObjectRenderArchetypeInstances` (the per-record `paths.filter` also removed); `runtimeObjectInstanceSync.ts` caches source keys per object and for the rover (`sourceKeysByObjectId`), no re-traversal while all keys are present; `runtimeObjectCameraPosition` and the snapshot `cameraPositions` use per-eye scratch; palette head-pose fallbacks use module scratch; label controller reuses its `Quaternion` and `Set` and iterates the label map directly. Tests: new `frameAllocations.test.ts` (counting mock of `three`), `portalEyeActivation.test.ts`, `portalEyeFrameTransforms.test.ts`, `protractorToolFeedback.test.ts`; additions to `xrPortalEye.test.ts` and `runtimeObjectInstanceSync.test.ts`.
+
+Part B (version counters): `createPaletteDefinitionCache` plus `nowMs` parameter of `createPaletteDefinition`; `ScenePaletteControllerUpdate.definitionVersion`, controller no longer calls `JSON.stringify`; `createThreeApp` uses the cache at both `update` calls. Registry: cached, frozen `getAll` and per-cell queries, invalidated in `add`, `remove` and `replaceObject` (so `update`, `moveToCell` and owner publishers). `refreshMeasuredGeodesicLengths()` per frame is skipped while registry version, player cell and exact position are unchanged (stored after the run). Label controller gets a `getRegistryVersion` dep and sweeps/creates labels only when the version changed (positioning still every frame). Tests: `paletteDefinitionCache.test.ts`, `geodesicEmitterLabelController.test.ts`, cached-query tests in `runtimeObjectRegistry.test.ts`.
+
+Part C (buffers and draw calls): `writeInstanceIfChanged`/`flagChangedBuffers` in `renderPortalInstances.ts` (compare with `Math.fround`, flag only changed buffers, update range `[0, count*itemSize)`); both update functions end with `mesh.visible = count > 0`; `prerenderCells` shows hidden instanced meshes during `compile`/warm-up and hides them again; `placedFlagModelArchetypeKeyPrefix` and `collectPlacedFlagRenderSourceMeshes` in `runtimeObjectRenderRecords.ts`, used by the instance sync (flags get own-prefix keys plus the shared model keys); `buildStaticMarmotProxy` is one merged vertex-coloured mesh `marmot:<id>`. Tests added to `portalInstanceBuffers`, `runtimeObjectPortalInstances`, `prerenderCells`, `runtimeObjectInstanceSync` (3 flags: 8 archetypes, model count 3, then 2 after removal) and `buildDecorationMesh` (1 mesh, 288 vertices, bounds). Header docs updated; generated docs regenerated in each Part commit.
+
+`renderFromRootMatrix` use list (checked before freezing): only read by `Matrix4.multiply` as right operand (`transformVisiblePortalResultToRenderFrame`), `applyMatrix4` (`runtimeObjectCameraPosition`) and `copy`/`invert` as source; nobody mutates it. `paletteDefinition.createPaletteDefinition` reads only its parameters, module constants and the clock (now `nowMs`), so the cache key (state reference, input mode, reload-confirmation flag) is complete. No caller of the registry queries needed a fix for the freeze (typecheck, tests and smoke show none mutating).
+
+### Deviations
+- Allocation tests used the `vi.mock("three")` counting method (it works in this vitest 1.6.1); no fallback needed.
+- Flag upload ranges: instead of always `clearUpdateRanges()` then `addUpdateRange`, a pending single range starting at 0 is extended (max of counts). Otherwise two syncs without a draw in between would lose the earlier change. Result for a single update is exactly `[{start: 0, count: count*itemSize}]` as specified.
+- Label sweep skipped: when the version is unchanged, labels are looked up in the map instead of re-resolving their text (`getGeodesicDisplayName`); a missing entry falls back to creation.
+- The `portalClipMaterial` viewport function had no job-22 changes to merge with; applied as written.
+- Existing test `runtimeObjectInstanceSync.test.ts`: `setup()` now also returns `roots`/`renderSourcesByKey` and accepts an optional root factory (additive; no assertion weakened).
+
+### Uncertain
+- Smoke: when it runs concurrently with other heavy work (vitest or edits compiling) or right after build, 3 of 4 worlds (all but the first) time out on "loading screen still present"; run alone, the full four-world smoke passed after each Part (Part A needed one rerun, Part B two, the last alone). I judge it to be the known load flake, not a regression.
+- Per-eye XR identification by `cameras.indexOf(renderCamera)` follows the three r0.164 source reading in the job; not verified in a headset.
+- The marmot's eyes lose their 0.6 roughness (accepted by Decision 15); pixel parity was not checked.
+- Frame snapshot `cameraPositions` now aliases scratch (valid until the next portal pass), as decided; any consumer retaining a snapshot across frames would see mutated positions (none found: only the instance sync reads them in the same frame).
+- Not claimed fixed (as listed in the job): `syncXrDebugState`, debug-state arrays, visibility computation, `remapStereoPortalPathIds`, non-identity XR transform, dedupe key strings, per-frame record arrays. Follow-ups recorded: sharing creature/asset archetypes by model, text atlas for flag text planes. `refreshMeasuredGeodesicLengths` gating covers the job-27 leftover scan; the `registry.getAll()` scans in `updateGeodesicEmitterLabels` and the instance sync remain per frame (now allocation-free thanks to cached arrays).
+
+### Not done
+- Manual checks not run (no browser/headset available to me).
+
+### Manual checks not run
+- Allocation (after Part A), Chrome: `npm run build`, `npx vite preview`, open `?config=full&world=cube`, click into the canvas, stand still. DevTools > Performance with Memory ticked, record 10 s, note the heap sawtooth (MB/s, minor GCs) on parent commit `0a97980` and on `8ce8798`. Then DevTools > Memory > Allocation sampling 10 s, sort by Self size: none of `updatePortalClipMaterialViewportFromRenderer`, `transformVisiblePortalResultToRenderFrame`, `resolveXrPortalEyeRenderRoot`, `runtimeObjectCameraPosition`, `updateGeodesicEmitterLabels` should appear.
+- Draw calls (after Part C): open `?config=full&world=cube&debugLevel=basic&debugOverlay=1&debugOverlayItems=fps`, place 20 flags of one type in the start cell, stand still facing them, read `webgl: N calls` on `7004802` (before) and `abe151f` (after). Expected about `M + 2` calls per flag before, 2 per flag after (plus `M` once), `M` = sign model mesh count. Record both numbers and `M`.
+- Headset: stereo XR, look through a portal at a flag with one eye's view crossing the portal; image should match the parent commit.
+
+### Checks
+- Baseline: typecheck and tests green at start.
+- After each Part: `npm run typecheck` ok; `npm test` ok (Part A 962 tests, Part B 970, Part C 976) apart from the docs test failing only until `npm run docs:generate` was run (stale generated docs), then green; `npm run docs:check` ok; `npm run build` ok; `npm run smoke -- --world cube,icosahedron,torus-moduli,genus-2-torus` ok (see Uncertain for the load flake).
+
+### Issues the Done-when closes
+Issue 75 (`_issues/75_frame_loop_allocation_and_per_object_draw_calls.md`, including the palette serialisation item from issue 41). Because the manual checks were not run, the job should be "done, needs review" and issue 75 left open with a pointer to this report, per the Bookkeeping section.
