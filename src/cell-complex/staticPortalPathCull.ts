@@ -11,8 +11,16 @@ import {
   type PortalRenderPath,
   type PortalRenderStep,
 } from "./portalPaths";
+import { developPortalSegment, type OrientedPortalSegment } from "./orientedPortal";
 import type { CompiledPortal } from "./specs";
 import type { CompiledPrismSide } from "./prismCells";
+import {
+  clipLineConeByPortal,
+  lineConeForTwoPortals,
+  lineConeMeasure,
+  staticLineConeMinMeasureMeters,
+  type LineCone,
+} from "./staticLineCone";
 import {
   composeRigidTransform3,
   identityRigidTransform3,
@@ -177,11 +185,247 @@ export interface RejectedPortalRenderPath {
 }
 
 /**
- * Generates portal-path tables breadth-first while culling, so descendants of rejected paths are never created.
- * Equivalent in spirit to buildPortalPathTables followed by staticallyCullPortalPathTables, but cheaper. Path ids are assigned to every candidate child before it is tested, so kept paths have sparse ids that do not match those of an unculled table built separately. After the budget is hit a single "static-path-budget" rejection is recorded and expansion of that root stops. Depth-0 root path is always kept.
+ * Generates portal-path tables breadth-first while culling by oriented line cones, so descendants of rejected paths are never created.
+ * Each word is kept iff some oriented plan-view line crosses its portals in order (see staticLineCone). Path ids are assigned to every candidate child before it is tested, so kept paths have sparse ids that do not match those of an unculled table built separately. After the budget is hit a single "static-path-budget" rejection is recorded and expansion of that root stops. Depth-0 root path is always kept; every other kept path carries newestPortalInRoot.
  * @throws Error if maxDepth is not a non-negative integer, toleranceMeters is negative, or a path reaches a missing cell or portal.
  */
 export function buildStaticallyCulledPortalPathTables(
+  world: CompiledCellComplex,
+  options: BuildStaticallyCulledPortalPathTablesOptions,
+): StaticPortalPathCullResult {
+  if (!Number.isInteger(options.maxDepth) || options.maxDepth < 0) {
+    throw new Error(`Portal path maxDepth must be a non-negative integer; received ${options.maxDepth}.`);
+  }
+
+  if (options.toleranceMeters < 0) {
+    throw new Error(`Static portal path cull tolerance must be non-negative; received ${options.toleranceMeters}.`);
+  }
+
+  const tablesByRootCellId = new Map<string, PortalPathTable>();
+  const summariesByRootCellId = new Map<string, StaticPortalPathCullSummary>();
+  const skipImmediateReverse = options.skipImmediateReverse ?? true;
+
+  for (const rootCell of world.cells) {
+    const rootPath: PortalRenderPath = {
+      id: 0,
+      rootCellId: rootCell.id,
+      destinationCellId: rootCell.id,
+      depth: 0,
+      steps: [],
+      destinationFromRoot: identityRigidTransform3,
+      rootFromDestination: identityRigidTransform3,
+    };
+    const keptPaths: PortalRenderPath[] = [rootPath];
+    const rejectedPaths: RejectedPortalRenderPath[] = [];
+    const rejectedByReason = new Map<StaticPortalPathRejectReason, number>();
+    // Cones of kept paths of depth >= 2, dropped at the end of the root.
+    const conesByPathId = new Map<number, LineCone>();
+    let frontier: PortalRenderPath[] = [rootPath];
+    const budget = options.maxKeptPathsPerRoot ?? Number.POSITIVE_INFINITY;
+    let nextPathId = 1;
+    let budgetExhausted = false;
+
+    options.onDepthComplete?.({
+      rootCellId: rootCell.id,
+      depth: 0,
+      processedPathCount: 1,
+      acceptedPathCount: 1,
+      rejectedPathCount: 0,
+      totalKeptPathCount: keptPaths.length,
+      totalRejectedPathCount: rejectedPaths.length,
+      budgetExhausted,
+    });
+
+    for (let depth = 1; depth <= options.maxDepth && frontier.length > 0 && !budgetExhausted; depth += 1) {
+      const nextFrontier: PortalRenderPath[] = [];
+      let processedPathCount = 0;
+      let acceptedPathCount = 0;
+      let rejectedPathCount = 0;
+
+      for (const parent of frontier) {
+        const sourceCell = world.cellsById.get(parent.destinationCellId);
+
+        if (!sourceCell) {
+          throw new Error(`Portal path reached missing cell "${parent.destinationCellId}".`);
+        }
+
+        for (const portal of sourceCell.portals) {
+          if (skipImmediateReverse && isImmediateReverse(parent, portal)) {
+            continue;
+          }
+
+          processedPathCount += 1;
+
+          // The budget check precedes the geometric tests, so once the cap is reached the next candidate is recorded as a budget rejection and this root's expansion stops.
+          if (keptPaths.length >= budget) {
+            const rejection = createRejection(nextPathId, "static-path-budget", options.keepRejectedPathDetails);
+            rejectedPaths.push(rejection);
+            rejectedByReason.set(rejection.reason, (rejectedByReason.get(rejection.reason) ?? 0) + 1);
+            rejectedPathCount += 1;
+            budgetExhausted = true;
+            break;
+          }
+
+          const destinationFromRoot = composeRigidTransform3(portal.transformToTarget, parent.destinationFromRoot);
+          const child: PortalRenderPath = {
+            id: nextPathId,
+            rootCellId: rootCell.id,
+            destinationCellId: portal.targetCellId,
+            depth,
+            parentPathId: parent.id,
+            steps: [
+              ...parent.steps,
+              {
+                sourceCellId: sourceCell.id,
+                sourcePortalId: portal.id,
+                sourcePortalSideIndex: portal.sideIndex,
+                targetCellId: portal.targetCellId,
+                targetPortalId: portal.targetPortalId,
+              },
+            ],
+            destinationFromRoot,
+            rootFromDestination: invertRigidTransform3(destinationFromRoot),
+            newestPortalInRoot: developPortalSegment(world, sourceCell.id, portal.sideIndex, parent.rootFromDestination),
+          };
+          nextPathId += 1;
+
+          const result = testChild(
+            depth,
+            conesByPathId.get(parent.id),
+            parent.newestPortalInRoot,
+            child.newestPortalInRoot!,
+            options.toleranceMeters,
+          );
+
+          if (!result) {
+            const rejection = createLineTransversalRejection(child.id, options.keepRejectedPathDetails);
+            rejectedPaths.push(rejection);
+            rejectedByReason.set(rejection.reason, (rejectedByReason.get(rejection.reason) ?? 0) + 1);
+            rejectedPathCount += 1;
+            continue;
+          }
+
+          if (result.cone) {
+            conesByPathId.set(child.id, result.cone);
+          }
+
+          keptPaths.push(child);
+          nextFrontier.push(child);
+          acceptedPathCount += 1;
+        }
+
+        if (budgetExhausted) {
+          break;
+        }
+      }
+
+      options.onDepthComplete?.({
+        rootCellId: rootCell.id,
+        depth,
+        processedPathCount,
+        acceptedPathCount,
+        rejectedPathCount,
+        totalKeptPathCount: keptPaths.length,
+        totalRejectedPathCount: rejectedPaths.length,
+        budgetExhausted,
+      });
+
+      frontier = nextFrontier;
+    }
+
+    tablesByRootCellId.set(rootCell.id, createPortalPathTable(rootCell.id, options.maxDepth, keptPaths));
+    summariesByRootCellId.set(rootCell.id, {
+      rootCellId: rootCell.id,
+      inputPathCount: keptPaths.length + rejectedPaths.length,
+      keptPathCount: keptPaths.length,
+      rejectedPathCount: rejectedPaths.length,
+      rejectedByReason,
+      rejectedPaths: options.keepRejectedPathDetails ? rejectedPaths : rejectedPaths.map(stripRejectionDetails),
+    });
+  }
+
+  return {
+    tables: {
+      maxDepth: options.maxDepth,
+      tablesByRootCellId,
+    },
+    summariesByRootCellId,
+  };
+}
+
+/**
+ * Outcome of testing one child word: the cone of lines crossing it (absent at depth 1, which has none) and its Crofton measure.
+ */
+interface ChildTestResult {
+  readonly cone: LineCone | undefined;
+  readonly measure: number;
+}
+
+/**
+ * Tests a child word of the given depth. Depth-1 words are never rejected and carry no cone; depth 2 builds the cone from the two portals; deeper words clip the parent's cone by the newest portal. Returns undefined if the word is rejected (empty cone or measure below staticLineConeMinMeasureMeters).
+ */
+function testChild(
+  depth: number,
+  parentCone: LineCone | undefined,
+  parentPortal: OrientedPortalSegment | undefined,
+  portal: OrientedPortalSegment,
+  wideningMeters: number,
+): ChildTestResult | undefined {
+  if (depth <= 1) {
+    return { cone: undefined, measure: 2 * Math.hypot(portal.left.x - portal.right.x, portal.left.y - portal.right.y) };
+  }
+
+  const cone =
+    depth === 2
+      ? parentPortal
+        ? lineConeForTwoPortals(parentPortal, portal, wideningMeters)
+        : []
+      : parentCone
+      ? clipLineConeByPortal(parentCone, portal, wideningMeters)
+      : [];
+  const measure = lineConeMeasure(cone);
+
+  if (cone.length === 0 || measure < staticLineConeMinMeasureMeters) {
+    return undefined;
+  }
+
+  return { cone, measure };
+}
+
+/**
+ * The newest portal of a table path developed into the root frame: the stored value, or computed from the parent's transform for hand-built paths.
+ */
+function newestPortalOf(world: CompiledCellComplex, table: PortalPathTable, path: PortalRenderPath): OrientedPortalSegment | undefined {
+  if (path.newestPortalInRoot) {
+    return path.newestPortalInRoot;
+  }
+
+  const parent = path.parentPathId === undefined ? undefined : table.pathsById.get(path.parentPathId);
+  const step = path.steps[path.steps.length - 1];
+
+  if (!parent || !step) {
+    return undefined;
+  }
+
+  return developPortalSegment(world, step.sourceCellId, step.sourcePortalSideIndex, parent.rootFromDestination);
+}
+
+/**
+ * Builds a rejection record for a word with no oriented line crossing its portals in order.
+ */
+function createLineTransversalRejection(pathId: number, includeDetails: boolean | undefined): RejectedPortalRenderPath {
+  return {
+    pathId,
+    reason: "no-static-line-transversal",
+    ...(includeDetails ? { details: `Rejected path ${pathId}; no oriented line crosses its portals in order.` } : {}),
+  };
+}
+
+/**
+ * Legacy tau/sigma builder, kept temporarily for the old-versus-new comparison test.
+ * @deprecated removed in Part C of job 20.
+ */
+export function buildStaticallyCulledPortalPathTablesLegacy(
   world: CompiledCellComplex,
   options: BuildStaticallyCulledPortalPathTablesOptions,
 ): StaticPortalPathCullResult {
@@ -362,7 +606,6 @@ export function staticallyCullPortalPathTables(
 
   const tablesByRootCellId = new Map<string, PortalPathTable>();
   const summariesByRootCellId = new Map<string, StaticPortalPathCullSummary>();
-  const tauSigmaDebugStats = options.debugTauSigmaDisagreements ? createTauSigmaDisagreementStats() : undefined;
 
   for (const [rootCellId, table] of pathTables.tablesByRootCellId) {
     if (!world.cellsById.has(rootCellId)) {
@@ -373,11 +616,9 @@ export function staticallyCullPortalPathTables(
     const rejectedPaths: RejectedPortalRenderPath[] = [];
     const rejectedByReason = new Map<StaticPortalPathRejectReason, number>();
     const budget = options.maxKeptPathsPerRoot ?? Number.POSITIVE_INFINITY;
-    // TODO(issue 56): same aperture-slack soundness question as in buildStaticallyCulledPortalPathTables.
-    // Same widened aperture tolerance as in buildStaticallyCulledPortalPathTables.
-    const cullTolerance = Math.max(options.toleranceMeters, forbiddenPortalJunctionRadiusMeters / 2);
 
     const keptPathIds = new Set<number>();
+    const conesByPathId = new Map<number, LineCone>();
     const rejectionReasonByPathId = new Map<number, StaticPortalPathRejectReason>();
 
     for (const path of table.paths) {
@@ -385,20 +626,35 @@ export function staticallyCullPortalPathTables(
         path.parentPathId !== undefined && !keptPathIds.has(path.parentPathId)
           ? rejectionReasonByPathId.get(path.parentPathId) ?? "static-path-budget"
           : undefined;
-      const geometricRejection =
-        path.depth === 0
-          ? undefined
-          : parentRejectionReason
-          ? createInheritedRejection(path.id, path.parentPathId, parentRejectionReason, options.keepRejectedPathDetails)
-          : rejectGeometrically(world, path, cullTolerance, options.keepRejectedPathDetails) ??
-            rejectByTauSigmaTransversal(
-              world,
-              path,
-              options.toleranceMeters,
-              options.keepRejectedPathDetails,
-              options.debugTauSigmaDisagreements,
-              tauSigmaDebugStats,
-            );
+      let childResult: ChildTestResult | undefined;
+      let geometricRejection: RejectedPortalRenderPath | undefined;
+
+      if (path.depth === 0) {
+        geometricRejection = undefined;
+      } else if (parentRejectionReason) {
+        geometricRejection = createInheritedRejection(
+          path.id,
+          path.parentPathId,
+          parentRejectionReason,
+          options.keepRejectedPathDetails,
+        );
+      } else {
+        const portal = newestPortalOf(world, table, path);
+        const parent = path.parentPathId === undefined ? undefined : table.pathsById.get(path.parentPathId);
+
+        if (!portal) {
+          throw new Error(`Static portal path culling cannot develop the newest portal of path ${path.id}.`);
+        }
+
+        childResult = testChild(
+          path.depth,
+          path.parentPathId === undefined ? undefined : conesByPathId.get(path.parentPathId),
+          parent ? newestPortalOf(world, table, parent) : undefined,
+          portal,
+          options.toleranceMeters,
+        );
+        geometricRejection = childResult ? undefined : createLineTransversalRejection(path.id, options.keepRejectedPathDetails);
+      }
       // The budget counts only paths that passed the geometric tests; the root path (depth 0) is exempt.
       const budgetRejection =
         path.depth > 0 && !geometricRejection && keptPaths.length >= budget
@@ -415,6 +671,10 @@ export function staticallyCullPortalPathTables(
 
       keptPaths.push(path);
       keptPathIds.add(path.id);
+
+      if (childResult?.cone) {
+        conesByPathId.set(path.id, childResult.cone);
+      }
     }
 
     tablesByRootCellId.set(rootCellId, createPortalPathTable(rootCellId, table.maxDepth, keptPaths));
@@ -427,8 +687,6 @@ export function staticallyCullPortalPathTables(
       rejectedPaths: options.keepRejectedPathDetails ? rejectedPaths : rejectedPaths.map(stripRejectionDetails),
     });
   }
-
-  logTauSigmaDisagreementSummary(tauSigmaDebugStats);
 
   return {
     tables: {

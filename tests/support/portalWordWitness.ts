@@ -36,7 +36,8 @@ export function walkedWordPrefixes(
   const result = walkDevelopedSegment({ world, cellId: rootCellId, start, direction, lengthMeters: 1000, maxCrossings });
   const prefixes: string[] = [];
 
-  for (let count = 1; count <= result.crossings.length; count += 1) {
+  // The walk records one crossing more than maxCrossings before it reports "crossing-limit".
+  for (let count = 1; count <= Math.min(result.crossings.length, maxCrossings); count += 1) {
     prefixes.push(
       wordSignature(result.crossings.slice(0, count).map((c) => ({ sourceCellId: c.sourceCellId, sourcePortalId: c.portalId }))),
     );

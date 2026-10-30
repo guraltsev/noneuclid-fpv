@@ -101,6 +101,47 @@ export const exampleWorldSpecs: readonly (readonly [string, CellComplexSpec])[] 
   ["torusModuli", examples.torusModuli],
 ];
 
+/**
+ * A cone-point fan: 3-8 triangles around a common apex, glued cyclically through their spokes. Apex angles are in [0.3, 2.0] rad and spoke radii in [3, 12] m, so the total angle ranges over about [0.9, 16] rad and cone points with angle sum below and above 2 pi both occur. Cell `fan-i` has portal "out" on side 2 and "in" on side 0; side 1 is a wall.
+ */
+export const arbConeFanWorldSpec: fc.Arbitrary<CellComplexSpec> = fc
+  .integer({ min: 3, max: 8 })
+  .chain((n) =>
+    fc.tuple(
+      fc.array(fc.double({ min: 0.3, max: 2.0, noNaN: true }), { minLength: n, maxLength: n }),
+      fc.array(fc.double({ min: 3, max: 12, noNaN: true }), { minLength: n, maxLength: n }),
+    ),
+  )
+  .map(([angles, radii]) => {
+    const n = angles.length;
+    const thetas = [0];
+
+    for (let i = 0; i < n; i += 1) {
+      thetas.push(thetas[i] + angles[i]);
+    }
+
+    const cells = angles.map((_, i) => {
+      const next = (i + 1) % n;
+      const previous = (i + n - 1) % n;
+
+      return {
+        id: `fan-${i}`,
+        heightMeters: 3,
+        baseVertices: [
+          { x: 0, y: 0 },
+          { x: radii[i] * Math.cos(thetas[i]), y: radii[i] * Math.sin(thetas[i]) },
+          { x: radii[next] * Math.cos(thetas[i + 1]), y: radii[next] * Math.sin(thetas[i + 1]) },
+        ],
+        portals: [
+          { id: "in", sideIndex: 0, targetCellId: `fan-${previous}`, targetPortalId: "out" },
+          { id: "out", sideIndex: 2, targetCellId: `fan-${next}`, targetPortalId: "in" },
+        ],
+      };
+    });
+
+    return { cells } as unknown as CellComplexSpec;
+  });
+
 /** Point strictly inside a (convex) cell: a weighted average of its base vertices with weights in [0.01, 1]. */
 export function arbPointInCell(cell: CompiledPrismCell): fc.Arbitrary<{ x: number; y: number }> {
   return fc

@@ -4,6 +4,7 @@ import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
 import { polygonSignedArea2xy, validatePolygon2xy } from "../../src/math/polygons";
 import { lengthVec3 } from "../../src/math/vec3";
 import {
+  arbConeFanWorldSpec,
   arbConvexPolygon2xy,
   arbCoordinate,
   arbPointInCell,
@@ -79,6 +80,17 @@ describe("arbitraries", () => {
       fc.property(arbPointInCell(cell), (p) =>
         cell.sides.every((side) => (p.x - side.start.x) * side.inwardNormal.x + (p.y - side.start.y) * side.inwardNormal.y > 0),
       ),
+      { numRuns: 50 },
+    );
+  });
+
+  it("cone fan world specs compile", () => {
+    fc.assert(
+      fc.property(arbConeFanWorldSpec, (spec) => {
+        const world = compileCellComplex(spec);
+
+        return world.cells.length >= 3 && world.cells.every((cell) => cell.portals.length === 2);
+      }),
       { numRuns: 50 },
     );
   });

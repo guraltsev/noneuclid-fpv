@@ -314,7 +314,8 @@ Static, view-independent culling of portal-path tables: discards portal words th
 | interface | `StaticPortalPathCullSummary` | Per-root statistics of a culling run. |
 | type | `StaticPortalPathRejectReason` | Why a path was removed. |
 | interface | `RejectedPortalRenderPath` | Record of one rejected path: its id, the rejection reason and optional explanatory text. |
-| function | `buildStaticallyCulledPortalPathTables` | Generates portal-path tables breadth-first while culling, so descendants of rejected paths are never created. |
+| function | `buildStaticallyCulledPortalPathTables` | Generates portal-path tables breadth-first while culling by oriented line cones, so descendants of rejected paths are never created. |
+| function | `buildStaticallyCulledPortalPathTablesLegacy` | Legacy tau/sigma builder, kept temporarily for the old-versus-new comparison test. |
 | function | `staticallyCullPortalPathTables` | Filters existing portal-path tables, keeping each path only if it passes all geometric tests, preserving the original path ids. |
 
 ### `cell-complex/validateCellComplexSpec.ts`

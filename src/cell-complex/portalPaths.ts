@@ -3,6 +3,7 @@
  * Paths are generated breadth-first from the root, so a parent always precedes its children and ids equal array indices (root path id 0). Each path stores destinationFromRoot, mapping root-cell-local coordinates to destination-cell-local ones, built as compose(portal.transformToTarget, parent.destinationFromRoot) so the newest portal is applied last, and its inverse rootFromDestination, which places destination geometry in the root frame (this is what a renderer needs to draw the destination as seen through the portal word). The number of paths can grow like branching^depth, which is why a static culling pass (staticPortalPathCull) exists. By default a portal that immediately undoes the previous step (its reciprocal) is skipped, since the net transform would be the identity and the path would only revisit the previous cell.
  */
 import type { CompiledCellComplex } from "./compileCellComplex";
+import { developPortalSegment, type OrientedPortalSegment } from "./orientedPortal";
 import type { CompiledPortal } from "./specs";
 import {
   composeRigidTransform3,
@@ -84,6 +85,10 @@ export interface PortalRenderPath {
    * Inverse of destinationFromRoot: places destination-cell geometry in the root cell's frame.
    */
   readonly rootFromDestination: RigidTransform3;
+  /**
+   * The newest crossed portal side developed into the root frame's plan (left/right as seen when leaving its source cell); absent on the root path. Optional only so hand-built fixtures compile.
+   */
+  readonly newestPortalInRoot?: OrientedPortalSegment;
 }
 
 /**
@@ -213,6 +218,7 @@ function buildPortalPathTableForRoot(
         ],
         destinationFromRoot,
         rootFromDestination: invertRigidTransform3(destinationFromRoot),
+        newestPortalInRoot: developPortalSegment(world, sourceCell.id, portal.sideIndex, parent.rootFromDestination),
       };
 
       paths.push(child);
