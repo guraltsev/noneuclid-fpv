@@ -254,9 +254,6 @@ export function createGeodesicDebugDumps(deps: GeodesicDebugDumpsDeps) {
         freeEndAnchorId: pair.freeEndAnchorId,
         first: formatEndpointRef(pair.first),
         second: formatEndpointRef(pair.second),
-        previousTotalLengthMeters: pair.previousTotalLengthMeters === undefined
-          ? undefined
-          : roundedMeters(pair.previousTotalLengthMeters),
         lastGoodFreeEndCellId: pair.lastGoodFreeEndCellId,
         lastGoodFreeEndPoint: formatVec3(pair.lastGoodFreeEndPoint),
       })),

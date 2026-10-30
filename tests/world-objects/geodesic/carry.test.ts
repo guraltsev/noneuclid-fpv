@@ -4,13 +4,9 @@ import {
   createRuntimeObjectRegistry,
   runtimeObjectToDynamicObjectState,
 } from "../.././../src/world-objects/runtimeObjectRegistry";
-import { advanceCurveShorteningPairs } from "../../../src/world-objects/geodesic/curveShortening";
 import {
-  createCurveShorteningPairObject,
-  createFreeGeodesicEndObject,
   createGeodesicCannonObject,
   createGeodesicIntervalObject,
-  geodesicRayBeamHeightMeters,
   geodesicRayBeamStartOffsetMeters,
 } from "../../../src/world-objects/geodesic/objects";
 import { collectGeodesicPortalWord, getGeodesicSegments } from "../../../src/world-objects/geodesic/segments";
@@ -18,7 +14,6 @@ import { getGeodesicConnection, isGeodesicLocked } from "../../../src/world-obje
 import { liftGeodesicEndpoint } from "../../../src/world-objects/geodesic/endpoints";
 import { rebuildConnectedGeodesicBetweenEmitters, shootGeodesic } from "../../../src/world-objects/geodesic/cannon";
 import {
-  rebuildDerivedGeodesicSegments,
   updateLockedGeodesicPortalWordForCarriedAnchorTraversal,
   updateLockedGeodesicPortalWordForCarriedAnchorTraversals,
 } from "../../../src/world-objects/geodesic/intervals";
@@ -36,7 +31,6 @@ import {
   compileThreeCellPortalWorld,
   compileTorusLoopWorld,
   compileTwoCellCylinderWorld,
-  compileRotatedFreeLoopWorld,
 } from "./fixtures";
 
 describe("geodesic cannon world objects: carry", () => {
@@ -884,55 +878,6 @@ describe("geodesic cannon world objects: carry", () => {
         });
         expect(totalGeodesicLength(registry, "g-loop")).toBeCloseTo(10, 6);
       }
-    });
-
-    it("conjugates a free loop's word when curve shortening moves its free end through a portal", () => {
-      const world = compileRotatedFreeLoopWorld();
-      const registry = createRuntimeObjectRegistry();
-      const point = { x: 4.9, y: 1, z: geodesicRayBeamHeightMeters };
-      registry.add(createFreeGeodesicEndObject({ id: "free-loop", cellId: "a", point }));
-      registry.add(createGeodesicIntervalObject({
-        id: "g-loop",
-        startAnchorObjectId: "free-loop",
-        endAnchorObjectId: "free-loop",
-        startCellId: "a",
-        motionState: "moving",
-        portalWord: [
-          createCarryPortalTraversal(world, "a", "ab"),
-          createCarryPortalTraversal(world, "b", "b-bottom"),
-          createCarryPortalTraversal(world, "b", "ba"),
-        ],
-      }));
-      expect(rebuildDerivedGeodesicSegments({ world, registry, geodesicId: "g-loop" })).toBeTruthy();
-      const startLength = totalGeodesicLength(registry, "g-loop");
-      expect(startLength).toBeCloseTo(7.34983, 5);
-      registry.add(createCurveShorteningPairObject({
-        id: "pair-loop",
-        first: { geodesicId: "g-loop", role: "start", anchorObjectId: "free-loop" },
-        second: { geodesicId: "g-loop", role: "end", anchorObjectId: "free-loop" },
-        freeEndAnchorId: "free-loop",
-        previousTotalLengthMeters: startLength,
-        lastGoodFreeEndCellId: "a",
-        lastGoodFreeEndPoint: point,
-      }));
-
-      const changed = advanceCurveShorteningPairs({ world, registry, deltaSeconds: 1 });
-
-      expect(changed).toEqual(["g-loop"]);
-      const freeEnd = registry.get("free-loop");
-      expect(freeEnd).toMatchObject({ kind: "free-geodesic-end", cellId: "b" });
-      expect(freeEnd?.localPose.translation.x).toBeCloseTo(0.2925, 3);
-      expect(freeEnd?.localPose.translation.y).toBeCloseTo(0.923, 3);
-      expect(registry.get("g-loop")).toMatchObject({
-        kind: "geodesic-interval",
-        cellId: "b",
-        startCellId: "b",
-        portalWord: [createCarryPortalTraversal(world, "b", "b-bottom")],
-      });
-      expect(totalGeodesicLength(registry, "g-loop")).toBeCloseTo(6.784145, 4);
-      const pair = registry.get("pair-loop");
-      expect(pair).toMatchObject({ kind: "curve-shortening-pair", state: "moving" });
-      expect(pair?.kind === "curve-shortening-pair" ? pair.previousTotalLengthMeters : undefined).toBeCloseTo(6.784145, 4);
     });
 
     it("refuses to lift an interval whose word does not chain between its anchors' cells", () => {

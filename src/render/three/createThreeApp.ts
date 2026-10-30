@@ -124,6 +124,7 @@ import { createHelpLensDefinition } from "../../ui/helpLensDefinition";
 import { createPaletteDefinition } from "../../ui/paletteDefinition";
 import { type GeodesicCarryPortalTransition } from "../../world-objects/geodesic/objects";
 import { advanceCurveShorteningPairs } from "../../world-objects/geodesic/curveShortening";
+import { pruneMissingGeodesicIntersectionObjects } from "../../world-objects/geodesic/intersections";
 import {
   type GeodesicMarmotRuntime,
   createGeodesicMarmotRuntime,
@@ -1467,15 +1468,11 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
         world: activeWorld(),
         registry: runtimeObjectRegistry,
         deltaSeconds: frame.resetRequested ? 0 : deltaSeconds,
-        onDebugMessage: menuState.debugEnabled
-          ? (message, detail) => {
-              const diagnostics = runtimeDiagnostics();
-              diagnostics.recordDebugEvent(message, detail);
-              if (!diagnostics.enabled) {
-                console.info(`[noneuclid] ${message}`, detail);
-              }
-            }
-          : undefined,
+        // There is no on-screen message system yet: notices go to the console and the diagnostics, always (not only in debug mode).
+        onNotice: (notice) => {
+          console.info(`[noneuclid] ${notice.message}`);
+          runtimeDiagnostics().recordDebugEvent(notice.message, notice);
+        },
       });
     });
     for (const geodesicId of straightenedGeodesicIds) {
@@ -1483,6 +1480,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       refreshMeasuredGeodesicLengthsForGeodesic(geodesicId);
     }
     if (straightenedGeodesicIds.length > 0) {
+      removeProtractorAnglesForMissingVertices(pruneMissingGeodesicIntersectionObjects(runtimeObjectRegistry));
       syncSelectableHitboxDebug();
     }
     refreshMeasuredGeodesicLengths();

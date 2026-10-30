@@ -11,6 +11,7 @@
  * ## Objects (all live in a `RuntimeObjectRegistry`)
  * - `GeodesicCannonObject` (emitter): a placed object that geodesic endpoints can attach to.
  * - `FreeGeodesicEndObject`: an invisible anchor for an endpoint that is not on an emitter.
+ * - `GeodesicCornerObject`: an invisible pinned anchor at a corner of a taut geodesic polygon, next to the forbidden disk it wraps.
  * - `GeodesicIntervalObject`: THE authoritative geodesic. It has two endpoint attachments (`start`, `end`; each names an anchor object, an
  *   emitter or a free end) and a PORTAL WORD: the ordered list of portal traversals from `start` to `end`. Nothing else is stored.
  * - `GeodesicSegmentObject`: derived, per-cell straight pieces of an interval, regenerated from the interval whenever it changes.
@@ -32,7 +33,7 @@
  * "free" because shooting (`shootGeodesic`) fixes the word by tracing the ray first and then recording what it crossed.
  *
  * ## Locked and moving intervals
- * An interval whose both endpoints are emitters is LOCKED (`isGeodesicLocked`): carrying an emitter keeps the interval and updates its
+ * An interval whose both endpoints are pinned anchors (emitters or polygon corners) is LOCKED (`isGeodesicLocked`): carrying an emitter keeps the interval and updates its
  * word by the portal the emitter crossed (both ends of a loop on that emitter move, so its word is conjugated: `w -> p^-1 w p`)
  * (`rebuildLockedGeodesicFromEndpointsAndPortalWord`). An interval with an emitter and a free end
  * is an aimable free geodesic (`aimFreeGeodesicFromEndpoint`, `extendGeodesic`, split by `splitGeodesicIntervalAtSegmentHit`).
@@ -40,19 +41,13 @@
  *
  * ## Curve shortening (issue 31/32)
  * `tieAndDetachGeodesicEndpoints` detaches two endpoint roles (possibly the two roles of one loop) from an emitter and ties them to one
- * shared free end F, creating a `CurveShorteningPairObject`. Each tick (`advanceCurveShorteningPairs`) moves F in the direction
- * `normalize(u + v)` (`u`, `v` unit tangents of the two arcs at F, pointing away from F), which is the steepest descent of total length
- * (first variation `dL = -(u + v) . dF`), by a bounded step; when F crosses a portal, each arc's word is updated by that portal
- * (`portalWordAfterAnchorCrossing`; a free loop's word is conjugated), otherwise the words stay fixed (no search over homotopy classes). Every arc is re-traced as a
- * preview before anything is written (`previewRebuildGeodesicInterval`). When the corner at F is straight (`u + v` vanishes, or the angle
- * is within `curveShorteningFuseAngleToleranceRadians` of pi) the pair becomes `"ready-to-fuse"` and `fuseCurveShorteningPair` merges the
- * arcs into one stable geodesic whose word is the role-aware concatenation of the two arcs' words, freely reduced
- * (`getPortalWordBetweenEndpointRoles`, `reduceAdjacentInversePortalTraversals`). A single interval whose two roles share F is a
- * free loop; fusing it keeps it as a stable free loop. A very short arc is absorbed into the other (`absorbShortCurveShorteningHalf`);
- * forbidden-zone hits delete the offending arc (the other survives as a stable free geodesic).
- * Monotone descent: a previewed tick whose total length exceeds the pair's recorded `previousTotalLengthMeters` by more than
- * `curveShorteningLengthIncreaseToleranceMeters` is not committed. A ready pair whose fusion fails without a forbidden zone reverts to
- * `"moving"`, and a free loop shorter than `GEODESIC_MIN_LENGTH_METERS` is deleted.
+ * shared free end F, creating a `CurveShorteningPairObject`. The next `advanceCurveShorteningPairs` call resolves the pair in one tick
+ * (`resolveCurveShorteningPair`): the role-aware concatenation of the two arcs' words, freely reduced (`getPortalWordBetweenEndpointRoles`,
+ * `reduceAdjacentInversePortalTraversals`), is developed into a sleeve of apertures (`sleeve.ts`), and the shortest path of that homotopy
+ * class is the straight chord, or a taut string that wraps the forbidden-zone disks at portal junctions. Wraps are drawn as corners,
+ * pinned `GeodesicCornerObject` anchors, so the result is a chain of stable locked intervals. A single interval whose two roles share F is a
+ * free loop: with a translation as holonomy it stays as a stable loop, with a rotation (it encircles a cone point) it is deleted with a
+ * notice. A pair that cannot be resolved is left as it was and marked `"unresolved"`. There is no gradient descent.
  *
  * ## Intersections and bookkeeping
  * `updateGeodesicIntersectionObjects` recomputes the crossing markers of all segments (same cell, different geodesics) and keeps marker ids
@@ -66,8 +61,8 @@
  * ## Constants
  * Meters unless stated. `GEODESIC_MIN_LENGTH_METERS` (0.15) minimum chord of a geodesic; `minGeodesicSegmentLengthMeters` (0.05) minimum
  * piece when splitting; `intersectionTolerance` (1e-7) numerical zero; `forbiddenZoneCircleToleranceMeters` (1e-9) band of the open-disk rule;
- * `emitterConnectionToleranceMeters` (0.3) capture radius around an emitter; `curveShortening*` (speed 0.4 m/s, angle 0.03 rad, absorb
- * tolerance 0.165 m, arc-length floor 0.002 m) parameters of the shortening tick.
+ * `emitterConnectionToleranceMeters` (0.3) capture radius around an emitter; `geodesicCornerClearanceMeters` (1e-6, in `sleeve.ts`) extra
+ * radius of the forbidden disk wrapped by the taut string.
  *
  * The geodesic code is split over the modules of `src/world-objects/geodesic/`; this module holds the object types,
  * constants, constructors and small geometry helpers they share.
@@ -210,11 +205,11 @@ export interface GeodesicIntervalObject extends RuntimeWorldObjectBase {
 }
 
 /**
- * Bookkeeping object owning one curve-shortening process: two endpoint roles glued at a shared free end that slides downhill.
+ * Bookkeeping object owning one curve-shortening process: two endpoint roles glued at a shared free end, resolved in one tick.
  *
  * Invariants (see issue 32): `first` and `second` are different endpoint roles attached to `freeEndAnchorId`
  * (they may belong to the same interval, which is then a free loop); every referenced interval is `"moving"`.
- * The object is invisible; `cellId`/`localPose` merely mirror `lastGoodFreeEndCellId`/`lastGoodFreeEndPoint`.
+ * The object is invisible; `cellId`/`localPose` merely mirror `lastGoodFreeEndCellId`/`lastGoodFreeEndPoint`. A pair whose resolution failed has `state: "unresolved"`.
  */
 export interface CurveShorteningPairObject extends RuntimeWorldObjectBase {
   readonly kind: "curve-shortening-pair";
@@ -222,14 +217,12 @@ export interface CurveShorteningPairObject extends RuntimeWorldObjectBase {
   readonly second: GeodesicEndpointAttachment;
   /** Id of the shared `FreeGeodesicEndObject` that both roles attach to. */
   readonly freeEndAnchorId: string;
-  /** Total length (meters) of the owned intervals after the last committed tick; the monotonicity reference. Updated only on a successful tick. */
-  readonly previousTotalLengthMeters?: number;
-  /** Cell of the shared free end at the last committed tick; rollback target. */
+  /** Cell of the shared free end when the pair was created (informational; the pose mirrors it). */
   readonly lastGoodFreeEndCellId: string;
-  /** Cell-local position (meters) of the shared free end at the last committed tick; rollback target. */
+  /** Cell-local position (meters) of the shared free end when the pair was created (informational). */
   readonly lastGoodFreeEndPoint: Vec3;
-  /** `"ready-to-fuse"` once the free end is (nearly) straight; `fuseCurveShorteningPair` consumes it. */
-  readonly state: "moving" | "ready-to-fuse" | "unresolved";
+  /** `"moving"` until the next `advanceCurveShorteningPairs` call resolves the pair; `"unresolved"` after a failed resolution (later calls skip it). */
+  readonly state: "moving" | "unresolved";
 }
 
 /**
@@ -565,10 +558,9 @@ export function createCurveShorteningPairObject(input: {
   readonly first: GeodesicEndpointAttachment;
   readonly second: GeodesicEndpointAttachment;
   readonly freeEndAnchorId: string;
-  readonly previousTotalLengthMeters?: number;
   readonly lastGoodFreeEndCellId: string;
   readonly lastGoodFreeEndPoint: Vec3;
-  readonly state?: "moving" | "ready-to-fuse" | "unresolved";
+  readonly state?: "moving" | "unresolved";
 }): CurveShorteningPairObject {
   return {
     id: input.id,
@@ -579,7 +571,6 @@ export function createCurveShorteningPairObject(input: {
     first: input.first,
     second: input.second,
     freeEndAnchorId: input.freeEndAnchorId,
-    previousTotalLengthMeters: input.previousTotalLengthMeters,
     lastGoodFreeEndCellId: input.lastGoodFreeEndCellId,
     lastGoodFreeEndPoint: input.lastGoodFreeEndPoint,
     state: input.state ?? "moving",

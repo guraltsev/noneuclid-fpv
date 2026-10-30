@@ -273,7 +273,6 @@ export interface AllGeodesicsDebugDump {
     readonly freeEndAnchorId: string;
     readonly first: string;
     readonly second: string;
-    readonly previousTotalLengthMeters?: number;
     readonly lastGoodFreeEndCellId: string;
     readonly lastGoodFreeEndPoint: string;
   }[];

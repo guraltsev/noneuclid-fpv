@@ -909,27 +909,3 @@ export function previewGeodesicIntervalHitsForbiddenZone(input: {
   });
   return traces.some((trace) => trace.terminal.kind === "forbidden-zone-hit");
 }
-
-// Read-only: is the lifted start-to-end chord shorter than `GEODESIC_MIN_LENGTH_METERS`? False if the lift itself fails.
-/** Read-only: is the lifted start-to-end chord shorter than `GEODESIC_MIN_LENGTH_METERS`? */
-export function previewGeodesicIntervalIsDegenerate(input: {
-  readonly world: CompiledCellComplex;
-  readonly registry: RuntimeObjectRegistry;
-  readonly interval: GeodesicIntervalObject;
-  readonly candidateAnchorsById?: ReadonlyMap<string, RuntimeWorldObject>;
-}): boolean {
-  const lifted = liftGeodesicEndpointWithAnchors({
-    world: input.world,
-    registry: input.registry,
-    interval: input.interval,
-    sourceRole: "start",
-    candidateAnchorsById: input.candidateAnchorsById,
-  });
-  if (!lifted) {
-    return false;
-  }
-  return Math.hypot(
-    lifted.targetPointInSourceCell.x - lifted.sourcePoint.x,
-    lifted.targetPointInSourceCell.y - lifted.sourcePoint.y,
-  ) < GEODESIC_MIN_LENGTH_METERS - intersectionTolerance;
-}

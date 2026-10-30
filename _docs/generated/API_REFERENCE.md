@@ -472,20 +472,14 @@ Emitter (cannon) operations: shooting, extending and re-aiming geodesics, connec
 
 ### `world-objects/geodesic/curveShortening.ts`
 
-Curve shortening: tie-and-detach of two endpoint roles into a curve-shortening pair, and the per-tick advance, fusion and failure handling of pairs.
+Curve shortening: tie-and-detach of two endpoint roles into a curve-shortening pair, and its exact resolution in one tick.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
 | interface | `TieAndDetachGeodesicEndpointsRequest` | Request for `tieAndDetachGeodesicEndpoints`: detach two endpoint roles from one emitter and tie them at a new shared free end. |
-| interface | `AdvanceCurveShorteningPairsRequest` | Request for `advanceCurveShorteningPairs`: advance every moving pair by `deltaSeconds`. |
-| const | `curveShorteningDefaultSpeedMetersPerSecond` | Default speed (m/s) at which a curve-shortening pair's shared free end moves downhill. |
-| const | `curveShorteningFuseAngleToleranceRadians` | Turn-angle tolerance (radians) below which the free end counts as locally straight, so the pair is ready to fuse. |
-| const | `curveShorteningFuseStepToleranceMeters` | Length tolerance (meters): a two-arc pair whose shorter arc is below this is absorbed into one geodesic (`absorbShortCurveShorteningHalf`); slightly above the minimum geodesic length. |
-| const | `curveShorteningMinStepMeters` | Floor (meters) applied to the arc lengths in the curve-shortening step's distance-to-straight estimate, so that a vanishing arc cannot divide by zero. |
-| const | `curveShorteningLengthIncreaseToleranceMeters` | Length tolerance (meters) for the monotone-descent check of curve shortening: a previewed step is committed only if the new total length of the pair's arcs is at most `previousTotalLengthMeters + curveShorteningLengthIn… |
+| interface | `AdvanceCurveShorteningPairsRequest` | Request for `advanceCurveShorteningPairs`: resolve every moving pair (the time step only gates the call; a pair is resolved in one tick). |
 | function | `tieAndDetachGeodesicEndpoints` | Detaches two endpoint roles from one emitter and ties them to a new shared free end, starting a curve-shortening pair. |
-| function | `advanceCurveShorteningPairs` | Advances every curve-shortening pair by one tick of `deltaSeconds`, sliding its shared free end downhill, and returns the changed ids. |
-| function | `fuseCurveShorteningPair` | Finishes a curve-shortening pair: merges its moving arcs into one stable geodesic and deletes the pair and its free end. |
+| function | `advanceCurveShorteningPairs` | Resolves every `"moving"` curve-shortening pair completely, in this one call, and returns the ids that changed. |
 | type | `CurveShorteningNotice` | A user-visible event of the curve-shortening resolution; the shell logs it (there is no on-screen message system yet). |
 | type | `CurveShorteningResolution` | Outcome of {@link resolveCurveShorteningPair}. |
 | function | `resolveCurveShorteningPair` | Resolves one curve-shortening pair completely: replaces its two arcs (or its free loop) by the length-minimizing path of their homotopy class. |
@@ -547,7 +541,6 @@ Interval rebuilds: realizing an interval's lifted chord, aiming free geodesics, 
 | function | `updatePortalWordForMovedEndpoint` | Returns the interval's portal word after one of its endpoints crossed a portal, or `undefined` if the result is inconsistent. |
 | function | `previewRebuildGeodesicInterval` | Computes the segments an interval would have, without touching the registry (rollback-safe). |
 | function | `previewGeodesicIntervalHitsForbiddenZone` | Read-only: would the previewed interval hit a forbidden zone or be shorter than the minimum length? |
-| function | `previewGeodesicIntervalIsDegenerate` | Read-only: is the lifted start-to-end chord shorter than `GEODESIC_MIN_LENGTH_METERS`? |
 
 ### `world-objects/geodesic/legacyConnection.ts`
 
@@ -595,7 +588,7 @@ Geodesic emitters ("cannons"), geodesic intervals and curve shortening on a glue
 | interface | `FreeGeodesicEndObject` | An invisible, non-colliding anchor object marking a geodesic endpoint that is not on an emitter. |
 | interface | `GeodesicCornerObject` | A pinned, invisible anchor at a corner of a taut geodesic polygon, next to the forbidden disk it wraps. |
 | interface | `GeodesicIntervalObject` | The authoritative description of one geodesic: two endpoint attachments plus the portal word joining them. |
-| interface | `CurveShorteningPairObject` | Bookkeeping object owning one curve-shortening process: two endpoint roles glued at a shared free end that slides downhill. |
+| interface | `CurveShorteningPairObject` | Bookkeeping object owning one curve-shortening process: two endpoint roles glued at a shared free end, resolved in one tick. |
 | interface | `LiftedGeodesicEndpoint` | An interval's far endpoint pulled back into the cell of a chosen source endpoint (the "development" of the interval). |
 | interface | `GeodesicTraceBuildResult` | Outcome of rebuilding an interval's derived geometry: the interval, its new segments, and how the trace ended. |
 | interface | `GeodesicSegmentObject` | A derived, per-cell straight piece of a geodesic: a ray inside one cell from `start` along `direction` for `lengthMeters`. |

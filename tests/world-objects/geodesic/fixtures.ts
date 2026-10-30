@@ -18,30 +18,6 @@ import { rebuildConnectedGeodesicBetweenEmitters } from "../../../src/world-obje
 import { rebuildDerivedGeodesicSegments } from "../../../src/world-objects/geodesic/intervals";
 import { yawRigidTransform3 } from "../.././../src/math/rigidTransform3";
 
-// Kink scenario: free end at the origin joins an arc from a left emitter (-2, 0) and an arc from a top emitter (0, 2), so the corner
-// is a right angle and the pair is `"moving"`. Cell `a` of `compileLargeWorld` is 6 m wide.
-export function createKinkPairScenario(options: { readonly previousTotalLengthMeters?: number }) {
-  const world = compileLargeWorld();
-  const registry = createRuntimeObjectRegistry();
-  registry.add(createGeodesicCannonObject({ id: "cannon-left", cellId: "a", localPose: yawRigidTransform3(0, { x: -2, y: 0, z: 0 }) }));
-  registry.add(createGeodesicCannonObject({ id: "cannon-top", cellId: "a", localPose: yawRigidTransform3(-Math.PI / 2, { x: 0, y: 2, z: 0 }) }));
-  registry.add(createFreeGeodesicEndObject({ id: "free-shared", cellId: "a", point: { x: 0, y: 0, z: geodesicRayBeamHeightMeters } }));
-  registry.add(createGeodesicIntervalObject({ id: "g-left", startAnchorObjectId: "cannon-left", endAnchorObjectId: "free-shared", startCellId: "a", motionState: "moving" }));
-  registry.add(createGeodesicIntervalObject({ id: "g-top", startAnchorObjectId: "free-shared", endAnchorObjectId: "cannon-top", startCellId: "a", motionState: "moving" }));
-  rebuildDerivedGeodesicSegments({ world, registry, geodesicId: "g-left" });
-  rebuildDerivedGeodesicSegments({ world, registry, geodesicId: "g-top" });
-  registry.add(createCurveShorteningPairObject({
-    id: "pair-kink",
-    first: { geodesicId: "g-left", role: "end", anchorObjectId: "free-shared" },
-    second: { geodesicId: "g-top", role: "start", anchorObjectId: "free-shared" },
-    freeEndAnchorId: "free-shared",
-    previousTotalLengthMeters: options.previousTotalLengthMeters,
-    lastGoodFreeEndCellId: "a",
-    lastGoodFreeEndPoint: { x: 0, y: 0, z: geodesicRayBeamHeightMeters },
-  }));
-  return { world, registry };
-}
-
 export function createSegment(overrides: Partial<GeodesicSegmentObject> = {}): GeodesicSegmentObject {
   return {
     id: "g-a:segment:0",
@@ -414,7 +390,6 @@ export function createSymmetricPairScenario(halfWidth: number, height: number) {
     first: { geodesicId: "g1", role: "end", anchorObjectId: "free" },
     second: { geodesicId: "g2", role: "start", anchorObjectId: "free" },
     freeEndAnchorId: "free",
-    previousTotalLengthMeters: totalGeodesicLength(registry, "g1") + totalGeodesicLength(registry, "g2"),
     lastGoodFreeEndCellId: "a",
     lastGoodFreeEndPoint: { x: 0, y: height, z: geodesicRayBeamHeightMeters },
   }));
