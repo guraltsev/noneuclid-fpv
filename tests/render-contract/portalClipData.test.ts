@@ -94,6 +94,8 @@ function createVisiblePath(
     destinationCellId: "room-b",
     depth: 1,
     rootFromDestinationMatrix: new THREE.Matrix4(),
+    clipPlanes: new Float64Array([0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1]),
+    terminal: false,
     clipPolygonNdc,
     clipRectNdc: { minX: -1, minY: -1, maxX: 1, maxY: 1 },
     screenAreaPixels: 1,

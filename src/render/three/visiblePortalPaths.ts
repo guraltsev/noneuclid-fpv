@@ -1,30 +1,51 @@
 /**
- * Per-frame portal visibility: decides which entries of a root cell's portal-path table are actually visible
- * on screen and returns, for each, the convex NDC polygon through which its destination cell may be drawn.
+ * Per-frame portal visibility: decides which entries of a root cell's portal-path table are visible on screen and
+ * returns, for each, its placement, the four planes through the eye that bound its visible region, and the convex
+ * NDC polygon through which its destination cell may be drawn.
  *
  * A `PortalRenderPath` is a chain of portal steps starting in the root (camera) cell; its `rootFromDestination`
  * rigid transform maps the destination cell's local frame into the root cell's frame (cell-local
- * x-right/y-forward/z-up, meters; the root frame is mapped to Three.js axes by `worldAxes`). Visibility is
- * computed top-down over the table (parents precede children, depth-limited): the aperture of the NEWEST
- * portal of a path (a floor-to-ceiling quad in its source cell) is carried into root space with the parent's
- * `rootFromDestination`, projected through the camera into NDC (near-plane clipped, convex-hulled over all
- * supplied cameras so stereo eyes share one conservative polygon), and clipped with Sutherland-Hodgman against
- * the parent's already-clipped NDC polygon. Paths whose polygon degenerates (<3 vertices) or whose pixel area
- * falls below `minPortalScreenAreaPixels` are dropped together with their whole subtree, since their children
- * are never visited; survivors are sorted and truncated to `maxVisiblePaths`.
+ * x-right/y-forward/z-up, meters; the root frame is mapped to Three.js axes by `worldAxes`). The eye lies in the
+ * root cell.
  *
- * Invariants: path 0 is the root with the full-screen polygon; every kept polygon is convex and lies inside its
- * parent's polygon (up to a 1e-9 tolerance); results are conservative (may over-include slightly, should not
- * under-include a portal a camera can see). The output feeds `renderPortalInstances`, which draws one instance
- * of the destination cell per visible path, clipped by `clipPolygonNdc` in a fragment shader.
+ * Visibility uses the exact funnel of `portalFunnel.ts`: the visible plan directions of a path form a 2D sector
+ * from the eye, clipped by each portal on the way (`d . rotCW(L - e) >= 0`, `d . rotCCW(R - e) >= 0`); together
+ * with the top and bottom edges of the newest portal this gives at most 4 half-spaces through the eye
+ * (`clipPlanes`). The screen polygon is the NDC square clipped by the 4 corresponding lines (at most 8 vertices;
+ * no near plane and no projection of apertures). The traversal is depth-first from the root over
+ * `pathsByParentPathId` and visits only the children of visible, non-terminal parents. A path with an empty
+ * sector is dropped with its subtree; a path whose sector is non-empty but whose polygon is empty (sight lines
+ * exist, none in view) is dropped (`clippedByCameraCount`); a path whose area is positive but below
+ * `minPortalScreenAreaPixels` is KEPT as a terminal path (its children are not visited), so a sliver never leaves
+ * a hole; a path at `maxDepth` is terminal. Survivors are sorted and truncated to `maxVisiblePaths` after the
+ * traversal.
+ *
+ * Scratch ownership: the module-scope scratch below (traversal stack, packed sectors, plane and polygon buffers,
+ * eye vector) is owned by `computeVisiblePortalPaths` / `computeIndependentVisiblePortalPaths`; it is valid only
+ * during one call, the functions are not re-entrant, and nothing returned aliases scratch. Nothing is allocated
+ * per EXAMINED path. Per RETURNED path the result allocates the `VisiblePortalPath`, its `clipPlanes` (copied from
+ * scratch) and its `clipPolygonNdc` array; zero allocation there needs stable ids and pooled results (the trie of
+ * a later job).
+ *
+ * Invariants: path 0 is the root with the full-screen polygon and four always-inside planes; every kept polygon
+ * is convex with at most 8 vertices. The output feeds `renderPortalInstances`, which draws one instance of the
+ * destination cell per visible path, clipped by `clipPolygonNdc` in a fragment shader.
  */
 
 import * as THREE from "three";
 import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex";
+import { developPortalSegment, type OrientedPortalSegment } from "../../cell-complex/orientedPortal";
 import type { PortalPathTable, PortalRenderPath } from "../../cell-complex/portalPaths";
-import { transformPoint3, type RigidTransform3 } from "../../math/rigidTransform3";
-import { vec3, type Vec3 } from "../../math/vec3";
-import { rigidTransformToThreeMatrix, worldPointToThree } from "./worldAxes";
+import {
+  clipPackedSectorByPortal,
+  clipPlaneArrayLength,
+  clipPlanesToNdcPolygon,
+  sectorSlotSize,
+  writeAlwaysInsideClipPlanes,
+  writeFullSector,
+  writeFunnelClipPlanes,
+} from "./portalFunnel";
+import { rigidTransformToThreeMatrix } from "./worldAxes";
 
 /** A 2D point; used for normalized device coordinates, where the visible square is [-1,1] x [-1,1] with +y up. */
 export interface Vec2 {
@@ -40,25 +61,28 @@ export interface Rect2 {
   readonly maxY: number;
 }
 
-/** Inputs for {@link computeVisiblePortalPaths}: a path table plus the camera(s) and viewport it is evaluated against. */
+/**
+ * Paths whose on-screen area is below this many physical pixels are kept but their children are not visited.
+ */
+export const defaultMinPortalScreenAreaPixels = 16;
+
+/** Inputs for {@link computeVisiblePortalPaths}: a path table plus the camera and viewport it is evaluated against. */
 export interface ComputeVisiblePortalPathsInput {
-  /** Compiled world; used to look up portal sides (aperture geometry) and cell heights. */
+  /** Compiled world; used to look up portal sides when a table path carries no developed newest portal. */
   readonly world: CompiledCellComplex;
   /** Root (camera) cell id; only used for diagnostics and the error message. */
   readonly rootCellId: string;
-  /** Precomputed path table for `rootCellId`; must contain path id 0 and list each parent before its children. */
+  /** Precomputed path table for `rootCellId`; must contain path id 0. */
   readonly pathTable: PortalPathTable;
-  /** Primary camera; used only when `cameras` is absent or empty. Its matrices are refreshed by the call. */
+  /** Camera in the root cell's frame, positioned inside the root cell. Its matrices are refreshed by the call. */
   readonly camera: THREE.Camera;
-  /** All cameras (e.g. both XR eyes) whose projections are unioned into one conservative polygon per portal. */
-  readonly cameras?: readonly THREE.Camera[];
   /** Render-target size in physical pixels; only used to convert NDC areas to pixel areas. */
   readonly viewportPixels: { readonly width: number; readonly height: number };
   /** Culling and sorting parameters. */
   readonly options: VisiblePortalPathOptions;
 }
 
-/** Inputs for {@link computeIndependentVisiblePortalPaths}: like the shared variant, but `cameras` is required and each is evaluated separately. */
+/** Inputs for {@link computeIndependentVisiblePortalPaths}: like the single variant, but `cameras` is required and each is evaluated separately. */
 export interface ComputeIndependentVisiblePortalPathsInput {
   readonly world: CompiledCellComplex;
   readonly rootCellId: string;
@@ -70,11 +94,11 @@ export interface ComputeIndependentVisiblePortalPathsInput {
 
 /** Culling, budget and ordering knobs for portal visibility. */
 export interface VisiblePortalPathOptions {
-  /** Largest path depth (number of portals crossed) considered; deeper table entries are skipped. */
+  /** Largest path depth (number of portals crossed) considered; paths at this depth are terminal. */
   readonly maxDepth: number;
   /** Hard cap on the number of returned paths (including the root when `includeRootCell`); clamped at 0. */
   readonly maxVisiblePaths: number;
-  /** Paths whose clipped aperture covers fewer pixels than this are culled together with their descendants. */
+  /** Paths whose clipped aperture covers fewer pixels than this are kept as terminal paths (children not visited). */
   readonly minPortalScreenAreaPixels: number;
   /** Whether the root path (depth 0, full screen) is included in the output list. */
   readonly includeRootCell: boolean;
@@ -82,7 +106,7 @@ export interface VisiblePortalPathOptions {
   readonly sortMode: "depth-then-area" | "area-then-depth";
 }
 
-/** One visible portal path: a destination cell to draw, its placement in the root frame, and its screen-space clip polygon. */
+/** One visible portal path: a destination cell to draw, its placement in the root frame, its clip planes and its screen-space clip polygon. */
 export interface VisiblePortalPath {
   /** Id of the source `PortalRenderPath` within its table (0 is the root). */
   readonly pathId: number;
@@ -90,9 +114,20 @@ export interface VisiblePortalPath {
   readonly destinationCellId: string;
   /** Number of portals crossed from the root cell. */
   readonly depth: number;
-  /** `rootFromDestination` expressed in Three.js axes: maps destination-cell geometry (in Three axes) into the root cell's Three frame. */
+  /**
+   * `rootFromDestination` expressed in Three.js axes: maps destination-cell geometry (in Three axes) into the root
+   * cell's Three frame. Cached per table path and shared between calls: never mutate.
+   */
   readonly rootFromDestinationMatrix: THREE.Matrix4;
-  /** Convex clip region in NDC, already intersected with every ancestor aperture (vertex order follows the clipper; winding not guaranteed). */
+  /**
+   * 4 planes (nx, ny, nz, d), inside where `n . X + d >= 0`, in the Three.js frame of the root cell (the frame that
+   * `rootFromDestinationMatrix` maps into). `|n| = 1`, or `(0, 0, 0, 1)` for "always inside". Order: right sector
+   * boundary, left sector boundary, top, bottom. Never mutate.
+   */
+  readonly clipPlanes: Float64Array;
+  /** True when the traversal did not visit this path's children (area below the threshold, or depth == maxDepth). */
+  readonly terminal: boolean;
+  /** Convex clip region in NDC (at most 8 vertices; winding follows the clipper). */
   readonly clipPolygonNdc: readonly Vec2[];
   /** Axis-aligned bounds of `clipPolygonNdc`. */
   readonly clipRectNdc: Rect2;
@@ -107,14 +142,18 @@ export interface VisiblePortalPathDebugSummary {
   readonly candidatePathCount: number;
   /** Currently the same value as `candidatePathCount` (no pre-filtering is performed). */
   readonly keptPathCount: number;
+  /** Number of children looked at by the traversal (children of visible, non-terminal parents). */
+  readonly examinedPathCount: number;
   /** Number of returned paths after the budget cut. */
   readonly visiblePathCount: number;
   readonly visiblePathCountByDepth: readonly { readonly depth: number; readonly count: number }[];
   readonly maxVisibleDepth: number;
-  /** Paths dropped because the portal aperture was entirely behind the camera. */
+  /** Paths dropped because no sight line through their portals exists (empty plan sector). */
+  readonly clippedByFunnelCount: number;
+  /** Paths dropped because sight lines exist but none is inside the view (empty screen polygon). */
   readonly clippedByCameraCount: number;
-  /** Paths dropped because the clipped polygon was degenerate or below the pixel-area threshold. */
-  readonly clippedByAreaCount: number;
+  /** Paths kept as terminal because their on-screen area is below the pixel threshold. */
+  readonly terminalByAreaCount: number;
   /** Paths that passed visibility but were truncated by `maxVisiblePaths`. */
   readonly clippedByBudgetCount: number;
   readonly budgetExhausted: boolean;
@@ -136,16 +175,11 @@ export interface VisiblePortalPathLookupResult {
   readonly clipRectNdc?: Rect2;
 }
 
-interface InternalVisiblePath extends VisiblePortalPath {
-  readonly sourcePath: PortalRenderPath;
-}
-
-interface VisiblePathAccumulator {
-  readonly camera: THREE.Camera;
-  readonly visibleBeforeBudgetById: Map<number, InternalVisiblePath>;
-  readonly discovered: InternalVisiblePath[];
-  clippedByCameraCount: number;
-  clippedByAreaCount: number;
+interface VisitCounters {
+  examined: number;
+  clippedByFunnel: number;
+  clippedByCamera: number;
+  terminalByArea: number;
 }
 
 const fullScreenPolygonNdc: readonly Vec2[] = [
@@ -155,76 +189,269 @@ const fullScreenPolygonNdc: readonly Vec2[] = [
   { x: -1, y: 1 },
 ];
 
-const polygonTolerance = 1e-9;
-const nearCoplanarPortalToleranceMeters = 0.05;
+// ---- Scratch (see the module header for the ownership rules) ----
+const stackPaths: PortalRenderPath[] = [];
+let stackSectors = new Float64Array(64 * sectorSlotSize);
+const parentSectorScratch = new Float64Array(sectorSlotSize);
+const childSectorScratch = new Float64Array(sectorSlotSize);
+const planeScratch = new Float64Array(clipPlaneArrayLength);
+const polygonScratch = new Float64Array(2 * 9);
+const eyeScratch = new THREE.Vector3();
+
+// Cached Three.js matrix per table path; shared by every result, never mutated.
+const threeMatrixByPath = new WeakMap<PortalRenderPath, THREE.Matrix4>();
+
+function threeMatrixForPath(path: PortalRenderPath): THREE.Matrix4 {
+  let matrix = threeMatrixByPath.get(path);
+
+  if (!matrix) {
+    matrix = rigidTransformToThreeMatrix(path.rootFromDestination);
+    threeMatrixByPath.set(path, matrix);
+  }
+
+  return matrix;
+}
+
+function pushStack(path: PortalRenderPath, sector: Float64Array, sectorOffset: number, top: number): void {
+  if ((top + 1) * sectorSlotSize > stackSectors.length) {
+    const grown = new Float64Array(stackSectors.length * 2);
+
+    grown.set(stackSectors);
+    stackSectors = grown;
+  }
+
+  stackPaths[top] = path;
+  const base = top * sectorSlotSize;
+
+  stackSectors[base] = sector[sectorOffset];
+  stackSectors[base + 1] = sector[sectorOffset + 1];
+  stackSectors[base + 2] = sector[sectorOffset + 2];
+  stackSectors[base + 3] = sector[sectorOffset + 3];
+}
 
 /**
- * Computes the visible portal paths for a root cell, using all supplied cameras as one conservative union.
+ * Computes the visible portal paths for a root cell from one camera.
  *
- * Traverses `pathTable.paths` in order (parents must precede children). A path is visible iff its parent is
- * visible and the newest portal's projected aperture, clipped to the parent's polygon, has at least 3 vertices
- * and at least `minPortalScreenAreaPixels` pixels. Budget truncation happens last, so a path may be returned
- * even if its parent was cut by the budget (possible with `area-then-depth`). Cost is O(paths x cameras) with
- * small per-path allocations; no GPU work.
+ * Depth-first traversal over `pathTable.pathsByParentPathId`: only the children of visible, non-terminal parents are
+ * examined. See the module header for the visibility rule. Budget truncation happens last, so a path may be returned
+ * even if its parent was cut by the budget (possible with `area-then-depth`).
  *
- * Side effects: calls `updateMatrixWorld(true)` and `updateProjectionMatrix()` on every camera.
+ * Side effects: calls `updateMatrixWorld(true)` and `updateProjectionMatrix()` on the camera. The camera must lie in
+ * the root cell (within 1e-6 m). Not re-entrant.
  * @throws Error if the table has no path with id 0.
  */
 export function computeVisiblePortalPaths(input: ComputeVisiblePortalPathsInput): ComputeVisiblePortalPathsResult {
-  const rootPath = input.pathTable.pathsById.get(0);
+  return visitFromRoot(input, input.camera);
+}
+
+/**
+ * Computes one visibility result per camera, each evaluated against that camera alone (own eye position, own
+ * funnel). The result array parallels `input.cameras`. Returns an empty array for an empty camera list.
+ * Side effects: refreshes camera matrices. @throws Error if the table has no path with id 0.
+ */
+export function computeIndependentVisiblePortalPaths(
+  input: ComputeIndependentVisiblePortalPathsInput,
+): readonly ComputeVisiblePortalPathsResult[] {
+  if (!input.pathTable.pathsById.get(0)) {
+    throw new Error(`Visible portal path table for root "${input.rootCellId}" has no root path.`);
+  }
+
+  return input.cameras.map((camera) => visitFromRoot(input, camera));
+}
+
+function visitFromRoot(
+  input: {
+    readonly world: CompiledCellComplex;
+    readonly rootCellId: string;
+    readonly pathTable: PortalPathTable;
+    readonly viewportPixels: { readonly width: number; readonly height: number };
+    readonly options: VisiblePortalPathOptions;
+  },
+  camera: THREE.Camera,
+): ComputeVisiblePortalPathsResult {
+  const { world, pathTable, viewportPixels, options } = input;
+  const rootPath = pathTable.pathsById.get(0);
 
   if (!rootPath) {
     throw new Error(`Visible portal path table for root "${input.rootCellId}" has no root path.`);
   }
 
-  const cameras = input.cameras && input.cameras.length > 0 ? input.cameras : [input.camera];
+  camera.updateMatrixWorld(true);
+  if ("updateProjectionMatrix" in camera && typeof camera.updateProjectionMatrix === "function") {
+    camera.updateProjectionMatrix();
+  }
 
-  for (const camera of cameras) {
-    camera.updateMatrixWorld(true);
-    if ("updateProjectionMatrix" in camera && typeof camera.updateProjectionMatrix === "function") {
-      camera.updateProjectionMatrix();
+  // Eye in the root cell's world axes: Three (x, y, z) -> world (x, -z, y).
+  eyeScratch.setFromMatrixPosition(camera.matrixWorld);
+  const eyeX = eyeScratch.x;
+  const eyeY = -eyeScratch.z;
+  const eyeZ = eyeScratch.y;
+  const projectionElements = camera.projectionMatrix.elements;
+  const viewElements = camera.matrixWorldInverse.elements;
+  const pixelScale = viewportPixels.width * viewportPixels.height / 4;
+  const counters: VisitCounters = { examined: 0, clippedByFunnel: 0, clippedByCamera: 0, terminalByArea: 0 };
+  const discovered: VisiblePortalPath[] = [];
+
+  if (options.includeRootCell) {
+    const rootPlanes = new Float64Array(clipPlaneArrayLength);
+
+    writeAlwaysInsideClipPlanes(rootPlanes, 0);
+    discovered.push({
+      pathId: rootPath.id,
+      destinationCellId: rootPath.destinationCellId,
+      depth: 0,
+      rootFromDestinationMatrix: threeMatrixForPath(rootPath),
+      clipPlanes: rootPlanes,
+      terminal: options.maxDepth <= 0,
+      clipPolygonNdc: fullScreenPolygonNdc,
+      clipRectNdc: { minX: -1, minY: -1, maxX: 1, maxY: 1 },
+      screenAreaPixels: viewportPixels.width * viewportPixels.height,
+    });
+  }
+
+  writeFullSector(childSectorScratch, 0);
+  pushStack(rootPath, childSectorScratch, 0, 0);
+  let top = 1;
+
+  while (top > 0) {
+    top -= 1;
+    const parent = stackPaths[top];
+    const parentSectorBase = top * sectorSlotSize;
+
+    // Copy the parent's sector out: pushing a child below reuses this stack slot.
+    parentSectorScratch[0] = stackSectors[parentSectorBase];
+    parentSectorScratch[1] = stackSectors[parentSectorBase + 1];
+    parentSectorScratch[2] = stackSectors[parentSectorBase + 2];
+    parentSectorScratch[3] = stackSectors[parentSectorBase + 3];
+
+    const children = pathTable.pathsByParentPathId.get(parent.id);
+
+    if (!children) {
+      continue;
+    }
+
+    for (const child of children) {
+      if (child.depth > options.maxDepth) {
+        continue;
+      }
+
+      counters.examined += 1;
+
+      const portal = newestPortalOf(world, child, parent);
+
+      if (!clipPackedSectorByPortal(parentSectorScratch, 0, portal, eyeX, eyeY, childSectorScratch, 0)) {
+        counters.clippedByFunnel += 1;
+        continue;
+      }
+
+      writeFunnelClipPlanes(
+        planeScratch,
+        0,
+        childSectorScratch[0],
+        childSectorScratch[1],
+        childSectorScratch[2],
+        childSectorScratch[3],
+        portal,
+        eyeX,
+        eyeY,
+        eyeZ,
+      );
+
+      const vertexCount = clipPlanesToNdcPolygon(planeScratch, projectionElements, viewElements, polygonScratch);
+      const areaPixels = vertexCount >= 3 ? polygonAreaNdc(polygonScratch, vertexCount) * pixelScale : 0;
+
+      if (!(areaPixels > 0)) {
+        counters.clippedByCamera += 1;
+        continue;
+      }
+
+      const belowThreshold = areaPixels < options.minPortalScreenAreaPixels;
+      const terminal = belowThreshold || child.depth >= options.maxDepth;
+
+      if (belowThreshold) {
+        counters.terminalByArea += 1;
+      }
+
+      discovered.push(createVisiblePath(child, planeScratch, polygonScratch, vertexCount, areaPixels, terminal));
+
+      if (!terminal) {
+        pushStack(child, childSectorScratch, 0, top);
+        top += 1;
+      }
     }
   }
 
-  const rootVisiblePath = createVisiblePath(rootPath, fullScreenPolygonNdc, input.viewportPixels);
-  const visibleBeforeBudgetById = new Map<number, InternalVisiblePath>([[rootPath.id, rootVisiblePath]]);
-  const discovered: InternalVisiblePath[] = input.options.includeRootCell ? [rootVisiblePath] : [];
-  let clippedByCameraCount = 0;
-  let clippedByAreaCount = 0;
+  return finalizeVisiblePortalPathResult(input, discovered, counters);
+}
 
-  for (const path of input.pathTable.paths) {
-    if (path.depth === 0 || path.depth > input.options.maxDepth) {
-      continue;
-    }
-
-    const parentPathId = path.parentPathId;
-    const parentVisible = parentPathId === undefined ? undefined : visibleBeforeBudgetById.get(parentPathId);
-
-    if (!parentVisible) {
-      continue;
-    }
-
-    const portalPolygon = projectNewestPortalApertureToNdc(input.world, path, parentVisible.sourcePath, cameras);
-
-    if (!portalPolygon) {
-      clippedByCameraCount += 1;
-      continue;
-    }
-
-    const clippedPolygon = clipConvexPolygonByConvexPolygon(portalPolygon, parentVisible.clipPolygonNdc);
-    const screenAreaPixels = ndcPolygonAreaPixels(clippedPolygon, input.viewportPixels);
-
-    if (clippedPolygon.length < 3 || screenAreaPixels < input.options.minPortalScreenAreaPixels) {
-      clippedByAreaCount += 1;
-      continue;
-    }
-
-    const visiblePath = createVisiblePath(path, clippedPolygon, input.viewportPixels);
-    visibleBeforeBudgetById.set(path.id, visiblePath);
-    discovered.push(visiblePath);
+// The newest portal of `path` in the root frame; hand-built fixtures may lack `newestPortalInRoot`.
+function newestPortalOf(world: CompiledCellComplex, path: PortalRenderPath, parent: PortalRenderPath): OrientedPortalSegment {
+  if (path.newestPortalInRoot) {
+    return path.newestPortalInRoot;
   }
 
-  const sorted = [...discovered].sort((a, b) => compareVisiblePaths(a, b, input.options.sortMode));
+  const step = path.steps[path.steps.length - 1];
+
+  return developPortalSegment(world, step.sourceCellId, step.sourcePortalSideIndex, parent.rootFromDestination);
+}
+
+// Shoelace area in NDC units of the first `count` vertices of a packed (x, y) polygon.
+function polygonAreaNdc(polygon: Float64Array, count: number): number {
+  let twiceArea = 0;
+
+  for (let index = 0; index < count; index += 1) {
+    const following = index + 1 === count ? 0 : index + 1;
+
+    twiceArea += polygon[index * 2] * polygon[following * 2 + 1] - polygon[following * 2] * polygon[index * 2 + 1];
+  }
+
+  return Math.abs(twiceArea) / 2;
+}
+
+function createVisiblePath(
+  path: PortalRenderPath,
+  planes: Float64Array,
+  polygon: Float64Array,
+  vertexCount: number,
+  screenAreaPixels: number,
+  terminal: boolean,
+): VisiblePortalPath {
+  const clipPolygonNdc: Vec2[] = [];
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+
+  for (let index = 0; index < vertexCount; index += 1) {
+    const x = polygon[index * 2];
+    const y = polygon[index * 2 + 1];
+
+    clipPolygonNdc.push({ x, y });
+    minX = Math.min(minX, x);
+    minY = Math.min(minY, y);
+    maxX = Math.max(maxX, x);
+    maxY = Math.max(maxY, y);
+  }
+
+  return {
+    pathId: path.id,
+    destinationCellId: path.destinationCellId,
+    depth: path.depth,
+    rootFromDestinationMatrix: threeMatrixForPath(path),
+    clipPlanes: planes.slice(0, clipPlaneArrayLength),
+    terminal,
+    clipPolygonNdc,
+    clipRectNdc: { minX, minY, maxX, maxY },
+    screenAreaPixels,
+  };
+}
+
+function finalizeVisiblePortalPathResult(
+  input: { readonly rootCellId: string; readonly pathTable: PortalPathTable; readonly options: VisiblePortalPathOptions },
+  discovered: VisiblePortalPath[],
+  counters: VisitCounters,
+): ComputeVisiblePortalPathsResult {
+  const sorted = discovered.sort((a, b) => compareVisiblePaths(a, b, input.options.sortMode));
   const maxVisiblePaths = Math.max(0, input.options.maxVisiblePaths);
   const paths = sorted.slice(0, maxVisiblePaths);
   const clippedByBudgetCount = Math.max(0, sorted.length - paths.length);
@@ -237,260 +464,34 @@ export function computeVisiblePortalPaths(input: ComputeVisiblePortalPathsInput)
       rootCellId: input.rootCellId,
       candidatePathCount: input.pathTable.paths.length,
       keptPathCount: input.pathTable.paths.length,
+      examinedPathCount: counters.examined,
       visiblePathCount: paths.length,
       visiblePathCountByDepth: summarizeVisiblePathCountByDepth(paths),
-      maxVisibleDepth: Math.max(0, ...paths.map((path) => path.depth)),
-      clippedByCameraCount,
-      clippedByAreaCount,
+      maxVisibleDepth: paths.reduce((deepest, path) => Math.max(deepest, path.depth), 0),
+      clippedByFunnelCount: counters.clippedByFunnel,
+      clippedByCameraCount: counters.clippedByCamera,
+      terminalByAreaCount: counters.terminalByArea,
       clippedByBudgetCount,
       budgetExhausted: clippedByBudgetCount > 0,
     },
   };
 }
 
-/**
- * Computes one visibility result per camera, each evaluated against that camera alone (no cross-eye union).
- *
- * Same algorithm as {@link computeVisiblePortalPaths}, but every camera keeps its own parent-visibility map, so
- * the result array parallels `input.cameras`. The portal aperture in root space is computed once per path and
- * shared across cameras. Returns an empty array for an empty camera list.
- * Side effects: refreshes camera matrices. @throws Error if the table has no path with id 0.
- */
-export function computeIndependentVisiblePortalPaths(
-  input: ComputeIndependentVisiblePortalPathsInput,
-): readonly ComputeVisiblePortalPathsResult[] {
-  const rootPath = input.pathTable.pathsById.get(0);
-
-  if (!rootPath) {
-    throw new Error(`Visible portal path table for root "${input.rootCellId}" has no root path.`);
-  }
-
-  if (input.cameras.length === 0) {
-    return [];
-  }
-
-  for (const camera of input.cameras) {
-    camera.updateMatrixWorld(true);
-    if ("updateProjectionMatrix" in camera && typeof camera.updateProjectionMatrix === "function") {
-      camera.updateProjectionMatrix();
-    }
-  }
-
-  const states = input.cameras.map((camera) => {
-    const rootVisiblePath = createVisiblePath(rootPath, fullScreenPolygonNdc, input.viewportPixels);
-
-    return {
-      camera,
-      visibleBeforeBudgetById: new Map<number, InternalVisiblePath>([[rootPath.id, rootVisiblePath]]),
-      discovered: input.options.includeRootCell ? [rootVisiblePath] : [],
-      clippedByCameraCount: 0,
-      clippedByAreaCount: 0,
-    };
-  });
-
-  for (const path of input.pathTable.paths) {
-    if (path.depth === 0 || path.depth > input.options.maxDepth) {
-      continue;
-    }
-
-    const parentPathId = path.parentPathId;
-    let apertureInRoot: readonly Vec3[] | undefined;
-
-    for (const state of states) {
-      const parentVisible = parentPathId === undefined ? undefined : state.visibleBeforeBudgetById.get(parentPathId);
-
-      if (!parentVisible) {
-        continue;
-      }
-
-      if (!apertureInRoot) {
-        apertureInRoot = buildNewestPortalApertureInRoot(input.world, path, parentVisible.sourcePath);
-      }
-
-      const portalPolygon = projectRootSpacePointsToConservativeNdc(apertureInRoot, [state.camera]);
-
-      if (!portalPolygon) {
-        state.clippedByCameraCount += 1;
-        continue;
-      }
-
-      const clippedPolygon = clipConvexPolygonByConvexPolygon(portalPolygon, parentVisible.clipPolygonNdc);
-      const screenAreaPixels = ndcPolygonAreaPixels(clippedPolygon, input.viewportPixels);
-
-      if (clippedPolygon.length < 3 || screenAreaPixels < input.options.minPortalScreenAreaPixels) {
-        state.clippedByAreaCount += 1;
-        continue;
-      }
-
-      const visiblePath = createVisiblePath(path, clippedPolygon, input.viewportPixels);
-      state.visibleBeforeBudgetById.set(path.id, visiblePath);
-      state.discovered.push(visiblePath);
-    }
-  }
-
-  return states.map((state) => finalizeVisiblePortalPathResult(input, state));
-}
-
-/**
- * Builds the four corners of a portal side's aperture as a floor-to-ceiling quad in the cell's local frame.
- *
- * Corners are (start,0), (end,0), (end,height), (start,height) using the side's 2D endpoints (meters) and the
- * cell's `heightMeters`, i.e. a planar convex quad lying on the prism's wall.
- * @throws Error if the cell or side index does not exist.
- */
-export function buildPortalApertureCorners(
-  world: CompiledCellComplex,
-  cellId: string,
-  sideIndex: number,
-): readonly Vec3[] {
-  const cell = world.cellsById.get(cellId);
-  const side = cell?.sides[sideIndex];
-
-  if (!cell || !side) {
-    throw new Error(`Cannot build portal aperture for missing side "${cellId}:${sideIndex}".`);
-  }
-
-  return [
-    vec3(side.start.x, side.start.y, 0),
-    vec3(side.end.x, side.end.y, 0),
-    vec3(side.end.x, side.end.y, cell.heightMeters),
-    vec3(side.start.x, side.start.y, cell.heightMeters),
-  ];
-}
-
-/** Maps aperture corners from a source cell's local frame into the root frame by applying `rootFromSource` to each point. */
-export function transformApertureCornersToRoot(
-  apertureCorners: readonly Vec3[],
-  rootFromSource: RigidTransform3,
-): readonly Vec3[] {
-  return apertureCorners.map((point) => transformPoint3(rootFromSource, point));
-}
-
-/**
- * Projects root-frame points through one camera into NDC, clipping against the camera's near plane first.
- *
- * Points are converted to the Three.js frame and then to camera space (camera looks down -z, so visible points
- * have z < 0). Polygons nearly coplanar with the image plane (within near + 5 cm) are clipped at a much smaller
- * distance so a portal the camera is touching does not vanish. Otherwise the polygon is clipped at z = -near.
- * Returns the projected vertices (not a hull; order follows the clipped polygon) or `undefined` when the polygon
- * is entirely behind the near plane. NDC x/y are perspective-divided, so this is valid for perspective cameras.
- */
-export function projectRootSpacePointsToNdc(
-  rootSpacePoints: readonly Vec3[],
-  camera: THREE.Camera,
-): readonly Vec2[] | undefined {
-  const cameraSpacePoints = rootSpacePoints.map((point) =>
-    worldPointToThree(point).applyMatrix4(camera.matrixWorldInverse),
-  );
-  const near = "near" in camera && typeof camera.near === "number" ? camera.near : 0.01;
-  const nearCoplanarPolygon = projectNearCoplanarPortalToNdc(cameraSpacePoints, camera, near);
-
-  if (nearCoplanarPolygon) {
-    return nearCoplanarPolygon;
-  }
-
-  const clippedCameraSpacePoints = clipCameraSpacePolygonAgainstNearPlane(cameraSpacePoints, near);
-
-  if (clippedCameraSpacePoints.length >= 3) {
-    return projectCameraSpacePointsToNdc(clippedCameraSpacePoints, camera);
-  }
-
-  if (cameraSpacePoints.every((point) => point.z < -polygonTolerance)) {
-    return projectCameraSpacePointsToNdc(cameraSpacePoints, camera);
-  }
-
-  return undefined;
-}
-
-// Special case for portals nearly coplanar with the camera image plane (e.g. standing in a doorway): the
-// ordinary near-plane clip would discard them, so clip against a tiny near distance instead.
-function projectNearCoplanarPortalToNdc(
-  points: readonly THREE.Vector3[],
-  camera: THREE.Camera,
-  near: number,
-): readonly Vec2[] | undefined {
-  if (points.length < 3 || !points.some((point) => point.z < -polygonTolerance)) {
-    return undefined;
-  }
-
-  const normal = new THREE.Vector3()
-    .subVectors(points[1], points[0])
-    .cross(new THREE.Vector3().subVectors(points[2], points[0]));
-  const normalLength = normal.length();
-
-  if (normalLength <= polygonTolerance) {
-    return undefined;
-  }
-
-  normal.divideScalar(normalLength);
-  const planeDistanceFromCamera = Math.abs(normal.dot(points[0]));
-
-  if (planeDistanceFromCamera >= near + nearCoplanarPortalToleranceMeters) {
-    return undefined;
-  }
-
-  const cameraPlaneClipped = clipCameraSpacePolygonAgainstNearPlane(points, Math.min(near, 1e-4));
-
-  return cameraPlaneClipped.length >= 3 ? projectCameraSpacePointsToNdc(cameraPlaneClipped, camera) : undefined;
-}
-
-// Perspective divide by clip-space w (= -z_cam for perspective projections); `|| 1` guards w == 0.
-function projectCameraSpacePointsToNdc(
-  cameraSpacePoints: readonly THREE.Vector3[],
-  camera: THREE.Camera,
-): readonly Vec2[] {
-  return cameraSpacePoints.map((point) => {
-    const projected = new THREE.Vector4(point.x, point.y, point.z, 1).applyMatrix4(camera.projectionMatrix);
-    const w = projected.w || 1;
-
-    return {
-      x: projected.x / w,
-      y: projected.y / w,
-    };
-  });
-}
-
-/**
- * Intersects two convex polygons with Sutherland-Hodgman clipping and returns the (possibly empty) result.
- *
- * `candidatePolygon` is clipped successively by the half-plane of each edge of `clipPolygon`; the clip winding
- * is detected from its signed area, so either orientation works. Points within 1e-9 of an edge count as inside
- * (slightly conservative). Returns `[]` if the candidate is empty, the clip polygon has fewer than 3 vertices,
- * or the intersection is empty; the result may still have fewer than 3 vertices for touching polygons.
- */
-export function clipConvexPolygonByConvexPolygon(
-  candidatePolygon: readonly Vec2[],
-  clipPolygon: readonly Vec2[],
-): Vec2[] {
-  if (candidatePolygon.length === 0 || clipPolygon.length < 3) {
-    return [];
-  }
-
-  let clipped = [...candidatePolygon];
-  const clipSign = Math.sign(signedPolygonArea(clipPolygon)) || 1;
-
-  for (let index = 0; index < clipPolygon.length; index += 1) {
-    const start = clipPolygon[index];
-    const end = clipPolygon[(index + 1) % clipPolygon.length];
-
-    clipped = clipPolygonByEdgeHalfPlane(clipped, start, end, clipSign);
-
-    if (clipped.length === 0) {
-      return [];
-    }
-  }
-
-  return dedupePolygonVertices(clipped);
-}
-
 /** Returns the axis-aligned NDC bounding box of a polygon; yields infinities for an empty polygon. */
 export function ndcRectForPolygon(polygon: readonly Vec2[]): Rect2 {
-  return {
-    minX: Math.min(...polygon.map((point) => point.x)),
-    minY: Math.min(...polygon.map((point) => point.y)),
-    maxX: Math.max(...polygon.map((point) => point.x)),
-    maxY: Math.max(...polygon.map((point) => point.y)),
-  };
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+
+  for (const point of polygon) {
+    minX = Math.min(minX, point.x);
+    minY = Math.min(minY, point.y);
+    maxX = Math.max(maxX, point.x);
+    maxY = Math.max(maxY, point.y);
+  }
+
+  return { minX, minY, maxX, maxY };
 }
 
 /**
@@ -540,95 +541,6 @@ export function describeVisiblePortalPath(
   };
 }
 
-// NDC polygon (convex hull over all cameras) of the newest portal in `path`. Its source cell is the parent's
-// destination cell, so the aperture is placed with the PARENT's rootFromDestination.
-function projectNewestPortalApertureToNdc(
-  world: CompiledCellComplex,
-  path: PortalRenderPath,
-  parentPath: PortalRenderPath,
-  cameras: readonly THREE.Camera[],
-): readonly Vec2[] | undefined {
-  return projectRootSpacePointsToConservativeNdc(
-    buildNewestPortalApertureInRoot(world, path, parentPath),
-    cameras,
-  );
-}
-
-function buildNewestPortalApertureInRoot(
-  world: CompiledCellComplex,
-  path: PortalRenderPath,
-  parentPath: PortalRenderPath,
-): readonly Vec3[] {
-  const newestStep = path.steps[path.steps.length - 1];
-
-  if (!newestStep) {
-    return [];
-  }
-
-  const apertureCorners = buildPortalApertureCorners(world, newestStep.sourceCellId, newestStep.sourcePortalSideIndex);
-
-  return transformApertureCornersToRoot(apertureCorners, parentPath.rootFromDestination);
-}
-
-function finalizeVisiblePortalPathResult(
-  input: ComputeIndependentVisiblePortalPathsInput,
-  state: VisiblePathAccumulator,
-): ComputeVisiblePortalPathsResult {
-  const sorted = [...state.discovered].sort((a, b) => compareVisiblePaths(a, b, input.options.sortMode));
-  const maxVisiblePaths = Math.max(0, input.options.maxVisiblePaths);
-  const paths = sorted.slice(0, maxVisiblePaths);
-  const clippedByBudgetCount = Math.max(0, sorted.length - paths.length);
-  const visiblePathById = new Map(paths.map((path) => [path.pathId, path]));
-
-  return {
-    paths,
-    visiblePathById,
-    summary: {
-      rootCellId: input.rootCellId,
-      candidatePathCount: input.pathTable.paths.length,
-      keptPathCount: input.pathTable.paths.length,
-      visiblePathCount: paths.length,
-      visiblePathCountByDepth: summarizeVisiblePathCountByDepth(paths),
-      maxVisibleDepth: Math.max(0, ...paths.map((path) => path.depth)),
-      clippedByCameraCount: state.clippedByCameraCount,
-      clippedByAreaCount: state.clippedByAreaCount,
-      clippedByBudgetCount,
-      budgetExhausted: clippedByBudgetCount > 0,
-    },
-  };
-}
-
-// Union of per-camera projections, hulled: one polygon valid (conservatively) for every eye.
-function projectRootSpacePointsToConservativeNdc(
-  rootSpacePoints: readonly Vec3[],
-  cameras: readonly THREE.Camera[],
-): readonly Vec2[] | undefined {
-  const projectedPoints = cameras.flatMap((camera) => projectRootSpacePointsToNdc(rootSpacePoints, camera) ?? []);
-
-  if (projectedPoints.length < 3) {
-    return undefined;
-  }
-
-  return convexHull(projectedPoints);
-}
-
-function createVisiblePath(
-  path: PortalRenderPath,
-  clipPolygonNdc: readonly Vec2[],
-  viewportPixels: { readonly width: number; readonly height: number },
-): InternalVisiblePath {
-  return {
-    pathId: path.id,
-    destinationCellId: path.destinationCellId,
-    depth: path.depth,
-    rootFromDestinationMatrix: rigidTransformToThreeMatrix(path.rootFromDestination),
-    clipPolygonNdc,
-    clipRectNdc: ndcRectForPolygon(clipPolygonNdc),
-    screenAreaPixels: ndcPolygonAreaPixels(clipPolygonNdc, viewportPixels),
-    sourcePath: path,
-  };
-}
-
 function compareVisiblePaths(
   a: VisiblePortalPath,
   b: VisiblePortalPath,
@@ -639,185 +551,6 @@ function compareVisiblePaths(
   }
 
   return a.depth - b.depth || b.screenAreaPixels - a.screenAreaPixels || a.pathId - b.pathId;
-}
-
-// One Sutherland-Hodgman step: keeps the part of `polygon` on the left of the directed edge (clipSign = +1 for
-// a CCW clip polygon; -1 flips the test for CW). Emits `next` for inside->inside and outside->inside, and the
-// crossing point for each inside/outside transition.
-function clipPolygonByEdgeHalfPlane(
-  polygon: readonly Vec2[],
-  edgeStart: Vec2,
-  edgeEnd: Vec2,
-  clipSign: number,
-): Vec2[] {
-  const clipped: Vec2[] = [];
-
-  for (let index = 0; index < polygon.length; index += 1) {
-    const current = polygon[index];
-    const next = polygon[(index + 1) % polygon.length];
-    const currentValue = clipSign * orient2(edgeStart, edgeEnd, current);
-    const nextValue = clipSign * orient2(edgeStart, edgeEnd, next);
-    const currentInside = currentValue >= -polygonTolerance;
-    const nextInside = nextValue >= -polygonTolerance;
-
-    if (currentInside && nextInside) {
-      clipped.push(next);
-      continue;
-    }
-
-    if (currentInside !== nextInside) {
-      clipped.push(intersectEdge(current, next, currentValue, nextValue));
-    }
-
-    if (!currentInside && nextInside) {
-      clipped.push(next);
-    }
-  }
-
-  return clipped;
-}
-
-// Linear interpolation to the zero of the signed edge distance between two vertices of opposite sign.
-function intersectEdge(start: Vec2, end: Vec2, startValue: number, endValue: number): Vec2 {
-  const alpha = startValue / (startValue - endValue);
-
-  return {
-    x: start.x + (end.x - start.x) * alpha,
-    y: start.y + (end.y - start.y) * alpha,
-  };
-}
-
-// Clips a camera-space polygon (camera looks down -z) to z <= -near against the single plane z = -near.
-function clipCameraSpacePolygonAgainstNearPlane(
-  polygon: readonly THREE.Vector3[],
-  near: number,
-): readonly THREE.Vector3[] {
-  const clipped: THREE.Vector3[] = [];
-  const nearPlaneZ = -near;
-
-  for (let index = 0; index < polygon.length; index += 1) {
-    const current = polygon[index];
-    const next = polygon[(index + 1) % polygon.length];
-    const currentInside = current.z <= nearPlaneZ + polygonTolerance;
-    const nextInside = next.z <= nearPlaneZ + polygonTolerance;
-
-    if (currentInside && nextInside) {
-      clipped.push(next.clone());
-      continue;
-    }
-
-    if (currentInside !== nextInside) {
-      clipped.push(intersectCameraSpaceNearPlane(current, next, nearPlaneZ));
-    }
-
-    if (!currentInside && nextInside) {
-      clipped.push(next.clone());
-    }
-  }
-
-  return dedupeCameraSpaceVertices(clipped);
-}
-
-function intersectCameraSpaceNearPlane(
-  start: THREE.Vector3,
-  end: THREE.Vector3,
-  nearPlaneZ: number,
-): THREE.Vector3 {
-  const alpha = (nearPlaneZ - start.z) / (end.z - start.z);
-
-  return new THREE.Vector3(
-    start.x + (end.x - start.x) * alpha,
-    start.y + (end.y - start.y) * alpha,
-    nearPlaneZ,
-  );
-}
-
-function dedupeCameraSpaceVertices(vertices: readonly THREE.Vector3[]): THREE.Vector3[] {
-  const deduped: THREE.Vector3[] = [];
-
-  for (const vertex of vertices) {
-    const previous = deduped[deduped.length - 1];
-
-    if (!previous || previous.distanceTo(vertex) > polygonTolerance) {
-      deduped.push(vertex);
-    }
-  }
-
-  const first = deduped[0];
-  const last = deduped[deduped.length - 1];
-
-  if (first && last && deduped.length > 1 && first.distanceTo(last) <= polygonTolerance) {
-    deduped.pop();
-  }
-
-  return deduped;
-}
-
-function dedupePolygonVertices(vertices: readonly Vec2[]): Vec2[] {
-  const deduped: Vec2[] = [];
-
-  for (const vertex of vertices) {
-    const previous = deduped[deduped.length - 1];
-
-    if (!previous || Math.hypot(vertex.x - previous.x, vertex.y - previous.y) > polygonTolerance) {
-      deduped.push(vertex);
-    }
-  }
-
-  const first = deduped[0];
-  const last = deduped[deduped.length - 1];
-
-  if (first && last && deduped.length > 1 && Math.hypot(first.x - last.x, first.y - last.y) <= polygonTolerance) {
-    deduped.pop();
-  }
-
-  return deduped;
-}
-
-// Andrew's monotone chain; near-collinear points (within tolerance) are dropped. Returns a CCW hull.
-function convexHull(points: readonly Vec2[]): Vec2[] {
-  const sorted = dedupeSortedPoints(
-    [...points].sort((left, right) => left.x - right.x || left.y - right.y),
-  );
-
-  if (sorted.length <= 2) {
-    return sorted;
-  }
-
-  const lower: Vec2[] = [];
-  for (const point of sorted) {
-    while (lower.length >= 2 && orient2(lower[lower.length - 2], lower[lower.length - 1], point) <= polygonTolerance) {
-      lower.pop();
-    }
-    lower.push(point);
-  }
-
-  const upper: Vec2[] = [];
-  for (let index = sorted.length - 1; index >= 0; index -= 1) {
-    const point = sorted[index];
-    while (upper.length >= 2 && orient2(upper[upper.length - 2], upper[upper.length - 1], point) <= polygonTolerance) {
-      upper.pop();
-    }
-    upper.push(point);
-  }
-
-  lower.pop();
-  upper.pop();
-  return [...lower, ...upper];
-}
-
-function dedupeSortedPoints(points: readonly Vec2[]): Vec2[] {
-  const deduped: Vec2[] = [];
-
-  for (const point of points) {
-    const previous = deduped[deduped.length - 1];
-
-    if (!previous || Math.hypot(point.x - previous.x, point.y - previous.y) > polygonTolerance) {
-      deduped.push(point);
-    }
-  }
-
-  return deduped;
 }
 
 // Shoelace formula: positive for counter-clockwise vertex order.
@@ -831,9 +564,4 @@ function signedPolygonArea(polygon: readonly Vec2[]): number {
   }
 
   return twiceArea / 2;
-}
-
-// 2D cross product (b-a) x (c-a): positive when c is left of the directed line a->b.
-function orient2(a: Vec2, b: Vec2, c: Vec2): number {
-  return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
 }

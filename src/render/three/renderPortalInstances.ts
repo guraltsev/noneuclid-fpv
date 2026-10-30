@@ -28,6 +28,7 @@ import type {
   RuntimeObjectRenderArchetypeDiagnostics,
 } from "./runtimeObjectRenderArchetypes";
 import type { RuntimeObjectRenderRecord } from "./runtimeObjectRenderRecords";
+import { clipPlaneArrayLength, writeAlwaysInsideClipPlanes } from "./portalFunnel";
 import type { VisiblePortalPath, VisiblePortalPathDebugSummary } from "./visiblePortalPaths";
 
 /** Snapshot of instanced portal rendering for the debug overlay and console helpers. */
@@ -122,6 +123,14 @@ export function createRootVisiblePortalPath(cellId: string): VisiblePortalPath {
       maxY: 1,
     },
     screenAreaPixels: Number.POSITIVE_INFINITY,
+    clipPlanes: (() => {
+      const planes = new Float64Array(clipPlaneArrayLength);
+
+      writeAlwaysInsideClipPlanes(planes, 0);
+
+      return planes;
+    })(),
+    terminal: false,
   };
 }
 
@@ -503,7 +512,9 @@ export function visiblePortalSummaryToRenderState(summary: VisiblePortalPathDebu
     visiblePathCountByDepth: summary.visiblePathCountByDepth,
     maxVisibleDepth: summary.maxVisibleDepth,
     clippedByCameraCount: summary.clippedByCameraCount,
-    clippedByAreaCount: summary.clippedByAreaCount,
+    clippedByFunnelCount: summary.clippedByFunnelCount,
+    terminalByAreaCount: summary.terminalByAreaCount,
+    examinedPathCount: summary.examinedPathCount,
     clippedByBudgetCount: summary.clippedByBudgetCount,
     budgetExhausted: summary.budgetExhausted,
   };

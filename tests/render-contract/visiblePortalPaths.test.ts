@@ -5,7 +5,6 @@ import { twoPrismLoop } from "../fixtures/twoPrismLoop";
 import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
 import { buildPortalPathTables } from "../../src/cell-complex/portalPaths";
 import {
-  clipConvexPolygonByConvexPolygon,
   computeIndependentVisiblePortalPaths,
   computeVisiblePortalPaths,
   describeVisiblePortalPath,
@@ -48,40 +47,6 @@ describe("computeVisiblePortalPaths", () => {
 
     expect(result.paths.map((path) => path.pathId)).toContain(1);
     expect(result.visiblePathById.get(1)?.screenAreaPixels).toBeGreaterThan(0);
-  });
-
-  it("uses a conservative clip polygon across multiple culling cameras", () => {
-    const world = compileCellComplex(twoPrismLoop);
-    const table = buildPortalPathTables(world, { maxDepth: 1 }).tablesByRootCellId.get("room-a")!;
-    const leftEye = createCamera({ x: 0, y: 0.06, z: 1.6 }, { x: 1, y: 0.06, z: 1.6 });
-    const rightEye = createCamera({ x: 0, y: -0.06, z: 1.6 }, { x: 1, y: -0.06, z: 1.6 });
-    const mono = computeVisiblePortalPaths({
-      world,
-      rootCellId: "room-a",
-      pathTable: table,
-      camera: leftEye,
-      viewportPixels: { width: 800, height: 600 },
-      options: defaultOptions(),
-    });
-    const stereo = computeVisiblePortalPaths({
-      world,
-      rootCellId: "room-a",
-      pathTable: table,
-      camera: leftEye,
-      cameras: [leftEye, rightEye],
-      viewportPixels: { width: 800, height: 600 },
-      options: defaultOptions(),
-    });
-
-    expect(stereo.visiblePathById.get(1)?.clipRectNdc.minY).toBeLessThanOrEqual(
-      mono.visiblePathById.get(1)!.clipRectNdc.minY,
-    );
-    expect(stereo.visiblePathById.get(1)?.clipRectNdc.maxY).toBeGreaterThanOrEqual(
-      mono.visiblePathById.get(1)!.clipRectNdc.maxY,
-    );
-    expect(stereo.visiblePathById.get(1)!.screenAreaPixels).toBeGreaterThanOrEqual(
-      mono.visiblePathById.get(1)!.screenAreaPixels,
-    );
   });
 
   it("matches separate per-eye visibility when computed in one independent-camera pass", () => {
@@ -324,7 +289,10 @@ describe("computeVisiblePortalPaths", () => {
     expect(cornerSliverPath).toBeDefined();
     expect(visiblePathIds).toContain(directTopPath!.id);
     expect(visiblePathIds).toContain(directRightPath!.id);
-    expect(visiblePathIds).not.toContain(cornerSliverPath!.id);
+    // The sliver is kept as a terminal path (no holes) or absent; it never grows into a real view.
+    const sliver = result.visiblePathById.get(cornerSliverPath!.id);
+
+    expect(sliver === undefined || (sliver.terminal && sliver.screenAreaPixels < 16)).toBe(true);
   });
 
   it("rejects a child path when its parent is not visible", () => {
@@ -422,28 +390,6 @@ describe("computeVisiblePortalPaths", () => {
   });
 });
 
-describe("clipConvexPolygonByConvexPolygon", () => {
-  it("clips a convex polygon deterministically by a parent aperture", () => {
-    const clipped = clipConvexPolygonByConvexPolygon(
-      [
-        { x: -2, y: -0.5 },
-        { x: 0.5, y: -0.5 },
-        { x: 0.5, y: 0.5 },
-        { x: -2, y: 0.5 },
-      ],
-      [
-        { x: -1, y: -1 },
-        { x: 1, y: -1 },
-        { x: 1, y: 1 },
-        { x: -1, y: 1 },
-      ],
-    );
-
-    expect(clipped.every((point) => point.x >= -1 - 1e-9 && point.x <= 1 + 1e-9)).toBe(true);
-    expect(clipped).toHaveLength(4);
-  });
-});
-
 function defaultOptions(
   overrides: Partial<Parameters<typeof computeVisiblePortalPaths>[0]["options"]> = {},
 ): Parameters<typeof computeVisiblePortalPaths>[0]["options"] {
@@ -494,6 +440,8 @@ function fakeVisibleResult(pathIds: readonly number[]): Pick<ComputeVisiblePorta
           destinationCellId: "room-b",
           depth: 1,
           rootFromDestinationMatrix: new THREE.Matrix4(),
+          clipPlanes: new Float64Array(16),
+          terminal: false,
           clipPolygonNdc: [],
           clipRectNdc: { minX: -0.1, minY: -0.1, maxX: 0.1, maxY: 0.1 },
           screenAreaPixels: 12,

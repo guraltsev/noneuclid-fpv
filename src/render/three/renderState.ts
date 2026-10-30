@@ -113,7 +113,9 @@ export interface VisiblePortalPathRenderState {
   readonly visiblePathCountByDepth: readonly { readonly depth: number; readonly count: number }[];
   readonly maxVisibleDepth: number;
   readonly clippedByCameraCount: number;
-  readonly clippedByAreaCount: number;
+  readonly clippedByFunnelCount: number;
+  readonly terminalByAreaCount: number;
+  readonly examinedPathCount: number;
   readonly clippedByBudgetCount: number;
   readonly budgetExhausted: boolean;
 }

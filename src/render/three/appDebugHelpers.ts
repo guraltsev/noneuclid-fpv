@@ -472,7 +472,9 @@ export function visibleSummaryToRenderState(summary: VisiblePortalPathDebugSumma
     visiblePathCountByDepth: summary.visiblePathCountByDepth,
     maxVisibleDepth: summary.maxVisibleDepth,
     clippedByCameraCount: summary.clippedByCameraCount,
-    clippedByAreaCount: summary.clippedByAreaCount,
+    clippedByFunnelCount: summary.clippedByFunnelCount,
+    terminalByAreaCount: summary.terminalByAreaCount,
+    examinedPathCount: summary.examinedPathCount,
     clippedByBudgetCount: summary.clippedByBudgetCount,
     budgetExhausted: summary.budgetExhausted,
   };

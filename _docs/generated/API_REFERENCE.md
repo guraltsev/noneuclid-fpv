@@ -1884,6 +1884,27 @@ Utilities for combining the per-eye visibility results of stereo (VR) rendering 
 | function | `transformVisiblePortalResultToRenderFrame` | Returns a copy of `result` whose path matrices are premultiplied by `renderFromRootMatrix`, so they place cells in the shared render frame; polygons and statistics are unchanged. |
 | function | `remapStereoPortalPathIds` | Reassigns path ids consecutively (from 0, in first-seen order) so equal `(rootCellId, pathId)` pairs share an id across eyes and different roots stay distinct; the input is not modified. |
 
+### `render/three/portalFunnel.ts`
+
+The exact per-frame visibility funnel: plan-direction sectors from the eye, clipped portal by portal, and the four half-spaces through the eye that bound a path's visible region.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| type | `DirectionSector` | Plan directions from the eye: all directions, or the ccw sector from `right` to `left` (angle in [0, pi]). |
+| const | `sectorSlotSize` | Number of `Float64Array` slots of one packed sector: right.x, right.y, left.x, left.y (NaN in slot 0 = full). |
+| const | `clipPlaneCount` | Number of clip planes of a path. |
+| const | `clipPlaneArrayLength` | Length of the `Float64Array` that holds a path's clip planes (4 planes x 4 numbers). |
+| function | `writeFullSector` | Writes the packed "all directions" sector at `offset`. |
+| function | `clipPackedSector` | Keeps `{d : d . |
+| function | `clipPackedSectorByPortal` | Clips the packed sector at `input[inOffset]` by a portal seen from eye `(ex, ey)`: first by `rotCW(L - e)` then by `rotCCW(R - e)`. |
+| function | `unpackDirectionSector` | Converts a packed sector to the object form. |
+| function | `clipDirectionSector` | Keeps the plan directions `d` of `sector` with `d . |
+| function | `clipSectorByPortal` | Clips `sector` by a portal seen from `eye`: `rotCW(L - e)` first, then `rotCCW(R - e)`. |
+| function | `writeAlwaysInsideClipPlanes` | Writes four "always inside" planes (the root path) at `out[offset .. |
+| function | `writeFunnelClipPlanes` | Writes the four clip planes of a path at `out[offset .. |
+| function | `funnelClipPlanes` | Convenience wrapper over {@link writeFunnelClipPlanes} taking a `Vec3` eye and object sector boundaries. |
+| function | `clipPlanesToNdcPolygon` | Clips the NDC square `[-1,1]^2` by the half-planes of the image of `planes` (4 planes, Three frame, through the eye) and writes the polygon vertices (x, y pairs) to `out`; returns the vertex count (0 when empty, at most… |
+
 ### `render/three/portalInstanceDebug.ts`
 
 Debug renderer that draws a single instance of a cell's archetypes at a chosen `rootFromDestination` matrix.
@@ -2221,25 +2242,22 @@ Large plane drawn below the cells so the void reads as ground.
 
 ### `render/three/visiblePortalPaths.ts`
 
-Per-frame portal visibility: decides which entries of a root cell's portal-path table are actually visible on screen and returns, for each, the convex NDC polygon through which its destination cell may be drawn.
+Per-frame portal visibility: decides which entries of a root cell's portal-path table are visible on screen and returns, for each, its placement, the four planes through the eye that bound its visible region, and the convex NDC polygon through which its destination cell may be drawn.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
 | interface | `Vec2` | A 2D point; used for normalized device coordinates, where the visible square is [-1,1] x [-1,1] with +y up. |
 | interface | `Rect2` | Axis-aligned rectangle in NDC (min/max inclusive); the bounding box of a clip polygon. |
-| interface | `ComputeVisiblePortalPathsInput` | Inputs for {@link computeVisiblePortalPaths}: a path table plus the camera(s) and viewport it is evaluated against. |
-| interface | `ComputeIndependentVisiblePortalPathsInput` | Inputs for {@link computeIndependentVisiblePortalPaths}: like the shared variant, but `cameras` is required and each is evaluated separately. |
+| const | `defaultMinPortalScreenAreaPixels` | Paths whose on-screen area is below this many physical pixels are kept but their children are not visited. |
+| interface | `ComputeVisiblePortalPathsInput` | Inputs for {@link computeVisiblePortalPaths}: a path table plus the camera and viewport it is evaluated against. |
+| interface | `ComputeIndependentVisiblePortalPathsInput` | Inputs for {@link computeIndependentVisiblePortalPaths}: like the single variant, but `cameras` is required and each is evaluated separately. |
 | interface | `VisiblePortalPathOptions` | Culling, budget and ordering knobs for portal visibility. |
-| interface | `VisiblePortalPath` | One visible portal path: a destination cell to draw, its placement in the root frame, and its screen-space clip polygon. |
+| interface | `VisiblePortalPath` | One visible portal path: a destination cell to draw, its placement in the root frame, its clip planes and its screen-space clip polygon. |
 | interface | `VisiblePortalPathDebugSummary` | Counters describing one visibility pass, for the debug overlay. |
 | interface | `ComputeVisiblePortalPathsResult` | Result of a visibility pass: the kept paths in render order plus an id lookup and diagnostics. |
 | interface | `VisiblePortalPathLookupResult` | Debug answer to "is this path visible right now?", with its area and bounds when it is. |
-| function | `computeVisiblePortalPaths` | Computes the visible portal paths for a root cell, using all supplied cameras as one conservative union. |
-| function | `computeIndependentVisiblePortalPaths` | Computes one visibility result per camera, each evaluated against that camera alone (no cross-eye union). |
-| function | `buildPortalApertureCorners` | Builds the four corners of a portal side's aperture as a floor-to-ceiling quad in the cell's local frame. |
-| function | `transformApertureCornersToRoot` | Maps aperture corners from a source cell's local frame into the root frame by applying `rootFromSource` to each point. |
-| function | `projectRootSpacePointsToNdc` | Projects root-frame points through one camera into NDC, clipping against the camera's near plane first. |
-| function | `clipConvexPolygonByConvexPolygon` | Intersects two convex polygons with Sutherland-Hodgman clipping and returns the (possibly empty) result. |
+| function | `computeVisiblePortalPaths` | Computes the visible portal paths for a root cell from one camera. |
+| function | `computeIndependentVisiblePortalPaths` | Computes one visibility result per camera, each evaluated against that camera alone (own eye position, own funnel). |
 | function | `ndcRectForPolygon` | Returns the axis-aligned NDC bounding box of a polygon; yields infinities for an empty polygon. |
 | function | `ndcPolygonAreaPixels` | Converts an NDC polygon's area to pixels of the given viewport. |
 | function | `summarizeVisiblePathCountByDepth` | Builds an ascending-by-depth histogram of how many paths exist at each depth. |

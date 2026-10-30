@@ -288,8 +288,10 @@ import { createUnderCellInfinityFloor } from "./underCellFloor";
 import {
   ComputeVisiblePortalPathsResult,
   VisiblePortalPath,
+  VisiblePortalPathOptions,
   computeIndependentVisiblePortalPaths,
   computeVisiblePortalPaths,
+  defaultMinPortalScreenAreaPixels,
 } from "./visiblePortalPaths";
 import {
   VrComfortOptions,
@@ -783,6 +785,14 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   // Portal path search limits: depth in portal hops, counts of paths, tolerance in meters.
   const rootRenderPathMaxDepth = 10;
   const maxVisiblePaths = 2_000;
+  // The one options object of every per-frame visibility call (mono, shared-root stereo, split-root stereo).
+  const visiblePortalPathOptions: VisiblePortalPathOptions = {
+    maxDepth: rootRenderPathMaxDepth,
+    maxVisiblePaths,
+    minPortalScreenAreaPixels: defaultMinPortalScreenAreaPixels,
+    includeRootCell: true,
+    sortMode: "depth-then-area",
+  };
   const portalPathOptions = {
     maxDepth: rootRenderPathMaxDepth,
     skipImmediateReverse: true,
@@ -2610,13 +2620,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       pathTable: table,
       camera: renderRoot.camera,
       viewportPixels: getPortalViewportPixels(renderer),
-      options: {
-        maxDepth: rootRenderPathMaxDepth,
-        maxVisiblePaths,
-        minPortalScreenAreaPixels: 16,
-        includeRootCell: true,
-        sortMode: "depth-then-area",
-      },
+      options: visiblePortalPathOptions,
     });
     const renderedComputed = transformVisiblePortalResultToRenderFrame(computed, renderRoot.renderFromRootMatrix);
     const summary = mergeStaticPathCounts(renderedComputed.summary, activeStaticCull(), renderRoot.rootCellId);
@@ -2691,13 +2695,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
           pathTable: activeStaticCull().tables.tablesByRootCellId.get(sharedRootCellId)!,
           cameras: renderRoots.map((renderRoot) => renderRoot.camera),
           viewportPixels: getPortalViewportPixels(renderer),
-          options: {
-            maxDepth: rootRenderPathMaxDepth,
-            maxVisiblePaths,
-            minPortalScreenAreaPixels: 16,
-            includeRootCell: true,
-            sortMode: "depth-then-area",
-          },
+          options: visiblePortalPathOptions,
         }).map((computed, eyeIndex) => {
           const renderRoot = renderRoots[eyeIndex];
           const renderedComputed = transformVisiblePortalResultToRenderFrame(computed, renderRoot.renderFromRootMatrix);
@@ -2720,13 +2718,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
         pathTable: table,
         camera: renderRoot.camera,
         viewportPixels: getPortalViewportPixels(renderer),
-        options: {
-          maxDepth: rootRenderPathMaxDepth,
-          maxVisiblePaths,
-          minPortalScreenAreaPixels: 16,
-          includeRootCell: true,
-          sortMode: "depth-then-area",
-        },
+        options: visiblePortalPathOptions,
       });
       const renderedComputed = transformVisiblePortalResultToRenderFrame(computed, renderRoot.renderFromRootMatrix);
 

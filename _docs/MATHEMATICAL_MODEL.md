@@ -331,25 +331,37 @@ $M_p = B\,D_p^{-1}\,B^{-1}$ is `rootFromDestination` conjugated by the basis cha
 Three.js frame (`src/render/three/worldAxes.ts#rigidTransformToThreeMatrix`); yaw about $+z$ equals the same angle about
 Three.js $y$. Cell meshes are authored directly in Three.js axes.
 
-**Which paths are visible.** `src/render/three/visiblePortalPaths.ts#computeVisiblePortalPaths` walks the path table in order
-(parents precede children) and keeps a path only if its parent was visible. For a path $p$ with parent $q$:
+**Which paths are visible.** `src/render/three/visiblePortalPaths.ts#computeVisiblePortalPaths` decides visibility with the
+*exact funnel* of `src/render/three/portalFunnel.ts`, in the root cell's world axes ($x$ right, $y$ forward, $z$ up). The
+eye $E=(e,z_e)$ lies in the root cell. For a path $p$ whose newest portal developed into the root frame has endpoints
+$L$ (left) and $R$ (right) and aperture top $h$ (`src/cell-complex/orientedPortal.ts#developPortalSegment`):
 
-1. The *aperture* of the newest portal is a floor-to-ceiling quad in the destination cell of $q$
-   (`src/render/three/visiblePortalPaths.ts#buildPortalApertureCorners`); it is mapped to the root frame by $q$'s
-   `rootFromDestination` (`buildNewestPortalApertureInRoot`).
-2. The quad is moved to camera space and clipped against the near plane, then projected with the camera's projection matrix
-   and perspective division to a convex polygon in normalized device coordinates (NDC). With several cameras (stereo),
-   the NDC points of all cameras are merged and replaced by their convex hull, which is conservative for every eye
-   (`projectRootSpacePointsToConservativeNdc`).
-3. That polygon is clipped by the parent's visible polygon with Sutherland–Hodgman convex clipping
-   (`src/render/three/visiblePortalPaths.ts#clipConvexPolygonByConvexPolygon`). The root's polygon is the full NDC square.
-4. If fewer than three vertices remain, or the pixel area $|A|\,w\,h/4$ is below `minPortalScreenAreaPixels`, the path and
-   its whole subtree are dropped.
+1. *Plan sector.* A line through $e$ with direction $d$ crosses the portal forward iff $d\cdot\mathrm{rot}_{CW}(L-e)\ge0$ and
+   $d\cdot\mathrm{rot}_{CCW}(R-e)\ge0$. The visible plan directions of $p$ form the sector
+   $W(p)=W(q)\cap\{d\cdot g_L\ge0\}\cap\{d\cdot g_R\ge0\}$ ($q$ the parent, $W(\text{root})$ all directions). Because $e$ lies
+   in the root cell, a line satisfying the constraints of a word crosses the portals in order ahead of $e$ (the convexity
+   argument of Section 4), so $W(p)$ is exactly the set of visible directions. A sector is a ccw arc of angle at most $\pi$
+   (a half-plane when the eye stands in a doorway) and is clipped by `portalFunnel.ts#clipDirectionSector`.
+   An empty sector drops the path and its subtree (`clippedByFunnelCount`).
+2. *Vertical.* Every ray of $W(p)$ meets the newest portal last and $z$ is linear along the ray, so with all ceilings at the
+   same height only the top and bottom edges of the newest portal bind. The visible region of $p$ is the cone of four
+   half-spaces through $E$: the two sector boundaries, the top edge and the bottom edge. They are stored as
+   `VisiblePortalPath.clipPlanes` (four planes $n\cdot X+d\ge0$ in the root's Three.js frame; "always inside" is
+   $(0,0,0,1)$; top and bottom are always inside when the eye lies in the portal's vertical plane).
+3. *Screen.* A plane through the eye maps to a line in NDC, so the image of the visible region is the NDC square
+   $[-1,1]^2$ clipped by four lines (at most 8 vertices; no near plane and no projection of apertures)
+   (`portalFunnel.ts#clipPlanesToNdcPolygon`). An empty image drops the path and its subtree (`clippedByCameraCount`).
+4. *Terminal paths.* If the pixel area $|A|\,w\,h/4$ is positive but below `minPortalScreenAreaPixels`
+   (`defaultMinPortalScreenAreaPixels`, 16), the path is *kept* but marked `terminal` and its children are not visited, so a
+   sliver never leaves a hole; the unvisited children show the scene background, which equals the fog colour. A path at
+   `maxDepth` is terminal too.
 
-Survivors are sorted (`depth-then-area` or `area-then-depth`, ties by path id) and truncated to `maxVisiblePaths`. The
-truncation happens *after* traversal, so with area-first ordering a child can survive while its parent was cut. Each result
-carries the Three.js matrix, the clip polygon and its bounding rectangle
-(`src/render/three/visiblePortalPaths.ts#VisiblePortalPath`).
+The traversal is depth-first from the root over `pathsByParentPathId` and examines only the children of visible,
+non-terminal parents (`examinedPathCount`). Survivors are sorted (`depth-then-area` or `area-then-depth`, ties by path id)
+and truncated to `maxVisiblePaths`. The truncation happens *after* traversal, so with area-first ordering a child can
+survive while its parent was cut. Each result carries the shared Three.js matrix, the clip planes, the clip polygon and its
+bounding rectangle (`src/render/three/visiblePortalPaths.ts#VisiblePortalPath`). With several cameras (stereo) each eye runs
+its own funnel (`computeIndependentVisiblePortalPaths`); there is no cross-eye union.
 
 **Instancing.** Each cell mesh part (floor, walls, portal frames, static objects; ceilings are skipped) is an
 `InstancedMesh` whose geometry is baked in the cell's local frame
@@ -487,6 +499,7 @@ rather than discovered.
   (`allowUnequalGluedSides`) bypasses it.
 - **Unequal cell heights.** Gluing preserves $z$, so across a portal the usable aperture height is the smaller of the
   two cell heights; the taller side's extra wall height above the shorter cell is not modelled.
+  The per-frame funnel (Section 8) uses only the newest portal's top, with the aperture top being the smaller of the two heights, so with unequal heights it over-includes rays blocked by an earlier lower portal; those pixels show the nearer wall above the earlier portal through the depth test.
 - **Orientation.** Only orientation-preserving gluings exist (Section 3).
 - **Vertex neighborhoods** are excluded rather than resolved (Section 3); a world with a vertex of angle sum $2\pi$ still
   carries the exclusion cylinder.

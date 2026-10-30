@@ -29,8 +29,9 @@ const degenerateCrossTolerance = 1e-12;
 
 /** Number of `Float64Array` slots of one packed sector: right.x, right.y, left.x, left.y (NaN in slot 0 = full). */
 export const sectorSlotSize = 4;
-/** Number of planes of a path and the `Float64Array` length that holds them. */
+/** Number of clip planes of a path. */
 export const clipPlaneCount = 4;
+/** Length of the `Float64Array` that holds a path's clip planes (4 planes x 4 numbers). */
 export const clipPlaneArrayLength = 16;
 
 /** Writes the packed "all directions" sector at `offset`. */

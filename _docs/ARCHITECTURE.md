@@ -156,8 +156,8 @@ Order of work in each frame (`renderFrame`):
 Rendering never builds a "world mesh". It draws each *cell* once as an instanced archetype and places one instance per
 visible portal path using the path's `rootFromDestination` matrix; a fragment shader clips each instance to the screen
 polygon through which that path is visible. Visibility is computed by
-`src/render/three/visiblePortalPaths.ts#computeVisiblePortalPaths` as recursive convex clipping of portal apertures in
-normalized device coordinates (details and the stereo variant are documented in that module and summarised in
+`src/render/three/visiblePortalPaths.ts#computeVisiblePortalPaths` as an exact funnel (a plan-direction sector from the eye plus
+the newest portal's top and bottom edges, giving four clip planes per path) traversed from the visible parents only (details and the stereo variant are documented in that module and summarised in
 [MATHEMATICAL_MODEL.md](MATHEMATICAL_MODEL.md)). Objects that straddle a portal or a vertex are drawn as "ghosts" in every cell copy their footprint reaches
 (`src/render/three/runtimeObjectGhostRecords.ts#collectPortalGhostRuntimeObjectRenderRecords`).
 
