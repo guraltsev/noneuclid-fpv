@@ -1,8 +1,8 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
-import { reverseGeodesicPortalWord, type GeodesicPortalTraversal } from "../../src/world-objects/geodesicCannon";
-import { exampleWorldSpecs } from "../support/arbitraries";
+import { compileCellComplex } from "../../../src/cell-complex/compileCellComplex";
+import { reverseGeodesicPortalWord, type GeodesicPortalTraversal } from "../../../src/world-objects/geodesicCannon";
+import { exampleWorldSpecs } from "../../support/arbitraries";
 
 const world = compileCellComplex(exampleWorldSpecs.find(([name]) => name === "cube")![1]);
 

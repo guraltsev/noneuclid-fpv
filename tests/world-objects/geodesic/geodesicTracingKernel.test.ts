@@ -1,8 +1,8 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
-import type { SegmentWalkPiece } from "../../src/cell-complex/segmentWalk";
-import { identityRigidTransform3, invertRigidTransform3, transformPoint3, yawRigidTransform3 } from "../../src/math/rigidTransform3";
+import { compileCellComplex } from "../../../src/cell-complex/compileCellComplex";
+import type { SegmentWalkPiece } from "../../../src/cell-complex/segmentWalk";
+import { identityRigidTransform3, invertRigidTransform3, transformPoint3, yawRigidTransform3 } from "../../../src/math/rigidTransform3";
 import {
   createGeodesicCannonObject,
   createGeodesicIntervalObject,
@@ -16,9 +16,9 @@ import {
   traceGeodesicSegment,
   updateGeodesicIntersectionObjects,
   type GeodesicSegmentObject,
-} from "../../src/world-objects/geodesicCannon";
-import { createRuntimeObjectRegistry } from "../../src/world-objects/runtimeObjectRegistry";
-import { exampleWorldSpecs } from "../support/arbitraries";
+} from "../../../src/world-objects/geodesicCannon";
+import { createRuntimeObjectRegistry } from "../../../src/world-objects/runtimeObjectRegistry";
+import { exampleWorldSpecs } from "../../support/arbitraries";
 
 const torusSpec = exampleWorldSpecs.find(([name]) => name === "torusModuli")![1];
 const torusWorld = compileCellComplex(torusSpec);
