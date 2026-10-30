@@ -1,6 +1,6 @@
 # Job 25 - Split geodesicCannon.ts into modules under src/world-objects/geodesic/
 
-Status: queued.
+Status: done, needs review on 2026-10-29 (commits 6059f0e, 2f6aff5, 0f9b6ab, 3ee49cc, 99b93f4).
 Former issue: 76 (converted to a job on 2026-10-28). Rewritten on 2026-10-29 against commit `0b468e1` for a less capable
 implementing model. Resolves: no open issue (concrete plan for the geodesic half of [job 33](33_decompose_runtime_monoliths.md)).
 
@@ -349,3 +349,53 @@ cycle to work around it.
 - [ ] `_docs` references point to the new files; `_docs/ARCHITECTURE.md` lists the modules.
 - [ ] Report written per [README](README.md); the job moves to `_done/`. No issue to close. Under `### Not done`, mention
       the tool reducer (Decision 9) so the coordinator can place it in job 31 or 33.
+
+## Report
+
+### Done
+Five commits, one per Part: A `6059f0e`, B `2f6aff5`, C `0f9b6ab`, D `3ee49cc`, E `99b93f4`.
+
+- A: `src/math/vec2.ts` (+ `distanceSquaredVec3` in `src/math/vec3.ts`, `tests/math/vec2.test.ts`, 4 tests); private `cross2` and
+  `distanceSquared` replaced; modules `objects`, `portalWord`, `development`, `trace`.
+- B: `intersections`, `endpoints`, `segments`, `lifecycle`.
+- C: `intervals`, `curveShortening`, `legacyConnection`, `cannon`; `rebuildLegacyConnectedGeodesic` extracted verbatim into
+  `legacyConnection.ts` (Decision 8); `moduleImportRules` / `moduleImportRuleViolations` in `scripts/docs/lib.mjs`,
+  `checkModuleImportRules` ("module import rules") in `scripts/docs/checks.mjs`, `tests/docs/moduleImportRules.test.ts` (2 tests).
+- D: `tests/world-objects/geodesicCannon.test.ts` split into `tests/world-objects/geodesic/{trace,cannon,carry,curveShortening,intersections,legacyConnection}.test.ts`
+  plus `fixtures.ts`; `geodesicTracingKernel.test.ts` and `geodesicPortalWord.property.test.ts` moved there. The JSON reporter lists of
+  test names (status, nesting, title) are identical before and after: 82 passed, 8 skipped (all 8 in `legacyConnection.test.ts`).
+- E: 24 importers repointed (only import lines), `geodesicCannon.ts` deleted, the legacy importer rule now allows
+  `render/three/geodesicCannonTools.ts` and `world-objects/geodesic/cannon.ts`; `_docs/ARCHITECTURE.md` has a paragraph on the modules;
+  `_docs/coding_style.md` line 91 points to `geodesic/trace.ts`; doc references (`MATHEMATICAL_MODEL.md`, `ARCHITECTURE.md`) were rewritten per Part.
+- Moves were done by a script (TypeScript AST) that cuts each declaration with its leading comments and computes the imports; no logic edited.
+  The module dependency graph (runtime imports) has no cycle; the only `objects -> portalWord` runtime edge is the one Decision 2 expects
+  (`portalWord` imports only types from `objects`).
+- Module sizes (lines): objects 625, portalWord 183, development 20, trace 481, intersections 327, endpoints 412, segments 518, lifecycle 163,
+  intervals 935, curveShortening 1034, legacyConnection 1045, cannon 794.
+
+### Deviations
+- Job 37 had already landed, so baseline counts were 117 files / 894 passed / 8 skipped (job text says 116/883). End state: 123 passed + 1
+  skipped file (`legacyConnection.test.ts`, all tests skipped), 900 passed, 8 skipped (894 + 4 vec2 + 2 import-rule tests).
+- Each new test file wraps its tests in `describe("geodesic cannon world objects: <module>", ...)` instead of the old single
+  `describe("geodesic cannon world objects", ...)` (the job asks for one wrapper per file); test names and bodies are unchanged.
+- `defaultTraceLengthMeters`, `intersectionTolerance`, `emitterConnectionToleranceMeters` and `sanitizeYaw` became exported (they are in the
+  job's "+export" list); `sanitizeYaw` had only a `//` comment, so I added a JSDoc line from it.
+- One extra comment edit: the header of `src/render/three/geodesicCannonTools.ts` named the deleted module `world-objects/geodesicCannon`; it now says `world-objects/geodesic/`.
+- New files use LF line endings (the old `geodesicCannon.ts` had mixed CRLF/LF).
+
+### Uncertain
+- The manual browser check (`?config=full`: place two cannons, shoot, carry through a portal, tie-and-detach a loop) was not run; the automated
+  smoke test for the four worlds passes after every Part.
+- The `mayImportOnly` rule for `trace.ts` lists `movement/` as allowed although `trace.ts` does not import it today (as the job specified).
+
+### Not done
+- The tool state machine (old stage 4: a pure `step(state, registry, input) -> { state, effects }` reducer for
+  `src/render/three/geodesicCannonTools.ts`, Decision 9) is out of scope; the coordinator should place it in job 31 or 33.
+- Other duplicated 2-D helpers (`staticPortalPathCull.ts`, `developedDisk.ts`, `sweptCollision.ts`, `measureLengthTool.ts`, `runtimeSceneUtils.ts`) are left for jobs 32/33.
+- Older open issues under `_issues/` still cite line numbers in `geodesicCannon.ts` (not checked by `docs:check`); not updated.
+
+### Checks
+Baseline: `npm run typecheck` ok, `npm test` 117 files, 894 passed, 8 skipped, `npm run docs:check` ok.
+After every Part (A-E): `npm run typecheck` ok; `npm test` ok (A 898/8, B 898/8, C 900/8, D and E 900/8 passed/skipped); `npm run docs:check` ok
+(after `npm run docs:generate`; from Part C includes "module import rules"); `npm run build` ok; `npm run smoke -- --world cube,icosahedron,torus-moduli,genus-2-torus`
+"SMOKE OK (4 page(s))" every time (no flake seen). No push.
