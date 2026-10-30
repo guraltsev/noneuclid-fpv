@@ -338,7 +338,11 @@ export function createRuntimeObjectInstanceSync(deps: RuntimeObjectInstanceSyncD
         snapshot.objectPathsByDestinationCell,
         deps.diagnostics,
         snapshot.clipIndexByPathId,
-        { cameraPositions: snapshot.cameraPositions },
+        {
+          cameraPositions: snapshot.cameraPositions,
+          unclippedRoot: snapshot.unclippedRoot,
+          rootGroupByPathId: snapshot.rootGroupByPathId,
+        },
       );
       stats.syncs += 1;
     },

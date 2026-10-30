@@ -2230,6 +2230,16 @@ Debug overlay builder for the collision shapes of static asset objects in one ce
 | --- | --- | --- |
 | function | `buildStaticObjectCollisionWireframeGroup` | Builds a group of collision wireframes for the collidable asset objects of cell `cellId`. |
 
+### `render/three/stereoPortalFrame.ts`
+
+Builds the per-eye visibility states of one stereo (XR) frame, as a pure function of the world, the static path tables, the eyes' render roots and the viewport, so the contract tests run the same code as the app.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `StereoPortalFrame` | Per-eye states of a stereo frame plus the root grouping used for clipping and de-duplication. |
+| function | `haveSameRootIdentity` | True iff the two eyes' render roots have the same cell id and the same frame (within 1e-9 per matrix element). |
+| function | `buildStereoPortalFrame` | Computes the visible paths of every eye and groups the eyes by root identity. |
+
 ### `render/three/toolObjectRuntimes.ts`
 
 Scene-graph runtimes for placed flags, measured lengths, and protractor angles: sync, removal, and refresh.

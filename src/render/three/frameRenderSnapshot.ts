@@ -30,6 +30,10 @@ export interface FrameRenderSnapshot {
   readonly clipIndexByPathId: ReadonlyMap<number, number>;
   /** Viewer positions in the render frame, one per eye (rover suppression). */
   readonly cameraPositions: readonly THREE.Vector3[];
+  /** Whether depth-0 instances skip the clip test: true except in split-root stereo, where each eye clips its own root. */
+  readonly unclippedRoot: boolean;
+  /** Root group per path id in split-root stereo (undefined otherwise); runtime-object de-duplication is per group. */
+  readonly rootGroupByPathId?: ReadonlyMap<number, number>;
 }
 
 /** Builds a snapshot; derives `objectPaths` and `objectPathsByDestinationCell` from `visiblePathsByDestinationCell`. */
@@ -39,6 +43,8 @@ export function createFrameRenderSnapshot(input: {
   visiblePathsByDestinationCell: ReadonlyMap<string, readonly VisiblePortalPath[]>;
   clipIndexByPathId: ReadonlyMap<number, number>;
   cameraPositions: readonly THREE.Vector3[];
+  unclippedRoot?: boolean;
+  rootGroupByPathId?: ReadonlyMap<number, number>;
 }): FrameRenderSnapshot {
   const objectPaths = flattenVisiblePortalPathGroups(input.visiblePathsByDestinationCell);
 
@@ -50,6 +56,8 @@ export function createFrameRenderSnapshot(input: {
     objectPathsByDestinationCell: groupVisiblePortalPathsByDestinationCell(objectPaths),
     clipIndexByPathId: input.clipIndexByPathId,
     cameraPositions: input.cameraPositions,
+    unclippedRoot: input.unclippedRoot ?? true,
+    rootGroupByPathId: input.rootGroupByPathId,
   };
 }
 
