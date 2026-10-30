@@ -13,7 +13,6 @@ import {
   yawRigidTransform3,
   type RigidTransform3,
 } from "../math/rigidTransform3";
-import { crossXY } from "../math/vec2";
 import { addVec3, distanceSquaredVec3, distanceVec3, scaleVec3, subVec3, type Vec3 } from "../math/vec3";
 import { type RuntimeObjectRegistry, type RuntimeWorldObject, runtimeObjectToDynamicObjectState } from "./runtimeObjectRegistry";
 import {
@@ -35,11 +34,8 @@ import {
   type GeodesicEndpointAttachment,
   type GeodesicEndpointSelection,
   type GeodesicEndRole,
-  type GeodesicHalfRole,
-  type GeodesicIntersectionObject,
   type GeodesicIntervalObject,
   type GeodesicPortalTraversal,
-  geodesicRayBeamHeightMeters,
   geodesicRayBeamStartOffsetMeters,
   type GeodesicSegmentObject,
   type GeodesicSegmentTerminal,
@@ -51,9 +47,7 @@ import {
   intersectionTolerance,
   isCurveShorteningPairObject,
   isFreeGeodesicEndObject,
-  isGeodesicIntervalObject,
   isGeodesicSegmentObject,
-  type LiftedGeodesicEndpoint,
   minGeodesicSegmentLengthMeters,
   normalizeHorizontalDirection,
   type PlaceGeodesicCannonResult,
@@ -71,13 +65,48 @@ import {
   reverseGeodesicPortalWord,
   samePortalWord,
 } from "./geodesic/portalWord";
-import { inversePortalTransform } from "./geodesic/development";
 import {
   findNearestEmitterHitOnTrace,
   traceGeodesicPathForConnectionMode,
   traceGeodesicSegment,
   traceTerminalToBuildTerminal,
 } from "./geodesic/trace";
+import { updateGeodesicIntersectionObjects } from "./geodesic/intersections";
+import {
+  collectIncidentGeodesicIdsForEmitter,
+  findSourceEmitterForGeodesic,
+  getGeodesicEndpointAttachmentsForAnchor,
+  isAimableFreeGeodesic,
+  liftGeodesicEndpoint,
+  liftGeodesicEndpointWithAnchors,
+  portalWordMatchesCurrentEndpointCells,
+  portalWordMatchesEndpointCellsWithAnchors,
+  removeUnusedFreeGeodesicEnds,
+  replaceGeodesicEndpointAttachment,
+} from "./geodesic/endpoints";
+import {
+  buildDerivedSegmentsFromTraces,
+  canConnectGeodesicSegmentAtDistance,
+  collectGeodesicPortalWord,
+  createGeodesicSegmentTooltip,
+  createSegmentFromTrace,
+  distanceAlongSegment,
+  getGeodesicSegments,
+  getGeodesicTail,
+  getGeodesicTotalLengthMeters,
+  removeGeodesicIntervalAndDerivedObjects,
+  removeGeodesicSegments,
+  replaceDerivedSegmentsFromTraces,
+  resolveEndpointTangentAtAnchor,
+  resolveGeodesicNumber,
+  segmentToTrace,
+  syncLegacyEmitterGeodesicFields,
+  totalGeodesicLengthFromSegments,
+  totalLengthThroughSegment,
+  withAnchoredTargetTerminal,
+  withAnchoredTargetTerminalForAnchors,
+} from "./geodesic/segments";
+import { collectLockedIncidentGeodesicIdsForEmitter, getGeodesicConnection, isGeodesicLocked, removeGeodesic } from "./geodesic/lifecycle";
 
 /**
  * Input for `shootGeodesic`: aim a cannon's geodesic along the cannon's yaw and trace it for `maxLengthMeters`.
@@ -238,15 +267,6 @@ export interface AdvanceCurveShorteningPairsRequest {
   readonly onDebugMessage?: (message: string, detail?: unknown) => void;
 }
 
-/** Maximum distance (meters) between two geodesic points for them to count as one vertex when placing at a vertex; deliberately generous. */
-const vertexContinuityToleranceMeters = 10;
-
-/** Distance (meters) from a geodesic's anchor within which a crossing counts as the anchor itself and is not reported. */
-const geodesicAnchorCrossingToleranceMeters = 1e-6;
-
-/** Extra height (meters) above the beam at which an intersection marker is placed. */
-const geodesicIntersectionBalloonHeightOffsetMeters = 0.25;
-
 /** Legacy: default speed (m/s) of the retired same-cell straightening model. */
 export const geodesicStraighteningSpeedMetersPerSecond = 0.4;
 
@@ -270,9 +290,6 @@ export const curveShorteningMinStepMeters = 0.002;
  * length of the pair's arcs is at most `previousTotalLengthMeters + curveShorteningLengthIncreaseToleranceMeters`.
  */
 export const curveShorteningLengthIncreaseToleranceMeters = 1e-4;
-
-/** Per-registry memory of intersection markers so ids remain stable while two segments keep crossing. */
-const geodesicIntersectionMemoryByRegistry = new WeakMap<RuntimeObjectRegistry, Map<string, GeodesicIntersectionObject>>();
 
 /**
  * Adds a new cannon standing on the floor at `floorPoint` unless the spot is blocked.
@@ -319,333 +336,6 @@ export function placeGeodesicCannonAtFloorPoint(
   return { placed: true, object: candidate };
 }
 
-// ---- Registry queries and edits of endpoint attachments ----
-
-/**
- * Lists every interval endpoint attachment (start or end of any interval) whose anchor is `anchorObjectId`.
- *
- * An interval whose both ends attach to the same anchor appears twice (once per role). Order follows registry order.
- */
-export function getGeodesicEndpointAttachmentsForAnchor(
-  registry: RuntimeObjectRegistry,
-  anchorObjectId: string,
-): readonly GeodesicEndpointAttachment[] {
-  return registry.getAll()
-    .filter(isGeodesicIntervalObject)
-    .flatMap((interval) => [interval.start, interval.end])
-    .filter((attachment) => attachment.anchorObjectId === anchorObjectId);
-}
-
-/** Returns `[start, end]` attachments of the interval `geodesicId`, or `undefined` if no such interval exists. */
-export function getGeodesicEndpoints(
-  registry: RuntimeObjectRegistry,
-  geodesicId: string,
-): readonly [GeodesicEndpointAttachment, GeodesicEndpointAttachment] | undefined {
-  const interval = registry.get(geodesicId);
-  return interval?.kind === "geodesic-interval" ? [interval.start, interval.end] : undefined;
-}
-
-/**
- * Re-attaches one endpoint role of an interval to another anchor object and returns the updated interval.
- *
- * Returns `undefined` (and changes nothing) if the interval does not exist or the new anchor cannot attach geodesics.
- * Does NOT update `startCellId`, the portal word or the derived segments: the caller must keep them consistent and
- * rebuild. Side effects: drops the geodesic id from the previous emitter's lists when no role still uses it, and
- * deletes free ends that became unreferenced.
- */
-export function replaceGeodesicEndpointAttachment(
-  registry: RuntimeObjectRegistry,
-  geodesicId: string,
-  endRole: GeodesicEndRole,
-  nextAnchorObjectId: string,
-): GeodesicIntervalObject | undefined {
-  const interval = registry.get(geodesicId);
-  if (interval?.kind !== "geodesic-interval" || !canObjectAttachGeodesics(registry.get(nextAnchorObjectId))) {
-    return undefined;
-  }
-  const previousAnchorObjectId = interval[endRole].anchorObjectId;
-
-  const next: GeodesicIntervalObject = {
-    ...interval,
-    [endRole]: {
-      geodesicId,
-      role: endRole,
-      anchorObjectId: nextAnchorObjectId,
-    },
-  };
-  registry.update(next);
-  if (
-    previousAnchorObjectId !== nextAnchorObjectId &&
-    !(["start", "end"] as const).some((role) => next[role].anchorObjectId === previousAnchorObjectId)
-  ) {
-    removeGeodesicAssociationFromEmitter(registry, previousAnchorObjectId, geodesicId);
-  }
-  removeUnusedFreeGeodesicEnds(registry);
-  return next;
-}
-
-/**
- * Deletes an interval together with everything derived from or pointing at it.
- *
- * Removes its segments, the interval, measurements and protractor angles referring to it, intersection markers
- * involving it, emitter list entries, and any free ends left unreferenced; then refreshes intersection markers.
- * No-op for unknown ids (the sweeps simply find nothing).
- */
-export function removeGeodesicIntervalAndDerivedObjects(
-  registry: RuntimeObjectRegistry,
-  geodesicId: string,
-): void {
-  removeGeodesicSegments(registry, geodesicId);
-  for (const object of registry.getAll()) {
-    if (
-      (object.kind === "geodesic-interval" && object.id === geodesicId) ||
-      (object.kind === "measured-geodesic-length" && object.geodesicId === geodesicId) ||
-      (object.kind === "protractor-angle" &&
-        (object.first.geodesicId === geodesicId || object.second.geodesicId === geodesicId)) ||
-      (object.kind === "geodesic-intersection" && object.geodesicIds.includes(geodesicId))
-    ) {
-      registry.remove(object.id);
-    }
-  }
-  removeGeodesicAssociations(registry, geodesicId);
-  removeUnusedFreeGeodesicEnds(registry);
-  updateGeodesicIntersectionObjects(registry);
-}
-
-/** Returns the stored portal word of an interval (ordered `start` -> `end`), or `undefined` if `geodesicId` is not an interval. */
-export function getGeodesicPortalWord(
-  registry: RuntimeObjectRegistry,
-  geodesicId: string,
-): readonly GeodesicPortalTraversal[] | undefined {
-  const interval = registry.get(geodesicId);
-  return interval?.kind === "geodesic-interval" ? interval.portalWord : undefined;
-}
-
-/**
- * Develops an interval into the source endpoint's cell: pulls the opposite endpoint back through the inverse portal transforms.
- *
- * Math: let the word read from the source be `t_1 ... t_n` with `T_i` = `transformToTarget` of the portal of `t_i`
- * (source-cell frame to target-cell frame). The target anchor lives in the frame of the last target cell; applying
- * `T_n^{-1}`, then `T_{n-1}^{-1}`, ... , `T_1^{-1}` expresses it in the source cell's frame. The geodesic is then the
- * straight segment from `sourcePoint` to that pulled-back point (so both its direction and its length are read off the
- * x/y difference), and it is the unique locally straight path realizing this word between the two anchors.
- *
- * Returns `undefined` if either anchor is missing or cannot attach geodesics, or a traversal names a portal not in
- * `world`. Also returns `undefined` when the stored word does not chain from the start anchor's cell to the end anchor's
- * cell (`portalWordMatchesEndpointCellsWithAnchors`). It does not check that the lifted chord is long enough.
- * Units: meters; z of both points is the anchors' beam height.
- */
-export function liftGeodesicEndpoint(input: {
-  readonly world: CompiledCellComplex;
-  readonly registry: RuntimeObjectRegistry;
-  readonly interval: GeodesicIntervalObject;
-  readonly sourceRole: GeodesicEndRole;
-}): LiftedGeodesicEndpoint | undefined {
-  const sourceAttachment = input.interval[input.sourceRole];
-  const targetRole: GeodesicEndRole = input.sourceRole === "start" ? "end" : "start";
-  const targetAttachment = input.interval[targetRole];
-  const sourceAnchor = input.registry.get(sourceAttachment.anchorObjectId);
-  const targetAnchor = input.registry.get(targetAttachment.anchorObjectId);
-  if (!canObjectAttachGeodesics(sourceAnchor) || !canObjectAttachGeodesics(targetAnchor)) {
-    return undefined;
-  }
-  if (!portalWordMatchesEndpointCellsWithAnchors({
-    registry: input.registry,
-    interval: input.interval,
-    word: input.interval.portalWord,
-  })) {
-    return undefined;
-  }
-
-  const portalWordFromSourceToTarget = input.sourceRole === "start"
-    ? input.interval.portalWord
-    : reverseGeodesicPortalWord(input.interval.portalWord);
-  const sourcePoint = getAnchorBeamPoint(sourceAnchor);
-  let targetPointInSourceCell = getAnchorBeamPoint(targetAnchor);
-  // Pull-back (development): the target anchor is expressed in the frame of the LAST target cell, so undo the traversals from the last
-  // to the first: p <- T_i^{-1}(p). After the loop `targetPointInSourceCell` is in the source cell's frame and the geodesic is the
-  // straight segment from `sourcePoint` to it. A traversal that names an unknown portal makes the lift fail.
-  for (const traversal of portalWordFromSourceToTarget.slice().reverse()) {
-    const portal = input.world.cellsById.get(traversal.sourceCellId)?.portalsById.get(traversal.sourcePortalId);
-    if (!portal) {
-      return undefined;
-    }
-    targetPointInSourceCell = transformPoint3(inversePortalTransform(portal), targetPointInSourceCell);
-  }
-
-  return {
-    sourceRole: input.sourceRole,
-    targetRole,
-    sourceAnchorObjectId: sourceAttachment.anchorObjectId,
-    targetAnchorObjectId: targetAttachment.anchorObjectId,
-    sourceCellId: sourceAnchor.cellId,
-    sourcePoint,
-    targetPointInSourceCell,
-    portalWordFromSourceToTarget,
-  };
-}
-
-// Same as `liftGeodesicEndpoint`, but anchors found in `candidateAnchorsById` shadow the registry, so a tick can be
-// previewed with a hypothetical free-end position without mutating the registry.
-function liftGeodesicEndpointWithAnchors(input: {
-  readonly world: CompiledCellComplex;
-  readonly registry: RuntimeObjectRegistry;
-  readonly interval: GeodesicIntervalObject;
-  readonly sourceRole: GeodesicEndRole;
-  readonly candidateAnchorsById?: ReadonlyMap<string, RuntimeWorldObject>;
-}): LiftedGeodesicEndpoint | undefined {
-  const sourceAttachment = input.interval[input.sourceRole];
-  const targetRole: GeodesicEndRole = input.sourceRole === "start" ? "end" : "start";
-  const targetAttachment = input.interval[targetRole];
-  const sourceAnchor = input.candidateAnchorsById?.get(sourceAttachment.anchorObjectId) ??
-    input.registry.get(sourceAttachment.anchorObjectId);
-  const targetAnchor = input.candidateAnchorsById?.get(targetAttachment.anchorObjectId) ??
-    input.registry.get(targetAttachment.anchorObjectId);
-  if (!canObjectAttachGeodesics(sourceAnchor) || !canObjectAttachGeodesics(targetAnchor)) {
-    return undefined;
-  }
-  if (!portalWordMatchesEndpointCellsWithAnchors({
-    registry: input.registry,
-    interval: input.interval,
-    word: input.interval.portalWord,
-    candidateAnchorsById: input.candidateAnchorsById,
-  })) {
-    return undefined;
-  }
-
-  const portalWordFromSourceToTarget = input.sourceRole === "start"
-    ? input.interval.portalWord
-    : reverseGeodesicPortalWord(input.interval.portalWord);
-  const sourcePoint = getAnchorBeamPoint(sourceAnchor);
-  let targetPointInSourceCell = getAnchorBeamPoint(targetAnchor);
-  for (const traversal of portalWordFromSourceToTarget.slice().reverse()) {
-    const portal = input.world.cellsById.get(traversal.sourceCellId)?.portalsById.get(traversal.sourcePortalId);
-    if (!portal) {
-      return undefined;
-    }
-    targetPointInSourceCell = transformPoint3(inversePortalTransform(portal), targetPointInSourceCell);
-  }
-
-  return {
-    sourceRole: input.sourceRole,
-    targetRole,
-    sourceAnchorObjectId: sourceAttachment.anchorObjectId,
-    targetAnchorObjectId: targetAttachment.anchorObjectId,
-    sourceCellId: sourceAnchor.cellId,
-    sourcePoint,
-    targetPointInSourceCell,
-    portalWordFromSourceToTarget,
-  };
-}
-
-/**
- * True when the interval's lifted start-to-end chord is at least `GEODESIC_MIN_LENGTH_METERS` long (horizontally).
- *
- * False also when the lift fails (missing anchors/portals). Used to reject degenerate (point-like) geodesics, e.g. a
- * closed loop that has shrunk to nothing.
- */
-export function geodesicHasNonzeroLiftedDisplacement(input: {
-  readonly world: CompiledCellComplex;
-  readonly registry: RuntimeObjectRegistry;
-  readonly interval: GeodesicIntervalObject;
-}): boolean {
-  const lifted = liftGeodesicEndpoint({ ...input, sourceRole: "start" });
-  if (!lifted) {
-    return false;
-  }
-  return Math.hypot(
-    lifted.targetPointInSourceCell.x - lifted.sourcePoint.x,
-    lifted.targetPointInSourceCell.y - lifted.sourcePoint.y,
-  ) >= GEODESIC_MIN_LENGTH_METERS - intersectionTolerance;
-}
-
-// ---- Derived-segment and connection queries ----
-
-/** Returns the derived segments of a geodesic sorted by `segmentIndex` (empty if none). */
-export function getGeodesicSegments(
-  registry: RuntimeObjectRegistry,
-  geodesicId: string,
-): readonly GeodesicSegmentObject[] {
-  return registry.getAll()
-    .filter((object): object is GeodesicSegmentObject => object.kind === "geodesic-segment")
-    .filter((segment) => segment.geodesicId === geodesicId)
-    .sort((a, b) => a.segmentIndex - b.segmentIndex);
-}
-
-/** Returns the last (highest `segmentIndex`) segment of a geodesic, or `undefined` if it has none. */
-export function getGeodesicTail(
-  registry: RuntimeObjectRegistry,
-  geodesicId: string,
-): GeodesicSegmentObject | undefined {
-  return getGeodesicSegments(registry, geodesicId).at(-1);
-}
-
-/**
- * Describes the emitter connection of a geodesic.
- *
- * For an interval it is derived from the attachments: start on an emitter gives `outgoing = start`, and `connected`
- * when the end is also an emitter (else `open`); an interval with only its end on an emitter reports that emitter as
- * outgoing and `open`. Legacy: otherwise falls back to the cannon-stored `geodesicConnectionsById` records and finally to
- * the source emitter, reporting `open`. Returns `undefined` when nothing owns the geodesic.
- */
-export function getGeodesicConnection(
-  registry: RuntimeObjectRegistry,
-  geodesicId: string,
-): GeodesicEmitterConnection | undefined {
-  const interval = registry.get(geodesicId);
-  if (interval?.kind === "geodesic-interval") {
-    const start = registry.get(interval.start.anchorObjectId);
-    const end = registry.get(interval.end.anchorObjectId);
-    if (start?.kind === "geodesic-cannon") {
-      return {
-        outgoingEmitterId: start.id,
-        incomingEmitterId: end?.kind === "geodesic-cannon" ? end.id : undefined,
-        state: end?.kind === "geodesic-cannon" ? "connected" : "open",
-      };
-    }
-    if (end?.kind === "geodesic-cannon") {
-      return {
-        outgoingEmitterId: end.id,
-        state: "open",
-      };
-    }
-  }
-
-  for (const object of registry.getAll()) {
-    if (object.kind !== "geodesic-cannon") {
-      continue;
-    }
-
-    const connection = object.geodesicConnectionsById?.[geodesicId];
-    if (connection) {
-      return connection;
-    }
-  }
-
-  const source = findSourceEmitterForGeodesic(registry, geodesicId);
-  return source ? { outgoingEmitterId: source.id, state: "open" } : undefined;
-}
-
-/**
- * True when both endpoints of the geodesic are emitters (a "locked" geodesic that cannot be extended or aimed freely).
- *
- * Legacy: for non-interval geodesics, falls back to `connected`/`straightening` connection state or an `emitter-hit` tail.
- */
-export function isGeodesicLocked(registry: RuntimeObjectRegistry, geodesicId: string): boolean {
-  const interval = registry.get(geodesicId);
-  if (interval?.kind === "geodesic-interval") {
-    return registry.get(interval.start.anchorObjectId)?.kind === "geodesic-cannon" &&
-      registry.get(interval.end.anchorObjectId)?.kind === "geodesic-cannon";
-  }
-
-  const state = getGeodesicConnection(registry, geodesicId)?.state;
-  if (state === "connected" || state === "straightening") {
-    return true;
-  }
-
-  return getGeodesicTail(registry, geodesicId)?.terminal.kind === "emitter-hit";
-}
-
 /** Legacy: true when the geodesic (or any segment) is in the retired `"straightening"` connection state. */
 export function isGeodesicStraightening(registry: RuntimeObjectRegistry, geodesicId: string): boolean {
   if (getGeodesicConnection(registry, geodesicId)?.state === "straightening") {
@@ -655,99 +345,10 @@ export function isGeodesicStraightening(registry: RuntimeObjectRegistry, geodesi
   return getGeodesicSegments(registry, geodesicId).some((segment) => segment.connectionState === "straightening");
 }
 
-/** Lists the ids of locked geodesics (see `isGeodesicLocked`) that have an endpoint on the emitter. */
-export function collectLockedIncidentGeodesicIdsForEmitter(
-  registry: RuntimeObjectRegistry,
-  emitterId: string,
-): readonly string[] {
-  return collectIncidentGeodesicIdsForEmitter(registry, emitterId)
-    .filter((geodesicId) => isGeodesicLocked(registry, geodesicId));
-}
-
-/** Returns the 1-based display number of a geodesic, defaulting to 1 when it has none. */
-export function resolveGeodesicNumber(registry: RuntimeObjectRegistry, geodesicId: string): number {
-  return getGlobalGeodesicNumbers(registry, geodesicId).get(geodesicId) ?? 1;
-}
-
-// ---- Removal ----
-
-/** Removes a geodesic and its derived objects (interval path via `removeGeodesicIntervalAndDerivedObjects`; legacy path removes segments and emitter associations), then refreshes intersections. */
-export function removeGeodesic(registry: RuntimeObjectRegistry, geodesicId: string): void {
-  if (registry.get(geodesicId)?.kind === "geodesic-interval") {
-    removeGeodesicIntervalAndDerivedObjects(registry, geodesicId);
-    return;
-  }
-  removeGeodesicSegments(registry, geodesicId);
-  removeGeodesicAssociations(registry, geodesicId);
-  updateGeodesicIntersectionObjects(registry);
-}
-
-/** Removes every non-locked geodesic listed on the cannon and returns the removed ids (empty if the id is not a cannon). */
-export function removeUnlockedGeodesicsFromCannon(
-  registry: RuntimeObjectRegistry,
-  cannonId: string,
-): readonly string[] {
-  const cannon = registry.get(cannonId);
-  if (cannon?.kind !== "geodesic-cannon") {
-    return [];
-  }
-
-  const removed: string[] = [];
-  for (const geodesicId of cannon.geodesicIds) {
-    if (isGeodesicLocked(registry, geodesicId)) {
-      continue;
-    }
-
-    removeGeodesic(registry, geodesicId);
-    removed.push(geodesicId);
-  }
-
-  return removed;
-}
-
 /** Legacy: true when any geodesic incident on the emitter is in the retired straightening state. */
 export function hasStraighteningIncidentGeodesic(registry: RuntimeObjectRegistry, emitterId: string): boolean {
   return collectIncidentGeodesicIdsForEmitter(registry, emitterId)
     .some((geodesicId) => isGeodesicStraightening(registry, geodesicId));
-}
-
-/**
- * Deletes a cannon and every geodesic that starts, ends, or connects (as incoming emitter) on it.
- *
- * Geodesics owned by other emitters but arriving here are removed as well. Safe for non-cannon ids (only the final
- * remove and intersection refresh run).
- */
-export function removeGeodesicCannonAndSegments(registry: RuntimeObjectRegistry, cannonId: string): void {
-  const cannon = registry.get(cannonId);
-  if (cannon?.kind === "geodesic-cannon") {
-    const geodesicIds = new Set(getGeodesicEndpointAttachmentsForAnchor(registry, cannonId).map((attachment) => attachment.geodesicId));
-    for (const geodesicId of cannon.geodesicIds) {
-      geodesicIds.add(geodesicId);
-    }
-    if (cannon.activeGeodesicId) {
-      geodesicIds.add(cannon.activeGeodesicId);
-    }
-    for (const geodesicId of geodesicIds) {
-      removeGeodesic(registry, geodesicId);
-    }
-  }
-  for (const object of registry.getAll()) {
-    if (
-      object.kind === "geodesic-cannon" &&
-      object.id !== cannonId &&
-      object.geodesicIds.some((geodesicId) =>
-        getGeodesicConnection(registry, geodesicId)?.incomingEmitterId === cannonId
-      )
-    ) {
-      for (const geodesicId of object.geodesicIds) {
-        if (getGeodesicConnection(registry, geodesicId)?.incomingEmitterId === cannonId) {
-          removeGeodesic(registry, geodesicId);
-        }
-      }
-    }
-  }
-  registry.remove(cannonId);
-  updateGeodesicIntersectionObjects(registry);
 }
 
 /**
@@ -1022,108 +623,6 @@ function lockedIntervalRebuildHitsForbiddenZone(input: {
     maxLengthMeters: lengthMeters,
   });
   return traces.some((trace) => trace.terminal.kind === "forbidden-zone-hit");
-}
-
-/**
- * Labels segments with `halfRole`, cutting the one that straddles the midpoint of the total length into two.
- *
- * Output ids are renumbered `<geodesicId>:segment:<i>` with consecutive indices. A cut segment's first piece gets
- * terminal `open`; its second piece keeps the original terminal. Pieces ending at or before the midpoint are the `start`
- * half, the rest the `end` half. Pure.
- */
-export function splitDerivedSegmentsIntoEndpointHalves(
-  segments: readonly GeodesicSegmentObject[],
-): readonly GeodesicSegmentObject[] {
-  const totalLengthMeters = totalGeodesicLengthFromSegments(segments);
-  // Halves are defined by arc length: everything before the midpoint is attached to the `start` role, everything after to `end`.
-  const midpointMeters = totalLengthMeters / 2;
-  let beforeMeters = 0;
-  const split: GeodesicSegmentObject[] = [];
-  let index = 0;
-  for (const segment of segments) {
-    const segmentStartMeters = beforeMeters;
-    const segmentEndMeters = beforeMeters + segment.lengthMeters;
-    if (
-      midpointMeters > segmentStartMeters + intersectionTolerance &&
-      midpointMeters < segmentEndMeters - intersectionTolerance
-    ) {
-      const firstLength = midpointMeters - segmentStartMeters;
-      const secondLength = segment.lengthMeters - firstLength;
-      const midpoint = addVec3(segment.start, scaleVec3(segment.direction, firstLength));
-      split.push({
-        ...segment,
-        id: `${segment.geodesicId}:segment:${index++}`,
-        segmentIndex: index - 1,
-        lengthMeters: firstLength,
-        terminal: { kind: "open" },
-        halfRole: "start",
-      });
-      split.push({
-        ...segment,
-        id: `${segment.geodesicId}:segment:${index++}`,
-        segmentIndex: index - 1,
-        start: midpoint,
-        localPose: yawRigidTransform3(Math.atan2(segment.direction.y, segment.direction.x), midpoint),
-        lengthMeters: secondLength,
-        halfRole: "end",
-      });
-    } else {
-      const halfRole: GeodesicHalfRole = segmentEndMeters <= midpointMeters + intersectionTolerance ? "start" : "end";
-      split.push({
-        ...segment,
-        id: `${segment.geodesicId}:segment:${index++}`,
-        segmentIndex: index - 1,
-        halfRole,
-      });
-    }
-    beforeMeters = segmentEndMeters;
-  }
-  return split;
-}
-
-/** Maps a clicked segment (by id) to the endpoint attachment of its half, or `undefined` if it is not a half-labelled segment of an existing interval. */
-export function resolveGeodesicEndpointSelectionFromSegmentHit(
-  registry: RuntimeObjectRegistry,
-  segmentId: string,
-): GeodesicEndpointSelection | undefined {
-  const segment = registry.get(segmentId);
-  if (segment?.kind !== "geodesic-segment" || !segment.halfRole) {
-    return undefined;
-  }
-  const interval = registry.get(segment.geodesicId);
-  return interval?.kind === "geodesic-interval" ? interval[segment.halfRole] : undefined;
-}
-
-/**
- * Yaw (radians) of the geodesic's tangent at the anchor of the given role, pointing away from the anchor along the geodesic.
- *
- * For `start` it is the first segment's direction; for `end` it is the last segment's direction rotated by pi (so it
- * points back into the geodesic). The yaw is expressed in the frame of that segment's cell, which is the anchor's
- * cell. Returns `undefined` if the interval or its segments are missing.
- */
-export function resolveEndpointTangentAtAnchor(input: {
-  readonly registry: RuntimeObjectRegistry;
-  readonly geodesicId: string;
-  readonly endRole: GeodesicEndRole;
-}): { readonly anchorObjectId: string; readonly yawRadians: number } | undefined {
-  const interval = input.registry.get(input.geodesicId);
-  if (interval?.kind !== "geodesic-interval") {
-    return undefined;
-  }
-  const attachment = interval[input.endRole];
-  const segment = input.endRole === "start"
-    ? getGeodesicSegments(input.registry, input.geodesicId)[0]
-    : getGeodesicSegments(input.registry, input.geodesicId).at(-1);
-  if (!segment) {
-    return undefined;
-  }
-  // Outward tangent at the anchor: the first segment's direction at `start`; at `end` the last segment points INTO the anchor, so reverse it.
-  // Relies on segments being ordered from `start` to `end`.
-  const yawRadians = Math.atan2(segment.direction.y, segment.direction.x) + (input.endRole === "start" ? 0 : Math.PI);
-  return {
-    anchorObjectId: attachment.anchorObjectId,
-    yawRadians: sanitizeYaw(yawRadians),
-  };
 }
 
 /**
@@ -1455,20 +954,6 @@ export function previewRebuildGeodesicInterval(input: {
   };
 }
 
-/** Lists one menu row (`G<n>` label) per distinct geodesic attached to the emitter, in attachment order. */
-export function collectGeodesicMenuRowsForEmitter(
-  registry: RuntimeObjectRegistry,
-  emitterId: string,
-): readonly { readonly geodesicId: string; readonly label: string }[] {
-  const rows = getGeodesicEndpointAttachmentsForAnchor(registry, emitterId)
-    .map((attachment) => attachment.geodesicId)
-    .filter((geodesicId, index, ids) => ids.indexOf(geodesicId) === index);
-  return rows.map((geodesicId) => ({
-    geodesicId,
-    label: `G${resolveGeodesicNumber(registry, geodesicId)}`,
-  }));
-}
-
 // Determines the new portal word of an interval whose endpoint anchor was carried. Precedence: explicit word (reduced and
 // validated) > traversal inferred from the anchor's motion > traversal reported by the mover > undefined (no change).
 // The traversal is appended for the `end` anchor and prepended inverted for the `start` anchor (both for a loop, which
@@ -1603,40 +1088,6 @@ function carriedTransitionMatchesAnchorMove(
     emitterConnectionToleranceMeters * emitterConnectionToleranceMeters;
 }
 
-function portalWordMatchesCurrentEndpointCells(
-  registry: RuntimeObjectRegistry,
-  interval: GeodesicIntervalObject,
-  word: readonly GeodesicPortalTraversal[],
-): boolean {
-  return portalWordMatchesEndpointCellsWithAnchors({ registry, interval, word });
-}
-
-// A word is consistent when it chains (each target cell equals the next source cell) and runs from the start anchor's cell
-// to the end anchor's cell; the empty word requires both anchors to share one cell. `candidateAnchorsById` shadows registry anchors.
-function portalWordMatchesEndpointCellsWithAnchors(input: {
-  readonly registry: RuntimeObjectRegistry;
-  readonly interval: GeodesicIntervalObject;
-  readonly word: readonly GeodesicPortalTraversal[];
-  readonly candidateAnchorsById?: ReadonlyMap<string, RuntimeWorldObject>;
-}): boolean {
-  const startAnchor = input.candidateAnchorsById?.get(input.interval.start.anchorObjectId) ??
-    input.registry.get(input.interval.start.anchorObjectId);
-  const endAnchor = input.candidateAnchorsById?.get(input.interval.end.anchorObjectId) ??
-    input.registry.get(input.interval.end.anchorObjectId);
-  if (!canObjectAttachGeodesics(startAnchor) || !canObjectAttachGeodesics(endAnchor)) {
-    return false;
-  }
-  if (input.word.length === 0) {
-    return startAnchor.cellId === endAnchor.cellId;
-  }
-  if (input.word[0].sourceCellId !== startAnchor.cellId || input.word.at(-1)?.targetCellId !== endAnchor.cellId) {
-    return false;
-  }
-  return input.word.every((traversal, index) =>
-    index === 0 || input.word[index - 1].targetCellId === traversal.sourceCellId
-  );
-}
-
 // Names the free-end object of a trace that simply ran out. With a registry the end anchor is identified by its object kind
 // (`isFreeGeodesicEndObject`); the "free-end" id-substring heuristic is only a fallback when no registry is available or the anchor
 // is not registered. A non-free anchor yields an empty `freeEndObjectId`.
@@ -1655,107 +1106,6 @@ function traceTerminalToBuildTerminalForInterval(
     ? isFreeGeodesicEndObject(endAnchor)
     : endAnchorId.startsWith(`${interval.id}:free-end`) || endAnchorId.includes("free-end");
   return endsAtFreeEnd ? { kind: "free-end", freeEndObjectId: endAnchorId } : terminal;
-}
-
-function withAnchoredTargetTerminal(
-  registry: RuntimeObjectRegistry,
-  interval: GeodesicIntervalObject,
-  traces: readonly TraceGeodesicSegmentResult[],
-): readonly TraceGeodesicSegmentResult[] {
-  return withAnchoredTargetTerminalForAnchors(registry, interval, traces);
-}
-
-// When the end anchor is an emitter and the trace simply ran out (`open`), relabels the last piece as `emitter-hit`, since
-// by construction the chord ends exactly at that emitter.
-function withAnchoredTargetTerminalForAnchors(
-  registry: RuntimeObjectRegistry,
-  interval: GeodesicIntervalObject,
-  traces: readonly TraceGeodesicSegmentResult[],
-  candidateAnchorsById?: ReadonlyMap<string, RuntimeWorldObject>,
-): readonly TraceGeodesicSegmentResult[] {
-  const targetAnchor = candidateAnchorsById?.get(interval.end.anchorObjectId) ??
-    registry.get(interval.end.anchorObjectId);
-  const tail = traces.at(-1);
-  if (targetAnchor?.kind !== "geodesic-cannon" || !tail || tail.terminal.kind !== "open") {
-    return traces;
-  }
-
-  return traces.map((trace, index) =>
-    index === traces.length - 1
-      ? { ...trace, terminal: { kind: "emitter-hit", emitterId: targetAnchor.id } }
-      : trace
-  );
-}
-
-// ---- Building derived segments from traces ----
-
-// Writes the registry's segment chain for a geodesic: deletes the old segments, builds new ones from `traces`, and adds them.
-// Not rollback-safe by itself; use `buildDerivedSegmentsFromTraces` for a side-effect-free preview.
-function replaceDerivedSegmentsFromTraces(input: {
-  readonly registry: RuntimeObjectRegistry;
-  readonly geodesicId: string;
-  readonly traces: readonly TraceGeodesicSegmentResult[];
-}): readonly GeodesicSegmentObject[] {
-  removeGeodesicSegments(input.registry, input.geodesicId);
-  const splitSegments = buildDerivedSegmentsFromTraces(input);
-  for (const segment of splitSegments) {
-    input.registry.add(segment);
-  }
-  return splitSegments;
-}
-
-// Pure counterpart of `replaceDerivedSegmentsFromTraces`: converts traces to segment objects (ids `<geodesicId>:segment:<i>`),
-// splits them at the length midpoint into start/end halves, and stamps connection state and tooltip. Nothing is added to the registry.
-function buildDerivedSegmentsFromTraces(input: {
-  readonly registry: RuntimeObjectRegistry;
-  readonly geodesicId: string;
-  readonly traces: readonly TraceGeodesicSegmentResult[];
-}): readonly GeodesicSegmentObject[] {
-  const geodesicNumber = resolveGeodesicNumber(input.registry, input.geodesicId);
-  const rawSegments = input.traces.map((trace, index) => createSegmentFromTrace({
-    id: `${input.geodesicId}:segment:${index}`,
-    geodesicId: input.geodesicId,
-    geodesicNumber,
-    segmentIndex: index,
-    trace,
-  }));
-  const connectionState = resolveDerivedSegmentConnectionState(input.registry, input.geodesicId);
-  const splitSegments = splitDerivedSegmentsIntoEndpointHalves(rawSegments)
-    .map((segment) => ({
-      ...segment,
-      connectionState,
-      tooltip: createGeodesicSegmentTooltip(segment.geodesicNumber, connectionState),
-    }));
-  return splitSegments;
-}
-
-// Display state of a geodesic's segments. A `"moving"` interval is reported as `"straightening"` (the renderer's moving
-// color); a stable emitter-to-emitter interval is `"connected"`; everything else is `"open"`. So `"straightening"` is still
-// produced for curve-shortening intervals, even though the old same-cell straightening model is retired.
-function resolveDerivedSegmentConnectionState(
-  registry: RuntimeObjectRegistry,
-  geodesicId: string,
-): "open" | "connected" | "straightening" {
-  const interval = registry.get(geodesicId);
-  if (interval?.kind !== "geodesic-interval") {
-    return getGeodesicTail(registry, geodesicId)?.terminal.kind === "emitter-hit" ? "connected" : "open";
-  }
-  if (interval.motionState === "moving") {
-    return "straightening";
-  }
-  const start = registry.get(interval.start.anchorObjectId);
-  const end = registry.get(interval.end.anchorObjectId);
-  return start?.kind === "geodesic-cannon" && end?.kind === "geodesic-cannon" ? "connected" : "open";
-}
-
-function segmentToTrace(segment: GeodesicSegmentObject): TraceGeodesicSegmentResult {
-  return {
-    cellId: segment.cellId,
-    start: segment.start,
-    direction: segment.direction,
-    lengthMeters: segment.lengthMeters,
-    terminal: segment.terminal,
-  };
 }
 
 // Retraces the part of a split free geodesic beyond a newly placed emitter: from the placed emitter along the original yaw
@@ -1811,51 +1161,6 @@ function rebuildContinuationFromCut(input: {
     geodesicId: input.geodesicId,
     traces,
   });
-}
-
-function getGeodesicTotalLengthMeters(registry: RuntimeObjectRegistry, geodesicId: string): number {
-  return getGeodesicSegments(registry, geodesicId)
-    .reduce((total, segment) => total + segment.lengthMeters, 0);
-}
-
-// "Aimable free": a stable interval with exactly one emitter endpoint and one free-end endpoint that no other attachment shares.
-function isAimableFreeGeodesic(registry: RuntimeObjectRegistry, interval: GeodesicIntervalObject): boolean {
-  if (interval.motionState !== "stable") {
-    return false;
-  }
-  const start = registry.get(interval.start.anchorObjectId);
-  const end = registry.get(interval.end.anchorObjectId);
-  const hasOneEmitter = (start?.kind === "geodesic-cannon") !== (end?.kind === "geodesic-cannon");
-  const freeEnd = start?.kind === "free-geodesic-end" ? start : end?.kind === "free-geodesic-end" ? end : undefined;
-  return hasOneEmitter && freeEnd !== undefined &&
-    getGeodesicEndpointAttachmentsForAnchor(registry, freeEnd.id).length === 1;
-}
-
-// Refreshes the emitter-side caches (`geodesicIds`, `activeGeodesicId`, per-geodesic yaw) from the interval: each emitter endpoint
-// lists the geodesic and records the tangent yaw at its anchor. The registry attachments remain the source of truth.
-function syncLegacyEmitterGeodesicFields(registry: RuntimeObjectRegistry, geodesicId: string): void {
-  const interval = registry.get(geodesicId);
-  if (interval?.kind !== "geodesic-interval") {
-    return;
-  }
-  for (const role of ["start", "end"] as const) {
-    const anchor = registry.get(interval[role].anchorObjectId);
-    if (anchor?.kind !== "geodesic-cannon") {
-      continue;
-    }
-    const tangent = resolveEndpointTangentAtAnchor({ registry, geodesicId, endRole: role });
-    registry.update({
-      ...anchor,
-      activeGeodesicId: geodesicId,
-      geodesicIds: anchor.geodesicIds.includes(geodesicId) ? anchor.geodesicIds : [...anchor.geodesicIds, geodesicId],
-      geodesicEmitterYawRadiansById: tangent
-        ? {
-            ...anchor.geodesicEmitterYawRadiansById,
-            [geodesicId]: tangent.yawRadians,
-          }
-        : anchor.geodesicEmitterYawRadiansById,
-    });
-  }
 }
 
 // ---- Shooting, extending, rebuilding by length ----
@@ -2069,14 +1374,6 @@ function resolveCannonSnappedToEmitter(input: RebuildGeodesicToLengthInput): Geo
 
 function resolveEmitterYawForGeodesic(cannon: GeodesicCannonObject, geodesicId: string): number {
   return sanitizeYaw(cannon.geodesicEmitterYawRadiansById?.[geodesicId] ?? cannon.aimYawRadians);
-}
-
-function removeUnusedFreeGeodesicEnds(registry: RuntimeObjectRegistry): void {
-  for (const object of registry.getAll()) {
-    if (object.kind === "free-geodesic-end" && getGeodesicEndpointAttachmentsForAnchor(registry, object.id).length === 0) {
-      registry.remove(object.id);
-    }
-  }
 }
 
 function resolveCannonForGeodesic(cannon: GeodesicCannonObject, geodesicId: string): GeodesicCannonObject {
@@ -3300,44 +2597,6 @@ function getPairFreeRoleForInterval(
   return undefined;
 }
 
-/**
- * Returns the portal word of a geodesic: the stored word for an interval, else (legacy) the traversals read off the segment chain.
- *
- * For legacy chains each `portal-hit` terminal contributes its traversal; hits whose portal is unknown to `world` are skipped.
- * Returns `[]` for unknown ids or geodesics that never cross a portal.
- */
-export function collectGeodesicPortalWord(
-  world: CompiledCellComplex,
-  registry: RuntimeObjectRegistry,
-  geodesicId: string,
-): readonly GeodesicPortalTraversal[] {
-  const intervalWord = getGeodesicPortalWord(registry, geodesicId);
-  if (intervalWord) {
-    return intervalWord;
-  }
-
-  const word: GeodesicPortalTraversal[] = [];
-  for (const segment of getGeodesicSegments(registry, geodesicId)) {
-    if (segment.terminal.kind !== "portal-hit") {
-      continue;
-    }
-
-    const portal = world.cellsById.get(segment.cellId)?.portalsById.get(segment.terminal.portalId);
-    if (!portal) {
-      continue;
-    }
-
-    word.push({
-      sourceCellId: segment.cellId,
-      sourcePortalId: portal.id,
-      targetCellId: portal.targetCellId,
-      targetPortalId: portal.targetPortalId,
-    });
-  }
-
-  return word;
-}
-
 // De-duplicates intervals by id (a loop pair names the same interval twice), keeping the last occurrence.
 function uniqueIntervals(intervals: readonly GeodesicIntervalObject[]): readonly GeodesicIntervalObject[] {
   const byId = new Map<string, GeodesicIntervalObject>();
@@ -3773,39 +3032,6 @@ function replaceConnectedGeodesicSegments(input: {
   markGeodesicConnected(input.registry, input.geodesicId, input.source.id, input.incomingEmitterId);
   updateGeodesicIntersectionObjects(input.registry);
   return getGeodesicSegments(input.registry, input.geodesicId);
-}
-
-// Ids of all geodesics incident on an emitter, from interval attachments, the emitter's own caches, and legacy connection records of any cannon.
-function collectIncidentGeodesicIdsForEmitter(
-  registry: RuntimeObjectRegistry,
-  emitterId: string,
-): readonly string[] {
-  const ids = new Set<string>();
-  for (const attachment of getGeodesicEndpointAttachmentsForAnchor(registry, emitterId)) {
-    ids.add(attachment.geodesicId);
-  }
-  const emitter = registry.get(emitterId);
-  if (emitter?.kind === "geodesic-cannon") {
-    for (const geodesicId of emitter.geodesicIds) {
-      ids.add(geodesicId);
-    }
-    if (emitter.activeGeodesicId) {
-      ids.add(emitter.activeGeodesicId);
-    }
-  }
-
-  for (const object of registry.getAll()) {
-    if (object.kind !== "geodesic-cannon") {
-      continue;
-    }
-    for (const [geodesicId, connection] of Object.entries(object.geodesicConnectionsById ?? {})) {
-      if (connection.outgoingEmitterId === emitterId || connection.incomingEmitterId === emitterId) {
-        ids.add(geodesicId);
-      }
-    }
-  }
-
-  return [...ids];
 }
 
 // Legacy: the emitter at the other end of the given geodesic, relative to the detached emitter, using the connection record.
@@ -4320,115 +3546,6 @@ export function placeGeodesicCannonAtGeodesicVertex(
   return placed?.kind === "geodesic-cannon" ? { placed: true, object: placed } : result;
 }
 
-// ---- Intersections ----
-
-/**
- * Recomputes all intersection markers (where segments of two different geodesics cross in a cell) and returns them.
- *
- * Existing markers are removed and re-added with ids preserved when a new marker pairs the same two geodesics in the same cell within
- * `vertexContinuityToleranceMeters` of an earlier one (identity continuity, so UI selections survive a moving crossing). Every call
- * is a full O(n^2) scan of all segments (TODO(issue 70): use a spatial index or per-cell buckets). Crossings within `emitterConnectionToleranceMeters` of an emitter are suppressed. Previously seen
- * markers stay in the per-registry memory (see `getRememberedGeodesicIntersectionObject`).
- */
-export function updateGeodesicIntersectionObjects(registry: RuntimeObjectRegistry): readonly GeodesicIntersectionObject[] {
-  const memory = getGeodesicIntersectionMemory(registry);
-  const previous = new Map(memory);
-  for (const object of registry.getAll()) {
-    if (object.kind === "geodesic-intersection") {
-      previous.set(object.id, object);
-      registry.remove(object.id);
-    }
-  }
-
-  const intersections = assignGeodesicIntersectionIdentities(findGeodesicIntersections(registry), previous);
-  memory.clear();
-  for (const intersection of intersections) {
-    registry.add(intersection);
-    memory.set(intersection.id, intersection);
-  }
-  for (const [id, intersection] of previous) {
-    if (!memory.has(id)) {
-      memory.set(id, intersection);
-    }
-  }
-
-  return intersections;
-}
-
-/** Returns the last known intersection marker with this id even if it has since disappeared from the registry, or `undefined`. */
-export function getRememberedGeodesicIntersectionObject(
-  registry: RuntimeObjectRegistry,
-  intersectionId: string,
-): GeodesicIntersectionObject | undefined {
-  return getGeodesicIntersectionMemory(registry).get(intersectionId);
-}
-
-/** Forgets remembered intersection markers that are no longer in the registry; returns the forgotten ids. */
-export function pruneMissingGeodesicIntersectionObjects(registry: RuntimeObjectRegistry): readonly string[] {
-  const memory = getGeodesicIntersectionMemory(registry);
-  const prunedIds: string[] = [];
-  for (const [id] of [...memory]) {
-    if (registry.get(id)?.kind === "geodesic-intersection") {
-      continue;
-    }
-
-    memory.delete(id);
-    prunedIds.push(id);
-  }
-
-  return prunedIds;
-}
-
-// Builds one segment object from a trace; its `halfRole` is provisionally `"start"` and is overwritten by `splitDerivedSegmentsIntoEndpointHalves`.
-// `connectionState` is `"connected"` only for an `emitter-hit` tail, otherwise `"open"`.
-function createSegmentFromTrace(options: {
-  readonly id: string;
-  readonly geodesicId: string;
-  readonly geodesicNumber?: number;
-  readonly segmentIndex: number;
-  readonly trace: TraceGeodesicSegmentResult;
-}): GeodesicSegmentObject {
-  const yaw = Math.atan2(options.trace.direction.y, options.trace.direction.x);
-  const connectionState = options.trace.terminal.kind === "emitter-hit" ? "connected" : "open";
-
-  return {
-    id: options.id,
-    kind: "geodesic-segment",
-    cellId: options.trace.cellId,
-    localPose: yawRigidTransform3(yaw, options.trace.start),
-    portalRenderable: true,
-    displayHelpMessage: "A locally straight geodesic ray segment. Use the active tool to extend, measure, or select it.",
-    tooltip: createGeodesicSegmentTooltip(options.geodesicNumber, connectionState),
-    geodesicId: options.geodesicId,
-    geodesicNumber: options.geodesicNumber,
-    segmentIndex: options.segmentIndex,
-    halfRole: "start",
-    start: options.trace.start,
-    direction: options.trace.direction,
-    lengthMeters: options.trace.lengthMeters,
-    terminal: options.trace.terminal,
-    connectionState,
-  };
-}
-
-function createGeodesicSegmentTooltip(
-  geodesicNumber: number | undefined,
-  connectionState: "open" | "connected" | "straightening",
-): GeodesicSegmentObject["tooltip"] {
-  const label = geodesicNumber === undefined ? "Geodesic" : `Geodesic G${geodesicNumber}`;
-  if (connectionState === "connected" || connectionState === "straightening") {
-    return {
-      label,
-      rangeMeters: 6,
-    };
-  }
-
-  return {
-    label,
-    rangeMeters: 6,
-  };
-}
-
 // A cut point must leave at least the minimum length on BOTH sides within the segment.
 function canSplitGeodesicSegmentAtDistance(
   segment: GeodesicSegmentObject,
@@ -4436,11 +3553,6 @@ function canSplitGeodesicSegmentAtDistance(
 ): boolean {
   return canConnectGeodesicSegmentAtDistance(distanceAlongSegmentMeters) &&
     segment.lengthMeters - distanceAlongSegmentMeters >= minGeodesicSegmentLengthMeters - intersectionTolerance;
-}
-
-// A cut point must be at least the minimum length from the segment's start.
-function canConnectGeodesicSegmentAtDistance(distanceAlongSegmentMeters: number): boolean {
-  return distanceAlongSegmentMeters >= minGeodesicSegmentLengthMeters - intersectionTolerance;
 }
 
 // Segments in the cell that pass within the emitter tolerance of the vertex (measured after orthogonal projection onto the segment line)
@@ -4464,79 +3576,6 @@ function findSegmentsPassingThroughVertex(
       ) <= emitterConnectionToleranceMeters * emitterConnectionToleranceMeters
     )
     .sort((left, right) => left.segment.geodesicId.localeCompare(right.segment.geodesicId));
-}
-
-// Signed distance of the orthogonal projection of `point` onto the segment's line, measured from the segment start (meters).
-function distanceAlongSegment(segment: GeodesicSegmentObject, point: Vec3): number {
-  const dx = point.x - segment.start.x;
-  const dy = point.y - segment.start.y;
-  const dz = point.z - segment.start.z;
-  return dx * segment.direction.x + dy * segment.direction.y + dz * segment.direction.z;
-}
-
-// Arc length from the start of the geodesic to the point `distanceAlongSegmentMeters` inside `targetSegment`.
-function totalLengthThroughSegment(
-  segments: readonly GeodesicSegmentObject[],
-  targetSegment: GeodesicSegmentObject,
-  distanceAlongSegmentMeters: number,
-): number {
-  return segments
-    .filter((segment) => segment.segmentIndex < targetSegment.segmentIndex)
-    .reduce((total, segment) => total + segment.lengthMeters, 0) + distanceAlongSegmentMeters;
-}
-
-function totalGeodesicLengthFromSegments(segments: readonly GeodesicSegmentObject[]): number {
-  return segments.reduce((total, segment) => total + segment.lengthMeters, 0);
-}
-
-// Removes all derived segments of a geodesic and refreshes intersection markers (so it is also a minor O(n^2) cost).
-function removeGeodesicSegments(registry: RuntimeObjectRegistry, geodesicId: string): void {
-  for (const segment of getGeodesicSegments(registry, geodesicId)) {
-    registry.remove(segment.id);
-  }
-  updateGeodesicIntersectionObjects(registry);
-}
-
-function removeGeodesicAssociations(registry: RuntimeObjectRegistry, geodesicId: string): void {
-  for (const object of registry.getAll()) {
-    if (object.kind !== "geodesic-cannon") {
-      continue;
-    }
-    removeGeodesicAssociationFromEmitter(registry, object.id, geodesicId);
-  }
-}
-
-// Removes the geodesic id from the emitter's caches (id list, active id, yaw and connection records). No-op when it holds nothing.
-function removeGeodesicAssociationFromEmitter(
-  registry: RuntimeObjectRegistry,
-  emitterId: string,
-  geodesicId: string,
-): void {
-  const object = registry.get(emitterId);
-  if (object?.kind !== "geodesic-cannon") {
-    return;
-  }
-  const hasYaw = geodesicId in (object.geodesicEmitterYawRadiansById ?? {});
-  const hasConnection = geodesicId in (object.geodesicConnectionsById ?? {});
-  if (
-    !object.geodesicIds.includes(geodesicId) &&
-    object.activeGeodesicId !== geodesicId &&
-    !hasYaw &&
-    !hasConnection
-  ) {
-    return;
-  }
-
-  const { [geodesicId]: _removedYaw, ...remainingYaws } = object.geodesicEmitterYawRadiansById ?? {};
-  const { [geodesicId]: _removedConnection, ...remainingConnections } = object.geodesicConnectionsById ?? {};
-  const geodesicIds = object.geodesicIds.filter((id) => id !== geodesicId);
-  registry.update({
-    ...object,
-    activeGeodesicId: object.activeGeodesicId === geodesicId ? geodesicIds[0] : object.activeGeodesicId,
-    geodesicIds,
-    geodesicEmitterYawRadiansById: remainingYaws,
-    geodesicConnectionsById: remainingConnections,
-  });
 }
 
 // Legacy: marks a non-interval geodesic as connected between two emitters: aligns each emitter's yaw with the geodesic's end tangents,
@@ -4646,338 +3685,6 @@ function markGeodesicConnected(
   }
 }
 
-// Legacy: finds the emitter that owns a non-interval geodesic, preferring the recorded outgoing connection, then yaw record,
-// then active id, then any listing.
-function findSourceEmitterForGeodesic(
-  registry: RuntimeObjectRegistry,
-  geodesicId: string,
-): GeodesicCannonObject | undefined {
-  for (const object of registry.getAll()) {
-    if (object.kind !== "geodesic-cannon") {
-      continue;
-    }
-    const connection = object.geodesicConnectionsById?.[geodesicId];
-    if (connection?.outgoingEmitterId === object.id) {
-      return object;
-    }
-  }
-
-  return registry.getAll().find((object): object is GeodesicCannonObject =>
-    object.kind === "geodesic-cannon" &&
-    object.geodesicIds.includes(geodesicId) &&
-    object.geodesicEmitterYawRadiansById?.[geodesicId] !== undefined
-  ) ?? registry.getAll().find((object): object is GeodesicCannonObject =>
-    object.kind === "geodesic-cannon" && object.activeGeodesicId === geodesicId
-  ) ?? registry.getAll().find((object): object is GeodesicCannonObject =>
-    object.kind === "geodesic-cannon" && object.geodesicIds.includes(geodesicId)
-  );
-}
-
-// Pairwise crossing search over all segments in the registry (O(n^2)). Only segments of different geodesics in the same cell count;
-// a crossing at an emitter is dropped, and duplicates (same rounded point and geodesic pair) are removed. Segments in different cells
-// never intersect here, even if they are adjacent through a portal.
-function findGeodesicIntersections(registry: RuntimeObjectRegistry): readonly GeodesicIntersectionObject[] {
-  const segments = registry.getAll().filter(isGeodesicSegmentObject);
-  const intersections: GeodesicIntersectionObject[] = [];
-  const seenKeys = new Set<string>();
-  const lastSegmentIndexByGeodesic = new Map<string, number>();
-  for (const segment of segments) {
-    lastSegmentIndexByGeodesic.set(
-      segment.geodesicId,
-      Math.max(lastSegmentIndexByGeodesic.get(segment.geodesicId) ?? 0, segment.segmentIndex),
-    );
-  }
-
-  for (let leftIndex = 0; leftIndex < segments.length; leftIndex += 1) {
-    for (let rightIndex = leftIndex + 1; rightIndex < segments.length; rightIndex += 1) {
-      const left = segments[leftIndex];
-      const right = segments[rightIndex];
-      if (left.cellId !== right.cellId) {
-        continue;
-      }
-      // Adjacent segments of one geodesic share an endpoint; only pairs two or more apart can cross.
-      if (left.geodesicId === right.geodesicId && Math.abs(left.segmentIndex - right.segmentIndex) < 2) {
-        continue;
-      }
-
-      const intersection = intersectHorizontalSegments(left, right);
-      if (!intersection) {
-        continue;
-      }
-      if (
-        crossingIsAtGeodesicAnchor(left, intersection.leftT, intersection.leftLengthMeters, lastSegmentIndexByGeodesic) ||
-        crossingIsAtGeodesicAnchor(right, intersection.rightT, intersection.rightLengthMeters, lastSegmentIndexByGeodesic)
-      ) {
-        continue;
-      }
-
-      const pointKey = `${left.cellId}:${intersection.point.x.toFixed(5)}:${intersection.point.y.toFixed(5)}`;
-      const sortedGeodesicIds = [left.geodesicId, right.geodesicId].sort();
-      const geodesicIds: [string, string] = [sortedGeodesicIds[0], sortedGeodesicIds[1]];
-      const key = `${pointKey}:${geodesicIds.join(":")}`;
-      if (seenKeys.has(key)) {
-        continue;
-      }
-
-      seenKeys.add(key);
-      intersections.push(createGeodesicIntersectionObject({
-        id: createGeodesicIntersectionId(left.cellId, geodesicIds, intersection.point),
-        cellId: left.cellId,
-        balloonPoint: {
-          x: intersection.point.x,
-          y: intersection.point.y,
-          z: geodesicRayBeamHeightMeters + geodesicIntersectionBalloonHeightOffsetMeters,
-        },
-        targetPoint: intersection.point,
-        geodesicIds: [geodesicIds[0], geodesicIds[1]],
-        segmentIds: [left.id, right.id],
-      }));
-    }
-  }
-
-  return intersections;
-}
-
-// True when a crossing lies within 1e-6 m of the geodesic's anchor: the start of its first segment or the end of its last one.
-// Geodesics that share an emitter meet there and that meeting is not a vertex.
-function crossingIsAtGeodesicAnchor(
-  segment: GeodesicSegmentObject,
-  t: number,
-  lengthMeters: number,
-  lastSegmentIndexByGeodesic: ReadonlyMap<string, number>,
-): boolean {
-  const toleranceT = lengthMeters > 0 ? geodesicAnchorCrossingToleranceMeters / lengthMeters : 1;
-  if (segment.segmentIndex === 0 && t <= toleranceT) {
-    return true;
-  }
-
-  return segment.segmentIndex === (lastSegmentIndexByGeodesic.get(segment.geodesicId) ?? 0) && t >= 1 - toleranceT;
-}
-
-function assignGeodesicIntersectionIdentities(
-  intersections: readonly GeodesicIntersectionObject[],
-  previousById: ReadonlyMap<string, GeodesicIntersectionObject>,
-): readonly GeodesicIntersectionObject[] {
-  const usedPreviousIds = new Set<string>();
-  return intersections.map((intersection) => {
-    const match = findContinuityMatchedIntersection(intersection, previousById, usedPreviousIds);
-    if (!match) {
-      return intersection;
-    }
-
-    usedPreviousIds.add(match.id);
-    return {
-      ...intersection,
-      id: match.id,
-    };
-  });
-}
-
-// Matches a fresh marker to the nearest unused previous marker of the same cell and geodesic pair within `vertexContinuityToleranceMeters`.
-function findContinuityMatchedIntersection(
-  intersection: GeodesicIntersectionObject,
-  previousById: ReadonlyMap<string, GeodesicIntersectionObject>,
-  usedPreviousIds: ReadonlySet<string>,
-): GeodesicIntersectionObject | undefined {
-  let best: { readonly object: GeodesicIntersectionObject; readonly distance: number } | undefined;
-  for (const previous of previousById.values()) {
-    if (
-      usedPreviousIds.has(previous.id) ||
-      previous.cellId !== intersection.cellId ||
-      !sameGeodesicPair(previous.geodesicIds, intersection.geodesicIds)
-    ) {
-      continue;
-    }
-
-    const distance = distanceBetweenIntersectionTargets(previous, intersection);
-    if (distance > vertexContinuityToleranceMeters || (best && distance >= best.distance)) {
-      continue;
-    }
-
-    best = { object: previous, distance };
-  }
-
-  return best?.object;
-}
-
-function sameGeodesicPair(left: readonly [string, string], right: readonly [string, string]): boolean {
-  return left[0] === right[0] && left[1] === right[1];
-}
-
-function distanceBetweenIntersectionTargets(left: GeodesicIntersectionObject, right: GeodesicIntersectionObject): number {
-  const leftPoint = left.aimStickyTarget?.localPoint ?? left.localPose.translation;
-  const rightPoint = right.aimStickyTarget?.localPoint ?? right.localPose.translation;
-  return Math.sqrt(distanceSquaredVec3(leftPoint, rightPoint));
-}
-
-function createGeodesicIntersectionId(
-  cellId: string,
-  geodesicIds: readonly [string, string],
-  point: Vec3,
-): string {
-  return `geodesic-intersection:${sanitizeIdPart(
-    `${cellId}:${geodesicIds.join(":")}:${point.x.toFixed(5)}:${point.y.toFixed(5)}`,
-  )}`;
-}
-
-function getGeodesicIntersectionMemory(registry: RuntimeObjectRegistry): Map<string, GeodesicIntersectionObject> {
-  let memory = geodesicIntersectionMemoryByRegistry.get(registry);
-  if (!memory) {
-    memory = new Map();
-    geodesicIntersectionMemoryByRegistry.set(registry, memory);
-  }
-
-  return memory;
-}
-
-function createGeodesicIntersectionObject(options: {
-  readonly id: string;
-  readonly cellId: string;
-  readonly balloonPoint: Vec3;
-  readonly targetPoint: Vec3;
-  readonly geodesicIds: readonly [string, string];
-  readonly segmentIds: readonly [string, string];
-}): GeodesicIntersectionObject {
-  return {
-    id: options.id,
-    kind: "geodesic-intersection",
-    cellId: options.cellId,
-    localPose: yawRigidTransform3(0, options.balloonPoint),
-    aimStickyTarget: {
-      localPoint: options.targetPoint,
-    },
-    portalRenderable: true,
-    displayHelpMessage: "A geodesic vertex. Use the protractor tool to select sides incident to this point.",
-    tooltip: {
-      label: "vertex",
-      rangeMeters: 3,
-    },
-    geodesicIds: options.geodesicIds,
-    segmentIds: options.segmentIds,
-  };
-}
-
-// Intersection of two finite horizontal segments P = L + s r, Q = R + u q (s, u in [0, 1]): with w = R - L,
-// s = (w x q) / (r x q) and u = (w x r) / (r x q). Parallel (including collinear) segments are reported as non-intersecting.
-// z of the result is the left segment's start height.
-function intersectHorizontalSegments(
-  left: GeodesicSegmentObject,
-  right: GeodesicSegmentObject,
-): {
-  readonly point: Vec3;
-  /** Position along the left / right segment in [0, 1] and the segments' lengths in meters. */
-  readonly leftT: number;
-  readonly rightT: number;
-  readonly leftLengthMeters: number;
-  readonly rightLengthMeters: number;
-} | undefined {
-  const leftEnd = getGeodesicSegmentEnd(left);
-  const rightEnd = getGeodesicSegmentEnd(right);
-  const rx = leftEnd.x - left.start.x;
-  const ry = leftEnd.y - left.start.y;
-  const sx = rightEnd.x - right.start.x;
-  const sy = rightEnd.y - right.start.y;
-  const denominator = crossXY(rx, ry, sx, sy);
-
-  if (Math.abs(denominator) <= intersectionTolerance) {
-    return undefined;
-  }
-
-  const dx = right.start.x - left.start.x;
-  const dy = right.start.y - left.start.y;
-  const leftT = crossXY(dx, dy, sx, sy) / denominator;
-  const rightT = crossXY(dx, dy, rx, ry) / denominator;
-
-  if (
-    leftT < -intersectionTolerance ||
-    leftT > 1 + intersectionTolerance ||
-    rightT < -intersectionTolerance ||
-    rightT > 1 + intersectionTolerance
-  ) {
-    return undefined;
-  }
-
-  return {
-    point: {
-      x: left.start.x + rx * Math.min(1, Math.max(0, leftT)),
-      y: left.start.y + ry * Math.min(1, Math.max(0, leftT)),
-      z: left.start.z,
-    },
-    leftT: Math.min(1, Math.max(0, leftT)),
-    rightT: Math.min(1, Math.max(0, rightT)),
-    leftLengthMeters: Math.hypot(rx, ry),
-    rightLengthMeters: Math.hypot(sx, sy),
-  };
-}
-
-function sanitizeIdPart(value: string): string {
-  return value.replace(/[^a-zA-Z0-9._:-]+/g, "_");
-}
-
-// Assigns display numbers: already numbered segments keep theirs; the remaining ids (cannon lists, segments, intervals, then the requested id)
-// get the smallest unused positive integers in encounter order. Pure function of the registry, recomputed on every call.
-function getGlobalGeodesicNumbers(
-  registry: RuntimeObjectRegistry,
-  requestedGeodesicId: string,
-): ReadonlyMap<string, number> {
-  const numbersById = new Map<string, number>();
-  const usedNumbers = new Set<number>();
-  const ids: string[] = [];
-  const seenIds = new Set<string>();
-  const numberedSegments = registry.getAll()
-    .filter(isGeodesicSegmentObject)
-    .filter((segment) => segment.geodesicNumber !== undefined)
-    .sort((left, right) => left.geodesicNumber! - right.geodesicNumber!);
-
-  for (const segment of numberedSegments) {
-    if (!numbersById.has(segment.geodesicId) && segment.geodesicNumber !== undefined) {
-      numbersById.set(segment.geodesicId, segment.geodesicNumber);
-      usedNumbers.add(segment.geodesicNumber);
-    }
-    pushUniqueId(ids, seenIds, segment.geodesicId);
-  }
-
-  for (const object of registry.getAll()) {
-    if (object.kind === "geodesic-cannon") {
-      for (const geodesicId of object.geodesicIds) {
-        pushUniqueId(ids, seenIds, geodesicId);
-      }
-      if (object.activeGeodesicId) {
-        pushUniqueId(ids, seenIds, object.activeGeodesicId);
-      }
-    } else if (object.kind === "geodesic-segment") {
-      pushUniqueId(ids, seenIds, object.geodesicId);
-    } else if (object.kind === "geodesic-interval") {
-      pushUniqueId(ids, seenIds, object.id);
-    }
-  }
-
-  pushUniqueId(ids, seenIds, requestedGeodesicId);
-  let nextNumber = 1;
-  for (const geodesicId of ids) {
-    if (numbersById.has(geodesicId)) {
-      continue;
-    }
-
-    while (usedNumbers.has(nextNumber)) {
-      nextNumber += 1;
-    }
-    numbersById.set(geodesicId, nextNumber);
-    usedNumbers.add(nextNumber);
-  }
-
-  return numbersById;
-}
-
-function pushUniqueId(ids: string[], seenIds: Set<string>, geodesicId: string): void {
-  if (seenIds.has(geodesicId)) {
-    return;
-  }
-
-  seenIds.add(geodesicId);
-  ids.push(geodesicId);
-}
-
 function radiansToDegrees(radians: number): number {
   return Number(((radians * 180) / Math.PI).toFixed(3));
 }
@@ -5035,3 +3742,39 @@ export {
   traceGeodesicSegmentWithEmitters,
   type TraceGeodesicSegmentWithEmittersInput,
 } from "./geodesic/trace";
+
+export {
+  getRememberedGeodesicIntersectionObject,
+  pruneMissingGeodesicIntersectionObjects,
+  updateGeodesicIntersectionObjects,
+} from "./geodesic/intersections";
+
+export {
+  geodesicHasNonzeroLiftedDisplacement,
+  getGeodesicEndpointAttachmentsForAnchor,
+  getGeodesicEndpoints,
+  getGeodesicPortalWord,
+  liftGeodesicEndpoint,
+  replaceGeodesicEndpointAttachment,
+  resolveGeodesicEndpointSelectionFromSegmentHit,
+} from "./geodesic/endpoints";
+
+export {
+  collectGeodesicMenuRowsForEmitter,
+  collectGeodesicPortalWord,
+  getGeodesicSegments,
+  getGeodesicTail,
+  removeGeodesicIntervalAndDerivedObjects,
+  resolveEndpointTangentAtAnchor,
+  resolveGeodesicNumber,
+  splitDerivedSegmentsIntoEndpointHalves,
+} from "./geodesic/segments";
+
+export {
+  collectLockedIncidentGeodesicIdsForEmitter,
+  getGeodesicConnection,
+  isGeodesicLocked,
+  removeGeodesic,
+  removeGeodesicCannonAndSegments,
+  removeUnlockedGeodesicsFromCannon,
+} from "./geodesic/lifecycle";

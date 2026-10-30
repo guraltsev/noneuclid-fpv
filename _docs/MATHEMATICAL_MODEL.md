@@ -243,9 +243,9 @@ its portal word, so the arc is determined by (anchor positions, word) alone. Thi
 **Lifting (unfolding).** Given the word $w=(p_1,\dots,p_k)$ from the source anchor $a$ (in cell $C_0$) to the target
 anchor $b$ (in cell $C_k$), the straight arc is the Euclidean segment from $a$ to the *developed* target
 $$\tilde b \;=\; g_1^{-1}\circ g_2^{-1}\circ\cdots\circ g_k^{-1}\,(b)$$
-in the frame of $C_0$ (`src/world-objects/geodesicCannon.ts#liftGeodesicEndpoint`; the inverses are applied from the
+in the frame of $C_0$ (`src/world-objects/geodesic/endpoints.ts#liftGeodesicEndpoint`; the inverses are applied from the
 last portal back to the first). Its length is $|\tilde b-a|$ (nonzero lift required:
-`src/world-objects/geodesicCannon.ts#geodesicHasNonzeroLiftedDisplacement`, minimum
+`src/world-objects/geodesic/endpoints.ts#geodesicHasNonzeroLiftedDisplacement`, minimum
 `src/world-objects/geodesic/objects.ts#GEODESIC_MIN_LENGTH_METERS` $=0.15$ m). The direction at $a$ is the direction of
 $\tilde b-a$, and re-tracing from $a$ in that direction for length $|\tilde b-a|$ must reproduce the word —
 this is how `src/world-objects/geodesicCannon.ts#rebuildLockedGeodesicFromEndpointsAndPortalWord` rebuilds a *locked*

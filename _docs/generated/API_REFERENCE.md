@@ -455,6 +455,51 @@ Development of portal words: inverse portal transforms, cached per compiled port
 | --- | --- | --- |
 | function | `inversePortalTransform` | Inverse of the portal's `transformToTarget`, cached per compiled portal. |
 
+### `world-objects/geodesic/endpoints.ts`
+
+Endpoint attachments of geodesic intervals: lookup by anchor, re-attachment, lifting the far endpoint into the source cell, word-against-cell-chain checks, and emitter cache cleanup.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| function | `getGeodesicEndpointAttachmentsForAnchor` | Lists every interval endpoint attachment (start or end of any interval) whose anchor is `anchorObjectId`. |
+| function | `getGeodesicEndpoints` | Returns `[start, end]` attachments of the interval `geodesicId`, or `undefined` if no such interval exists. |
+| function | `replaceGeodesicEndpointAttachment` | Re-attaches one endpoint role of an interval to another anchor object and returns the updated interval. |
+| function | `getGeodesicPortalWord` | Returns the stored portal word of an interval (ordered `start` -> `end`), or `undefined` if `geodesicId` is not an interval. |
+| function | `liftGeodesicEndpoint` | Develops an interval into the source endpoint's cell: pulls the opposite endpoint back through the inverse portal transforms. |
+| function | `liftGeodesicEndpointWithAnchors` | Lifts the far endpoint of an interval into the source cell, with candidate anchors that may differ from the registry. |
+| function | `geodesicHasNonzeroLiftedDisplacement` | True when the interval's lifted start-to-end chord is at least `GEODESIC_MIN_LENGTH_METERS` long (horizontally). |
+| function | `resolveGeodesicEndpointSelectionFromSegmentHit` | Maps a clicked segment (by id) to the endpoint attachment of its half, or `undefined` if it is not a half-labelled segment of an existing interval. |
+| function | `portalWordMatchesCurrentEndpointCells` | True when the interval's portal word leads from the start anchor's cell to the end anchor's cell. |
+| function | `portalWordMatchesEndpointCellsWithAnchors` | Like `portalWordMatchesCurrentEndpointCells`, with candidate anchors that may differ from the registry. |
+| function | `isAimableFreeGeodesic` | True for a stable interval with one emitter endpoint and one free end that no other geodesic uses. |
+| function | `removeUnusedFreeGeodesicEnds` | Removes free-end anchors that no interval attaches to any more. |
+| function | `collectIncidentGeodesicIdsForEmitter` | Ids of all geodesics incident on an emitter. |
+| function | `removeGeodesicAssociations` | Removes a geodesic id from the caches of every emitter. |
+| function | `findSourceEmitterForGeodesic` | The emitter that a geodesic originates from, if any. |
+
+### `world-objects/geodesic/intersections.ts`
+
+Geodesic intersection markers: crossings of segments in the same cell, stable marker identities between updates, and the per-registry marker memory.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| function | `updateGeodesicIntersectionObjects` | Recomputes all intersection markers (where segments of two different geodesics cross in a cell) and returns them. |
+| function | `getRememberedGeodesicIntersectionObject` | Returns the last known intersection marker with this id even if it has since disappeared from the registry, or `undefined`. |
+| function | `pruneMissingGeodesicIntersectionObjects` | Forgets remembered intersection markers that are no longer in the registry; returns the forgotten ids. |
+
+### `world-objects/geodesic/lifecycle.ts`
+
+Queries whether a geodesic is locked or connected, and removal of geodesics and cannons together with their derived objects.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| function | `getGeodesicConnection` | Describes the emitter connection of a geodesic. |
+| function | `isGeodesicLocked` | True when both endpoints of the geodesic are emitters (a "locked" geodesic that cannot be extended or aimed freely). |
+| function | `collectLockedIncidentGeodesicIdsForEmitter` | Lists the ids of locked geodesics (see `isGeodesicLocked`) that have an endpoint on the emitter. |
+| function | `removeGeodesic` | Removes a geodesic and its derived objects (interval path via `removeGeodesicIntervalAndDerivedObjects`; legacy path removes segments and emitter associations), then refreshes intersections. |
+| function | `removeUnlockedGeodesicsFromCannon` | Removes every non-locked geodesic listed on the cannon and returns the removed ids (empty if the id is not a cannon). |
+| function | `removeGeodesicCannonAndSegments` | Deletes a cannon and every geodesic that starts, ends, or connects (as incoming emitter) on it. |
+
 ### `world-objects/geodesic/objects.ts`
 
 Geodesic emitters ("cannons"), geodesic intervals and curve shortening on a glued cell complex.
@@ -524,6 +569,35 @@ Portal-word algebra of geodesic intervals: reversal, free reduction, comparison,
 | function | `applyAnchorCrossingTraversals` | Applies {@link portalWordAfterAnchorCrossing} once per traversal, in order, feeding each resulting word into the next. |
 | function | `reduceAdjacentInversePortalTraversals` | Freely reduces a portal word by cancelling adjacent inverse traversals. |
 
+### `world-objects/geodesic/segments.ts`
+
+Derived geodesic segments: lookup by geodesic, building segments from traces with the start/end half split, lengths, tangents at anchors, display numbers and the emitter-side caches.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| function | `removeGeodesicIntervalAndDerivedObjects` | Deletes an interval together with everything derived from or pointing at it. |
+| function | `getGeodesicSegments` | Returns the derived segments of a geodesic sorted by `segmentIndex` (empty if none). |
+| function | `getGeodesicTail` | Returns the last (highest `segmentIndex`) segment of a geodesic, or `undefined` if it has none. |
+| function | `resolveGeodesicNumber` | Returns the 1-based display number of a geodesic, defaulting to 1 when it has none. |
+| function | `splitDerivedSegmentsIntoEndpointHalves` | Labels segments with `halfRole`, cutting the one that straddles the midpoint of the total length into two. |
+| function | `resolveEndpointTangentAtAnchor` | Yaw (radians) of the geodesic's tangent at the anchor of the given role, pointing away from the anchor along the geodesic. |
+| function | `collectGeodesicMenuRowsForEmitter` | Lists one menu row (`G<n>` label) per distinct geodesic attached to the emitter, in attachment order. |
+| function | `withAnchoredTargetTerminal` | Re-labels the tail of a trace as an emitter hit when the interval ends on an emitter. |
+| function | `withAnchoredTargetTerminalForAnchors` | Like `withAnchoredTargetTerminal`, with candidate anchors that may differ from the registry. |
+| function | `replaceDerivedSegmentsFromTraces` | Replaces the derived segments of an interval by segments built from traces. |
+| function | `buildDerivedSegmentsFromTraces` | Builds, without side effects, the derived segments of an interval from traces. |
+| function | `segmentToTrace` | Converts a derived segment back to the trace piece it was built from. |
+| function | `getGeodesicTotalLengthMeters` | Total length of a geodesic, the sum over its derived segments, in meters. |
+| function | `syncLegacyEmitterGeodesicFields` | Updates the menu caches of an emitter from the geodesic intervals that attach to it. |
+| function | `collectGeodesicPortalWord` | Returns the portal word of a geodesic: the stored word for an interval, else (legacy) the traversals read off the segment chain. |
+| function | `createSegmentFromTrace` | Creates a derived segment object from one trace piece. |
+| function | `createGeodesicSegmentTooltip` | Tooltip text of a derived segment. |
+| function | `canConnectGeodesicSegmentAtDistance` | True when a point at the given distance along a segment can be connected to. |
+| function | `distanceAlongSegment` | Signed distance of the projection of a point onto a segment's line, from the segment start. |
+| function | `totalLengthThroughSegment` | Arc length from the start of the geodesic to a point inside the given segment. |
+| function | `totalGeodesicLengthFromSegments` | Sum of the lengths of the given segments, in meters. |
+| function | `removeGeodesicSegments` | Removes all derived segments of a geodesic and refreshes the intersection markers. |
+
 ### `world-objects/geodesic/trace.ts`
 
 Tracing a horizontal geodesic ray through a compiled cell complex: the single-cell tracer, the multi-cell walk on the segment-walk kernel, and forbidden-zone (open-disk) and emitter hits.
@@ -564,37 +638,17 @@ Facade that re-exports the geodesic modules of `src/world-objects/geodesic/` und
 | const | `curveShorteningMinStepMeters` | Floor (meters) applied to the arc lengths in the curve-shortening step's distance-to-straight estimate, so that a vanishing arc cannot divide by zero. |
 | const | `curveShorteningLengthIncreaseToleranceMeters` | Length tolerance (meters) for the monotone-descent check of curve shortening: a previewed step is committed only if the new total length of the pair's arcs is at most `previousTotalLengthMeters + curveShorteningLengthIn… |
 | function | `placeGeodesicCannonAtFloorPoint` | Adds a new cannon standing on the floor at `floorPoint` unless the spot is blocked. |
-| function | `getGeodesicEndpointAttachmentsForAnchor` | Lists every interval endpoint attachment (start or end of any interval) whose anchor is `anchorObjectId`. |
-| function | `getGeodesicEndpoints` | Returns `[start, end]` attachments of the interval `geodesicId`, or `undefined` if no such interval exists. |
-| function | `replaceGeodesicEndpointAttachment` | Re-attaches one endpoint role of an interval to another anchor object and returns the updated interval. |
-| function | `removeGeodesicIntervalAndDerivedObjects` | Deletes an interval together with everything derived from or pointing at it. |
-| function | `getGeodesicPortalWord` | Returns the stored portal word of an interval (ordered `start` -> `end`), or `undefined` if `geodesicId` is not an interval. |
-| function | `liftGeodesicEndpoint` | Develops an interval into the source endpoint's cell: pulls the opposite endpoint back through the inverse portal transforms. |
-| function | `geodesicHasNonzeroLiftedDisplacement` | True when the interval's lifted start-to-end chord is at least `GEODESIC_MIN_LENGTH_METERS` long (horizontally). |
-| function | `getGeodesicSegments` | Returns the derived segments of a geodesic sorted by `segmentIndex` (empty if none). |
-| function | `getGeodesicTail` | Returns the last (highest `segmentIndex`) segment of a geodesic, or `undefined` if it has none. |
-| function | `getGeodesicConnection` | Describes the emitter connection of a geodesic. |
-| function | `isGeodesicLocked` | True when both endpoints of the geodesic are emitters (a "locked" geodesic that cannot be extended or aimed freely). |
 | function | `isGeodesicStraightening` | Legacy: true when the geodesic (or any segment) is in the retired `"straightening"` connection state. |
-| function | `collectLockedIncidentGeodesicIdsForEmitter` | Lists the ids of locked geodesics (see `isGeodesicLocked`) that have an endpoint on the emitter. |
-| function | `resolveGeodesicNumber` | Returns the 1-based display number of a geodesic, defaulting to 1 when it has none. |
-| function | `removeGeodesic` | Removes a geodesic and its derived objects (interval path via `removeGeodesicIntervalAndDerivedObjects`; legacy path removes segments and emitter associations), then refreshes intersections. |
-| function | `removeUnlockedGeodesicsFromCannon` | Removes every non-locked geodesic listed on the cannon and returns the removed ids (empty if the id is not a cannon). |
 | function | `hasStraighteningIncidentGeodesic` | Legacy: true when any geodesic incident on the emitter is in the retired straightening state. |
-| function | `removeGeodesicCannonAndSegments` | Deletes a cannon and every geodesic that starts, ends, or connects (as incoming emitter) on it. |
 | function | `traceGeodesicFromLiftedChord` | Realizes an interval's geometry by tracing the lifted chord, and replaces the interval's derived segments with it. |
 | function | `aimFreeGeodesicFromEndpoint` | Re-aims a free geodesic (emitter at one role, a singly attached free end at the other) toward a target point. |
 | function | `rebuildDerivedGeodesicSegments` | Regenerates an interval's segments from its endpoint anchors and portal word (the fundamental "development" step). |
-| function | `splitDerivedSegmentsIntoEndpointHalves` | Labels segments with `halfRole`, cutting the one that straddles the midpoint of the total length into two. |
-| function | `resolveGeodesicEndpointSelectionFromSegmentHit` | Maps a clicked segment (by id) to the endpoint attachment of its half, or `undefined` if it is not a half-labelled segment of an existing interval. |
-| function | `resolveEndpointTangentAtAnchor` | Yaw (radians) of the geodesic's tangent at the anchor of the given role, pointing away from the anchor along the geodesic. |
 | function | `splitGeodesicIntervalAtSegmentHit` | Splits a free geodesic at a point on one of its segments, ending the first part at a newly placed emitter. |
 | function | `rebuildLockedGeodesicFromEndpointsAndPortalWord` | Rebuilds a locked (emitter-to-emitter) interval after an endpoint was carried, updating its portal word first. |
 | function | `updateLockedGeodesicPortalWordForCarriedAnchorTraversal` | Extends an interval's stored portal word with one portal crossing made by a carried anchor, and saves it. |
 | function | `updateLockedGeodesicPortalWordForCarriedAnchorTraversals` | Same as {@link updateLockedGeodesicPortalWordForCarriedAnchorTraversal} for a chain of traversals the carried anchor made in one frame, in order. |
 | function | `updatePortalWordForMovedEndpoint` | Returns the interval's portal word after one of its endpoints crossed a portal, or `undefined` if the result is inconsistent. |
 | function | `previewRebuildGeodesicInterval` | Computes the segments an interval would have, without touching the registry (rollback-safe). |
-| function | `collectGeodesicMenuRowsForEmitter` | Lists one menu row (`G<n>` label) per distinct geodesic attached to the emitter, in attachment order. |
 | function | `shootGeodesic` | Emits (or re-aims) a free geodesic from a cannon along its yaw and returns its first derived segment. |
 | function | `extendGeodesic` | Lengthens an aimable free geodesic by re-aiming it from its emitter along the current tangent, and returns its new last segment. |
 | function | `rebuildGeodesicToLength` | Re-shoots a geodesic from its cannon so that its total length is `totalLengthMeters`, returning the new segments. |
@@ -605,12 +659,8 @@ Facade that re-exports the geodesic modules of `src/world-objects/geodesic/` und
 | function | `advanceStraighteningGeodesics` | Legacy: advances curve-shortening pairs, and only if none changed, the retired same-cell straightening polylines. |
 | function | `advanceCurveShorteningPairs` | Advances every curve-shortening pair by one tick of `deltaSeconds`, sliding its shared free end downhill, and returns the changed ids. |
 | function | `fuseCurveShorteningPair` | Finishes a curve-shortening pair: merges its moving arcs into one stable geodesic and deletes the pair and its free end. |
-| function | `collectGeodesicPortalWord` | Returns the portal word of a geodesic: the stored word for an interval, else (legacy) the traversals read off the segment chain. |
 | function | `placeGeodesicCannonOnGeodesic` | Places a new cannon at a point of a free geodesic and splits the geodesic there into two intervals. |
 | function | `placeGeodesicCannonAtGeodesicVertex` | Places a cannon at a vertex where segments pass and cuts every passing geodesic there, connecting the pieces to the new cannon. |
-| function | `updateGeodesicIntersectionObjects` | Recomputes all intersection markers (where segments of two different geodesics cross in a cell) and returns them. |
-| function | `getRememberedGeodesicIntersectionObject` | Returns the last known intersection marker with this id even if it has since disappeared from the registry, or `undefined`. |
-| function | `pruneMissingGeodesicIntersectionObjects` | Forgets remembered intersection markers that are no longer in the registry; returns the forgotten ids. |
 
 ### `world-objects/geodesicMarmot.ts`
 
