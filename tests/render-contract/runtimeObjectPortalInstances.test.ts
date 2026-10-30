@@ -279,6 +279,37 @@ describe("updateRuntimeObjectRenderArchetypeInstances", () => {
     expect(diagnostics.capacityOverflowCount).toBe(0);
   });
 
+  it("keeps every clipped copy of one placement, each with its own clip slot", () => {
+    const archetype = createArchetype("mouse-body", 4);
+    const diagnostics = createRuntimeObjectRenderArchetypeDiagnostics();
+    const records: RuntimeObjectRenderRecord[] = [
+      { objectId: "mouse-a", cellId: "room-b", archetypeKey: "mouse-body", localMatrix: new THREE.Matrix4().makeTranslation(1, 0, 0) },
+    ];
+    const through = (pathId: number, depth: number) => ({
+      ...createRootVisiblePortalPath("room-b"),
+      depth,
+      pathId,
+      rootFromDestinationMatrix: new THREE.Matrix4().makeTranslation(15, 0, 0),
+    });
+
+    // Two paths reach room-b at the same place (and a third, deeper one). Each is clipped to its own funnel, so
+    // keeping only the first or lowest-depth copy would hide the object wherever the others' funnels show it.
+    updateRuntimeObjectRenderArchetypeInstances(
+      [archetype],
+      groupRuntimeObjectRenderRecordsByArchetype(records),
+      new Map([["room-b", [through(5, 2), through(6, 2), through(7, 3)]]]),
+      diagnostics,
+      new Map([
+        [5, 2],
+        [6, 3],
+        [7, 4],
+      ]),
+    );
+
+    expect(archetype.mesh.count).toBe(3);
+    expect([0, 1, 2].map((i) => archetype.portalClipIndexAttribute.getX(i))).toEqual([2, 3, 4]);
+  });
+
   it("writes both instances when records of one object land on different places", () => {
     const archetype = createArchetype("mouse-body", 4);
     const diagnostics = createRuntimeObjectRenderArchetypeDiagnostics();

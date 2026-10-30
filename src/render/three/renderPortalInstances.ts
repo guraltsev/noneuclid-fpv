@@ -330,8 +330,10 @@ export function updateCellRenderArchetypeInstances(
  * `suppressWithinCameraDistanceMeters` are skipped when their root-frame position lies closer than that distance
  * (meters) to any of `options.cameraPositions` (root Three frame), which hides objects around the viewer's own head.
  * Instances of one object that land on the same place in the root frame (same translation and first column, rounded
- * to 1e-4) are written once, from the path with the smallest depth (ties: first), so a real object and its ghost do
- * not z-fight; with `rootGroupByPathId` only instances of one root group merge. `unclippedRoot` as in
+ * to 1e-4) are written once, from the unclipped depth-0 path, when there is one, so a real object and its ghost do
+ * not z-fight. Otherwise every copy is written: each clipped path shows the object only inside its own funnel, so
+ * keeping one would make the object pop as the winner changes with the view. With `rootGroupByPathId` only instances
+ * of one root group merge. `unclippedRoot` as in
  * `resolvePortalInstanceClipIndex`. Overflow is counted by requested (not stored) instances.
  */
 export function updateRuntimeObjectRenderArchetypeInstances(
@@ -361,7 +363,7 @@ export function updateRuntimeObjectRenderArchetypeInstances(
     let count = 0;
 
     // Pass 1: the lowest path depth per placement. A real object and a ghost that land on the same place in the
-    // root frame are drawn once, by the copy with the loosest clip (depth 0 is unclipped).
+    // root frame are drawn once, by the depth-0 copy (unclipped). Without one, all copies are drawn.
     lowestDepthByPlacement.clear();
     writtenPlacements.clear();
     for (const record of records) {
@@ -403,10 +405,12 @@ export function updateRuntimeObjectRenderArchetypeInstances(
         }
 
         const key = placementKeyForPath(record, path, composedMatrix, rootGroupByPathId);
-        if (path.depth !== lowestDepthByPlacement.get(key) || writtenPlacements.has(key)) {
-          continue;
+        if (lowestDepthByPlacement.get(key) === 0 && unclippedRoot) {
+          if (path.depth !== 0 || writtenPlacements.has(key)) {
+            continue;
+          }
+          writtenPlacements.add(key);
         }
-        writtenPlacements.add(key);
 
         requestedCount += 1;
 
