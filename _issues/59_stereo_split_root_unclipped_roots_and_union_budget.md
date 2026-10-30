@@ -1,6 +1,6 @@
 # 59 - Stereo with split roots: each eye's root cell is drawn unclipped in the other eye; union overflow favors eye 0
 
-Status: open; re-verified 2026-10-28.
+Status: open; implemented by job 23, which ended "done, needs review" (headset check not run; this issue closes when it passes); see the Report in `.agents/jobs/_done/23_stereo_split_root_correctness.md`. Re-verified 2026-10-28.
 
 Priority: P2 (correctness, XR only). Related to issue 21 (closed 2026-10-28; its remaining stereo items are merged here). That issue covered stereo union and allocation; it did not
 cover these defects.

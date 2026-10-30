@@ -1,6 +1,6 @@
 # Job 23 - Correct stereo rendering with split eye roots
 
-Status: queued.
+Status: done, needs review on 2026-10-30 (commits 5ff4df4, 0b618e4, 40fe59a); issue 59 stays open until the headset check passes.
 Rewritten on 2026-10-29 for a less capable implementing model (was a pointer to issue 59).
 Resolves: issue [59](../../_issues/59_stereo_split_root_unclipped_roots_and_union_budget.md), including its "Merged
 from issue 21" section.
@@ -385,3 +385,43 @@ issue 59 stays open until the headset checks pass; add a one-line pointer to the
 - Capacity uses the two-root bound; the test shows no overflow while straddling.
 - `stereoPortalPaths` is in the debug state, the overlay and the headset panel.
 - Checks pass after each part; three commits (A, B, C). Report written per [README](README.md).
+
+## Report
+
+### Done
+Commits: Part A `5ff4df4`, Part B `0b618e4`, Part C `40fe59a`.
+
+- Part A. `rankStereoUnionPaths`, `countStereoPortalPaths` and an optional `rootGroup` on `PortalEyeRenderState` (remap keys by group, else by cell id) in `portalEyeFrameTransforms.ts`. `StereoPortalPathRenderState` in `renderState.ts`. `portalClipData.ts`: round-robin ranking for 2 or more eyes (one eye keeps id order), new getters `acceptedPathIds` and `rankedAcceptedPaths`. `deriveCellRenderArchetypeCapacities(..., eyes)` sums the `eyes` largest per-root counts. `renderPortalInstances.ts`: `resolvePortalInstanceClipIndex`, `unclippedRoot` option on both instance writers, and `rootGroupByPathId` on the runtime-object writer (placement key prefixed by group). Tests added in `portalEyeFrameTransforms`, `portalClipData`, `cellRenderArchetypes` and `runtimeObjectPortalInstances`.
+- Part B. New `stereoPortalFrame.ts` (`buildStereoPortalFrame`, `haveSameRootIdentity`; root identity is cell id plus matrix within 1e-9, groups in eye order). `createThreeApp.ts`: the stereo pass calls it, instances only `portalClipData.rankedAcceptedPaths`, passes `separateRoot` and `unclippedRoot` = `!splitRoots`, `createActiveWorldBundle` uses `eyes = 2`. `FrameRenderSnapshot` gained `unclippedRoot` and `rootGroupByPathId`, and `runtimeObjectInstanceSync` forwards them. New `tests/render-contract/stereoSplitRoot.test.ts` (torus-moduli straddling the east portal plus a shared case).
+- Part C. `stereoPortalPaths` in `XrDebugRenderState`, in `DebugOverlayState` (portal-quantities only) and in the console `noneuclidPortalDebug.state`. `formatStereoPortalPathLine` is placed right after the portal-eyes line, so the headset panel shows it through `formatDebugOverlayLines`. Tests added in `debugOverlay.test.ts`. `_docs/MATHEMATICAL_MODEL.md` (eye roots, stereo, capacity) and `_docs/ARCHITECTURE.md` updated; generated docs regenerated.
+
+### Deviations
+- Job 22 had already replaced NDC polygons with 4 world-space clip planes and per-(slot, eye) rows with "always outside" for an eye that does not see a union path. So Decision 2's `rootClipPolygonNdc` was not needed and was not added: a depth-0 path carries always-inside planes, which accept in the owning eye, and the other eye's row is already always-outside. Its test (a row `[-2, -2, 4, id]`) became "root seen by one eye only is inside in that eye and outside in the other".
+- Union budget. Job 22 sizes the clip texture as `maxVisiblePaths * eyes` slots, so the budget I rank against is `maxClipSlots` (2 x `maxVisiblePaths`), not `maxVisiblePaths`. Each eye's list is capped at `maxVisiblePaths`, so the union fits and `visiblePathOverflowCount` stays 0 in practice; the ranking only matters if that ever changes. The Part A tests use `maxVisiblePaths` 3 and 2 (6 and 4 slots) to reproduce the job's numbers, so the dropped-per-eye figures are 7/7 and 1/1.
+- Decision 7 (`sourceCamera`, `findPortalEyeRenderState`): `findPortalEyeRenderState` no longer exists (job 22 replaced it by `portalEyeActivator`, which identifies the eye by index in `renderer.xr.getCamera().cameras`). So no `sourceCamera` field was added, and `buildStereoPortalFrame` has no `sourceCameras` input.
+- `buildStereoPortalFrame` calls `computeVisiblePortalPaths` once per eye (each camera is already evaluated independently), not `computeIndependentVisiblePortalPaths`. `buildUnionVisiblePathById` is now unused in the app (still exported and tested elsewhere).
+- Split-root test samples 3D points in the render frame against the clip planes (the representation after job 22) instead of an NDC grid.
+- Existing tests: no change to any existing assertion.
+
+### Uncertain
+- The coordinator note "ghost dedupe in `runtimeObjectGhostRecords.ts` must be grouped by root": I read it as Decision 6 (the placement dedupe in `updateRuntimeObjectRenderArchetypeInstances`, grouped by root group) and left `runtimeObjectGhostRecords.ts` untouched, since its dedupe is per cell copy and independent of the eye roots.
+- Runtime-object paths come from `snapshot.objectPathsByDestinationCell`, which `flattenVisiblePortalPathGroups` sorts by id, so for objects a capacity cut follows id order, not the rank. Cell archetypes do follow the rank. Practically moot while the union fits.
+- The debug-state field `stereoPortalPaths` is read from `xrDebugState`, which `syncXrDebugState` refreshes; it can lag one refresh behind the portal pass.
+- Smoke covers desktop only, so the stereo wiring (including temporal-dead-zone ordering of the new `let`s, declared next to `portalEyeRenderStates`) is checked by typecheck, tests and the load of the app, not by an XR frame.
+
+### Not done
+- Headset checks (below).
+
+### Checks
+- Baseline: `npm run typecheck` ok, `npm test` 142 files passed (1031 tests).
+- After Part A, B, C: `npm run typecheck` ok; `npm test` 143 files passed, 1049 tests, 1 skipped; `npm run docs:check` ok after `npm run docs:generate` (the generated docs were stale after each part and were regenerated and committed); `npm run build` ok; `npm run smoke -- --world cube,icosahedron,torus-moduli,genus-2-torus` SMOKE OK (4 pages) after Parts B and C.
+
+### Manual checks not run
+Headset (Quest), debug mode on, "UI overlay" and "portal-quantities" on; the panel shows the `stereo:` line. Worlds `torus-moduli` and `genus-2-torus`.
+1. Stand with the head across a portal (line ends `split`). Move the head sideways through the portal and back: a portal image may be visible in one eye only, but never disappears from both, and no eye shows a full-screen wrong room.
+2. Left and right portal edges stay stable and do not fight.
+3. Recursive views reach the same depth as on desktop (compare the portal-eyes line with the desktop overlay at the same spot).
+4. `dropped` stays `0|0` and `archetypes ... overflow 0` while straddling.
+5. Record `portal ms` (fps line) before (commit `321eae0`/`31e3557` era) and after (`40fe59a`), same world and viewpoint.
+
+Issue to close once the headset checks pass: issue 59 (including its "Merged from issue 21" section); it stays open until then. Suggested status: `done, needs review`.
