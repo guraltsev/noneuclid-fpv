@@ -1,6 +1,6 @@
 # 70 - Per-frame cost of geodesic rebuilds
 
-Status: open; re-verified 2026-10-28.
+Status: open; re-verified 2026-10-28. Implemented by job 27, which ended "done, needs review"; see the Report in `.agents/jobs/_done/27_geodesic_rebuild_performance.md`.
 
 Priority: P2 (performance + design). Complements issue 38 (decompose monoliths) with a concrete cut for this file.
 

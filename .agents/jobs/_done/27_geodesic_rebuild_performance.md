@@ -1,6 +1,6 @@
 # Job 27 - Per-frame cost of geodesic rebuilds
 
-Status: queued.
+Status: done, needs review on 2026-10-29 (commits 17e4695, 24fc885, 33e435f).
 Rewritten on 2026-10-29 against commit `0b468e1` for a less capable implementing model.
 Resolves: issue [70](../../_issues/70_geodesic_module_performance_and_split.md).
 
@@ -325,3 +325,43 @@ before/after numbers and times in the report.
 - [ ] Issue 70 is closed (moved to `_issues/_closed/` with Outcome and Closing evidence: the benchmark numbers, Decision 8
       for item 4) unless the report has `### Uncertain` or `### Not done` items; then leave it open with a pointer.
 - [ ] Report written per [README](README.md); mention `refreshMeasuredGeodesicLengths` for job 29.
+
+## Report
+
+### Done
+Commits: Part A `17e4695`, Part B `24fc885`, Part C `33e435f`.
+
+- Part A: `RuntimeObjectRegistry.getObjectsOfKind` and `getSegmentsOfGeodesic` (indexes `objectIdsByKind`, `segmentIdsByGeodesicId`, maintained in `add`, `remove` and job 37's `replaceObject`, so `update`, `moveToCell` and ownership publishers re-index). `getGeodesicSegments`, `removeGeodesicIntervalAndDerivedObjects`, endpoints, lifecycle, intersections, curveShortening and the three `geodesicCannonTools.ts` scans no longer call `getAll()`. `resolveGeodesicNumber` returns the number of an existing segment of that geodesic first; `replaceDerivedSegmentsFromTraces` resolves the number before removing the old segments and passes it through the new optional `geodesicNumber` input of `buildDerivedSegmentsFromTraces`. Tests: two registry tests, A3 in `trace.test.ts`.
+- Part B: `perfCounters.ts` (+ `trace.ts` import-rule entry in `scripts/docs/lib.mjs`); `requestGeodesicIntersectionUpdate` / `withDeferredGeodesicIntersections` in `intersections.ts` (WeakMap per registry, flush on outermost exit also on throw); every internal call became a request; exported entry points wrapped (each is now a thin wrapper over a private `...Now` function): cannon.ts `shootGeodesic`, `extendGeodesic`, `rebuildGeodesicToLength`, `connectGeodesicToEmitter`, `rebuildConnectedGeodesicBetweenEmitters`, `placeGeodesicCannonOnGeodesic`, `placeGeodesicCannonAtGeodesicVertex`; intervals.ts `traceGeodesicFromLiftedChord`, `aimFreeGeodesicFromEndpoint`, `rebuildDerivedGeodesicSegments`, `splitGeodesicIntervalAtSegmentHit`, `rebuildLockedGeodesicFromEndpointsAndPortalWord`; lifecycle.ts `removeGeodesic`, `removeUnlockedGeodesicsFromCannon`, `removeGeodesicCannonAndSegments`; segments.ts `removeGeodesicIntervalAndDerivedObjects`; curveShortening.ts `tieAndDetachGeodesicEndpoints`, `advanceCurveShorteningPairs`, `resolveCurveShorteningPair`. The carry loop in `geodesicCannonTools.ts#rebuildCarriedGeodesicFromCannon` wraps its rebuild loop in one scope. `findGeodesicIntersections` buckets by cell; identity matching is keyed by `cell|geodesicIds[0]|geodesicIds[1]`; a crossing at the end of a `portal-hit` segment is dropped (reported by the continuation). Tests: `performance.test.ts` B1-B3, `intersections.test.ts` B4 and B5 (B6 are the existing identity tests, unchanged). The benchmark scene builder is `createTorusLoopBenchmarkScene` in `fixtures.ts`.
+- Part C: `realizeIntervalChord`, `IntervalChordRealization`, `rebuildDerivedGeodesicSegmentsDetailed`, `rebuildLockedGeodesicFromEndpointsAndPortalWordDetailed` (intervals.ts), a private `traceAndClassifyChord` shared by `traceGeodesicFromLiftedChord`; `previewRebuildGeodesicInterval` now returns `GeodesicIntervalPreview` (build result plus `traces`); `rebuildConnectedGeodesicBetweenEmitters` reads "zone" from the realization; `lockedIntervalRebuildHitsForbiddenZone` and `previewGeodesicIntervalHitsForbiddenZone` deleted (`previewGeodesicIntervalIsDegenerate` was already gone after job 26); `resolveCurveShorteningPair` commits the previewed traces with `replaceDerivedSegmentsFromTraces` (not the preview's pre-built segments, see Uncertain). Tests C1-C3 in `performance.test.ts`, C4 in `curveShortening.test.ts`.
+
+Benchmark (B1, 200 segments, 10 loops on one emitter, one carry frame), before this job (same scene, Part A applied, no scope): 20 intersection passes, 10 chord traces, 247.6 ms. After: 1 pass, 10 chord traces, no `getAll()`, about 10 ms (9.8 to 11.0 ms over runs). `git grep -n "getAll()" src/world-objects/geodesic src/render/three/geodesicCannonTools.ts` lists only `segments.ts` `getGlobalGeodesicNumbers` second loop (needs cannons, segments and intervals in registry order; it is only reached when the geodesic has no numbered segment yet).
+
+Done-when says to close: issue 70 (`_issues/70_geodesic_module_performance_and_split.md`) with Outcome and Closing evidence (benchmark numbers above, Decision 8 for item 4: inverse transforms already cached by job 15, sleeve developed once per pair by job 26); issue 41 was merged into this job (portal-side crossings), close it too if it is still open. The job's Resolves line names only 70.
+
+Mention for job 29: `createThreeApp.ts` still calls `refreshMeasuredGeodesicLengths()` every frame, which scans `getAll()` and recomputes every measurement (`toolObjectRuntimes.ts`); not touched.
+
+### Deviations
+- `rebuildUnlockedGeodesicToLength` (cannon.ts) no longer calls `removeGeodesicSegments` before `shootGeodesic`; the re-shot replaces the segments itself (`replaceDerivedSegmentsFromTraces`), which is what lets the geodesic keep its number (A3 requires number 3 after `rebuildGeodesicToLength`). The old pre-removal also cost an extra intersection pass.
+- C4 is in `curveShortening.test.ts` (next to the local `createCornerScenario` it needs) instead of `performance.test.ts`. B5's test-local all-pairs copy and B4 are in `intersections.test.ts` as the job says.
+- C2: the existing "preserves a locked interval after a failed live carry rebuild" scenario fails the lift (unknown portal), so it makes 0 traces. C2 therefore uses a new scenario (carried end moved below the floor edge, chord hits the wall) and asserts exactly 1 trace and the interval preserved. C1 uses the existing forbidden-zone scenario (1 trace, interval deleted).
+- In the carry loop the per-geodesic `refreshMeasuredGeodesicLengthsForGeodesic` calls moved after the scope (lengths depend only on segments), so protractor/length refreshes never see stale markers.
+- `getObjectsOfKind` is typed `readonly (RuntimeWorldObject & { readonly kind: K })[]` instead of `Extract<...>`, because the creature objects have a union `kind` and `Extract` would give `never` for them.
+- No existing test was changed.
+
+### Uncertain
+- `resolveCurveShorteningPair` commits the previewed traces through `replaceDerivedSegmentsFromTraces` rather than the preview's `segments`: the preview is built before the new intervals exist in the registry, so its `connectionState` and display numbers could differ (two new pieces could get the same number). The committed segments are therefore rebuilt from the same traces under the committed registry state. All existing curve-shortening tests pass; confirm visually that tied-and-released geodesics keep the expected colour and numbers.
+- Markers may be stale inside a deferral scope; no code in the scope reads them today (checked by the tests), but a future caller that reads markers mid-operation must not do so inside a scope.
+- Public functions not on the job's list that make a single request (for example `removeGeodesicSegments`) are not wrapped; only `geodesicCannonTools.ts` callers that call several public functions in sequence outside the carry loop (for example `placeGeodesicCannonOnGeodesic` followed by other calls) may still do one pass per call, which is the intended contract.
+
+### Not done
+- Item 4 of issue 70 (sleeve and inverse-transform caches): closed without code per Decision 8.
+- The manual browser check is not run (see below).
+
+### Checks
+- Baseline before changes: `npm run typecheck` ok; `npm test` 124 files, 913 tests passed; `npm run docs:check` ok.
+- After each Part: `npm run typecheck`, `npm test`, `npm run docs:generate` + `npm run docs:check`. Final after Part C: typecheck ok; 125 files, 926 tests passed; docs:check ok; `npm run build` ok.
+- Smoke `npm run smoke -- --world cube,icosahedron,torus-moduli,genus-2-torus`: green after Part B on the second run (the first run had "loading screen still present" on icosahedron, torus-moduli and genus-2-torus right after the long test run; the known flake) and green first time after Part C.
+
+### Manual checks not run
+In `?config=full` on `torus-moduli`: place an emitter, shoot several geodesics from it and lock each loop back onto the emitter (so several loops are incident to it), then carry the emitter around with the carry tool. Expect smooth motion and the vertex balloons following the crossings. Then shoot two geodesics that cross exactly on a portal side (for example straight through a cell corner region on `cube`) and check that exactly one balloon appears at that crossing, in the cell they enter.
