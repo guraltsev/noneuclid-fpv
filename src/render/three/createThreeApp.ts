@@ -738,9 +738,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     onGeodesicCannonDeleteRequested(cannonId, geodesicId) {
       deleteGeodesicFromCannon(cannonId, geodesicId);
     },
-    onGeometryComputerSetTargetRequested(computerId, target) {
-      setGeometryComputerPendingTarget(computerId, target);
-    },
     onGeometryComputerStepTargetRequested(computerId, axis, deltaMeters) {
       stepGeometryComputerPendingTarget(computerId, axis, deltaMeters);
     },
@@ -1017,7 +1014,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   const {
     createGeometryComputerMenuOptions,
     refreshOpenGeometryComputerMenu,
-    setGeometryComputerPendingTarget,
     stepGeometryComputerPendingTarget,
     startGeometryComputerDeformation,
   } = createGeometryComputerMenu({

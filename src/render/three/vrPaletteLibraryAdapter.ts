@@ -2,7 +2,7 @@
  * Builds the in-scene tool palette panel as a @pmndrs/uikit component tree from a renderer-neutral PaletteDefinition (src/ui/paletteDefinition.ts).
  * The adapter is purely a view: it lays out a header (left action, utility and contextual buttons, right action) and a page body chosen by definition.content.kind,
  * and turns every clickable element into a Container whose userData carries the action callback and an item id. scenePaletteController.ts ray-casts the panel and reads those userData keys;
- * it activates the first ancestor with scenePaletteAction (legacy alias xrPaletteAction) and looks up the tooltip from scenePaletteItemId (legacy alias xrPaletteItemId).
+ * it activates the first ancestor with scenePaletteAction and looks up the tooltip from scenePaletteItemId.
  * Layout units are uikit pixels on a 980x760 panel (scenePaletteLayout.ts); scenePalettePanelPixelSize converts them to meters, so the root Container is a flat panel in its own local frame with +Z as the front.
  * The module name says VR for historical reasons: the same adapter serves the desktop palette, re-exported as createScenePaletteLibraryAdapter and by scenePaletteLibraryAdapter.ts.
  * Content is rebuilt wholesale on each setDefinition (no diffing); disposal of the previous uikit tree is handled by this module.
@@ -64,7 +64,6 @@ export interface VrPaletteLibraryAdapterOptions {
   readonly onGeodesicCannonAimRequested?: (cannonId: string, geodesicId?: string) => void;
   readonly onGeodesicCannonDeleteRequested?: (cannonId: string, geodesicId: string) => void;
   /** Geometry computer page callbacks (the set-target callback is part of the contract but not invoked by this adapter). Deltas and targets are in meters. */
-  readonly onGeometryComputerSetTargetRequested?: (computerId: string, target: { readonly aMeters: number; readonly bMeters: number }) => void;
   readonly onGeometryComputerStepTargetRequested?: (computerId: string, axis: "a" | "b", deltaMeters: number) => void;
   readonly onGeometryComputerGoRequested?: (computerId: string) => void;
   /** Help hub and paged tutorial/goal navigation. */
@@ -334,7 +333,6 @@ function createHeaderUtilityButton(
   button.name = actionId === "home"
     ? "Home"
     : active ? "Click again to confirm" : "Reload world";
-  button.userData.xrPaletteItemId = actionId === "home" ? "go-home" : "reload-world";
   button.userData.scenePaletteItemId = actionId === "home" ? "go-home" : "reload-world";
   button.add(actionId === "home"
     ? new House({
@@ -404,7 +402,6 @@ function createHeaderButton(
     backgroundColor: action.disabled ? "#334155" : actionColor,
   });
   button.name = action.ariaLabel || "palette-header-action";
-  button.userData.xrPaletteItemId = action.ariaLabel || action.label;
   button.userData.scenePaletteItemId = action.id;
   const icon = createHeaderIcon(action.id);
   if (icon) {
@@ -663,7 +660,6 @@ function buildGeodesicCannonActionsContent(
       backgroundColor: geodesic.deleteDisabled ? "#334155" : "#7f1d1d",
       onClick: () => options.onGeodesicCannonDeleteRequested?.(content.cannonId, geodesic.id),
     });
-    deleteButton.userData.xrPaletteItemId = `geodesic-cannon-action:delete:${geodesic.id}`;
     deleteButton.userData.scenePaletteItemId = `geodesic-cannon-action:delete:${geodesic.id}`;
     deleteButton.add(new Trash2({
       width: 24,
@@ -697,7 +693,6 @@ function buildGeodesicCannonActionsContent(
         backgroundColor: actionColor,
         onClick: () => options.onGeodesicCannonAimRequested?.(content.cannonId, geodesic.id),
       });
-      aimButton.userData.xrPaletteItemId = `geodesic-cannon-action:aim:${geodesic.id}`;
       aimButton.userData.scenePaletteItemId = `geodesic-cannon-action:aim:${geodesic.id}`;
       aimButton.add(createGeodesicCannonActionIcon("aim"));
 
@@ -772,7 +767,6 @@ function buildGeometryComputerActionsContent(
         backgroundColor: action.disabled ? "#334155" : actionColor,
         onClick: () => options.onGeometryComputerStepTargetRequested?.(content.computerId, action.axis, action.deltaMeters),
       });
-      button.userData.xrPaletteItemId = `geometry-computer:step:${action.axis}:${action.deltaMeters}`;
       button.userData.scenePaletteItemId = `geometry-computer:step:${action.axis}:${action.deltaMeters}`;
       row.add(button);
     }
@@ -788,7 +782,6 @@ function buildGeometryComputerActionsContent(
     backgroundColor: content.goAction.disabled ? "#334155" : "#166534",
     onClick: () => options.onGeometryComputerGoRequested?.(content.computerId),
   });
-  goButton.userData.xrPaletteItemId = "geometry-computer:go";
   goButton.userData.scenePaletteItemId = "geometry-computer:go";
 
   panel.add(presetGrid, goButton);
@@ -842,7 +835,6 @@ function createWorldDeformationDiagram(
   ));
 
   diagram.userData.scenePaletteIconSrc = "world-deformation-parallelogram";
-  diagram.userData.xrPaletteItemId = "geometry-computer:diagram";
   diagram.userData.scenePaletteItemId = "geometry-computer:diagram";
   diagram.userData.scenePaletteDiagramWorldPoints = {
     current: createDiagramLatticePoints(content.widthMeters, content.current.aMeters, content.current.bMeters),
@@ -1062,7 +1054,6 @@ function buildQuestionHelpContent(
         }
       },
     });
-    button.userData.xrPaletteItemId = `question-help:${entry.id}`;
     button.userData.scenePaletteItemId = `question-help:${entry.id}`;
     optionRows.add(button);
   }
@@ -1130,7 +1121,6 @@ function buildPagedHelpContent(
       }
     },
   });
-  previousButton.userData.xrPaletteItemId = `${content.kind}:previous`;
   previousButton.userData.scenePaletteItemId = `${content.kind}:previous`;
   previousButton.add(new ChevronLeft({
     width: 28,
@@ -1162,7 +1152,6 @@ function buildPagedHelpContent(
       }
     },
   });
-  nextButton.userData.xrPaletteItemId = `${content.kind}:next`;
   nextButton.userData.scenePaletteItemId = `${content.kind}:next`;
   nextButton.add(new ChevronRight({
     width: 28,
@@ -1210,7 +1199,6 @@ function buildPlaceSignOptionsContent(
       onClick: () => options.onPlaceFlagTypeSelected?.(option.id as PlacedFlagType),
     });
     const signType = option.id as PlacedFlagType;
-    tile.userData.xrPaletteItemId = `sign-type:${option.id}`;
     tile.userData.scenePaletteItemId = `sign-type:${option.id}`;
     tile.add(createSignImage(signType, 92), createButtonText(signTypeLabels[signType], 15));
     grid.add(tile);
@@ -1274,7 +1262,6 @@ function buildEditSignContent(
     backgroundColor: actionColor,
     onClick: () => options.onSignKeyboardCharacter?.("\n"),
   });
-  enter.userData.xrPaletteItemId = "sign-key:Enter";
   enter.userData.scenePaletteItemId = "sign-key:Enter";
   const space = createInteractiveSurface({
     width: 156,
@@ -1284,7 +1271,6 @@ function buildEditSignContent(
     backgroundColor: inactiveColor,
     onClick: () => options.onSignKeyboardCharacter?.(" "),
   });
-  space.userData.xrPaletteItemId = "sign-key:Space";
   space.userData.scenePaletteItemId = "sign-key:Space";
   const backspace = createInteractiveSurface({
     width: 156,
@@ -1294,7 +1280,6 @@ function buildEditSignContent(
     backgroundColor: "#991b1b",
     onClick: () => options.onSignKeyboardBackspace?.(),
   });
-  backspace.userData.xrPaletteItemId = "sign-key:Backspace";
   backspace.userData.scenePaletteItemId = "sign-key:Backspace";
   backspaceRow.add(enter, space, backspace);
   panel.add(backspaceRow);
@@ -1363,7 +1348,6 @@ function createKeyboardRow(
       backgroundColor: inactiveColor,
       onClick: () => options.onSignKeyboardCharacter?.(key),
     });
-    button.userData.xrPaletteItemId = `sign-key:${key}`;
     button.userData.scenePaletteItemId = `sign-key:${key}`;
     row.add(button);
   }
@@ -1390,7 +1374,6 @@ function createToolTile(
     backgroundColor: selected ? activeColor : inactiveColor,
     onClick: () => options.onToolSelected?.(toolId),
   });
-  button.userData.xrPaletteItemId = `tool:${toolId}`;
   button.userData.scenePaletteItemId = `tool:${toolId}`;
   button.add(createToolIcon(toolId, signType), createButtonText(label, 16));
   if (toolId === "place-flag") {
@@ -1598,7 +1581,6 @@ function createSignOptionsButton(options: VrPaletteLibraryAdapterOptions): Conta
     backgroundColor: "#0f172a",
     onClick: () => options.onPlaceFlagOptionsRequested?.(),
   });
-  optionsButton.userData.xrPaletteItemId = "tool-options:place-sign";
   optionsButton.userData.scenePaletteItemId = "tool-options:place-sign";
   return optionsButton;
 }
@@ -1806,7 +1788,6 @@ function createOptionGrid(
         labelFontSize: 15,
         onClick: () => onSelected(option.id),
       });
-      button.userData.xrPaletteItemId = `${itemPrefix}:${option.id}`;
       button.userData.scenePaletteItemId = `${itemPrefix}:${option.id}`;
       row.add(button);
     }
@@ -1850,7 +1831,6 @@ function createToggleButton(
     onClick: () => onToggled(!enabled),
     backgroundColor: enabled ? activeColor : inactiveColor,
   });
-  button.userData.xrPaletteItemId = itemId;
   button.userData.scenePaletteItemId = itemId;
   return button;
 }
@@ -1874,7 +1854,6 @@ function createActionButton(
     labelFontSize: 15,
     onClick,
   });
-  button.userData.xrPaletteItemId = itemId;
   button.userData.scenePaletteItemId = itemId;
   if (options.icon === "home") {
     button.add(new House({
@@ -1915,7 +1894,6 @@ function createHeaderActionButton(
     disabled: options.disabled,
     backgroundColor: options.disabled ? "#334155" : (options.backgroundColor ?? actionColor),
   });
-  button.userData.xrPaletteItemId = itemId;
   button.userData.scenePaletteItemId = itemId;
   if (options.icon === "trash") {
     button.add(new Trash2({
@@ -1932,7 +1910,7 @@ function createHeaderActionButton(
   return button;
 }
 
-// Base clickable Container. The click callback is stored in userData.scenePaletteAction / xrPaletteAction, not on uikit events; disabled buttons store no action and set pointerEvents "none" so rays pass through them.
+// Base clickable Container. The click callback is stored in userData.scenePaletteAction, not on uikit events; disabled buttons store no action and set pointerEvents "none" so rays pass through them.
 function createInteractiveSurface(options: {
   readonly width: number | `${number}%` | `${number}px` | "auto";
   readonly height: number;
@@ -1973,7 +1951,6 @@ function createInteractiveSurface(options: {
     depthTest: false,
     depthWrite: false,
   });
-  button.userData.xrPaletteAction = options.disabled ? undefined : options.onClick;
   button.userData.scenePaletteAction = options.disabled ? undefined : options.onClick;
   if (options.label) {
     button.add(createButtonText(options.label, options.labelFontSize ?? 15));

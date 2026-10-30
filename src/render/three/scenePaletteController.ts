@@ -88,7 +88,6 @@ export interface ScenePaletteControllerOptions {
   readonly onGeodesicCannonAimRequested: (cannonId: string, geodesicId?: string) => void;
   readonly onGeodesicCannonDeleteRequested: (cannonId: string, geodesicId: string) => void;
   /** Geometry computer callbacks take the computer id; targets and deltas are in meters (aMeters/bMeters are the two target coordinates). */
-  readonly onGeometryComputerSetTargetRequested: (computerId: string, target: { readonly aMeters: number; readonly bMeters: number }) => void;
   readonly onGeometryComputerStepTargetRequested: (computerId: string, axis: "a" | "b", deltaMeters: number) => void;
   readonly onGeometryComputerGoRequested: (computerId: string) => void;
   /** Help hub navigation (tutorial and goal pages) and the paging callbacks that follow. */
@@ -203,7 +202,6 @@ export function createScenePaletteController(options: ScenePaletteControllerOpti
     onGeodesicCannonRotateRequested: options.onGeodesicCannonRotateRequested,
     onGeodesicCannonAimRequested: options.onGeodesicCannonAimRequested,
     onGeodesicCannonDeleteRequested: options.onGeodesicCannonDeleteRequested,
-    onGeometryComputerSetTargetRequested: options.onGeometryComputerSetTargetRequested,
     onGeometryComputerStepTargetRequested: options.onGeometryComputerStepTargetRequested,
     onGeometryComputerGoRequested: options.onGeometryComputerGoRequested,
     onQuestionHelpTutorialRequested: options.onQuestionHelpTutorialRequested,
@@ -467,12 +465,12 @@ function resolvePalettePlanePoint(
   return pointerRay.intersectPlane(palettePlane, palettePlaneIntersection) ?? undefined;
 }
 
-// Walk up the parent chain for a userData action (scenePaletteAction, or the legacy xrPaletteAction).
+// Walk up the parent chain for a userData action (scenePaletteAction).
 function findPaletteAction(object: THREE.Object3D | null): (() => void) | undefined {
   let current: THREE.Object3D | null = object;
 
   while (current) {
-    const action = current.userData.scenePaletteAction ?? current.userData.xrPaletteAction;
+    const action = current.userData.scenePaletteAction;
     if (typeof action === "function") {
       return action as () => void;
     }
@@ -482,12 +480,12 @@ function findPaletteAction(object: THREE.Object3D | null): (() => void) | undefi
   return undefined;
 }
 
-// Walk up the parent chain for a userData item id (scenePaletteItemId, or the legacy xrPaletteItemId).
+// Walk up the parent chain for a userData item id (scenePaletteItemId).
 function findPaletteItemId(object: THREE.Object3D | null): string | undefined {
   let current: THREE.Object3D | null = object;
 
   while (current) {
-    const itemId = current.userData.scenePaletteItemId ?? current.userData.xrPaletteItemId;
+    const itemId = current.userData.scenePaletteItemId;
     if (typeof itemId === "string") {
       return itemId;
     }

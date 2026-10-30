@@ -2384,7 +2384,7 @@ WebXR gamepad input -> `RuntimeInputFrame` (the XR input path for locomotion and
 | function | `isResetPressed` | True while the thumbstick-click button (index 3) is held; false for a missing gamepad or button. |
 | function | `isPrimaryActionPressed` | True while the primary trigger (button 0) is held. |
 | function | `isInteractPressed` | True while the side trigger / squeeze (button 1) is held. |
-| function | `isCarryActionPressed` | Placeholder for a carry-action binding; always returns false (the `source` argument is unused). |
+| function | `isCarryActionPressed` | True while the lower face button (button 4: A on the right controller, X on the left) is held on `source`. |
 | function | `isHelpPressed` | True while the help face button (button 5) is held. |
 | function | `emptyXrInputFrame` | Returns a fresh neutral XR input frame (zero motion, no requests, `source: "xr"`), for frames with no usable input. |
 
@@ -2452,10 +2452,8 @@ XR input path for the in-scene palette: converts XR controller target-ray poses 
 | Kind | Name | Summary |
 | --- | --- | --- |
 | interface | `XrScenePaletteInput` | Per-frame XR palette input adapter; created by createXrScenePaletteInput. |
-| function | `createXrScenePaletteInput` | Creates the XR palette input adapter; it holds no resources beyond the shared controller cache, which reset() clears. |
-| function | `createControllerSources` | Derives palette pointer sources from XR input sources for one frame and also reports whether any controller's menu button is down. |
+| function | `createXrScenePaletteInput` | Creates the XR palette input adapter; it holds no resources beyond its own controller cache, which reset() clears. |
 | function | `isSelectPressed` | Returns whether the controller's primary action button is pressed (select); false for a missing gamepad. |
-| function | `isMenuTogglePressed` | Returns whether the controller's interact button is pressed, which is the menu toggle level; false for a missing gamepad. |
 
 ### `render/three/xrSessionRestart.ts`
 

@@ -3,7 +3,7 @@
  * Each pointer source (a controller or desktop ray object) gets a `@pmndrs/pointer-events` ray pointer, created lazily and removed once the source disappears.
  * Select events are derived from the source's `selectPressed` flag: a rising edge fires pointer-down and a falling edge pointer-up on whatever the ray hovers;
  * the per-frame `selectStarted`/`selectEnded` flags report the same edges to the caller.
- * Hovered targets are identified by `userData.scenePaletteItemId` (or `xrPaletteItemId`) on the intersected object.
+ * Hovered targets are identified by `userData.scenePaletteItemId` on the intersected object.
  */
 import * as THREE from "three";
 import { createRayPointer, type Pointer } from "@pmndrs/pointer-events";
@@ -143,7 +143,5 @@ function readHoveredTargetId(pointer: Pointer): string | undefined {
   const object = pointer.getIntersection()?.object;
   return typeof object?.userData?.scenePaletteItemId === "string"
     ? object.userData.scenePaletteItemId
-    : typeof object?.userData?.xrPaletteItemId === "string"
-      ? object.userData.xrPaletteItemId
-      : undefined;
+    : undefined;
 }

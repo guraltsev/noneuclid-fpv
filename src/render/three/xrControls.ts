@@ -3,7 +3,7 @@
  * Reads the thumbstick axes and button states of every XR input source's gamepad, combines them,
  * and produces a frame in the player-local frame (x right, y forward, z up; meters and radians).
  * Stick-forward moves along y and stick-x turns the player (continuous turn, no strafing). Pitch is never driven from XR.
- * Button layout follows the WebXR `xr-standard` gamepad mapping: 0 trigger, 1 squeeze, 3 thumbstick click, 5 face button.
+ * Button layout follows the WebXR `xr-standard` gamepad mapping: 0 trigger, 1 squeeze, 3 thumbstick click, 4 lower face button (carry), 5 upper face button (help).
  * Held buttons in `createXrInputFrame` are level signals; only `createXrControls` converts them to rising-edge requests.
  */
 import { vec3 } from "../../math/vec3";
@@ -38,7 +38,7 @@ export interface XrControls {
    * Converts the current XR input sources into one input frame, advancing the edge-detection state.
    * `deltaSeconds` is the frame time in seconds (scales stick locomotion and turn). Call exactly once per rendered XR frame:
    * every action `*Requested` flag (including reset) is true only on the frame where any source's button went from released to pressed.
-   * `carryActionRequested` is always false because no carry button is bound yet (see _issues/41_documentation_audit_findings.md).
+   * `carryActionRequested` follows button 4 (A on the right controller, X on the left) on any source.
    */
   consumeFrame(inputSources: Iterable<XrInputSourceLike>, deltaSeconds: number): RuntimeInputFrame;
 }
@@ -47,6 +47,7 @@ export interface XrControls {
 const primaryTriggerButtonIndex = 0;
 const sideTriggerButtonIndex = 1;
 const thumbstickButtonIndex = 3;
+const carryFaceButtonIndex = 4;
 const helpFaceButtonIndex = 5;
 
 /**
@@ -208,12 +209,11 @@ export function isInteractPressed(gamepad: GamepadLike | undefined): boolean {
 }
 
 /**
- * Placeholder for a carry-action binding; always returns false (the `source` argument is unused).
- * Consequently `carryActionRequested` is never set from this module. Which button should carry is an open design decision (_issues/41_documentation_audit_findings.md).
+ * True while the lower face button (button 4: A on the right controller, X on the left) is held on `source`.
+ * This is the XR carry binding; false for a missing gamepad or button.
  */
 export function isCarryActionPressed(source: XrInputSourceLike): boolean {
-  void source;
-  return false;
+  return source.gamepad?.buttons?.[carryFaceButtonIndex]?.pressed === true;
 }
 
 /**

@@ -1,10 +1,10 @@
 /**
  * XR input path for the in-scene palette: converts XR controller target-ray poses and gamepad state into palette pointer sources.
  * Poses come from XRFrame.getPose in the reference space and are lifted into the Three.js world frame (meters) with the reference-space-to-world matrix of the player rig.
- * Only gamepad controllers with left or right handedness are used; hand-tracking sources are skipped. The side-trigger menu toggle is computed but not forwarded (see createXrScenePaletteInput).
+ * Only gamepad controllers with left or right handedness are used; hand-tracking sources are skipped. The side-trigger menu toggle is not handled here: it goes through the runtime interact path (see createXrScenePaletteInput).
  */
 import * as THREE from "three";
-import { isInteractPressed, isPrimaryActionPressed } from "./xrControls";
+import { isPrimaryActionPressed } from "./xrControls";
 import { xrRigidTransformLocalMatrix } from "./xrPlayerRig";
 import type { ScenePaletteInputFrame, ScenePalettePointerSource } from "./scenePaletteInput";
 
@@ -28,16 +28,17 @@ export interface XrScenePaletteInput {
   reset(): void;
 }
 
-// Module-level cache of pointer Object3Ds keyed by controller id so pointer identity is stable across frames; shared by all instances and cleared by reset().
-const controllerObjects = new Map<string, THREE.Object3D>();
-
 /**
- * Creates the XR palette input adapter; it holds no resources beyond the shared controller cache, which reset() clears.
+ * Creates the XR palette input adapter; it holds no resources beyond its own controller cache, which reset() clears.
  */
 export function createXrScenePaletteInput(): XrScenePaletteInput {
+  // Cache of pointer Object3Ds keyed by controller id so pointer identity is stable across frames; owned by this instance.
+  const controllerObjects = new Map<string, THREE.Object3D>();
+
   return {
     update(options) {
-      const sources = createControllerSources(
+      const pointerSources = createControllerSources(
+        controllerObjects,
         options.inputSources,
         options.xrFrame,
         options.referenceSpace,
@@ -46,10 +47,10 @@ export function createXrScenePaletteInput(): XrScenePaletteInput {
 
       return {
         deltaSeconds: options.deltaSeconds,
-        // XR side-trigger menu actions are handled by the main runtime input
-        // path so object menus and the global tool palette share one flow.
+        // The side trigger toggles the menu through the runtime interact path (openContextMenuFromAim in createThreeApp),
+        // so this input never reports a toggle of its own.
         menuTogglePressed: false,
-        pointers: sources.pointerSources,
+        pointers: pointerSources,
       };
     },
     reset() {
@@ -58,22 +59,17 @@ export function createXrScenePaletteInput(): XrScenePaletteInput {
   };
 }
 
-/**
- * Derives palette pointer sources from XR input sources for one frame and also reports whether any controller's menu button is down.
- * Skips sources that are hands, have no left/right handedness, or have no target-ray pose in referenceSpace. Each source gets id "controller:left" or "controller:right", kind "xr-controller", a visible ray, and the right hand is dominant.
- * The cached Object3D per id is updated in place with the world-frame target-ray pose.
- */
-export function createControllerSources(
+// Derives palette pointer sources from XR input sources for one frame.
+// Skips sources that are hands, have no left/right handedness, or have no target-ray pose in referenceSpace. Each source gets id "controller:left" or "controller:right", kind "xr-controller", a visible ray, and the right hand is dominant.
+// The Object3D per id in controllerObjects is updated in place with the world-frame target-ray pose.
+function createControllerSources(
+  controllerObjects: Map<string, THREE.Object3D>,
   inputSources: readonly XRInputSource[],
   frame: XRFrame,
   referenceSpace: XRReferenceSpace,
   referenceSpaceToWorldMatrix: THREE.Matrix4,
-): {
-  readonly pointerSources: readonly ScenePalettePointerSource[];
-  readonly menuTogglePressed: boolean;
-} {
+): readonly ScenePalettePointerSource[] {
   const pointerSources: ScenePalettePointerSource[] = [];
-  let menuTogglePressed = false;
 
   for (const source of inputSources) {
     // Only left/right gamepad controllers are handled; tracked hands are ignored here.
@@ -93,8 +89,6 @@ export function createControllerSources(
     object.updateMatrixWorld(true);
     controllerObjects.set(id, object);
 
-    menuTogglePressed ||= isMenuTogglePressed(source.gamepad);
-
     pointerSources.push({
       id,
       kind: "xr-controller",
@@ -105,10 +99,7 @@ export function createControllerSources(
     });
   }
 
-  return {
-    pointerSources,
-    menuTogglePressed,
-  };
+  return pointerSources;
 }
 
 // Write the world-frame decomposition of (referenceSpaceToWorld * pose) into object's position, quaternion and scale.
@@ -126,11 +117,4 @@ function applyXrPoseToObject(
  */
 export function isSelectPressed(gamepad: XRInputSource["gamepad"] | undefined): boolean {
   return isPrimaryActionPressed(gamepad);
-}
-
-/**
- * Returns whether the controller's interact button is pressed, which is the menu toggle level; false for a missing gamepad.
- */
-export function isMenuTogglePressed(gamepad: XRInputSource["gamepad"] | undefined): boolean {
-  return isInteractPressed(gamepad);
 }

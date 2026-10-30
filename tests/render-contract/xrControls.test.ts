@@ -170,17 +170,24 @@ describe("XR controls", () => {
     expect(isInteractPressed(bPressed)).toBe(false);
   });
 
-  it("does not map face buttons to carry shortcuts", () => {
+  it("maps button 4 to carry edges", () => {
     const controls = createXrControls();
-    const released = { handedness: "right", gamepad: { buttons: [{ pressed: false }, { pressed: false }] } };
-    const pressed = { handedness: "right", gamepad: { buttons: [{ pressed: false }, { pressed: true }] } };
-    const leftPressed = { handedness: "left", gamepad: { buttons: [{ pressed: false }, { pressed: true }] } };
+    const buttons = (index: number | undefined) =>
+      Array.from({ length: 6 }, (_, i) => ({ pressed: i === index }));
+    const released = { handedness: "right", gamepad: { buttons: buttons(undefined) } };
+    const pressed = { handedness: "right", gamepad: { buttons: buttons(4) } };
+    const leftPressed = { handedness: "left", gamepad: { buttons: buttons(4) } };
+    const sidePressed = { handedness: "right", gamepad: { buttons: buttons(1) } };
+    const helpPressed = { handedness: "right", gamepad: { buttons: buttons(5) } };
 
-    expect(isCarryActionPressed(pressed)).toBe(false);
-    expect(isCarryActionPressed(leftPressed)).toBe(false);
-    expect(createXrInputFrame([pressed], 1).carryActionRequested).toBe(false);
+    expect(isCarryActionPressed(pressed)).toBe(true);
+    expect(isCarryActionPressed(leftPressed)).toBe(true);
+    expect(isCarryActionPressed(sidePressed)).toBe(false);
+    expect(isCarryActionPressed(helpPressed)).toBe(false);
+    expect(isCarryActionPressed({ handedness: "right" })).toBe(false);
+    expect(createXrInputFrame([pressed], 1).carryActionRequested).toBe(true);
     expect(controls.consumeFrame([released], 1).carryActionRequested).toBe(false);
-    expect(controls.consumeFrame([pressed], 1).carryActionRequested).toBe(false);
+    expect(controls.consumeFrame([pressed], 1).carryActionRequested).toBe(true);
     expect(controls.consumeFrame([pressed], 1).carryActionRequested).toBe(false);
     expect(controls.consumeFrame([released], 1).carryActionRequested).toBe(false);
   });
