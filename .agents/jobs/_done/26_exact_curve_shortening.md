@@ -1,6 +1,6 @@
 # Job 26 - Exact curve shortening via the sleeve and funnel
 
-Status: queued.
+Status: done, needs review on 2026-10-29 (commits 01fa320, 8e70ebd, acf450a, 571d8eb, f975c3b).
 Split from issue 67 on 2026-10-28; rewritten on 2026-10-29 against commit `0b468e1` for a less capable implementing
 model. Resolves: issue [67](../../_issues/67_exact_curve_shortening_via_sleeve_funnel.md).
 
@@ -557,3 +557,54 @@ anchor, and carrying an emitter keeps the bend.
 - [ ] Issue 67 is closed (moved to `_issues/_closed/` with Outcome and Closing evidence: test names and the B1 numbers),
       unless the report has `### Uncertain` or `### Not done` items; then leave it open with a pointer to the report.
 - [ ] Report written per [README](README.md).
+
+
+## Report
+
+### Done
+
+Commits (one per Part): A `01fa320`, B `8e70ebd`, C `acf450a`, D `571d8eb`, E `f975c3b`.
+
+- **Part A.** New pure `src/world-objects/geodesic/sleeve.ts`: `developSleeve`, `funnelPointApexes`, `tangentFromPointToDisk`, `tangentFromDiskToPoint`, `tangentBetweenDisks`, `solveTautPath`, `geodesicCornerClearanceMeters` (+ types). `moduleImportRules` entry for it in `scripts/docs/lib.mjs`. `tests/world-objects/geodesic/sleeve.test.ts` (A1-A9 plus an A4b word-mismatch test; all the numbers of the job reproduce, A9 runs 100 fast-check cases).
+- **Part B.** `GeodesicCornerObject` / `createGeodesicCornerObject` / `isGeodesicCornerObject` (+ union entry); `isGeodesicLocked` is true for emitter-or-corner at both ends; `removeUnusedFreeGeodesicEnds` also removes unattached corners; `resolveCurveShorteningPair`, `CurveShorteningNotice`, `CurveShorteningResolution` in `curveShortening.ts`; `compileNarrowPortalWorld` fixture; tests B1-B6 (B1 numbers match: corner `pair:corner:0`, junction `a:vertex-1`, side `right`, (4.998114, 0.150095), total 3.001883).
+- **Part C.** `advanceCurveShorteningPairs` resolves every `"moving"` pair in one call (returns new interval ids, then deleted arc ids, then the pair id when the pair was deleted or set unresolved); pair state is `"moving" | "unresolved"`; `previousTotalLengthMeters` removed (type, factory, debug dump, `appDebugHelpers`); tie never deletes (forbidden-zone branch removed); deleted `fuseCurveShorteningPair`, `absorbShortCurveShorteningHalf`, `cleanupCurveShorteningPreviewFailure`, `removeDegenerateFreeLoop`, `endpointDirectionAwayFromAnchor`, `getPairFreeRoleForInterval`, `totalLengthForGeodesicIds`, `radiansToDegrees`, `previewGeodesicIntervalIsDegenerate` (intervals.ts) and the five descent constants. `createThreeApp.ts`: `onNotice` logs `console.info("[noneuclid] " + message)` and `recordDebugEvent(message, notice)` always; after the changed-ids loop it calls `removeProtractorAnglesForMissingVertices(pruneMissingGeodesicIntersectionObjects(...))`. Docs: `_docs/MATHEMATICAL_MODEL.md` section "7. Curve shortening" rewritten (the job says §6; in this file the section is 7), constants rows replaced by a corner-clearance row, `_docs/ARCHITECTURE.md` module list, module headers of `curveShortening.ts` and `objects.ts`.
+- **Part D.** D1-D8 in `describe("issue 31/32 outcomes")` (D6 has a second test for the deleted loop id).
+- **Part E.** Deleted `legacyConnection.ts`, `legacyConnection.test.ts` (the 8 skipped tests) and its import rule; `cannon.ts` returns `getGeodesicSegments(...)` for non-interval ids in `rebuildConnectedGeodesicBetweenEmitters` and `connectGeodesicToEmitter`; `geodesicCannonTools.ts` lost the `isGeodesicStraightening` filters, the `hasStraighteningIncidentGeodesic` guards, the non-interval branch of `updateCarriedGeodesicPortalWord` and `applyCarriedPortalTransition`; the factory doc comment is fixed. Notes added in job 33 (the skipped legacy tests are gone) and in issue 67.
+- Issues the Done-when says to close: **issue 67** (move to `_issues/_closed/` with Outcome and Closing evidence = tests B1-B6, D1-D8, B1 numbers above). See Uncertain/Not done: the job rule says to leave it open when those sections are non-empty; the coordinator decides. Issues 31/32 were already closed.
+
+### Deviations
+
+- Old tests deleted (as listed in the job): in `curveShortening.test.ts` "emits a debug diagnostic when a shortening pair is marked ready by mobile angle", "does not use monotonicity as a collapse criterion for non-straight pairs", "rolls back a shortening step whose total length would increase beyond the tolerance", "records the new total length after a monotone shortening step", "does not report a pair as changed when a non-forbidden preview failure commits nothing", "reverts a ready-to-fuse pair to moving when its fusion preview fails without a forbidden zone", "moves a shortening free end through a portal and recomputes moved-start portal words", "absorbs a very short incident half ...", "absorbs a near-minimum half ...", "keeps moving a free loop at 240 Hz until it is resolved" (replaced by B4); in `carry.test.ts` "conjugates a free loop's word when curve shortening moves its free end through a portal".
+- Old tests edited: "fuses a ready curve-shortening pair ..." (state `ready-to-fuse` removed, `changed` is now `["g-a", "g-b"]`) and the `setup()` of "fusing into an already existing geodesic" (state removed). All other kept tests pass unchanged.
+- Fixtures: `createKinkPairScenario` removed (only the deleted tests used it); `previousTotalLengthMeters` removed from `createSymmetricPairScenario`; `compileNarrowPortalWorld` added; `createCornerScenario` / `createNarrowPortalScenario` are hoisted to module level of `curveShortening.test.ts` so D tests can share them.
+- Part E also removed the test "extends a carried connection word once per crossing, in order" (`tests/render-contract/geodesicCarryPortalTransition.test.ts`, it only called `applyCarriedPortalTransition`), and replaced the legacy-importers test in `tests/docs/moduleImportRules.test.ts` by a test of the sleeve import rule (the `allowedImporters` rule shape in `lib.mjs` is now unused by any rule but still supported).
+- `AdvanceCurveShorteningPairsRequest` lost `onDebugMessage` as well as `speedMetersPerSecond` (nothing emits debug messages any more); `createThreeApp.ts` passes only `onNotice`.
+- `resolveCurveShorteningPair` returns `{status: "resolved", geodesicIds, removedIds} | {status: "deleted", removedIds} | {status: "unresolved", reason}` (job: `{status:"deleted"}`); tests use `toMatchObject`.
+- `resolveDerivedSegmentConnectionState` (segments.ts) now reports `"connected"` for a stable interval whose ends are emitter-or-corner (the job did not list it; without it a locked polygon would be drawn as "open").
+- `funnelPointApexes`: the pseudocode needed two guards: it stops when the end point itself tightened the right edge and meets the left edge, and it never reports portal 0 / the end portal or the same point twice. `solveTautPath` counts the "wrong side" test only when the aperture endpoint projects onto the piece, and orders inserted apexes of equal aperture index by projection on the start-end chord.
+
+### Uncertain
+
+- Only synthetic worlds (large portal world, torus, narrow portal world, rotated free loop) test the resolution; no cube/icosahedron case with several corners at one vertex or `m = 2` corners per wrap was exercised. A manual run on `cube` (see below) would confirm the walk-based corner placement and the junction lookup (`corner-junction` failure would show as an `unresolved` notice).
+- Corner `z` is the beam height of anchor A (`pointA.z`); correct when all anchors share a floor height.
+- `geodesicDebugDumps` anchor list still shows only emitters and free ends (corners are not listed).
+- The job says the math doc section is §6; it is "## 7. Curve shortening" in the file.
+- `getGeodesicConnection` / `isGeodesicLocked` legacy fallbacks (connection state `straightening`) are untouched, as the job says.
+
+### Not done
+
+- On-screen message for the notices (no HUD message system; separate UI job). Notices go to `console.info` and `recordDebugEvent`.
+- Carrying an emitter rebuilds its emitter-to-corner interval with the corner fixed; the chain is not re-tautened (known limitation, Decision 5).
+- Kept for job 33: `GeodesicEmitterConnection`, `getGeodesicConnection`, `geodesicConnectionsById` readers and the segment `connectionState` (display state `"straightening"`).
+- No animation of the resolution (Decision 1).
+
+### Manual checks not run
+
+1. `npm run dev`, open `?config=full&world=torus-moduli`; place two emitters, shoot two geodesics between them, use tie-and-detach at one emitter: within one frame a single locked geodesic must remain (console shows no `unresolved` notice).
+2. Same on `?world=cube`: tie two geodesics whose straight result would pass a cube corner. The result must bend at the corner with no visible corner anchor, and carrying an emitter must keep the bend (the corner stays pinned). Check the console for `[noneuclid] The tied geodesic could not be straightened (...)` messages.
+
+### Checks
+
+- Baseline before changes: `npm run typecheck` clean; `npm test` 123 files passed + 1 skipped, 900 passed, 8 skipped.
+- Final: `npm run typecheck` clean; `npm test` 124 files passed, 913 tests passed, 0 skipped; `npm run docs:check` all ok (after `npm run docs:generate`); `npm run build` ok (chunk-size warning only); `npm run smoke -- --world cube,icosahedron,torus-moduli,genus-2-torus` SMOKE OK (4 pages), run after Part C and after Part E (no loading-screen flake seen).
+- `git grep -n "ready-to-fuse\|absorbShort\|FuseAngle" src` is empty; `git grep -n "Straightening" src` shows only `geodesicSegmentStraighteningArchetypeKey` in `geodesicCannonRenderer.ts` (display state).

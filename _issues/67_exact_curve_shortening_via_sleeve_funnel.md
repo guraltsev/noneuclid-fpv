@@ -1,6 +1,6 @@
 # 67 - Curve shortening by gradient descent does not find the taut string
 
-Status: open; re-verified 2026-10-28.
+Status: open; re-verified 2026-10-28. Implemented by job 26, which ended "done, needs review"; see the Report in `.agents/jobs/_done/26_exact_curve_shortening.md`.
 
 Priority: P1 (correctness + design). Supersedes the "Tick Geometry" and "Monotonicity" sections of issue 32 and
 resolves the issue-41 items "failed fusion leaves a stuck ready-to-fuse pair", "degenerate free loop never deleted"

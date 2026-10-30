@@ -108,7 +108,7 @@ Resolves: issue [NN](../../_issues/NN_....md).
 | [23](23_stereo_split_root_correctness.md) | Correct stereo rendering with split eye roots | [59](../../_issues/59_stereo_split_root_unclipped_roots_and_union_budget.md) |  |
 | [24](24_lazy_path_trie.md) | Replace per-root path tables with a lazy path trie | - | 60 |
 | [25](_done/25_split_geodesic_cannon_modules.md) | ~~Split geodesicCannon.ts into modules under src/world-objects/geodesic/~~ (done, needs review) | - | 76 |
-| [26](26_exact_curve_shortening.md) | Exact curve shortening via the sleeve/funnel | [67](../../_issues/67_exact_curve_shortening_via_sleeve_funnel.md) |  |
+| [26](_done/26_exact_curve_shortening.md) | ~~Exact curve shortening via the sleeve/funnel~~ (done, needs review) | [67](../../_issues/67_exact_curve_shortening_via_sleeve_funnel.md) |  |
 | [27](27_geodesic_rebuild_performance.md) | Per-frame cost of geodesic rebuilds | [70](../../_issues/70_geodesic_module_performance_and_split.md) |  |
 | [28](28_frame_snapshot_instance_sync.md) | Sync runtime-object instances once per frame against the rendered root | [71](../../_issues/71_runtime_object_instance_sync_runs_twice_with_stale_root.md) |  |
 | [29](29_frame_loop_allocation_and_draw_calls.md) | Frame-loop allocation and per-object draw calls | [75](../../_issues/75_frame_loop_allocation_and_per_object_draw_calls.md) |  |
