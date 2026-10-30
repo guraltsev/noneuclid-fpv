@@ -89,7 +89,10 @@ was superseded while it was loading.
 - **Runtime objects** live in a registry keyed by id and by cell
   (`src/world-objects/runtimeObjectRegistry.ts#RuntimeObjectRegistry`). Each object has a cell id and a local pose. The
   registry is the single source of truth for flags, geodesic intervals/emitters/free ends, measurements and protractor
-  angles; renderers are *views* that are synchronised from it.
+  angles; renderers are *views* that are synchronised from it. Creatures, the marmot and collidable assets are written
+  only by their **owners** (`src/world-objects/worldObjectOwner.ts#WorldObjectOwner`); for them the registry is a read
+  model and any other write throws. `ObjectHost.placeAt` relocates any owned object by sending the placement command to
+  its owner. Bulk particles (bullets, stars) never go through the registry.
 - **Menu/tool state** is an immutable value updated by pure functions
   (`src/runtime/runtimeMenuState.ts#RuntimeMenuState`); the shell replaces its reference.
 - **Player state** (`PlayerPose`) is replaced each frame by the result of `movePlayer`.

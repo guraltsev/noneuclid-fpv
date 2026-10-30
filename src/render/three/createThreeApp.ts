@@ -157,7 +157,7 @@ import {
   createSimpleGeoCreatureRuntime,
   isSimpleGeoCreatureObjectSpec,
 } from "../../world-objects/simpleGeoCreature";
-import { createObjectHost } from "../../world-objects/worldObjectOwner";
+import { createObjectHost, createPlainWorldObject, type PlainWorldObject } from "../../world-objects/worldObjectOwner";
 import { createDesktopFlagEditor } from "../dom/desktopFlagEditor";
 import { createDesktopToolIndicator } from "../dom/desktopToolIndicator";
 import { createFloatingObjectTooltip } from "../dom/floatingObjectTooltip";
@@ -834,6 +834,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   }
 
   const dynamicObjectRuntimes: Array<GeodesicMarmotRuntime | SimpleGeoCreatureRuntime> = [];
+  const staticAssetOwners: PlainWorldObject[] = [];
   const placedFlagRuntimes = new Map<string, PlacedFlagRuntime>();
   const measuredGeodesicLengthRuntimes = new Map<string, MeasuredGeodesicLengthRuntime>();
   const protractorAngleRuntimes = new Map<string, ProtractorAngleRuntime>();
@@ -1177,7 +1178,9 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       }
 
       if (objectSpec.kind === "asset" && objectSpec.collision) {
-        runtimeObjectRegistry.add(createRuntimeStaticAssetObject(objectSpec, cell.id));
+        const owner = createPlainWorldObject(runtimeObjectRegistry, createRuntimeStaticAssetObject(objectSpec, cell.id));
+        objectHost.register(owner);
+        staticAssetOwners.push(owner);
       }
     }
   }
@@ -1577,7 +1580,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
    *
    * Computes per-cell deformation maps from the previous to the new snapshot, then moves the player (reset to
    * home if the pose cannot be mapped), creatures, flags and cannons through them (objects that cannot be
-   * mapped are removed, collidable assets are rebuilt from the new spec), swaps `activeWorldBundle`, drops
+   * mapped are removed, collidable assets are mapped by their owners), swaps `activeWorldBundle`, drops
    * visibility caches and tool selections, rebuilds cell meshes and portal instances, and recreates the portal
    * debug runtime. Positions are cell-local meters and yaw is in radians. Throws if the deformation family is
    * not registered. Runs on the frame loop only, before input is read.
@@ -1660,15 +1663,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     mapByCellId: ReadonlyMap<string, CellDeformationMap>,
     snapshot: WorldGeometrySnapshot,
   ): void {
-    for (const runtime of dynamicObjectRuntimes) {
-      runtime.transformGeometry(mapByCellId, snapshot.world);
-    }
-
-    for (const object of runtimeObjectRegistry.getAll()) {
-      if (object.kind === "asset") {
-        runtimeObjectRegistry.remove(object.id);
-      }
-    }
+    objectHost.transformGeometry(mapByCellId, snapshot.world);
 
     for (const object of runtimeObjectRegistry.getAll()) {
       if (object.kind === "placed-flag") {
@@ -1701,7 +1696,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       }
     }
 
-    rebuildStaticAssetRegistryObjects(snapshot);
     rebuildGeometryDependentRuntimeObjectsAfterCommit(snapshot);
   }
 
@@ -1732,16 +1726,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       aimYawRadians,
       geodesicEmitterYawRadiansById,
     };
-  }
-
-  function rebuildStaticAssetRegistryObjects(snapshot: WorldGeometrySnapshot): void {
-    for (const cell of snapshot.world.cells) {
-      for (const objectSpec of cell.objects) {
-        if (objectSpec.kind === "asset" && objectSpec.collision) {
-          runtimeObjectRegistry.add(createRuntimeStaticAssetObject(objectSpec, cell.id));
-        }
-      }
-    }
   }
 
   function rebuildGeometryDependentRuntimeObjectsAfterCommit(snapshot: WorldGeometrySnapshot): void {
@@ -1975,6 +1959,11 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
         disposeObject3D(runtime.root);
       }
       dynamicObjectRuntimes.length = 0;
+      for (const owner of staticAssetOwners) {
+        objectHost.unregister(owner.id);
+        owner.dispose();
+      }
+      staticAssetOwners.length = 0;
       for (const runtime of measuredGeodesicLengthRuntimes.values()) {
         runtime.dispose();
       }

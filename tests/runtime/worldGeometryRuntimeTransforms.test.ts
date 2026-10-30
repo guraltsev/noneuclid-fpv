@@ -9,6 +9,7 @@ import { createTorusSkewCellDeformationMaps, createTorusSkewDeformationFamily } 
 import { transformPoseWithCellMaps } from "../../src/runtime/worldGeometryDeformations";
 import { createPlacedFlagObject } from "../../src/world-objects/placedFlags";
 import { createRuntimeObjectRegistry, createRuntimeStaticAssetObject } from "../../src/world-objects/runtimeObjectRegistry";
+import { createObjectHost, createPlainWorldObject } from "../../src/world-objects/worldObjectOwner";
 import { createSimpleGeoCreature, createSimpleGeoCreatureRuntime } from "../../src/world-objects/simpleGeoCreature";
 
 describe("world geometry runtime transforms", () => {
@@ -54,6 +55,37 @@ describe("world geometry runtime transforms", () => {
     expect(transformed?.localPose.translation.z).toBeCloseTo(0);
     expect(transformed ? Math.atan2(transformed.localPose.rotation.m10, transformed.localPose.rotation.m00) : 0)
       .toBeCloseTo(Math.PI / 2);
+  });
+
+  it("maps an owned static asset through a geometry commit and keeps a placement made before it", () => {
+    const family = createTorusSkewDeformationFamily();
+    const cell = torus.cells[0];
+    const bench = cell.visuals?.objects?.find((object) => object.id === "torus-bench");
+    if (bench?.kind !== "asset") {
+      throw new Error("Expected torus bench asset.");
+    }
+    const maps = createTorusSkewCellDeformationMaps(skewState(0), skewState(2));
+
+    const registry = createRuntimeObjectRegistry();
+    const host = createObjectHost();
+    host.register(createPlainWorldObject(registry, createRuntimeStaticAssetObject(bench, "torus-room")));
+    host.transformGeometry(maps);
+
+    const mapped = registry.get("torus-bench");
+    const deformedBench = family.applyToSpec(torus, skewState(2)).cells[0].visuals?.objects?.find((object) => object.id === "torus-bench");
+    expect(mapped?.localPose.translation.x).toBeCloseTo(2.78, 9);
+    expect(mapped?.localPose.translation.y).toBeCloseTo(-2.4, 9);
+    expect(mapped?.localPose.translation.z).toBeCloseTo(0, 9);
+    expect(deformedBench?.kind === "asset" ? deformedBench.position.x : NaN).toBeCloseTo(2.78, 9);
+
+    const placedRegistry = createRuntimeObjectRegistry();
+    const placedHost = createObjectHost();
+    placedHost.register(createPlainWorldObject(placedRegistry, createRuntimeStaticAssetObject(bench, "torus-room")));
+    expect(placedHost.placeAt("torus-bench", "torus-room", yawRigidTransform3(0, vec3(0, 3, 0)))).toBe(true);
+    placedHost.transformGeometry(maps);
+    const placed = placedRegistry.get("torus-bench");
+    expect(placed?.localPose.translation.x).toBeCloseTo(0.4, 9);
+    expect(placed?.localPose.translation.y).toBeCloseTo(3, 9);
   });
 
   it("keeps dynamic creature private state and registry state aligned after deformation", () => {
