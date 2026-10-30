@@ -77,13 +77,15 @@ export function createObjectHost(): ObjectHost {
  * Default owner for objects that need no logic (houses, bikes): holds `{ cellId, localPose }` and publishes it.
  */
 export interface PlainWorldObject extends WorldObjectOwner {
+  /** Publishes the authored pose again (mapped through every geometry change since creation, without push-out). */
+  reset(): void;
   /** Releases registry ownership; does not remove the record. */
   dispose(): void;
 }
 
 /**
  * Creates the default owner for `initial`: adds the record if the registry has none, then claims it.
- * `place` adopts the pose and publishes it; `transformGeometry` maps the pose through the cell maps and, when a next world is given, pushes it out of obstacles. An unmappable pose is left unchanged.
+ * It remembers the authored pose; `reset` publishes it. `place` adopts the pose and publishes it; `transformGeometry` maps the pose through the cell maps and, when a next world is given, pushes it out of obstacles. An unmappable pose is left unchanged.
  */
 export function createPlainWorldObject(registry: RuntimeObjectRegistry, initial: RuntimeWorldObject): PlainWorldObject {
   if (registry.get(initial.id) === undefined) {
@@ -92,6 +94,8 @@ export function createPlainWorldObject(registry: RuntimeObjectRegistry, initial:
 
   const publish = registry.claimOwnership(initial.id);
   let latest: RuntimeWorldObject = registry.get(initial.id) ?? initial;
+  // The authored pose, kept in step with geometry changes so that `reset` returns to it.
+  let authored: { cellId: string; localPose: RigidTransform3 } = { cellId: latest.cellId, localPose: latest.localPose };
 
   function publishPose(cellId: string, localPose: RigidTransform3): void {
     latest = { ...latest, cellId, localPose } as RuntimeWorldObject;
@@ -103,7 +107,15 @@ export function createPlainWorldObject(registry: RuntimeObjectRegistry, initial:
     place(cellId, localPose) {
       publishPose(cellId, localPose);
     },
+    reset() {
+      publishPose(authored.cellId, authored.localPose);
+    },
     transformGeometry(mapByCellId, nextWorld) {
+      const mappedAuthored = transformPoseWithCellMaps(authored, mapByCellId);
+      if (mappedAuthored) {
+        authored = mappedAuthored;
+      }
+
       const mapped = transformPoseWithCellMaps(latest, mapByCellId);
       if (!mapped) {
         return;

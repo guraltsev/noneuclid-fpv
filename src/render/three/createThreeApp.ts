@@ -1211,7 +1211,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
         continue;
       }
 
-      if (objectSpec.kind === "asset" && objectSpec.collision) {
+      if (objectSpec.kind === "asset") {
         const owner = createPlainWorldObject(runtimeObjectRegistry, createRuntimeStaticAssetObject(objectSpec, cell.id));
         objectHost.register(owner);
         staticAssetOwners.push(owner);

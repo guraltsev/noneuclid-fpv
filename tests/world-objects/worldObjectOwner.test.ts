@@ -67,4 +67,29 @@ describe("object host and plain world objects", () => {
     expect(moved.localPose.translation.y).toBeCloseTo(0, 12);
     expect(Math.atan2(moved.localPose.rotation.m10, moved.localPose.rotation.m00)).toBeCloseTo(0.5, 12);
   });
+
+  it("reset restores the authored pose, mapped through geometry changes", () => {
+    const registry = createRuntimeObjectRegistry();
+    const host = createObjectHost();
+    const owner = createPlainWorldObject(registry, {
+      ...house("h", "cell-a"),
+      localPose: yawRigidTransform3(0.5, { x: 1, y: 1, z: 0 }),
+    });
+    host.register(owner);
+
+    host.placeAt("h", "cell-a", yawRigidTransform3(0, { x: 9, y: 9, z: 0 }));
+    owner.reset();
+    expect(registry.get("h")!.localPose.translation).toEqual({ x: 1, y: 1, z: 0 });
+
+    const map: CellDeformationMap = {
+      cellId: "cell-a",
+      mapPoint: (p) => ({ x: p.x + 2, y: p.y - 1, z: p.z }),
+      mapDirection: (d) => d,
+    };
+    host.transformGeometry(new Map([["cell-a", map]]));
+    host.placeAt("h", "cell-a", yawRigidTransform3(0, { x: 9, y: 9, z: 0 }));
+    owner.reset();
+    expect(registry.get("h")!.localPose.translation.x).toBeCloseTo(3, 12);
+    expect(registry.get("h")!.localPose.translation.y).toBeCloseTo(0, 12);
+  });
 });
