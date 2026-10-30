@@ -16,4 +16,30 @@ npm run --silent typecheck
 echo "pre-push: npm test" >&2
 npm test --silent
 
+# The production bundle can fail at load time (for example a const used before its declaration runs) while typecheck
+# and the unit tests stay green, so build it and load a few worlds in a headless browser. The smoke step is skipped,
+# with a warning, when no Chromium-based browser is found (set BROWSER to its path).
+echo "pre-push: npm run build" >&2
+npm run --silent build >/dev/null
+
+smoke_browser="${BROWSER:-}"
+if [ -z "$smoke_browser" ]; then
+  case "$(uname -s)" in
+    MINGW*|MSYS*|CYGWIN*) smoke_browser="C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe" ;;
+    *) smoke_browser="$(command -v chromium || true)" ;;
+  esac
+fi
+
+if [ -n "$smoke_browser" ] && { [ -x "$smoke_browser" ] || [ -f "$smoke_browser" ]; }; then
+  echo "pre-push: npm run smoke" >&2
+  # torus-moduli has occasionally stayed on the loading screen (no console output) and then passed on a rerun, so a
+  # failure is retried once; a real load-time crash fails both attempts.
+  if ! npm run --silent smoke -- --world cube,torus-moduli; then
+    echo "pre-push: smoke failed; retrying once" >&2
+    npm run --silent smoke -- --world cube,torus-moduli
+  fi
+else
+  echo "pre-push: warning: no Chromium-based browser found; skipping the smoke test (set BROWSER to enable it)." >&2
+fi
+
 echo "pre-push: all checks passed." >&2

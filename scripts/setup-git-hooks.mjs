@@ -30,4 +30,4 @@ if (result.status !== 0) {
   process.exit(1);
 }
 
-console.log(`setup-git-hooks: core.hooksPath = ${hooksDir} (pre-push runs typecheck and tests).`);
+console.log(`setup-git-hooks: core.hooksPath = ${hooksDir} (pre-push runs typecheck, tests, build and a headless smoke test).`);

@@ -23,7 +23,7 @@ npm run dev
 `?config=001`, `?config=002` or `?config=default`, and confirm that the world loads and that the menu and a placed
 tool work.
 
-`git push` runs `npm run typecheck` and `npm test` through the pre-push hook in
+`git push` runs `npm run typecheck`, `npm test`, `npm run build` and a headless smoke test of the cube and torus-moduli worlds (skipped with a warning when no Chromium-based browser is found) through the pre-push hook in
 `.githooks/` (enabled by `npm install`, or by hand with `npm run setup:hooks`,
 which runs `scripts/setup-git-hooks.mjs` to set `core.hooksPath`) and refuses
 the push on failure. Run the full set yourself before sharing a change:

@@ -10,8 +10,9 @@ at **https://guraltsev.github.io/noneuclid-fpv/**. Publishing is automatic: ever
 push to `main` runs the [Pages workflow](../.github/workflows/deploy-pages.yml),
 which installs dependencies, builds the site and deploys it. The workflow does
 **not** run the tests (they are heavy). Instead a local pre-push hook
-(`.githooks/pre-push`, enabled by `npm install` or `npm run setup:hooks`) runs `npm run typecheck` and
-`npm test` and refuses the push if either fails.
+(`.githooks/pre-push`, enabled by `npm install` or `npm run setup:hooks`) runs `npm run typecheck`,
+`npm test`, `npm run build` and a headless smoke test of two worlds (skipped with a warning when no Chromium-based
+browser is found) and refuses the push if any fails.
 Nothing needs to be run by hand.
 
 ### One-time setup (about two minutes)
