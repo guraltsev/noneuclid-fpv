@@ -10,7 +10,16 @@ import {
   describeVisiblePortalPath,
   type ComputeVisiblePortalPathsResult,
 } from "../../src/render/three/visiblePortalPaths";
-import { worldPointToThree } from "../../src/render/three/worldAxes";
+import { buildStaticallyCulledPortalPathTables } from "../../src/cell-complex/staticPortalPathCull";
+import type { PortalPathTable } from "../../src/cell-complex/portalPaths";
+import { developPortalSegment } from "../../src/cell-complex/orientedPortal";
+import {
+  clipPlanesToNdcPolygon,
+  clipSectorByPortal,
+  funnelClipPlanes,
+  type DirectionSector,
+} from "../../src/render/three/portalFunnel";
+import { threePointToWorld, worldPointToThree } from "../../src/render/three/worldAxes";
 
 describe("computeVisiblePortalPaths", () => {
   it("includes the root path when requested", () => {
@@ -387,6 +396,165 @@ describe("computeVisiblePortalPaths", () => {
       screenAreaPixels: 12,
     });
     expect(describeVisiblePortalPath(2, visible)).toEqual({ currentlyVisible: false });
+  });
+});
+
+// Reference implementation of the visibility rule that loops over the whole table in table order (parents first)
+// instead of using the stack traversal. Returns the pre-budget set of kept path ids.
+function referenceVisibleIds(
+  world: ReturnType<typeof compileCellComplex>,
+  table: PortalPathTable,
+  camera: THREE.PerspectiveCamera,
+  viewportPixels: { width: number; height: number },
+  options: { maxDepth: number; minPortalScreenAreaPixels: number },
+): Set<number> {
+  camera.updateMatrixWorld(true);
+  camera.updateProjectionMatrix();
+
+  const eye = threePointToWorld(new THREE.Vector3().setFromMatrixPosition(camera.matrixWorld));
+  const sectorByPathId = new Map<number, DirectionSector>([[0, { full: true }]]);
+  const terminalByPathId = new Map<number, boolean>([[0, options.maxDepth <= 0]]);
+  const visible = new Set<number>([0]);
+  const out = new Float64Array(18);
+
+  for (const path of table.paths) {
+    if (path.depth === 0 || path.depth > options.maxDepth || path.parentPathId === undefined) {
+      continue;
+    }
+
+    const parentSector = sectorByPathId.get(path.parentPathId);
+
+    if (!parentSector || terminalByPathId.get(path.parentPathId)) {
+      continue;
+    }
+
+    const parent = table.pathsById.get(path.parentPathId)!;
+    const step = path.steps[path.steps.length - 1];
+    const portal = path.newestPortalInRoot
+      ?? developPortalSegment(world, step.sourceCellId, step.sourcePortalSideIndex, parent.rootFromDestination);
+    const sector = clipSectorByPortal(parentSector, portal, eye);
+
+    if (!sector || sector.full) {
+      continue;
+    }
+
+    const planes = funnelClipPlanes(sector.right, sector.left, portal, eye);
+    const count = clipPlanesToNdcPolygon(planes, camera.projectionMatrix.elements, camera.matrixWorldInverse.elements, out);
+    let twice = 0;
+
+    for (let index = 0; index < count; index += 1) {
+      const next = (index + 1) % count;
+
+      twice += out[index * 2] * out[next * 2 + 1] - out[next * 2] * out[index * 2 + 1];
+    }
+
+    const area = count >= 3 ? Math.abs(twice) / 2 * viewportPixels.width * viewportPixels.height / 4 : 0;
+
+    if (!(area > 0)) {
+      continue;
+    }
+
+    visible.add(path.id);
+    sectorByPathId.set(path.id, sector);
+    terminalByPathId.set(path.id, area < options.minPortalScreenAreaPixels || path.depth >= options.maxDepth);
+  }
+
+  return visible;
+}
+
+describe("computeVisiblePortalPaths traversal", () => {
+  const viewportPixels = { width: 800, height: 600 };
+  const options = defaultOptions({ maxDepth: 6, maxVisiblePaths: 100_000, minPortalScreenAreaPixels: 16 });
+
+  it("visits the same paths as a full-table scan (mono)", () => {
+    const world = compileCellComplex(cube);
+    const table = buildStaticallyCulledPortalPathTables(world, { maxDepth: 6, toleranceMeters: 1e-6 }).tables.tablesByRootCellId.get("front")!;
+    const cameras = [
+      createCamera({ x: 0, y: 0, z: 1.6 }, { x: 2, y: 2, z: 1.6 }, 110),
+      createCamera({ x: 7.49, y: 1, z: 1.45 }, { x: 6, y: 3, z: 1.45 }, 70),
+      createCamera({ x: 1, y: 1, z: 1.45 }, { x: 4, y: 1, z: 1.45 - 3 * Math.tan(Math.PI / 6) }, 90),
+    ];
+
+    for (const camera of cameras) {
+      const result = computeVisiblePortalPaths({ world, rootCellId: "front", pathTable: table, camera, viewportPixels, options });
+      const expected = referenceVisibleIds(world, table, camera, viewportPixels, options);
+
+      expect(new Set(result.paths.map((path) => path.pathId))).toEqual(expected);
+      expect(expected.size).toBeGreaterThan(3);
+    }
+  });
+
+  it("visits the same paths as a full-table scan for each eye (shared-root stereo)", () => {
+    const world = compileCellComplex(cube);
+    const table = buildStaticallyCulledPortalPathTables(world, { maxDepth: 6, toleranceMeters: 1e-6 }).tables.tablesByRootCellId.get("front")!;
+    const eyes = [
+      createCamera({ x: -0.032, y: 0, z: 1.6 }, { x: 2, y: 2, z: 1.6 }, 110),
+      createCamera({ x: 0.032, y: 0, z: 1.6 }, { x: 2, y: 2, z: 1.6 }, 110),
+    ];
+    const batched = computeIndependentVisiblePortalPaths({ world, rootCellId: "front", pathTable: table, cameras: eyes, viewportPixels, options });
+
+    expect(batched).toHaveLength(2);
+    eyes.forEach((eye, index) => {
+      const ids = new Set(batched[index].paths.map((path) => path.pathId));
+      const alone = computeVisiblePortalPaths({ world, rootCellId: "front", pathTable: table, camera: eye, viewportPixels, options });
+
+      expect(ids).toEqual(referenceVisibleIds(world, table, eye, viewportPixels, options));
+      expect(ids).toEqual(new Set(alone.paths.map((path) => path.pathId)));
+    });
+  });
+
+  it("examines only the children of visible non-terminal parents", () => {
+    const world = compileCellComplex(cube);
+    const table = buildStaticallyCulledPortalPathTables(world, { maxDepth: 10, toleranceMeters: 1e-6 }).tables.tablesByRootCellId.get("front")!;
+
+    expect(table.paths.length).toBeGreaterThan(1000);
+
+    const result = computeVisiblePortalPaths({
+      world,
+      rootCellId: "front",
+      pathTable: table,
+      camera: createCamera({ x: 0, y: 0, z: 1.45 }, { x: 0, y: 7.5, z: 1.45 }, 20),
+      viewportPixels,
+      options: defaultOptions({ maxDepth: 10, maxVisiblePaths: 100_000, minPortalScreenAreaPixels: 16 }),
+    });
+    const childCount = result.paths
+      .filter((path) => !path.terminal)
+      .reduce((sum, path) => sum + (table.pathsByParentPathId.get(path.pathId)?.length ?? 0), 0);
+
+    expect(result.summary.examinedPathCount).toBe(childCount);
+    expect(result.summary.examinedPathCount).toBeLessThan(table.paths.length * 0.1);
+  });
+
+  it("returns four clip planes and at most eight polygon vertices for every path", () => {
+    const world = compileCellComplex(cube);
+    const table = buildStaticallyCulledPortalPathTables(world, { maxDepth: 6, toleranceMeters: 1e-6 }).tables.tablesByRootCellId.get("front")!;
+    const result = computeVisiblePortalPaths({
+      world,
+      rootCellId: "front",
+      pathTable: table,
+      camera: createCamera({ x: 0, y: 0, z: 1.6 }, { x: 2, y: 2, z: 1.6 }, 110),
+      viewportPixels,
+      options,
+    });
+
+    for (const path of result.paths) {
+      expect(path.clipPlanes).toHaveLength(16);
+      expect(path.clipPolygonNdc.length).toBeLessThanOrEqual(8);
+    }
+  });
+
+  it("returns the identical cached matrix object for the same path across calls", () => {
+    const world = compileCellComplex(cube);
+    const table = buildPortalPathTables(world, { maxDepth: 2 }).tablesByRootCellId.get("front")!;
+    const camera = createCamera({ x: 0, y: 0, z: 1.6 }, { x: 2, y: 2, z: 1.6 }, 110);
+    const input = { world, rootCellId: "front", pathTable: table, camera, viewportPixels, options: defaultOptions({ maxDepth: 2 }) };
+    const first = computeVisiblePortalPaths(input);
+    const second = computeVisiblePortalPaths(input);
+
+    expect(first.paths.length).toBeGreaterThan(1);
+    for (const path of first.paths) {
+      expect(second.visiblePathById.get(path.pathId)!.rootFromDestinationMatrix).toBe(path.rootFromDestinationMatrix);
+    }
   });
 });
 
