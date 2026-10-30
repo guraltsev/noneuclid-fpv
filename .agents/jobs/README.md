@@ -103,7 +103,7 @@ Resolves: issue [NN](../../_issues/NN_....md).
 | [18](18_vertex_classes_and_gluing_validation.md) | Compile-time vertex classes, cone angles and gluing validation | [52](../../_issues/52_compile_time_vertex_classes_and_gluing_validation.md) |  |
 | [19](19_vr_palette_and_in_headset_debug.md) | Fix the XR input defects and add an in-headset debug panel | - | 20 |
 | [20](_done/20_exact_static_cull.md) | ~~Exact static cull by oriented line stabbing~~ (done, needs review) | [56](../../_issues/56_exact_static_cull_by_oriented_line_stabbing.md) |  |
-| [21](21_per_frame_visibility_funnel.md) | Per-frame visibility: visible-parent traversal and the exact funnel | [57](../../_issues/57_per_frame_portal_visibility_funnel_and_traversal.md) |  |
+| [21](_done/21_per_frame_visibility_funnel.md) | ~~Per-frame visibility: visible-parent traversal and the exact funnel~~ (done, needs review) | [57](../../_issues/57_per_frame_portal_visibility_funnel_and_traversal.md) |  |
 | [22](22_gpu_portal_clip_planes.md) | GPU portal clipping with clip planes | [58](../../_issues/58_gpu_portal_clip_overflow_and_clip_planes.md) |  |
 | [23](23_stereo_split_root_correctness.md) | Correct stereo rendering with split eye roots | [59](../../_issues/59_stereo_split_root_unclipped_roots_and_union_budget.md) |  |
 | [24](24_lazy_path_trie.md) | Replace per-root path tables with a lazy path trie | - | 60 |
