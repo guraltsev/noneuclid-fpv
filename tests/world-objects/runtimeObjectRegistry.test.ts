@@ -1,3 +1,14 @@
+/**
+ * `tests/world-objects/runtimeObjectRegistry.test.ts` — unit tier.
+ *
+ * The runtime object registry indexes every world object by id and by cell, and derives from an object's own
+ * fields which lists it belongs in: collidable (geodesic emitters never block the player; an object may opt out
+ * of colliding with a class), player-blocking, interactable and tooltip-capable (including the fixed
+ * geometry-computer and help-hub contracts). An object claimed by an owner (`createObjectHost`,
+ * `tests/world-objects/worldObjectOwner.test.ts`) refuses every direct write except through the publisher the
+ * claim returns — this file owns that rule. These tests check each derived list, the ownership claim/release/
+ * publish cycle and its error cases, and basic add/move/remove indexing.
+ */
 import { describe, expect, it } from "vitest";
 import { identityRigidTransform3 } from "../../src/math/rigidTransform3";
 import { simpleCollisionCylinder } from "../../src/movement/dynamicObject";
@@ -7,7 +18,7 @@ import {
   type RuntimeCreatureObject,
 } from "../../src/world-objects/runtimeObjectRegistry";
 import type { GeodesicCannonObject } from "../../src/world-objects/geodesic/objects";
-import { createSegment } from "./geodesic/fixtures";
+import { createSegment } from "../fixtures/world-objects/geodesic";
 import { userObjectClass } from "../../src/world-objects/library";
 
 function creature(id: string, cellId: string, extra: Partial<RuntimeCreatureObject> = {}): RuntimeCreatureObject {

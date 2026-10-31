@@ -1,3 +1,14 @@
+/**
+ * `tests/world-objects/library.test.ts` — unit tier.
+ *
+ * `worldObjectLibrary` wraps each bundled asset (static decoration, or a dynamic geo-mouse/geo-butterfly) behind a
+ * short authoring call that fills in its asset path, documented collision cylinder and per-asset scale/offset
+ * quirks (benches raised above the floor, trees scaled per axis, oversized models shrunk), while letting an
+ * authored instance override class and collision metadata without changing the library's own defaults. These
+ * tests check the static and dynamic wrappers' output, one asset for the current path convention and one for the
+ * `_legacy/` convention (`publicAssetPolicy.test.ts` enforces that no other source names `_legacy/` directly),
+ * collision defaults and overrides, per-asset scale quirks, and the dynamic creatures' collision and oscillation.
+ */
 import { describe, expect, it } from "vitest";
 import { worldObjectLibrary } from "../../src/world-objects/library";
 import { standardUserRobotObject, userObjectClass } from "../../src/world-objects/library";
@@ -57,15 +68,9 @@ describe("worldObjectLibrary", () => {
   });
 
   it.each([
+    // One class of asset path for each naming convention the library wraps.
     ["bicycle", "bicycle/Bicycle.glb"],
-    ["flower_group", "FloweGroup/flower_group.glb"],
-    ["flower_pot", "flowerPot/flower_pot.glb"],
-    ["stop_sign", "stopsign/stop_sign.glb"],
-    ["traffic_cone", "trafficCone/Cone.glb"],
     ["clock", "_legacy/clock_low_poly/scene.gltf"],
-    ["campfire", "_legacy/low_poly_campfire/scene.gltf"],
-    ["rocks", "_legacy/low_poly_rocks/scene.gltf"],
-    ["emergency_button", "_legacy/low_poly_emergency_button/scene.gltf"],
   ] as const)("maps %s to %s", (libraryKey, assetPath) => {
     expect(
       worldObjectLibrary[libraryKey](`${libraryKey}-object`, {

@@ -1,4 +1,15 @@
-﻿import { describe, expect, it } from "vitest";
+﻿/**
+ * `tests/world-objects/worldObjectOwner.test.ts` — unit tier.
+ *
+ * `createObjectHost` is the base an object's own runtime (a marmot, a geodesic cannon, ...) builds on to own one
+ * registry record: `placeAt` moves it and updates the registry together, `transformGeometry` maps its pose through
+ * a geometry commit's per-cell maps (passing it through unchanged where no map applies), and `reset` restores the
+ * authored pose, mapped the same way. `createPlainWorldObject` is the host for an object with no behaviour beyond
+ * ownership. These tests check each of those, that placing an unknown id reports failure rather than throwing,
+ * that registering one owner id twice is rejected, and the one case that shows a direct registry write to an
+ * owned object is refused (the rule itself is owned by `runtimeObjectRegistry.test.ts`).
+ */
+import { describe, expect, it } from "vitest";
 import { identityRigidTransform3, yawRigidTransform3 } from "../../src/math/rigidTransform3";
 import type { CellDeformationMap } from "../../src/runtime/worldGeometryDeformations";
 import {

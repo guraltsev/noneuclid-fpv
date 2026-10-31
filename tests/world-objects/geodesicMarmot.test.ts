@@ -1,27 +1,20 @@
+/**
+ * `tests/world-objects/geodesicMarmot.test.ts` — unit tier.
+ *
+ * A geodesic marmot (mouse or butterfly) walks its own geodesic without a leader, cross-fading cell ownership on
+ * the same frame it crosses a portal with the kernel's anchor-crossing rule (`_docs/MATHEMATICAL_MODEL.md` §5),
+ * and turns away from a forbidden zone instead of freezing against it. These tests check portal reparenting at
+ * the exact crossing frame, that its heading always points along its authored velocity direction, and that it
+ * keeps moving and visibly turns when walked into a zone. `runtimeObjectRegistry.test.ts` owns the generic
+ * ownership rule (writes to an owned object throw); `worldObjectOwner.test.ts` shows one object host wiring it.
+ */
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import { torus } from "../../src/authoring/exampleWorlds";
 import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
-import { transformDirection3, yawRigidTransform3 } from "../../src/math/rigidTransform3";
+import { transformDirection3 } from "../../src/math/rigidTransform3";
 import { createGeodesicMarmot, createGeodesicMarmotRuntime, createGeodesicMarmotRuntimeObject } from "../../src/world-objects/geodesicMarmot";
-import { createRuntimeObjectRegistry } from "../../src/world-objects/runtimeObjectRegistry";
 import type { PreparedWorldAssets } from "../../src/render/three/preloadWorldAssets";
-
-describe("marmot ownership", () => {
-  it("place moves the registry record and direct registry updates throw", () => {
-    const registry = createRuntimeObjectRegistry();
-    const marmot = createGeodesicMarmot({ id: "owned", position: { x: 0, y: 0, z: 0.5 }, velocity: { x: 1, y: 0 } });
-    const runtime = createGeodesicMarmotRuntime(marmot, "room-a", stubAssets(), registry);
-    const pose = yawRigidTransform3(0.4, { x: 0.5, y: 0.25, z: 0.5 });
-
-    runtime.place("room-b", pose);
-
-    expect(registry.get("owned")!.cellId).toBe("room-b");
-    expect(registry.get("owned")!.localPose).toBe(pose);
-    expect(runtime.cellId).toBe("room-b");
-    expect(() => registry.update({ ...registry.get("owned")!, cellId: "room-a" })).toThrow(/is owned/);
-  });
-});
 
 describe("createGeodesicMarmotRuntime", () => {
   it("uses anchor crossing semantics and reparents on the same crossing frame", () => {

@@ -1,5 +1,17 @@
+/**
+ * `tests/world-objects/geodesic/intersections.test.ts` — unit tier.
+ *
+ * `updateGeodesicIntersectionObjects` places one vertex balloon at every point where two geodesics' segments
+ * cross, bucketed by cell (never two segments of the same geodesic near each other, and never at a shared
+ * emitter/anchor), keeping a moving crossing's identity continuous and remembering a vertex that briefly
+ * disappears so it can reappear with the same id within ten meters. These tests check marker placement including
+ * at an unrelated emitter and exactly on a portal side, identity continuity and memory (move, vanish-and-return,
+ * a jump too far to match, pruning, removal with its geodesic), and that the per-cell bucket search finds the
+ * same markers as an all-pairs search. The lifecycle helpers this file also exercises (endpoint detachment,
+ * stale active-emitter state) are a geodesic's own bookkeeping, owned here because they share this fixture set.
+ */
 import { describe, expect, it } from "vitest";
-import { createRuntimeObjectRegistry } from "../.././../src/world-objects/runtimeObjectRegistry";
+import { createRuntimeObjectRegistry } from "../../../src/world-objects/runtimeObjectRegistry";
 import {
   createFreeGeodesicEndObject,
   createGeodesicCannonObject,
@@ -19,8 +31,8 @@ import {
 } from "../../../src/world-objects/geodesic/intersections";
 import { replaceGeodesicEndpointAttachment } from "../../../src/world-objects/geodesic/endpoints";
 import { removeGeodesic } from "../../../src/world-objects/geodesic/lifecycle";
-import { yawRigidTransform3 } from "../.././../src/math/rigidTransform3";
-import { createSegment, compileWorld, createTorusLoopBenchmarkScene, getCannonGeodesicIds } from "./fixtures";
+import { yawRigidTransform3 } from "../../../src/math/rigidTransform3";
+import { createSegment, compileWorld, createTorusLoopBenchmarkScene, getCannonGeodesicIds } from "../../fixtures/world-objects/geodesic";
 
 describe("geodesic cannon world objects: intersections", () => {
   it("looks up tails and removes segment chains", () => {
@@ -143,7 +155,7 @@ describe("geodesic cannon world objects: intersections", () => {
     expect(registry.getAll().filter((object) => object.kind === "geodesic-intersection")).toHaveLength(1);
   });
 
-  it("creates a vertex balloon where geodesics intersect at an unrelated emitter (job 15: the 0.3 m emitter exclusion is gone)", () => {
+  it("creates a vertex balloon where geodesics intersect at an unrelated emitter", () => {
     const registry = createRuntimeObjectRegistry([
       createGeodesicCannonObject({
         id: "cannon-a",
@@ -306,7 +318,41 @@ describe("geodesic cannon world objects: intersections", () => {
     expect(registry.getAll().filter((object) => object.kind === "geodesic-intersection")).toHaveLength(0);
   });
 
-  it("B4: a crossing exactly on a portal side is reported once, in the cell the geodesics enter", () => {
+  it("reports a crossing between two segments of one geodesic that are two apart", () => {
+    const registry = createRuntimeObjectRegistry([
+      createSegment({ id: "g-a:segment:0", segmentIndex: 0, start: { x: 0, y: 1, z: geodesicRayBeamHeightMeters }, direction: { x: 1, y: 0, z: 0 }, lengthMeters: 2 }),
+      createSegment({ id: "g-a:segment:1", segmentIndex: 1, start: { x: 2, y: 1, z: geodesicRayBeamHeightMeters }, direction: { x: 0, y: 1, z: 0 }, lengthMeters: 1 }),
+      createSegment({ id: "g-a:segment:2", segmentIndex: 2, start: { x: 2, y: 2, z: geodesicRayBeamHeightMeters }, direction: { x: -1, y: 0, z: 0 }, lengthMeters: 1.5 }),
+      createSegment({ id: "g-a:segment:3", segmentIndex: 3, start: { x: 0.5, y: 2, z: geodesicRayBeamHeightMeters }, direction: { x: 0, y: -1, z: 0 }, lengthMeters: 2 }),
+    ]);
+
+    const vertices = updateGeodesicIntersectionObjects(registry);
+
+    expect(vertices).toHaveLength(1);
+    expect(vertices[0].geodesicIds).toEqual(["g-a", "g-a"]);
+    expect(vertices[0].segmentIds).toEqual(["g-a:segment:0", "g-a:segment:3"]);
+  });
+
+  it("reports a crossing of two geodesics 0.2 m from an unrelated emitter", () => {
+    const registry = createRuntimeObjectRegistry([
+      createGeodesicCannonObject({ id: "other", cellId: "a", localPose: yawRigidTransform3(0, { x: 1.2, y: 1, z: 0 }) }),
+      createSegment({ id: "g-a:segment:0", start: { x: 0, y: 1, z: geodesicRayBeamHeightMeters }, direction: { x: 1, y: 0, z: 0 }, lengthMeters: 2 }),
+      createSegment({ id: "g-b:segment:0", geodesicId: "g-b", start: { x: 1, y: 0, z: geodesicRayBeamHeightMeters }, direction: { x: 0, y: 1, z: 0 }, lengthMeters: 2 }),
+    ]);
+
+    expect(updateGeodesicIntersectionObjects(registry)).toHaveLength(1);
+  });
+
+  it("does not report geodesics that meet at the shared start anchor", () => {
+    const registry = createRuntimeObjectRegistry([
+      createSegment({ id: "g-a:segment:0", start: { x: 1, y: 1, z: geodesicRayBeamHeightMeters }, direction: { x: 1, y: 0, z: 0 }, lengthMeters: 1 }),
+      createSegment({ id: "g-b:segment:0", geodesicId: "g-b", start: { x: 1, y: 1, z: geodesicRayBeamHeightMeters }, direction: { x: 0, y: 1, z: 0 }, lengthMeters: 1 }),
+    ]);
+
+    expect(updateGeodesicIntersectionObjects(registry)).toEqual([]);
+  });
+
+  it("reports a crossing exactly on a portal side once, in the cell the geodesics enter", () => {
     const z = geodesicRayBeamHeightMeters;
     const root = Math.sqrt(1.25);
     const portalHit = (direction: { x: number; y: number; z: number }) => ({
@@ -353,7 +399,7 @@ describe("geodesic cannon world objects: intersections", () => {
     expect(markers[0].aimStickyTarget?.localPoint.y).toBeCloseTo(1);
   });
 
-  it("B5: per-cell buckets find the same markers as the all-pairs search", () => {
+  it("finds the same markers with per-cell buckets as with an all-pairs search", () => {
     const { registry } = createTorusLoopBenchmarkScene();
     const markers = updateGeodesicIntersectionObjects(registry);
     expect(markers.length).toBeGreaterThan(10);

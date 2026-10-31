@@ -1,4 +1,17 @@
-import { describe, expect, it, vi } from "vitest";
+/**
+ * `tests/world-objects/geodesic/geodesicRebuildOutcomes.test.ts` — unit tier.
+ *
+ * `rebuildConnectedGeodesicBetweenEmitters` rebuilds a geodesic (or, carrying an emitter, several at once) after a
+ * change, preserving it when the rebuild fails and the caller asked to preserve it, or deleting it when the
+ * rebuilt chord lands in a forbidden zone; `realizeIntervalChord` classifies a straight chord between two anchors
+ * as feasible, blocked by a wall, blocked by a zone, or degenerate (too short to realize). `withDeferredGeodesicIntersections`
+ * batches intersection-marker recomputation, including across nested scopes and when the wrapped body throws.
+ * These tests check each rebuild/classification outcome and that nested deferred scopes still leave the right
+ * markers in place, with or without an error. (Rewritten from a performance test that asserted internal pass and
+ * trace counters and spied on the registry; those are implementation, not behaviour — see `_docs/tests.md` §2.2.
+ * A `carrying 10 loops through a frame` perf number, if wanted again, belongs in a `scripts/bench/` script.)
+ */
+import { describe, expect, it } from "vitest";
 import { yawRigidTransform3 } from "../../../src/math/rigidTransform3";
 import { rebuildConnectedGeodesicBetweenEmitters } from "../../../src/world-objects/geodesic/cannon";
 import {
@@ -6,7 +19,6 @@ import {
   withDeferredGeodesicIntersections,
 } from "../../../src/world-objects/geodesic/intersections";
 import { collectLockedIncidentGeodesicIdsForEmitter, removeGeodesic } from "../../../src/world-objects/geodesic/lifecycle";
-import { geodesicPerfCounters, resetGeodesicPerfCounters } from "../../../src/world-objects/geodesic/perfCounters";
 import { getGeodesicSegments } from "../../../src/world-objects/geodesic/segments";
 import { createRuntimeObjectRegistry } from "../../../src/world-objects/runtimeObjectRegistry";
 import { realizeIntervalChord } from "../../../src/world-objects/geodesic/intervals";
@@ -16,26 +28,17 @@ import {
   createGeodesicIntervalObject,
   geodesicRayBeamHeightMeters,
 } from "../../../src/world-objects/geodesic/objects";
-import { compileLargePortalWorld, compileLargeWorld, createTorusLoopBenchmarkScene } from "./fixtures";
+import { compileLargePortalWorld, compileLargeWorld, createTorusLoopBenchmarkScene } from "../../fixtures/world-objects/geodesic";
 
-function countSegments(registry: ReturnType<typeof createRuntimeObjectRegistry>): number {
-  return registry.getObjectsOfKind("geodesic-segment").length;
-}
-
-describe("geodesic rebuild performance", () => {
-  it("B1: a carry frame of 10 loops and 200 segments does one intersection pass, at most 10 chord traces and no getAll()", () => {
+describe("geodesic rebuild outcomes", () => {
+  it("keeps every carried loop's segments and portal word after moving the shared emitter", () => {
     const { world, registry, words } = createTorusLoopBenchmarkScene();
-    expect(countSegments(registry)).toBeGreaterThanOrEqual(195);
-    expect(countSegments(registry)).toBeLessThanOrEqual(205);
-
     const before = registry.get("e");
     if (before?.kind !== "geodesic-cannon") {
       throw new Error("Expected the emitter.");
     }
     registry.update({ ...before, localPose: yawRigidTransform3(0, { x: -1.95, y: 1.95, z: 0 }) });
-    resetGeodesicPerfCounters();
-    const getAll = vi.spyOn(registry, "getAll");
-    const startedAt = performance.now();
+
     withDeferredGeodesicIntersections(registry, () => {
       for (const id of collectLockedIncidentGeodesicIdsForEmitter(registry, "e")) {
         rebuildConnectedGeodesicBetweenEmitters({
@@ -49,34 +52,14 @@ describe("geodesic rebuild performance", () => {
         });
       }
     });
-    console.info(
-      `carry frame: ${(performance.now() - startedAt).toFixed(1)} ms, ` +
-        `${geodesicPerfCounters.intersectionPasses} intersection passes, ${geodesicPerfCounters.chordTraces} chord traces`,
-    );
 
-    expect(geodesicPerfCounters.intersectionPasses).toBeLessThanOrEqual(1);
-    expect(geodesicPerfCounters.chordTraces).toBeLessThanOrEqual(10);
-    expect(getAll).not.toHaveBeenCalled();
     for (let j = 0; j < 10; j += 1) {
       expect(getGeodesicSegments(registry, `loop-${j}`).length).toBeGreaterThan(0);
       expect(registry.get(`loop-${j}`)).toMatchObject({ portalWord: words.get(`loop-${j}`) });
     }
   });
 
-  it("B2: a public call makes one intersection pass", () => {
-    const { world, registry } = createTorusLoopBenchmarkScene();
-
-    resetGeodesicPerfCounters();
-    removeGeodesic(registry, "loop-0");
-    expect(geodesicPerfCounters.intersectionPasses).toBe(1);
-
-    resetGeodesicPerfCounters();
-    rebuildConnectedGeodesicBetweenEmitters({ world, registry, geodesicId: "loop-1" });
-    expect(geodesicPerfCounters.intersectionPasses).toBe(1);
-    expect(geodesicPerfCounters.chordTraces).toBe(1);
-  });
-
-  it("C1: a live carry rebuild that ends in a forbidden zone traces the chord once and deletes the interval", () => {
+  it("deletes a carry rebuild that lands in a forbidden zone", () => {
     const world = compileLargePortalWorld();
     const registry = createRuntimeObjectRegistry();
     registry.add(createGeodesicCannonObject({ id: "cannon-a", cellId: "a", localPose: yawRigidTransform3(0, { x: 1, y: 2.5, z: 0 }) }));
@@ -88,7 +71,6 @@ describe("geodesic rebuild performance", () => {
       startCellId: "a",
     }));
 
-    resetGeodesicPerfCounters();
     const rebuilt = rebuildConnectedGeodesicBetweenEmitters({
       world,
       registry,
@@ -100,10 +82,9 @@ describe("geodesic rebuild performance", () => {
 
     expect(rebuilt).toEqual([]);
     expect(registry.get("g-a")).toBeUndefined();
-    expect(geodesicPerfCounters.chordTraces).toBe(1);
   });
 
-  it("C2: a failed live carry rebuild that is preserved traces the chord once", () => {
+  it("preserves a carry rebuild that fails when the caller asks to preserve it", () => {
     const world = compileLargePortalWorld();
     const registry = createRuntimeObjectRegistry();
     registry.add(createGeodesicCannonObject({ id: "cannon-a", cellId: "a", localPose: yawRigidTransform3(0, { x: 1, y: 2.5, z: 0 }) }));
@@ -123,7 +104,6 @@ describe("geodesic rebuild performance", () => {
     }
     registry.update({ ...carried, localPose: yawRigidTransform3(Math.PI, { x: 1, y: -3, z: 0 }) });
 
-    resetGeodesicPerfCounters();
     const rebuilt = rebuildConnectedGeodesicBetweenEmitters({
       world,
       registry,
@@ -134,10 +114,9 @@ describe("geodesic rebuild performance", () => {
 
     expect(rebuilt).toEqual([]);
     expect(registry.get("g-a")?.kind).toBe("geodesic-interval");
-    expect(geodesicPerfCounters.chordTraces).toBe(1);
   });
 
-  it("C3: realizeIntervalChord classifies a chord with one trace", () => {
+  it("classifies a straight chord as feasible, wall-blocked, or too short to realize", () => {
     const world = compileLargeWorld();
     const registry = createRuntimeObjectRegistry();
     registry.add(createGeodesicCannonObject({ id: "cannon-a", cellId: "a", localPose: yawRigidTransform3(0, { x: -2, y: 0, z: 0 }) }));
@@ -147,24 +126,15 @@ describe("geodesic rebuild performance", () => {
       registry.add(createFreeGeodesicEndObject({ id: "tip", cellId: "a", point: { ...freeEndPoint, z: geodesicRayBeamHeightMeters } }));
       const interval = createGeodesicIntervalObject({ id: "g-tip", startAnchorObjectId: "cannon-a", endAnchorObjectId: "tip", startCellId: "a" });
       registry.add(interval);
-      resetGeodesicPerfCounters();
-      const realization = realizeIntervalChord({ world, registry, interval });
-      return realization;
+      return realizeIntervalChord({ world, registry, interval });
     };
 
     expect(realize({ x: 1, y: 0 }).kind).toBe("ok");
-    expect(geodesicPerfCounters.chordTraces).toBe(1);
-
-    const wall = realize({ x: 5, y: 0 });
-    expect(wall).toMatchObject({ kind: "wall", sideIndex: 1 });
-    expect(geodesicPerfCounters.chordTraces).toBe(1);
-
-    const degenerate = realize({ x: -1.9, y: 0 });
-    expect(degenerate.kind).toBe("degenerate");
-    expect(geodesicPerfCounters.chordTraces).toBe(0);
+    expect(realize({ x: 5, y: 0 })).toMatchObject({ kind: "wall", sideIndex: 1 });
+    expect(realize({ x: -1.9, y: 0 }).kind).toBe("degenerate");
   });
 
-  it("C3: realizeIntervalChord reports the junction of a forbidden-zone hit", () => {
+  it("reports the junction of a chord blocked by a forbidden zone", () => {
     const world = compileLargePortalWorld();
     const registry = createRuntimeObjectRegistry();
     registry.add(createGeodesicCannonObject({ id: "cannon-a", cellId: "a", localPose: yawRigidTransform3(0, { x: 1, y: 2.5, z: 0 }) }));
@@ -178,30 +148,26 @@ describe("geodesic rebuild performance", () => {
     expect(realization.kind === "zone" ? realization.junctionId : "").not.toBe("");
   });
 
-  it("B3: nested deferral scopes coalesce into one pass, also when the body throws", () => {
+  it("keeps intersection markers correct across nested deferred scopes, even if the body throws", () => {
     const { registry } = createTorusLoopBenchmarkScene();
     updateGeodesicIntersectionObjects(registry);
 
-    resetGeodesicPerfCounters();
     withDeferredGeodesicIntersections(registry, () =>
       withDeferredGeodesicIntersections(registry, () => {
         removeGeodesic(registry, "loop-0");
         removeGeodesic(registry, "loop-1");
       })
     );
-    expect(geodesicPerfCounters.intersectionPasses).toBe(1);
     const markers = registry.getObjectsOfKind("geodesic-intersection");
     expect(markers.some((marker) => marker.geodesicIds.some((id) => id === "loop-0" || id === "loop-1"))).toBe(false);
     expect(markers.some((marker) => marker.geodesicIds.includes("loop-2"))).toBe(true);
 
-    resetGeodesicPerfCounters();
     expect(() =>
       withDeferredGeodesicIntersections(registry, () => {
         removeGeodesic(registry, "loop-2");
         throw new Error("boom");
       })
     ).toThrow("boom");
-    expect(geodesicPerfCounters.intersectionPasses).toBe(1);
     expect(registry.getObjectsOfKind("geodesic-intersection").some((marker) =>
       marker.geodesicIds.includes("loop-2")
     )).toBe(false);

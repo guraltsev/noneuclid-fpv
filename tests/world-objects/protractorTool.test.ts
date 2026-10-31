@@ -1,3 +1,13 @@
+/**
+ * `tests/world-objects/protractorTool.test.ts` — unit tier.
+ *
+ * A protractor angle measures between two selections, each a side of a geodesic chosen from an emitter, a segment,
+ * or an endpoint-centered locked geodesic; the angle is counterclockwise from the first to the second, wrapped
+ * positive, and must come from different anchors of its geodesics. These tests check selection resolution for
+ * each kind, angle measurement (counterclockwise, wrapping, different-anchor requirement, custom labels), live
+ * refresh from an emitter's or segment's current direction, and hiding a vertex-centered angle while its vertex is
+ * temporarily missing (then restoring it).
+ */
 import { describe, expect, it } from "vitest";
 import { yawRigidTransform3 } from "../../src/math/rigidTransform3";
 import { createRuntimeObjectRegistry } from "../../src/world-objects/runtimeObjectRegistry";

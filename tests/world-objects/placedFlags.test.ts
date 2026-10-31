@@ -1,3 +1,12 @@
+/**
+ * `tests/world-objects/placedFlags.test.ts` — unit tier.
+ *
+ * A placed flag is a wooden-sign world object a player authors in place: `placeFlagAtFloorPoint`/`placeFlagFromAim`
+ * place one at a floor point or along an aim ray, with numbered default text continuing from existing flags of the
+ * same type; its message is sanitized (clamped length, newlines preserved, other whitespace normalized). These
+ * tests check type acceptance, message sanitizing, default-text numbering, placement and orientation toward the
+ * eye, font colour updates, and conversion to a dynamic-object state for collision.
+ */
 import { describe, expect, it } from "vitest";
 import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
 import type { CellComplexSpec } from "../../src/cell-complex/specs";

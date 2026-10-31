@@ -1,5 +1,16 @@
+/**
+ * `tests/world-objects/geodesic/trace.test.ts` — unit tier.
+ *
+ * `traceGeodesicSegment` walks one straight geodesic segment from a point until a wall, forbidden zone, portal or
+ * the requested length; `shootGeodesic`/`extendGeodesic`/`rebuildGeodesicToLength` build a geodesic from its
+ * emitter one or more segments at a time, seamlessly across portals, numbering it (globally, reusing the lowest
+ * free number) and giving it a tooltip (`_docs/MATHEMATICAL_MODEL.md` §6). These tests check each trace outcome,
+ * numbering and its continuity across a rebuild, the emitter's own collision/tooltip contract, cannon aim-yaw
+ * resolution, rebuilding to a length across portals and when a forbidden zone blocks it (with and without
+ * breaking the geodesic entirely), and that lifting an emitter removes its unlocked geodesics immediately.
+ */
 import { describe, expect, it } from "vitest";
-import { createRuntimeObjectRegistry } from "../.././../src/world-objects/runtimeObjectRegistry";
+import { createRuntimeObjectRegistry } from "../../../src/world-objects/runtimeObjectRegistry";
 import {
   createGeodesicCannonObject,
   geodesicRayBeamHeightMeters,
@@ -15,7 +26,7 @@ import {
 import { getGeodesicSegments, resolveGeodesicNumber } from "../../../src/world-objects/geodesic/segments";
 import { removeGeodesic, removeUnlockedGeodesicsFromCannon } from "../../../src/world-objects/geodesic/lifecycle";
 import { traceGeodesicSegment } from "../../../src/world-objects/geodesic/trace";
-import { yawRigidTransform3 } from "../.././../src/math/rigidTransform3";
+import { yawRigidTransform3 } from "../../../src/math/rigidTransform3";
 import {
   createSegment,
   compileWorld,
@@ -23,7 +34,7 @@ import {
   getCannonGeodesicIds,
   compileLargeWorld,
   compileLargePortalWorld,
-} from "./fixtures";
+} from "../../fixtures/world-objects/geodesic";
 
 describe("geodesic cannon world objects: trace", () => {
   it("traces an open one-meter horizontal segment", () => {
@@ -154,7 +165,7 @@ describe("geodesic cannon world objects: trace", () => {
     expect(resolveGeodesicNumber(registry, "g-c")).toBe(1);
   });
 
-  it("keeps the display number of a rebuilt geodesic and reuses the lowest free number for a new one", () => {
+  it("keeps a rebuilt geodesic's number and reuses the lowest free number for a new one", () => {
     const world = compileLargeWorld();
     const registry = createRuntimeObjectRegistry();
     registry.add(createGeodesicCannonObject({
@@ -286,7 +297,7 @@ describe("geodesic cannon world objects: trace", () => {
     expect(extendGeodesic({ world, registry, geodesicId: "g-a" })).toBeUndefined();
   });
 
-  it("rebuilds rotated geodesics to the remembered total length after moving past a forbidden zone", () => {
+  it("rebuilds a rotated geodesic to its remembered length after clearing a forbidden zone", () => {
     const world = compileLargePortalWorld();
     const registry = createRuntimeObjectRegistry();
     const cannon = createGeodesicCannonObject({

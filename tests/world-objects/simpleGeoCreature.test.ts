@@ -1,3 +1,21 @@
+/**
+ * `tests/world-objects/simpleGeoCreature.test.ts` — unit tier.
+ *
+ * A simple geo creature (mouse or butterfly) walks forward at constant speed plus a lateral wobble (faded near
+ * forbidden zones) and, for butterflies, a bounded vertical bob (`_docs/MATHEMATICAL_MODEL.md` §5). It owns an
+ * invisible leader that walks its geodesic exactly with the segment-walk kernel; the creature steers toward the
+ * leader through the same swept collision as any mover, so it detours around a body or a forbidden zone and then
+ * rejoins the same geodesic, keeping a zone's vertex on the required side throughout. These tests check the
+ * lateral-wobble bound and its fade near a zone (`forbiddenZoneLateralOscillationScale`), the pure side-rule
+ * function (`geodesicSideOfPoint`/`applyForbiddenZoneSideRule`), that the leader tracks the unobstructed geodesic
+ * exactly across portals, each detour/rejoin case (a zone on either side, a geodesic-exact vertex hit, being
+ * pushed to the wrong side, a blocking body), ownership and placement (`host.placeAt`, a direct registry write
+ * refused), and that `reset`/`transformGeometry` re-seed the leader. The detour/rejoin cases check the leader's
+ * effect only through the creature's own public pose, never through the runtime's debug-only leader accessor:
+ * "rejoined" is proven by resuming an independent pure-geodesic walk from the creature's current pose and checking
+ * its next steps retrace it exactly, and "stopped short" by a position bound instead of reading the leader's lag
+ * directly.
+ */
 import { describe, expect, it } from "vitest";
 import * as THREE from "three";
 import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
@@ -309,15 +327,6 @@ describe("leader and detour", () => {
       if (!object) throw new Error("missing creature");
       return { cellId: object.cellId, pose: object.localPose };
     };
-    const leaderInCreatureFrame = (): RigidTransform3 => {
-      const leader = runtime.leaderForDebug();
-      return composeRigidTransform3(leader.creatureFromLeader, leader.localPose);
-    };
-    const lag = (): number => {
-      const leader = leaderInCreatureFrame().translation;
-      const mine = pose().pose.translation;
-      return Math.hypot(leader.x - mine.x, leader.y - mine.y);
-    };
     const nearestColumn = () => {
       const cell = world.cellsById.get(pose().cellId);
       if (!cell) throw new Error("missing cell");
@@ -326,39 +335,99 @@ describe("leader and detour", () => {
         .map((column) => ({ column, distance: Math.hypot(column.center.x - mine.x, column.center.y - mine.y) }))
         .sort((a, b) => a.distance - b.distance)[0];
     };
-    return { runtime, registry, pose, leaderInCreatureFrame, lag, nearestColumn, world };
+    return { runtime, registry, pose, nearestColumn, world, speed };
   }
 
-  /** Signed angle of the creature around the nearest zone centre, measured from the leader's forward direction (frame independent). */
-  function angleAroundZone(c: ReturnType<typeof makeCreature>) {
+  /**
+   * An independent, obstacle- and zone-oblivious walk of the pure geodesic from `pose`, matching the model the
+   * leader itself walks when nothing blocks it (same computation as the "follows the unobstructed geodesic"
+   * test below). Used to check that a creature has rejoined its geodesic after a detour: once caught up, its own
+   * future motion must retrace this walk exactly.
+   */
+  function pureGeodesicWalk(
+    world: CompiledCellComplex,
+    cellId: string,
+    pose: RigidTransform3,
+    speed: number,
+    ticks: number,
+  ): { cellId: string; pose: RigidTransform3 } {
+    let cell = cellId;
+    let current = pose;
+
+    for (let tick = 0; tick < ticks; tick += 1) {
+      const dir = transformDirection3(current, { x: 0, y: 1, z: 0 });
+      const walk = walkDevelopedSegment({
+        world,
+        cellId: cell,
+        start: { x: current.translation.x, y: current.translation.y },
+        direction: { x: dir.x, y: dir.y },
+        lengthMeters: speed * dt,
+      });
+      const last = walk.pieces[walk.pieces.length - 1];
+      const moved: RigidTransform3 = {
+        rotation: current.rotation,
+        translation: { x: current.translation.x + dir.x * speed * dt, y: current.translation.y + dir.y * speed * dt, z: 0 },
+      };
+
+      current = orthonormalizeYawRigidTransform3(composeRigidTransform3(last.cellFromStart, moved));
+      cell = last.cellId;
+    }
+
+    return { cellId: cell, pose: current };
+  }
+
+  /** Runs `resumeTicks` more unobstructed updates and checks the creature's pose matches an independent pure-geodesic walk from its pose at the start of this call: the public-API proof that it has rejoined its geodesic, used in place of comparing against the private leader state directly. */
+  function expectRejoinsGeodesic(c: ReturnType<typeof makeCreature>, resumeTicks = 60, tolerance = 1e-8): void {
+    const start = c.pose();
+    const expected = pureGeodesicWalk(c.world, start.cellId, start.pose, c.speed, resumeTicks);
+
+    for (let tick = 0; tick < resumeTicks; tick += 1) {
+      c.runtime.update(c.world, dt);
+    }
+
+    const actual = c.pose();
+
+    expect(actual.cellId).toBe(expected.cellId);
+    expect(Math.hypot(actual.pose.translation.x - expected.pose.translation.x, actual.pose.translation.y - expected.pose.translation.y)).toBeLessThan(tolerance);
+    expect(Math.abs(actual.pose.rotation.m00 - expected.pose.rotation.m00)).toBeLessThan(tolerance);
+    expect(Math.abs(actual.pose.rotation.m10 - expected.pose.rotation.m10)).toBeLessThan(tolerance);
+  }
+
+  /**
+   * Signed angle of the creature around the nearest zone centre, measured from `forward` (captured once, before
+   * any detour, so the measurement frame does not rotate with the creature while it turns to avoid the zone).
+   */
+  function angleAroundZone(c: ReturnType<typeof makeCreature>, forward: { x: number; y: number }) {
     const { column } = c.nearestColumn();
     const mine = c.pose().pose.translation;
-    const leaderPose = c.leaderInCreatureFrame();
-    const d = transformDirection3(leaderPose, { x: 0, y: 1, z: 0 });
     const rx = mine.x - column.center.x;
     const ry = mine.y - column.center.y;
-    return Math.atan2(d.x * ry - d.y * rx, d.x * rx + d.y * ry);
+    return Math.atan2(forward.x * ry - forward.y * rx, forward.x * rx + forward.y * ry);
   }
 
-  /** v relative to the creature and the leader's forward direction, for the side test. */
-  function crossForwardToZone(c: ReturnType<typeof makeCreature>): { cross: number; distance: number; along: number } {
+  /** The zone centre relative to the creature, and the required-side test, against the same fixed `forward`. */
+  function crossForwardToZone(c: ReturnType<typeof makeCreature>, forward: { x: number; y: number }): { cross: number; distance: number; along: number; clearedZone: boolean } {
     const { column, distance } = c.nearestColumn();
     const mine = c.pose().pose.translation;
-    const d = transformDirection3(c.leaderInCreatureFrame(), { x: 0, y: 1, z: 0 });
     const vx = column.center.x - mine.x;
     const vy = column.center.y - mine.y;
-    return { cross: d.x * vy - d.y * vx, distance, along: -(d.x * vx + d.y * vy) };
+
+    return {
+      cross: forward.x * vy - forward.y * vx,
+      distance,
+      along: -(forward.x * vx + forward.y * vy),
+      clearedZone: distance >= column.radius - 1e-9,
+    };
   }
 
-  function expectCoincide(c: ReturnType<typeof makeCreature>, tolerance: number): void {
-    const leaderPose = c.leaderInCreatureFrame();
-    const mine = c.pose().pose;
-    expect(Math.hypot(leaderPose.translation.x - mine.translation.x, leaderPose.translation.y - mine.translation.y)).toBeLessThan(tolerance);
-    expect(Math.abs(leaderPose.rotation.m00 - mine.rotation.m00)).toBeLessThan(tolerance);
-    expect(Math.abs(leaderPose.rotation.m10 - mine.rotation.m10)).toBeLessThan(tolerance);
+  /** The creature's own forward direction at its current pose: a one-shot reference direction, fixed by the caller, or recomputed each tick when the path may cross into another cell. */
+  function currentForward(c: ReturnType<typeof makeCreature>): { x: number; y: number } {
+    const d = transformDirection3(c.pose().pose, { x: 0, y: 1, z: 0 });
+
+    return { x: d.x, y: d.y };
   }
 
-  it("1. follows the unobstructed geodesic exactly across portals", () => {
+  it("follows the unobstructed geodesic exactly across portals", () => {
     const world = compileCellComplex(icosahedron);
     const cellId = world.cells[0].id;
     const speed = 1.2;
@@ -426,52 +495,59 @@ describe("leader and detour", () => {
   }
 
   for (const zoneOnLeft of [true, false]) {
-    it(`${zoneOnLeft ? "2" : "3"}. keeps the zone vertex on the geodesic's side (zone on the ${zoneOnLeft ? "left" : "right"})`, () => {
+    it(`detours around a zone on the ${zoneOnLeft ? "left" : "right"}, keeping the required side`, () => {
       const c = detourScenario({ zoneOnLeft });
+      const forward = currentForward(c);
       let passedTicks: number | undefined;
-      let detoured = false;
+      let approached = false;
 
       for (let tick = 0; tick < 600; tick += 1) {
         c.runtime.update(c.world, dt);
-        const s = crossForwardToZone(c);
+        const s = crossForwardToZone(c, forward);
         if (s.distance < 1) {
+          approached = true;
+          expect(s.clearedZone).toBe(true);
           if (zoneOnLeft) {
             expect(s.cross).toBeGreaterThanOrEqual(-1e-9);
           } else {
             expect(s.cross).toBeLessThanOrEqual(1e-9);
           }
         }
-        if (c.lag() > 1e-4) detoured = true;
         if (passedTicks === undefined && s.along > 1 && s.distance < 3) passedTicks = tick;
       }
 
-      expect(detoured).toBe(true);
+      expect(approached).toBe(true);
       expect(passedTicks).toBeDefined();
-      expect(c.lag()).toBeLessThan(1e-6);
-      expectCoincide(c, 1e-6);
+      expectRejoinsGeodesic(c);
     });
   }
 
-  it("4. a geodesic exactly through the vertex passes it on the right and the creature rejoins", () => {
+  it("passes a geodesic-exact vertex hit on the right of the motion, and rejoins", () => {
     const world = compileCellComplex(cube);
     const c = makeCreature(world, "front", 4.5, 7.5, -90);
     let minCross = Infinity;
 
     for (let tick = 0; tick < 700; tick += 1) {
       c.runtime.update(world, dt);
-      const s = crossForwardToZone(c);
-      if (s.distance < 1) minCross = Math.min(minCross, -s.cross);
+      // The exact vertex hit crosses into the next cell through the vertex-tie rule (unlike the offset detour
+      // cases below), so the reference direction is recomputed each tick from the creature's own current pose
+      // (which the registry keeps correctly expressed in whichever cell it is currently in) rather than fixed.
+      const s = crossForwardToZone(c, currentForward(c));
+      if (s.distance < 1) {
+        expect(s.clearedZone).toBe(true);
+        minCross = Math.min(minCross, -s.cross);
+      }
     }
 
     // Vertex on the right of the motion: cross(forward, v - c) <= 0 throughout.
     expect(minCross).toBeGreaterThanOrEqual(-1e-9);
-    expect(c.lag()).toBeLessThan(1e-6);
-    expectCoincide(c, 1e-6);
+    expectRejoinsGeodesic(c);
   });
 
-  it("5. a creature pushed to the wrong side of a zone orbits to the required side and rejoins", () => {
+  it("orbits to the required side when pushed to the wrong side of a zone, and rejoins", () => {
     const world = compileCellComplex(cube);
     const c = makeCreature(world, "front", 4.5, 7.5 - 0.12, -90);
+    const forward = currentForward(c);
     // A body below and left of the corner squeezes the creature up over the line, onto the wrong side of the corner zone (found by scanning body placements; the wrong-side branch is entered here).
     const body = {
       cellId: "front",
@@ -485,9 +561,10 @@ describe("leader and detour", () => {
     // The geodesic loops back to the same corner after about 800 ticks, so stop well before that.
     for (let tick = 0; tick < 400; tick += 1) {
       c.runtime.update(world, dt, tick < 150 ? [body] : []);
-      const s = crossForwardToZone(c);
+      const s = crossForwardToZone(c, forward);
       if (s.distance < 0.6) {
-        const angle = angleAroundZone(c);
+        expect(s.clearedZone).toBe(true);
+        const angle = angleAroundZone(c, forward);
         if (previous !== undefined) {
           let step = angle - previous;
           while (step > Math.PI) step -= 2 * Math.PI;
@@ -503,10 +580,10 @@ describe("leader and detour", () => {
 
     // Zone on the left: the creature goes round it counter-clockwise, so the unwrapped angle never decreases by more than jitter.
     expect(worstDecrease).toBeGreaterThan(-0.2);
-    expect(c.lag()).toBeLessThan(1e-6);
+    expectRejoinsGeodesic(c);
   });
 
-  it("6. a blocking body leashes the leader; the creature rejoins when it is removed", () => {
+  it("stops short of a blocking body and resumes its geodesic once it is removed", () => {
     const world = compileCellComplex(cube);
     const c = makeCreature(world, "front", 0, 0, -90);
     const body = {
@@ -514,23 +591,25 @@ describe("leader and detour", () => {
       localPose: yawRigidTransform3(0, { x: 1, y: 0, z: 0 }),
       collision: simpleCollisionCylinder(0.3, 0.4, { x: 0, y: 0, z: 0.2 }),
     };
-    let maxLag = 0;
+    let maxForwardX = -Infinity;
 
     for (let tick = 0; tick < 120; tick += 1) {
       c.runtime.update(world, dt, [body]);
-      maxLag = Math.max(maxLag, c.lag());
+      maxForwardX = Math.max(maxForwardX, c.pose().pose.translation.x);
     }
-    expect(maxLag).toBeLessThanOrEqual(0.5 + 1.2 * dt + 1e-9);
-    expect(maxLag).toBeGreaterThan(0.3);
+    // Turn -90 degrees faces +x; the body sits at x = 1 with a combined radius of 0.35 m (0.3 body + 0.05
+    // creature), so the creature must stop short of it, but should still have advanced well past its start (the
+    // leash lets it get within 0.5 m of the leader before holding the leader back).
+    expect(maxForwardX).toBeLessThanOrEqual(0.65 + 1e-6);
+    expect(maxForwardX).toBeGreaterThan(0.15);
 
     for (let tick = 0; tick < 600; tick += 1) {
       c.runtime.update(world, dt, []);
     }
-    expect(c.lag()).toBeLessThan(1e-6);
-    expectCoincide(c, 1e-6);
+    expectRejoinsGeodesic(c);
   });
 
-  it("7a. host.placeAt re-seeds the leader and the creature walks the geodesic from the placed pose", () => {
+  it("host.placeAt re-seeds the leader so the creature walks the geodesic from the placed pose", () => {
     const world = compileCellComplex(cube);
     const c = makeCreature(world, "front", 0, 0, -90);
     const host = createObjectHost();
@@ -541,11 +620,9 @@ describe("leader and detour", () => {
     expect(host.placeAt("m", "front", placed)).toBe(true);
     expect(c.registry.get("m")!.localPose).toEqual(placed);
     expect(c.registry.get("m")!.cellId).toBe("front");
-    const leader = c.runtime.leaderForDebug();
-    expect(leader.creatureFromLeader.translation).toEqual({ x: 0, y: 0, z: 0 });
-    expect(Math.abs(leader.creatureFromLeader.rotation.m00 - 1)).toBeLessThan(1e-12);
-    expect(Math.abs(leader.creatureFromLeader.rotation.m10)).toBeLessThan(1e-12);
 
+    // If the leader were not re-seeded at the placed pose, the creature would keep tracking a leader still walking
+    // from the pre-placement position and would not match a fresh creature started at the same placed pose.
     const fresh = makeCreature(world, "front", 0, -5, (0.3 * 180) / Math.PI);
     for (let tick = 0; tick < 100; tick += 1) {
       c.runtime.update(world, dt);
@@ -560,7 +637,7 @@ describe("leader and detour", () => {
     }
   });
 
-  it("7b. host.placeAt into another cell moves the registry record and the three.js parent", () => {
+  it("host.placeAt into another cell moves the registry record and the three.js parent", () => {
     const world = compileCellComplex(cube);
     const c = makeCreature(world, "front", 0, 0, -90);
     const host = createObjectHost();
@@ -579,7 +656,7 @@ describe("leader and detour", () => {
     expect(c.runtime.root.parent).toBe(cellRoots.get(otherId));
   });
 
-  it("7c. a direct registry.update of a creature throws and leaves its pose unchanged", () => {
+  it("a direct registry update of a creature throws and leaves its pose unchanged", () => {
     const world = compileCellComplex(cube);
     const c = makeCreature(world, "front", 0, 0, -90);
     const record = c.registry.get("m")!;
@@ -595,7 +672,7 @@ describe("leader and detour", () => {
     expect(c.runtime.root.position.z).toBe(rootZ);
   });
 
-  it("8. reset and transformGeometry put the leader back on the creature", () => {
+  it("reset and transformGeometry put the leader back on the creature", () => {
     const world = compileCellComplex(cube);
     const c = makeCreature(world, "front", 0, 0, -90);
     const body = {
@@ -603,22 +680,30 @@ describe("leader and detour", () => {
       localPose: yawRigidTransform3(0, { x: 1, y: 0, z: 0 }),
       collision: simpleCollisionCylinder(0.3, 0.4, { x: 0, y: 0, z: 0.2 }),
     };
+
     for (let tick = 0; tick < 100; tick += 1) c.runtime.update(world, dt, [body]);
-    expect(c.lag()).toBeGreaterThan(0.1);
+    // Lagged behind (stalled short of the body) rather than passed through it.
+    expect(c.pose().pose.translation.x).toBeLessThanOrEqual(0.65 + 1e-6);
+    expect(c.pose().pose.translation.x).toBeGreaterThan(0.15);
 
     const identityMap = { cellId: "front", mapPoint: (point: { x: number; y: number; z: number }) => point, mapDirection: (direction: { x: number; y: number; z: number }) => direction };
     c.runtime.transformGeometry(new Map([["front", identityMap]]), world);
-    expect(c.lag()).toBeLessThan(1e-9);
-    expect(c.runtime.leaderForDebug().creatureFromLeader.translation).toEqual({ x: 0, y: 0, z: 0 });
+    // If the leader were still ahead, the next unobstructed step would move faster than speed * dt to catch up;
+    // transformGeometry re-seeds the leader exactly on the creature, so a step right after it does not.
+    const afterTransform = c.pose().pose.translation.x;
+    c.runtime.update(world, dt);
+    expect(c.pose().pose.translation.x - afterTransform).toBeCloseTo(1.2 * dt, 9);
 
+    // The step just above skipped the body, so the creature is already past the point the body would otherwise
+    // hold it at; reintroducing the body here cannot push it back (a mover may leave an obstacle but never go
+    // deeper into it), only block further advance, so this only needs to confirm it stays well short of the body.
     for (let tick = 0; tick < 100; tick += 1) c.runtime.update(world, dt, [body]);
-    expect(c.lag()).toBeGreaterThan(0.1);
+    expect(c.pose().pose.translation.x).toBeLessThan(0.9);
     c.runtime.reset(new Map());
-    expect(c.lag()).toBeLessThan(1e-9);
 
     const before = c.pose().pose.translation.x;
     c.runtime.update(world, dt);
     expect(c.pose().pose.translation.x).toBeCloseTo(before + 1.2 * dt, 9);
-    expectCoincide(c, 1e-9);
+    expectRejoinsGeodesic(c);
   });
 });

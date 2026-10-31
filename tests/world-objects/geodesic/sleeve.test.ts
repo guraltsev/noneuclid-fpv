@@ -1,3 +1,15 @@
+/**
+ * `tests/world-objects/geodesic/sleeve.test.ts` — unit tier.
+ *
+ * The shortest path between two points through a chain of forbidden-zone disks (the "taut string"/funnel
+ * algorithm, `_docs/MATHEMATICAL_MODEL.md` §7) wraps a disk only when the straight chord would pass within its
+ * radius, alternating sides as needed, and reports infeasible when an aperture is narrower than two radii.
+ * `developSleeve` builds the sleeve of apertures along a portal word in the start cell's frame, agreeing with
+ * `liftGeodesicEndpoint`. These tests check the pure tangent geometry (point-to-disk, disk-to-disk), each taut-path
+ * outcome (clear chord, one wrap, an alternating wrap, infeasible, a wrap subdivided by a turn limit),
+ * `developSleeve` against `liftGeodesicEndpoint` and its word-mismatch error, and the property that the funnel's
+ * length and apex sequence match a brute-force shortest path when the radius is zero.
+ */
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { createRuntimeObjectRegistry } from "../../../src/world-objects/runtimeObjectRegistry";
@@ -13,7 +25,7 @@ import {
   type SleeveAperture,
 } from "../../../src/world-objects/geodesic/sleeve";
 import { identityRigidTransform3, yawRigidTransform3 } from "../../../src/math/rigidTransform3";
-import { createCarryPortalTraversal, compileLargePortalWorld } from "./fixtures";
+import { createCarryPortalTraversal, compileLargePortalWorld } from "../../fixtures/world-objects/geodesic";
 
 const rho = 0.15;
 
@@ -26,7 +38,7 @@ function sleeveOf(start: { x: number; y: number }, end: { x: number; y: number }
 }
 
 describe("sleeve and taut string (pure geometry)", () => {
-  it("A1: tangent from a point to a disk", () => {
+  it("tangent from a point to a disk", () => {
     const left = tangentFromPointToDisk({ x: 0, y: 0 }, { x: 2, y: 0 }, 1, "left");
     expect(left?.to.x).toBeCloseTo(1.5, 9);
     expect(left?.to.y).toBeCloseTo(-Math.sqrt(3) / 2, 9);
@@ -38,7 +50,7 @@ describe("sleeve and taut string (pure geometry)", () => {
     expect(right?.to.y).toBeCloseTo(Math.sqrt(3) / 2, 9);
   });
 
-  it("A2: tangents between two disks", () => {
+  it("tangents between two disks", () => {
     const leftLeft = tangentBetweenDisks({ x: 0, y: 0 }, "left", { x: 3, y: 0 }, "left", 0.5);
     expect(leftLeft?.from).toEqual({ x: 0, y: -0.5 });
     expect(leftLeft?.to).toEqual({ x: 3, y: -0.5 });
@@ -52,12 +64,12 @@ describe("sleeve and taut string (pure geometry)", () => {
     expect(tangentBetweenDisks({ x: 0, y: 0 }, "left", { x: 0.9, y: 0 }, "right", 0.5)).toBeUndefined();
   });
 
-  it("A3: a chord that stays in the sleeve has no apex", () => {
+  it("a chord that stays in the sleeve has no apex", () => {
     const result = solveTautPath(sleeveOf({ x: 0, y: 0 }, { x: 4, y: 0 }, [aperture({ x: 2, y: 1 }, { x: 2, y: -1 })]), rho);
     expect(result).toMatchObject({ status: "ok", apexes: [], points: [{ x: 0, y: 0 }, { x: 4, y: 0 }], lengthMeters: 4 });
   });
 
-  it("A4: developSleeve agrees with liftGeodesicEndpoint", () => {
+  it("developSleeve agrees with liftGeodesicEndpoint", () => {
     const world = compileLargePortalWorld();
     const word = [createCarryPortalTraversal(world, "a", "ab")];
     const result = developSleeve({ world, startCellId: "a", start: { x: 4, y: 0.1 }, word, end: { x: 2, y: 0.1 } });
@@ -86,13 +98,13 @@ describe("sleeve and taut string (pure geometry)", () => {
     expect(lifted?.targetPointInSourceCell.y).toBeCloseTo(sleeve.end.y, 12);
   });
 
-  it("A4b: a word that does not chain is a mismatch", () => {
+  it("a word that does not chain is a mismatch", () => {
     const world = compileLargePortalWorld();
     const word = [createCarryPortalTraversal(world, "b", "ba")];
     expect(developSleeve({ world, startCellId: "a", start: { x: 1, y: 1 }, word, end: { x: 1, y: 1 } })).toEqual({ status: "word-mismatch", index: 0 });
   });
 
-  it("A5: one disk is wrapped by one corner", () => {
+  it("one disk is wrapped by one corner", () => {
     const result = solveTautPath(sleeveOf({ x: -2, y: 0 }, { x: 2, y: 0 }, [aperture({ x: 0, y: 0.05 }, { x: 0, y: -5 })]), rho);
     if (result.status !== "ok") {
       throw new Error(result.status);
@@ -106,7 +118,7 @@ describe("sleeve and taut string (pure geometry)", () => {
     expect(result.polylineLengthMeters).toBeCloseTo(4.005015681862478, 9);
   });
 
-  it("A6: an alternating funnel wraps a left and then a right disk", () => {
+  it("an alternating funnel wraps a left and then a right disk", () => {
     const result = solveTautPath(
       sleeveOf({ x: 0, y: 0 }, { x: 6, y: 0 }, [
         aperture({ x: 2, y: -0.5 }, { x: 2, y: -3 }),
@@ -137,12 +149,12 @@ describe("sleeve and taut string (pure geometry)", () => {
     expect(result.lengthMeters).toBeCloseTo(6.602835373640863, 9);
   });
 
-  it("A7: an aperture narrower than two radii is infeasible", () => {
+  it("an aperture narrower than two radii is infeasible", () => {
     const result = solveTautPath(sleeveOf({ x: 0, y: 0 }, { x: 4, y: 0 }, [aperture({ x: 2, y: 0.1 }, { x: 2, y: -0.1 })]), rho);
     expect(result).toEqual({ status: "infeasible", apertureIndex: 0 });
   });
 
-  it("A8: a wrap is subdivided into corners of at most the given turn", () => {
+  it("a wrap is subdivided into corners of at most the given turn", () => {
     const result = solveTautPath(
       sleeveOf({ x: -2, y: 0 }, { x: 2, y: 0 }, [aperture({ x: 0, y: 0.05 }, { x: 0, y: -5 })]),
       rho,
@@ -160,7 +172,7 @@ describe("sleeve and taut string (pure geometry)", () => {
     expect(result.polylineLengthMeters).toBeCloseTo(2 * Math.sqrt(distance * distance - rho * rho) + 6 * rho * Math.tan(phi / 6), 8);
   });
 
-  it("A9: the funnel matches a brute-force shortest path (rho = 0)", () => {
+  it("the funnel matches a brute-force shortest path (rho = 0)", () => {
     fc.assert(
       fc.property(
         fc.array(fc.tuple(fc.double({ min: 0.2, max: 2, noNaN: true }), fc.double({ min: -2, max: -0.2, noNaN: true })), { minLength: 3, maxLength: 6 }),

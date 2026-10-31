@@ -1,5 +1,19 @@
+/**
+ * `tests/world-objects/geodesic/curveShortening.test.ts` — unit tier.
+ *
+ * Curve shortening straightens a geodesic pair tied at a shared free end: `resolveCurveShorteningPair` resolves a
+ * pair exactly (fusing to a straight chord, wrapping a junction disk with a corner when the chord would pass too
+ * close to it, or deleting a free loop that encircles a cone point), and `advanceCurveShorteningPairs` moves every
+ * pair's free end one tick toward that resolution, fusing or deleting once the chord is short enough, consistently
+ * at any frame rate (`_docs/MATHEMATICAL_MODEL.md` §7). These tests check: tying two locked endpoints into a
+ * moving pair; each exact-resolution outcome (fuse to a straight chord, fuse into an existing geodesic under the
+ * identity and homotopy-class rules, wrap a corner, delete a degenerate or cone-point-encircling free loop, mark
+ * an infeasible pair unresolved and leave it untouched); ticking at 60 Hz and 240 Hz reaching the same fused
+ * result, without a tie-breaking 2-cycle, and within a bounded number of ticks; and the attached measurements,
+ * angles and intersection markers refreshing or being removed after a resolution.
+ */
 import { describe, expect, it } from "vitest";
-import { createRuntimeObjectRegistry } from "../.././../src/world-objects/runtimeObjectRegistry";
+import { createRuntimeObjectRegistry } from "../../../src/world-objects/runtimeObjectRegistry";
 import {
   advanceCurveShorteningPairs,
   resolveCurveShorteningPair,
@@ -31,7 +45,6 @@ import {
   resolveProtractorCenterSelection,
   resolveProtractorDirectedGeodesicSelection,
 } from "../../../src/world-objects/protractorTool";
-import { geodesicPerfCounters, resetGeodesicPerfCounters } from "../../../src/world-objects/geodesic/perfCounters";
 import { getGeodesicEndpointAttachmentsForAnchor } from "../../../src/world-objects/geodesic/endpoints";
 import { getGeodesicSegments } from "../../../src/world-objects/geodesic/segments";
 import {
@@ -40,7 +53,7 @@ import {
   traceGeodesicFromLiftedChord,
 } from "../../../src/world-objects/geodesic/intervals";
 import { rebuildConnectedGeodesicBetweenEmitters } from "../../../src/world-objects/geodesic/cannon";
-import { yawRigidTransform3 } from "../.././../src/math/rigidTransform3";
+import { yawRigidTransform3 } from "../../../src/math/rigidTransform3";
 import {
   createSegment,
   totalGeodesicLength,
@@ -53,7 +66,7 @@ import {
   runCurveShorteningUntilPairGone,
   createTorusTiedPairScenario,
   createSymmetricPairScenario,
-} from "./fixtures";
+} from "../../fixtures/world-objects/geodesic";
 
 function createCornerScenario() {
   const world = compileLargePortalWorld();
@@ -381,19 +394,7 @@ describe("geodesic cannon world objects: curve shortening", () => {
   });
 
   describe("exact resolution", () => {
-    it("C4: resolving a pair traces each result chord once (preview only, no rebuild)", () => {
-      const { world, registry } = createCornerScenario();
-
-      resetGeodesicPerfCounters();
-      const result = resolveCurveShorteningPair({ world, registry, pairId: "pair" });
-
-      expect(result).toMatchObject({ status: "resolved", geodesicIds: ["g1", "g1:piece:1"] });
-      expect(geodesicPerfCounters.chordTraces).toBe(2);
-      expect(getGeodesicSegments(registry, "g1").length).toBeGreaterThan(0);
-      expect(getGeodesicSegments(registry, "g1:piece:1").length).toBeGreaterThan(0);
-    });
-
-    it("B1: wraps the junction disk with one corner when the chord would pass too close to it", () => {
+    it("wraps the junction disk with one corner when the chord would pass too close to it", () => {
       const { world, registry } = createCornerScenario();
       const notices: CurveShorteningNotice[] = [];
 
@@ -426,7 +427,7 @@ describe("geodesic cannon world objects: curve shortening", () => {
       expect(totalGeodesicLength(registry, "g1") + totalGeodesicLength(registry, "g1:piece:1")).toBeCloseTo(3.001883, 6);
     });
 
-    it("B2: resolves a symmetric pair to the straight chord", () => {
+    it("resolves a symmetric pair to the straight chord", () => {
       const { world, registry } = createSymmetricPairScenario(1, 1);
 
       const result = resolveCurveShorteningPair({ world, registry, pairId: "pair" });
@@ -438,7 +439,7 @@ describe("geodesic cannon world objects: curve shortening", () => {
       expect(totalGeodesicLength(registry, "g1")).toBeCloseTo(2, 9);
     });
 
-    it("B3: resolves the issue 66 torus pair to a stable loop at the emitter", () => {
+    it("resolves the torus tied-pair scenario to a stable loop at the emitter", () => {
       const { world, registry } = createTorusTiedPairScenario();
 
       const result = resolveCurveShorteningPair({ world, registry, pairId: "pair" });
@@ -455,7 +456,7 @@ describe("geodesic cannon world objects: curve shortening", () => {
       expect(getGeodesicSegments(registry, "g1")).toHaveLength(3);
     });
 
-    it("B4: deletes a free loop that encircles a cone point and sends a notice", () => {
+    it("deletes a free loop that encircles a cone point and sends a notice", () => {
       const world = compileRotatedFreeLoopWorld();
       const registry = createRuntimeObjectRegistry();
       const point = { x: 4.9, y: 1, z: geodesicRayBeamHeightMeters };
@@ -493,7 +494,7 @@ describe("geodesic cannon world objects: curve shortening", () => {
       expect(notices[0]).toMatchObject({ kind: "free-loop-collapsed", geodesicId: "g-loop" });
     });
 
-    it("B5: a torus free loop stays as one stable loop on its free end", () => {
+    it("keeps a torus free loop as one stable loop on its free end", () => {
       const world = compileTorusLoopWorld();
       const registry = createRuntimeObjectRegistry();
       const point = { x: 1, y: 2.3, z: geodesicRayBeamHeightMeters };
@@ -530,7 +531,7 @@ describe("geodesic cannon world objects: curve shortening", () => {
       expect(registry.getAll().filter((object) => object.kind === "geodesic-corner")).toEqual([]);
     });
 
-    it("B6: an infeasible word leaves everything unchanged and marks the pair unresolved", () => {
+    it("leaves everything unchanged and marks the pair unresolved for an infeasible word", () => {
       const { world, registry } = createNarrowPortalScenario("a");
       const before = {
         g1: registry.get("g1"),
@@ -553,8 +554,8 @@ describe("geodesic cannon world objects: curve shortening", () => {
     });
   });
 
-  describe("curve shortening at any frame rate (job 06)", () => {
-    it("fuses the issue 66 torus pair into the same loop at 60 Hz and at 240 Hz", () => {
+  describe("curve shortening advances consistently at different frame rates", () => {
+    it("fuses the torus tied-pair scenario into the same loop at 60 Hz and at 240 Hz", () => {
       for (const [deltaSeconds, maxTicks] of [[1 / 60, 300], [1 / 240, 1200]] as const) {
         const { world, registry } = createTorusTiedPairScenario();
         runCurveShorteningUntilPairGone(world, registry, { pairId: "pair", geodesicIds: ["g1", "g2"], deltaSeconds, maxTicks });
@@ -650,7 +651,7 @@ describe("geodesic cannon world objects: curve shortening", () => {
   });
 });
 
-describe("issue 31/32 outcomes", () => {
+describe("additional curve-shortening outcomes", () => {
   function maxSideViolation(world: ReturnType<typeof compileLargeWorld>, registry: ReturnType<typeof createRuntimeObjectRegistry>): number {
     let worst = 0;
     for (const segment of registry.getAll().filter((object): object is GeodesicSegmentObject => object.kind === "geodesic-segment")) {
@@ -672,7 +673,7 @@ describe("issue 31/32 outcomes", () => {
     return worst;
   }
 
-  it("D1: tying two distinct locked intervals at one emitter creates two moving intervals and one pair", () => {
+  it("tying two locked intervals at one emitter creates two moving intervals and a pair", () => {
     const world = compileLargeWorld();
     const registry = createRuntimeObjectRegistry();
     registry.add(createGeodesicCannonObject({ id: "left", cellId: "a", localPose: yawRigidTransform3(0, { x: -2, y: 0, z: 0 }) }));
@@ -703,7 +704,7 @@ describe("issue 31/32 outcomes", () => {
     expect(totalGeodesicLength(registry, "g-lm")).toBeCloseTo(Math.hypot(2, 1), 9);
   });
 
-  it("D2: the torus two-emitter scenario ends as one stable locked loop after one tick", () => {
+  it("ends the torus two-emitter scenario as one stable locked loop after one tick", () => {
     const { world, registry } = createTorusTiedPairScenario();
 
     const changed = advanceCurveShorteningPairs({ world, registry, deltaSeconds: 1 / 60 });
@@ -724,7 +725,7 @@ describe("issue 31/32 outcomes", () => {
     expect(maxSideViolation(world, registry)).toBeLessThan(1e-6);
   });
 
-  it("D3: a nondegenerate free loop ends as one stable free loop", () => {
+  it("ends a nondegenerate free loop as one stable free loop after one tick", () => {
     const world = compileTorusLoopWorld();
     const registry = createRuntimeObjectRegistry();
     const point = { x: 1, y: 2.3, z: geodesicRayBeamHeightMeters };
@@ -788,7 +789,7 @@ describe("issue 31/32 outcomes", () => {
     return { world, registry };
   }
 
-  it("D4: a pair whose straight chord crosses a junction disk wraps the disk instead of deleting an arc", () => {
+  it("wraps the junction disk instead of deleting an arc when the straight chord crosses it", () => {
     const { world, registry } = createThirdEmitterCornerScenario();
 
     advanceCurveShorteningPairs({ world, registry, deltaSeconds: 1 / 60 });
@@ -804,14 +805,14 @@ describe("issue 31/32 outcomes", () => {
     expect(maxSideViolation(world, registry)).toBeLessThan(1e-6);
   });
 
-  it("D5: no resolved segment spans a portal", () => {
+  it("never leaves a resolved segment spanning a portal", () => {
     const { world, registry } = createThirdEmitterCornerScenario();
     advanceCurveShorteningPairs({ world, registry, deltaSeconds: 1 / 60 });
     expect(getGeodesicSegments(registry, "a1:piece:1").length).toBeGreaterThanOrEqual(2);
     expect(maxSideViolation(world, registry)).toBeLessThan(1e-6);
   });
 
-  it("D6: measurements, angles and intersections refresh or are removed after a resolution", () => {
+  it("refreshes or removes measurements, angles and intersections after a resolution", () => {
     const { world, registry } = createSymmetricPairScenario(1, 1);
     registry.add(createGeodesicCannonObject({ id: "c3a", cellId: "a", localPose: yawRigidTransform3(0, { x: 0.5, y: -1, z: 0 }) }));
     registry.add(createGeodesicCannonObject({ id: "c3b", cellId: "a", localPose: yawRigidTransform3(0, { x: 0.5, y: 2, z: 0 }) }));
@@ -852,7 +853,7 @@ describe("issue 31/32 outcomes", () => {
     expect(intersections[0].localPose.translation.y).toBeCloseTo(0, 9);
   });
 
-  it("D6: a deleted free loop is reported with its id", () => {
+  it("reports a deleted free loop's id in the list of changed geodesics", () => {
     const world = compileRotatedFreeLoopWorld();
     const registry = createRuntimeObjectRegistry();
     const point = { x: 4.9, y: 1, z: geodesicRayBeamHeightMeters };
@@ -885,7 +886,7 @@ describe("issue 31/32 outcomes", () => {
     expect(registry.get("g-loop")).toBeUndefined();
   });
 
-  it("D7: an unresolved pair leaves the stored words unchanged and is not retried", () => {
+  it("leaves the stored words unchanged for an unresolved pair and does not retry it", () => {
     const { world, registry } = createNarrowPortalScenario("b");
     const wordsBefore = [(registry.get("g1") as GeodesicIntervalObject).portalWord, (registry.get("g2") as GeodesicIntervalObject).portalWord];
     expect(wordsBefore[0]).toHaveLength(1);
@@ -899,7 +900,7 @@ describe("issue 31/32 outcomes", () => {
     expect(advanceCurveShorteningPairs({ world, registry, deltaSeconds: 1 / 60 })).toEqual([]);
   });
 
-  it("D8: the non-free anchors of a pair may be a corner or a free end", () => {
+  it("accepts a corner or a free end as the non-free anchor of a pair", () => {
     const { world, registry } = createCornerScenario();
     expect(resolveCurveShorteningPair({ world, registry, pairId: "pair" }).status).toBe("resolved");
     registry.add(createGeodesicCannonObject({ id: "e0", cellId: "a", localPose: yawRigidTransform3(0, { x: 1, y: 1, z: 0 }) }));

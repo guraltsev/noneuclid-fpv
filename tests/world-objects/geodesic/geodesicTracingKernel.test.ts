@@ -1,8 +1,20 @@
+/**
+ * `tests/world-objects/geodesic/geodesicTracingKernel.test.ts` — unit tier.
+ *
+ * Geodesics are traced on the shared segment-walk kernel (`walkDevelopedSegment`,
+ * `_docs/MATHEMATICAL_MODEL.md` §4, §6): a geodesic's piece lengths always sum to the requested length and its
+ * drawn polyline length matches, a long multi-wrap rebuild lands back on its target emitter, and every compiled
+ * world's portal junctions have a forbidden zone at both ends of every portal side. The open-disk rule
+ * (`_docs/MATHEMATICAL_MODEL.md` §7) stops a geodesic at the edge of a forbidden zone it starts on or enters, from
+ * either side. When the walk's vertex tie rule decides an exit and the vertex has no forbidden zone of its own (a
+ * plain wall corner), the terminal is still reported as a forbidden-zone-hit rather than a wall-hit through the
+ * shared corner — these tests check that through `shootGeodesic`, the one public entry point that reaches this
+ * mapping, rather than the pure (but test-only-exported) conversion function directly.
+ */
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { compileCellComplex } from "../../../src/cell-complex/compileCellComplex";
-import type { SegmentWalkPiece } from "../../../src/cell-complex/segmentWalk";
-import { identityRigidTransform3, invertRigidTransform3, transformPoint3, yawRigidTransform3 } from "../../../src/math/rigidTransform3";
+import { invertRigidTransform3, transformPoint3, yawRigidTransform3 } from "../../../src/math/rigidTransform3";
 import {
   createGeodesicCannonObject,
   createGeodesicIntervalObject,
@@ -10,8 +22,7 @@ import {
   getGeodesicSegmentEnd,
   type GeodesicSegmentObject,
 } from "../../../src/world-objects/geodesic/objects";
-import { geodesicTerminalFromWalkPiece, traceGeodesicSegment } from "../../../src/world-objects/geodesic/trace";
-import { updateGeodesicIntersectionObjects } from "../../../src/world-objects/geodesic/intersections";
+import { traceGeodesicSegment } from "../../../src/world-objects/geodesic/trace";
 import { collectGeodesicPortalWord, getGeodesicSegments } from "../../../src/world-objects/geodesic/segments";
 import { rebuildConnectedGeodesicBetweenEmitters, shootGeodesic } from "../../../src/world-objects/geodesic/cannon";
 import { createRuntimeObjectRegistry } from "../../../src/world-objects/runtimeObjectRegistry";
@@ -21,24 +32,7 @@ const torusSpec = exampleWorldSpecs.find(([name]) => name === "torusModuli")![1]
 const torusWorld = compileCellComplex(torusSpec);
 const torusCell = "torus-room";
 
-function createSegment(overrides: Partial<GeodesicSegmentObject>): GeodesicSegmentObject {
-  return {
-    id: "g-a:segment:0",
-    kind: "geodesic-segment",
-    cellId: "a",
-    localPose: yawRigidTransform3(0, { x: 0, y: 0, z: geodesicRayBeamHeightMeters }),
-    portalRenderable: true,
-    geodesicId: "g-a",
-    segmentIndex: 0,
-    start: { x: 0, y: 0, z: geodesicRayBeamHeightMeters },
-    direction: { x: 1, y: 0, z: 0 },
-    lengthMeters: 1,
-    terminal: { kind: "open" },
-    ...overrides,
-  };
-}
-
-describe("geodesic tracing on the kernel (job 15)", () => {
+describe("geodesic tracing on the kernel", () => {
   it("sums piece lengths to the requested length and ends at the developed end point (up to 200 crossings)", () => {
     let checked = 0;
     fc.assert(
@@ -182,42 +176,6 @@ describe("geodesic tracing on the kernel (job 15)", () => {
     });
   });
 
-  describe("intersections", () => {
-    it("reports a crossing between two segments of one geodesic that are two apart", () => {
-      const registry = createRuntimeObjectRegistry([
-        createSegment({ id: "g-a:segment:0", segmentIndex: 0, start: { x: 0, y: 1, z: geodesicRayBeamHeightMeters }, direction: { x: 1, y: 0, z: 0 }, lengthMeters: 2 }),
-        createSegment({ id: "g-a:segment:1", segmentIndex: 1, start: { x: 2, y: 1, z: geodesicRayBeamHeightMeters }, direction: { x: 0, y: 1, z: 0 }, lengthMeters: 1 }),
-        createSegment({ id: "g-a:segment:2", segmentIndex: 2, start: { x: 2, y: 2, z: geodesicRayBeamHeightMeters }, direction: { x: -1, y: 0, z: 0 }, lengthMeters: 1.5 }),
-        createSegment({ id: "g-a:segment:3", segmentIndex: 3, start: { x: 0.5, y: 2, z: geodesicRayBeamHeightMeters }, direction: { x: 0, y: -1, z: 0 }, lengthMeters: 2 }),
-      ]);
-
-      const vertices = updateGeodesicIntersectionObjects(registry);
-
-      expect(vertices).toHaveLength(1);
-      expect(vertices[0].geodesicIds).toEqual(["g-a", "g-a"]);
-      expect(vertices[0].segmentIds).toEqual(["g-a:segment:0", "g-a:segment:3"]);
-    });
-
-    it("reports a crossing of two geodesics 0.2 m from an unrelated emitter", () => {
-      const registry = createRuntimeObjectRegistry([
-        createGeodesicCannonObject({ id: "other", cellId: "a", localPose: yawRigidTransform3(0, { x: 1.2, y: 1, z: 0 }) }),
-        createSegment({ id: "g-a:segment:0", start: { x: 0, y: 1, z: geodesicRayBeamHeightMeters }, direction: { x: 1, y: 0, z: 0 }, lengthMeters: 2 }),
-        createSegment({ id: "g-b:segment:0", geodesicId: "g-b", start: { x: 1, y: 0, z: geodesicRayBeamHeightMeters }, direction: { x: 0, y: 1, z: 0 }, lengthMeters: 2 }),
-      ]);
-
-      expect(updateGeodesicIntersectionObjects(registry)).toHaveLength(1);
-    });
-
-    it("does not report geodesics that meet at the shared start anchor", () => {
-      const registry = createRuntimeObjectRegistry([
-        createSegment({ id: "g-a:segment:0", start: { x: 1, y: 1, z: geodesicRayBeamHeightMeters }, direction: { x: 1, y: 0, z: 0 }, lengthMeters: 1 }),
-        createSegment({ id: "g-b:segment:0", geodesicId: "g-b", start: { x: 1, y: 1, z: geodesicRayBeamHeightMeters }, direction: { x: 0, y: 1, z: 0 }, lengthMeters: 1 }),
-      ]);
-
-      expect(updateGeodesicIntersectionObjects(registry)).toEqual([]);
-    });
-  });
-
   it("has a junction at both ends of every portal side in every example world", () => {
     for (const [name, spec] of exampleWorldSpecs) {
       const world = compileCellComplex(spec);
@@ -234,17 +192,38 @@ describe("geodesic tracing on the kernel (job 15)", () => {
     }
   });
 
-  it("maps a walk piece that exits through a vertex to a forbidden-zone-hit at that vertex", () => {
-    const piece: SegmentWalkPiece = {
-      cellId: "c",
-      cellFromStart: identityRigidTransform3,
-      tEnter: 0,
-      tExit: 1,
-      exit: { kind: "wall", sideIndex: 3, throughVertexIndex: 2 },
-    };
+  it("reports a forbidden-zone-hit at a plain wall corner via the walk's vertex tie rule", () => {
+    // A square room with no portals: the corner at (1, 1) has no forbidden zone of its own (prismCells only adds
+    // one at a portal-side endpoint), but a geodesic aimed exactly at it ties between the two walls that meet
+    // there, and the kernel still reports the corner itself, not an arbitrary choice of one wall.
+    const world = compileCellComplex({
+      cells: [
+        {
+          id: "room",
+          heightMeters: 2,
+          baseVertices: [
+            { x: -1, y: -1 },
+            { x: 1, y: -1 },
+            { x: 1, y: 1 },
+            { x: -1, y: 1 },
+          ],
+          portals: [],
+        },
+      ],
+    });
+    const registry = createRuntimeObjectRegistry();
+    const cannon = createGeodesicCannonObject({
+      id: "cannon",
+      cellId: "room",
+      localPose: yawRigidTransform3(Math.atan2(1, 1), { x: 0, y: 0, z: 0 }),
+    });
+    registry.add(cannon);
 
-    expect(geodesicTerminalFromWalkPiece(piece)).toEqual({ kind: "forbidden-zone-hit", junctionId: "c:vertex-2" });
-    expect(geodesicTerminalFromWalkPiece({ ...piece, exit: { kind: "wall", sideIndex: 3 } })).toEqual({ kind: "wall-hit", sideIndex: 3 });
-    expect(geodesicTerminalFromWalkPiece({ ...piece, exit: { kind: "end" } })).toEqual({ kind: "open" });
+    shootGeodesic({ world, registry, cannon, geodesicId: "g", maxLengthMeters: 2, connectEmitters: false });
+
+    expect(getGeodesicSegments(registry, "g").at(-1)?.terminal).toEqual({
+      kind: "forbidden-zone-hit",
+      junctionId: "room:vertex-2",
+    });
   });
 });

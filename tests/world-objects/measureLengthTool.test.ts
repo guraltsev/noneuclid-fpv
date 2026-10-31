@@ -1,3 +1,11 @@
+/**
+ * `tests/world-objects/measureLengthTool.test.ts` — unit tier.
+ *
+ * `createMeasuredGeodesicLengthObject` sums a geodesic's segment lengths and places its label at the player's
+ * horizontal position in whichever of the geodesic's own cells the player currently occupies, at the geodesic's
+ * own height; `refreshMeasuredGeodesicLengthObject` keeps the last label location when the player leaves every
+ * cell the geodesic passes through. These tests check both.
+ */
 import { describe, expect, it } from "vitest";
 import { yawRigidTransform3 } from "../../src/math/rigidTransform3";
 import {

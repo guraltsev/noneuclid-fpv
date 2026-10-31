@@ -1,5 +1,17 @@
+/**
+ * `tests/world-objects/geodesic/cannon.test.ts` — unit tier.
+ *
+ * A geodesic cannon shoots a geodesic from its emitter pole, which connects and locks the moment it reaches
+ * another emitter (or is placed on an existing geodesic, truncating and locking it there), and which extends
+ * further, or disconnects, as geometry changes (`_docs/MATHEMATICAL_MODEL.md` §6). These tests check placing an
+ * incoming emitter on a geodesic (truncating it, refusing a split too close to an existing endpoint, and picking
+ * the right geodesic when the source owns several), immediate and delayed connection to a target emitter,
+ * recomputing a lock onto the emitter's exact pole, connecting a self-looping geodesic back to its own emitter,
+ * that preview rebuilds never connect emitters, and that deleting a connected geodesic clears both emitters'
+ * associations.
+ */
 import { describe, expect, it } from "vitest";
-import { createRuntimeObjectRegistry } from "../.././../src/world-objects/runtimeObjectRegistry";
+import { createRuntimeObjectRegistry } from "../../../src/world-objects/runtimeObjectRegistry";
 import {
   createGeodesicCannonObject,
   createGeodesicIntervalObject,
@@ -20,14 +32,14 @@ import {
 } from "../../../src/world-objects/geodesic/cannon";
 import { getGeodesicEndpointAttachmentsForAnchor } from "../../../src/world-objects/geodesic/endpoints";
 import { getGeodesicConnection, isGeodesicLocked, removeGeodesic } from "../../../src/world-objects/geodesic/lifecycle";
-import { yawRigidTransform3 } from "../.././../src/math/rigidTransform3";
+import { yawRigidTransform3 } from "../../../src/math/rigidTransform3";
 import {
   totalGeodesicLength,
   getCannonGeodesicIds,
   getCannonGeodesicYaw,
   compileLargeWorld,
   compileTorusLoopWorld,
-} from "./fixtures";
+} from "../../fixtures/world-objects/geodesic";
 
 describe("geodesic cannon world objects: cannon", () => {
   it("places an incoming emitter on a segment, truncates the geodesic, and locks it", () => {
@@ -96,7 +108,7 @@ describe("geodesic cannon world objects: cannon", () => {
     expect(getGeodesicTail(registry, "g-a")?.terminal.kind).toBe("open");
   });
 
-  it("places an incoming emitter on the selected geodesic when the source owns multiple geodesics", () => {
+  it("places an incoming emitter on the right geodesic when the source owns several", () => {
     const world = compileLargeWorld();
     const registry = createRuntimeObjectRegistry();
     const cannon = createGeodesicCannonObject({

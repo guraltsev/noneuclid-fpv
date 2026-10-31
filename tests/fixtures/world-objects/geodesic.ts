@@ -1,6 +1,11 @@
+/**
+ * Shared fixtures for the geodesic world-object tests (`tests/world-objects/geodesic/`,
+ * `tests/world-objects/runtimeObjectRegistry.test.ts`): small compiled worlds, segment/scenario builders, and
+ * geometric helpers. Not a test file itself; see `tests.md` §3.
+ */
 import { expect } from "vitest";
-import { compileCellComplex } from "../.././../src/cell-complex/compileCellComplex";
-import { createRuntimeObjectRegistry } from "../.././../src/world-objects/runtimeObjectRegistry";
+import { compileCellComplex } from "../../../src/cell-complex/compileCellComplex";
+import { createRuntimeObjectRegistry } from "../../../src/world-objects/runtimeObjectRegistry";
 import {
   advanceCurveShorteningPairs,
   tieAndDetachGeodesicEndpoints,
@@ -16,7 +21,7 @@ import {
 import { getGeodesicSegments } from "../../../src/world-objects/geodesic/segments";
 import { rebuildConnectedGeodesicBetweenEmitters } from "../../../src/world-objects/geodesic/cannon";
 import { rebuildDerivedGeodesicSegments } from "../../../src/world-objects/geodesic/intervals";
-import { yawRigidTransform3 } from "../.././../src/math/rigidTransform3";
+import { yawRigidTransform3 } from "../../../src/math/rigidTransform3";
 import { walkDevelopedSegment } from "../../../src/cell-complex/segmentWalk";
 
 export function createSegment(overrides: Partial<GeodesicSegmentObject> = {}): GeodesicSegmentObject {
@@ -346,7 +351,7 @@ export function runCurveShorteningUntilPairGone(
   return ticks;
 }
 
-// Issue 66: two emitters on the 15 m torus, a straight arc E1 -> E2 and an arc E2 -> E1 that wraps once to the right,
+// Two emitters on the 15 m torus, a straight arc E1 -> E2 and an arc E2 -> E1 that wraps once to the right,
 // tied and released at E2.
 export function createTorusTiedPairScenario() {
   const world = compileTorusLoopWorld();
