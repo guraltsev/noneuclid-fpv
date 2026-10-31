@@ -1,3 +1,13 @@
+/**
+ * `tests/movement/depenetrateDynamicObject.test.ts` — unit tier.
+ *
+ * `depenetrateDynamicObject` pushes a body that is already overlapping a wall or forbidden zone back to a legal
+ * pose, along the wall's inward normal or away from a zone's centre, rather than leaving it stuck (a live
+ * deformation can commit a pose that was legal before into one that overlaps, §9). These tests check that a
+ * trapped pose is pushed clear of a forbidden zone and can then move normally, that a non-overlapping pose is
+ * returned unchanged, pushes out of a wall and a corner, that every legal rest pose near a cell's corners across
+ * several deformation targets stays unblocked after the deformation, and that the push can be skipped for zones.
+ */
 import { describe, expect, it } from "vitest";
 import { torusModuli } from "../../src/authoring/exampleWorlds";
 import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
@@ -37,7 +47,7 @@ function blocked(world: ReturnType<typeof compileCellComplex>, object: DynamicOb
 }
 
 describe("depenetrateDynamicObject", () => {
-  it("pushes the player out of the junction zone after the issue-53 trap commit", () => {
+  it("pushes the player out of the junction zone after a deformation traps it", () => {
     const object = player(7.1, -7.3);
     expect(blocked(restWorld, object).blocked).toBe(false);
 

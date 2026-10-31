@@ -1,10 +1,18 @@
+/**
+ * `tests/movement/collision.test.ts` — unit tier.
+ *
+ * A dynamic object's collision bounds are a vertical cylinder centred on its rotated, translated collision offset
+ * (`_docs/MATHEMATICAL_MODEL.md` §5): the footprint never grows with rotation, only the offset moves. These tests
+ * check the bounds computation (identity rotation, missing collision, rotated offsets) and the strict
+ * horizontal-radius-plus-vertical-overlap rule two simple cylinders use to decide whether they intersect.
+ */
 import { describe, expect, it } from "vitest";
 import { getCollisionBounds, getDynamicObjectCollisionBounds, simpleCylinderIntersectsSimpleCylinder } from "../../src/movement/collision";
 import { simpleCollisionCylinder, type DynamicObjectState } from "../../src/movement/dynamicObject";
 import { identityMat3, yawRigidTransform3, type Mat3 } from "../../src/math/rigidTransform3";
 
 describe("collision bounds", () => {
-  it("preserves identity-rotation bounds from the position-based helper", () => {
+  it("gives the same bounds as the plain position-based helper when unrotated", () => {
     const collision = simpleCollisionCylinder(0.4, 0.8, { x: 0.1, y: -0.2, z: 0.3 });
     const object = dynamicObject({ x: 1, y: 2, z: 3 }, identityMat3, collision);
 

@@ -1,14 +1,6 @@
 H4	tests/render-contract/preloadWorldAssets.test.ts	-
 H4	tests/world-objects/geodesic/geodesicTracingKernel.test.ts	-
 H4	tests/world-objects/simpleGeoCreature.test.ts	-
-H5	tests/movement/moveDynamicObject.test.ts	bodies across portals (issue 63)
-H5	tests/movement/moveDynamicObject.test.ts	ends inside the neighbour when a slide past the end of a wall continues through a portal (issue 61)
-H5	tests/movement/moveDynamicObject.test.ts	gives the same final pose for one long move as for many short ones (issue 62)
-H5	tests/movement/moveDynamicObject.test.ts	keeps the anchor inside its cell on a straight walk through a cube vertex with zones ignored (issue 62)
-H5	tests/movement/moveDynamicObject.test.ts	stops at the forbidden zone of a cube vertex when zones are on (issue 62)
-H5	tests/movement/moveDynamicObject.test.ts	stops in all four corners of a walled room (issue 61)
-H5	tests/movement/movementNumerics.test.ts	movement numerics (issue 65)
-H5	tests/movement/sweptCollision.test.ts	stops in every corner of a walled square (issue 61)
 H5	tests/world-objects/geodesic/carry.test.ts	applies one anchor-crossing traversal per crossing in order (curve shortening loop, job 13 part C)
 H5	tests/world-objects/geodesic/carry.test.ts	folds two crossings of one frame in order, like two single updates (job 13 part C)
 H5	tests/world-objects/geodesic/carry.test.ts	loop words under anchor portal crossings (job 05)
@@ -72,20 +64,6 @@ H6	tests/glue/geometrySelection.test.ts	-
 H6	tests/glue/launchOptionsUrl.test.ts	-
 H6	tests/glue/readLaunchOptions.test.ts	-
 H6	tests/glue/serverChannel.test.ts	-
-H6	tests/movement/collision.test.ts	-
-H6	tests/movement/depenetrateDynamicObject.test.ts	-
-H6	tests/movement/developedObstacles.test.ts	-
-H6	tests/movement/moveDynamicObject.property.test.ts	-
-H6	tests/movement/moveDynamicObject.test.ts	-
-H6	tests/movement/moveDynamicObject.test.ts	does not let an offset collision center trigger anchor portal crossing before the object anchor crosses
-H6	tests/movement/moveDynamicObject.test.ts	ends inside the neighbour when a slide past the end of a wall continues through a portal (issue 61)
-H6	tests/movement/moveDynamicObject.test.ts	keeps anchor-crossing objects in the source cell until their traversal center crosses the portal plane
-H6	tests/movement/moveDynamicObject.test.ts	keeps the anchor inside its cell on a straight walk through a cube vertex with zones ignored (issue 62)
-H6	tests/movement/movePlayer.test.ts	-
-H6	tests/movement/movementNumerics.test.ts	-
-H6	tests/movement/portalCrossing.property.test.ts	-
-H6	tests/movement/portalCrossing.test.ts	-
-H6	tests/movement/sweptCollision.test.ts	-
 H6	tests/render-contract/aimCrossMarker.test.ts	-
 H6	tests/render-contract/aimTarget.test.ts	-
 H6	tests/render-contract/aimTarget.test.ts	keeps short geodesic ray segments selectable near their emitter when the emitter hitbox is missed

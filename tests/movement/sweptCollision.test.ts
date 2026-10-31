@@ -1,3 +1,14 @@
+/**
+ * `tests/movement/sweptCollision.test.ts` — unit tier.
+ *
+ * `sweepDiscAgainstObstacle` finds the earliest approaching hit of a moving disc against a disc or capsule
+ * obstacle; `slideDisc` repeats that up to four times, keeping only the tangential part of the remaining
+ * displacement at each contact (`_docs/MATHEMATICAL_MODEL.md` §5 steps 2-3). These tests check each sweep outcome
+ * (head-on, miss, already-overlapping, capsule slab and end cap), that sliding keeps the tangential part of a
+ * diagonal step into one wall, and the property that a long random walk against a convex polygon's walls never
+ * gets closer than the disc's radius. `moveDynamicObject.test.ts` owns the one case that shows this is wired into
+ * cell-aware movement (walled-room corners).
+ */
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { distancePointToSegment2 } from "../../src/cell-complex/developedDisk";
@@ -65,25 +76,6 @@ describe("sweepDiscAgainstObstacle", () => {
 });
 
 describe("slideDisc", () => {
-  it("stops in every corner of a walled square (issue 61)", () => {
-    for (const [sx, sy] of [
-      [1, 1],
-      [-1, 1],
-      [1, -1],
-      [-1, -1],
-    ]) {
-      const walls = squareWalls(0.25);
-      let position: Vec2xy = { x: 0, y: 0 };
-
-      for (let i = 0; i < 200; i += 1) {
-        position = slideDisc(position, { x: 0.03 * sx, y: 0.03 * sy }, walls).end;
-      }
-
-      expect(Math.abs(position.x - 0.75 * sx)).toBeLessThan(1e-5);
-      expect(Math.abs(position.y - 0.75 * sy)).toBeLessThan(1e-5);
-    }
-  });
-
   it("keeps the tangential part of a diagonal step into one wall", () => {
     const result = slideDisc({ x: 0.7, y: 0 }, { x: 0.1, y: 0.3 }, squareWalls(0.25));
 

@@ -1,3 +1,12 @@
+/**
+ * `tests/movement/developedObstacles.test.ts` — unit tier.
+ *
+ * `collectDevelopedObstacles` develops the walls, zone-blocked portals and forbidden-zone columns around a body
+ * into its own cell's frame, within its reach (`_docs/MATHEMATICAL_MODEL.md` §5 step 1): every non-portal side as a
+ * capsule, a portal into a lower cell as a "ceiling" capsule, and each forbidden-zone column once even when it is
+ * reached through several developed copies. These tests check each obstacle kind and the deduplication of a vertex
+ * seen through multiple cell copies.
+ */
 import { describe, expect, it } from "vitest";
 import { cube } from "../../src/authoring/exampleWorlds";
 import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";

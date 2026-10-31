@@ -1,3 +1,14 @@
+/**
+ * `tests/movement/movePlayer.test.ts` — unit tier.
+ *
+ * `movePlayer` turns a `PlayerPose` plus a yaw/pitch/displacement intent into a new pose: it rotates the
+ * displacement into the chosen coordinate frame, clamps pitch before the view can flip over, and, when a compiled
+ * world is given, runs the displacement through the same wall/floor/ceiling/portal rules as `moveDynamicObject`
+ * (`_docs/MATHEMATICAL_MODEL.md` §5). These tests check the explicit movement contract without a world, both
+ * coordinate frames, pitch clamping, collision and portal crossing with a world, and that the result reports the
+ * displacement actually applied (including against another body in the cell), for the XR rig's post-move
+ * bookkeeping.
+ */
 import { describe, expect, it } from "vitest";
 import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
 import { movePlayer } from "../../src/movement/movePlayer";
@@ -79,7 +90,7 @@ describe("movePlayer", () => {
     expect(result.pose.pitchRadians).toBeCloseTo(Math.PI / 2 - 0.01);
   });
 
-  it("uses the shared world-aware collision rules when a compiled world is provided", () => {
+  it("blocks on a wall using moveDynamicObject's collision rules when a world is given", () => {
     const world = compileCellComplex({
       cells: [
         {
