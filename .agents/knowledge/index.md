@@ -1,4 +1,4 @@
-﻿# Knowledge index
+# Knowledge index
 
 Short notes on traps and non-obvious facts of this repository. Rules: `AGENTS.md`.
 
@@ -11,4 +11,4 @@ Short notes on traps and non-obvious facts of this repository. Rules: `AGENTS.md
 - [windows-shell.md](windows-shell.md): the Bash tool can return empty output with no error on this machine; use PowerShell.
 - [headless-edge-end-to-end.md](headless-edge-end-to-end.md): recipe and flags to test the local server channel end to end with headless Edge.
 - [relative-base-urls.md](relative-base-urls.md): the site uses a relative Vite base; always build URLs with publicUrl, never BASE_URL concatenation or root-absolute paths.
-- [pages-publish-template.md](pages-publish-template.md): the Pages publisher is a drop-in kept in Documents/templates/git/pages-publish; fix it there and re-copy scripts/pages_publish.py.
+- [pages-publish-template.md](pages-publish-template.md): the Pages publisher is a drop-in kept in Documents/templates/git/tools/pages-publish; fix it there and re-copy into .gittools/pages-publish/.

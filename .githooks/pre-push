@@ -53,6 +53,6 @@ if [ "$(git config --bool publish.onPush 2>/dev/null)" = "true" ]; then
   for candidate in python3 python py; do
     if command -v "$candidate" >/dev/null 2>&1 && "$candidate" -c "import sys" >/dev/null 2>&1; then py="$candidate"; break; fi
   done
-  "$py" scripts/pages_publish.py publish >&2 || echo "pre-push: warning: publishing failed (the push continues)." >&2
+  "$py" .gittools/pages-publish/pages_publish.py publish >&2 || echo "pre-push: warning: publishing failed (the push continues)." >&2
 fi
 # pages-publish:end

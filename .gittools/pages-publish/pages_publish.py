@@ -1,7 +1,7 @@
 """Publish built folders of a repository's branches to a GitHub Pages branch.
 
-Call ``python scripts/pages_publish.py publish`` to build the checked-out
-commit with the command configured in ``pages-publish.toml`` and copy the result
+Call ``python .gittools/pages-publish/pages_publish.py publish`` to build the checked-out
+commit with the command configured in ``config.toml`` and copy the result
 into ``<pages branch>/<branch folder>/``. The Pages branch (``gh_pages`` by
 default) also receives ``published.json`` (which commit each folder was built
 from), a ``versions/`` page listing every published folder, and a root
@@ -40,8 +40,8 @@ from typing import Iterator, Sequence
 # Folder names that belong to the site itself and cannot name a branch.
 RESERVED_FOLDERS = frozenset({"versions"})
 
-# Config file looked up in the repository root unless ``--config`` is given.
-DEFAULT_CONFIG_NAME = "pages-publish.toml"
+# Config file next to this script unless ``--config`` is given.
+DEFAULT_CONFIG_PATH = Path(__file__).resolve().with_name("config.toml")
 
 # Keys accepted in each config table; anything else is reported as a typo.
 _PUBLISH_KEYS = {
@@ -87,7 +87,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         # Every command works on the repository that contains the current
         # directory, whatever subdirectory the command was started from.
         root = Path(_git(["rev-parse", "--show-toplevel"], cwd=Path.cwd())).resolve()
-        config_path = (root / args.config).resolve()
+        config_path = (root / args.config).resolve() if args.config else DEFAULT_CONFIG_PATH
 
         if args.command == "init":
             return _command_init(root, config_path, force=args.force)
@@ -135,7 +135,7 @@ class PublishError(Exception):
 
 @dataclass(frozen=True)
 class Config:
-    """Settings read from ``pages-publish.toml``.
+    """Settings read from ``config.toml``.
 
     Attributes
     ----------
@@ -206,7 +206,7 @@ class Result:
 
 
 def load_config(path: Path) -> Config:
-    """Read and validate a ``pages-publish.toml`` file.
+    """Read and validate a ``config.toml`` file.
 
     Parameters
     ----------
@@ -226,7 +226,7 @@ def load_config(path: Path) -> Config:
     """
     # A missing file gets a pointer to ``init`` rather than a traceback.
     if not path.exists():
-        raise PublishError(f"{path.name} not found; run `python scripts/pages_publish.py init` to create it.")
+        raise PublishError(f"{path.name} not found; run `python .gittools/pages-publish/pages_publish.py init` to create it.")
 
     try:
         # utf-8-sig tolerates the byte-order mark that some Windows editors add.
@@ -333,7 +333,7 @@ def publish(
         or the push keeps being rejected.
     """
     log = log or _log
-    config_path = config_path or root / DEFAULT_CONFIG_NAME
+    config_path = config_path or DEFAULT_CONFIG_PATH
     remote = _resolve_remote(root, config)
 
     # Establish which branch and commit are being published.
@@ -367,7 +367,10 @@ def publish(
     # The folder must match the commit, so tracked changes block publishing.
     # The config file is exempt because ``--add`` edits it and the build does not read it.
     changed = _git(["diff", "--name-only", "HEAD"], cwd=root).splitlines()
-    config_relative = config_path.resolve().relative_to(root).as_posix()
+    try:
+        config_relative = config_path.resolve().relative_to(root).as_posix()
+    except ValueError:
+        config_relative = None
     if any(name != config_relative for name in changed if name):
         raise PublishError("the working tree has uncommitted changes; commit them first so the published folder matches the commit.")
 
@@ -427,7 +430,7 @@ def remove(root: Path, config: Config, branch: str | None = None, *, config_path
         ``status == "pruned"`` after the folder is gone.
     """
     log = log or _log
-    config_path = config_path or root / DEFAULT_CONFIG_NAME
+    config_path = config_path or DEFAULT_CONFIG_PATH
     remote = _resolve_remote(root, config)
     branch = branch or _git(["rev-parse", "--abbrev-ref", "HEAD"], cwd=root)
     folder = folder_for_branch(branch)
@@ -639,7 +642,7 @@ def _command_init(root: Path, config_path: Path, *, force: bool) -> int:
         encoding="utf-8",
         newline="\n",
     )
-    print(f"wrote {config_path.name}; edit it, then run `python scripts/pages_publish.py publish --add`.")
+    print(f"wrote {config_path.name}; edit it, then run `python .gittools/pages-publish/pages_publish.py publish --add`.")
     return 0
 
 
@@ -1057,7 +1060,7 @@ def _parse_arguments(argv: list[str]) -> argparse.Namespace:
         prog="pages_publish.py",
         description="Publish branches of this repository to GitHub Pages (one folder per branch).",
     )
-    parser.epilog = "Option for every command: --config FILE (relative to the repository root, default pages-publish.toml)."
+    parser.epilog = "Option for every command: --config FILE (relative to the repository root; default: config.toml next to this script)."
     commands = parser.add_subparsers(dest="command", metavar="command")
 
     publish_parser = commands.add_parser("publish", help="build and publish the checked-out commit (default)")
@@ -1075,14 +1078,14 @@ def _parse_arguments(argv: list[str]) -> argparse.Namespace:
 
     commands.add_parser("prune", help="remove folders of branches that no longer exist")
     commands.add_parser("status", help="list published folders")
-    init_parser = commands.add_parser("init", help="write a starter pages-publish.toml")
+    init_parser = commands.add_parser("init", help="write a starter config.toml")
     init_parser.add_argument("--force", action="store_true")
     enable_parser = commands.add_parser("enable-pages", help="point the repository's Pages setting at the Pages branch (uses gh)")
     enable_parser.add_argument("--dry-run", action="store_true")
     commands.add_parser("install-hook", help="add an opt-in publish step to .githooks/pre-push")
 
     # ``--config`` may appear anywhere; pull it out before the command is read.
-    config = DEFAULT_CONFIG_NAME
+    config = None
     if "--config" in argv:
         position = argv.index("--config")
         if position + 1 >= len(argv):
@@ -1105,7 +1108,7 @@ def _parse_arguments(argv: list[str]) -> argparse.Namespace:
 
 # Starter config written by ``init``; ``{command}`` and ``{dist}`` are guessed from the project.
 _STARTER_CONFIG = '''\
-# Settings for scripts/pages_publish.py. See PUBLISHING.md.
+# Settings for .gittools/pages-publish/pages_publish.py. See README.md in this folder.
 
 [publish]
 # Branches that are published (globs: * stays inside one / segment, ** crosses it).
@@ -1145,7 +1148,7 @@ if [ "$(git config --bool publish.onPush 2>/dev/null)" = "true" ]; then
   for candidate in python3 python py; do
     if command -v "$candidate" >/dev/null 2>&1 && "$candidate" -c "import sys" >/dev/null 2>&1; then py="$candidate"; break; fi
   done
-  "$py" scripts/pages_publish.py publish >&2 || echo "pre-push: warning: publishing failed (the push continues)." >&2
+  "$py" .gittools/pages-publish/pages_publish.py publish >&2 || echo "pre-push: warning: publishing failed (the push continues)." >&2
 fi
 """
 
