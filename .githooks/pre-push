@@ -44,10 +44,15 @@ fi
 
 echo "pre-push: all checks passed." >&2
 
-# Optional: publish the checked-out branch to gh_pages after the checks (off by default).
-# Turn on with `git config publish.onPush true`, off with `git config --unset publish.onPush`.
-# A failed publish only warns; it never blocks the push. See _docs/PUBLISHING.md.
+# pages-publish:begin
+# Opt-in: publish the checked-out branch after the other checks. Enable with
+#   git config publish.onPush true
+# A failed publish only warns; it never blocks the push.
 if [ "$(git config --bool publish.onPush 2>/dev/null)" = "true" ]; then
-  echo "pre-push: node scripts/publish/publish.mjs" >&2
-  node scripts/publish/publish.mjs >&2 || echo "pre-push: warning: publishing failed (the push continues)." >&2
+  py=""
+  for candidate in python3 python py; do
+    if command -v "$candidate" >/dev/null 2>&1 && "$candidate" -c "import sys" >/dev/null 2>&1; then py="$candidate"; break; fi
+  done
+  "$py" scripts/pages_publish.py publish >&2 || echo "pre-push: warning: publishing failed (the push continues)." >&2
 fi
+# pages-publish:end

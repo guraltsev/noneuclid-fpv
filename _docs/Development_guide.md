@@ -77,7 +77,7 @@ npm run dev -- --host 0.0.0.0
 ```
 
 For GitHub Pages, see [PUBLISHING.md](PUBLISHING.md): the site is served from the `gh_pages` branch, one folder per
-branch, published by `npm run publish:branch` or by the optional workflow `.github/workflows/publish.yml`.
+branch, published by `npm run publish:branch` or by the optional workflow `.github/workflows/pages-publish.yml`.
 
 `npm run build:pages` is the production build used for publishing. The site uses
 relative paths, so there is no base path to give. See the
