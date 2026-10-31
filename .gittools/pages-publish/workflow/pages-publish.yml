@@ -1,0 +1,65 @@
+name: Publish branches to GitHub Pages
+
+# Optional. Does what `python .gittools/pages-publish/pages_publish.py publish` does, for the branch that was pushed.
+# Delete this file, or set the repository variable PUBLISH_DISABLED to "true", to turn it off.
+# GitHub Pages must be set to "Deploy from a branch": gh_pages / (root)
+# (`python .gittools/pages-publish/pages_publish.py enable-pages` does that; see .gittools/pages-publish/README.md).
+
+on:
+  push:
+    branches: ["**"]
+  delete:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pages-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: ${{ vars.PUBLISH_DISABLED != 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        if: ${{ github.event_name != 'delete' }}
+        uses: actions/checkout@v5
+
+      - name: Checkout the default branch (the deleted branch no longer exists)
+        if: ${{ github.event_name == 'delete' }}
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Prune folders of deleted branches
+        if: ${{ github.event_name == 'delete' }}
+        run: python .gittools/pages-publish/pages_publish.py prune
+
+      # Cheap: reads the Pages branch only. Says build=false when the branch is not listed in
+      # .gittools/pages-publish/config.toml or the commit is already published (for example by a local publish).
+      - name: Is there anything to publish?
+        id: check
+        if: ${{ github.event_name != 'delete' }}
+        run: python .gittools/pages-publish/pages_publish.py check --branch "${{ github.ref_name }}"
+
+      # EDIT: install whatever the build in .gittools/pages-publish/config.toml needs. Examples:
+      #
+      # - uses: actions/setup-node@v5
+      #   if: ${{ steps.check.outputs.build == 'true' }}
+      #   with: { node-version: 24, cache: npm }
+      # - run: npm ci
+      #   if: ${{ steps.check.outputs.build == 'true' }}
+      #
+      # - run: pip install -r requirements.txt
+      #   if: ${{ steps.check.outputs.build == 'true' }}
+
+      - name: Publish
+        if: ${{ steps.check.outputs.build == 'true' }}
+        run: python .gittools/pages-publish/pages_publish.py publish --branch "${{ github.ref_name }}"

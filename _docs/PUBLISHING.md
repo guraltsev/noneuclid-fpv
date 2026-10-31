@@ -13,7 +13,7 @@ gh_pages
 ```
 
 The tool is the reusable Python tool in `.gittools/pages-publish/` (source of truth, installer and tests:
-`Documents/templates/git/tools/pages-publish/`). Its full usage is in
+`Documents/templates/git/.gittools/pages-publish/`). Its full usage is in
 [.gittools/pages-publish/README.md](../.gittools/pages-publish/README.md); this file records how this repository uses it.
 Settings are in [config.toml](../.gittools/pages-publish/config.toml).
 
