@@ -6,7 +6,7 @@ import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
 
-/** Return the base path (for example `/noneuclid-fpv/`) a built index.html was made for. */
+/** Return the base path (for example `/noneuclid-fpv/`) a built index.html was made for; `./` for a relocatable build. */
 export function detectBaseFromIndexHtml(html) {
   const match = /<script[^>]*\ssrc="([^"]*?)assets\/[^"]*"/.exec(html);
   return match ? match[1] : "/";

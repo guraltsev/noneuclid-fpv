@@ -1,27 +1,16 @@
+// Production build for publishing: `npm run build` (the site uses a relative base, so one build works from any path),
+// then `.nojekyll` and the dist size budget. Used by scripts/publish (publish.config.json) and runnable by hand.
 import { writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { resolvePagesBase } from "./pagesBase.mjs";
 import { checkDistSize, formatDistSizeReport } from "./check-dist-size.mjs";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 
-let pagesBase;
-try {
-  pagesBase = resolvePagesBase({ argv: process.argv.slice(2), env: process.env });
-} catch (error) {
-  console.error(`build:pages: ${error instanceof Error ? error.message : String(error)}`);
-  process.exit(1);
-}
-console.log(`build:pages: base ${pagesBase.base} (from ${pagesBase.source})`);
-
 const result = spawnSync(...buildCommand(), {
   cwd: resolve(scriptDir, ".."),
-  env: {
-    ...process.env,
-    VITE_BASE: pagesBase.base,
-  },
+  env: process.env,
   stdio: "inherit",
 });
 

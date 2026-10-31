@@ -36,6 +36,7 @@ describe("static smoke server", () => {
     const { detectBaseFromIndexHtml } = await load();
     expect(detectBaseFromIndexHtml(HTML)).toBe("/base-x/");
     expect(detectBaseFromIndexHtml('<script src="/assets/a.js">')).toBe("/");
+    expect(detectBaseFromIndexHtml('<script src="./assets/a.js">')).toBe("./");
   });
 
   it("serves files with content types", async () => {

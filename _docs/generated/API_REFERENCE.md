@@ -1255,11 +1255,11 @@ Loads and normalizes the app configuration: a per-deployment JavaScript file (<n
 
 ### `glue/assetUrls.ts`
 
-Builds URLs for files served from the Vite public folder, honoring the deployment base path (import.meta.env.BASE_URL) so the app works when hosted under a sub-path.
+Builds URLs for files served from the Vite public folder.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
-| function | `publicUrl` | Returns the URL of a file relative to the public root, prefixed by the Vite base path. |
+| function | `publicUrl` | Returns the URL of a file relative to the public root, resolved against the page's address (so `?config=` queries and the deployment path do not matter). |
 | function | `publicAssetUrl` | Returns the URL of a file under assets/ in the public folder. |
 | function | `legacyPublicAssetUrl` | Returns the URL of a file under assets/_legacy/ (older assets kept for compatibility). |
 

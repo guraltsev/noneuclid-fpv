@@ -56,8 +56,9 @@ Each is independent; use none, one or both.
 
 ## How it works, and what to know
 
-- **Base path.** Each folder is built for `/<repo>/<folder>/` (`{base}` in the `build` command, also exported as
-  `VITE_BASE`). For a user site (`<name>.github.io`) the repository part is dropped. Override with `siteBase`.
+- **No base path.** The site is built once with relative paths (Vite `base: "./"`; public files are resolved against
+  the page in `src/glue/assetUrls.ts`), so a folder works wherever it is served. The publisher refuses a build whose
+  `index.html` has root-absolute `src`/`href` paths.
 - **One commit.** With `"history": "single"` (the default) `gh_pages` is a single commit, force-pushed with
   `--force-with-lease`, so built assets never accumulate in the repository's history. With `"keep"` every publish is a
   commit on top. A rejected push (someone published meanwhile) is retried from the new tip, up to five times.
@@ -75,7 +76,7 @@ Nothing in `scripts/publish/` is specific to this repository; it has no dependen
 
 1. Copy `scripts/publish/` (two files), `.github/workflows/publish.yml` (optional) and `publish.config.json`.
 2. Set `build` to the site's build command (`["npm", "run", "build"]` is the default), `dist` to its output folder, and
-   `branches`. The build must honour the base path given in `{base}` / `VITE_BASE` (for Vite, `base: process.env.VITE_BASE`).
+   `branches`. The build must be relocatable: relative asset paths (for Vite, `base: "./"`), and no root-absolute URLs in code.
 3. Add a script such as `"publish:branch": "node scripts/publish/publish.mjs"`, and the Pages setting above.
 4. In the workflow, add an install step suited to the project (the example uses `npm ci`).
 

@@ -6,7 +6,7 @@
  * Escape) and fails on: uncaught exceptions, contained frame errors, the built-in-defaults config fallback, failed
  * requests, a loading error or a stuck loading screen, or a missing canvas.
  *
- *   npm run build:pages -- --base noneuclid-fpv
+ *   npm run build:pages
  *   npm run smoke -- --world cube,dodecahedron,torus-moduli
  *
  * Flags: --world <id[,id...]> (default cube), --config <name> (default full), --debug-level <off|basic|verbose>,
@@ -45,10 +45,12 @@ if (options.pageUrl) {
   if (!siteUrl) {
     const indexPath = path.resolve(options.dist, "index.html");
     if (!fs.existsSync(indexPath)) {
-      console.error(`smoke: ${options.dist}/index.html not found; run "npm run build:pages -- --base <name>" or "npm run build" first.`);
+      console.error(`smoke: ${options.dist}/index.html not found; run "npm run build" first.`);
       process.exit(2);
     }
-    const base = detectBaseFromIndexHtml(fs.readFileSync(indexPath, "utf8"));
+    const detected = detectBaseFromIndexHtml(fs.readFileSync(indexPath, "utf8"));
+    // A relocatable build ("./") is served under a sub-path on purpose, which checks that nothing assumes the root.
+    const base = detected.startsWith(".") ? "/smoke/relocated/" : detected;
     server = await startStaticServer({ root: path.resolve(options.dist), base });
     siteUrl = server.siteUrl;
     console.log(`smoke: serving ${options.dist} at ${siteUrl}`);

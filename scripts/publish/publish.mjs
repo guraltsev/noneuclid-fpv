@@ -17,13 +17,11 @@ import { pathToFileURL } from "node:url";
 import {
   branchMatches,
   emptyManifest,
-  folderBase,
   folderForBranch,
   parseManifest,
   pruneManifest,
   renderIndex,
   renderVersions,
-  siteBaseFromRemote,
   totalBytes,
   withEntry,
 } from "./lib.mjs";
@@ -36,14 +34,12 @@ export const DEFAULT_CONFIG = {
   branches: ["main"],
   // Branch the site root redirects to.
   defaultBranch: "main",
-  // Build command as an argument list; "{base}" is replaced by the folder's base path (also set as VITE_BASE).
+  // Build command as an argument list. The build must be relocatable (relative asset paths), because each branch is served from its own sub-path.
   build: ["npm", "run", "build"],
   // Folder the build writes, relative to the repository root.
   dist: "dist",
   // "single": gh_pages is one force-pushed commit (small repository). "keep": every publish is a new commit.
   history: "single",
-  // Path the site is served under; derived from the remote URL when omitted (for example "/site/").
-  siteBase: undefined,
   // Remote name; defaults to "origin", else the first remote.
   remote: undefined,
   // Warn when the published folders add up to more than this many MiB (GitHub Pages sites are limited to 1 GiB).
@@ -151,28 +147,26 @@ export async function publish(options = {}) {
     }
   }
 
-  const siteBase = config.siteBase ?? siteBaseFromRemote(git(["remote", "get-url", remote]).out);
   let bytes = 0;
   const distDir = path.resolve(root, config.dist);
   if (!noBuild) {
-    const base = folderBase(siteBase, folder);
-    log(`building ${branch} (${sha.slice(0, 7)}) with base ${base}`);
-    const [command, ...args] = config.build.map((part) => part.replaceAll("{base}", base));
+    log(`building ${branch} (${sha.slice(0, 7)})`);
+    const [command, ...args] = config.build;
     fs.rmSync(distDir, { recursive: true, force: true });
     // npm is a .cmd shim on Windows and needs a shell; other commands run directly.
     const built = spawnSync(command, args, {
       cwd: root,
-      env: { ...process.env, VITE_BASE: base },
+      env: process.env,
       stdio: "inherit",
       shell: process.platform === "win32" && command === "npm",
     });
     if (built.error) throw built.error;
     if (built.status !== 0) throw new Error(`The build command failed (exit ${built.status}).`);
     if (!fs.existsSync(distDir)) throw new Error(`The build did not create "${config.dist}".`);
-    // A build that ignored the base would publish a site whose assets 404; fail instead.
+    // A build with root-absolute asset paths (src="/assets/...") would 404 under a sub-path; fail instead.
     const builtIndex = path.join(distDir, "index.html");
-    if (base !== "/" && fs.existsSync(builtIndex) && !fs.readFileSync(builtIndex, "utf8").includes(base)) {
-      throw new Error(`The built index.html does not mention the base ${base}; the build command must honour {base} / VITE_BASE.`);
+    if (fs.existsSync(builtIndex) && /\b(?:src|href)="\/[^/"]/.test(fs.readFileSync(builtIndex, "utf8"))) {
+      throw new Error('The built index.html uses root-absolute paths; build with relative paths (Vite: base "./").');
     }
     bytes = directorySize(distDir);
   }

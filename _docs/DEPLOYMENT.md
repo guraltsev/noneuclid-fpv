@@ -1,4 +1,4 @@
-﻿# Deployment guide
+# Deployment guide
 
 This guide is for maintainers publishing a classroom instance. It is separate
 from the main README so students and educators can focus on the mathematics.
@@ -18,7 +18,7 @@ Chromium-based browser is found) and refuses the push if any fails. Publishing i
 Before publishing you can run the browser smoke check (optional, needs a Chromium-based browser):
 
 ```sh
-npm run build:pages -- --base noneuclid-fpv
+npm run build:pages
 npm run smoke -- --world cube,dodecahedron,torus-moduli
 ```
 
@@ -33,17 +33,15 @@ Per-activity settings live in `public/*.config.js`.
 ### Check a build locally first (optional)
 
 ```sh
-npm run build:pages -- --base noneuclid-fpv
-VITE_BASE=noneuclid-fpv npm run preview
+npm run build:pages
+npm run preview
 ```
 
-Then open `http://localhost:4173/noneuclid-fpv/?config=001`. Write the base
-without a leading slash, because Git Bash rewrites `/noneuclid-fpv/` into a
-Windows path, and `build:pages` refuses such a value. The preview also needs
-`VITE_BASE`, or it serves the app's files as HTML. `build:pages` never guesses
-the base: it takes `--base <name>` or `VITE_BASE`, prints the base it uses, and
-fails before building when neither is given (use `--base .` for a site at a
-domain root).
+Then open `http://localhost:4173/?config=001`. The site is built with relative
+paths (Vite `base: "./"`, and `src/glue/assetUrls.ts` resolves public files
+against the page), so the same `dist/` works from any path: the root, a Pages
+folder, a subfolder of another host, the local server (`npm run server`). There
+is no base path to configure.
 
 ### Deploying another instance (yearly or ad-hoc repository)
 
@@ -51,25 +49,21 @@ domain root).
 another GitHub repository with the same source.
 
 - Push the same source to the new repository and do the one-time setup in it.
-- The workflow takes the base from GitHub Pages, so no file changes.
-- To check locally, use `--base camp-2026-VR` and `VITE_BASE=camp-2026-VR`.
+- The site has no base path to configure; it works from any path.
 - Do not rename the package.
 
 ### Troubleshooting
 
-- **404 or blank page:** Pages source is not set to GitHub Actions, or the first
-  workflow run has not finished.
-- **Workflow does not start:** the push was not to `main`, or Actions are
-  disabled under Settings â†’ Actions.
-- **Deploy fails with a permissions or environment error:** repeat setup step 2.
+- **404 or blank page:** Pages source is not set to the `gh_pages` branch, the
+  branch is not published yet, or the Pages build has not finished (see
+  [PUBLISHING.md](PUBLISHING.md)).
 - **Floor textures missing:** only compressed `runtime/*.ktx2` textures are in
   the repository; texture sources are not (see
   [job 02](../.agents/jobs/_done/02_asset_footprint_and_provenance.md) and
   `public/assets/textures/README.md`).
-- **Every asset 404s or the page is blank locally:** the build and the preview
-  use different bases. Run both with the same `--base`/`VITE_BASE` value.
-- **`build:pages` says the base looks like a Windows path:** drop the leading
-  slash (Git Bash rewrote it).
+- **Every asset 404s:** the page was opened from a URL without the trailing
+  slash (`.../main` instead of `.../main/`), or `index.html` was opened from disk
+  (`file://`); use a web server.
 
 ## HTTPS and WebXR
 

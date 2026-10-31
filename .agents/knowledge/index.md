@@ -10,3 +10,4 @@ Short notes on traps and non-obvious facts of this repository. Rules: `AGENTS.md
 - [test-and-smoke-timing.md](test-and-smoke-timing.md): `npm test` takes about a minute (one file ~55 s); multi-world smoke has a known load flake.
 - [windows-shell.md](windows-shell.md): the Bash tool can return empty output with no error on this machine; use PowerShell.
 - [headless-edge-end-to-end.md](headless-edge-end-to-end.md): recipe and flags to test the local server channel end to end with headless Edge.
+- [relative-base-urls.md](relative-base-urls.md): the site uses a relative Vite base; always build URLs with publicUrl, never BASE_URL concatenation or root-absolute paths.

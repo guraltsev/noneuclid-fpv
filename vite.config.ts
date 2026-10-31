@@ -1,17 +1,9 @@
 import { defineConfig } from "vitest/config";
 
-function resolveBase(): string {
-  const configuredBase = process.env.VITE_BASE?.trim();
-
-  if (!configuredBase || configuredBase === "/") {
-    return "/";
-  }
-
-  return `/${configuredBase.replace(/^\/+/, "").replace(/\/+$/, "")}/`;
-}
-
 export default defineConfig({
-  base: resolveBase(),
+  // Relative base: the built site works from any path (a Pages folder, the local server, a domain root). Public
+  // files are addressed through src/glue/assetUrls.ts, which resolves them against the page.
+  base: "./",
   test: {
     environment: "node",
     coverage: {

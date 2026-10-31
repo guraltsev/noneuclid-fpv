@@ -5,7 +5,7 @@
 
 This reference is produced from the source code. For the *meaning* of the modules — the mathematical model they implement — read [../MATHEMATICAL_MODEL.md](../MATHEMATICAL_MODEL.md) and [../ARCHITECTURE.md](../ARCHITECTURE.md). For every exported symbol see [API_REFERENCE.md](API_REFERENCE.md).
 
-**189 modules, 46,834 lines** under `src/`.
+**189 modules, 46,841 lines** under `src/`.
 
 ## Layers
 
@@ -21,7 +21,7 @@ A module belongs to the layer named by its first path segment under `src/`. "May
 | `authoring` | 5 | 671 | `math`, `cell-complex`, `examples`, `world-assets`, `world-objects` | World builder DSL, world-script compiler, validation and world catalog. |
 | `runtime` | 12 | 2,843 | `math`, `cell-complex`, `movement`, `world-objects`, `authoring`, `ui`, `glue` | Runtime menu state, command dispatch, geometry session/worker and deformation families. |
 | `ui` | 6 | 1,324 | `math`, `cell-complex`, `runtime`, `world-objects`, `authoring`, `glue` | Renderer-neutral palette, help, tooltip and input-intent definitions. |
-| `glue` | 12 | 1,185 | `authoring`, `runtime`, `ui` | Launch options, debug settings, asset URLs, app configuration. |
+| `glue` | 12 | 1,192 | `authoring`, `runtime`, `ui` | Launch options, debug settings, asset URLs, app configuration. |
 | `render` | 94 | 25,957 | anything | Three.js / DOM / WebXR rendering and input adapters (the application shell). |
 | `root` | 2 | 257 | anything | Entry point and application state. |
 
@@ -229,7 +229,7 @@ These imports break the intended layering. They are frozen in `scripts/docs/laye
 | Module | Lines | Summary | Imports |
 | --- | ---: | --- | --- |
 | `glue/appConfig.ts` | 290 | Loads and normalizes the app configuration: a per-deployment JavaScript file (<name>.config.js in the public folder, chosen by the ?config= URL parameter) that sets the starting world, which menu sections and tools are … | `authoring/worldCatalog`, `glue/assetUrls`, `glue/debugLevels`, `glue/debugOptions`, `glue/portalPanelMode`, `runtime/runtimeMenuState` |
-| `glue/assetUrls.ts` | 19 | Builds URLs for files served from the Vite public folder, honoring the deployment base path (import.meta.env.BASE_URL) so the app works when hosted under a sub-path. | — |
+| `glue/assetUrls.ts` | 26 | Builds URLs for files served from the Vite public folder. | — |
 | `glue/debugLevels.ts` | 49 | Defines the debug levels (off, basic, verbose) as a single constant table that is the source of truth for the DebugLevelId type, the settings UI and URL parsing. | — |
 | `glue/debugOptions.ts` | 103 | Defines the individual debug options (diagnostics logging, portal path/cull inspection, overlays, wireframes, hitbox displays) as a constant table that is the source of truth for the DebugOptionId type. | — |
 | `glue/debugSettings.ts` | 46 | Value types describing a complete debug configuration (level, portal panel mode and enabled options) and a predicate telling whether a change to it can be applied to a running world without a reload. | `glue/debugLevels`, `glue/debugOptions`, `glue/portalPanelMode` |

@@ -2,7 +2,7 @@
   "pagesBranch": "gh_pages",
   "branches": ["main", "design/**"],
   "defaultBranch": "main",
-  "build": ["node", "scripts/build-pages.mjs", "--base", "{base}"],
+  "build": ["node", "scripts/build-pages.mjs"],
   "dist": "dist",
   "history": "single"
 }

@@ -36,15 +36,15 @@ npm run build
 
 The test suite checks mathematical and renderer contracts and the documentation
 rules (`tests/docs`). It does not replace a short browser check of the
-interaction you changed. For a scripted check, build for a subpath and run the
+interaction you changed. For a scripted check, build and run the
 headless smoke test (needs a Chromium-based browser):
 
 ```sh
-npm run build:pages -- --base noneuclid-fpv
+npm run build:pages
 npm run smoke -- --world cube,dodecahedron,torus-moduli
 ```
 
-The script serves `dist/` itself under the build base path, with real 404s like GitHub Pages (no HTML fallback), loads one page per world, opens and closes the menu (right click, Escape), and prints `SMOKE OK` or `SMOKE FAILED` per world. A world fails on:
+The script serves `dist/` itself under a sub-path (`/smoke/relocated/`, which checks that the build is relocatable), with real 404s like GitHub Pages (no HTML fallback), loads one page per world, opens and closes the menu (right click, Escape), and prints `SMOKE OK` or `SMOKE FAILED` per world. A world fails on:
 
 - an uncaught exception;
 - a console message with `[noneuclid] frame error` or `frames in a row failed`;

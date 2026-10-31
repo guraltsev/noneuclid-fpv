@@ -1,4 +1,4 @@
-﻿import { spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -21,8 +21,6 @@ interface Manifest {
 interface Lib {
   folderForBranch(branch: string): string;
   branchMatches(branch: string, patterns: string[]): boolean;
-  siteBaseFromRemote(url: string): string;
-  folderBase(siteBase: string, folder: string): string;
   parseManifest(text: string, defaultBranch: string): Manifest;
   withEntry(manifest: Manifest, folder: string, entry: Entry): Manifest;
   pruneManifest(manifest: Manifest, live: string[]): { manifest: Manifest; removed: string[] };
@@ -57,15 +55,6 @@ describe("publish helpers", () => {
     expect(branchMatches("design/a/b", ["design/**"])).toBe(true);
     expect(branchMatches("other", ["main", "design/**"])).toBe(false);
     expect(branchMatches("mainx", ["main"])).toBe(false);
-  });
-
-  it("derives the site base from a remote URL", async () => {
-    const { siteBaseFromRemote, folderBase } = await loadLib();
-    expect(siteBaseFromRemote("git@github.com:guraltsev/noneuclid-fpv.git")).toBe("/noneuclid-fpv/");
-    expect(siteBaseFromRemote("https://github.com/guraltsev/noneuclid-fpv")).toBe("/noneuclid-fpv/");
-    expect(siteBaseFromRemote("https://github.com/guraltsev/guraltsev.github.io.git")).toBe("/");
-    expect(folderBase("/site/", "main")).toBe("/site/main/");
-    expect(folderBase("/", "main")).toBe("/main/");
   });
 
   it("records, prunes and renders the manifest", async () => {
@@ -117,11 +106,11 @@ describe("publish end to end (temporary repositories)", { timeout: 60_000 }, () 
     // The "build" writes dist/index.html containing the base and the source text.
     fs.writeFileSync(
       path.join(work, "build.mjs"),
-      'import fs from "node:fs"; fs.mkdirSync("dist",{recursive:true}); fs.writeFileSync("dist/index.html", `base=${process.argv[2]} src=${fs.readFileSync("src.txt","utf8")}`);',
+      'import fs from "node:fs"; fs.mkdirSync("dist",{recursive:true}); fs.writeFileSync("dist/index.html", `src=${fs.readFileSync("src.txt","utf8")}`);',
     );
     fs.writeFileSync(
       path.join(work, "publish.config.json"),
-      JSON.stringify({ branches: ["main", "feature/**"], build: ["node", "build.mjs", "{base}"], siteBase: "/site/" }),
+      JSON.stringify({ branches: ["main", "feature/**"], build: ["node", "build.mjs"], extra: "kept" }),
     );
     fs.writeFileSync(path.join(work, ".gitignore"), "dist\n");
     commitFile("one");
@@ -136,7 +125,7 @@ describe("publish end to end (temporary repositories)", { timeout: 60_000 }, () 
     const quiet = { cwd: work, log: () => undefined };
 
     expect((await publish(quiet)).status).toBe("published");
-    expect(show("main/index.html").stdout).toBe("base=/site/main/ src=one");
+    expect(show("main/index.html").stdout).toBe("src=one");
     expect(show("index.html").stdout).toContain("url=./main/");
     expect(show("versions/index.html").stdout).toContain('href="../main/"');
     expect(JSON.parse(show("published.json").stdout).entries.main.sha).toBe(git(work, "rev-parse", "HEAD"));
@@ -148,10 +137,22 @@ describe("publish end to end (temporary repositories)", { timeout: 60_000 }, () 
     commitFile("two");
     expect(await publish({ ...quiet, check: true })).toEqual({ status: "check", build: true });
     expect((await publish(quiet)).status).toBe("published");
-    expect(show("feature-x/index.html").stdout).toBe("base=/site/feature-x/ src=two");
-    expect(show("main/index.html").stdout).toBe("base=/site/main/ src=one");
+    expect(show("feature-x/index.html").stdout).toBe("src=two");
+    expect(show("main/index.html").stdout).toBe("src=one");
     // History mode "single": the published branch is one commit.
     expect(git(remote, "rev-list", "--count", "gh_pages")).toBe("1");
+  });
+
+  it("refuses a build whose index.html uses root-absolute paths", async () => {
+    const { publish } = await loadPublish();
+    fs.writeFileSync(
+      path.join(work, "bad-build.mjs"),
+      'import fs from "node:fs"; fs.mkdirSync("dist",{recursive:true}); fs.writeFileSync("dist/index.html", \'<script src="/assets/a.js"></script>\');',
+    );
+    fs.writeFileSync(path.join(work, "publish.config.json"), JSON.stringify({ build: ["node", "bad-build.mjs"] }));
+    git(work, "add", "-A");
+    git(work, "commit", "-q", "-m", "bad build");
+    await expect(publish({ cwd: work, log: () => undefined })).rejects.toThrow("root-absolute");
   });
 
   it("skips unlisted branches unless forced, and refuses a dirty tree", async () => {
@@ -175,7 +176,7 @@ describe("publish end to end (temporary repositories)", { timeout: 60_000 }, () 
     expect((await publish({ ...quiet, add: true })).status).toBe("published");
     const config = JSON.parse(fs.readFileSync(path.join(work, "publish.config.json"), "utf8"));
     expect(config.branches).toEqual(["main", "feature/**", "scratch"]);
-    expect(config.siteBase).toBe("/site/");
+    expect(config.extra).toBe("kept");
     expect(show("scratch/index.html").status).toBe(0);
     // Adding again changes nothing.
     await publish({ ...quiet, add: true, force: true });

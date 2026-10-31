@@ -1,4 +1,4 @@
-﻿# Development Guide
+# Development Guide
 
 This is the living overview for building the NonEuclidean FPV experience.
 
@@ -67,7 +67,7 @@ npm run dev
 npm run typecheck
 npm test
 npm run build
-npm run build:pages -- --base noneuclid-fpv
+npm run build:pages
 ```
 
 For local classroom serving:
@@ -79,9 +79,8 @@ npm run dev -- --host 0.0.0.0
 For GitHub Pages, see [PUBLISHING.md](PUBLISHING.md): the site is served from the `gh_pages` branch, one folder per
 branch, published by `npm run publish:branch` or by the optional workflow `.github/workflows/publish.yml`.
 
-`npm run build:pages` is the local verification build for that deployment path.
-`npm run build:pages` requires the target repository name (`--base <name>` or
-`VITE_BASE`) and prints the base it uses. See the
+`npm run build:pages` is the production build used for publishing. The site uses
+relative paths, so there is no base path to give. See the
 [deployment guide](DEPLOYMENT.md) for the current release procedure.
 
 ## Repository Map

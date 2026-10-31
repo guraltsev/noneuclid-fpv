@@ -1,6 +1,5 @@
-﻿/**
- * Pure helpers of the branch publisher (scripts/publish/publish.mjs): folder names, branch patterns, the site base
- * path, the manifest `published.json` and the root `index.html`. No file system and no git, so they are unit-tested
+/**
+ * Pure helpers of the branch publisher (scripts/publish/publish.mjs): folder names, branch patterns, the manifest `published.json` and the root `index.html`. No file system and no git, so they are unit-tested
  * directly (tests/scripts/publish.test.ts). Nothing here is specific to this repository.
  */
 
@@ -25,21 +24,6 @@ export function branchMatches(branch, patterns) {
 
 function escapeRegExp(text) {
   return text.replace(/[.+?^${}()|[\]\\]/g, "\\$&");
-}
-
-/**
- * The path the whole site is served under, from a remote URL: `git@github.com:me/site.git` gives `/site/`; a user
- * site (`me.github.io`) gives `/`. Throws when the URL has no repository name.
- */
-export function siteBaseFromRemote(url) {
-  const match = /[/:]([^/:]+?)(?:\.git)?\/?$/.exec(url.trim());
-  if (!match) throw new Error(`Cannot read a repository name from the remote URL "${url}"; set "siteBase" in the config.`);
-  return /\.github\.io$/i.test(match[1]) ? "/" : `/${match[1]}/`;
-}
-
-/** The base path of one published folder, for example `/site/` + `main` gives `/site/main/`. */
-export function folderBase(siteBase, folder) {
-  return `${siteBase.replace(/\/*$/, "/")}${folder}/`;
 }
 
 /** An empty manifest. */
