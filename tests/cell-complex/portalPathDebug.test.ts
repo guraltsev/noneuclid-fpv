@@ -1,3 +1,12 @@
+/**
+ * `tests/cell-complex/portalPathDebug.test.ts` — unit tier.
+ *
+ * `checkPortalPathString` parses a human-typed portal path (a list of side indices or portal-array indices) against
+ * a root cell's path tables and reports whether it parses, exists in the built table, and survived static culling,
+ * naming the rejection reason when it did not; `createPortalPathDebugState` summarizes a root's tables for the debug
+ * UI and console helpers. These are the backing functions of the `portal-path-debug` option
+ * (`_docs/MATHEMATICAL_MODEL.md` §4, §8).
+ */
 import { describe, expect, it } from "vitest";
 import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
 import { checkPortalPathString, createPortalPathDebugState } from "../../src/cell-complex/portalPathDebug";

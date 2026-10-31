@@ -14,6 +14,7 @@
     "test:release": "npm run build && vitest run --project release --passWithNoTests",
     "test:report": "node scripts/tests/cli.mjs report",
     "test:coverage": "vitest run --project unit --coverage",
+    "bench": "node scripts/bench/run.mjs",
     "build": "tsc --noEmit && vite build",
     "build:pages": "node scripts/build-pages.mjs",
     "preview": "vite preview",

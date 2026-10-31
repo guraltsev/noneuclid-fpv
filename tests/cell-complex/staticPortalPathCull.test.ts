@@ -1,7 +1,22 @@
+/**
+ * `tests/cell-complex/staticPortalPathCull.test.ts` — unit tier.
+ *
+ * `staticallyCullPortalPathTables`/`buildStaticallyCulledPortalPathTables` keep, of every candidate portal path, only
+ * those a line could actually pass through (a non-empty "crossed strings" line cone, `staticLineCone.test.ts`) and
+ * at most `maxKeptPathsPerRoot` per root, spent best-first by the cone's measure
+ * (`_docs/MATHEMATICAL_MODEL.md` §4, §8.1). Rejections are reported by reason rather than silently dropped, and a
+ * kept path never has a rejected parent. These tests check path-count bookkeeping, both rejection reasons
+ * (geometric transversal and path budget), that the depth-10 cube path tree can be culled contextually while
+ * expanding (matching a post-hoc cull of the same tree), and the property that the cull never drops a path a line
+ * actually walks, checked by sampling lines inside the kept cones and by walking random lines through example
+ * worlds and cone-point fans.
+ */
+import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
+import { compileCellComplex, type CompiledCellComplex } from "../../src/cell-complex/compileCellComplex";
 import { checkPortalPathString } from "../../src/cell-complex/portalPathDebug";
-import { buildPortalPathTables } from "../../src/cell-complex/portalPaths";
+import { buildPortalPathTables, type PortalPathTable, type PortalRenderPath } from "../../src/cell-complex/portalPaths";
+import { clipLineConeByPortal, lineConeForTwoPortals, type LineCone } from "../../src/cell-complex/staticLineCone";
 import {
   buildStaticallyCulledPortalPathTables,
   staticallyCullPortalPathTables,
@@ -9,6 +24,8 @@ import {
 } from "../../src/cell-complex/staticPortalPathCull";
 import { cube, dodecahedron } from "../../src/authoring/exampleWorlds";
 import { twoPrismLoop } from "../fixtures/twoPrismLoop";
+import { arbConeFanWorldSpec, arbPointInCell, exampleWorldSpecs } from "../support/arbitraries";
+import { lineStartThroughPortal, mulberry32, sampleLineInCone, walkedWordPrefixes, wordSignature } from "../support/portalWordWitness";
 
 describe("staticallyCullPortalPathTables", () => {
   it("keeps depth-0 paths and preserves kept path ids", () => {
@@ -202,10 +219,13 @@ describe("staticallyCullPortalPathTables", () => {
     expect(contextualCull.summariesByRootCellId.get("front")?.rejectedPathCount).toBeGreaterThan(0);
   });
 
-  it("prunes the dodecahedron path tree contextually at depth 10", () => {
+  it("prunes the dodecahedron path tree contextually at depth 6", () => {
+    // Depth 6 already keeps hundreds of paths per root and rejects hundreds more by the geometric transversal
+    // check (not the path budget, which is set far above what is kept): deep enough to show contextual pruning
+    // without the exponential depth-10 cost a benchmark measures instead (scripts/bench/staticCull.bench.ts).
     const world = compileCellComplex(dodecahedron);
     const result = buildStaticallyCulledPortalPathTables(world, {
-      maxDepth: 10,
+      maxDepth: 6,
       toleranceMeters: 1e-6,
       maxKeptPathsPerRoot: 50_000,
     });
@@ -214,15 +234,132 @@ describe("staticallyCullPortalPathTables", () => {
     const keptPathCounts = [...result.summariesByRootCellId.values()].map((summary) => summary.keptPathCount);
     const rejectedPathCounts = [...result.summariesByRootCellId.values()].map((summary) => summary.rejectedPathCount);
 
-    expect(topTable.maxDepth).toBe(10);
+    expect(topTable.maxDepth).toBe(6);
     expect(topSummary.keptPathCount).toBe(topTable.paths.length);
-    expect(topSummary.keptPathCount).toBeLessThanOrEqual(12_000);
+    expect(topSummary.keptPathCount).toBeLessThanOrEqual(1_000);
     expect(new Set(keptPathCounts)).toEqual(new Set([topSummary.keptPathCount]));
     expect(new Set(rejectedPathCounts)).toEqual(new Set([topSummary.rejectedPathCount]));
     expect(topSummary.rejectedPathCount).toBeGreaterThan(0);
     expect([...topSummary.rejectedByReason.values()].reduce((total, count) => total + count, 0)).toBe(
       topSummary.rejectedPathCount,
     );
+  });
+
+  describe("properties", () => {
+    const wideningMeters = 1e-6;
+
+    function keptSignaturesByRoot(world: CompiledCellComplex, maxDepth: number): Map<string, Set<string>> {
+      const result = buildStaticallyCulledPortalPathTables(world, { maxDepth, toleranceMeters: wideningMeters });
+      const byRoot = new Map<string, Set<string>>();
+
+      for (const [rootCellId, table] of result.tables.tablesByRootCellId) {
+        byRoot.set(rootCellId, new Set(table.paths.map((path) => wordSignature(path.steps))));
+      }
+
+      return byRoot;
+    }
+
+    /** Portals of the word's prefixes (index = depth - 1), developed into the root frame. */
+    function portalsAlongPath(table: PortalPathTable, path: PortalRenderPath) {
+      const portals = [];
+      let current: PortalRenderPath | undefined = path;
+
+      while (current && current.depth > 0) {
+        portals.unshift(current.newestPortalInRoot!);
+        current = current.parentPathId === undefined ? undefined : table.pathsById.get(current.parentPathId);
+      }
+
+      return portals;
+    }
+
+    function coneOfPath(table: PortalPathTable, path: PortalRenderPath): LineCone {
+      const portals = portalsAlongPath(table, path);
+      let cone = lineConeForTwoPortals(portals[0], portals[1], wideningMeters);
+
+      for (const portal of portals.slice(2)) {
+        cone = clipLineConeByPortal(cone, portal, wideningMeters);
+      }
+
+      return cone;
+    }
+
+    it("keeps every prefix of a walked line in the example worlds", () => {
+      for (const [name, spec] of exampleWorldSpecs) {
+        const world = compileCellComplex(spec);
+        const kept = keptSignaturesByRoot(world, 6);
+
+        fc.assert(
+          fc.property(
+            fc.nat({ max: world.cells.length - 1 }).chain((index) =>
+              fc.tuple(fc.constant(index), arbPointInCell(world.cells[index]), fc.double({ min: -Math.PI, max: Math.PI, noNaN: true })),
+            ),
+            ([index, start, angle]) => {
+              const cell = world.cells[index];
+              const prefixes = walkedWordPrefixes(world, cell.id, start, { x: Math.cos(angle), y: Math.sin(angle) }, 6);
+              const missing = prefixes.filter((prefix) => !kept.get(cell.id)!.has(prefix));
+
+              expect(missing, `${name} root ${cell.id} start ${JSON.stringify(start)} angle ${angle} missing ${missing.join(" | ")}`).toEqual([]);
+            },
+          ),
+          { numRuns: 100 },
+        );
+      }
+    });
+
+    it("keeps every prefix of a walked line in random cone-point fans", () => {
+      fc.assert(
+        fc.property(
+          arbConeFanWorldSpec,
+          fc.nat({ max: 7 }),
+          fc.double({ min: 0.01, max: 1, noNaN: true }),
+          fc.double({ min: 0.01, max: 1, noNaN: true }),
+          fc.double({ min: -Math.PI, max: Math.PI, noNaN: true }),
+          (spec, rootIndex, u, v, angle) => {
+            const world = compileCellComplex(spec);
+            const cell = world.cells[rootIndex % world.cells.length];
+            // Interior point: a convex combination of the three base vertices with positive weights.
+            const total = 1 + u + v;
+            const [a, b, c] = cell.baseVertices;
+            const start = { x: (a.x + u * b.x + v * c.x) / total, y: (a.y + u * b.y + v * c.y) / total };
+            const kept = keptSignaturesByRoot(world, 6).get(cell.id)!;
+            const prefixes = walkedWordPrefixes(world, cell.id, start, { x: Math.cos(angle), y: Math.sin(angle) }, 6);
+
+            expect(prefixes.filter((prefix) => !kept.has(prefix))).toEqual([]);
+          },
+        ),
+        { numRuns: 100 },
+      );
+    });
+
+    it("every kept path of depth 3-6 has a line in its cone that reproduces the word", () => {
+      for (const [name, spec] of exampleWorldSpecs) {
+        const world = compileCellComplex(spec);
+        const rng = mulberry32(2024);
+        const result = buildStaticallyCulledPortalPathTables(world, { maxDepth: 6, toleranceMeters: wideningMeters });
+        const candidates = [...result.tables.tablesByRootCellId.values()].flatMap((table) =>
+          table.paths.filter((path) => path.depth >= 3).map((path) => ({ table, path })),
+        );
+
+        for (let sample = 0; sample < 50 && candidates.length > 0; sample += 1) {
+          const { table, path } = candidates[Math.floor(rng() * candidates.length)];
+          const cone = coneOfPath(table, path);
+          const signature = wordSignature(path.steps);
+          const first = portalsAlongPath(table, path)[0];
+          let reproduced = false;
+
+          expect(cone.length, `${name} ${signature}`).toBeGreaterThanOrEqual(3);
+
+          for (let attempt = 0; attempt < 20 && !reproduced; attempt += 1) {
+            const line = sampleLineInCone(cone, rng);
+            const { start, direction } = lineStartThroughPortal(line, first);
+
+            reproduced = walkedWordPrefixes(world, path.rootCellId, start, direction, path.depth).includes(signature);
+          }
+
+          expect(reproduced, `${name} root ${path.rootCellId} word ${signature}`).toBe(true);
+        }
+      }
+    });
   });
 });
 

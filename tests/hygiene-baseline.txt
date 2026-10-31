@@ -64,24 +64,6 @@ H6	tests/assets/publicAssetPolicy.test.ts	-
 H6	tests/authoring/compileWorldScript.test.ts	-
 H6	tests/authoring/exampleWorlds.test.ts	-
 H6	tests/authoring/worldBuilder.test.ts	-
-H6	tests/cell-complex/compileCellComplex.test.ts	-
-H6	tests/cell-complex/compilePortalTransforms.property.test.ts	-
-H6	tests/cell-complex/compilePortalTransforms.property.test.ts	maps the source side's start to the target side's end and vice versa, and normals to normals
-H6	tests/cell-complex/compilePortalTransforms.test.ts	-
-H6	tests/cell-complex/describeGeometry.test.ts	-
-H6	tests/cell-complex/developedDisk.test.ts	-
-H6	tests/cell-complex/floorUv.test.ts	-
-H6	tests/cell-complex/portalPathDebug.test.ts	-
-H6	tests/cell-complex/portalPaths.property.test.ts	-
-H6	tests/cell-complex/portalPaths.test.ts	-
-H6	tests/cell-complex/prismCells.test.ts	-
-H6	tests/cell-complex/segmentWalk.property.test.ts	-
-H6	tests/cell-complex/segmentWalk.test.ts	-
-H6	tests/cell-complex/staticCullBenchmark.test.ts	-
-H6	tests/cell-complex/staticLineCone.test.ts	-
-H6	tests/cell-complex/staticPortalPathCull.property.test.ts	-
-H6	tests/cell-complex/staticPortalPathCull.test.ts	-
-H6	tests/cell-complex/validateCellComplexSpec.test.ts	-
 H6	tests/docs/documentation.test.ts	-
 H6	tests/docs/documentation.test.ts	keeps module headers, exported JSDoc, layering, generated references and document links healthy
 H6	tests/docs/moduleImportRules.test.ts	-
@@ -90,16 +72,6 @@ H6	tests/glue/geometrySelection.test.ts	-
 H6	tests/glue/launchOptionsUrl.test.ts	-
 H6	tests/glue/readLaunchOptions.test.ts	-
 H6	tests/glue/serverChannel.test.ts	-
-H6	tests/math/intersections.property.test.ts	-
-H6	tests/math/intersections.test.ts	-
-H6	tests/math/planes.test.ts	-
-H6	tests/math/polygons.property.test.ts	-
-H6	tests/math/polygons.test.ts	-
-H6	tests/math/rigidTransform3.property.test.ts	-
-H6	tests/math/rigidTransform3.test.ts	-
-H6	tests/math/vec2.test.ts	-
-H6	tests/math/vec3.property.test.ts	-
-H6	tests/math/vec3.test.ts	-
 H6	tests/movement/collision.test.ts	-
 H6	tests/movement/depenetrateDynamicObject.test.ts	-
 H6	tests/movement/developedObstacles.test.ts	-
@@ -253,5 +225,4 @@ H6	tests/world-objects/simpleGeoCreature.test.ts	${zoneOnLeft ? "2" : "3"}. keep
 H6	tests/world-objects/simpleGeoCreature.test.ts	-
 H6	tests/world-objects/simpleGeoCreature.test.ts	7a. host.placeAt re-seeds the leader and the creature walks the geodesic from the placed pose
 H6	tests/world-objects/worldObjectOwner.test.ts	-
-H9	tests/cell-complex/staticCullBenchmark.test.ts	-
 H9	tests/render-contract/funnelStaticCullBenchmark.test.ts	-

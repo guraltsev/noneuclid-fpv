@@ -1,3 +1,13 @@
+/**
+ * `tests/cell-complex/developedDisk.test.ts` — unit tier.
+ *
+ * `collectDevelopedDisk` develops the cells around a point into a disk atlas: each node is a neighbouring cell
+ * mapped into the center cell's frame, restricted to the angular wedge from which it is actually reached, so the
+ * disk tiles each direction exactly once even around a cone-point vertex (`_docs/MATHEMATICAL_MODEL.md` §4). These
+ * tests check that property by sampling many points of the disk across several example worlds, that a center
+ * exactly on a portal side still includes the neighbour, and the wedge arithmetic (intersection, segment clipping,
+ * distance) the atlas is built from.
+ */
 import { describe, expect, it } from "vitest";
 import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
 import {

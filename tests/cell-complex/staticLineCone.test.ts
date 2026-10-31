@@ -1,3 +1,13 @@
+/**
+ * `tests/cell-complex/staticLineCone.test.ts` — unit tier.
+ *
+ * `developPortalSegment` reads a cell side's endpoints as seen through a chain of portal transforms;
+ * `lineConeForTwoPortals`/`clipLineConeByPortal` build and narrow the cone of line directions that pass through a
+ * sequence of developed portal segments in order (the "crossed strings" construction static path culling relies on,
+ * `_docs/MATHEMATICAL_MODEL.md` §4, §8.1). These tests check the developed segment's orientation, small worked cones
+ * with known ray sets and measures, and that clipping by a further portal never increases the cone's measure and
+ * agrees with brute-force vertex enumeration and a numeric integral.
+ */
 import { describe, expect, it } from "vitest";
 import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
 import { developPortalSegment, type OrientedPortalSegment } from "../../src/cell-complex/orientedPortal";

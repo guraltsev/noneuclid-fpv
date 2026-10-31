@@ -1,6 +1,15 @@
+/**
+ * `tests/cell-complex/validateCellComplexSpec.test.ts` — unit tier.
+ *
+ * `validateCellComplexSpec` checks an authored spec against the rules a cell complex must follow
+ * (`_docs/MATHEMATICAL_MODEL.md` §2, §3): unique cell and portal ids, portals reciprocated by their target,
+ * targets that exist, in-range side indices, convex counter-clockwise bases, finite coordinates and heights, and
+ * glued sides of equal length (optionally skipped for tests that deliberately build an ill-formed gluing). It
+ * reports every error found, with a message naming the offending cell or portal, rather than stopping at the first
+ * one. `compileCellComplex` calls it and throws on any error (`tests/cell-complex/compileCellComplex.test.ts`).
+ */
 import { describe, expect, it } from "vitest";
 import { validateAuthoringSpec } from "../../src/authoring/validateAuthoringSpec";
-import { starterWorldSpecs } from "../../src/authoring/worldCatalog";
 import type { CellComplexSpec } from "../../src/cell-complex/specs";
 import { validateCellComplexSpec } from "../../src/cell-complex/validateCellComplexSpec";
 
@@ -8,6 +17,12 @@ const square = [
   { x: 0, y: 0 },
   { x: 1, y: 0 },
   { x: 1, y: 1 },
+  { x: 0, y: 1 },
+];
+
+const triangleBase = [
+  { x: 0, y: 0 },
+  { x: 1, y: 0 },
   { x: 0, y: 1 },
 ];
 
@@ -91,10 +106,83 @@ describe("validateCellComplexSpec", () => {
     expect(validateCellComplexSpec({ cells: [tall.cells[0], { ...tall.cells[1], heightMeters: 7 }] })).toEqual([]);
   });
 
-  it("validates every bundled catalog world", () => {
-    for (const spec of starterWorldSpecs) {
-      expect(validateCellComplexSpec(spec)).toEqual([]);
-    }
+  it("reports readable movement-critical authoring errors", () => {
+    const errors = validateCellComplexSpec({
+      cells: [
+        {
+          id: "room",
+          heightMeters: 2,
+          baseVertices: triangleBase,
+          portals: [
+            {
+              id: "bad",
+              sideIndex: 3,
+              targetCellId: "missing",
+              targetPortalId: "also-missing",
+            },
+            {
+              id: "bad",
+              sideIndex: 0,
+              targetCellId: "room",
+              targetPortalId: "bad",
+            },
+          ],
+        },
+        {
+          id: "room",
+          heightMeters: 2,
+          baseVertices: triangleBase,
+          portals: [],
+        },
+      ],
+    });
+
+    expect(errors).toContain('Duplicate cell id "room".');
+    expect(errors).toContain('Cell "room" has duplicate portal id "bad".');
+    expect(errors).toContain('Portal "room:bad" has sideIndex 3, expected 0-2.');
+    expect(errors).toContain('Portal "room:bad" targets missing cell "missing".');
+    expect(errors).toContain('Portal "room:bad" is not reciprocated by "room:bad".');
+  });
+
+  it("rejects non-convex and clockwise prism bases", () => {
+    const nonConvexErrors = validateCellComplexSpec({
+      cells: [
+        {
+          id: "non-convex",
+          heightMeters: 2,
+          baseVertices: [
+            { x: 0, y: 0 },
+            { x: 2, y: 0 },
+            { x: 1, y: 1 },
+            { x: 2, y: 2 },
+            { x: 0, y: 2 },
+          ],
+          portals: [],
+        },
+      ],
+    });
+    const clockwiseErrors = validateCellComplexSpec({
+      cells: [
+        {
+          id: "clockwise",
+          heightMeters: 2,
+          baseVertices: [
+            { x: -1, y: -1 },
+            { x: -1, y: 1 },
+            { x: 1, y: 1 },
+            { x: 1, y: -1 },
+          ],
+          portals: [],
+        },
+      ],
+    });
+
+    expect(nonConvexErrors).toContain(
+      'Cell "non-convex" must be strictly convex; non-convex prism cells are not supported.',
+    );
+    expect(clockwiseErrors).toContain(
+      'Cell "clockwise" must list baseVertices in counterclockwise order in the x/y plane.',
+    );
   });
 });
 

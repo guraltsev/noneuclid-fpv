@@ -1,3 +1,11 @@
+/**
+ * `tests/cell-complex/floorUv.test.ts` — unit tier.
+ *
+ * Floor textures are mapped either to a fixed world lattice (shared across cells, so a texture does not slide as
+ * the floor deforms, §9) or to a per-cell metric scale (one tile every `tileSizeMeters`). These tests check the
+ * lattice UV computation against its inverse frame, the metric UV scale, and that the tile count a cell spans is
+ * always rounded to a whole number of at least one.
+ */
 import { describe, expect, it } from "vitest";
 import { floorLatticeUv, floorMetricUv, floorTilesAlong } from "../../src/cell-complex/floorUv";
 

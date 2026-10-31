@@ -1,3 +1,10 @@
+/**
+ * `tests/cell-complex/prismCells.test.ts` — unit tier.
+ *
+ * `compilePrismCellGeometry` derives a cell's per-side length and inward unit normal, and one invisible forbidden
+ * zone per vertex that is an endpoint of a portal side (`_docs/MATHEMATICAL_MODEL.md` §2). These tests check the
+ * side geometry of a plain square room and that portal-side endpoints each get their own forbidden zone.
+ */
 import { describe, expect, it } from "vitest";
 import { compilePrismCellGeometry } from "../../src/cell-complex/prismCells";
 import type { PrismCellSpec } from "../../src/cell-complex/specs";
