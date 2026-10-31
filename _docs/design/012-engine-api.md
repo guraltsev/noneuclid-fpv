@@ -197,6 +197,16 @@ geodesic") is separate from the representation ("how we compute": vectors, matri
 - Principle 4: "plain data" means *read-only, with no live handles*, not *deep-copied every frame* ([P7](#p7-snapshots-read-only-by-reference-serialised-only-at-the-transport)).
 - Principle 8: state it as measurable budgets ([P12](#p12-performance-budgets)).
 
+### Documentation tiers and the mathematics-to-code mapping
+
+**Agreed (2026-10-30): explanation is multi-tiered, and the top tier is mathematical.** At the top: a mathematical
+description of the model, and an explanation of how the mathematical abstraction maps to the code organisation.
+
+The philosophy behind this, its thesis, the tiers, the candidate principles, the evidence and the tensions now live in
+their own document, [CODING_MATH.md](../CODING_MATH.md) (moved there on 2026-10-31). This project is a test case for
+that thesis and a development playground for refining it into precise principles. Decisions in this document that bear
+on the philosophy are recorded there as evidence, tensions or refinements.
+
 ## 3. Where the code stands (checked 2026-10-30)
 
 What is already engine-ready:
@@ -870,3 +880,7 @@ state holder and one command path; proposed: build its `appSession` as engine st
 | 2026-10-30 | Proposed by the maintainer (P5): a trusted local server recognised by a public key, with debug access, also carrying multiplayer coordination. Details proposed: key in app config, challenge-response, roles, discovery options (leaning: server serves the app), fit as a transport adapter. |
 | 2026-10-30 | Agreed (maintainer's simplification): two deployment modes, a static site for single player only and a local server for multiplayer with a password-protected admin. The public-key scheme, the teacher's device as authority and WebRTC signaling are superseded; classroom transport is WebSockets from Node. |
 | 2026-10-30 | Agreed tentatively (P7): the three commitments (whole-value immutable state, one place for changes, field labels); to revisit with a prototype. |
+| 2026-10-30 | Agreed: multi-tiered explanation with a mathematical top tier (model, then the mapping of abstraction to code organisation), for the maintainer's wider project. Proposed: six tiers, two-way traceability checked by docs:check, seven design principles with evidence from this session. |
+| 2026-10-31 | Thesis restated in the maintainer's words (a coding design philosophy makes the mapping possible; principles are its elements) and this project named a test case for it. Proposed: record tensions (counter-evidence) beside the evidence. |
+| 2026-10-31 | Agreed: the project is also a development playground for refining the philosophy into precise principles; the principle list is a working draft and its refinements are logged. |
+| 2026-10-31 | The thesis, tiers, principles, evidence and tensions moved to their own metadocument, `_docs/CODING_MATH.md`; this document keeps the agreed tier requirement and a pointer. |
