@@ -1,3 +1,11 @@
+/**
+ * Portal clip plane data (src/render/three/portalClipData.ts): the clip-plane texture and slot assignment the
+ * clip shader (`portalClipMaterial`) reads, and the single owner of stereo ranking and budget (which visible path
+ * gets a slot when the mono or stereo union exceeds `maxVisiblePaths`, and in what order). A stereo union is
+ * ranked round-robin across eyes (`rankStereoUnionPaths`, also exercised directly below) so each eye loses the
+ * same number of paths when some are dropped; a path missing a slot is never drawn clipped, it is removed from
+ * the instance list entirely (`omitPathsWithoutClipSlot`).
+ */
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import {
@@ -7,6 +15,7 @@ import {
   writeAlwaysInsidePlanes,
   writeAlwaysOutsidePlanes,
 } from "../../src/render/three/portalClipData";
+import { rankStereoUnionPaths } from "../../src/render/three/portalEyeFrameTransforms";
 import { createRootVisiblePortalPath, omitPathsWithoutClipSlot } from "../../src/render/three/renderPortalInstances";
 import type { VisiblePortalPath } from "../../src/render/three/visiblePortalPaths";
 
@@ -110,7 +119,7 @@ describe("portal clip data", () => {
     clipData.dispose();
   });
 
-  it("counts surplus paths and removes them from the instance list instead of drawing them clipped", () => {
+  it("drops surplus paths from the instance list instead of drawing them clipped", () => {
     const clipData = createPortalClipData({ maxVisiblePaths: 1, maxClipTextureEyes: 1 });
     const paths = [createVisiblePath(1), createVisiblePath(2), createVisiblePath(3)];
 
@@ -180,6 +189,22 @@ describe("portal clip data", () => {
     expect(Array.from(out)).toEqual([0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1]);
     writeAlwaysOutsidePlanes(out, 0);
     expect(Array.from(out)).toEqual([0, 0, 0, -1, 0, 0, 0, -1, 0, 0, 0, -1, 0, 0, 0, -1]);
+  });
+});
+
+describe("rankStereoUnionPaths", () => {
+  it("alternates between disjoint lists, roots first", () => {
+    const eye0 = Array.from({ length: 10 }, (_, id) => createVisiblePath(id, undefined, id === 0 ? 0 : 1));
+    const eye1 = Array.from({ length: 10 }, (_, id) => createVisiblePath(10 + id, undefined, id === 0 ? 0 : 1));
+
+    expect(rankStereoUnionPaths([eye0, eye1]).map((path) => path.pathId).slice(0, 6)).toEqual([0, 10, 1, 11, 2, 12]);
+  });
+
+  it("does not spend a turn on an id that is already taken", () => {
+    const eye0 = [0, 1, 2, 3].map((id) => createVisiblePath(id, undefined, 1));
+    const eye1 = [0, 1, 4, 5].map((id) => createVisiblePath(id, undefined, 1));
+
+    expect(rankStereoUnionPaths([eye0, eye1]).map((path) => path.pathId)).toEqual([0, 1, 2, 4, 3, 5]);
   });
 });
 

@@ -2,10 +2,6 @@ H6	tests/render/aimTarget.test.ts	-
 H6	tests/render/aimTarget.test.ts	keeps short geodesic ray segments selectable near their emitter when the emitter hitbox is missed
 H6	tests/render/aimTarget.test.ts	reports the next available geodesic id when an ignored geodesic is aimed through the emitter body
 H6	tests/render/aimTarget.test.ts	resolves geodesic ray segments near their emitter when the smaller emitter hitbox is missed
-H6	tests/render/portalClipData.test.ts	-
-H6	tests/render/portalClipData.test.ts	counts surplus paths and removes them from the instance list instead of drawing them clipped
-H6	tests/render/portalClipPlanes.test.ts	-
-H6	tests/render/portalEyeFrameTransforms.test.ts	-
 H6	tests/render/scenePaletteLibraryAdapter.test.ts	-
 H6	tests/render/scenePaletteLibraryAdapter.test.ts	renders sign editing with fixed number, QWERTY, space, enter, backspace, cursor, and trash controls
 H6	tests/render/visiblePortalPaths.property.test.ts	-

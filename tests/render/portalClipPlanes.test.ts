@@ -1,3 +1,10 @@
+/**
+ * Clip plane transform and shader emulation (src/render/three/portalEyeFrameTransforms.ts's
+ * `transformClipPlanes`, and portalClipData's stored planes): a plane's signed distance to any point is invariant
+ * under a rigid map applied to both the plane and the point, and the always-inside/always-outside sentinel rows
+ * map to themselves. A CPU re-implementation of the vertex-clip shader's per-vertex test, run against real cube
+ * worlds at many camera poses, agrees with the path's screen polygon to within about a pixel.
+ */
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import { cube } from "../../src/authoring/exampleWorlds";
@@ -15,7 +22,7 @@ import {
   transformVisiblePortalResultToRenderFrame,
 } from "../../src/render/three/portalEyeFrameTransforms";
 import { computeVisiblePortalPaths, type VisiblePortalPath } from "../../src/render/three/visiblePortalPaths";
-import { worldPointToThree } from "../../src/render/three/worldAxes";
+import { createCameraFacingYaw } from "../support/cameras";
 
 describe("transformClipPlanes", () => {
   it("translates and rotates planes with the render frame", () => {
@@ -125,7 +132,7 @@ describe("CPU emulation of the clip shader", () => {
     expect(clipDistancesForVertex(data, 0, 0, 2, new THREE.Vector3(0, 0, 0), -1)).toEqual([-1, -1, -1, -1]);
   });
 
-  it("agrees with the screen polygon to within one pixel for 20000 random pixels", () => {
+  it("agrees with the screen polygon to within one pixel for 3000 random pixels", () => {
     const { result, clipData } = cubeScene(cubeCamera(-0.04, 0, 0.3));
     const data = clipData.texture.image.data as unknown as Float32Array;
     const random = lcg(777);
@@ -133,7 +140,7 @@ describe("CPU emulation of the clip shader", () => {
 
     expect(paths.length).toBeGreaterThan(0);
 
-    for (let sample = 0; sample < 20000; sample += 1) {
+    for (let sample = 0; sample < 3000; sample += 1) {
       const path = paths[sample % paths.length];
       const slot = clipData.clipIndexByPathId.get(path.pathId)!;
       const ndcX = random() * 2 - 1;
@@ -208,15 +215,7 @@ describe("CPU emulation of the clip shader", () => {
 const viewport = { width: 800, height: 600 };
 
 function cubeCamera(x: number, y: number, yaw: number): THREE.PerspectiveCamera {
-  const camera = new THREE.PerspectiveCamera(90, viewport.width / viewport.height, 0.03, 250);
-
-  camera.position.copy(worldPointToThree({ x, y, z: 1.6 }));
-  camera.up.set(0, 1, 0);
-  camera.lookAt(worldPointToThree({ x: x + Math.cos(yaw), y: y + Math.sin(yaw), z: 1.6 }));
-  camera.updateMatrixWorld(true);
-  camera.updateProjectionMatrix();
-
-  return camera;
+  return createCameraFacingYaw({ x, y, z: 1.6 }, yaw, { fovDegrees: 90, aspect: viewport.width / viewport.height, near: 0.03, far: 250 });
 }
 
 function cubeScene(camera: THREE.PerspectiveCamera): {

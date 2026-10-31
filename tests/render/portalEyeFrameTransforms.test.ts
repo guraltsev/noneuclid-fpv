@@ -1,8 +1,15 @@
+/**
+ * Per-eye portal frame transforms (src/render/three/portalEyeFrameTransforms.ts): moves a visible-paths result
+ * into the render frame of a non-identity root (premultiplying every path's matrix, sharing the input when the
+ * transform is the identity); counts stereo cell copies by their placement (both eyes, left-only, right-only,
+ * dropped) rather than by path id; and remaps path ids so that eyes sharing one root group share ids while eyes
+ * in different groups never collide. Stereo ranking and budget (`rankStereoUnionPaths`, the round-robin order
+ * `portalClipData` assigns clip slots in) is owned by tests/render/portalClipData.test.ts.
+ */
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import {
   countStereoPortalPaths,
-  rankStereoUnionPaths,
   remapStereoPortalPathIds,
   transformVisiblePortalResultToRenderFrame,
   type PortalEyeRenderState,
@@ -63,22 +70,6 @@ function eyeState(eyeIndex: number, rootCellId: string, paths: VisiblePortalPath
     result: { paths, visiblePathById: new Map(paths.map((path) => [path.pathId, path])) } as unknown as ComputeVisiblePortalPathsResult,
   };
 }
-
-describe("rankStereoUnionPaths", () => {
-  it("alternates between disjoint lists, roots first", () => {
-    const eye0 = Array.from({ length: 10 }, (_, id) => createVisiblePath(id, id === 0 ? 0 : 1, "a", id));
-    const eye1 = Array.from({ length: 10 }, (_, id) => createVisiblePath(10 + id, id === 0 ? 0 : 1, "b", id));
-
-    expect(rankStereoUnionPaths([eye0, eye1]).map((path) => path.pathId).slice(0, 6)).toEqual([0, 10, 1, 11, 2, 12]);
-  });
-
-  it("does not spend a turn on an id that is already taken", () => {
-    const eye0 = [0, 1, 2, 3].map((id) => createVisiblePath(id, 1, "a", id));
-    const eye1 = [0, 1, 4, 5].map((id) => createVisiblePath(id, 1, "a", id));
-
-    expect(rankStereoUnionPaths([eye0, eye1]).map((path) => path.pathId)).toEqual([0, 1, 2, 4, 3, 5]);
-  });
-});
 
 describe("countStereoPortalPaths", () => {
   it("counts cell copies by placement, not by id", () => {
