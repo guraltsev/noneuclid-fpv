@@ -152,6 +152,9 @@ Baseline: `npm run typecheck` and `npm test` (expect 160 files and 1,071 tests p
 
 ## Report
 
+Commit: `653a8a2` ("Job 41: test tiers, hygiene checks, baseline and indicators"), on `design/012-engine-api`,
+one commit for the whole job.
+
 ### Done
 
 - **Baseline (step 1).** Before any change, commit `2378b1f`: `npm run typecheck` passed; `npm test` (the old,
