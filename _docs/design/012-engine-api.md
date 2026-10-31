@@ -843,7 +843,7 @@ marked below. *Stages*, each useful on its own (S2 to S4 still **Proposed**):
   | dodecahedron | 6 | 666 / 6,826 | 135 / 273 | 107 / 107 | 74 / 80 us |
   | genus-2 | 5 | 1,209 / 22,409 | 177 / 490 | 124 / 124 | 90 / 107 us |
 
-  Rerun with `tests/render-contract/funnelStaticCullBenchmark.test.ts` (skipped unless `FUNNEL_CULL_BENCH` is set);
+  Rerun with `npm run bench -- funnelStaticCull`;
   a second run with another seed agreed within noise. Visible sets are identical (funnel exact, static cull
   conservative). Without the static cull the funnel examines
   1.3 to 2.8 times as many paths but takes only 2 to 19% longer (at most ~17 us per call, under 0.2% of a 90 Hz

@@ -1,80 +1,68 @@
-H4	tests/render-contract/preloadWorldAssets.test.ts	-
-H6	tests/render-contract/aimCrossMarker.test.ts	-
-H6	tests/render-contract/aimTarget.test.ts	-
-H6	tests/render-contract/aimTarget.test.ts	keeps short geodesic ray segments selectable near their emitter when the emitter hitbox is missed
-H6	tests/render-contract/aimTarget.test.ts	reports the next available geodesic id when an ignored geodesic is aimed through the emitter body
-H6	tests/render-contract/aimTarget.test.ts	resolves geodesic ray segments near their emitter when the smaller emitter hitbox is missed
-H6	tests/render-contract/buildCellMesh.test.ts	-
-H6	tests/render-contract/buildDecorationMesh.test.ts	-
-H6	tests/render-contract/cellRenderArchetypes.test.ts	-
-H6	tests/render-contract/cellRenderArchetypes.test.ts	builds floor, portal-frame, solid-wall, and no static-object archetypes while excluding sky caps and marmots
-H6	tests/render-contract/cellRenderArchetypes.test.ts	counts kept destination paths per cell, includes depth-0 roots, and respects a visible-path cap
-H6	tests/render-contract/cellRenderArchetypes.test.ts	gives every archetype a hidden root mesh with the shared geometry and an unpatched material
-H6	tests/render-contract/debugCollisionWireframes.test.ts	-
-H6	tests/render-contract/debugOverlay.test.ts	-
-H6	tests/render-contract/debugVisualization.test.ts	-
-H6	tests/render-contract/desktopControls.test.ts	-
-H6	tests/render-contract/desktopScenePaletteInput.test.ts	-
-H6	tests/render-contract/frameErrorGuard.test.ts	-
-H6	tests/render-contract/frameRenderSnapshot.test.ts	-
-H6	tests/render-contract/funnelStaticCullBenchmark.test.ts	-
-H6	tests/render-contract/geodesicCannonAimTarget.test.ts	-
-H6	tests/render-contract/geodesicCannonRenderer.test.ts	-
-H6	tests/render-contract/geodesicCarryPortalTransition.test.ts	-
-H6	tests/render-contract/geodesicCreatureDebug.test.ts	-
-H6	tests/render-contract/geodesicEmitterLabelController.test.ts	-
-H6	tests/render-contract/measureLengthRenderer.test.ts	-
-H6	tests/render-contract/placedFlagRenderer.test.ts	-
-H6	tests/render-contract/playerRoverModel.test.ts	-
-H6	tests/render-contract/portalClipData.test.ts	-
-H6	tests/render-contract/portalClipData.test.ts	counts surplus paths and removes them from the instance list instead of drawing them clipped
-H6	tests/render-contract/portalClipMaterial.test.ts	-
-H6	tests/render-contract/portalClipMaterial.test.ts	patches materials with plane fetches in the vertex stage and a single compare in the fragment stage
-H6	tests/render-contract/portalClipPlanes.test.ts	-
-H6	tests/render-contract/portalClipPolygonOverlay.test.ts	-
-H6	tests/render-contract/portalEyeActivation.test.ts	-
-H6	tests/render-contract/portalEyeFrameTransforms.test.ts	-
-H6	tests/render-contract/portalFunnel.test.ts	-
-H6	tests/render-contract/portalInstanceBuffers.test.ts	-
-H6	tests/render-contract/portalInstanceBuffers.test.ts	hides the root mesh when no depth-0 path is visible, and a root-only archetype draws no instance
-H6	tests/render-contract/portalWallTexture.test.ts	-
-H6	tests/render-contract/preloadWorldAssets.test.ts	-
-H6	tests/render-contract/prerenderCells.test.ts	-
-H6	tests/render-contract/protractorAngleRenderer.test.ts	-
-H6	tests/render-contract/protractorToolFeedback.test.ts	-
-H6	tests/render-contract/renderCameraClip.test.ts	-
-H6	tests/render-contract/renderQuality.test.ts	-
-H6	tests/render-contract/renderQuality.test.ts	uses drawing-buffer pixels for portal viewport uniforms because gl_FragCoord is in framebuffer pixels
-H6	tests/render-contract/runtimeObjectGhostRecords.test.ts	-
-H6	tests/render-contract/runtimeObjectInstanceSync.test.ts	-
-H6	tests/render-contract/runtimeObjectInstanceSync.test.ts	traverses an object's hierarchy once, and again only after one of its source keys is deleted
-H6	tests/render-contract/runtimeObjectPortalInstances.test.ts	-
-H6	tests/render-contract/runtimeObjectRenderArchetypes.test.ts	-
-H6	tests/render-contract/runtimeObjectRenderArchetypes.test.ts	collects mesh sources, hides source meshes, and bakes mesh transforms into archetype geometry
-H6	tests/render-contract/runtimeSceneDispose.test.ts	-
-H6	tests/render-contract/sceneLighting.test.ts	-
-H6	tests/render-contract/scenePaletteLibraryAdapter.test.ts	-
-H6	tests/render-contract/scenePaletteLibraryAdapter.test.ts	renders sign editing with fixed number, QWERTY, space, enter, backspace, cursor, and trash controls
-H6	tests/render-contract/scenePaletteTooltip.test.ts	-
-H6	tests/render-contract/scenePointers.test.ts	-
-H6	tests/render-contract/staticAssetRenderRoot.test.ts	-
-H6	tests/render-contract/stereoSplitRoot.test.ts	-
-H6	tests/render-contract/visiblePortalPaths.property.test.ts	-
-H6	tests/render-contract/visiblePortalPaths.test.ts	-
-H6	tests/render-contract/visiblePortalPaths.test.ts	reports live ShowCellPath-style visibility only when the matched path id is in the latest result
-H6	tests/render-contract/vrComfort.test.ts	-
-H6	tests/render-contract/vrLocomotion.test.ts	-
-H6	tests/render-contract/vrPaletteHeaderActions.test.ts	-
-H6	tests/render-contract/vrPalettePlacement.test.ts	-
-H6	tests/render-contract/worldResultBadge.test.ts	-
-H6	tests/render-contract/xrControllerHandModels.test.ts	-
-H6	tests/render-contract/xrControls.test.ts	-
-H6	tests/render-contract/xrDebugPanel.test.ts	-
-H6	tests/render-contract/xrPortalEye.test.ts	-
-H6	tests/render-contract/xrPortalEye.test.ts	reuses the target's camera and matrix across re-rooting calls with the same result as without a target
-H6	tests/render-contract/xrScenePaletteInput.test.ts	-
-H6	tests/render-contract/xrScenePaletteInput.test.ts	does not emit a second menu toggle edge because XR runtime input already owns side-trigger menu actions
-H6	tests/render-contract/xrScenePaletteInput.test.ts	maps controller select and side trigger buttons without treating face buttons as menu toggles
-H6	tests/render-contract/xrSessionRestart.test.ts	-
-H6	tests/render-contract/xrSessionState.test.ts	-
-H9	tests/render-contract/funnelStaticCullBenchmark.test.ts	-
+H4	tests/render/preloadWorldAssets.test.ts	-
+H6	tests/render/aimCrossMarker.test.ts	-
+H6	tests/render/aimTarget.test.ts	-
+H6	tests/render/aimTarget.test.ts	keeps short geodesic ray segments selectable near their emitter when the emitter hitbox is missed
+H6	tests/render/aimTarget.test.ts	reports the next available geodesic id when an ignored geodesic is aimed through the emitter body
+H6	tests/render/aimTarget.test.ts	resolves geodesic ray segments near their emitter when the smaller emitter hitbox is missed
+H6	tests/render/buildDecorationMesh.test.ts	-
+H6	tests/render/cellRenderArchetypes.test.ts	-
+H6	tests/render/cellRenderArchetypes.test.ts	builds floor, portal-frame, solid-wall, and no static-object archetypes while excluding sky caps and marmots
+H6	tests/render/cellRenderArchetypes.test.ts	counts kept destination paths per cell, includes depth-0 roots, and respects a visible-path cap
+H6	tests/render/cellRenderArchetypes.test.ts	gives every archetype a hidden root mesh with the shared geometry and an unpatched material
+H6	tests/render/debugCollisionWireframes.test.ts	-
+H6	tests/render/debugOverlay.test.ts	-
+H6	tests/render/desktopControls.test.ts	-
+H6	tests/render/desktopScenePaletteInput.test.ts	-
+H6	tests/render/frameErrorGuard.test.ts	-
+H6	tests/render/geodesicCannonAimTarget.test.ts	-
+H6	tests/render/geodesicCannonRenderer.test.ts	-
+H6	tests/render/geodesicCarryPortalTransition.test.ts	-
+H6	tests/render/geodesicCreatureDebug.test.ts	-
+H6	tests/render/geodesicEmitterLabelController.test.ts	-
+H6	tests/render/measureLengthRenderer.test.ts	-
+H6	tests/render/placedFlagRenderer.test.ts	-
+H6	tests/render/playerRoverModel.test.ts	-
+H6	tests/render/portalClipData.test.ts	-
+H6	tests/render/portalClipData.test.ts	counts surplus paths and removes them from the instance list instead of drawing them clipped
+H6	tests/render/portalClipPlanes.test.ts	-
+H6	tests/render/portalClipPolygonOverlay.test.ts	-
+H6	tests/render/portalEyeActivation.test.ts	-
+H6	tests/render/portalEyeFrameTransforms.test.ts	-
+H6	tests/render/portalFunnel.test.ts	-
+H6	tests/render/portalInstanceBuffers.test.ts	-
+H6	tests/render/portalInstanceBuffers.test.ts	hides the root mesh when no depth-0 path is visible, and a root-only archetype draws no instance
+H6	tests/render/portalWallTexture.test.ts	-
+H6	tests/render/preloadWorldAssets.test.ts	-
+H6	tests/render/prerenderCells.test.ts	-
+H6	tests/render/protractorAngleRenderer.test.ts	-
+H6	tests/render/protractorToolFeedback.test.ts	-
+H6	tests/render/runtimeObjectGhostRecords.test.ts	-
+H6	tests/render/runtimeObjectPortalInstances.test.ts	-
+H6	tests/render/runtimeObjectRenderArchetypes.test.ts	-
+H6	tests/render/runtimeObjectRenderArchetypes.test.ts	collects mesh sources, hides source meshes, and bakes mesh transforms into archetype geometry
+H6	tests/render/runtimeSceneDispose.test.ts	-
+H6	tests/render/sceneLighting.test.ts	-
+H6	tests/render/scenePaletteLibraryAdapter.test.ts	-
+H6	tests/render/scenePaletteLibraryAdapter.test.ts	renders sign editing with fixed number, QWERTY, space, enter, backspace, cursor, and trash controls
+H6	tests/render/scenePaletteTooltip.test.ts	-
+H6	tests/render/scenePointers.test.ts	-
+H6	tests/render/staticAssetRenderRoot.test.ts	-
+H6	tests/render/stereoSplitRoot.test.ts	-
+H6	tests/render/visiblePortalPaths.property.test.ts	-
+H6	tests/render/visiblePortalPaths.test.ts	-
+H6	tests/render/visiblePortalPaths.test.ts	reports live ShowCellPath-style visibility only when the matched path id is in the latest result
+H6	tests/render/vrComfort.test.ts	-
+H6	tests/render/vrLocomotion.test.ts	-
+H6	tests/render/vrPaletteHeaderActions.test.ts	-
+H6	tests/render/vrPalettePlacement.test.ts	-
+H6	tests/render/worldResultBadge.test.ts	-
+H6	tests/render/xrControllerHandModels.test.ts	-
+H6	tests/render/xrControls.test.ts	-
+H6	tests/render/xrDebugPanel.test.ts	-
+H6	tests/render/xrPortalEye.test.ts	-
+H6	tests/render/xrPortalEye.test.ts	reuses the target's camera and matrix across re-rooting calls with the same result as without a target
+H6	tests/render/xrScenePaletteInput.test.ts	-
+H6	tests/render/xrScenePaletteInput.test.ts	does not emit a second menu toggle edge because XR runtime input already owns side-trigger menu actions
+H6	tests/render/xrScenePaletteInput.test.ts	maps controller select and side trigger buttons without treating face buttons as menu toggles
+H6	tests/render/xrSessionRestart.test.ts	-
+H6	tests/render/xrSessionState.test.ts	-

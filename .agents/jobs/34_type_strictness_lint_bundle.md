@@ -13,7 +13,7 @@ Nothing in this issue has been implemented. Re-checked:
 - `npx tsc --noEmit --noUncheckedIndexedAccess` now gives 353 errors: `src/render` 86, `src/cell-complex` 78,
   `src/world-objects` 50, `src/math` 13, `src/runtime` 2, `src/authoring` 0 (the validator moved to
   `src/cell-complex/validateCellComplexSpec.ts`), tests 124. Top files: `geodesicCannon.ts` 50,
-  `staticPortalPathCull.ts` 39, `tests/render-contract/visiblePortalPaths.test.ts` 27, `visiblePortalPaths.ts` 21,
+  `staticPortalPathCull.ts` 39, `tests/render/visiblePortalPaths.test.ts` 27, `visiblePortalPaths.ts` 21,
   `tests/runtime/worldGeometryDeformations.test.ts` 17, `validateCellComplexSpec.ts` 16, `polygons.ts` 13,
   `prismBase.ts` 12. Plain `npm run typecheck` passes.
 - `package.json` has no ESLint/Prettier and no `lint` script; there is no CI workflow that could run one (issue 36).

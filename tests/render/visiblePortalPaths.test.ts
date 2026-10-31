@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import { cube, tetrahedron } from "../../src/authoring/exampleWorlds";
-import { twoPrismLoop } from "../fixtures/twoPrismLoop";
+import { twoPrismLoop } from "../fixtures/cell-complex/twoPrismLoop";
 import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
 import { buildPortalPathTables } from "../../src/cell-complex/portalPaths";
 import {

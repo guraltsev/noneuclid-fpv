@@ -1,4 +1,16 @@
+/**
+ * Render quality policy: device pixel ratio capping, the camera's near/far clip planes, and the CSS versus
+ * drawing-buffer canvas sizes the renderer and the portal-clip shader read (see _docs/ARCHITECTURE.md, "Testing
+ * strategy").
+ *
+ * The renderer is faked by `tests/support/fakeRenderer.ts`; only `getSize`/`getDrawingBufferSize` are read here.
+ */
 import { describe, expect, it } from "vitest";
+import {
+  renderCameraDepthRangeRatio,
+  renderCameraFarMeters,
+  renderCameraNearMeters,
+} from "../../src/render/three/renderCameraClip";
 import {
   createRenderQualityState,
   getPortalViewportPixels,
@@ -10,10 +22,18 @@ import {
   resolveRenderPixelRatio,
 } from "../../src/render/three/renderQuality";
 import type * as THREE from "three";
+import { createFakeRenderer } from "../support/fakeRenderer";
 
 describe("render quality policy", () => {
   it("requests renderer antialiasing explicitly", () => {
     expect(renderAntialiasRequested).toBe(true);
+  });
+
+  it("keeps the near plane close but not so tiny that far static objects lose depth precision", () => {
+    expect(renderCameraNearMeters).toBeGreaterThanOrEqual(0.03);
+    expect(renderCameraNearMeters).toBeLessThanOrEqual(0.05);
+    expect(renderCameraFarMeters).toBe(250);
+    expect(renderCameraDepthRangeRatio()).toBeLessThanOrEqual(10_000);
   });
 
   it("caps device pixel ratio to the configured maximum", () => {
@@ -44,20 +64,20 @@ describe("render quality policy", () => {
   });
 
   it("keeps CSS and drawing-buffer renderer sizes distinct", () => {
-    const renderer = createRendererSizeStub({
-      css: { width: 800, height: 450 },
-      drawingBuffer: { width: 1600, height: 900 },
-    });
+    const renderer = createFakeRenderer({
+      cssSize: { width: 800, height: 450 },
+      drawingBufferSize: { width: 1600, height: 900 },
+    }) as unknown as THREE.WebGLRenderer;
 
     expect(getRendererCssCanvasSize(renderer)).toEqual({ width: 800, height: 450 });
     expect(getRendererDrawingBufferPixels(renderer)).toEqual({ width: 1600, height: 900 });
   });
 
-  it("uses drawing-buffer pixels for portal viewport uniforms because gl_FragCoord is in framebuffer pixels", () => {
-    const renderer = createRendererSizeStub({
-      css: { width: 640, height: 360 },
-      drawingBuffer: { width: 1280, height: 720 },
-    });
+  it("reads portal viewport uniforms in drawing-buffer pixels, matching gl_FragCoord", () => {
+    const renderer = createFakeRenderer({
+      cssSize: { width: 640, height: 360 },
+      drawingBufferSize: { width: 1280, height: 720 },
+    }) as unknown as THREE.WebGLRenderer;
 
     expect(getPortalViewportPixels(renderer)).toEqual({ width: 1280, height: 720 });
     expect(createRenderQualityState(renderer, 2, true)).toMatchObject({
@@ -74,21 +94,3 @@ describe("render quality policy", () => {
     });
   });
 });
-
-function createRendererSizeStub(sizes: {
-  readonly css: { readonly width: number; readonly height: number };
-  readonly drawingBuffer: { readonly width: number; readonly height: number };
-}): THREE.WebGLRenderer {
-  return {
-    getSize(target: { x: number; y: number }) {
-      target.x = sizes.css.width;
-      target.y = sizes.css.height;
-      return target;
-    },
-    getDrawingBufferSize(target: { x: number; y: number }) {
-      target.x = sizes.drawingBuffer.width;
-      target.y = sizes.drawingBuffer.height;
-      return target;
-    },
-  } as unknown as THREE.WebGLRenderer;
-}

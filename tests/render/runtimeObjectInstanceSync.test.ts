@@ -1,9 +1,21 @@
+/**
+ * Runtime-object instance sync (src/render/three/runtimeObjectInstanceSync.ts): on each `sync(snapshot)`, writes
+ * every render archetype's instance matrices and clip indices from the frame's visible portal paths, rebuilding a
+ * world object's cached records only when it (or the world) changed. A ghost (the same object seen through two
+ * destination paths) is suppressed by distance to the camera, except the player rover's own ghost, which the host
+ * suppresses within a fixed radius. Also covers `frameRenderSnapshot.ts`, the small per-frame value this module
+ * reads: it flattens a frame's visible paths (grouped by destination cell) into one sorted list and regroups them,
+ * keeping the camera positions and clip-index lookup alongside.
+ *
+ * This file does not assert the module's own performance counters (`sync.stats`) or spy on `Object3D.traverse`
+ * (tests.md §2.2): those are an optimisation, not a behaviour a caller observes.
+ */
 import * as THREE from "three";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
 import type { CellComplexSpec } from "../../src/cell-complex/specs";
 import { yawRigidTransform3 } from "../../src/math/rigidTransform3";
-import { createFrameRenderSnapshot } from "../../src/render/three/frameRenderSnapshot";
+import { createEmptyFrameRenderSnapshot, createFrameRenderSnapshot } from "../../src/render/three/frameRenderSnapshot";
 import type { PlayerRoverRenderModel } from "../../src/render/three/playerRoverModel";
 import { createRootVisiblePortalPath, unclippedPortalClipIndex } from "../../src/render/three/renderPortalInstances";
 import {
@@ -119,31 +131,6 @@ function readMatrix(mesh: THREE.InstancedMesh, index: number): THREE.Matrix4 {
 }
 
 describe("runtimeObjectInstanceSync", () => {
-  it("collects records once per sync", () => {
-    const { sync } = setup([mouse("mouse-1")]);
-    const snap = snapshot({ "room-b": [path("room-b", 0, 0)] });
-
-    sync.sync(snap);
-    sync.sync(snap);
-    sync.sync(snap);
-
-    expect(sync.stats.syncs).toBe(3);
-    expect(sync.stats.recordCollections).toBe(3);
-  });
-
-  it("reuses the records of unchanged objects, ghosts included", () => {
-    const { sync, registry } = setup([mouse("mouse-1")]);
-    const snap = snapshot({ "room-b": [path("room-b", 0, 0)] });
-
-    sync.sync(snap);
-    sync.sync(snap);
-    expect(sync.stats.ghostComputations).toBe(1);
-
-    registry.update(mouse("mouse-1", 0.1));
-    sync.sync(snap);
-    expect(sync.stats.ghostComputations).toBe(2);
-  });
-
   it("uses the snapshot root and paths, not a player cell", () => {
     const { sync, renderArchetypesByKey } = setup([mouse("mouse-1")]);
     const snap = snapshot({
@@ -240,18 +227,14 @@ describe("runtimeObjectInstanceSync", () => {
     readMatrix(archetype.mesh, 0).elements.forEach((value, i) => expect(value).toBeCloseTo(rigidTransformToThreeMatrix(moved).elements[i], 6));
   });
 
-  it("traverses an object's hierarchy once, and again only after one of its source keys is deleted", () => {
-    const { sync, roots, renderSourcesByKey } = setup([mouse("mouse-1")]);
-    const traverse = vi.spyOn(roots.get("mouse-1")!, "traverse");
+  it("rebuilds a render source that was removed from the cache", () => {
+    const { sync, renderSourcesByKey } = setup([mouse("mouse-1")]);
     const snap = snapshot({ "room-b": [path("room-b", 0, 0)] });
 
     sync.sync(snap);
-    sync.sync(snap);
-    expect(traverse).toHaveBeenCalledTimes(1);
-
     renderSourcesByKey.delete("geo-mouse:mouse-1:mesh:0");
     sync.sync(snap);
-    expect(traverse).toHaveBeenCalledTimes(2);
+
     expect(renderSourcesByKey.has("geo-mouse:mouse-1:mesh:0")).toBe(true);
   });
 
@@ -308,15 +291,36 @@ describe("runtimeObjectInstanceSync", () => {
     }
   });
 
-  it("does not walk ghosts again for an unchanged static asset record", () => {
-    const spec = { id: "house", kind: "asset" as const, assetPath: "models/house.glb", position: { x: 0, y: 0, z: 0 } };
-    const { sync } = setup([createRuntimeStaticAssetObject(spec, "room-b")]);
-    const snap = snapshot({ "room-b": [path("room-b", 0, 0)] });
+});
 
-    sync.sync(snap);
-    sync.sync(snap);
-    sync.sync(snap);
+describe("frameRenderSnapshot", () => {
+  it("flattens, sorts and regroups the paths for objects and keeps the cell map", () => {
+    const map = new Map([
+      ["room-b", [path("room-b", 3, 1), path("room-b", 1, 0)]],
+      ["room-a", [path("room-a", 2, 1)]],
+    ]);
 
-    expect(sync.stats.ghostComputations).toBe(1);
+    const snap = createFrameRenderSnapshot({
+      serial: 4,
+      rootCellId: "room-b",
+      visiblePathsByDestinationCell: map,
+      clipIndexByPathId: new Map(),
+      cameraPositions: [],
+    });
+
+    expect(snap.objectPaths.map((p) => p.pathId)).toEqual([1, 2, 3]);
+    expect(snap.objectPathsByDestinationCell.get("room-b")?.map((p) => p.pathId)).toEqual([1, 3]);
+    expect(snap.visiblePathsByDestinationCell).toBe(map);
+    expect(snap.rootCellId).toBe("room-b");
+    expect(snap.serial).toBe(4);
+  });
+
+  it("builds an empty snapshot that keeps the root cell", () => {
+    const snap = createEmptyFrameRenderSnapshot(2, "room-a");
+
+    expect(snap.objectPaths).toEqual([]);
+    expect(snap.objectPathsByDestinationCell.size).toBe(0);
+    expect(snap.visiblePathsByDestinationCell.size).toBe(0);
+    expect(snap.rootCellId).toBe("room-a");
   });
 });

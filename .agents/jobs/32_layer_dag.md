@@ -36,5 +36,5 @@ Checker (`scripts/docs/lib.mjs`):
 - `layers` in `scripts/docs/lib.mjs` is a DAG; a test asserts it.
 - `layering-baseline.json` has no `world-objects -> render`, `runtime -> render`, `glue -> render` edges.
 - No `from "three"` outside `src/render` and `src/main.ts`, enforced by `docs:check`.
-- `aimTarget` and `visiblePortalPaths` tests move from `tests/render-contract/` to plain-Node test dirs.
+- `aimTarget` and `visiblePortalPaths` tests move from `tests/render/` to plain-Node test dirs.
 - Zero import cycles reported.

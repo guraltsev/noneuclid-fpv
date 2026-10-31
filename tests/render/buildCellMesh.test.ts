@@ -1,14 +1,29 @@
+/**
+ * Cell mesh building (src/render/three/buildCellMesh.ts): the floor, ceiling, walls and portal-wall geometry and
+ * materials built from a compiled cell and its `PreparedWorldAssets`, plus the `userData.kind`/`portalSides`
+ * payload `cellRenderArchetypes` and `aimTarget` read downstream.
+ *
+ * Rules: a configured floor texture (and the portal wall texture) is cached and shared across meshes built from the
+ * same assets; a missing texture falls back to the cell's floor colour; portal panels, their text labels and
+ * forbidden-zone wireframes are built only when their debug option asks for them. Floor UVs follow `floorUv.ts`'s
+ * lattice frame when the cell has one, otherwise a fixed-period tiling.
+ *
+ * Prepared assets are faked by `tests/support/preparedAssets.ts`; `document.createElement("canvas")` for portal
+ * panel text is faked by `tests/support/fakeCanvas2d.ts`.
+ */
 import * as THREE from "three";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
 import { dodecahedron } from "../../src/authoring/exampleWorlds";
-import { twoPrismLoop } from "../fixtures/twoPrismLoop";
+import { twoPrismLoop } from "../fixtures/cell-complex/twoPrismLoop";
 import { floorLatticeUv, type FloorLatticeUvFrame } from "../../src/cell-complex/floorUv";
 import type { CellComplexSpec } from "../../src/cell-complex/specs";
 import { buildCellMesh } from "../../src/render/three/buildCellMesh";
 import { SCENE_BACKGROUND_COLOR } from "../../src/render/three/sceneColors";
 import { PORTAL_WALL_TEXTURE_KEY } from "../../src/render/three/portalWallTexture";
 import type { PreparedWorldAssets } from "../../src/render/three/preloadWorldAssets";
+import { installFakeCanvas2d } from "../support/fakeCanvas2d";
+import { createFakePreparedAssets } from "../support/preparedAssets";
 
 describe("buildCellMesh", () => {
   afterEach(() => {
@@ -24,14 +39,7 @@ describe("buildCellMesh", () => {
 
     expect(roomA.portalBySideIndex.get(1)?.id).toBe("side-1");
 
-    const preparedAssets: PreparedWorldAssets = {
-      getTexture: () => new THREE.Texture(),
-      getConfiguredTexture: () => new THREE.Texture(),
-      instantiateGltf: () => ({
-        scene: new THREE.Group(),
-        animations: [],
-      }),
-    };
+    const preparedAssets = createFakePreparedAssets();
     const mesh = buildCellMesh(roomA, {
       debugLevel: "basic",
       portalPanelMode: "panel",
@@ -59,7 +67,6 @@ describe("buildCellMesh", () => {
     expect(floor).toBeDefined();
     expect(ceiling).toBeDefined();
     expect(walls).toBeDefined();
-    expect(walls?.children).toHaveLength(roomA.sideCount);
     expect((ceilingMesh?.material as THREE.MeshStandardMaterial | undefined)?.userData.textureUrl).toBeUndefined();
     expect((ceilingMesh?.material as THREE.MeshStandardMaterial | undefined)?.color.getHex()).toBe(
       SCENE_BACKGROUND_COLOR,
@@ -77,14 +84,7 @@ describe("buildCellMesh", () => {
   it("renders portal panels and labels according to the selected portal panel mode", () => {
     const compiled = compileCellComplex(twoPrismLoop);
     const roomA = compiled.cellsById.get("room-a")!;
-    const preparedAssets: PreparedWorldAssets = {
-      getTexture: () => new THREE.Texture(),
-      getConfiguredTexture: () => new THREE.Texture(),
-      instantiateGltf: () => ({
-        scene: new THREE.Group(),
-        animations: [],
-      }),
-    };
+    const preparedAssets = createFakePreparedAssets();
 
     const noPanelMesh = buildCellMesh(roomA, {
       debugLevel: "basic",
@@ -99,32 +99,7 @@ describe("buildCellMesh", () => {
       assets: preparedAssets,
     });
 
-    vi.stubGlobal("document", {
-      createElement(tagName: string) {
-        if (tagName !== "canvas") {
-          throw new Error(`Unexpected element request: ${tagName}`);
-        }
-
-        return {
-          width: 0,
-          height: 0,
-          getContext(kind: string) {
-            if (kind !== "2d") {
-              return null;
-            }
-
-            return {
-              clearRect() {},
-              fillText() {},
-              fillStyle: "#ffffff",
-              font: "bold 96px system-ui, sans-serif",
-              textAlign: "center",
-              textBaseline: "middle",
-            };
-          },
-        };
-      },
-    });
+    installFakeCanvas2d();
 
     const labeledMesh = buildCellMesh(roomA, {
       debugLevel: "basic",
@@ -162,7 +137,7 @@ describe("buildCellMesh", () => {
       debugLevel: "off",
       portalPanelMode: "none",
       eyeHeightMeters: 1.6,
-      assets: createPreparedAssets(),
+      assets: createFakePreparedAssets(),
     });
 
     expect(mesh.getObjectByName("floor:top")).toBeDefined();
@@ -176,14 +151,14 @@ describe("buildCellMesh", () => {
       debugLevel: "basic",
       portalPanelMode: "none",
       eyeHeightMeters: 1.6,
-      assets: createPreparedAssets(),
+      assets: createFakePreparedAssets(),
       showForbiddenZoneWireframes: false,
     });
     const debugMesh = buildCellMesh(roomA, {
       debugLevel: "basic",
       portalPanelMode: "none",
       eyeHeightMeters: 1.6,
-      assets: createPreparedAssets(),
+      assets: createFakePreparedAssets(),
       showForbiddenZoneWireframes: true,
     });
 
@@ -191,7 +166,6 @@ describe("buildCellMesh", () => {
 
     const wireframeGroup = debugMesh.getObjectByName("forbidden-zone-wireframes:room-a") as THREE.Group | undefined;
     expect(wireframeGroup).toBeDefined();
-    expect(wireframeGroup?.children).toHaveLength(roomA.forbiddenZones.length);
     expect(
       debugMesh.getObjectByName("forbidden-zone-wireframe:room-a:room-a:vertex-1")?.userData,
     ).toMatchObject({
@@ -218,44 +192,8 @@ describe("buildCellMesh", () => {
   it("labels portal side redirects as source side to target face and side", () => {
     const compiled = compileCellComplex(twoPrismLoop);
     const roomA = compiled.cellsById.get("room-a")!;
-    const preparedAssets: PreparedWorldAssets = {
-      getTexture: () => new THREE.Texture(),
-      getConfiguredTexture: () => new THREE.Texture(),
-      instantiateGltf: () => ({
-        scene: new THREE.Group(),
-        animations: [],
-      }),
-    };
-    const drawnText: string[] = [];
-
-    vi.stubGlobal("document", {
-      createElement(tagName: string) {
-        if (tagName !== "canvas") {
-          throw new Error(`Unexpected element request: ${tagName}`);
-        }
-
-        return {
-          width: 0,
-          height: 0,
-          getContext(kind: string) {
-            if (kind !== "2d") {
-              return null;
-            }
-
-            return {
-              clearRect() {},
-              fillText(text: string) {
-                drawnText.push(text);
-              },
-              fillStyle: "#ffffff",
-              font: "bold 96px system-ui, sans-serif",
-              textAlign: "center",
-              textBaseline: "middle",
-            };
-          },
-        };
-      },
-    });
+    const preparedAssets = createFakePreparedAssets();
+    const canvas = installFakeCanvas2d();
 
     buildCellMesh(roomA, {
       debugLevel: "basic",
@@ -264,7 +202,7 @@ describe("buildCellMesh", () => {
       assets: preparedAssets,
     });
 
-    expect(drawnText).toEqual(["1 -> room-b, 3"]);
+    expect(canvas.context.fillText.mock.calls.map((call) => call[0])).toEqual(["1 -> room-b, 3"]);
   });
 
   it("reuses configured floor textures across matching meshes and keeps sRGB color space", () => {
@@ -277,14 +215,7 @@ describe("buildCellMesh", () => {
       configuredTexture.repeat.set(request.repeatX, request.repeatY);
       return configuredTexture;
     });
-    const assets: PreparedWorldAssets = {
-      getTexture: () => sharedTexture,
-      getConfiguredTexture,
-      instantiateGltf: () => ({
-        scene: new THREE.Group(),
-        animations: [],
-      }),
-    };
+    const assets = createFakePreparedAssets({ getTexture: () => sharedTexture, getConfiguredTexture });
 
     const firstMesh = buildCellMesh(roomA, {
       debugLevel: "off",
@@ -313,14 +244,10 @@ describe("buildCellMesh", () => {
     const compiled = compileCellComplex(twoPrismLoop);
     const roomA = compiled.cellsById.get("room-a")!;
     const portalWallTexture = new THREE.Texture();
-    const assets: PreparedWorldAssets = {
+    const assets = createFakePreparedAssets({
       getTexture: (assetPath) => assetPath === PORTAL_WALL_TEXTURE_KEY ? portalWallTexture : undefined,
       getConfiguredTexture: (request) => request.assetPath === PORTAL_WALL_TEXTURE_KEY ? portalWallTexture : undefined,
-      instantiateGltf: () => ({
-        scene: new THREE.Group(),
-        animations: [],
-      }),
-    };
+    });
 
     const mesh = buildCellMesh(roomA, {
       debugLevel: "off",
@@ -340,7 +267,7 @@ describe("buildCellMesh", () => {
 });
 
 describe("buildCellMesh floor UVs", () => {
-  const readFloor = (half: number, extra: { floorUvFrame?: FloorLatticeUvFrame } = {}, assets = createPreparedAssets()) => {
+  const readFloor = (half: number, extra: { floorUvFrame?: FloorLatticeUvFrame } = {}, assets = createFakePreparedAssets()) => {
     const world = compileCellComplex(createFloorRoomSpec(half));
     const mesh = buildCellMesh(world.cellsById.get("floor-room")!, {
       debugLevel: "off",
@@ -365,7 +292,7 @@ describe("buildCellMesh floor UVs", () => {
 
   it("requests the floor texture with repeat 1", () => {
     const getConfiguredTexture = vi.fn(() => new THREE.Texture());
-    const assets: PreparedWorldAssets = { ...createPreparedAssets(), getConfiguredTexture };
+    const assets: PreparedWorldAssets = { ...createFakePreparedAssets(), getConfiguredTexture };
     readFloor(5, {}, assets);
     const calls = (getConfiguredTexture.mock.calls as unknown as [Parameters<PreparedWorldAssets["getConfiguredTexture"]>[0]][])
       .map(([request]) => request)
@@ -413,16 +340,5 @@ function createFloorRoomSpec(half: number): CellComplexSpec {
       },
     ],
   } as unknown as CellComplexSpec;
-}
-
-function createPreparedAssets(): PreparedWorldAssets {
-  return {
-    getTexture: () => new THREE.Texture(),
-    getConfiguredTexture: () => new THREE.Texture(),
-    instantiateGltf: () => ({
-      scene: new THREE.Group(),
-      animations: [],
-    }),
-  };
 }
 

@@ -176,7 +176,7 @@ renderer-neutral data (`src/ui/paletteDefinition.ts#createPaletteDefinition`) an
 ## Testing strategy
 
 Tests mirror `src/` (see [tests.md](tests.md)). The geometry layers are covered by behavior tests that need no browser;
-`tests/render-contract` checks renderer contracts with Three.js objects but no GPU; `tests/docs` enforces the
+`tests/render` checks renderer contracts with Three.js objects but no GPU; `tests/docs` enforces the
 documentation rules above. There is no automated end-to-end test of the WebGL frame loop; the application shell is
 checked by a manual/headless smoke run (see [DEVELOPMENT.md](DEVELOPMENT.md)).
 
