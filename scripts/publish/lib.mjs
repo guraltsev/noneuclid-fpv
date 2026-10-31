@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Pure helpers of the branch publisher (scripts/publish/publish.mjs): folder names, branch patterns, the site base
  * path, the manifest `published.json` and the root `index.html`. No file system and no git, so they are unit-tested
  * directly (tests/scripts/publish.test.ts). Nothing here is specific to this repository.
@@ -8,6 +8,7 @@
 export function folderForBranch(branch) {
   const folder = branch.replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^[-.]+|-+$/g, "");
   if (folder === "") throw new Error(`The branch name "${branch}" gives an empty folder name.`);
+  if (RESERVED_FOLDERS.includes(folder)) throw new Error(`The folder name "${folder}" is reserved for the site; rename the branch.`);
   return folder;
 }
 
@@ -83,27 +84,35 @@ export function totalBytes(manifest) {
 
 const escapeHtml = (text) => text.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 
+/** Folder names that belong to the site itself and cannot be used for a branch. */
+export const RESERVED_FOLDERS = ["versions"];
+
 /**
- * The root `index.html`: redirects to the default branch's folder when it is published, and lists every published
- * branch with its commit and time.
+ * The root `index.html`: redirects to the default branch's folder when it is published, otherwise to `versions/`.
  */
 export function renderIndex(manifest) {
   const defaultFolder = Object.entries(manifest.entries).find(([, entry]) => entry.branch === manifest.default)?.[0];
+  const target = defaultFolder ? `./${escapeHtml(defaultFolder)}/` : "./versions/";
+  return `<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta http-equiv="refresh" content="0; url=${target}"><link rel="canonical" href="${target}"><title>Redirecting</title></head>
+<body><p><a href="${target}">Continue</a> or see <a href="./versions/">all published versions</a>.</p></body></html>
+`;
+}
+
+/** The page `versions/index.html`: every published branch with its commit and time, linking to its folder. */
+export function renderVersions(manifest) {
   const rows = Object.entries(manifest.entries)
     .sort(([a], [b]) => a.localeCompare(b))
     .map(
       ([folder, entry]) =>
-        `<li><a href="./${escapeHtml(folder)}/">${escapeHtml(entry.branch)}</a> <small>${escapeHtml(entry.sha.slice(0, 7))}, ${escapeHtml(entry.publishedAt)}</small></li>`,
+        `<li><a href="../${escapeHtml(folder)}/">${escapeHtml(entry.branch)}</a>${entry.branch === manifest.default ? " (default)" : ""} <small>${escapeHtml(entry.sha.slice(0, 7))}, ${escapeHtml(entry.publishedAt)}</small></li>`,
     )
     .join("\n");
-  const redirect = defaultFolder
-    ? `<meta http-equiv="refresh" content="0; url=./${escapeHtml(defaultFolder)}/"><link rel="canonical" href="./${escapeHtml(defaultFolder)}/">`
-    : "";
   return `<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">${redirect}<title>Published versions</title></head>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Published versions</title></head>
 <body><h1>Published versions</h1>
 <ul>
-${rows}
+${rows === "" ? "<li>Nothing is published yet.</li>" : rows}
 </ul></body></html>
 `;
 }
