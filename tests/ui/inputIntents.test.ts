@@ -1,3 +1,11 @@
+/**
+ * `tests/ui/inputIntents.test.ts` — unit tier.
+ *
+ * `getInputHintGlyph` maps an input intent (primary, context-menu, help, move, ...) and the current input mode to
+ * the label and icon a help row or tooltip shows: desktop intents to mouse/keyboard glyphs, XR intents to
+ * controller glyphs, independently of each other. These tests check the desktop glyph set and that XR intents do
+ * not fall back to the mouse icons.
+ */
 import { describe, expect, it } from "vitest";
 import { publicAssetUrl } from "../../src/glue/assetUrls";
 import { getInputHintGlyph } from "../../src/ui/inputIntents";

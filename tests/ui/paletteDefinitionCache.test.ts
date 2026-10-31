@@ -1,3 +1,10 @@
+/**
+ * `tests/ui/paletteDefinitionCache.test.ts` — unit tier.
+ *
+ * `createPaletteDefinitionCache` memoizes `createPaletteDefinition` (expensive to rebuild every frame) against the
+ * menu state object, the input mode and a "clock changed" flag: the same inputs return the same definition and
+ * version, and any of the three changing bumps the version. These tests check both.
+ */
 import { describe, expect, it } from "vitest";
 import { defaultAppConfig } from "../../src/glue/appConfig";
 import { createRuntimeMenuState } from "../../src/runtime/runtimeMenuState";

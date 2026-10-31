@@ -1,3 +1,11 @@
+/**
+ * `tests/ui/inputModeText.test.ts` — unit tier.
+ *
+ * `formatBodyForInputMode` rewrites a handful of known sentence patterns in authored help text (movement, the
+ * help key, the primary-action phrasing) to the words of the current input mode (desktop or XR), leaving every
+ * other sentence untouched. These tests check each known pattern for both modes and that unknown text passes
+ * through unchanged.
+ */
 import { describe, expect, it } from "vitest";
 import { formatBodyForInputMode } from "../../src/ui/inputModeText";
 

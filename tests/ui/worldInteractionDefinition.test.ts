@@ -1,3 +1,12 @@
+/**
+ * `tests/ui/worldInteractionDefinition.test.ts` — unit tier.
+ *
+ * `createWorldFocusMessageDefinition` builds the focus message (title plus available actions) shown while aiming
+ * at a world object, from the object's kind and the currently selected tool, independent of the renderer;
+ * `formatWorldFocusMessageTextForLegacyFallback` renders it as the plain text the old debug overlay still reads.
+ * These tests check the definition and legacy text for signs, geodesic emitters, help hubs, open geodesic
+ * segments (the extend action available only when a segment is actually open), and measurements and angles.
+ */
 import { describe, expect, it } from "vitest";
 import { identityRigidTransform3 } from "../../src/math/rigidTransform3";
 import {

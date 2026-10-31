@@ -1,3 +1,11 @@
+/**
+ * `tests/ui/paletteTooltips.test.ts` — unit tier.
+ *
+ * `resolvePaletteTooltipLabel` names a palette control's tooltip from its control id, including ids that carry
+ * extra data (a geodesic cannon action, a specific geodesic id, a sign type). These tests check the label for
+ * every control class: global actions, geodesic-cannon actions, question-help and goal paging, sign actions, tool
+ * tiles, and tool options.
+ */
 import { describe, expect, it } from "vitest";
 import { resolvePaletteTooltipLabel } from "../../src/ui/paletteTooltips";
 

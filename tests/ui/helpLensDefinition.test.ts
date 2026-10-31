@@ -1,3 +1,11 @@
+/**
+ * `tests/ui/helpLensDefinition.test.ts` — unit tier.
+ *
+ * `createHelpLensDefinition` builds the content of the "help lens" (the H/B help overlay) from the object the
+ * player is aiming at: a title, a short body, and one row per available action with the right input hint for the
+ * current mode. No three.js is involved; this is plain data the renderer displays. These tests check the content
+ * built from focus metadata for an object with actions.
+ */
 import { describe, expect, it } from "vitest";
 import { publicAssetUrl } from "../../src/glue/assetUrls";
 import { createHelpLensDefinition } from "../../src/ui/helpLensDefinition";

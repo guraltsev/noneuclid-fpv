@@ -140,12 +140,6 @@ H6	tests/server/localServer.process.test.ts	-
 H6	tests/smoke/smokeArgs.test.ts	-
 H6	tests/smoke/staticServer.process.test.ts	-
 H6	tests/support/arbitraries.test.ts	-
-H6	tests/ui/helpLensDefinition.test.ts	-
-H6	tests/ui/inputIntents.test.ts	-
-H6	tests/ui/inputModeText.test.ts	-
-H6	tests/ui/paletteDefinitionCache.test.ts	-
-H6	tests/ui/paletteTooltips.test.ts	-
-H6	tests/ui/worldInteractionDefinition.test.ts	-
 H6	tests/world-objects/geodesic/cannon.test.ts	-
 H6	tests/world-objects/geodesic/cannon.test.ts	places an incoming emitter on the selected geodesic when the source owns multiple geodesics
 H6	tests/world-objects/geodesic/carry.test.ts	-
