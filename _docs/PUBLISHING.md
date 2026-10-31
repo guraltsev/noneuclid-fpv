@@ -19,13 +19,16 @@ Settings are in [config.toml](../.gittools/pages-publish/config.toml).
 
 ## Everyday use
 
+The launcher `_scripts/pages-publish.cmd` (Windows; `_scripts/pages-publish.sh` elsewhere) runs the tool from any directory of the
+repository; the tool itself is `.gittools/pages-publish/pages_publish.py`.
+
 ```sh
 git commit ...                                      # the tracked working tree must be clean
-python .gittools/pages-publish/pages_publish.py publish             # or: npm run publish:branch
-python .gittools/pages-publish/pages_publish.py publish --add       # also list a new branch in .gittools/pages-publish/config.toml (then commit it)
-python .gittools/pages-publish/pages_publish.py remove --branch X   # delete a branch's folder (and its exact entry in the config)
-python .gittools/pages-publish/pages_publish.py prune               # delete folders of branches that no longer exist
-python .gittools/pages-publish/pages_publish.py status              # what is published
+_scripts/pages-publish.cmd publish             # or: npm run publish:branch
+_scripts/pages-publish.cmd publish --add       # also list a new branch in .gittools/pages-publish/config.toml (then commit it)
+_scripts/pages-publish.cmd remove --branch X   # delete a branch's folder (and its exact entry in the config)
+_scripts/pages-publish.cmd prune               # delete folders of branches that no longer exist
+_scripts/pages-publish.cmd status              # what is published
 ```
 
 A commit that `published.json` already records is skipped without building, so a local publish and the workflow never
@@ -33,14 +36,14 @@ repeat each other's work. Branches not listed in `branches` are skipped unless `
 
 ## One-time setup
 
-Settings → Pages → Source: **Deploy from a branch**, `gh_pages`, `/ (root)` — or `python .gittools/pages-publish/pages_publish.py enable-pages`.
+Settings → Pages → Source: **Deploy from a branch**, `gh_pages`, `/ (root)` — or `_scripts/pages-publish.cmd enable-pages`.
 
 ## Two optional automations
 
 Independent; use none, one or both.
 
 - **On `git push`, from your machine:** `git config publish.onPush true` (the tracked pre-push hook, installed with
-  `python .gittools/pages-publish/pages_publish.py install-hook`, then publishes after the checks pass; a failure only warns).
+  `_scripts/pages-publish.cmd install-hook`, then publishes after the checks pass; a failure only warns).
 - **On GitHub:** [.github/workflows/pages-publish.yml](../.github/workflows/pages-publish.yml) checks whether the pushed
   commit is already published, installs Node and builds only if not, and prunes when a branch is deleted. Turn it off by
   deleting the file or setting the repository variable `PUBLISH_DISABLED=true`.
