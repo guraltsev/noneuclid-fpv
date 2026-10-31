@@ -4,7 +4,8 @@ The site is served from a branch, `gh_pages`, that holds one built folder per pu
 
 ```text
 gh_pages
-  index.html          redirects to ./main/ and lists every published branch
+  index.html          redirects to ./main/ (or to ./versions/ while the default branch is not published)
+  versions/index.html list of every published branch with links, commit and time
   published.json      which commit each folder was built from
   .nojekyll
   main/               build of main            https://guraltsev.github.io/noneuclid-fpv/main/

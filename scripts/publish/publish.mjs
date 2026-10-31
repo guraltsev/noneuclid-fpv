@@ -22,6 +22,7 @@ import {
   parseManifest,
   pruneManifest,
   renderIndex,
+  renderVersions,
   siteBaseFromRemote,
   totalBytes,
   withEntry,
@@ -211,6 +212,8 @@ export async function publish(options = {}) {
       message ??= "Prune";
       fs.writeFileSync(manifestFile, `${JSON.stringify(manifest, null, 2)}\n`);
       fs.writeFileSync(path.join(dir, "index.html"), renderIndex(manifest));
+      fs.mkdirSync(path.join(dir, "versions"), { recursive: true });
+      fs.writeFileSync(path.join(dir, "versions", "index.html"), renderVersions(manifest));
       fs.writeFileSync(path.join(dir, ".nojekyll"), "\n");
       inDir(["add", "-A"]);
       const tree = inDir(["write-tree"]).out;

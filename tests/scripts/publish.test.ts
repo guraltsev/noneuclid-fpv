@@ -1,4 +1,4 @@
-import { spawnSync } from "node:child_process";
+﻿import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -27,6 +27,7 @@ interface Lib {
   withEntry(manifest: Manifest, folder: string, entry: Entry): Manifest;
   pruneManifest(manifest: Manifest, live: string[]): { manifest: Manifest; removed: string[] };
   renderIndex(manifest: Manifest): string;
+  renderVersions(manifest: Manifest): string;
 }
 interface PublishResult {
   status: string;
@@ -45,6 +46,7 @@ describe("publish helpers", () => {
     expect(folderForBranch("main")).toBe("main");
     expect(folderForBranch("design/012-engine-api")).toBe("design-012-engine-api");
     expect(() => folderForBranch("///")).toThrow();
+    expect(() => folderForBranch("versions")).toThrow("reserved");
   });
 
   it("matches branch globs", async () => {
@@ -67,18 +69,21 @@ describe("publish helpers", () => {
   });
 
   it("records, prunes and renders the manifest", async () => {
-    const { parseManifest, withEntry, pruneManifest, renderIndex } = await loadLib();
+    const { parseManifest, withEntry, pruneManifest, renderIndex, renderVersions } = await loadLib();
     expect(parseManifest("not json", "main")).toEqual({ default: "main", entries: {} });
     let manifest = parseManifest("", "main");
     manifest = withEntry(manifest, "main", { branch: "main", sha: "a".repeat(40), publishedAt: "t" });
     manifest = withEntry(manifest, "x-y", { branch: "x/y", sha: "b".repeat(40), publishedAt: "t" });
     const html = renderIndex(manifest);
     expect(html).toContain('url=./main/"');
-    expect(html).toContain('href="./x-y/"');
+    const versions = renderVersions(manifest);
+    expect(versions).toContain('href="../x-y/"');
+    expect(versions).toContain('href="../main/"');
     const { manifest: pruned, removed } = pruneManifest(manifest, ["main"]);
     expect(removed).toEqual(["x-y"]);
     expect(Object.keys(pruned.entries)).toEqual(["main"]);
-    expect(renderIndex({ default: "main", entries: {} })).not.toContain("http-equiv");
+    expect(renderIndex({ default: "main", entries: { "x-y": manifest.entries["x-y"] } })).toContain('url=./versions/"');
+    expect(renderVersions({ default: "main", entries: {} })).toContain("Nothing is published yet");
   });
 });
 
@@ -133,6 +138,7 @@ describe("publish end to end (temporary repositories)", { timeout: 60_000 }, () 
     expect((await publish(quiet)).status).toBe("published");
     expect(show("main/index.html").stdout).toBe("base=/site/main/ src=one");
     expect(show("index.html").stdout).toContain("url=./main/");
+    expect(show("versions/index.html").stdout).toContain('href="../main/"');
     expect(JSON.parse(show("published.json").stdout).entries.main.sha).toBe(git(work, "rev-parse", "HEAD"));
 
     expect((await publish(quiet)).status).toBe("current");
