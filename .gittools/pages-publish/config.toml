@@ -1,4 +1,4 @@
-# Settings for scripts/pages_publish.py. See _docs/PUBLISHING.md.
+# Settings for scripts/pages_publish.py. See README.md in this folder and _docs/PUBLISHING.md.
 
 [publish]
 # Branches that are published (globs: * stays inside one / segment, ** crosses it).

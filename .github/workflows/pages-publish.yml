@@ -1,9 +1,9 @@
-﻿name: Publish branches to GitHub Pages
+name: Publish branches to GitHub Pages
 
-# Optional. Does what `python scripts/pages_publish.py publish` does, for the branch that was pushed.
+# Optional. Does what `python .gittools/pages-publish/pages_publish.py publish` does, for the branch that was pushed.
 # Delete this file, or set the repository variable PUBLISH_DISABLED to "true", to turn it off.
 # GitHub Pages must be set to "Deploy from a branch": gh_pages / (root)
-# (`python scripts/pages_publish.py enable-pages` does that; see PUBLISHING.md).
+# (`python .gittools/pages-publish/pages_publish.py enable-pages` does that; see .gittools/pages-publish/README.md).
 
 on:
   push:
@@ -40,14 +40,14 @@ jobs:
 
       - name: Prune folders of deleted branches
         if: ${{ github.event_name == 'delete' }}
-        run: python scripts/pages_publish.py prune
+        run: python .gittools/pages-publish/pages_publish.py prune
 
       # Cheap: reads the Pages branch only. Says build=false when the branch is not listed in
-      # pages-publish.toml or the commit is already published (for example by a local publish).
+      # .gittools/pages-publish/config.toml or the commit is already published (for example by a local publish).
       - name: Is there anything to publish?
         id: check
         if: ${{ github.event_name != 'delete' }}
-        run: python scripts/pages_publish.py check --branch "${{ github.ref_name }}"
+        run: python .gittools/pages-publish/pages_publish.py check --branch "${{ github.ref_name }}"
 
       - name: Setup Node
         if: ${{ steps.check.outputs.build == 'true' }}
@@ -61,4 +61,4 @@ jobs:
         run: npm ci
       - name: Publish
         if: ${{ steps.check.outputs.build == 'true' }}
-        run: python scripts/pages_publish.py publish --branch "${{ github.ref_name }}"
+        run: python .gittools/pages-publish/pages_publish.py publish --branch "${{ github.ref_name }}"
