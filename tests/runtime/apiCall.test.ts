@@ -1,3 +1,13 @@
+/**
+ * `tests/runtime/apiCall.test.ts` — unit tier.
+ *
+ * `callApi` dispatches a dotted path (`"app.changeWorld"`) against a namespaced API object, calling a function
+ * with `this` bound to its own namespace, reading a plain property, and awaiting an async result; `listApi` lists
+ * every callable path for `help`; `toPlainData` converts a result to data a transport (JSON, a script) can carry
+ * (`_docs/tests.md` §8.5: this is the dispatch layer under `window.noneuclid.api`). These tests check path
+ * resolution and its errors (an unknown path, a non-function at the end, a forbidden segment such as `__proto__`),
+ * plain-data conversion of maps, typed arrays, sets, errors, functions and cycles, and listing sorted nested names.
+ */
 import { describe, expect, it } from "vitest";
 import { callApi, listApi, toPlainData } from "../../src/runtime/apiCall";
 

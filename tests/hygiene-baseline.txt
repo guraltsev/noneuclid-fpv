@@ -139,15 +139,6 @@ H6	tests/render-contract/xrScenePaletteInput.test.ts	does not emit a second menu
 H6	tests/render-contract/xrScenePaletteInput.test.ts	maps controller select and side trigger buttons without treating face buttons as menu toggles
 H6	tests/render-contract/xrSessionRestart.test.ts	-
 H6	tests/render-contract/xrSessionState.test.ts	-
-H6	tests/runtime/apiCall.test.ts	-
-H6	tests/runtime/runtimeCommands.test.ts	-
-H6	tests/runtime/runtimeMenuState.test.ts	-
-H6	tests/runtime/torusSkewDeformation.test.ts	-
-H6	tests/runtime/worldGeometryComputedObjects.test.ts	-
-H6	tests/runtime/worldGeometryDeformations.property.test.ts	-
-H6	tests/runtime/worldGeometryDeformations.test.ts	-
-H6	tests/runtime/worldGeometryRuntimeTransforms.test.ts	-
-H6	tests/runtime/worldGeometrySession.test.ts	-
 H6	tests/scripts/checkDistSize.test.ts	-
 H6	tests/server/channel.process.test.ts	-
 H6	tests/server/localServer.process.test.ts	-

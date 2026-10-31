@@ -1,3 +1,11 @@
+/**
+ * `tests/runtime/worldGeometryRuntimeTransforms.test.ts` — unit tier.
+ *
+ * When a geometry commit changes a cell's shape, every pose that lived in it must move with it: the authored
+ * starting position, a placed flag, and a runtime object's pose and three.js transform, each mapped by the
+ * commit's per-cell deformation maps (`_docs/MATHEMATICAL_MODEL.md` §9). These tests check each of those poses
+ * after a torus-skew commit, including a static asset, a positioned object spec, and a creature's host transform.
+ */
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import { torus } from "../../src/authoring/exampleWorlds";

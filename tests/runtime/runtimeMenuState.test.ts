@@ -1,3 +1,12 @@
+/**
+ * `tests/runtime/runtimeMenuState.test.ts` — unit tier.
+ *
+ * `RuntimeMenuState` holds the palette's own state (open page, selected tool, debug settings, in-progress sign
+ * edits, goal/tutorial page indices) separately from the scene; its `showRuntimeMenu*`/`setRuntimeMenu*` functions
+ * are the only way it changes, and `createPaletteDefinition` reads it into the content a renderer-independent
+ * palette displays. These tests check tool selection, each page transition and its content, derived debug settings,
+ * and the fallback title/page-label shown for an empty goal or tutorial page list.
+ */
 import { describe, expect, it } from "vitest";
 import {
   createRuntimeMenuState,

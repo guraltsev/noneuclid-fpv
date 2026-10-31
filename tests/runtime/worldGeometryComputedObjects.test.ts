@@ -1,7 +1,19 @@
+/**
+ * `tests/runtime/worldGeometryComputedObjects.test.ts` — unit tier.
+ *
+ * `applyGeometryCommitComputedObjectPolicy` runs after a geometry commit (a deformation, or any change that can
+ * move geodesics): it rebuilds every locked geodesic it still can, removes the ones it cannot, and refreshes or
+ * removes the measured-length and protractor-angle objects attached to them, reporting what it did so a caller can
+ * sync its own render state. These tests check: an unlocked (open) geodesic and its attachments are removed; a
+ * rebuildable locked geodesic keeps its attachments, which are refreshed with new values; an angle selected by
+ * segment (not by the emitter id) survives a rebuild of its endpoints; and a locked interval geodesic rebuilds even
+ * when it was never owned by a cannon's own id list.
+ */
 import { describe, expect, it } from "vitest";
 import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
+import type { CompiledCellComplex } from "../../src/cell-complex/compileCellComplex";
 import { yawRigidTransform3 } from "../../src/math/rigidTransform3";
-import { vec3 } from "../../src/math/vec3";
+import { vec3, type Vec3 } from "../../src/math/vec3";
 import { applyGeometryCommitComputedObjectPolicy } from "../../src/runtime/worldGeometryComputedObjects";
 import { createGeodesicCannonObject, geodesicRayBeamHeightMeters } from "../../src/world-objects/geodesic/objects";
 import { getGeodesicSegments, getGeodesicTail } from "../../src/world-objects/geodesic/segments";
@@ -19,25 +31,23 @@ import {
 import {
   createRuntimeObjectRegistry,
   type RuntimeWorldObject,
+  type RuntimeObjectRegistry,
 } from "../../src/world-objects/runtimeObjectRegistry";
+
+const centerPoint = vec3(0, 0, geodesicRayBeamHeightMeters);
 
 describe("world geometry computed object policy", () => {
   it("clears unlocked geodesics and attached computed objects after a geometry commit", () => {
     const world = compileLargeWorld();
     const registry = createRuntimeObjectRegistry();
-    const cannon = createGeodesicCannonObject({
-      id: "cannon-a",
-      cellId: "a",
-      localPose: yawRigidTransform3(0, vec3(-1.5, 0, 0)),
-    });
-    registry.add(cannon);
-    shootGeodesic({ world, registry, cannon, geodesicId: "g-open", maxLengthMeters: 1.5 });
+    addCannon(registry, "cannon-a", "a", yawRigidTransform3(0, vec3(-1.5, 0, 0)));
+    shoot(world, registry, "cannon-a", "g-open", 1.5);
     const measurement = createMeasuredGeodesicLengthObject({
       id: "measure-open",
       registry,
       geodesicId: "g-open",
       playerCellId: "a",
-      playerPoint: vec3(-0.75, 0, geodesicRayBeamHeightMeters),
+      playerPoint: centerPoint,
     });
     if (!measurement) {
       throw new Error("Expected open geodesic measurement fixture.");
@@ -71,49 +81,23 @@ describe("world geometry computed object policy", () => {
   });
 
   it("rebuilds locked geodesics and refreshes attached measurements and protractor angles", () => {
-    const world = compileLargeWorld();
-    const registry = createRuntimeObjectRegistry();
-    const leftSource = createGeodesicCannonObject({
-      id: "cannon-a",
-      cellId: "a",
-      localPose: yawRigidTransform3(0, vec3(-1.5, 0, 0)),
-    });
-    const lowerSource = createGeodesicCannonObject({
-      id: "cannon-c",
-      cellId: "a",
-      localPose: yawRigidTransform3(Math.PI / 2, vec3(1, -2, 0)),
-    });
-    const incoming = createGeodesicCannonObject({
-      id: "cannon-b",
-      cellId: "a",
-      localPose: yawRigidTransform3(Math.PI, vec3(1, 0, 0)),
-    });
-    registry.add(leftSource);
-    registry.add(lowerSource);
-    registry.add(incoming);
-    shootGeodesic({ world, registry, cannon: leftSource, geodesicId: "g-a", maxLengthMeters: 4 });
-    shootGeodesic({ world, registry, cannon: lowerSource, geodesicId: "g-b", maxLengthMeters: 4 });
+    const { world, registry } = threeCannonWorld();
+    shoot(world, registry, "cannon-a", "g-a");
+    shoot(world, registry, "cannon-c", "g-b");
     const measurement = createMeasuredGeodesicLengthObject({
       id: "measure-g-a",
       registry,
       geodesicId: "g-a",
       playerCellId: "a",
-      playerPoint: vec3(0, 0, geodesicRayBeamHeightMeters),
+      playerPoint: centerPoint,
     });
     if (!measurement) {
       throw new Error("Expected locked geodesic measurement fixture.");
     }
     registry.add(measurement);
-    registry.add(createIncomingEmitterAngle(registry.get("cannon-b")));
+    registry.add(createIncomingEmitterAngle(registry));
     const previousLength = measurement.lengthMeters;
-    const movedIncoming = registry.get("cannon-b");
-    if (movedIncoming?.kind !== "geodesic-cannon") {
-      throw new Error("Expected incoming emitter.");
-    }
-    registry.update({
-      ...movedIncoming,
-      localPose: yawRigidTransform3(Math.PI, vec3(1, 1, 0)),
-    });
+    moveIncoming(registry, vec3(1, 1, 0));
 
     const syncedMeasurements: string[] = [];
     const syncedAngles: string[] = [];
@@ -121,7 +105,7 @@ describe("world geometry computed object policy", () => {
       world,
       registry,
       playerCellId: "a",
-      playerPoint: vec3(0, 0, geodesicRayBeamHeightMeters),
+      playerPoint: centerPoint,
       callbacks: {
         syncMeasuredGeodesicLength: (object) => syncedMeasurements.push(object.id),
         syncProtractorAngle: (object) => syncedAngles.push(object.id),
@@ -152,43 +136,17 @@ describe("world geometry computed object policy", () => {
   });
 
   it("keeps segment-selected angles while shared locked endpoints are rebuilt", () => {
-    const world = compileLargeWorld();
-    const registry = createRuntimeObjectRegistry();
-    const leftSource = createGeodesicCannonObject({
-      id: "cannon-a",
-      cellId: "a",
-      localPose: yawRigidTransform3(0, vec3(-1.5, 0, 0)),
-    });
-    const lowerSource = createGeodesicCannonObject({
-      id: "cannon-c",
-      cellId: "a",
-      localPose: yawRigidTransform3(Math.PI / 2, vec3(1, -2, 0)),
-    });
-    const incoming = createGeodesicCannonObject({
-      id: "cannon-b",
-      cellId: "a",
-      localPose: yawRigidTransform3(Math.PI, vec3(1, 0, 0)),
-    });
-    registry.add(leftSource);
-    registry.add(lowerSource);
-    registry.add(incoming);
-    shootGeodesic({ world, registry, cannon: leftSource, geodesicId: "g-a", maxLengthMeters: 4 });
-    shootGeodesic({ world, registry, cannon: lowerSource, geodesicId: "g-b", maxLengthMeters: 4 });
-    registry.add(createIncomingSegmentAngle(registry.get("cannon-b"), registry));
-    const movedIncoming = registry.get("cannon-b");
-    if (movedIncoming?.kind !== "geodesic-cannon") {
-      throw new Error("Expected incoming emitter.");
-    }
-    registry.update({
-      ...movedIncoming,
-      localPose: yawRigidTransform3(Math.PI, vec3(1, 1, 0)),
-    });
+    const { world, registry } = threeCannonWorld();
+    shoot(world, registry, "cannon-a", "g-a");
+    shoot(world, registry, "cannon-c", "g-b");
+    registry.add(createIncomingSegmentAngle(registry));
+    moveIncoming(registry, vec3(1, 1, 0));
 
     const result = applyGeometryCommitComputedObjectPolicy({
       world,
       registry,
       playerCellId: "a",
-      playerPoint: vec3(0, 0, geodesicRayBeamHeightMeters),
+      playerPoint: centerPoint,
     });
 
     expect(result.removedProtractorAngleIds).toEqual([]);
@@ -199,19 +157,9 @@ describe("world geometry computed object policy", () => {
   it("rebuilds locked interval geodesics even without legacy cannon-owned ids", () => {
     const world = compileLargeWorld();
     const registry = createRuntimeObjectRegistry();
-    const source = createGeodesicCannonObject({
-      id: "cannon-a",
-      cellId: "a",
-      localPose: yawRigidTransform3(0, vec3(-1.5, 0, 0)),
-    });
-    const incoming = createGeodesicCannonObject({
-      id: "cannon-b",
-      cellId: "a",
-      localPose: yawRigidTransform3(Math.PI, vec3(1, 0, 0)),
-    });
-    registry.add(source);
-    registry.add(incoming);
-    shootGeodesic({ world, registry, cannon: source, geodesicId: "g-a", maxLengthMeters: 4 });
+    addCannon(registry, "cannon-a", "a", yawRigidTransform3(0, vec3(-1.5, 0, 0)));
+    addCannon(registry, "cannon-b", "a", yawRigidTransform3(Math.PI, vec3(1, 0, 0)));
+    shoot(world, registry, "cannon-a", "g-a");
     for (const object of registry.getAll()) {
       if (object.kind === "geodesic-cannon") {
         registry.update({
@@ -223,20 +171,13 @@ describe("world geometry computed object policy", () => {
         });
       }
     }
-    const movedIncoming = registry.get("cannon-b");
-    if (movedIncoming?.kind !== "geodesic-cannon") {
-      throw new Error("Expected incoming emitter.");
-    }
-    registry.update({
-      ...movedIncoming,
-      localPose: yawRigidTransform3(Math.PI, vec3(1, 1, 0)),
-    });
+    moveIncoming(registry, vec3(1, 1, 0));
 
     const result = applyGeometryCommitComputedObjectPolicy({
       world,
       registry,
       playerCellId: "a",
-      playerPoint: vec3(0, 0, geodesicRayBeamHeightMeters),
+      playerPoint: centerPoint,
     });
 
     expect(result.rebuiltGeodesicIds).toEqual(["g-a"]);
@@ -246,7 +187,7 @@ describe("world geometry computed object policy", () => {
   });
 });
 
-function compileLargeWorld() {
+function compileLargeWorld(): CompiledCellComplex {
   return compileCellComplex({
     cells: [
       {
@@ -264,12 +205,48 @@ function compileLargeWorld() {
   });
 }
 
+/** Adds a cannon of the given id, cell and pose to the registry, and returns it. */
+function addCannon(registry: RuntimeObjectRegistry, id: string, cellId: string, localPose: ReturnType<typeof yawRigidTransform3>) {
+  const cannon = createGeodesicCannonObject({ id, cellId, localPose });
+  registry.add(cannon);
+  return cannon;
+}
+
+/** Shoots a geodesic from the named cannon in the registry. */
+function shoot(world: CompiledCellComplex, registry: RuntimeObjectRegistry, cannonId: string, geodesicId: string, maxLengthMeters = 4) {
+  const cannon = registry.get(cannonId);
+  if (cannon?.kind !== "geodesic-cannon") {
+    throw new Error(`Expected cannon "${cannonId}".`);
+  }
+  shootGeodesic({ world, registry, cannon, geodesicId, maxLengthMeters });
+}
+
+/** The three-cannon setup ("cannon-a" firing east, "cannon-c" firing north, "cannon-b" incoming) shared by several cases. */
+function threeCannonWorld(): { world: CompiledCellComplex; registry: RuntimeObjectRegistry } {
+  const world = compileLargeWorld();
+  const registry = createRuntimeObjectRegistry();
+
+  addCannon(registry, "cannon-a", "a", yawRigidTransform3(0, vec3(-1.5, 0, 0)));
+  addCannon(registry, "cannon-c", "a", yawRigidTransform3(Math.PI / 2, vec3(1, -2, 0)));
+  addCannon(registry, "cannon-b", "a", yawRigidTransform3(Math.PI, vec3(1, 0, 0)));
+
+  return { world, registry };
+}
+
+/** Moves the "cannon-b" incoming emitter to `translation`, the change a commit must rebuild locked geodesics for. */
+function moveIncoming(registry: RuntimeObjectRegistry, translation: Vec3): void {
+  const movedIncoming = registry.get("cannon-b");
+  if (movedIncoming?.kind !== "geodesic-cannon") {
+    throw new Error("Expected incoming emitter.");
+  }
+  registry.update({ ...movedIncoming, localPose: yawRigidTransform3(Math.PI, translation) });
+}
+
 function createProtractorFixture(
   id: string,
   centerObjectId: string,
   geodesicId: string,
 ): ProtractorAngleObject {
-  const centerPoint = vec3(0, 0, geodesicRayBeamHeightMeters);
   return {
     id,
     kind: "protractor-angle",
@@ -297,7 +274,8 @@ function createProtractorFixture(
   };
 }
 
-function createIncomingEmitterAngle(object: RuntimeWorldObject | undefined): ProtractorAngleObject {
+function createIncomingEmitterAngle(registry: RuntimeObjectRegistry): ProtractorAngleObject {
+  const object = registry.get("cannon-b");
   if (object?.kind !== "geodesic-cannon") {
     throw new Error("Expected incoming emitter.");
   }
@@ -317,10 +295,8 @@ function createIncomingEmitterAngle(object: RuntimeWorldObject | undefined): Pro
   });
 }
 
-function createIncomingSegmentAngle(
-  object: RuntimeWorldObject | undefined,
-  registry: ReturnType<typeof createRuntimeObjectRegistry>,
-): ProtractorAngleObject {
+function createIncomingSegmentAngle(registry: RuntimeObjectRegistry): ProtractorAngleObject {
+  const object = registry.get("cannon-b");
   if (object?.kind !== "geodesic-cannon") {
     throw new Error("Expected incoming emitter.");
   }

@@ -1,3 +1,13 @@
+/**
+ * `tests/runtime/worldGeometrySession.test.ts` — unit tier.
+ *
+ * `createWorldGeometrySession` runs deformation geometry builds (compiling the deformed spec and its portal path
+ * tables, potentially expensive) through an injected build client, keeping at most one build in flight, canceling
+ * a stale one when a newer target arrives, and committing a finished build's snapshot back to its target state
+ * (`_docs/MATHEMATICAL_MODEL.md` §9). These tests check in-flight/cancel/stale-response bookkeeping, committing a
+ * finished build, and that a failed or superseded build leaves the previous snapshot in place; a deferred fake
+ * build client stands in for the real worker.
+ */
 import { describe, expect, it } from "vitest";
 import { torus } from "../../src/authoring/exampleWorlds";
 import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";

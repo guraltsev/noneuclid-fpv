@@ -1,3 +1,13 @@
+/**
+ * `tests/runtime/worldGeometryDeformations.test.ts` — unit tier.
+ *
+ * Live deformation (`_docs/MATHEMATICAL_MODEL.md` §9) maps cell-local points and poses from a rest spec to a
+ * deformed one; a "family" (so far only torus-skew) owns a deformation's state, validates whether a spec can use
+ * it, infers the state a shipped spec already has, and builds the per-cell maps a commit applies. These tests
+ * check comparing and inferring deformation state (independent of key order, from a spec's own base vertices, with
+ * a safe fallback when inference is impossible), replacing a prism base's vertices while checking convexity, and
+ * that a deformation applies directly to a plain spec's data with no renderer involved.
+ */
 import { describe, expect, it } from "vitest";
 import { torus } from "../../src/authoring/exampleWorlds";
 import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
@@ -221,7 +231,7 @@ describe("world geometry deformation families", () => {
     expect(() => compileCellComplex(nonconvex)).toThrowError(/non-convex prism cells are not supported/);
   });
 
-  it("applies a deformation without importing Three.js or DOM code", () => {
+  it("applies a torus-skew deformation directly to a plain spec's base vertices", () => {
     const spec = applyWorldDeformationToSpec(torus, {
       kind: "torus-skew",
       cellId: "torus-room",

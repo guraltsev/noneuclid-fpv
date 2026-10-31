@@ -1,3 +1,11 @@
+/**
+ * `tests/runtime/runtimeCommands.test.ts` — unit tier.
+ *
+ * `dispatchRuntimeCommand` is the one dispatch point shared by the desktop/XR palette and the public API for
+ * commands that are not cell-local movement: reload, go home, change the current world, and toggle the debug
+ * overlay. These tests check that each command calls the one adapter it owns, through fakes that count calls
+ * instead of touching the renderer.
+ */
 import { describe, expect, it } from "vitest";
 import {
   dispatchRuntimeCommand,

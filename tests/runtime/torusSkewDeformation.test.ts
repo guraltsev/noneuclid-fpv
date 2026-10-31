@@ -1,3 +1,14 @@
+/**
+ * `tests/runtime/torusSkewDeformation.test.ts` — unit tier.
+ *
+ * The torus-skew deformation family (`_docs/MATHEMATICAL_MODEL.md` §9) treats the torus room's base as a centred
+ * parallelogram spanned by a width, depth and horizontal skew, and builds, for any rest/target pair, the per-cell
+ * point and direction maps, a bounded incremental step toward a target, and a floor-UV frame that keeps a lattice
+ * texture seamless. These tests check the parallelogram geometry and its validation (centred, axis-aligned,
+ * nonzero width/depth), the maps' effect on points, directions, poses and live/authored objects, incremental
+ * stepping toward a target, floor-UV continuity across commits and portals, and that static culling still filters
+ * immediate-reverse paths after a skew.
+ */
 import { describe, expect, it } from "vitest";
 import { torus } from "../../src/authoring/exampleWorlds";
 import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
@@ -174,10 +185,15 @@ describe("torus skew deformation", () => {
     expect(authored.yawRadians!).toBeCloseTo(liveYaw, 10);
   });
 
-  it("keeps immediate reverse paths filtered under depth-10 static culling", () => {
+  it("excludes an immediate-reverse word from the culled table of a skewed torus", () => {
+    // Depth 3 already produces "0 2" (crossing side 0, then immediately back across the opposite self-gluing
+    // side 2) as a candidate word; a much deeper table would not show anything more about this, only cost more to
+    // build (_docs/tests.md §4.7). The word is missing from the culled table either way it is excluded
+    // (skipImmediateReverse at generation, or the geometric transversal check); this asserts the outcome a caller
+    // sees (checkPortalPathString reports it absent), not which mechanism excluded it.
     const world = compileCellComplex(createTorusSkewDeformationFamily().applyToSpec(torus, skewState(2)));
     const staticCull = buildStaticallyCulledPortalPathTables(world, {
-      maxDepth: 10,
+      maxDepth: 3,
       skipImmediateReverse: true,
       toleranceMeters: 1e-6,
       maxKeptPathsPerRoot: 50_000,
@@ -252,7 +268,7 @@ describe("torus skew base frame and width step", () => {
     expect(createTorusSkewDeformationFamily().canApplyToSpec(spec)).toBe(false);
   });
 
-  it("still accepts the shipped torus worlds", () => {
+  it("accepts the shipped torus worlds as valid torus-skew bases", () => {
     const family = createTorusSkewDeformationFamily();
     expect(family.canApplyToSpec(torus)).toBe(true);
     expect(family.canApplyToSpec(torusModuli)).toBe(true);
