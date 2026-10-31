@@ -1,3 +1,10 @@
+/**
+ * VR palette placement (src/render/three/vrPalettePlacement.ts): the in-scene palette floats at a head-relative
+ * target (0, -0.12, -0.72) m from the headset, facing back toward it, smoothed from the previous pose; freezing
+ * keeps it at its previous pose instead. The palette auto-closes once the headset moves more than
+ * `VR_PALETTE_AUTO_CLOSE_DISTANCE_METERS` away from it. `resolveFrontFacingQuaternion` orients a tooltip plane's
+ * front face toward a target position.
+ */
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import {

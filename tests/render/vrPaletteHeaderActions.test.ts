@@ -1,3 +1,9 @@
+/**
+ * VR palette header actions (src/render/three/vrPaletteHeaderActions.ts): resolves the in-scene palette's left and
+ * right header buttons from a palette definition. A "back" right action moves to the left slot and a close button
+ * takes the right slot; an already-"close" right action passes through unchanged; any other right action is
+ * replaced by a close button while the left action is kept.
+ */
 import { describe, expect, it } from "vitest";
 import {
   createRuntimeMenuState,

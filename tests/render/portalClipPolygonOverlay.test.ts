@@ -1,3 +1,7 @@
+/**
+ * Debug SVG overlay (src/render/three/portalClipPolygonOverlay.ts) that draws each visible portal path's NDC
+ * clip polygon over the canvas, so it shows exactly the region the fragment shader allows for that path.
+ */
 import { describe, expect, it } from "vitest";
 import { ndcPointToViewportPixels } from "../../src/render/three/portalClipPolygonOverlay";
 

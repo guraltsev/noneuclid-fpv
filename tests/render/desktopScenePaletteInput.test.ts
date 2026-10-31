@@ -1,3 +1,10 @@
+/**
+ * Desktop input path for the in-scene palette (src/render/three/desktopScenePaletteInput.ts): turns mouse motion
+ * and button state into a single virtual pointer aimed at the palette. The cursor accumulates from relative
+ * pointer deltas while the palette is open, clamped to the panel's rounded outline, and is reduced to a
+ * `ScenePalettePointerSource` of kind "desktop-aimer" aimed from the camera through that cursor point on the
+ * placed panel. Also holds the pure reducer mapping secondary click and Escape to palette toggle actions.
+ */
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import {
@@ -121,7 +128,7 @@ describe("desktopScenePaletteInput", () => {
     expect(direction.x).toBeLessThan(0);
   });
 
-  it("reaches the full scene palette width instead of the older inset cursor bounds", () => {
+  it("clamps the cursor to the full scene palette width, not a narrower inset", () => {
     const input = createDesktopScenePaletteInput();
     const point = resolvePointerPlanePoint(input, {
       x: 100000,

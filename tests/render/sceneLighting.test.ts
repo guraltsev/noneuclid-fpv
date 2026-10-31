@@ -1,3 +1,9 @@
+/**
+ * Stylized scene lighting (src/render/three/sceneLighting.ts): one hemisphere light plus one ambient light, with no
+ * shadows and no directional component. Since neither light depends on position for its shading, the rig is
+ * portal-invariant: it never needs re-posing when the camera crosses a portal. Disposing it removes both lights
+ * from the scene; creating a fresh rig afterwards adds two new light objects, never the disposed ones.
+ */
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import {

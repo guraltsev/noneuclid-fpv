@@ -1,3 +1,9 @@
+/**
+ * Carried-geodesic portal transitions (src/render/three/geodesicCarryPortalTransition.ts): when the player
+ * carrying a geodesic cannon crosses a portal, the crossed portal's identity and rigid transform (source cell
+ * frame to target cell frame) are reported so the carried object can be re-expressed in the destination cell.
+ * Nothing is reported unless the portal found in the previous cell actually leads to the cell the move ended in.
+ */
 import { describe, expect, it } from "vitest";
 import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
 import { movePlayer } from "../../src/movement/movePlayer";

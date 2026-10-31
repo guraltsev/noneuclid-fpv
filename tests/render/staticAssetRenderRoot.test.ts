@@ -1,3 +1,9 @@
+/**
+ * Static asset render root (src/render/three/staticAssetRenderRoot.ts): a group whose single child is the
+ * decoration model, placed so drawing the root at the record's current pose reproduces the authored decoration
+ * exactly, however the pose has since changed (offset, scale, tilt, non-uniform scale, or the procedural marmot
+ * proxy substituted for a missing model). A non-collidable static asset's record is ignored by collision queries.
+ */
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import type { AssetObjectSpec } from "../../src/cell-complex/specs";
@@ -52,7 +58,7 @@ const specs: Array<[string, AssetObjectSpec]> = [
       scaleXYZ: { x: 1, y: 2, z: 0.5 },
     },
   ],
-  ["legacy marmot", { ...base, assetPath: staticMarmotAssetPath }],
+  ["procedural marmot proxy asset path", { ...base, assetPath: staticMarmotAssetPath }],
 ];
 
 describe("buildStaticAssetRenderRoot", () => {

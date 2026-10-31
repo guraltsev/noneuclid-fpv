@@ -1,3 +1,14 @@
+/**
+ * Per-frame cell instance buffers (src/render/three/renderPortalInstances.ts,
+ * src/render/three/portalInstanceDebug.ts): writes one instance per visible portal path into its destination
+ * cell's archetype, with the path's `rootFromDestinationMatrix`, its `portalPathId` and its `portalClipIndex`
+ * (the clip-plane texture slot the shader reads). When the depth-0 path's archetype draws through its own
+ * unclipped `rootMesh` instead (`separateRoot`), that path is left out of the instance buffer. Instances beyond
+ * an archetype's capacity are dropped and recorded in `PortalInstanceDiagnostics`; uploads are dirty-checked, so
+ * an unchanged matrix or attribute does not bump its buffer's version. Also covers the debug renderer that draws
+ * one unclipped instance of a cell's archetypes at a chosen matrix, for inspecting a path without the clipping
+ * pipeline.
+ */
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import type { CellRenderArchetype } from "../../src/render/three/cellRenderArchetypes";
@@ -234,7 +245,7 @@ describe("updateCellRenderArchetypeInstances separate root", () => {
     expect(readAttribute(archetype.portalClipIndexAttribute, 0)).toBe(unclippedPortalClipIndex);
   });
 
-  it("hides the root mesh when no depth-0 path is visible, and a root-only archetype draws no instance", () => {
+  it("hides the root mesh without a depth-0 path; a root-only archetype draws no instance", () => {
     const archetype = createArchetype("room-b", "room-b:floor:0", 4);
     const diagnostics = createPortalInstanceDiagnostics();
 

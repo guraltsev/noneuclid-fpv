@@ -1,3 +1,12 @@
+/**
+ * Stereo rendering with split eye roots (src/render/three/stereoPortalFrame.ts and xrPortalEye.ts): when a glued
+ * cell (such as a single torus room) puts each eye's render root in the same cell at a different frame, the two
+ * eyes get distinct root groups, each clipped to its own eye rather than sharing the unclipped-root sentinel.
+ * Covers clip-plane acceptance per eye (via src/render/three/portalClipData.ts), the left/right/shared cell-copy
+ * counts `countStereoPortalPaths` reports, and that the two eyes' accepted paths stay within one cell's shared
+ * archetype capacity. When both eyes share one root (the player far from any seam), there is only one group and
+ * the unclipped sentinel is used, as in mono rendering.
+ */
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import { torusModuli } from "../../src/authoring/exampleWorlds";

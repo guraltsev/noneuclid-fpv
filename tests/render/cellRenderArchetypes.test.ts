@@ -1,3 +1,11 @@
+/**
+ * Cell render archetypes (src/render/three/cellRenderArchetypes.ts): one instanced-mesh archetype per drawable
+ * mesh part of every cell (floor, solid wall, portal frame, static object, debug wireframe; ceilings and floor
+ * outlines are intentionally skipped). Instance capacity per cell is the largest number of statically kept paths
+ * ending at that cell over all roots, optionally capped by a visible-path budget (at least 1) or summed across
+ * several eyes. Each archetype also owns a hidden, unpatched-material `rootMesh` sharing the same geometry, used
+ * to draw the unclipped root path with early depth rejection.
+ */
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import { cube } from "../../src/authoring/exampleWorlds";
@@ -16,7 +24,7 @@ import {
 import type { PreparedWorldAssets } from "../../src/render/three/preloadWorldAssets";
 
 describe("planCellRenderArchetypes", () => {
-  it("builds floor, portal-frame, solid-wall, and no static-object archetypes while excluding sky caps and marmots", () => {
+  it("builds floor, portal-frame and solid-wall archetypes, excluding sky caps and marmots", () => {
     const world = compileCellComplex(createStaticObjectWorld());
     const planned = planCellRenderArchetypes(world, {
       debugLevel: "basic",
@@ -59,7 +67,7 @@ describe("planCellRenderArchetypes", () => {
 });
 
 describe("deriveCellRenderArchetypeCapacities", () => {
-  it("counts kept destination paths per cell, includes depth-0 roots, and respects a visible-path cap", () => {
+  it("counts kept destination paths per cell, with depth-0 roots and a visible-path cap", () => {
     const world = compileCellComplex(cube);
     const staticCull = buildStaticallyCulledPortalPathTables(world, {
       maxDepth: 3,
@@ -144,7 +152,7 @@ describe("buildCellRenderArchetypes floor UV frames", () => {
 });
 
 describe("buildCellRenderArchetypes root mesh", () => {
-  it("gives every archetype a hidden root mesh with the shared geometry and an unpatched material", () => {
+  it("gives every archetype a hidden root mesh sharing geometry with an unpatched material", () => {
     const world = compileCellComplex(cube);
     const clipData = createPortalClipData({ maxVisiblePaths: 8 });
     const archetypes = buildCellRenderArchetypes(world, {

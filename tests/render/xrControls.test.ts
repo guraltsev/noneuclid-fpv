@@ -1,3 +1,10 @@
+/**
+ * WebXR gamepad input (src/render/three/xrControls.ts): turns the thumbstick axes and button states of every XR
+ * input source's gamepad into a `RuntimeInputFrame` (continuous turn from stick-x, forward motion from stick-y, no
+ * strafing, no pitch) and into rising-edge action requests (reset, primary action, interact, carry, help) that fire
+ * once per press. Follows the WebXR `xr-standard` gamepad button layout. Gamepad and input-source objects here are
+ * plain literals (the `GamepadLike` structural type accepts them directly), not a fake of a boundary.
+ */
 import { describe, expect, it } from "vitest";
 import { combineStickAxes, createXrControls, createXrInputFrame, isCarryActionPressed, isHelpPressed, isInteractPressed, isResetPressed, readPrimaryStickAxes } from "../../src/render/three/xrControls";
 

@@ -1,3 +1,10 @@
+/**
+ * Scene-graph disposal helpers (src/render/three/runtimeSceneUtils.ts): free GPU resources on dispose without
+ * removing objects from their parent. `disposeObject3D` frees geometries and materials but leaves textures alone
+ * (they may be preloaded assets shared with other objects); `disposeObject3DWithTextures` additionally frees a
+ * material's own `map` texture, so it is only safe on textures the caller created; `disposeCanvasTextures` frees
+ * only canvas-texture maps, which are never shared with preloaded assets.
+ */
 import * as THREE from "three";
 import { describe, expect, it, vi } from "vitest";
 import { disposeCanvasTextures, disposeObject3D, disposeObject3DWithTextures } from "../../src/render/three/runtimeSceneUtils";

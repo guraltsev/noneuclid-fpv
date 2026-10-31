@@ -1,3 +1,8 @@
+/**
+ * Debug portal wall material (src/render/three/portalWallTexture.ts): a generated checkerboard texture, since no
+ * image file is loaded for the debug wall. `preloadWorldAssets` registers it under `PORTAL_WALL_TEXTURE_KEY` so a
+ * configured clone (with repeat/wrap settings) is shared by identical requests.
+ */
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import { createPortalWallDataTexture } from "../../src/render/three/portalWallTexture";

@@ -1,3 +1,8 @@
+/**
+ * Aim cross marker orientation (src/render/three/aimCrossMarker.ts): the red cross decal drawn where the aim ray
+ * hits a surface is oriented tangent to that surface, with its right axis following the camera or controller's
+ * right axis projected onto the surface plane, so the cross rolls with the aiming hand in XR.
+ */
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import { resolveAimCrossMarkerQuaternion } from "../../src/render/three/aimCrossMarker";

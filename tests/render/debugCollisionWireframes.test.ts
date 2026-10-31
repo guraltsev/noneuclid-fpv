@@ -1,3 +1,9 @@
+/**
+ * Debug collision wireframes (src/render/three/debugCollisionWireframes.ts and staticObjectCollisionWireframes.ts):
+ * line-segment outlines of a dynamic object's or a static asset's collision cylinder, positioned and scaled from
+ * the real radius and height in the cell-local world frame. An object without collision bounds is hidden
+ * (`visible = false`) and shown again once bounds exist.
+ */
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import { yawRigidTransform3 } from "../../src/math/rigidTransform3";

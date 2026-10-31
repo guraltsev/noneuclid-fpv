@@ -1,3 +1,8 @@
+/**
+ * Measured-geodesic-length renderer (src/render/three/measureLengthRenderer.ts): renders a measurement object as a
+ * floating two-sided "length" badge hovering above its anchor pose, portal-renderable like any other runtime
+ * object source. Each sync rebuilds the group fresh.
+ */
 import { describe, expect, it } from "vitest";
 import { createMeasuredGeodesicLengthRuntime } from "../../src/render/three/measureLengthRenderer";
 import { createMeasuredGeodesicLengthObject } from "../../src/world-objects/measureLengthTool";

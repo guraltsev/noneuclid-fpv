@@ -1,3 +1,9 @@
+/**
+ * XR debug panel (src/render/three/xrDebugPanel.ts): the head-locked text panel shown in immersive sessions when
+ * both XR and the debug overlay are on. Covers the pure helpers (line wrapping and truncation, head-frame pose,
+ * visibility, redraw gating by change-or-interval, and input-mode description); the canvas/Three.js drawing itself
+ * runs only in the browser and is not tested here.
+ */
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import {

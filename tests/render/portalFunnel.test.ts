@@ -1,3 +1,10 @@
+/**
+ * The exact per-frame visibility funnel (src/render/three/portalFunnel.ts): plan-direction sectors from the eye,
+ * clipped portal by portal, and the four half-spaces through the eye that bound a path's visible region. A
+ * path's visible region is a cone of at most 4 half-spaces (`clipPlanes`); its screen image is the NDC square
+ * clipped by the 4 corresponding lines. Pure numeric code: it allocates nothing and takes only the column-major
+ * element arrays of a camera's projection and view matrices as its THREE-specific input.
+ */
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import {

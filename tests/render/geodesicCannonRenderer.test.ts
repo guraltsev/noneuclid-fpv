@@ -1,3 +1,11 @@
+/**
+ * Geodesic cannon renderer (src/render/three/geodesicCannonRenderer.ts): render sources and per-frame render
+ * records for geodesic cannons, segments and intersections, drawn through the instanced runtime-object pipeline.
+ * A segment's record matrix scales a unit-length ribbon to the segment's length; its archetype is chosen by
+ * state, highest priority first: tie-detach selection, straightening, connected, default. A cannon's ray-emitter
+ * records include one post, one head per active geodesic on that post, and no head records when no geodesic is
+ * active. Assets that fail to preload fall back to simple procedural stand-ins, so source creation never throws.
+ */
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import { buildRuntimeObjectRenderArchetype } from "../../src/render/three/runtimeObjectRenderArchetypes";

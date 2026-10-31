@@ -1,3 +1,10 @@
+/**
+ * Desktop keyboard and pointer-lock mouse input (src/render/three/desktopControls.ts): accumulates events between
+ * frames into one `DesktopInputFrame` per `consumeFrame` call. In palette look mode the mouse drives the palette
+ * cursor instead of the camera, clicks select rather than fire, and movement is disabled; editable DOM targets
+ * (input, textarea, select, contenteditable) are ignored; window blur clears held keys and buttons; `dispose()`
+ * removes every listener.
+ */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createDesktopControls } from "../../src/render/three/desktopControls";
 

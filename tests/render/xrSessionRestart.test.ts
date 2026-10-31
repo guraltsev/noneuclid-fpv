@@ -1,26 +1,14 @@
+/**
+ * XR session restart coordination (src/render/three/xrSessionRestart.ts): runs a restart action (world change, app
+ * restart) only after the current immersive session has fully ended, so a restart never races a still-presenting
+ * session. With no session the restart runs immediately. At most one `end()` is in flight; a newer restart request
+ * while one is ending replaces the pending callback rather than queuing a second one.
+ *
+ * The `XRSession` is faked by tests/support/fakeXr.ts's `createFakeXrSession`.
+ */
 import { describe, expect, it, vi } from "vitest";
-import {
-  createXrSessionRestartCoordinator,
-  type RestartableXrSession,
-} from "../../src/render/three/xrSessionRestart";
-
-function createSession(): RestartableXrSession & { dispatchEnd(): void } {
-  const listeners: Array<() => void> = [];
-
-  return {
-    end: vi.fn(async () => undefined),
-    addEventListener(type, listener) {
-      if (type === "end") {
-        listeners.push(listener);
-      }
-    },
-    dispatchEnd() {
-      for (const listener of listeners) {
-        listener();
-      }
-    },
-  };
-}
+import { createXrSessionRestartCoordinator } from "../../src/render/three/xrSessionRestart";
+import { createFakeXrSession } from "../support/fakeXr";
 
 describe("XR session restart coordinator", () => {
   it("runs immediately when there is no active XR session", () => {
@@ -34,7 +22,7 @@ describe("XR session restart coordinator", () => {
 
   it("waits for the XR session to end before restarting", async () => {
     const coordinator = createXrSessionRestartCoordinator();
-    const session = createSession();
+    const session = createFakeXrSession();
     const restart = vi.fn();
 
     coordinator.requestRestart(session, restart);
@@ -50,7 +38,7 @@ describe("XR session restart coordinator", () => {
 
   it("coalesces repeated restart requests while the session is ending", async () => {
     const coordinator = createXrSessionRestartCoordinator();
-    const session = createSession();
+    const session = createFakeXrSession();
     const firstRestart = vi.fn();
     const latestRestart = vi.fn();
 
@@ -66,7 +54,7 @@ describe("XR session restart coordinator", () => {
 
   it("reports session end failures without restarting", async () => {
     const error = new Error("cannot leave VR");
-    const session = createSession();
+    const session = createFakeXrSession();
     vi.mocked(session.end).mockRejectedValueOnce(error);
     const coordinator = createXrSessionRestartCoordinator();
     const restart = vi.fn();

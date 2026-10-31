@@ -1,3 +1,9 @@
+/**
+ * Decoration mesh building (src/render/three/buildDecorationMesh.ts): builds the render node for a static asset
+ * object from its preloaded glTF scene. `buildStaticMarmotProxy` is the procedural stand-in used for the one asset
+ * path with no real model: twelve boxes (body, head, muzzle, tail, ears, eyes, legs) merged into a single
+ * vertex-coloured mesh, so the marmot is one draw call.
+ */
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import type { AssetObjectSpec } from "../../src/cell-complex/specs";
@@ -5,7 +11,7 @@ import { buildDecorationMesh, buildStaticMarmotProxy } from "../../src/render/th
 import type { PreparedWorldAssets } from "../../src/render/three/preloadWorldAssets";
 
 describe("buildStaticMarmotProxy", () => {
-  it("is one vertex-coloured mesh with the bounds of the old twelve boxes", () => {
+  it("is one vertex-coloured mesh covering the twelve-box marmot silhouette", () => {
     const root = buildStaticMarmotProxy("m");
     const meshes: THREE.Mesh[] = [];
     root.traverse((child) => {

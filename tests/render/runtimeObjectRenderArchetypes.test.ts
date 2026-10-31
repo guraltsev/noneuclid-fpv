@@ -1,3 +1,9 @@
+/**
+ * Runtime-object render archetypes (src/render/three/runtimeObjectRenderArchetypes.ts): one `THREE.InstancedMesh`
+ * per source mesh, drawn once per visible portal path. Each archetype bakes its source mesh's transform (relative
+ * to the object root) into a cloned geometry and hides the source mesh, so only the instanced copies are drawn.
+ * Capacity is fixed at creation (`recordCount * maxVisiblePaths`, at least 1).
+ */
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import {
@@ -7,7 +13,7 @@ import {
 import { collectRuntimeObjectRenderSourceMeshes } from "../../src/render/three/runtimeObjectRenderRecords";
 
 describe("runtime object render archetypes", () => {
-  it("collects mesh sources, hides source meshes, and bakes mesh transforms into archetype geometry", () => {
+  it("collects, hides and bakes a source mesh's transform into the archetype geometry", () => {
     const root = new THREE.Group();
     const sourceMesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial());
     sourceMesh.position.set(2, 0, 0);

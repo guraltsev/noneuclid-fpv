@@ -1,3 +1,8 @@
+/**
+ * XR controller hand models (src/render/three/xrControllerHandModels.ts): splits one loaded low-poly hand asset
+ * into a left and a right template by mesh name prefix, and maps the selected tool to the small wrist indicator
+ * icon shown near the right hand (an icon, a label, or nothing for tools with no icon).
+ */
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import { publicAssetUrl } from "../../src/glue/assetUrls";

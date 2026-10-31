@@ -1,3 +1,12 @@
+/**
+ * Immersive-VR session lifecycle (src/render/three/xrSessionState.ts): a pure state model with support detection.
+ * Typical flow: unknown -> (detect) available | unsupported | insecure-context | failed -> entering -> active ->
+ * ended; entering can also go to failed. States are immutable; transitioning preserves `secureContext` and
+ * `immersiveVrSupported`.
+ *
+ * `navigator.xr` is faked by tests/support/fakeXr.ts's `createFakeXrNavigator` where a case needs only a
+ * supported/rejected `isSessionSupported` result.
+ */
 import { describe, expect, it } from "vitest";
 import {
   createXrSessionState,
@@ -6,6 +15,7 @@ import {
   transitionXrSessionState,
   type XrNavigatorLike,
 } from "../../src/render/three/xrSessionState";
+import { createFakeXrNavigator } from "../support/fakeXr";
 
 describe("XR session state", () => {
   it("labels the public session statuses", () => {
@@ -36,7 +46,7 @@ describe("XR session state", () => {
 
   it("updates when immersive-vr support resolves", async () => {
     await expect(
-      detectXrSessionState({ xr: { isSessionSupported: async () => true } }, true),
+      detectXrSessionState(createFakeXrNavigator(true), true),
     ).resolves.toMatchObject({
       status: "available",
       immersiveVrSupported: true,
@@ -45,7 +55,7 @@ describe("XR session state", () => {
 
   it("turns support check rejection into a readable failure state", async () => {
     await expect(
-      detectXrSessionState({ xr: { isSessionSupported: async () => Promise.reject(new Error("blocked")) } }, true),
+      detectXrSessionState(createFakeXrNavigator(false, new Error("blocked")), true),
     ).resolves.toMatchObject({
       status: "failed",
       failureMessage: "blocked",

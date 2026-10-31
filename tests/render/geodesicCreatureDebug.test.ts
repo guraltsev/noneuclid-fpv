@@ -1,3 +1,10 @@
+/**
+ * Geodesic creature consistency dump (src/render/three/geodesicCreatureDebug.ts): cross-checks a creature's
+ * Three.js root, its runtime-object-registry record, and the compiled cell it should be inside, reporting a short
+ * issue code for each disagreement (cell mismatch between registry and parent, or a visible creature marked
+ * portal-renderable whose own root is hidden — an ancestor cell being hidden is not itself an issue). Read-only
+ * and allocation-heavy; for on-demand debugging, not per-frame use.
+ */
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";

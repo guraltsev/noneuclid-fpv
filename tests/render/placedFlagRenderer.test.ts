@@ -1,9 +1,37 @@
+/**
+ * Placed-flag renderer (src/render/three/placedFlagRenderer.ts): renders a player-placed text sign as a glTF
+ * model with the user's message rasterised onto two transparent planes over the sign board. Invariants: the
+ * flag id and flag type of a runtime never change; `syncParent` re-parents the group under the root node of the
+ * cell the flag now lives in.
+ *
+ * Prepared assets are faked by `tests/support/preparedAssets.ts` (a fake glTF with a named board/post mesh so the
+ * board-finding heuristic has something to calibrate against); the canvas the text is drawn on is faked by
+ * `tests/support/fakeCanvas2d.ts`.
+ */
 import * as THREE from "three";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { identityRigidTransform3 } from "../../src/math/rigidTransform3";
-import type { PreparedWorldAssets } from "../../src/render/three/preloadWorldAssets";
 import { createPlacedFlagRuntime } from "../../src/render/three/placedFlagRenderer";
 import { createPlacedFlagObject } from "../../src/world-objects/placedFlags";
+import { installFakeCanvas2d } from "../support/fakeCanvas2d";
+import { createFakePreparedAssets } from "../support/preparedAssets";
+
+function fakeSignAssets() {
+  const scene = new THREE.Group();
+  const board = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.72, 0.08));
+  board.name = "fake-sign-board";
+  board.position.set(0.2, 1.2, 0.045);
+  const post = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.8, 0.12));
+  post.name = "fake-sign-post";
+  post.position.set(-0.5, 0.9, 0);
+  scene.add(board, post);
+
+  return createFakePreparedAssets({
+    getTexture: () => undefined,
+    getConfiguredTexture: () => undefined,
+    instantiateGltf: () => ({ scene, animations: [] }),
+  });
+}
 
 describe("placedFlagRenderer", () => {
   afterEach(() => {
@@ -11,7 +39,7 @@ describe("placedFlagRenderer", () => {
   });
 
   it("places sign text on front and back planes centered on the sign board mesh", () => {
-    const canvas = installCanvasDocumentShim();
+    const canvas = installFakeCanvas2d();
     const cellRoot = new THREE.Group();
     const runtime = createPlacedFlagRuntime(createPlacedFlagObject({
       id: "flag-a",
@@ -19,7 +47,7 @@ describe("placedFlagRenderer", () => {
       localPose: identityRigidTransform3,
       flagType: "WoodenSign1",
       message: "Hello",
-    }), createPreparedAssets());
+    }), fakeSignAssets());
 
     runtime.syncParent(new Map([["room-a", cellRoot]]));
 
@@ -45,7 +73,7 @@ describe("placedFlagRenderer", () => {
   });
 
   it("reparents when the runtime object changes cells", () => {
-    installCanvasDocumentShim();
+    installFakeCanvas2d();
     const roomA = new THREE.Group();
     const roomB = new THREE.Group();
     const runtime = createPlacedFlagRuntime(createPlacedFlagObject({
@@ -54,7 +82,7 @@ describe("placedFlagRenderer", () => {
       localPose: identityRigidTransform3,
       flagType: "WoodenSign1",
       message: "Hello",
-    }), createPreparedAssets());
+    }), fakeSignAssets());
 
     runtime.syncParent(new Map([["room-a", roomA], ["room-b", roomB]]));
     runtime.syncFromObject(createPlacedFlagObject({
@@ -71,14 +99,14 @@ describe("placedFlagRenderer", () => {
   });
 
   it("wraps and centers text in the calibrated writing area", () => {
-    const canvas = installCanvasDocumentShim();
+    const canvas = installFakeCanvas2d();
     createPlacedFlagRuntime(createPlacedFlagObject({
       id: "flag-a",
       cellId: "room-a",
       localPose: identityRigidTransform3,
       flagType: "WoodenSign1",
       message: "ABCDEFGHIJKLMNO",
-    }), createPreparedAssets());
+    }), fakeSignAssets());
 
     expect(canvas.context.fillStyle).toBe("#f8fafc");
     expect(canvas.context.textAlign).toBe("center");
@@ -92,79 +120,15 @@ describe("placedFlagRenderer", () => {
   });
 
   it("preserves explicit sign editor newlines as separate rendered lines", () => {
-    const canvas = installCanvasDocumentShim();
+    const canvas = installFakeCanvas2d();
     createPlacedFlagRuntime(createPlacedFlagObject({
       id: "flag-a",
       cellId: "room-a",
       localPose: identityRigidTransform3,
       flagType: "WoodenSign1",
       message: "A\nB",
-    }), createPreparedAssets());
+    }), fakeSignAssets());
 
     expect(canvas.context.fillText.mock.calls.map((call) => call[0])).toEqual(["A", "B"]);
   });
 });
-
-function createPreparedAssets(): PreparedWorldAssets {
-  return {
-    getTexture: () => undefined,
-    getConfiguredTexture: () => undefined,
-    instantiateGltf() {
-      const scene = new THREE.Group();
-      const board = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.72, 0.08));
-      board.name = "fake-sign-board";
-      board.position.set(0.2, 1.2, 0.045);
-      const post = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.8, 0.12));
-      post.name = "fake-sign-post";
-      post.position.set(-0.5, 0.9, 0);
-      scene.add(board, post);
-
-      return {
-        scene,
-        animations: [],
-      };
-    },
-  };
-}
-
-function installCanvasDocumentShim(): {
-    readonly context: {
-    readonly clearRect: ReturnType<typeof vi.fn>;
-    readonly fillText: ReturnType<typeof vi.fn>;
-    readonly measureText: (text: string) => { readonly width: number };
-    fillStyle: string;
-    font: string;
-    textAlign: string;
-    textBaseline: string;
-  };
-  height: number;
-  width: number;
-} {
-  const canvas = {
-    width: 0,
-    height: 0,
-    context: {
-      clearRect: vi.fn(),
-      fillText: vi.fn(),
-      measureText: vi.fn((text: string) => ({ width: text.length * 60 })),
-      fillStyle: "",
-      font: "",
-      textAlign: "",
-      textBaseline: "",
-    },
-    getContext() {
-      return this.context;
-    },
-  };
-
-  vi.stubGlobal("document", {
-    createElement(tagName: string) {
-      if (tagName !== "canvas") {
-        throw new Error(`Unexpected element: ${tagName}`);
-      }
-
-      return canvas;
-    },
-  });
-  return canvas;
-}

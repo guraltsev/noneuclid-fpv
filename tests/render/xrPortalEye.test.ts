@@ -1,3 +1,11 @@
+/**
+ * XR portal-eye re-rooting (src/render/three/xrPortalEye.ts): decides which cell an XR eye camera should render
+ * from when the eye has physically crossed a portal away from the player's anchor, by walking the straight segment
+ * from the anchor to the eye through the portals. Re-rooting is independent of portal side order and handles any
+ * number of crossings; an eye that stays in its own cell (or behind a wall) is not re-rooted, and reusing a
+ * persistent `XrPortalEyeRenderRootTarget` across calls gives the same result without reallocating the camera or
+ * matrix.
+ */
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
@@ -8,7 +16,8 @@ import {
   identityRenderFromRootMatrix,
   resolveXrPortalEyeRenderRoot,
 } from "../../src/render/three/xrPortalEye";
-import { rigidTransformToThreeMatrix, worldPointToThree } from "../../src/render/three/worldAxes";
+import { rigidTransformToThreeMatrix } from "../../src/render/three/worldAxes";
+import { createCameraAt } from "../support/cameras";
 
 const baseVertices = [
   { x: -1, y: -1 },
@@ -58,11 +67,7 @@ function chainWorld(rotation: number): CellComplexSpec {
 }
 
 function camera(x: number, y: number, z = 1.6): THREE.PerspectiveCamera {
-  const result = new THREE.PerspectiveCamera(70, 1, 0.001, 250);
-  result.position.copy(worldPointToThree({ x, y, z }));
-  result.lookAt(worldPointToThree({ x: x + 1, y, z }));
-  result.updateMatrixWorld(true);
-  return result;
+  return createCameraAt({ x, y, z }, { x: x + 1, y, z }, { fovDegrees: 70, aspect: 1, near: 0.001, far: 250 });
 }
 
 describe("resolveXrPortalEyeRenderRoot", () => {
@@ -96,7 +101,7 @@ describe("resolveXrPortalEyeRenderRoot", () => {
     expect(result.renderFromRootMatrix).toBe(identityRenderFromRootMatrix);
   });
 
-  it("reuses the target's camera and matrix across re-rooting calls with the same result as without a target", () => {
+  it("reuses a persistent target's camera and matrix, matching the result without one", () => {
     const world = compileCellComplex(chainWorld(0));
     const anchorPoint = { x: 0.8, y: 0.8, z: 0 };
     const eye = camera(1.1, 1.05);

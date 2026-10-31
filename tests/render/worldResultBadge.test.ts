@@ -1,3 +1,8 @@
+/**
+ * World result badge (src/render/three/worldResultBadge.ts): a floating text "pill", with an optional downward
+ * pointer, used as an in-world label for a measured length or angle. Double-faced badges build two meshes (front
+ * and back) at the requested render order, each facing +z in its own local frame.
+ */
 import { describe, expect, it } from "vitest";
 import { createWorldResultBadge } from "../../src/render/three/worldResultBadge";
 

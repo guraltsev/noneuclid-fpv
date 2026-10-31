@@ -1,3 +1,9 @@
+/**
+ * Active-pointer priority (`chooseActiveScenePointer` in src/render/three/scenePointers.ts): among the scene
+ * palette's per-source pointers (desktop ray or XR controller), picks the one that should drive the palette UI
+ * this frame: first a pressed pointer, then a hovering dominant one, then any hovering one, then any dominant one,
+ * then the first in the list. Returns `undefined` for an empty list.
+ */
 import { describe, expect, it } from "vitest";
 import { chooseActiveScenePointer } from "../../src/render/three/scenePointers";
 

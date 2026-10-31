@@ -1,3 +1,8 @@
+/**
+ * Protractor-angle renderer (src/render/three/protractorAngleRenderer.ts): renders a measured-angle marker as a
+ * filled sector, an arc, two boundary rods and a floating angle badge at the sector's bisector, all portal-
+ * renderable like other runtime object sources. Each sync rebuilds the whole group.
+ */
 import { describe, expect, it } from "vitest";
 import { createProtractorAngleRuntime } from "../../src/render/three/protractorAngleRenderer";
 import {

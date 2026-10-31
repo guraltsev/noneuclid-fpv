@@ -1,3 +1,8 @@
+/**
+ * Debug overlay line formatting (src/render/three/debugOverlay.ts): the text HUD's formatters are pure functions
+ * of a `DebugOverlayState`, independent of the overlay's own visibility. The stereo portal-path line, when
+ * present, is listed right after the portal-eyes line and before the location line.
+ */
 import { describe, expect, it } from "vitest";
 import {
   formatDebugOverlayLines,

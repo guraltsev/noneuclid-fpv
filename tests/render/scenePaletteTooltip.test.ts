@@ -1,3 +1,8 @@
+/**
+ * Palette tooltip label wrapping (`wrapPaletteTooltipLabel` in src/render/three/scenePaletteController.ts): greedy
+ * word-wraps a tooltip label into lines of at most 38 characters by default. Whitespace is collapsed; a single
+ * word longer than the limit stays on its own over-long line rather than being split.
+ */
 import { describe, expect, it } from "vitest";
 import { wrapPaletteTooltipLabel } from "../../src/render/three/scenePaletteController";
 

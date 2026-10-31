@@ -1,3 +1,10 @@
+/**
+ * VR comfort vignette policy (src/render/three/vrComfort.ts): darkens everything outside a cone around the view
+ * direction while artificial locomotion (stick move or turn) is active, to reduce visual-vestibular mismatch. The
+ * visible cone is half the camera's field of view by default, configurable and clamped via
+ * `antiNauseaVisibleFovScale`; opacity fades toward 1 while active and toward 0 once locomotion stops, at the
+ * configured fade rate.
+ */
 import { describe, expect, it } from "vitest";
 import {
   advanceComfortVignetteOpacity,

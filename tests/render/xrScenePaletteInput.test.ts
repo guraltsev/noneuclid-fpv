@@ -1,48 +1,31 @@
+/**
+ * XR input path for the in-scene palette (src/render/three/xrScenePaletteInput.ts): converts XR controller
+ * target-ray poses and gamepad state into palette pointer sources. Only gamepad controllers with left or right
+ * handedness are used; hand-tracking sources are skipped. The side-trigger menu toggle is handled by the runtime
+ * interact path, not here, so this adapter never emits its own toggle edge for it.
+ *
+ * `XRInputSource`/`XRFrame`/gamepads are faked by tests/support/fakeXr.ts.
+ */
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import { createXrScenePaletteInput, isSelectPressed } from "../../src/render/three/xrScenePaletteInput";
+import { createFakeGamepad, createFakeXrFrame, createFakeXrInputSource } from "../support/fakeXr";
 
 describe("xrScenePaletteInput", () => {
-  it("maps controller select and side trigger buttons without treating face buttons as menu toggles", () => {
-    const gamepad = {
-      buttons: [
-        { pressed: true },
-        { pressed: true },
-        { pressed: false },
-        { pressed: false },
-        { pressed: false },
-        { pressed: false },
-      ],
-    } as unknown as XRInputSource["gamepad"];
+  it("maps select and side-trigger buttons, not face buttons, to menu toggles", () => {
+    const gamepad = createFakeGamepad({ pressedButtonIndexes: [0, 1] });
 
     expect(isSelectPressed(gamepad)).toBe(true);
   });
 
-  it("does not emit a second menu toggle edge because XR runtime input already owns side-trigger menu actions", () => {
+  it("leaves the side-trigger menu toggle to XR runtime input, not the palette", () => {
     const input = createXrScenePaletteInput();
-    const xrFrame = {
-      getPose: () => ({
-        transform: {
-          position: { x: 0, y: 0, z: 0 },
-          orientation: { x: 0, y: 0, z: 0, w: 1 },
-        },
-      }),
-    } as unknown as XRFrame;
+    const xrFrame = createFakeXrFrame();
     const referenceSpace = {} as XRReferenceSpace;
-    const source = {
+    const source = createFakeXrInputSource({
       handedness: "right",
-      targetRaySpace: {},
-      gamepad: {
-        buttons: [
-          { pressed: false },
-          { pressed: true },
-          { pressed: false },
-          { pressed: false },
-          { pressed: false },
-          { pressed: false },
-        ],
-      },
-    } as unknown as XRInputSource;
+      gamepad: createFakeGamepad({ pressedButtonIndexes: [1] }),
+    });
 
     const frame = input.update({
       deltaSeconds: 1 / 60,
@@ -60,19 +43,8 @@ describe("xrScenePaletteInput", () => {
   it("keeps a separate controller object cache per input", () => {
     const a = createXrScenePaletteInput();
     const b = createXrScenePaletteInput();
-    const xrFrame = {
-      getPose: () => ({
-        transform: {
-          position: { x: 0, y: 0, z: 0 },
-          orientation: { x: 0, y: 0, z: 0, w: 1 },
-        },
-      }),
-    } as unknown as XRFrame;
-    const source = {
-      handedness: "right",
-      targetRaySpace: {},
-      gamepad: { buttons: [{ pressed: false }] },
-    } as unknown as XRInputSource;
+    const xrFrame = createFakeXrFrame();
+    const source = createFakeXrInputSource({ handedness: "right" });
     const run = (input: ReturnType<typeof createXrScenePaletteInput>) =>
       input.update({
         deltaSeconds: 1 / 60,

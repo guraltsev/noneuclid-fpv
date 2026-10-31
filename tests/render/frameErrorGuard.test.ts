@@ -1,3 +1,10 @@
+/**
+ * Frame-loop error containment (src/render/three/frameErrorGuard.ts): an exception thrown from a frame or a named
+ * sub-phase is caught, reported once per distinct phase+message pair (repeats only increment the failure count),
+ * and a recovery callback runs after a failed frame so the loop keeps going instead of freezing the canvas.
+ * `onPersistentFailure` fires once per streak once `maxConsecutiveFailures` is reached; a successful frame ends
+ * the streak. The guard itself never throws, even if `report` or the recovery callback throws.
+ */
 import { describe, expect, it, vi } from "vitest";
 import { createFrameErrorGuard } from "../../src/render/three/frameErrorGuard";
 
