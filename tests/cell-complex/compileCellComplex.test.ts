@@ -10,7 +10,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
-import { twoPrismLoop } from "../fixtures/twoPrismLoop";
+import { twoPrismLoop } from "../fixtures/cell-complex/twoPrismLoop";
 import { identityMat3 } from "../../src/math/rigidTransform3";
 
 describe("compileCellComplex", () => {

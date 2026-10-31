@@ -14,7 +14,7 @@ import { describe, expect, it } from "vitest";
 import { compileCellComplex, type CompiledCellComplex } from "../../src/cell-complex/compileCellComplex";
 import { buildPortalPathTables } from "../../src/cell-complex/portalPaths";
 import { cube } from "../../src/authoring/exampleWorlds";
-import { twoPrismLoop } from "../fixtures/twoPrismLoop";
+import { twoPrismLoop } from "../fixtures/cell-complex/twoPrismLoop";
 import fc from "fast-check";
 import {
   composeRigidTransform3,

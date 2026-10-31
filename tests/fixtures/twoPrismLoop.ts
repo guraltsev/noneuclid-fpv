@@ -1,24 +1,3 @@
-import { createWorldBuilder } from "../../src/authoring/worldBuilder";
-import { createConvexPrismBaseVertices } from "../../src/cell-complex/prismBase";
-import type { CellComplexSpec } from "../../src/cell-complex/specs";
-import { worldFloorTextureLibrary } from "../../src/world-assets/floorTextures";
-
-const square = [
-  [-7.5, -7.5],
-  [7.5, -7.5],
-  [7.5, 7.5],
-  [-7.5, 7.5],
-] as const;
-
-export const twoPrismLoop: CellComplexSpec = createTwoPrismLoop();
-
-function createTwoPrismLoop(): CellComplexSpec {
-  const builder = createWorldBuilder();
-  const squareBase = createConvexPrismBaseVertices(square);
-
-  builder.PolygonFace("room-a", worldFloorTextureLibrary.floorTexture("grass1"), squareBase);
-  builder.PolygonFace("room-b", worldFloorTextureLibrary.floorTexture("snow"), squareBase);
-  builder.Portal("room-a", 1, "room-b", 3);
-
-  return builder.build();
-}
+// Moved to ./cell-complex/twoPrismLoop.ts (job 42); re-exported here only for tests/render-contract/, which job 43
+// still owns. Remove this file once job 43 updates its importers to the new path.
+export * from "./cell-complex/twoPrismLoop";

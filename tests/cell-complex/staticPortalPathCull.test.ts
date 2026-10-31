@@ -23,7 +23,7 @@ import {
   type StaticPortalPathRootStatus,
 } from "../../src/cell-complex/staticPortalPathCull";
 import { cube, dodecahedron } from "../../src/authoring/exampleWorlds";
-import { twoPrismLoop } from "../fixtures/twoPrismLoop";
+import { twoPrismLoop } from "../fixtures/cell-complex/twoPrismLoop";
 import { arbConeFanWorldSpec, arbPointInCell, exampleWorldSpecs } from "../support/arbitraries";
 import { lineStartThroughPortal, mulberry32, sampleLineInCone, walkedWordPrefixes, wordSignature } from "../support/portalWordWitness";
 
