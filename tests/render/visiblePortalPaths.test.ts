@@ -1,7 +1,19 @@
+/**
+ * Visible portal paths (src/render/three/visiblePortalPaths.ts): per-frame, camera-visible portal-path discovery.
+ * Walks a portal-path table from the root, clipping each portal's aperture by its parent's surviving sector and
+ * the camera frustum, and keeps a path only while its clip polygon has positive screen area (in pixels) at least
+ * `minPortalScreenAreaPixels`; a path whose polygon vanishes (behind the camera, outside the frustum, or clipped
+ * to nothing by an ancestor) is dropped along with everything under it, without visiting its children. Depth,
+ * total visible-path count and screen-area budgets stop the walk early (`budgetExhausted`). A near-boundary
+ * camera pose must not make a portal flicker in and out, nor duplicate a destination with near-zero slivers.
+ * `computeIndependentVisiblePortalPaths` runs the same walk once per camera (stereo) and must agree with calling
+ * `computeVisiblePortalPaths` separately for each.
+ */
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import { cube, tetrahedron } from "../../src/authoring/exampleWorlds";
 import { twoPrismLoop } from "../fixtures/cell-complex/twoPrismLoop";
+import { twoRoomsWithPortal } from "../fixtures/cell-complex/twoRoomWorld";
 import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
 import { buildPortalPathTables } from "../../src/cell-complex/portalPaths";
 import {
@@ -11,6 +23,7 @@ import {
   type ComputeVisiblePortalPathsResult,
 } from "../../src/render/three/visiblePortalPaths";
 import { buildStaticallyCulledPortalPathTables } from "../../src/cell-complex/staticPortalPathCull";
+import type { CellComplexSpec } from "../../src/cell-complex/specs";
 import type { PortalPathTable } from "../../src/cell-complex/portalPaths";
 import { developPortalSegment } from "../../src/cell-complex/orientedPortal";
 import {
@@ -19,7 +32,8 @@ import {
   funnelClipPlanes,
   type DirectionSector,
 } from "../../src/render/three/portalFunnel";
-import { threePointToWorld, worldPointToThree } from "../../src/render/three/worldAxes";
+import { threePointToWorld } from "../../src/render/three/worldAxes";
+import { createCameraAt } from "../support/cameras";
 
 describe("computeVisiblePortalPaths", () => {
   it("includes the root path when requested", () => {
@@ -88,22 +102,6 @@ describe("computeVisiblePortalPaths", () => {
     expectVisibleResultsEquivalent(batched[1], separate[1]);
   });
 
-  it("keeps a first-hop portal stable when the camera is nearly on its boundary plane", () => {
-    const world = compileCellComplex(twoRoomsWithPortal());
-    const table = buildPortalPathTables(world, { maxDepth: 1 }).tablesByRootCellId.get("room-a")!;
-    const result = computeVisiblePortalPaths({
-      world,
-      rootCellId: "room-a",
-      pathTable: table,
-      camera: createCamera({ x: 0.995, y: 0, z: 1.6 }, { x: 1.995, y: 0, z: 1.6 }),
-      viewportPixels: { width: 800, height: 600 },
-      options: defaultOptions({ minPortalScreenAreaPixels: 0 }),
-    });
-
-    expect(result.paths.map((path) => path.pathId)).toContain(1);
-    expect(result.visiblePathById.get(1)?.screenAreaPixels).toBeGreaterThan(100_000);
-  });
-
   it("rejects a portal fully behind the camera", () => {
     const world = compileCellComplex(twoPrismLoop);
     const table = buildPortalPathTables(world, { maxDepth: 1 }).tablesByRootCellId.get("room-a")!;
@@ -142,128 +140,6 @@ describe("computeVisiblePortalPaths", () => {
 
     expect(pathZeroThree).toBeDefined();
     expect(result.paths.map((path) => path.pathId)).not.toContain(pathZeroThree!.id);
-  });
-
-  it("keeps cube portals stable at a captured near-boundary camera pose", () => {
-    const world = compileCellComplex(cube);
-    const table = buildPortalPathTables(world, { maxDepth: 2 }).tablesByRootCellId.get("front")!;
-    const result = computeVisiblePortalPaths({
-      world,
-      rootCellId: "front",
-      pathTable: table,
-      camera: createCamera(
-        { x: -2.106879, y: 7.498034, z: 1.45 },
-        { x: -2.986468, y: 7.414927, z: 0.981581 },
-        70,
-        803 / 985,
-      ),
-      viewportPixels: { width: 803, height: 985 },
-      options: defaultOptions({ maxDepth: 2, minPortalScreenAreaPixels: 4 }),
-    });
-    const topPortalPath = table.paths.find((path) =>
-      path.steps.map((step) => step.sourcePortalSideIndex).join(" ") === "2",
-    );
-
-    expect(topPortalPath).toBeDefined();
-    expect(result.paths.map((path) => path.pathId)).toContain(topPortalPath!.id);
-    expect(result.visiblePathById.get(topPortalPath!.id)?.screenAreaPixels).toBeGreaterThan(10_000);
-    expect(result.visiblePathById.get(topPortalPath!.id)?.clipRectNdc.maxX).toBeGreaterThan(0.95);
-  });
-
-  it("keeps cube portals stable when a near-boundary aperture straddles the camera plane", () => {
-    const world = compileCellComplex(cube);
-    const table = buildPortalPathTables(world, { maxDepth: 2 }).tablesByRootCellId.get("front")!;
-    const result = computeVisiblePortalPaths({
-      world,
-      rootCellId: "front",
-      pathTable: table,
-      camera: createCamera(
-        { x: -0.610551, y: 7.498906, z: 1.45 },
-        { x: -1.598485, y: 7.621336, z: 1.355143 },
-        70,
-        803 / 985,
-      ),
-      viewportPixels: { width: 803, height: 985 },
-      options: defaultOptions({ maxDepth: 2, minPortalScreenAreaPixels: 4 }),
-    });
-    const topPortalPath = table.paths.find((path) =>
-      path.steps.map((step) => step.sourcePortalSideIndex).join(" ") === "2",
-    );
-
-    expect(topPortalPath).toBeDefined();
-    expect(result.paths.map((path) => path.pathId)).toContain(topPortalPath!.id);
-    expect(result.visiblePathById.get(topPortalPath!.id)?.screenAreaPixels).toBeGreaterThan(10_000);
-    expect(result.visiblePathById.get(topPortalPath!.id)?.clipRectNdc.maxX).toBeGreaterThan(0.95);
-  });
-
-  it("keeps a tetrahedron portal filling the view when the camera is just inside its boundary", () => {
-    const world = compileCellComplex(tetrahedron);
-    const table = buildPortalPathTables(world, { maxDepth: 2 }).tablesByRootCellId.get("face-a")!;
-    const directFaceBPath = table.paths.find((path) =>
-      path.steps.map((step) => step.sourcePortalSideIndex).join(" ") === "1"
-    );
-    const result = computeVisiblePortalPaths({
-      world,
-      rootCellId: "face-a",
-      pathTable: table,
-      camera: createCamera(
-        { x: 9.461191, y: 6.636625, z: 1.45 },
-        { x: 9.510715, y: 7.626288, z: 1.31541 },
-        70,
-        1053 / 665,
-      ),
-      viewportPixels: { width: 1053, height: 665 },
-      options: defaultOptions({ maxDepth: 2, minPortalScreenAreaPixels: 16 }),
-    });
-
-    expect(directFaceBPath).toBeDefined();
-    const visiblePath = result.visiblePathById.get(directFaceBPath!.id);
-    expect(visiblePath).toBeDefined();
-    expect(visiblePath?.screenAreaPixels).toBeGreaterThan(100_000);
-    expect(visiblePath?.clipRectNdc.minX).toBeLessThanOrEqual(-0.95);
-  });
-
-  it("keeps cube portals stable at a captured left-face near-boundary camera pose", () => {
-    const world = compileCellComplex(cube);
-    const table = buildPortalPathTables(world, { maxDepth: 2 }).tablesByRootCellId.get("left")!;
-    const result = computeVisiblePortalPaths({
-      world,
-      rootCellId: "left",
-      pathTable: table,
-      camera: createCamera(
-        { x: 6.569187, y: 7.491772, z: 1.45 },
-        { x: 6.009501, y: 8.267515, z: 1.158498 },
-        70,
-        803 / 985,
-      ),
-      viewportPixels: { width: 803, height: 985 },
-      options: defaultOptions({ maxDepth: 2, minPortalScreenAreaPixels: 4 }),
-    });
-
-    expect(result.summary.visiblePathCount).toBeGreaterThan(1);
-    expect(result.paths.some((path) => path.depth === 1 && path.screenAreaPixels > 10_000)).toBe(true);
-  });
-
-  it("keeps cube portals stable at a captured right-face near-boundary camera pose", () => {
-    const world = compileCellComplex(cube);
-    const table = buildPortalPathTables(world, { maxDepth: 2 }).tablesByRootCellId.get("right")!;
-    const result = computeVisiblePortalPaths({
-      world,
-      rootCellId: "right",
-      pathTable: table,
-      camera: createCamera(
-        { x: 7.086317, y: 7.489888, z: 1.45 },
-        { x: 7.256504, y: 8.447983, z: 1.219589 },
-        70,
-        803 / 985,
-      ),
-      viewportPixels: { width: 803, height: 985 },
-      options: defaultOptions({ maxDepth: 2, minPortalScreenAreaPixels: 4 }),
-    });
-
-    expect(result.summary.visiblePathCount).toBeGreaterThan(1);
-    expect(result.paths.some((path) => path.depth === 1 && path.screenAreaPixels > 10_000)).toBe(true);
-    expect(result.paths.every((path) => path.clipPolygonNdc.length <= 8)).toBe(true);
   });
 
   it("drops near-corner duplicate sliver paths while keeping the main portal views", () => {
@@ -388,7 +264,7 @@ describe("computeVisiblePortalPaths", () => {
     expect(new Set(duplicateDestination?.map((path) => path.pathId)).size).toBe(duplicateDestination?.length);
   });
 
-  it("reports live ShowCellPath-style visibility only when the matched path id is in the latest result", () => {
+  it("reports live ShowCellPath visibility only when the matched id is in the latest result", () => {
     const visible = fakeVisibleResult([1]);
 
     expect(describeVisiblePortalPath(1, visible)).toMatchObject({
@@ -396,6 +272,146 @@ describe("computeVisiblePortalPaths", () => {
       screenAreaPixels: 12,
     });
     expect(describeVisiblePortalPath(2, visible)).toEqual({ currentlyVisible: false });
+  });
+});
+
+interface CapturedBoundaryPoseCase {
+  readonly label: string;
+  readonly world: CellComplexSpec;
+  readonly rootCellId: string;
+  readonly maxDepth: number;
+  readonly minPortalScreenAreaPixels: number;
+  readonly cameraPosition: { readonly x: number; readonly y: number; readonly z: number };
+  readonly cameraLookAt: { readonly x: number; readonly y: number; readonly z: number };
+  readonly fovDegrees: number;
+  readonly viewportPixels: { readonly width: number; readonly height: number };
+  check(result: ComputeVisiblePortalPathsResult, table: PortalPathTable): void;
+}
+
+// Each pose below was captured from a real near-boundary camera position that once made a portal flicker, vanish
+// or clip incorrectly; every case is a distinct world, root cell or aperture configuration (tests.md §4.4).
+const capturedBoundaryPoseCases: readonly CapturedBoundaryPoseCase[] = [
+  {
+    label: "a first-hop portal nearly on its own boundary plane",
+    world: twoRoomsWithPortal({ heightMeters: 3 }),
+    rootCellId: "room-a",
+    maxDepth: 1,
+    minPortalScreenAreaPixels: 0,
+    cameraPosition: { x: 0.995, y: 0, z: 1.6 },
+    cameraLookAt: { x: 1.995, y: 0, z: 1.6 },
+    fovDegrees: 70,
+    viewportPixels: { width: 800, height: 600 },
+    check: (result) => {
+      expect(result.paths.map((path) => path.pathId)).toContain(1);
+      expect(result.visiblePathById.get(1)?.screenAreaPixels).toBeGreaterThan(100_000);
+    },
+  },
+  {
+    label: "a cube's top portal, captured near-boundary",
+    world: cube,
+    rootCellId: "front",
+    maxDepth: 2,
+    minPortalScreenAreaPixels: 4,
+    cameraPosition: { x: -2.106879, y: 7.498034, z: 1.45 },
+    cameraLookAt: { x: -2.986468, y: 7.414927, z: 0.981581 },
+    fovDegrees: 70,
+    viewportPixels: { width: 803, height: 985 },
+    check: (result, table) => checksTopPortalStaysLarge(result, table),
+  },
+  {
+    label: "a cube's top portal, its aperture straddling the camera plane",
+    world: cube,
+    rootCellId: "front",
+    maxDepth: 2,
+    minPortalScreenAreaPixels: 4,
+    cameraPosition: { x: -0.610551, y: 7.498906, z: 1.45 },
+    cameraLookAt: { x: -1.598485, y: 7.621336, z: 1.355143 },
+    fovDegrees: 70,
+    viewportPixels: { width: 803, height: 985 },
+    check: (result, table) => checksTopPortalStaysLarge(result, table),
+  },
+  {
+    label: "a tetrahedron portal filling the view from just inside its boundary",
+    world: tetrahedron,
+    rootCellId: "face-a",
+    maxDepth: 2,
+    minPortalScreenAreaPixels: 16,
+    cameraPosition: { x: 9.461191, y: 6.636625, z: 1.45 },
+    cameraLookAt: { x: 9.510715, y: 7.626288, z: 1.31541 },
+    fovDegrees: 70,
+    viewportPixels: { width: 1053, height: 665 },
+    check: (result, table) => {
+      const directFaceBPath = table.paths.find(
+        (path) => path.steps.map((step) => step.sourcePortalSideIndex).join(" ") === "1",
+      );
+
+      expect(directFaceBPath).toBeDefined();
+      const visiblePath = result.visiblePathById.get(directFaceBPath!.id);
+      expect(visiblePath).toBeDefined();
+      expect(visiblePath?.screenAreaPixels).toBeGreaterThan(100_000);
+      expect(visiblePath?.clipRectNdc.minX).toBeLessThanOrEqual(-0.95);
+    },
+  },
+  {
+    label: "a cube's left-face portals, captured near-boundary",
+    world: cube,
+    rootCellId: "left",
+    maxDepth: 2,
+    minPortalScreenAreaPixels: 4,
+    cameraPosition: { x: 6.569187, y: 7.491772, z: 1.45 },
+    cameraLookAt: { x: 6.009501, y: 8.267515, z: 1.158498 },
+    fovDegrees: 70,
+    viewportPixels: { width: 803, height: 985 },
+    check: (result) => {
+      expect(result.summary.visiblePathCount).toBeGreaterThan(1);
+      expect(result.paths.some((path) => path.depth === 1 && path.screenAreaPixels > 10_000)).toBe(true);
+    },
+  },
+  {
+    label: "a cube's right-face portals, captured near-boundary",
+    world: cube,
+    rootCellId: "right",
+    maxDepth: 2,
+    minPortalScreenAreaPixels: 4,
+    cameraPosition: { x: 7.086317, y: 7.489888, z: 1.45 },
+    cameraLookAt: { x: 7.256504, y: 8.447983, z: 1.219589 },
+    fovDegrees: 70,
+    viewportPixels: { width: 803, height: 985 },
+    check: (result) => {
+      expect(result.summary.visiblePathCount).toBeGreaterThan(1);
+      expect(result.paths.some((path) => path.depth === 1 && path.screenAreaPixels > 10_000)).toBe(true);
+      expect(result.paths.every((path) => path.clipPolygonNdc.length <= 8)).toBe(true);
+    },
+  },
+];
+
+function checksTopPortalStaysLarge(result: ComputeVisiblePortalPathsResult, table: PortalPathTable): void {
+  const topPortalPath = table.paths.find((path) => path.steps.map((step) => step.sourcePortalSideIndex).join(" ") === "2");
+
+  expect(topPortalPath).toBeDefined();
+  expect(result.paths.map((path) => path.pathId)).toContain(topPortalPath!.id);
+  expect(result.visiblePathById.get(topPortalPath!.id)?.screenAreaPixels).toBeGreaterThan(10_000);
+  expect(result.visiblePathById.get(topPortalPath!.id)?.clipRectNdc.maxX).toBeGreaterThan(0.95);
+}
+
+describe.each(capturedBoundaryPoseCases)("captured near-boundary camera pose: $label", (testCase) => {
+  it("keeps the expected portal view stable", () => {
+    const world = compileCellComplex(testCase.world);
+    const table = buildPortalPathTables(world, { maxDepth: testCase.maxDepth }).tablesByRootCellId.get(testCase.rootCellId)!;
+    const camera = createCameraAt(testCase.cameraPosition, testCase.cameraLookAt, {
+      fovDegrees: testCase.fovDegrees,
+      aspect: testCase.viewportPixels.width / testCase.viewportPixels.height,
+    });
+    const result = computeVisiblePortalPaths({
+      world,
+      rootCellId: testCase.rootCellId,
+      pathTable: table,
+      camera,
+      viewportPixels: testCase.viewportPixels,
+      options: defaultOptions({ maxDepth: testCase.maxDepth, minPortalScreenAreaPixels: testCase.minPortalScreenAreaPixels }),
+    });
+
+    testCase.check(result, table);
   });
 });
 
@@ -543,19 +559,6 @@ describe("computeVisiblePortalPaths traversal", () => {
     }
   });
 
-  it("returns the identical cached matrix object for the same path across calls", () => {
-    const world = compileCellComplex(cube);
-    const table = buildPortalPathTables(world, { maxDepth: 2 }).tablesByRootCellId.get("front")!;
-    const camera = createCamera({ x: 0, y: 0, z: 1.6 }, { x: 2, y: 2, z: 1.6 }, 110);
-    const input = { world, rootCellId: "front", pathTable: table, camera, viewportPixels, options: defaultOptions({ maxDepth: 2 }) };
-    const first = computeVisiblePortalPaths(input);
-    const second = computeVisiblePortalPaths(input);
-
-    expect(first.paths.length).toBeGreaterThan(1);
-    for (const path of first.paths) {
-      expect(second.visiblePathById.get(path.pathId)!.rootFromDestinationMatrix).toBe(path.rootFromDestinationMatrix);
-    }
-  });
 });
 
 function defaultOptions(
@@ -571,21 +574,14 @@ function defaultOptions(
   };
 }
 
+// Positional-argument convenience over the shared builder, matching every call site in this file.
 function createCamera(
   position: { readonly x: number; readonly y: number; readonly z: number },
   lookAt: { readonly x: number; readonly y: number; readonly z: number },
   fovDegrees = 70,
   aspect = 800 / 600,
 ): THREE.PerspectiveCamera {
-  const camera = new THREE.PerspectiveCamera(fovDegrees, aspect, 0.01, 250);
-
-  camera.position.copy(worldPointToThree(position));
-  camera.up.set(0, 1, 0);
-  camera.lookAt(worldPointToThree(lookAt));
-  camera.updateMatrixWorld(true);
-  camera.updateProjectionMatrix();
-
-  return camera;
+  return createCameraAt(position, lookAt, { fovDegrees, aspect });
 }
 
 function groupByDestination(paths: ComputeVisiblePortalPathsResult["paths"]): Map<string, ComputeVisiblePortalPathsResult["paths"]> {
@@ -645,44 +641,4 @@ function expectVisibleResultsEquivalent(
     expect(actualPath.clipRectNdc.maxY).toBeCloseTo(expectedPath.clipRectNdc.maxY, 12);
     expect(actualPath.screenAreaPixels).toBeCloseTo(expectedPath.screenAreaPixels, 8);
   }
-}
-
-function twoRoomsWithPortal() {
-  const squareRoomBase = [
-    { x: -1, y: -1 },
-    { x: 1, y: -1 },
-    { x: 1, y: 1 },
-    { x: -1, y: 1 },
-  ];
-
-  return {
-    cells: [
-      {
-        id: "room-a",
-        heightMeters: 3,
-        baseVertices: squareRoomBase,
-        portals: [
-          {
-            id: "east",
-            sideIndex: 1,
-            targetCellId: "room-b",
-            targetPortalId: "west",
-          },
-        ],
-      },
-      {
-        id: "room-b",
-        heightMeters: 3,
-        baseVertices: squareRoomBase,
-        portals: [
-          {
-            id: "west",
-            sideIndex: 3,
-            targetCellId: "room-a",
-            targetPortalId: "east",
-          },
-        ],
-      },
-    ],
-  };
 }

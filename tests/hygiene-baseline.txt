@@ -1,3 +1,0 @@
-H6	tests/render/visiblePortalPaths.property.test.ts	-
-H6	tests/render/visiblePortalPaths.test.ts	-
-H6	tests/render/visiblePortalPaths.test.ts	reports live ShowCellPath-style visibility only when the matched path id is in the latest result

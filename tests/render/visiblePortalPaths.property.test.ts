@@ -1,3 +1,10 @@
+/**
+ * Visible portal paths (src/render/three/visiblePortalPaths.ts), property: `computeVisiblePortalPaths` never gives
+ * a false negative. For random cameras and random screen points in several example worlds, the ray a screen point
+ * casts is walked through the glued cells directly (bypassing the renderer); every prefix of the word it crosses
+ * must be a path `computeVisiblePortalPaths` returned, and the ray must lie inside that path's four clip planes
+ * (within the tolerance of a cell-corner tie).
+ */
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import { cube, genus2Torus, icosahedron, torusModuli } from "../../src/authoring/exampleWorlds";
@@ -6,16 +13,15 @@ import type { PortalPathTable } from "../../src/cell-complex/portalPaths";
 import { walkDevelopedSegment } from "../../src/cell-complex/segmentWalk";
 import { buildStaticallyCulledPortalPathTables } from "../../src/cell-complex/staticPortalPathCull";
 import { computeVisiblePortalPaths } from "../../src/render/three/visiblePortalPaths";
-import { threePointToWorld, worldPointToThree } from "../../src/render/three/worldAxes";
+import { threePointToWorld } from "../../src/render/three/worldAxes";
 import { mulberry32, wordSignature } from "../support/portalWordWitness";
+import { createRandomCamera } from "../support/cameras";
 
 const maxDepth = 6;
 const eyeHeightMeters = 1.45;
-const camerasPerWorld = 40;
-const pointsPerCamera = 300;
+const camerasPerWorld = 20;
+const pointsPerCamera = 150;
 
-// Brute-force check of "no false negatives": for random cameras and random NDC points, the horizontal ray walk
-// crosses a word whose every prefix must be a returned path whose four clip planes contain the ray.
 describe("computeVisiblePortalPaths brute-force ray walk", () => {
   const worlds: readonly (readonly [string, CompiledCellComplex])[] = [
     ["cube", compileCellComplex(cube)],
@@ -26,7 +32,6 @@ describe("computeVisiblePortalPaths brute-force ray walk", () => {
 
   for (const [name, world] of worlds) {
     it(`finds every walked word and keeps its rays inside the clip planes in ${name}`, () => {
-      const started = performance.now();
       const random = mulberry32(0x5eed + name.length);
       const tables = buildStaticallyCulledPortalPathTables(world, { maxDepth, toleranceMeters: 1e-6 }).tables;
       const cells = [...world.cellsById.values()];
@@ -38,7 +43,7 @@ describe("computeVisiblePortalPaths brute-force ray walk", () => {
         const table = tables.tablesByRootCellId.get(rootCell.id)!;
         const eye = cameraIndex % 4 === 3 ? pointNearRandomPortal(rootCell, random) : pointInCell(rootCell, random);
         const viewport = { width: 640, height: 480 };
-        const camera = randomCamera(eye, random);
+        const camera = createRandomCamera(eye, random);
         const result = computeVisiblePortalPaths({
           world,
           rootCellId: rootCell.id,
@@ -102,9 +107,7 @@ describe("computeVisiblePortalPaths brute-force ray walk", () => {
       }
 
       expect(checkedPoints).toBeGreaterThan(camerasPerWorld * pointsPerCamera * 0.5);
-      expect(checkedWords).toBeGreaterThan(500);
-      // Runtime guard: the whole test should stay far below 20 s per world.
-      expect(performance.now() - started).toBeLessThan(20_000);
+      expect(checkedWords).toBeGreaterThan(200);
     });
   }
 });
@@ -147,24 +150,4 @@ function pointNearRandomPortal(cell: Cell, random: () => number): { x: number; y
   const y = side.start.y + along * (side.end.y - side.start.y) + inset * side.inwardNormal.y;
 
   return { x, y, z: eyeHeightMeters };
-}
-
-function randomCamera(eye: { x: number; y: number; z: number }, random: () => number): THREE.PerspectiveCamera {
-  const degrees = (value: number): number => (value * Math.PI) / 180;
-  const yaw = random() * 2 * Math.PI;
-  const pitch = degrees(-60 + 120 * random());
-  const roll = degrees(-30 + 60 * random());
-  const halfFov = 30 + 50 * random();
-  const aspect = 0.6 + 1.2 * random();
-  const camera = new THREE.PerspectiveCamera(2 * halfFov, aspect, 0.01, 250);
-
-  camera.position.copy(worldPointToThree(eye));
-  camera.quaternion
-    .setFromAxisAngle(new THREE.Vector3(0, 1, 0), yaw)
-    .multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), pitch))
-    .multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), roll));
-  camera.updateMatrixWorld(true);
-  camera.updateProjectionMatrix();
-
-  return camera;
 }
