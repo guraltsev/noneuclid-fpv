@@ -1,5 +1,18 @@
+/**
+ * Aim-ray resolution (src/render/three/aimTarget.ts, aimInteraction.ts): the closest interactable hit along a
+ * ray walked through the glued cells (objects, the floor, geodesic ray segments, geodesic emitters and their
+ * handles, geodesic intersection balloons, protractor-angle labels), with "sticky" objects snapping to a
+ * declared local point. Hits within a priority tolerance of each other are ordered by kind rather than strict
+ * distance (protractor label > cannon > geodesic intersection > geodesic segment > floor); this order is not
+ * transitive by design, so each pairwise preference is its own rule. `createAimInteraction` caches one resolution
+ * per distinct ray, ignored-geodesic set and frame serial, invalidated explicitly or by a new frame.
+ *
+ * Not asserted here (tests.md §2.2): the exact tuning constants of the emitter's enlarged aim sphere/cylinder (an
+ * implementation detail; the selection and miss behaviour at their boundary is what is tested), and resolver call
+ * counts as a proxy for the cache (its outcome — a stale result until invalidated — is asserted directly instead).
+ */
 import * as THREE from "three";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
 import { buildPortalPathTables, type PortalRenderPath } from "../../src/cell-complex/portalPaths";
 import type { CellComplexSpec } from "../../src/cell-complex/specs";
@@ -15,7 +28,6 @@ import {
 } from "../../src/world-objects/geodesic/objects";
 import { createProtractorAngleObject } from "../../src/world-objects/protractorTool";
 import {
-  getGeodesicEmitterAimCylinderBounds,
   getGeodesicEmitterAimSphereCenter,
   resolveAimTarget,
   resolveAimTargets,
@@ -102,32 +114,6 @@ describe("resolveAimTarget", () => {
     expect(target?.distanceMeters).toBeGreaterThan(39);
   });
 
-  it("lowers the geodesic emitter top aim sphere by 0.3 meters", () => {
-    const emitter = createGeodesicCannonObject({
-      id: "emitter-a",
-      cellId: "room",
-      localPose: yawRigidTransform3(0, { x: 40, y: 0, z: 0 }),
-    });
-
-    expect(getGeodesicEmitterAimSphereCenter(emitter)).toEqual({
-      x: 40,
-      y: 0,
-      z: geodesicRayBeamHeightMeters - 0.3,
-    });
-  });
-
-  it("uses a halved geodesic emitter aim cylinder radius", () => {
-    const emitter = createGeodesicCannonObject({
-      id: "emitter-a",
-      cellId: "room",
-      localPose: yawRigidTransform3(0, { x: 40, y: 0, z: 0 }),
-    });
-
-    const bounds = getGeodesicEmitterAimCylinderBounds(emitter);
-
-    expect(bounds?.radius).toBeCloseTo(0.19);
-  });
-
   it("misses geodesic emitters just outside the narrowed cylindrical aim outline", () => {
     const world = compileCellComplex(largeRoomWorld());
     const emitter = createGeodesicCannonObject({
@@ -211,7 +197,7 @@ describe("resolveAimTarget", () => {
     expect(target?.localPoint.z).toBeCloseTo(1.08);
   });
 
-  it("resolves geodesic ray segments near their emitter when the smaller emitter hitbox is missed", () => {
+  it("resolves geodesic ray segments near an emitter with a missed hitbox", () => {
     const world = compileCellComplex(singleRoomWorld());
     const cannon = createGeodesicCannonObject({
       id: "cannon-a",
@@ -340,7 +326,7 @@ describe("resolveAimTarget", () => {
     expect(target?.geodesicEmitterGeodesicId).toBe("g-b");
   });
 
-  it("reports the next available geodesic id when an ignored geodesic is aimed through the emitter body", () => {
+  it("reports the next available geodesic id past an ignored one aimed through the emitter", () => {
     const world = compileCellComplex(singleRoomWorld());
     const cannon = createGeodesicCannonObject({
       id: "cannon-a",
@@ -407,7 +393,7 @@ describe("resolveAimTarget", () => {
     expect(endTarget).toBeUndefined();
   });
 
-  it("keeps short geodesic ray segments selectable near their emitter when the emitter hitbox is missed", () => {
+  it("keeps short geodesic ray segments selectable near an emitter with a missed hitbox", () => {
     const world = compileCellComplex(singleRoomWorld());
     const cannon = createGeodesicCannonObject({
       id: "cannon-a",
@@ -890,10 +876,10 @@ describe("ray walk", () => {
     expect(targets[0]?.rootPoint.z).toBeCloseTo(0);
   });
 
-  it("resolves once per distinct ray and frame through the aim interaction", () => {
+  it("keeps a resolution for the same ray and frame until invalidated or the frame advances", () => {
     const world = compileCellComplex(rayWalkWorld());
-    const registry = createRuntimeObjectRegistry();
-    const resolver = vi.fn(resolveAimTargets);
+    const segment = createGeodesicSegment({ cellId: "room-a", start: { x: 0, y: 0, z: 1.08 } });
+    const registry = createRuntimeObjectRegistry([segment]);
     let frameSerial = 1;
     const interaction = createAimInteraction({
       camera: new THREE.PerspectiveCamera(),
@@ -906,27 +892,27 @@ describe("ray walk", () => {
       getCannonToolState: () => ({ activeGeodesicId: undefined }) as never,
       getPlayerPose: () => ({ cellId: "room-a", position: { x: 0, y: 0, z: 0 }, yawRadians: 0, pitchRadians: 0 }),
       getFrameSerial: () => frameSerial,
-      resolveAimTargets: resolver,
     });
-    const camera = cameraLookingAt({ x: 0, y: 0, z: 1.5 }, { x: 0.5, y: 0.5, z: 0 });
+    const camera = cameraLookingAt({ x: 0, y: -0.5, z: 1.08 }, { x: 0, y: 0, z: 1.08 });
     const ray = {
       origin: camera.position.clone(),
       direction: new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion),
       quaternion: camera.quaternion.clone(),
     };
 
-    interaction.resolveCurrentAimTargets(ray);
-    interaction.resolveCurrentAimTargets(ray);
-    interaction.resolveCurrentAimTarget(ray);
-    expect(resolver).toHaveBeenCalledTimes(1);
+    expect(interaction.resolveCurrentAimTarget(ray)?.object?.id).toBe("segment-a");
+
+    registry.remove("segment-a");
+    expect(interaction.resolveCurrentAimTarget(ray)?.object?.id).toBe("segment-a");
 
     interaction.invalidateAimCache();
-    interaction.resolveCurrentAimTargets(ray);
-    expect(resolver).toHaveBeenCalledTimes(2);
+    expect(interaction.resolveCurrentAimTarget(ray)).toBeUndefined();
+
+    registry.add(segment);
+    expect(interaction.resolveCurrentAimTarget(ray)).toBeUndefined();
 
     frameSerial = 2;
-    interaction.resolveCurrentAimTargets(ray);
-    expect(resolver).toHaveBeenCalledTimes(3);
+    expect(interaction.resolveCurrentAimTarget(ray)?.object?.id).toBe("segment-a");
   });
 });
 
