@@ -160,8 +160,20 @@ export async function publish(options = {}) {
     const [command, ...args] = config.build.map((part) => part.replaceAll("{base}", base));
     fs.rmSync(distDir, { recursive: true, force: true });
     // npm is a .cmd shim on Windows and needs a shell; other commands run directly.
-    run(command, args, { cwd: root, env: { VITE_BASE: base }, shell: process.platform === "win32" && command === "npm" });
+    const built = spawnSync(command, args, {
+      cwd: root,
+      env: { ...process.env, VITE_BASE: base },
+      stdio: "inherit",
+      shell: process.platform === "win32" && command === "npm",
+    });
+    if (built.error) throw built.error;
+    if (built.status !== 0) throw new Error(`The build command failed (exit ${built.status}).`);
     if (!fs.existsSync(distDir)) throw new Error(`The build did not create "${config.dist}".`);
+    // A build that ignored the base would publish a site whose assets 404; fail instead.
+    const builtIndex = path.join(distDir, "index.html");
+    if (base !== "/" && fs.existsSync(builtIndex) && !fs.readFileSync(builtIndex, "utf8").includes(base)) {
+      throw new Error(`The built index.html does not mention the base ${base}; the build command must honour {base} / VITE_BASE.`);
+    }
     bytes = directorySize(distDir);
   }
 
