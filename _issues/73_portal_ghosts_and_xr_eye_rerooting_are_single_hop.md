@@ -1,6 +1,6 @@
 # 73 - Portal ghost records and XR eye re-rooting are single-hop
 
-Status: open; re-verified 2026-10-28; fix designed 2026-10-29.
+Status: open; re-verified 2026-10-28; fix designed 2026-10-29. Implemented by job 17, which ended "done, needs review" (headset check not run; this issue closes when it passes); see the Report in [job 17](../.agents/jobs/_done/17_multi_hop_ghosts_and_eye_rerooting.md).
 
 Priority: P2 (correctness, visible near cone vertices and portal corners).
 
