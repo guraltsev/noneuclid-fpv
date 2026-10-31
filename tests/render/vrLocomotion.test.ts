@@ -1,6 +1,16 @@
+/**
+ * VR locomotion mapping (src/render/three/vrLocomotion.ts, xrPlayerRig.ts): turns a thumbstick axis pair into
+ * local-frame walking (forward only, continuous turn, never strafe) and continuous rotation; turns room-scale
+ * headset tracking deltas into player displacement through the current artificial yaw; keeps the XR rig's camera
+ * and culling camera in sync with the player pose and head motion. A large physical tracking jump (a lost or
+ * re-centred headset) is ignored, keeping the player at the last accepted pose.
+ *
+ * The joystick dead zone and the "no strafe from either stick" rule are owned by
+ * tests/render/xrControls.test.ts, which exercises them through the actual WebXR gamepad frame; this file keeps
+ * only the locomotion-mapping cases xrControls does not cover.
+ */
 import { describe, expect, it } from "vitest";
 import {
-  applyJoystickDeadZone,
   computeContinuousTurn,
   computeJoystickLocomotion,
   computePhysicalRoomScaleDisplacement,
@@ -17,15 +27,8 @@ import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
 import { identityRigidTransform3 } from "../../src/math/rigidTransform3";
 import { movePlayer, type MoveResult } from "../../src/movement/movePlayer";
 import type { PlayerPose } from "../../src/movement/playerPose";
-import { resolveXrPortalEyeRenderRoot } from "../../src/render/three/xrPortalEye";
-import { worldPointToThree } from "../../src/render/three/worldAxes";
 
 describe("VR locomotion mapping", () => {
-  it("dead-zones small stick noise", () => {
-    expect(applyJoystickDeadZone({ x: 0.05, y: -0.05 }, 0.18)).toEqual({ x: 0, y: 0 });
-    expect(computeJoystickLocomotion({ x: 0.05, y: -0.05 }, 1).localDisplacement).toEqual({ x: 0, y: 0, z: 0 });
-  });
-
   it("uses joystick Y for forward locomotion without strafing", () => {
     const frame = computeJoystickLocomotion({ x: 1, y: -1 }, 1, {
       moveSpeedMetersPerSecond: 1.5,
@@ -33,12 +36,6 @@ describe("VR locomotion mapping", () => {
 
     expect(frame.localDisplacement.x).toBe(0);
     expect(frame.localDisplacement.y).toBeCloseTo(1.5);
-  });
-
-  it("does not drift forward from turn-only joystick input", () => {
-    expect(computeJoystickLocomotion({ x: 1, y: 0.1 }, 1, {
-      joystickDeadZone: 0.18,
-    }).localDisplacement).toEqual({ x: 0, y: 0, z: 0 });
   });
 
   it("returns zero displacement when axes are missing", () => {
@@ -74,30 +71,6 @@ describe("VR locomotion mapping", () => {
         pitchRadians: 0,
       }),
     ).toBe("room-a");
-  });
-
-  it("resolves XR portal render roots independently per eye", async () => {
-    const THREE = await import("three");
-    const world = compileCellComplex(twoRoomsWithPortal());
-    const sourceEye = createCamera(THREE, { x: 0.99, y: 0, z: 1.6 });
-    const targetEye = createCamera(THREE, { x: 1.01, y: 0, z: 1.6 });
-
-    expect(
-      resolveXrPortalEyeRenderRoot({
-        world,
-        sourceCellId: "room-a",
-        anchorPoint: { x: 0, y: 0, z: 0 },
-        camera: sourceEye,
-      }).rootCellId,
-    ).toBe("room-a");
-    expect(
-      resolveXrPortalEyeRenderRoot({
-        world,
-        sourceCellId: "room-a",
-        anchorPoint: { x: 0, y: 0, z: 0 },
-        camera: targetEye,
-      }).rootCellId,
-    ).toBe("room-b");
   });
 
   it("converts room-scale world deltas back to player-local movement after artificial yaw", () => {
@@ -263,58 +236,6 @@ function viewerPose(options: {
     },
     views: [],
   } as unknown as XRViewerPose;
-}
-
-function createCamera(
-  THREE: typeof import("three"),
-  position: { readonly x: number; readonly y: number; readonly z: number },
-): import("three").PerspectiveCamera {
-  const camera = new THREE.PerspectiveCamera(70, 1, 0.001, 250);
-  camera.position.copy(worldPointToThree(position));
-  camera.lookAt(worldPointToThree({ x: position.x + 1, y: position.y, z: position.z }));
-  camera.updateMatrixWorld(true);
-  camera.updateProjectionMatrix();
-  return camera;
-}
-
-function twoRoomsWithPortal() {
-  const squareRoomBase = [
-    { x: -1, y: -1 },
-    { x: 1, y: -1 },
-    { x: 1, y: 1 },
-    { x: -1, y: 1 },
-  ];
-
-  return {
-    cells: [
-      {
-        id: "room-a",
-        heightMeters: 3,
-        baseVertices: squareRoomBase,
-        portals: [
-          {
-            id: "east",
-            sideIndex: 1,
-            targetCellId: "room-b",
-            targetPortalId: "west",
-          },
-        ],
-      },
-      {
-        id: "room-b",
-        heightMeters: 3,
-        baseVertices: squareRoomBase,
-        portals: [
-          {
-            id: "west",
-            sideIndex: 3,
-            targetCellId: "room-a",
-            targetPortalId: "east",
-          },
-        ],
-      },
-    ],
-  };
 }
 
 describe("XR physical move baseline", () => {
