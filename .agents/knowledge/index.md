@@ -12,3 +12,4 @@ Short notes on traps and non-obvious facts of this repository. Rules: `AGENTS.md
 - [headless-edge-end-to-end.md](headless-edge-end-to-end.md): recipe and flags to test the local server channel end to end with headless Edge.
 - [relative-base-urls.md](relative-base-urls.md): the site uses a relative Vite base; always build URLs with publicUrl, never BASE_URL concatenation or root-absolute paths.
 - [pages-publish-template.md](pages-publish-template.md): the Pages publisher is a drop-in kept in Documents/templates/git/.gittools/pages-publish (copy-paste folder); fix it there and re-copy into .gittools/pages-publish/.
+- [vitest-workspace-and-hygiene-proofs.md](vitest-workspace-and-hygiene-proofs.md): Vitest 1.6 forbids `passWithNoTests` inside a workspace project (use the `--passWithNoTests` CLI flag); `git add -N` lets a git-ls-files-based check see an uncommitted scratch file.

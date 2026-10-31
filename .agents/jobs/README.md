@@ -127,7 +127,7 @@ queued job, despite their numbers (they were numbered after the existing queue t
 | [39](_done/39_local_node_https_server.md) | Local Node server: serve the built app over HTTPS on the local network | done, needs review | - |  |
 | [40](_done/40_state_api_object_and_server_channel.md) | The public API object, the server channel, and `npm run cdp` for any device | done, needs review | - |  |
 | [00](00_coordinate_jobs_41_44.md) | Coordinate jobs 41-44 (test rehaul): order, gates, fresh-context reviews, indicators, batch report | queued | - |  |
-| [41](41_test_tiers_and_hygiene_checks.md) | Test tiers, hygiene checks, baseline and indicators | queued | - |  |
+| [41](_done/41_test_tiers_and_hygiene_checks.md) | Test tiers, hygiene checks, baseline and indicators | done, needs review | - |  |
 | [42](42_clean_test_areas.md) | Clean every test area except render | queued | - |  |
 | [43](43_clean_render_tests_and_shared_fakes.md) | Clean the render tests and share the boundary fakes | queued | - |  |
 | [44](44_api_scenario_runner_and_manual_checklist.md) | API scenario runner, first scenarios, and the manual checklist | queued | - |  |

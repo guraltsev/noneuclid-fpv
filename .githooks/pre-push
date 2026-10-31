@@ -22,6 +22,9 @@ npm test --silent
 echo "pre-push: npm run build" >&2
 npm run --silent build >/dev/null
 
+echo "pre-push: npx vitest run --project release" >&2
+npx vitest run --project release --passWithNoTests
+
 smoke_browser="${BROWSER:-}"
 if [ -z "$smoke_browser" ]; then
   case "$(uname -s)" in

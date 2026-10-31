@@ -1,0 +1,257 @@
+H4	tests/render-contract/preloadWorldAssets.test.ts	-
+H4	tests/world-objects/geodesic/geodesicTracingKernel.test.ts	-
+H4	tests/world-objects/simpleGeoCreature.test.ts	-
+H5	tests/movement/moveDynamicObject.test.ts	bodies across portals (issue 63)
+H5	tests/movement/moveDynamicObject.test.ts	ends inside the neighbour when a slide past the end of a wall continues through a portal (issue 61)
+H5	tests/movement/moveDynamicObject.test.ts	gives the same final pose for one long move as for many short ones (issue 62)
+H5	tests/movement/moveDynamicObject.test.ts	keeps the anchor inside its cell on a straight walk through a cube vertex with zones ignored (issue 62)
+H5	tests/movement/moveDynamicObject.test.ts	stops at the forbidden zone of a cube vertex when zones are on (issue 62)
+H5	tests/movement/moveDynamicObject.test.ts	stops in all four corners of a walled room (issue 61)
+H5	tests/movement/movementNumerics.test.ts	movement numerics (issue 65)
+H5	tests/movement/sweptCollision.test.ts	stops in every corner of a walled square (issue 61)
+H5	tests/world-objects/geodesic/carry.test.ts	applies one anchor-crossing traversal per crossing in order (curve shortening loop, job 13 part C)
+H5	tests/world-objects/geodesic/carry.test.ts	folds two crossings of one frame in order, like two single updates (job 13 part C)
+H5	tests/world-objects/geodesic/carry.test.ts	loop words under anchor portal crossings (job 05)
+H5	tests/world-objects/geodesic/curveShortening.test.ts	B1: wraps the junction disk with one corner when the chord would pass too close to it
+H5	tests/world-objects/geodesic/curveShortening.test.ts	B2: resolves a symmetric pair to the straight chord
+H5	tests/world-objects/geodesic/curveShortening.test.ts	B3: resolves the issue 66 torus pair to a stable loop at the emitter
+H5	tests/world-objects/geodesic/curveShortening.test.ts	B4: deletes a free loop that encircles a cone point and sends a notice
+H5	tests/world-objects/geodesic/curveShortening.test.ts	B5: a torus free loop stays as one stable loop on its free end
+H5	tests/world-objects/geodesic/curveShortening.test.ts	B6: an infeasible word leaves everything unchanged and marks the pair unresolved
+H5	tests/world-objects/geodesic/curveShortening.test.ts	C4: resolving a pair traces each result chord once (preview only, no rebuild)
+H5	tests/world-objects/geodesic/curveShortening.test.ts	D1: tying two distinct locked intervals at one emitter creates two moving intervals and one pair
+H5	tests/world-objects/geodesic/curveShortening.test.ts	D2: the torus two-emitter scenario ends as one stable locked loop after one tick
+H5	tests/world-objects/geodesic/curveShortening.test.ts	D3: a nondegenerate free loop ends as one stable free loop
+H5	tests/world-objects/geodesic/curveShortening.test.ts	D4: a pair whose straight chord crosses a junction disk wraps the disk instead of deleting an arc
+H5	tests/world-objects/geodesic/curveShortening.test.ts	D5: no resolved segment spans a portal
+H5	tests/world-objects/geodesic/curveShortening.test.ts	D6: a deleted free loop is reported with its id
+H5	tests/world-objects/geodesic/curveShortening.test.ts	D6: measurements, angles and intersections refresh or are removed after a resolution
+H5	tests/world-objects/geodesic/curveShortening.test.ts	D7: an unresolved pair leaves the stored words unchanged and is not retried
+H5	tests/world-objects/geodesic/curveShortening.test.ts	D8: the non-free anchors of a pair may be a corner or a free end
+H5	tests/world-objects/geodesic/curveShortening.test.ts	curve shortening at any frame rate (job 06)
+H5	tests/world-objects/geodesic/curveShortening.test.ts	fuses the issue 66 torus pair into the same loop at 60 Hz and at 240 Hz
+H5	tests/world-objects/geodesic/curveShortening.test.ts	issue 31/32 outcomes
+H5	tests/world-objects/geodesic/geodesicTracingKernel.test.ts	geodesic tracing on the kernel (job 15)
+H5	tests/world-objects/geodesic/intersections.test.ts	B4: a crossing exactly on a portal side is reported once, in the cell the geodesics enter
+H5	tests/world-objects/geodesic/intersections.test.ts	B5: per-cell buckets find the same markers as the all-pairs search
+H5	tests/world-objects/geodesic/intersections.test.ts	creates a vertex balloon where geodesics intersect at an unrelated emitter (job 15: the 0.3 m emitter exclusion is gone)
+H5	tests/world-objects/geodesic/performance.test.ts	B1: a carry frame of 10 loops and 200 segments does one intersection pass, at most 10 chord traces and no getAll()
+H5	tests/world-objects/geodesic/performance.test.ts	B2: a public call makes one intersection pass
+H5	tests/world-objects/geodesic/performance.test.ts	B3: nested deferral scopes coalesce into one pass, also when the body throws
+H5	tests/world-objects/geodesic/performance.test.ts	C1: a live carry rebuild that ends in a forbidden zone traces the chord once and deletes the interval
+H5	tests/world-objects/geodesic/performance.test.ts	C2: a failed live carry rebuild that is preserved traces the chord once
+H5	tests/world-objects/geodesic/performance.test.ts	C3: realizeIntervalChord classifies a chord with one trace
+H5	tests/world-objects/geodesic/performance.test.ts	C3: realizeIntervalChord reports the junction of a forbidden-zone hit
+H5	tests/world-objects/geodesic/sleeve.test.ts	A1: tangent from a point to a disk
+H5	tests/world-objects/geodesic/sleeve.test.ts	A2: tangents between two disks
+H5	tests/world-objects/geodesic/sleeve.test.ts	A3: a chord that stays in the sleeve has no apex
+H5	tests/world-objects/geodesic/sleeve.test.ts	A4: developSleeve agrees with liftGeodesicEndpoint
+H5	tests/world-objects/geodesic/sleeve.test.ts	A4b: a word that does not chain is a mismatch
+H5	tests/world-objects/geodesic/sleeve.test.ts	A5: one disk is wrapped by one corner
+H5	tests/world-objects/geodesic/sleeve.test.ts	A6: an alternating funnel wraps a left and then a right disk
+H5	tests/world-objects/geodesic/sleeve.test.ts	A7: an aperture narrower than two radii is infeasible
+H5	tests/world-objects/geodesic/sleeve.test.ts	A8: a wrap is subdivided into corners of at most the given turn
+H5	tests/world-objects/geodesic/sleeve.test.ts	A9: the funnel matches a brute-force shortest path (rho = 0)
+H5	tests/world-objects/simpleGeoCreature.test.ts	1. follows the unobstructed geodesic exactly across portals
+H5	tests/world-objects/simpleGeoCreature.test.ts	4. a geodesic exactly through the vertex passes it on the right and the creature rejoins
+H5	tests/world-objects/simpleGeoCreature.test.ts	5. a creature pushed to the wrong side of a zone orbits to the required side and rejoins
+H5	tests/world-objects/simpleGeoCreature.test.ts	6. a blocking body leashes the leader; the creature rejoins when it is removed
+H5	tests/world-objects/simpleGeoCreature.test.ts	7a. host.placeAt re-seeds the leader and the creature walks the geodesic from the placed pose
+H5	tests/world-objects/simpleGeoCreature.test.ts	7b. host.placeAt into another cell moves the registry record and the three.js parent
+H5	tests/world-objects/simpleGeoCreature.test.ts	7c. a direct registry.update of a creature throws and leaves its pose unchanged
+H5	tests/world-objects/simpleGeoCreature.test.ts	8. reset and transformGeometry put the leader back on the creature
+H6	tests/assets/publicAssetPolicy.test.ts	-
+H6	tests/authoring/compileWorldScript.test.ts	-
+H6	tests/authoring/exampleWorlds.test.ts	-
+H6	tests/authoring/worldBuilder.test.ts	-
+H6	tests/cell-complex/compileCellComplex.test.ts	-
+H6	tests/cell-complex/compilePortalTransforms.property.test.ts	-
+H6	tests/cell-complex/compilePortalTransforms.property.test.ts	maps the source side's start to the target side's end and vice versa, and normals to normals
+H6	tests/cell-complex/compilePortalTransforms.test.ts	-
+H6	tests/cell-complex/describeGeometry.test.ts	-
+H6	tests/cell-complex/developedDisk.test.ts	-
+H6	tests/cell-complex/floorUv.test.ts	-
+H6	tests/cell-complex/portalPathDebug.test.ts	-
+H6	tests/cell-complex/portalPaths.property.test.ts	-
+H6	tests/cell-complex/portalPaths.test.ts	-
+H6	tests/cell-complex/prismCells.test.ts	-
+H6	tests/cell-complex/segmentWalk.property.test.ts	-
+H6	tests/cell-complex/segmentWalk.test.ts	-
+H6	tests/cell-complex/staticCullBenchmark.test.ts	-
+H6	tests/cell-complex/staticLineCone.test.ts	-
+H6	tests/cell-complex/staticPortalPathCull.property.test.ts	-
+H6	tests/cell-complex/staticPortalPathCull.test.ts	-
+H6	tests/cell-complex/validateCellComplexSpec.test.ts	-
+H6	tests/docs/documentation.test.ts	-
+H6	tests/docs/documentation.test.ts	keeps module headers, exported JSDoc, layering, generated references and document links healthy
+H6	tests/docs/moduleImportRules.test.ts	-
+H6	tests/glue/debugSettings.test.ts	-
+H6	tests/glue/geometrySelection.test.ts	-
+H6	tests/glue/launchOptionsUrl.test.ts	-
+H6	tests/glue/readLaunchOptions.test.ts	-
+H6	tests/glue/serverChannel.test.ts	-
+H6	tests/math/intersections.property.test.ts	-
+H6	tests/math/intersections.test.ts	-
+H6	tests/math/planes.test.ts	-
+H6	tests/math/polygons.property.test.ts	-
+H6	tests/math/polygons.test.ts	-
+H6	tests/math/rigidTransform3.property.test.ts	-
+H6	tests/math/rigidTransform3.test.ts	-
+H6	tests/math/vec2.test.ts	-
+H6	tests/math/vec3.property.test.ts	-
+H6	tests/math/vec3.test.ts	-
+H6	tests/movement/collision.test.ts	-
+H6	tests/movement/depenetrateDynamicObject.test.ts	-
+H6	tests/movement/developedObstacles.test.ts	-
+H6	tests/movement/moveDynamicObject.property.test.ts	-
+H6	tests/movement/moveDynamicObject.test.ts	-
+H6	tests/movement/moveDynamicObject.test.ts	does not let an offset collision center trigger anchor portal crossing before the object anchor crosses
+H6	tests/movement/moveDynamicObject.test.ts	ends inside the neighbour when a slide past the end of a wall continues through a portal (issue 61)
+H6	tests/movement/moveDynamicObject.test.ts	keeps anchor-crossing objects in the source cell until their traversal center crosses the portal plane
+H6	tests/movement/moveDynamicObject.test.ts	keeps the anchor inside its cell on a straight walk through a cube vertex with zones ignored (issue 62)
+H6	tests/movement/movePlayer.test.ts	-
+H6	tests/movement/movementNumerics.test.ts	-
+H6	tests/movement/portalCrossing.property.test.ts	-
+H6	tests/movement/portalCrossing.test.ts	-
+H6	tests/movement/sweptCollision.test.ts	-
+H6	tests/render-contract/aimCrossMarker.test.ts	-
+H6	tests/render-contract/aimTarget.test.ts	-
+H6	tests/render-contract/aimTarget.test.ts	keeps short geodesic ray segments selectable near their emitter when the emitter hitbox is missed
+H6	tests/render-contract/aimTarget.test.ts	reports the next available geodesic id when an ignored geodesic is aimed through the emitter body
+H6	tests/render-contract/aimTarget.test.ts	resolves geodesic ray segments near their emitter when the smaller emitter hitbox is missed
+H6	tests/render-contract/buildCellMesh.test.ts	-
+H6	tests/render-contract/buildDecorationMesh.test.ts	-
+H6	tests/render-contract/cellRenderArchetypes.test.ts	-
+H6	tests/render-contract/cellRenderArchetypes.test.ts	builds floor, portal-frame, solid-wall, and no static-object archetypes while excluding sky caps and marmots
+H6	tests/render-contract/cellRenderArchetypes.test.ts	counts kept destination paths per cell, includes depth-0 roots, and respects a visible-path cap
+H6	tests/render-contract/cellRenderArchetypes.test.ts	gives every archetype a hidden root mesh with the shared geometry and an unpatched material
+H6	tests/render-contract/debugCollisionWireframes.test.ts	-
+H6	tests/render-contract/debugOverlay.test.ts	-
+H6	tests/render-contract/debugVisualization.test.ts	-
+H6	tests/render-contract/desktopControls.test.ts	-
+H6	tests/render-contract/desktopScenePaletteInput.test.ts	-
+H6	tests/render-contract/frameErrorGuard.test.ts	-
+H6	tests/render-contract/frameRenderSnapshot.test.ts	-
+H6	tests/render-contract/funnelStaticCullBenchmark.test.ts	-
+H6	tests/render-contract/geodesicCannonAimTarget.test.ts	-
+H6	tests/render-contract/geodesicCannonRenderer.test.ts	-
+H6	tests/render-contract/geodesicCarryPortalTransition.test.ts	-
+H6	tests/render-contract/geodesicCreatureDebug.test.ts	-
+H6	tests/render-contract/geodesicEmitterLabelController.test.ts	-
+H6	tests/render-contract/measureLengthRenderer.test.ts	-
+H6	tests/render-contract/placedFlagRenderer.test.ts	-
+H6	tests/render-contract/playerRoverModel.test.ts	-
+H6	tests/render-contract/portalClipData.test.ts	-
+H6	tests/render-contract/portalClipData.test.ts	counts surplus paths and removes them from the instance list instead of drawing them clipped
+H6	tests/render-contract/portalClipMaterial.test.ts	-
+H6	tests/render-contract/portalClipMaterial.test.ts	patches materials with plane fetches in the vertex stage and a single compare in the fragment stage
+H6	tests/render-contract/portalClipPlanes.test.ts	-
+H6	tests/render-contract/portalClipPolygonOverlay.test.ts	-
+H6	tests/render-contract/portalEyeActivation.test.ts	-
+H6	tests/render-contract/portalEyeFrameTransforms.test.ts	-
+H6	tests/render-contract/portalFunnel.test.ts	-
+H6	tests/render-contract/portalInstanceBuffers.test.ts	-
+H6	tests/render-contract/portalInstanceBuffers.test.ts	hides the root mesh when no depth-0 path is visible, and a root-only archetype draws no instance
+H6	tests/render-contract/portalWallTexture.test.ts	-
+H6	tests/render-contract/preloadWorldAssets.test.ts	-
+H6	tests/render-contract/prerenderCells.test.ts	-
+H6	tests/render-contract/protractorAngleRenderer.test.ts	-
+H6	tests/render-contract/protractorToolFeedback.test.ts	-
+H6	tests/render-contract/renderCameraClip.test.ts	-
+H6	tests/render-contract/renderQuality.test.ts	-
+H6	tests/render-contract/renderQuality.test.ts	uses drawing-buffer pixels for portal viewport uniforms because gl_FragCoord is in framebuffer pixels
+H6	tests/render-contract/runtimeObjectGhostRecords.test.ts	-
+H6	tests/render-contract/runtimeObjectInstanceSync.test.ts	-
+H6	tests/render-contract/runtimeObjectInstanceSync.test.ts	traverses an object's hierarchy once, and again only after one of its source keys is deleted
+H6	tests/render-contract/runtimeObjectPortalInstances.test.ts	-
+H6	tests/render-contract/runtimeObjectRenderArchetypes.test.ts	-
+H6	tests/render-contract/runtimeObjectRenderArchetypes.test.ts	collects mesh sources, hides source meshes, and bakes mesh transforms into archetype geometry
+H6	tests/render-contract/runtimeSceneDispose.test.ts	-
+H6	tests/render-contract/sceneLighting.test.ts	-
+H6	tests/render-contract/scenePaletteLibraryAdapter.test.ts	-
+H6	tests/render-contract/scenePaletteLibraryAdapter.test.ts	renders sign editing with fixed number, QWERTY, space, enter, backspace, cursor, and trash controls
+H6	tests/render-contract/scenePaletteTooltip.test.ts	-
+H6	tests/render-contract/scenePointers.test.ts	-
+H6	tests/render-contract/staticAssetRenderRoot.test.ts	-
+H6	tests/render-contract/stereoSplitRoot.test.ts	-
+H6	tests/render-contract/visiblePortalPaths.property.test.ts	-
+H6	tests/render-contract/visiblePortalPaths.test.ts	-
+H6	tests/render-contract/visiblePortalPaths.test.ts	reports live ShowCellPath-style visibility only when the matched path id is in the latest result
+H6	tests/render-contract/vrComfort.test.ts	-
+H6	tests/render-contract/vrLocomotion.test.ts	-
+H6	tests/render-contract/vrPaletteHeaderActions.test.ts	-
+H6	tests/render-contract/vrPalettePlacement.test.ts	-
+H6	tests/render-contract/worldResultBadge.test.ts	-
+H6	tests/render-contract/xrControllerHandModels.test.ts	-
+H6	tests/render-contract/xrControls.test.ts	-
+H6	tests/render-contract/xrDebugPanel.test.ts	-
+H6	tests/render-contract/xrPortalEye.test.ts	-
+H6	tests/render-contract/xrPortalEye.test.ts	reuses the target's camera and matrix across re-rooting calls with the same result as without a target
+H6	tests/render-contract/xrScenePaletteInput.test.ts	-
+H6	tests/render-contract/xrScenePaletteInput.test.ts	does not emit a second menu toggle edge because XR runtime input already owns side-trigger menu actions
+H6	tests/render-contract/xrScenePaletteInput.test.ts	maps controller select and side trigger buttons without treating face buttons as menu toggles
+H6	tests/render-contract/xrSessionRestart.test.ts	-
+H6	tests/render-contract/xrSessionState.test.ts	-
+H6	tests/runtime/apiCall.test.ts	-
+H6	tests/runtime/runtimeCommands.test.ts	-
+H6	tests/runtime/runtimeMenuState.test.ts	-
+H6	tests/runtime/torusSkewDeformation.test.ts	-
+H6	tests/runtime/worldGeometryComputedObjects.test.ts	-
+H6	tests/runtime/worldGeometryDeformations.property.test.ts	-
+H6	tests/runtime/worldGeometryDeformations.test.ts	-
+H6	tests/runtime/worldGeometryRuntimeTransforms.test.ts	-
+H6	tests/runtime/worldGeometrySession.test.ts	-
+H6	tests/scripts/checkDistSize.test.ts	-
+H6	tests/server/channel.process.test.ts	-
+H6	tests/server/localServer.process.test.ts	-
+H6	tests/smoke/smokeArgs.test.ts	-
+H6	tests/smoke/staticServer.process.test.ts	-
+H6	tests/support/arbitraries.test.ts	-
+H6	tests/ui/helpLensDefinition.test.ts	-
+H6	tests/ui/inputIntents.test.ts	-
+H6	tests/ui/inputModeText.test.ts	-
+H6	tests/ui/paletteDefinitionCache.test.ts	-
+H6	tests/ui/paletteTooltips.test.ts	-
+H6	tests/ui/worldInteractionDefinition.test.ts	-
+H6	tests/world-objects/geodesic/cannon.test.ts	-
+H6	tests/world-objects/geodesic/cannon.test.ts	places an incoming emitter on the selected geodesic when the source owns multiple geodesics
+H6	tests/world-objects/geodesic/carry.test.ts	-
+H6	tests/world-objects/geodesic/carry.test.ts	applies one anchor-crossing traversal per crossing in order (curve shortening loop, job 13 part C)
+H6	tests/world-objects/geodesic/carry.test.ts	derives a different-cell portal carry transition from endpoint cells without player transition state
+H6	tests/world-objects/geodesic/carry.test.ts	destroys a locked interval during live carry when the rebuilt path crosses a forbidden zone
+H6	tests/world-objects/geodesic/carry.test.ts	fails to rebuild a horizontal torus loop carried across the perpendicular portal instead of making it diagonal
+H6	tests/world-objects/geodesic/carry.test.ts	normalizes an out-of-cell carried emitter through one portal on release before final rebuild
+H6	tests/world-objects/geodesic/carry.test.ts	rebuilds a live carried geodesic to a formal out-of-bounds emitter without mutating the word
+H6	tests/world-objects/geodesic/carry.test.ts	updates a locked interval portal word from carried endpoint player traversal before rebuild
+H6	tests/world-objects/geodesic/curveShortening.test.ts	-
+H6	tests/world-objects/geodesic/curveShortening.test.ts	D1: tying two distinct locked intervals at one emitter creates two moving intervals and one pair
+H6	tests/world-objects/geodesic/curveShortening.test.ts	D4: a pair whose straight chord crosses a junction disk wraps the disk instead of deleting an arc
+H6	tests/world-objects/geodesic/curveShortening.test.ts	fuses a ready curve-shortening pair into one stable locked interval using the lower geodesic id
+H6	tests/world-objects/geodesic/curveShortening.test.ts	keeps the existing geodesic and drops the new one when both have the same endpoints and word
+H6	tests/world-objects/geodesic/geodesicPortalWord.property.test.ts	-
+H6	tests/world-objects/geodesic/geodesicTracingKernel.test.ts	-
+H6	tests/world-objects/geodesic/geodesicTracingKernel.test.ts	sums piece lengths to the requested length and ends at the developed end point (up to 200 crossings)
+H6	tests/world-objects/geodesic/intersections.test.ts	-
+H6	tests/world-objects/geodesic/intersections.test.ts	creates a vertex balloon where geodesics intersect at an unrelated emitter (job 15: the 0.3 m emitter exclusion is gone)
+H6	tests/world-objects/geodesic/performance.test.ts	-
+H6	tests/world-objects/geodesic/performance.test.ts	B1: a carry frame of 10 loops and 200 segments does one intersection pass, at most 10 chord traces and no getAll()
+H6	tests/world-objects/geodesic/performance.test.ts	C1: a live carry rebuild that ends in a forbidden zone traces the chord once and deletes the interval
+H6	tests/world-objects/geodesic/sleeve.test.ts	-
+H6	tests/world-objects/geodesic/trace.test.ts	-
+H6	tests/world-objects/geodesic/trace.test.ts	keeps the display number of a rebuilt geodesic and reuses the lowest free number for a new one
+H6	tests/world-objects/geodesic/trace.test.ts	rebuilds rotated geodesics to the remembered total length after moving past a forbidden zone
+H6	tests/world-objects/geodesicMarmot.test.ts	-
+H6	tests/world-objects/library.test.ts	-
+H6	tests/world-objects/library.test.ts	lets authored instances override documented collision metadata without changing library defaults
+H6	tests/world-objects/measureLengthTool.test.ts	-
+H6	tests/world-objects/measureLengthTool.test.ts	measures the full geodesic length and places the label near the player in the current segment cell
+H6	tests/world-objects/placedFlags.test.ts	-
+H6	tests/world-objects/protractorTool.test.ts	-
+H6	tests/world-objects/protractorTool.test.ts	hides vertex-centered angles while their vertex is temporarily missing and restores them when it returns
+H6	tests/world-objects/runtimeObjectRegistry.test.ts	-
+H6	tests/world-objects/simpleGeoCreature.test.ts	${zoneOnLeft ? "2" : "3"}. keeps the zone vertex on the geodesic's side (zone on the ${zoneOnLeft ? "left" : "right"})
+H6	tests/world-objects/simpleGeoCreature.test.ts	-
+H6	tests/world-objects/simpleGeoCreature.test.ts	7a. host.placeAt re-seeds the leader and the creature walks the geodesic from the placed pose
+H6	tests/world-objects/worldObjectOwner.test.ts	-
+H9	tests/cell-complex/staticCullBenchmark.test.ts	-
+H9	tests/render-contract/funnelStaticCullBenchmark.test.ts	-

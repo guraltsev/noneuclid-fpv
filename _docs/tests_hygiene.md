@@ -200,8 +200,11 @@ A tool also prints the indicators of [tests.md](tests.md) §2.3, so every job ca
   the API in a browser, about 20 need a small API function, about 7 need the engine split, about 15 need a person, and 4
   are stale (`.agents/jobs/_reports/test_audit_2026_10_31.md`).
 - **Status (2026-10-31):**
-  - The tiers, checks, baseline and indicator tool do not exist yet; job 41 builds them.
-  - `tests/scratch/` (empty) is replaced by `tests/_temp/<ref>/`.
+  - Job 41 built the tiers, the checks (`scripts/tests/hygiene.mjs`, run by `tests/project/testHygiene.test.ts` and by
+    `npm run test:report`), the baseline (`tests/hygiene-baseline.txt`, 257 lines: H4 3, H5 59, H6 193, H9 2; H1, H2,
+    H3, H7 and H8 start at 0) and the indicator tool. No test was rewritten; the baseline carries today's debt forward
+    for jobs 42-44 to shrink.
+  - `tests/scratch/` (empty) is deleted; `tests/_temp/<ref>/` is unused so far (0 folders).
   - The area clean-up is jobs 42 (every area except `render`) and 43 (`render`); the conversion of manual checks is
     jobs 44 (through today's API) and 45 (needs API functions agreed in
     [012](design/012-engine-api.md)).

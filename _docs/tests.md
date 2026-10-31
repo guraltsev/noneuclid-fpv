@@ -403,10 +403,13 @@ holding both its examples and its properties.
 | `npm run test:release` | `release`: builds, then the `release` files and the browser smoke |
 | `npm run test:report` | the indicators of §2.3 and the hygiene check ([tests_hygiene.md](tests_hygiene.md) §6) |
 
-Status (2026-10-31): the suffixes and the commands other than `npm test` do not exist yet. Job 41 creates them; until
-then `npm test` runs every file and the browser smoke runs as `npm run smoke` (flags in [DEVELOPMENT.md](DEVELOPMENT.md)).
+Status (2026-10-31): job 41 built the suffixes, the `vitest.workspace.ts` projects and the commands above.
+`npm run test:release` builds and passes with no tests (no `*.release.test.ts` file exists yet; job 44 adds the first
+scenarios). The browser smoke still runs separately as `npm run smoke` (flags in [DEVELOPMENT.md](DEVELOPMENT.md));
+job 44 is expected to fold it into the `release` tier.
 
-`git push` runs typecheck, `npm test`, the build and the browser smoke through the pre-push hook (`.githooks/`). Before
+`git push` runs typecheck, `npm test`, the build, `npx vitest run --project release` and the browser smoke through the
+pre-push hook (`.githooks/`). Before
 closing a piece of work, run:
 
 ```sh
