@@ -1,35 +1,31 @@
+/**
+ * Scene palette library adapter (src/render/three/scenePaletteLibraryAdapter.ts): turns a `PaletteDefinition`
+ * (src/ui/paletteDefinition.ts) into a Three.js object tree the VR panel renders, tagging every interactive mesh
+ * with a `scenePaletteItemId` (and `scenePaletteAction` where it is clickable) that the input layer reads back.
+ * This file covers only what the adapter itself decides that `PaletteDefinition` does not: which icon goes with
+ * which tool and action, the on-screen sign-editing keyboard's key choice and cursor/preview layout, and
+ * suppressing an action for a locked geodesic. Which options a page offers and which are disabled is
+ * `createPaletteDefinition`'s decision, covered directly in `tests/ui/paletteDefinition.test.ts`.
+ */
 import { describe, expect, it } from "vitest";
-import { normalizeAppConfig } from "../../src/glue/appConfig";
-import { publicAssetUrl } from "../../src/glue/assetUrls";
 import {
   createRuntimeMenuState,
   showRuntimeMenuEditSign,
   showRuntimeMenuGeodesicCannonActions,
   showRuntimeMenuGeometryComputerActions,
-  showRuntimeMenuPlaceFlagOptions,
-  showRuntimeMenuQuestionHelp,
-  showRuntimeMenuSettings,
-  showRuntimeMenuTutorial,
 } from "../../src/runtime/runtimeMenuState";
+import { publicAssetUrl } from "../../src/glue/assetUrls";
 import { createScenePaletteLibraryAdapter } from "../../src/render/three/scenePaletteLibraryAdapter";
 import { createPaletteDefinition } from "../../src/ui/paletteDefinition";
 
 describe("scenePaletteLibraryAdapter", () => {
-  it("renders explicit main tool tiles without a default tool tile", () => {
+  it("maps each main tool and its nested options to the right icon", () => {
     const adapter = createScenePaletteLibraryAdapter(createNoopOptions());
     adapter.setDefinition(createPaletteDefinition(createRuntimeMenuState({ selectedWorldId: "cube" })));
 
     const itemIds = collectPaletteItemIds(adapter.root);
     const imageSources = collectPaletteImageSources(adapter.root);
 
-    expect(itemIds).not.toContain("tool:aim");
-    expect(itemIds).toContain("settings");
-    expect(itemIds).toContain("close");
-    expect(itemIds).toContain("go-home");
-    expect(itemIds).toContain("reload-world");
-    expect(itemIds).toContain("tool:place-flag");
-    expect(itemIds).toContain("tool:geodesic-cannon");
-    expect(itemIds).toContain("tool:measure-length");
     expect(itemIds).toContain("tool-options:place-sign");
     expect(imageSources).toContain(publicAssetUrl("WoodenSign1/WoodenSign1.png"));
     expect(imageSources).toContain(publicAssetUrl("flashlight/Lightsaber.png"));
@@ -39,50 +35,15 @@ describe("scenePaletteLibraryAdapter", () => {
     adapter.dispose();
   });
 
-  it("renders place sign options", () => {
-    const adapter = createScenePaletteLibraryAdapter(createNoopOptions());
-    adapter.setDefinition(createPaletteDefinition(showRuntimeMenuPlaceFlagOptions(
-      createRuntimeMenuState({ selectedWorldId: "cube" }),
-    )));
-
-    const itemIds = collectPaletteItemIds(adapter.root);
-    const imageSources = collectPaletteImageSources(adapter.root);
-
-    expect(itemIds).not.toContain("go-home");
-    expect(itemIds).not.toContain("reload-world");
-    expect(itemIds).toContain("sign-type:WoodenSign1");
-    expect(itemIds).toContain("sign-type:WoodenSign2");
-    expect(imageSources).toContain(publicAssetUrl("WoodenSign1/WoodenSign1.png"));
-    expect(imageSources).toContain(publicAssetUrl("WoodenSign2/WoodenSign2.png"));
-
-    adapter.dispose();
-  });
-
-  it("renders geodesic ray emitter actions with aim only for unlocked geodesics", () => {
+  it("maps each geodesic emitter action to the right icon", () => {
     const adapter = createScenePaletteLibraryAdapter(createNoopOptions());
     adapter.setDefinition(createPaletteDefinition(showRuntimeMenuGeodesicCannonActions(
       createRuntimeMenuState({ selectedWorldId: "cube" }),
       { cannonId: "cannon-a", geodesicIds: ["g-a"], canTieAndDetach: true },
     )));
 
-    const itemIds = collectPaletteItemIds(adapter.root);
-    const actionIds = collectPaletteActionItemIds(adapter.root);
     const imageSources = collectPaletteImageSources(adapter.root);
 
-    expect(itemIds).not.toContain("go-home");
-    expect(itemIds).not.toContain("reload-world");
-    expect(itemIds).toContain("geodesic-cannon-action:add-geodesic");
-    expect(itemIds).toContain("geodesic-cannon-action:carry");
-    expect(itemIds).toContain("geodesic-cannon-action:tie-and-detach");
-    expect(itemIds).not.toContain("geodesic-cannon-action:rotate:g-a");
-    expect(itemIds).toContain("geodesic-cannon-action:aim:g-a");
-    expect(itemIds).toContain("geodesic-cannon-action:delete:g-a");
-    expect(actionIds).toContain("geodesic-cannon-action:add-geodesic");
-    expect(actionIds).toContain("geodesic-cannon-action:carry");
-    expect(actionIds).toContain("geodesic-cannon-action:tie-and-detach");
-    expect(actionIds).not.toContain("geodesic-cannon-action:rotate:g-a");
-    expect(actionIds).toContain("geodesic-cannon-action:aim:g-a");
-    expect(actionIds).toContain("geodesic-cannon-action:delete:g-a");
     expect(imageSources).toContain(publicAssetUrl("icons/aim-inverted.png"));
     expect(imageSources).toContain(publicAssetUrl("icons/carry-inverted.svg"));
     expect(imageSources).toContain(publicAssetUrl("icons/unlink-inverted.png"));
@@ -128,7 +89,7 @@ describe("scenePaletteLibraryAdapter", () => {
   });
 
 
-  it("renders sign editing with fixed number, QWERTY, space, enter, backspace, cursor, and trash controls", () => {
+  it("renders a sign's keyboard, cursor and preview, fixed keys only, with a trash action", () => {
     const adapter = createScenePaletteLibraryAdapter(createNoopOptions());
     const definition = createPaletteDefinition(showRuntimeMenuEditSign(
       createRuntimeMenuState({ selectedWorldId: "cube" }),
@@ -181,8 +142,6 @@ describe("scenePaletteLibraryAdapter", () => {
     const imageSources = collectPaletteImageSources(adapter.root);
     const diagramPoints = collectGeometryComputerDiagramWorldPoints(adapter.root);
 
-    expect(itemIds).not.toContain("go-home");
-    expect(itemIds).not.toContain("reload-world");
     expect(itemIds).toContain("geometry-computer:diagram");
     expect(imageSources).toContain("world-deformation-parallelogram");
     expect(diagramPoints).toEqual({
@@ -203,95 +162,6 @@ describe("scenePaletteLibraryAdapter", () => {
     adapter.dispose();
   });
 
-  it("renders tutorial paging controls", () => {
-    const adapter = createScenePaletteLibraryAdapter(createNoopOptions());
-    adapter.setDefinition(createPaletteDefinition(showRuntimeMenuTutorial(
-      createRuntimeMenuState({ selectedWorldId: "cube" }),
-      {
-        objectId: "startingQuestionCube",
-        pages: [
-          { title: "Move", body: "Use arrows." },
-          { title: "Act", body: "Click things." },
-        ],
-      },
-    )));
-
-    const itemIds = collectPaletteItemIds(adapter.root);
-    const actionIds = collectPaletteActionItemIds(adapter.root);
-
-    expect(itemIds).not.toContain("go-home");
-    expect(itemIds).not.toContain("reload-world");
-    expect(itemIds).toContain("tutorial:previous");
-    expect(itemIds).toContain("tutorial:next");
-    expect(actionIds).not.toContain("tutorial:previous");
-    expect(actionIds).toContain("tutorial:next");
-
-    adapter.dispose();
-  });
-
-  it("renders help hub choices", () => {
-    const adapter = createScenePaletteLibraryAdapter(createNoopOptions());
-    adapter.setDefinition(createPaletteDefinition(showRuntimeMenuQuestionHelp(
-      createRuntimeMenuState({ selectedWorldId: "cube" }),
-      {
-        objectId: "startingQuestionCube",
-        tutorialPages: [{ title: "Move", body: "Use arrows." }],
-        goalPages: [{ title: "Goal", body: "Find a portal." }],
-      },
-    )));
-
-    const itemIds = collectPaletteItemIds(adapter.root);
-    const actionIds = collectPaletteActionItemIds(adapter.root);
-
-    expect(itemIds).toContain("question-help:tutorial");
-    expect(itemIds).toContain("question-help:goal");
-    expect(actionIds).toContain("question-help:tutorial");
-    expect(actionIds).toContain("question-help:goal");
-
-    adapter.dispose();
-  });
-
-  it("renders world and config choices in settings", () => {
-    const adapter = createScenePaletteLibraryAdapter(createNoopOptions());
-    adapter.setDefinition(createPaletteDefinition(showRuntimeMenuSettings(
-      createRuntimeMenuState({ selectedWorldId: "cube", selectedAppConfigName: "full" }),
-    )));
-
-    const itemIds = collectPaletteItemIds(adapter.root);
-
-    expect(itemIds).toContain("config:default");
-    expect(itemIds).toContain("config:full");
-    expect(itemIds).toContain("config:001");
-    expect(itemIds).toContain("config:002");
-    expect(itemIds).toContain("config:003");
-    expect(itemIds).toContain("world:cube");
-    expect(itemIds).toContain("world:torus");
-    expect(itemIds).toContain("world:torus-moduli");
-
-    adapter.dispose();
-  });
-
-  it("hides world and config choices when the active config disables those settings sections", () => {
-    const adapter = createScenePaletteLibraryAdapter(createNoopOptions());
-    adapter.setDefinition(createPaletteDefinition(
-      showRuntimeMenuSettings(createRuntimeMenuState({ selectedWorldId: "001-basic-cube" })),
-      normalizeAppConfig({
-        optionsMenu: {
-          configSelectionSection: false,
-          worldSelectionSection: false,
-        },
-      }),
-    ));
-
-    const itemIds = collectPaletteItemIds(adapter.root);
-
-    expect(itemIds).not.toContain("world:cube");
-    expect(itemIds).not.toContain("world:torus");
-    expect(itemIds).not.toContain("config:default");
-    expect(itemIds).not.toContain("config:full");
-
-    adapter.dispose();
-  });
 });
 
 function collectPaletteItemIds(root: { readonly children: readonly any[]; readonly userData?: Record<string, unknown> }): string[] {
