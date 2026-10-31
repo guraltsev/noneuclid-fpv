@@ -1,6 +1,6 @@
 /**
  * Fake of a `<canvas>` element and its 2D drawing context, for renderer code that draws text or shapes onto a
- * canvas texture (e.g. `placedFlagRenderer.ts`, `geodesicEmitterLabels.ts`) without a real DOM. Installs
+ * canvas texture (e.g. `placedFlagRenderer.ts`, `geodesicEmitterLabelController.ts`) without a real DOM. Installs
  * `document.createElement("canvas")` as a global stub that always returns the same fake canvas, so the caller's
  * `document.createElement("canvas")` call resolves to a value the test can inspect. Every 2D context drawing
  * method a test does not override is a `vi.fn()` no-op that records its calls; drawing state (`fillStyle`,
