@@ -17,6 +17,11 @@ first.
   the source (`npm run docs:generate`): module index, dependency graph,
   layering debt, and every exported symbol.
 
+- [CODING_MATH.md](CODING_MATH.md) is the metadocument: the philosophy of
+  coding mathematics this repository tests and refines (mapping mathematical
+  ideas to code organisation and visualisation), its principles, evidence and
+  tensions, and a guide to practising it.
+
 Both hand-written documents contain machine-checked references to the code
 (`npm run docs:check`), so a rename or removal cannot silently leave them wrong.
 
@@ -62,6 +67,9 @@ Both hand-written documents contain machine-checked references to the code
 - [design/010-webxr-vr-runtime.md](design/010-webxr-vr-runtime.md) and
   [design/011-vr-hand-tools-palette.md](design/011-vr-hand-tools-palette.md)
   cover WebXR and the shared tool palette (011 is a historical record).
+- [design/012-engine-api.md](design/012-engine-api.md) is the living design
+  document for the next version: the app as a non-Euclidean engine with a
+  programmatic API that the UI, VR, tests, bots, replays and AI agents all use.
 
 ## Other Records
 

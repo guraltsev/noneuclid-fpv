@@ -206,6 +206,36 @@ several frames, and for anything finer the page needs a counter of its own.
 It does not answer questions about stereo or controller input; those need a headset session (see
 [design/010-webxr-vr-runtime.md](design/010-webxr-vr-runtime.md)).
 
+## 3a. Any device through the local server
+
+`npm run cdp` has a second backend that reaches any device (a headset, another desktop) through the local server
+([DEPLOYMENT.md](DEPLOYMENT.md), "Local HTTPS server for a headset"). Every page served by that server joins a
+WebSocket channel and exposes its public API, `window.noneuclid.api`: namespaces `app` (`info`, `changeWorld`,
+`changeConfig`, `reload`), `debug`, `portal`, `geometry` (torus-skew worlds only) and `view` (`screenshot`). A call is a
+literal function call on that object; `help` lists what exists.
+
+```powershell
+$env:NONEUCLID_ADMIN_PASSWORD = "choose-one"
+npm run server -- --dev                       # --dev also allows `eval`
+# open the printed address on the device, then, from any machine that can reach the server:
+npm run cdp -- --server wss://192.168.1.50:11446 devices
+npm run cdp -- --server wss://192.168.1.50:11446 help
+npm run cdp -- --server wss://192.168.1.50:11446 call app.info
+npm run cdp -- --server wss://192.168.1.50:11446 --device d1 call app.changeWorld '"cube"'
+npm run cdp -- --server wss://192.168.1.50:11446 --device all call app.reload
+npm run cdp -- --server wss://192.168.1.50:11446 shot out.jpg
+npm run cdp -- --server wss://192.168.1.50:11446 console 15
+```
+
+- `NONEUCLID_SERVER` can replace `--server`. Use `ws://` with `npm run server -- --http`.
+- Arguments of `call` are JSON, or plain strings when they are not valid JSON. The result is printed as JSON.
+- `--device <id>` is required when more than one device is connected; only `call` accepts `--device all`.
+- `eval` and `record "<expression>"` work only when the server runs with `--dev`; `record "debug.dumpAllGeodesics"`
+  (a dotted name) polls that API function instead, every 100 ms.
+- A self-signed certificate is accepted with a warning; pass `--ca <file>` to trust a certificate file instead.
+- `help` and `call` also work on the DevTools backend (without `--server`), evaluated in the attached page.
+- `shot` fails while the device is presenting in XR.
+
 ## 4. Ending the session
 
 Close the Edge window, stop the dev server, and delete the throwaway profile:

@@ -162,6 +162,7 @@ import {
   isSimpleGeoCreatureObjectSpec,
 } from "../../world-objects/simpleGeoCreature";
 import { createObjectHost, createPlainWorldObject, type PlainWorldObject } from "../../world-objects/worldObjectOwner";
+import { setApiNamespace } from "../../runtime/publicApi";
 import { createDesktopFlagEditor } from "../dom/desktopFlagEditor";
 import { createDesktopToolIndicator } from "../dom/desktopToolIndicator";
 import { createFloatingObjectTooltip } from "../dom/floatingObjectTooltip";
@@ -1235,6 +1236,15 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     placeObjectAt: debugPlaceObjectAt,
   });
   installGeometryDebugHelpersIfAvailable();
+  setApiNamespace("view", {
+    screenshot() {
+      if (renderer.xr.isPresenting) {
+        throw new Error("screenshot is not available while presenting in XR");
+      }
+      renderer.render(scene, camera);
+      return renderer.domElement.toDataURL("image/jpeg", 0.85);
+    },
+  });
   syncDesktopPalette();
 
   // Instantiate the world's authored objects: creatures become per-frame updated runtimes, collidable assets
@@ -1925,6 +1935,12 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     };
 
     (window as WindowWithGeometryDebugHelpers).noneuclidGeometry = helpers;
+    setApiNamespace("geometry", {
+      setTorusSkew: (m: number) => helpers.SetTorusSkew(m),
+      stepTorusSkew: (dm: number) => helpers.StepTorusSkew(dm),
+      cancel: () => helpers.Cancel(),
+      state: () => helpers.state,
+    });
   }
 
   function applyMenuDebugState(nextMenuState: typeof menuState): void {
@@ -2139,6 +2155,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       portalDebugRuntime.dispose();
       uninstallGeneralDebugHelpers();
       uninstallGeometryDebugHelpers();
+      setApiNamespace("view", undefined);
       geometrySession.dispose();
       debugOverlay.dispose();
       scene.remove(xrDebugPanel.object);

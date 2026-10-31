@@ -1,0 +1,8 @@
+{
+  "pagesBranch": "gh_pages",
+  "branches": ["main", "design/**"],
+  "defaultBranch": "main",
+  "build": ["node", "scripts/build-pages.mjs", "--base", "{base}"],
+  "dist": "dist",
+  "history": "single"
+}

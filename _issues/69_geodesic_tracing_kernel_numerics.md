@@ -1,6 +1,6 @@
 # 69 - Geodesic tracing kernel: nudge drift, disk test with the start inside, missed intersections
 
-Status: open; re-verified 2026-10-28; fix designed 2026-10-29.
+Status: open; re-verified 2026-10-28; fix designed 2026-10-29. Implemented by job 15, which ended "done, needs review"; see the Report in [job 15](../.agents/jobs/_done/15_geodesic_tracing_on_kernel.md).
 
 Priority: P2 (robustness / correctness).
 

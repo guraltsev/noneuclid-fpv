@@ -1,4 +1,4 @@
-# Development Guide
+﻿# Development Guide
 
 This is the living overview for building the NonEuclidean FPV experience.
 
@@ -76,11 +76,8 @@ For local classroom serving:
 npm run dev -- --host 0.0.0.0
 ```
 
-For GitHub Pages, use [`.github/workflows/deploy-pages.yml`](../.github/workflows/deploy-pages.yml)
-and set the repository Pages source to `GitHub Actions`. The workflow does not run
-tests (the pre-push hook runs `npm run typecheck` and `npm test`); it builds the site with the correct Pages base path, publishes
-`.nojekyll` so underscore-prefixed asset folders survive deployment, and
-deploys the built `dist/` output.
+For GitHub Pages, see [PUBLISHING.md](PUBLISHING.md): the site is served from the `gh_pages` branch, one folder per
+branch, published by `npm run publish:branch` or by the optional workflow `.github/workflows/publish.yml`.
 
 `npm run build:pages` is the local verification build for that deployment path.
 `npm run build:pages` requires the target repository name (`--base <name>` or

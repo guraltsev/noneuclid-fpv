@@ -1,55 +1,29 @@
-# Deployment guide
+﻿# Deployment guide
 
 This guide is for maintainers publishing a classroom instance. It is separate
 from the main README so students and educators can focus on the mathematics.
 
 ## GitHub Pages
 
-The site is published from [guraltsev/noneuclid-fpv](https://github.com/guraltsev/noneuclid-fpv)
-at **https://guraltsev.github.io/noneuclid-fpv/**. Publishing is automatic: every
-push to `main` runs the [Pages workflow](../.github/workflows/deploy-pages.yml),
-which installs dependencies, builds the site and deploys it. The workflow does
-**not** run the tests (they are heavy). Instead a local pre-push hook
-(`.githooks/pre-push`, enabled by `npm install` or `npm run setup:hooks`) runs `npm run typecheck`,
-`npm test`, `npm run build` and a headless smoke test of two worlds (skipped with a warning when no Chromium-based
-browser is found) and refuses the push if any fails.
-Nothing needs to be run by hand.
+The site is published from [guraltsev/noneuclid-fpv](https://github.com/guraltsev/noneuclid-fpv). The `gh_pages`
+branch holds one built folder per published branch; the stable version is at
+**https://guraltsev.github.io/noneuclid-fpv/main/** and the root redirects there. Setup, the `npm run publish:branch`
+command, the optional push hook and the optional workflow are described in [PUBLISHING.md](PUBLISHING.md).
 
-### One-time setup (about two minutes)
+A local pre-push hook (`.githooks/pre-push`, enabled by `npm install` or `npm run setup:hooks`) runs
+`npm run typecheck`, `npm test`, `npm run build` and a headless smoke test of two worlds (skipped with a warning when no
+Chromium-based browser is found) and refuses the push if any fails. Publishing itself does not test anything.
+`git push --no-verify` skips the hook.
 
-1. Open the repository on GitHub, then **Settings → Pages**.
-2. Under **Build and deployment → Source**, choose **GitHub Actions** (not
-   "Deploy from a branch").
-3. Open the **Actions** tab. Find the latest "Deploy GitHub Pages" run; if none
-   exists, choose it on the left and press **Run workflow**.
-4. Wait for both jobs (`build`, then `deploy`) to turn green. If asked, approve
-   the `github-pages` environment.
-5. Open the site address above. The same address appears on the finished
-   `deploy` job and under Settings → Pages.
-
-### Publishing a change
-
-```sh
-git add -A
-git commit -m "Describe the change"
-git push
-```
-
-That is all. `git push` first runs the pre-push hook (about a minute); the
-deploy itself does not test anything. `git push --no-verify` skips the hook,
-so use it only when you know the checks are irrelevant. Watch the run in the Actions tab; after a minute or two the site
-shows the change (force-refresh the browser, Ctrl+F5, if it looks stale). If the
-build fails, the deploy is skipped and the old site stays up.
-
-Before pushing a release you can also run the browser smoke check (optional, needs a Chromium-based browser):
+Before publishing you can run the browser smoke check (optional, needs a Chromium-based browser):
 
 ```sh
 npm run build:pages -- --base noneuclid-fpv
 npm run smoke -- --world cube,dodecahedron,torus-moduli
 ```
 
-After a deploy, check the live site with `npm run smoke -- --url https://guraltsev.github.io/noneuclid-fpv/ --world cube`.
-
+After publishing, check the live site with
+`npm run smoke -- --url https://guraltsev.github.io/noneuclid-fpv/main/ --world cube`.
 ### Activity addresses
 
 Add `?config=...` to the site address: `001` to `005` are the locked student
@@ -86,7 +60,7 @@ another GitHub repository with the same source.
 - **404 or blank page:** Pages source is not set to GitHub Actions, or the first
   workflow run has not finished.
 - **Workflow does not start:** the push was not to `main`, or Actions are
-  disabled under Settings → Actions.
+  disabled under Settings â†’ Actions.
 - **Deploy fails with a permissions or environment error:** repeat setup step 2.
 - **Floor textures missing:** only compressed `runtime/*.ktx2` textures are in
   the repository; texture sources are not (see
@@ -107,14 +81,25 @@ connecting from another device. A manual headset checklist is in `_docs/acceptan
 
 ### Local HTTPS server for a headset
 
-`wwwserver/` holds the Rebex Tiny Web Server, configured to serve `dist/` at the
-site root on HTTP port 1183 and HTTPS port 11446, with the certificate
-`wwwserver/server-certificate.pfx`.
+The recommended way is the Node server, `npm run server`. It serves `dist/` at the site root over HTTPS (default port
+11446, certificate `wwwserver/server-certificate.pfx`), prints the address of every network interface, and marks the
+`index.html` it serves with `<meta name="noneuclid-server">` so the page knows it came from this server. Cross-platform
+alternative: the Rebex Tiny Web Server in `wwwserver/` (Windows only, steps 4 and 5 below).
 
 1. Run `npm run build` (base `/`, because the server serves `dist/` at the root).
 2. Find the PC's LAN IPv4 address with `ipconfig`.
-3. In Git Bash, run these two OpenSSL commands from `wwwserver/`, with that
-   address in place of `192.168.1.50`:
+3. Create the certificate (below).
+4. Run `npm run server`. Options: `--port <n>`, `--host <h>`, `--dist <dir>`, `--pfx <file>`, `--http` (plain HTTP, no
+   headset), `--dev` (dev mode). The pfx passphrase is read from `NONEUCLID_PFX_PASSPHRASE` (default: the local test
+   password below).
+5. On the headset, open `https://<printed address>:11446/?config=001` and accept the certificate warning.
+
+The server also hosts the channel for [interactive debugging of any device](interactive-browser-debugging.md). Set
+`NONEUCLID_ADMIN_PASSWORD` before `npm run server` to allow admin connections (`npm run cdp -- --server ...`); without
+it the server refuses them and says so at start. `--dev` additionally allows evaluating arbitrary expressions on devices.
+
+Certificate: in Git Bash, run these two OpenSSL commands from `wwwserver/`, with the PC's address in place of
+`192.168.1.50`:
 
    ```sh
    cd wwwserver
@@ -122,9 +107,8 @@ site root on HTTP port 1183 and HTTPS port 11446, with the certificate
    openssl pkcs12 -export -out server-certificate.pfx -inkey server.key -in server-certificate.cer      -passout pass:my-super-secure-password -certpbe PBE-SHA1-3DES -keypbe PBE-SHA1-3DES -macalg sha1
    ```
 
-4. Start `wwwserver/RebexTinyWebServer.exe` and press Start.
-5. On the headset, open `https://<address>:11446/?config=001` and accept the
-   certificate warning.
+Rebex alternative: it is configured to serve `dist/` on HTTP port 1183 and HTTPS port 11446 with the same certificate.
+Start `wwwserver/RebexTinyWebServer.exe`, press Start, and open `https://<address>:11446/?config=001` on the headset.
 
 The certificate files are ignored by Git and must never be committed. The
 password in the server config is a local test setting, not a secret.
