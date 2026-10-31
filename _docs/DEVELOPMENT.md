@@ -78,7 +78,7 @@ After changing code, run `npm run docs:generate` and commit the regenerated
   explain what the program computes and how it is organised.
 - [Development overview](Development_guide.md) records the project boundaries
   and repository map.
-- [Testing guide](testing.md) explains what each kind of test should prove.
+- [Test policy](tests.md) explains what a good test is, where it goes, its tier, and how manual checks become API tests; [test hygiene](tests_hygiene.md) how the suite stays healthy.
 - [Asset provenance](ASSET_PROVENANCE.md) is required reading before adding,
   moving, or redistributing an asset.
 

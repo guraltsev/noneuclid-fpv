@@ -42,7 +42,7 @@ Both hand-written documents contain machine-checked references to the code
   boundaries, and implementation style.
 - [documentation_style.md](documentation_style.md) records public documentation
   and in-code explanation rules.
-- [testing.md](testing.md) records the testing philosophy, scripts, and what
+- [tests.md](tests.md) and [tests_hygiene.md](tests_hygiene.md) record the test policy, tiers, scripts, and what
   each kind of test should prove.
 - [ASSET_PROVENANCE.md](ASSET_PROVENANCE.md) is the canonical record of
   third-party asset origins, licenses, required credits, and release status.
@@ -73,7 +73,7 @@ Both hand-written documents contain machine-checked references to the code
 
 ## Other Records
 
-- [testing.md](testing.md), [acceptance-checklists.md](acceptance-checklists.md),
+- [tests.md](tests.md), [acceptance-checklists.md](acceptance-checklists.md),
   and [llm-implementation-workflow.md](llm-implementation-workflow.md) cover
   verification and LLM-assisted workflow.
 - Problems live in `_issues` (closed ones in `_issues/_closed`); work orders live in

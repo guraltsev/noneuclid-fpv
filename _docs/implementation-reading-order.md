@@ -14,7 +14,7 @@ Read the materials in this order when working through the flattened cube rebuild
 6. `_docs/design/004-domain-model.md` - shared vocabulary for cells, portals, rays, tools, and forbidden zones.
 7. `_docs/design/007-authoring-model.md` - TypeScript world specs now, compiler and QR authoring later.
 8. `_docs/design/008-runtime-contracts.md` - public data contracts the implementation should stabilize early.
-9. `_docs/testing.md` - behavior tests, test layout, stage gates, and forbidden implementation-locking tests.
+9. `_docs/tests.md` - the test policy: what a good test is, layout, tiers, stage gates, and tests through the public API.
 10. `_docs/llm-implementation-workflow.md` - how future LLM sessions should work in this codebase, plus reusable prompt templates.
 11. `_issues/_closed/10_stage_00_bootstrap.md` - closed; initial empty project and tooling scaffold.
 12. `_issues/_closed/16_stage_01_math_primitives.md` - closed; vectors, transforms, planes, polygons, tolerances.

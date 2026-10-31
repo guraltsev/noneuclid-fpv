@@ -139,7 +139,7 @@ import from `render`.
   public modules, and import boundaries.
 - [documentation_style.md](documentation_style.md) covers public docs, JSDoc,
   and in-code narration.
-- [testing.md](testing.md) covers testing philosophy, layout, scripts, and stage gates.
+- [tests.md](tests.md) covers the test policy, layout, tiers, scripts and stage gates; [tests_hygiene.md](tests_hygiene.md) covers temporary tests, the baseline and automatic checks.
 - [design/001-stack.md](design/001-stack.md) explains the stack decision.
 - [design/002-cell-complex-first.md](design/002-cell-complex-first.md) explains
   the prism-cell-first decision.

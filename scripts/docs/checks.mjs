@@ -25,7 +25,7 @@ export const referenceCheckedDocs = [
   "_docs/Readme.md",
   "_docs/coding_style.md",
   "_docs/documentation_style.md",
-  "_docs/testing.md",
+  "_docs/tests.md",
 ];
 
 export function checkModuleHeaders(modules) {
