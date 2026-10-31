@@ -32,7 +32,7 @@ rather than switching branches.
 | Job | Result (pass / needs review / skipped / failed) | Commits | Review (fresh agent / self-review; findings) |
 | --- | --- | --- | --- |
 | 41 | done, needs review (two Uncertain items for the maintainer; no open review finding) | `653a8a2`, `d7fec50`, `8b49b4c` (repair) | fresh agent; 1 must-adjacent finding (below), fixed |
-| 42 | TBD | | |
+| 42 | done, needs review (three Uncertain items for the maintainer; no open review finding) | `5520f78`..`05666ff` (11 commits, one per area + fixtures follow-up + report) | fresh agent; 0 must findings, 4 should-level reporting-wording notes (below), not fixed |
 | 43 | TBD | | |
 | 44 | TBD | | |
 
@@ -40,12 +40,12 @@ rather than switching branches.
 
 | Indicator | Start | After 41 | After 42 | After 43 | After 44 |
 | --- | --- | --- | --- | --- | --- |
-| Test lines / src lines | ~25.5k / ~46.7k | 25,851 / 48,974 | | | |
-| Test files / tests (unit, process, release) | 160 files / 1,071 tests (undifferentiated) | unit 146f/942t; process 3f/18t; release 0f/0t | | | |
-| Unit tier serial time; slowest file | ~75s summed; portalPaths.test.ts ~62.5s | 73.50s; portalPaths.test.ts 66.36s | | | |
-| Baseline lines (total; per rule) | n/a (baseline not created yet) | 257 total (H1:0 H2:0 H3:0 H4:3 H5:59 H6:193 H7:0 H8:0 H9:2) | | | |
-| Manual checks in tests/manual_smoke.md | 0 (file does not exist) | 0 (file still does not exist; job 44) | | | |
-| Scenarios in tests/app | 0 | 0 (tests/app does not exist yet; job 44) | | | |
+| Test lines / src lines | ~25.5k / ~46.7k | 25,851 / 48,974 | 25,908 / 48,974 | | |
+| Test files / tests (unit, process, release) | 160 files / 1,071 tests (undifferentiated) | unit 146f/942t; process 3f/18t; release 0f/0t | unit 131f/928t; process 3f/18t; release 0f/0t | | |
+| Unit tier serial time; slowest file | ~75s summed; portalPaths.test.ts ~62.5s | 73.50s; portalPaths.test.ts 66.36s | 8.23s; moduleImportRules.test.ts 2.11s | | |
+| Baseline lines (total; per rule) | n/a (baseline not created yet) | 257 total (H1:0 H2:0 H3:0 H4:3 H5:59 H6:193 H7:0 H8:0 H9:2) | 80 total, all in tests/render-contract/ (H1:0 H2:0 H3:0 H4:1 H5:0 H6:78 H7:0 H8:0 H9:1) | | |
+| Manual checks in tests/manual_smoke.md | 0 (file does not exist) | 0 (file still does not exist; job 44) | 0 (unchanged; job 44) | | |
+| Scenarios in tests/app | 0 | 0 (tests/app does not exist yet; job 44) | 0 (unchanged; job 44) | | |
 
 ## Job 41
 
@@ -84,6 +84,54 @@ doesn't); H4 flags `PreparedKtx2Loader`'s "injectable for tests" JSDoc even thou
 injection-seam design, because the check is a literal text match.
 
 ## Job 42
+
+Cleaned every test area except `render` (math, cell-complex, movement, authoring, runtime, glue, ui, world-objects
+incl. `geodesic/`, project), one commit per area plus a fixtures follow-up and the job report, following the prior
+audit's verdicts. Full report with per-area behaviour maps:
+[42_clean_test_areas.md](../_done/42_clean_test_areas.md).
+
+Headline results: `tests/hygiene-baseline.txt` dropped from 257 to 80 lines, and the coordinator independently
+confirmed all 80 remaining lines sit inside `tests/render-contract/` (job 43's area) — zero elsewhere. Unit tier
+serial time dropped from 73.50s to 8.23s (the 62.8s `portalPaths.test.ts` depth-10 case was replaced by a property
+test that composes one generated length-10 word, now ~0.03s). Two H4 debug-only-import violations were fixed by
+reaching the same behaviour through public APIs (`simpleGeoCreature.test.ts` no longer imports `leaderForDebug`;
+the geodesic tracing test no longer imports `geodesicTerminalFromWalkPiece`). `tests/support/arbitraries.test.ts`
+was retired, its precondition checks moved into the generators themselves. About 10 proof runs (break the
+behaviour, see the test fail, restore) are logged in the job's Checks section.
+
+**Coordinator's own gate-out** (independent of the sub-agent's own checks): `npm run typecheck`, `npm test` (133
+files / 1014 tests / 1 skipped — matches the job's own count), `npm run docs:check`, and `npm run build && npm run
+test:release` (no release tests exist yet; expected, job 44's work) all passed. `npm run test:report`: H1-H10 all
+`ok`; confirmed via `grep` that zero baseline lines fall outside `tests/render-contract/`.
+
+**Review finding.** The fresh-context review (`_docs/tests_hygiene.md` §4) ran three independent sub-reviews
+across all 11 commits plus its own direct checks (re-running `test:report`, diffing `src/` across the full commit
+range to confirm zero net product-code change, reading replacement tests directly rather than trusting the
+behaviour-map prose). **No must-level finding.** Four should-level (debt) notes, none blocking:
+
+1. `compileCellComplex.test.ts`'s retired per-shape object-count coverage is real (owned by the pre-existing
+   `compileWorldScript.test.ts`) but not credited in the behaviour map.
+2. `geodesicRebuildOutcomes.test.ts`'s rewrite silently drops a fixture segment-count sanity bound (≥195/≤205)
+   beyond the disclosed perf-counter drops; defensible (it checks test-fixture construction, not product
+   behaviour) but the report's "perf assertions dropped, outcome assertions unchanged" line overclaims slightly.
+3. math area: the retired "fixed example" test's replacement uses a different numeric example than the report's
+   wording implies (same behaviour class, not the identical worked example) — cosmetic.
+4. glue area: the report misattributes which old file held the "3-row starter-config `it.each`" (it was already in
+   `readLaunchOptions.test.ts`, not `geometrySelection.test.ts`) — no coverage impact, just an imprecise sentence.
+
+Not repaired (should-level, debt per job 00's process, not a blocker); recorded here instead of editing the job's
+own report.
+
+The review explicitly checked the job's own Deviations/Uncertain/Not done sections against the actual diffs and
+found all of them honest and complete: the `simpleGeoCreature` leash-bound coverage gap, the
+`torusSkewDeformation`/`skipImmediateReverse` non-isolation, and the cone-fan coverage claim are all exactly as
+described, with no better alternative found by the reviewer either.
+
+**Deviations/Uncertain carried from the job** (for the maintainer, below): the `moveDynamicObject.test.ts`
+policy-constant check was kept against the audit's "Q1" flag (it is a real, cheap, intentional-decision check, not
+an unfalsifiable one); 13 test names beyond the audit's specific notes were shortened to clear H6's 90-character
+limit; the tetrahedron vertex-quotient test in `compileCellComplex.test.ts` was retired as a deviation from the
+audit (found independently — it never called the compiler under test).
 
 ## Job 43
 
