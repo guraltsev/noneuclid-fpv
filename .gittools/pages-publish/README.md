@@ -14,7 +14,26 @@ gh_pages
 
 The tool needs only Python 3.11+ and git (`gh` is optional). All settings are in `config.toml`.
 
-## Enable hosting
+## Setup
+
+This folder is the whole tool. **Copy `.gittools/pages-publish/` into any git repository**, then run the installer from
+inside that repository:
+
+```sh
+python .gittools/pages-publish/install.py
+```
+
+It asks, one question at a time, whether to add: a starter `config.toml` (build command guessed from the project), the
+GitHub Actions workflow, the opt-in pre-push hook, and launcher scripts in `_scripts/` (`pages-publish.cmd`/`.sh`).
+Flags answer the questions up front (`--workflow/--no-workflow`, `--hook/--no-hook`, `--init/--no-init`,
+`--launchers/--no-launchers`); `--yes` accepts the defaults without asking; nothing is overwritten without `--force` and
+nothing is committed. From outside a repository, `python install.py path/to/repo` copies this folder there first.
+Skipping the installer is fine: the tool runs as soon as a `config.toml` exists next to it (`pages_publish.py init`
+writes one).
+
+Files used by the optional pieces: `workflow/pages-publish.yml` (copied to `.github/workflows/`; GitHub requires that
+location), a marked block in `.githooks/pre-push`, and `_scripts/pages-publish.*`. Everything else stays in this folder.
+## Enable hosting (after setup)
 
 1. Edit `config.toml`: the build command, the folder it writes (`dist`), and `branches`.
 2. `python .gittools/pages-publish/pages_publish.py publish --add` builds the checked-out branch, lists it in `branches`, and creates
