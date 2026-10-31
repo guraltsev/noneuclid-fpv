@@ -1,3 +1,12 @@
+/**
+ * `tests/project/smokeArgs.test.ts` — unit tier.
+ *
+ * `scripts/smoke/smokeArgs.mjs` parses the browser smoke script's command line: named `--flag`/`--flag=value`
+ * options (world list, config, debug level, dist folder, site URL, timeout, label) with defaults, plus the
+ * legacy positional `<pageUrl> [label]` form Windows shells that cut `&` still need; `buildPageUrl` builds one
+ * world's query string. These tests check the defaults, each flag form, the legacy positional form, invalid
+ * input, and the built URL.
+ */
 import { describe, expect, it } from "vitest";
 
 // Plain ESM script; load through a variable path so tsc does not need declarations.

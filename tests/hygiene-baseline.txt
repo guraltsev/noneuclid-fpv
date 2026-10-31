@@ -1,8 +1,4 @@
 H4	tests/render-contract/preloadWorldAssets.test.ts	-
-H6	tests/assets/publicAssetPolicy.test.ts	-
-H6	tests/docs/documentation.test.ts	-
-H6	tests/docs/documentation.test.ts	keeps module headers, exported JSDoc, layering, generated references and document links healthy
-H6	tests/docs/moduleImportRules.test.ts	-
 H6	tests/render-contract/aimCrossMarker.test.ts	-
 H6	tests/render-contract/aimTarget.test.ts	-
 H6	tests/render-contract/aimTarget.test.ts	keeps short geodesic ray segments selectable near their emitter when the emitter hitbox is missed
@@ -81,22 +77,4 @@ H6	tests/render-contract/xrScenePaletteInput.test.ts	does not emit a second menu
 H6	tests/render-contract/xrScenePaletteInput.test.ts	maps controller select and side trigger buttons without treating face buttons as menu toggles
 H6	tests/render-contract/xrSessionRestart.test.ts	-
 H6	tests/render-contract/xrSessionState.test.ts	-
-H6	tests/scripts/checkDistSize.test.ts	-
-H6	tests/server/channel.process.test.ts	-
-H6	tests/server/localServer.process.test.ts	-
-H6	tests/smoke/smokeArgs.test.ts	-
-H6	tests/smoke/staticServer.process.test.ts	-
-H6	tests/support/arbitraries.test.ts	-
-H6	tests/world-objects/geodesic/carry.test.ts	derives a different-cell portal carry transition from endpoint cells without player transition state
-H6	tests/world-objects/geodesic/carry.test.ts	destroys a locked interval during live carry when the rebuilt path crosses a forbidden zone
-H6	tests/world-objects/geodesic/carry.test.ts	fails to rebuild a horizontal torus loop carried across the perpendicular portal instead of making it diagonal
-H6	tests/world-objects/geodesic/carry.test.ts	normalizes an out-of-cell carried emitter through one portal on release before final rebuild
-H6	tests/world-objects/geodesic/carry.test.ts	rebuilds a live carried geodesic to a formal out-of-bounds emitter without mutating the word
-H6	tests/world-objects/geodesic/carry.test.ts	updates a locked interval portal word from carried endpoint player traversal before rebuild
-H6	tests/world-objects/geodesic/curveShortening.test.ts	fuses a ready curve-shortening pair into one stable locked interval using the lower geodesic id
-H6	tests/world-objects/geodesic/curveShortening.test.ts	keeps the existing geodesic and drops the new one when both have the same endpoints and word
-H6	tests/world-objects/geodesic/geodesicTracingKernel.test.ts	sums piece lengths to the requested length and ends at the developed end point (up to 200 crossings)
-H6	tests/world-objects/library.test.ts	lets authored instances override documented collision metadata without changing library defaults
-H6	tests/world-objects/measureLengthTool.test.ts	measures the full geodesic length and places the label near the player in the current segment cell
-H6	tests/world-objects/protractorTool.test.ts	hides vertex-centered angles while their vertex is temporarily missing and restores them when it returns
 H9	tests/render-contract/funnelStaticCullBenchmark.test.ts	-

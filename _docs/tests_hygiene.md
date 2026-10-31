@@ -184,7 +184,7 @@ A tool also prints the indicators of [tests.md](tests.md) §2.3, so every job ca
 - **Report runs:** report modules are named `<name>.report.test.ts` and run only by path:
   `npx vitest run --project report tests/_temp/<ref>/<file>` (excluded from every other command).
 - **Where the checks run:** the hygiene checks are a script under `scripts/tests/`, run by a `unit` test in
-  `tests/project/` (the way `tests/docs/documentation.test.ts` runs `scripts/docs/checks.mjs`) and by
+  `tests/project/` (the way `tests/project/documentation.test.ts` runs `scripts/docs/checks.mjs`) and by
   `npm run test:report`, which also prints the indicators.
 - **H2 here:** the unit tier's setup file makes `node:child_process`, `node:net`, `node:http(s)`, `fetch`, `WebSocket`
   and any `setTimeout` or `setInterval` with a delay above zero throw a message naming the tier; Vitest fake timers

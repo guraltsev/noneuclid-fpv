@@ -136,7 +136,7 @@ describe("worldObjectLibrary", () => {
     });
   });
 
-  it("lets authored instances override documented collision metadata without changing library defaults", () => {
+  it("lets an authored instance override documented collision metadata, not the library default", () => {
     const object = worldObjectLibrary.grass("soft-grass", {
       position: [0, 0, 0],
       class: "soft-groundcover",

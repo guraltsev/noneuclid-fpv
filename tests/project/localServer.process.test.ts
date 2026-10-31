@@ -1,3 +1,13 @@
+/**
+ * `tests/project/localServer.process.test.ts` — process tier.
+ *
+ * `scripts/server/localServer.mjs` serves a built `dist/` over a real loopback HTTP server for the local network
+ * server, injecting the server marker (`<meta name="noneuclid-server" ...>`) right after `<head>` in every
+ * `index.html` response so a page can tell it loaded from this server, never serving a path outside `dist/`, and
+ * sending `Cache-Control: no-store` on every response. These tests check marker injection, content types, path
+ * traversal rejection, and the no-store header, against a real HTTP server; `localServerChannel.process.test.ts`
+ * covers the same server's WebSocket control channel.
+ */
 import fs from "node:fs";
 import http from "node:http";
 import os from "node:os";

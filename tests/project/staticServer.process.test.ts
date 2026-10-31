@@ -1,3 +1,13 @@
+/**
+ * `tests/project/staticServer.process.test.ts` — process tier.
+ *
+ * `scripts/smoke/staticServer.mjs` serves a built `dist/` over a real loopback HTTP server for the browser smoke
+ * script, detecting the site's base path from `index.html`'s first script tag and answering requests with the
+ * content types and 404/405 behaviour GitHub Pages would give (`scripts/server/localServer.mjs` is the second,
+ * independent implementation of the same static-file serving, used by the real local server;
+ * `localServer.process.test.ts` is its own test). These tests check base detection, content types, and the
+ * 404/405 cases.
+ */
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";

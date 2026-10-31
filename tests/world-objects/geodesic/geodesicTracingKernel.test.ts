@@ -33,7 +33,7 @@ const torusWorld = compileCellComplex(torusSpec);
 const torusCell = "torus-room";
 
 describe("geodesic tracing on the kernel", () => {
-  it("sums piece lengths to the requested length and ends at the developed end point (up to 200 crossings)", () => {
+  it("sums piece lengths to the requested length, ending at the developed end point", () => {
     let checked = 0;
     fc.assert(
       fc.property(

@@ -1,7 +1,7 @@
 /**
  * Documentation checks. Each returns a list of human-readable problems (empty means healthy).
  *
- * They are run by `npm run docs:check` and by `tests/docs/documentation.test.ts`, so documentation drift
+ * They are run by `npm run docs:check` and by `tests/project/documentation.test.ts`, so documentation drift
  * fails the same way a failing unit test does.
  */
 import fs from "node:fs";

@@ -1,3 +1,11 @@
+/**
+ * `tests/project/checkDistSize.test.ts` — unit tier.
+ *
+ * `scripts/check-dist-size.mjs` (`npm run size:dist`) measures a built `dist/` directory's total size and lists
+ * its largest files, and checks that total against a budget, reporting "OVER BUDGET" when it is exceeded. These
+ * tests check measurement (largest first, forward-slash paths), the pass/fail boundary at the budget, and the
+ * error for a missing directory, against a small temporary tree.
+ */
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";

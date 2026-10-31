@@ -16,7 +16,7 @@ import { createRuntimeObjectRegistry } from "../../src/world-objects/runtimeObje
 import type { GeodesicSegmentObject } from "../../src/world-objects/geodesic/objects";
 
 describe("measure length tool objects", () => {
-  it("measures the full geodesic length and places the label near the player in the current segment cell", () => {
+  it("measures a geodesic's length and places the label near the player in its segment's cell", () => {
     const first = createSegment({
       id: "g-a:segment:0",
       cellId: "cell-a",

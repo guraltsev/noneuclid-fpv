@@ -287,7 +287,7 @@ describe("carrying a geodesic across a portal", () => {
     expect(collectGeodesicPortalWord(world, registry, "g-a")).toEqual([]);
   });
 
-  it("derives a different-cell portal carry transition from endpoint cells without player transition state", () => {
+  it("derives a cross-cell carry transition from endpoint cells, with no player transition state", () => {
     const world = compileLargePortalWorld();
     const registry = createRuntimeObjectRegistry();
     const source = createGeodesicCannonObject({
@@ -491,7 +491,7 @@ describe("carrying a geodesic within one cell", () => {
 });
 
 describe("updating a locked interval's portal word from carried traversal", () => {
-  it("updates a locked interval portal word from carried endpoint player traversal before rebuild", () => {
+  it("updates a locked interval's word from the carried endpoint's traversal before rebuild", () => {
     const world = compileLargePortalWorld();
     const registry = createRuntimeObjectRegistry();
     const source = createGeodesicCannonObject({
@@ -534,7 +534,7 @@ describe("updating a locked interval's portal word from carried traversal", () =
     expect(isGeodesicLocked(registry, "g-a")).toBe(true);
   });
 
-  it("normalizes an out-of-cell carried emitter through one portal on release before final rebuild", () => {
+  it("normalizes an out-of-cell carried emitter through one portal before the final rebuild", () => {
     const world = compileLargePortalWorld();
     const registry = createRuntimeObjectRegistry();
     const source = createGeodesicCannonObject({
@@ -594,7 +594,7 @@ describe("updating a locked interval's portal word from carried traversal", () =
 });
 
 describe("live carry rebuilds that cannot connect cleanly", () => {
-  it("rebuilds a live carried geodesic to a formal out-of-bounds emitter without mutating the word", () => {
+  it("rebuilds a live carried geodesic to a formal out-of-bounds emitter, word left unchanged", () => {
     const world = compileLargePortalWorld();
     const registry = createRuntimeObjectRegistry();
     const source = createGeodesicCannonObject({
@@ -691,7 +691,7 @@ describe("live carry rebuilds that cannot connect cleanly", () => {
     expect(registry.get("g-a")).toBeUndefined();
   });
 
-  it("destroys a locked interval during live carry when the rebuilt path crosses a forbidden zone", () => {
+  it("destroys a locked interval when a live carry rebuild crosses a forbidden zone", () => {
     const world = compileLargePortalWorld();
     const registry = createRuntimeObjectRegistry();
     registry.add(createGeodesicCannonObject({
@@ -831,7 +831,7 @@ describe("loop words under anchor portal crossings", () => {
     expect(totalGeodesicLength(registry, "g-loop")).toBeCloseTo(15 * Math.SQRT2, 6);
   });
 
-  it("fails to rebuild a horizontal torus loop carried across the perpendicular portal instead of making it diagonal", () => {
+  it("fails to rebuild a horizontal torus loop across the perpendicular portal, not diagonally", () => {
     const { world, registry, cannon } = torusLoopSetup(6, ["right-left"]);
     const py = createCarryPortalTraversal(world, "torus-room", "top-bottom");
     const px = createCarryPortalTraversal(world, "torus-room", "right-left");

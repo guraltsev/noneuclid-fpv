@@ -1,10 +1,11 @@
+import assert from "node:assert/strict";
 import fc from "fast-check";
 import * as examples from "../../src/authoring/exampleWorlds";
 import type { CompiledPrismCell } from "../../src/cell-complex/prismCells";
 import type { CellComplexSpec } from "../../src/cell-complex/specs";
-import type { Polygon2xy } from "../../src/math/polygons";
+import { polygonSignedArea2xy, validatePolygon2xy, type Polygon2xy } from "../../src/math/polygons";
 import { yawRigidTransform3, type RigidTransform3 } from "../../src/math/rigidTransform3";
-import { normalizeVec3, vec3, type Vec3 } from "../../src/math/vec3";
+import { lengthVec3, normalizeVec3, vec3, type Vec3 } from "../../src/math/vec3";
 
 /** Coordinates in meters; never NaN or infinite. */
 export const arbCoordinate = fc.double({ min: -100, max: 100, noNaN: true, noDefaultInfinity: true });
@@ -15,7 +16,12 @@ export const arbVec3: fc.Arbitrary<Vec3> = fc.tuple(arbCoordinate, arbCoordinate
 /** Unit-length vector (drawn from {@link arbVec3}, length > 1e-3, then normalized). */
 export const arbUnitVec3: fc.Arbitrary<Vec3> = arbVec3
   .filter((v) => Math.hypot(v.x, v.y, v.z) > 1e-3)
-  .map((v) => normalizeVec3(v));
+  .map((v) => {
+    const unit = normalizeVec3(v);
+
+    assert(Math.abs(lengthVec3(unit) - 1) < 1e-12, "arbUnitVec3 produced a non-unit vector");
+    return unit;
+  });
 
 /** Yaw angle in radians. */
 export const arbYawRadians = fc.double({ min: -Math.PI, max: Math.PI, noNaN: true });
@@ -38,22 +44,28 @@ export const arbRigidTransform3: fc.Arbitrary<RigidTransform3> = fc
     const n = Math.hypot(w, x, y, z);
     const [a, b, c, d] = [w / n, x / n, y / n, z / n];
 
-    return arbVec3.map(
-      (translation): RigidTransform3 => ({
-        rotation: {
-          m00: 1 - 2 * (c * c + d * d),
-          m01: 2 * (b * c - a * d),
-          m02: 2 * (b * d + a * c),
-          m10: 2 * (b * c + a * d),
-          m11: 1 - 2 * (b * b + d * d),
-          m12: 2 * (c * d - a * b),
-          m20: 2 * (b * d - a * c),
-          m21: 2 * (c * d + a * b),
-          m22: 1 - 2 * (b * b + c * c),
-        },
-        translation,
-      }),
-    );
+    return arbVec3.map((translation): RigidTransform3 => {
+      const r = {
+        m00: 1 - 2 * (c * c + d * d),
+        m01: 2 * (b * c - a * d),
+        m02: 2 * (b * d + a * c),
+        m10: 2 * (b * c + a * d),
+        m11: 1 - 2 * (b * b + d * d),
+        m12: 2 * (c * d - a * b),
+        m20: 2 * (b * d - a * c),
+        m21: 2 * (c * d + a * b),
+        m22: 1 - 2 * (b * b + c * c),
+      };
+      const det =
+        r.m00 * (r.m11 * r.m22 - r.m12 * r.m21) -
+        r.m01 * (r.m10 * r.m22 - r.m12 * r.m20) +
+        r.m02 * (r.m10 * r.m21 - r.m11 * r.m20);
+
+      assert(Math.abs(Math.hypot(r.m00, r.m01, r.m02) - 1) < 1e-9, "arbRigidTransform3 produced a non-orthonormal rotation");
+      assert(Math.abs(det - 1) < 1e-9, "arbRigidTransform3 produced a rotation with determinant != 1");
+
+      return { rotation: r, translation };
+    });
   });
 
 /** Strictly convex counterclockwise polygon with 3-8 vertices on a circle of radius 1-20 m, no edge shorter than 0.05 m. */
@@ -85,7 +97,12 @@ export const arbConvexPolygon2xy: fc.Arbitrary<Polygon2xy> = fc
 
       return Math.hypot(next.x - vertex.x, next.y - vertex.y) >= 0.05;
     }),
-  );
+  )
+  .map((polygon) => {
+    assert(polygonSignedArea2xy(polygon) > 0, "arbConvexPolygon2xy produced a clockwise (not CCW) polygon");
+    validatePolygon2xy(polygon);
+    return polygon;
+  });
 
 /** The ten bundled example world specs, by name. */
 export const exampleWorldSpecs: readonly (readonly [string, CellComplexSpec])[] = [

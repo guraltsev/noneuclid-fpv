@@ -180,7 +180,7 @@ describe("geodesic cannon world objects: curve shortening", () => {
     expect(getGeodesicSegments(registry, "g-loop").map((segment) => segment.connectionState)).toContain("straightening");
   });
 
-  it("fuses a ready curve-shortening pair into one stable locked interval using the lower geodesic id", () => {
+  it("fuses a ready pair into one stable locked interval, keeping the lower geodesic id", () => {
     const world = compileLargeWorld();
     const registry = createRuntimeObjectRegistry();
     registry.add(createGeodesicCannonObject({
@@ -262,7 +262,7 @@ describe("geodesic cannon world objects: curve shortening", () => {
       return { world, registry };
     }
 
-    it("keeps the existing geodesic and drops the new one when both have the same endpoints and word", () => {
+    it("keeps the existing geodesic and drops the new one when both share endpoints and word", () => {
       const { world, registry } = setup({ id: "g-old", startAnchorObjectId: "cannon-left", endAnchorObjectId: "cannon-right", startCellId: "a" });
 
       advanceCurveShorteningPairs({ world, registry, deltaSeconds: 1 });

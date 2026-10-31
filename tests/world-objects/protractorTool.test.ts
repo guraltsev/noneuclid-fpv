@@ -253,7 +253,7 @@ describe("protractor tool objects", () => {
     expect(refreshed?.angleDegrees).toBeCloseTo(60);
   });
 
-  it("hides vertex-centered angles while their vertex is temporarily missing and restores them when it returns", () => {
+  it("hides a vertex-centered angle while its vertex is missing, and restores it when it returns", () => {
     const firstSegment = createSegment({
       id: "g-a:segment:0",
       geodesicId: "g-a",

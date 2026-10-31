@@ -1,3 +1,12 @@
+/**
+ * `tests/project/moduleImportRules.test.ts` — unit tier.
+ *
+ * `scripts/docs/lib.mjs#moduleImportRuleViolations` enforces the project's layering rules (also run by
+ * `npm run docs:check`, see `documentation.test.ts`): a pure module (the sleeve/taut-path geometry, the
+ * portal-word helpers) may not import
+ * a module that pulls in the registry, rendering, or other impure layers. These tests check the rule against two
+ * of the pure modules it protects.
+ */
 import { describe, expect, it } from "vitest";
 
 // The documentation tooling is plain ESM JavaScript; load it through a variable path (see documentation.test.ts).

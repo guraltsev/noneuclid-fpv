@@ -1,3 +1,16 @@
+/**
+ * `tests/project/localServerChannel.process.test.ts` — process tier.
+ *
+ * `scripts/server/localServer.mjs`'s control channel is a WebSocket at `/__noneuclid/channel`: pages join as
+ * devices, an admin (with the configured password, after a fixed delay on a wrong one) lists them and routes
+ * `call`/`eval`/`console` requests to one device or all of them, refusing `eval` outside dev mode. These tests
+ * check admin authentication (including the delay on a wrong password and the refusal with no password
+ * configured), that requests are ignored before a successful hello, device listing and call routing (to one
+ * device, to all, and to an unknown target), the dev-mode gate on `eval`, and console forwarding only while
+ * turned on. The wrong-password delay (1 s) and two settle waits (150 ms) are real timers against a real
+ * WebSocket server, which is why this is the process tier, not the unit tier; `localServer.mjs` does not accept
+ * an injected clock or delay parameter, so they could not be replaced with a fake one (see the job report).
+ */
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";

@@ -1,3 +1,13 @@
+/**
+ * `tests/project/publicAssetPolicy.test.ts` — unit tier.
+ *
+ * `public/` ships exactly the runtime assets the site needs: no authoring or archive file formats, only converted
+ * runtime KTX2 textures under `assets/textures`, nothing over 5 MiB, no `_legacy/` entry that no source file still
+ * references, and every asset a bundled world preloads actually present. This is a filesystem walk of the
+ * checked-out `public/` and `src/` trees (read-only, so the unit tier allows it), not a build step; it greps
+ * `src/` for `_legacy/` by name because that is the asset-provenance policy's own boundary, not an internal detail
+ * of any one module.
+ */
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
