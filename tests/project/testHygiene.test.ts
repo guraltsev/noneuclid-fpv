@@ -4,8 +4,8 @@
  * modules import only from the shared support/fixture folders, nothing imports a test/debug-only name from
  * `src/`, no test name or comment carries history, every module has a doc comment and short test names, every
  * `_conditional`/`_temp` folder has a valid README, no test is skipped or gated by an environment variable
- * outside `_temp/`, and `tests/hygiene-baseline.txt` only ever shrinks. This reads repository files read-only,
- * which the unit tier allows.
+ * outside `_temp/`, and `tests/hygiene-baseline.txt` only ever shrinks. This reads repository files read-only
+ * (a filesystem walk, not `git ls-files`, so it stays in the process itself), which the unit tier allows.
  */
 import { describe, expect, it } from "vitest";
 

@@ -21,11 +21,26 @@ function toPosix(p) {
   return p.split(path.sep).join("/");
 }
 
+// Directories git ignores wholesale (`.gitignore`); walking the filesystem instead of shelling out to
+// `git ls-files` keeps `gitTrackedFiles()` usable from the `unit` tier, which may touch only the process itself
+// (`_docs/tests.md` §5). None of H1-H10 needs the finer-grained ignores (textures, key files), only these.
+const IGNORED_DIR_NAMES = new Set([".git", "node_modules", "dist", ".vite", "coverage", "assets-src"]);
+
+function listAllFiles(dir) {
+  const out = [];
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (entry.isDirectory()) {
+      if (IGNORED_DIR_NAMES.has(entry.name)) continue;
+      out.push(...listAllFiles(path.join(dir, entry.name)));
+    } else if (entry.isFile()) {
+      out.push(path.join(dir, entry.name));
+    }
+  }
+  return out;
+}
+
 function gitTrackedFiles() {
-  return execSync("git ls-files", { cwd: repoRoot, encoding: "utf8" })
-    .trim()
-    .split(/\r?\n/)
-    .filter(Boolean);
+  return listAllFiles(repoRoot).map((abs) => toPosix(path.relative(repoRoot, abs)));
 }
 
 const TIER_SUFFIXES = [

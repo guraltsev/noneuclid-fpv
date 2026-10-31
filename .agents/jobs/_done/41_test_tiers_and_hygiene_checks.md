@@ -231,6 +231,17 @@ one commit for the whole job.
   lines, not 259. Verified this does not weaken the ratchet: fixing only one of the two underlying issues in a
   file still leaves the other violation suppressed by the single remaining baseline line, and fixing both
   removes the need for the line entirely (proven in the H10 step-6 proof below).
+- **Review fix (coordinator, after the fresh-context review):** the review found that `gitTrackedFiles()` in
+  `scripts/tests/hygiene.mjs` shelled out to `git ls-files` via `execSync`, so `tests/project/testHygiene.test.ts`
+  spawned a real child process on every run despite being a `unit`-tier test — violating the tier rule the test
+  itself checks for others (`_docs/tests.md` §5), and making its module comment's "reads repository files
+  read-only" claim false. Fixed by replacing `gitTrackedFiles()` with a pure recursive filesystem walk
+  (`listAllFiles()`) that skips the directories git ignores wholesale (`.git`, `node_modules`, `dist`, `.vite`,
+  `coverage`, `assets-src`); none of H1-H10 needs `git`'s finer-grained ignores (textures, key files). Verified:
+  `npm run typecheck`, `npm test` (147 files/2 skipped, 1070/2 skipped, unchanged), `npm run docs:check` and
+  `npm run test:report` (same 257-line baseline, same H1-H10 "ok") all still pass; re-ran the H9 scratch-file proof
+  (add a `.skip(` test outside `_temp/`, see it fail named H9, delete it, see it pass again) to confirm the new
+  file-discovery mechanism still feeds the checks correctly. The module comment is corrected to say so.
 
 ### Uncertain
 
