@@ -23,7 +23,7 @@ import {
   geodesicSegmentArchetypeKey,
   getGeodesicRayArchetypeKeys,
 } from "../../src/render/three/geodesicCannonRenderer";
-import type { PreparedWorldAssets } from "../../src/render/three/preloadWorldAssets";
+import { createFakePreparedAssets } from "../support/preparedAssets";
 import type {
   GeodesicCannonObject,
   GeodesicIntersectionObject,
@@ -184,10 +184,8 @@ function createRayEmitter(overrides: Partial<GeodesicCannonObject> = {}): Geodes
   };
 }
 
-function createPreparedRayAssets(): PreparedWorldAssets {
-  return {
-    getTexture: () => undefined,
-    getConfiguredTexture: () => undefined,
+function createPreparedRayAssets() {
+  return createFakePreparedAssets({
     instantiateGltf(assetPath) {
       if (assetPath === geodesicRayAssetPaths.post) {
         const scene = new THREE.Group();
@@ -209,7 +207,7 @@ function createPreparedRayAssets(): PreparedWorldAssets {
 
       return undefined;
     },
-  };
+  });
 }
 
 function createIntersection(overrides: Partial<GeodesicIntersectionObject> = {}): GeodesicIntersectionObject {

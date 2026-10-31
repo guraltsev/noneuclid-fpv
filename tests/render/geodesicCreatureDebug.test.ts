@@ -12,7 +12,7 @@ import type { CellComplexSpec } from "../../src/cell-complex/specs";
 import { createRuntimeObjectRegistry } from "../../src/world-objects/runtimeObjectRegistry";
 import { createSimpleGeoCreature, createSimpleGeoCreatureRuntime } from "../../src/world-objects/simpleGeoCreature";
 import { collectGeodesicCreatureDebugDump } from "../../src/render/three/geodesicCreatureDebug";
-import type { PreparedWorldAssets } from "../../src/render/three/preloadWorldAssets";
+import { createFakePreparedAssets } from "../support/preparedAssets";
 
 describe("geodesic creature debug dump", () => {
   it("reports a consistent runtime creature with no issues", () => {
@@ -143,21 +143,11 @@ describe("geodesic creature debug dump", () => {
   });
 });
 
-function stubAssets(): PreparedWorldAssets {
-  return {
-    getTexture() {
-      return undefined;
-    },
-    getConfiguredTexture() {
-      return undefined;
-    },
-    instantiateGltf() {
-      return {
-        scene: new THREE.Group(),
-        animations: [],
-      };
-    },
-  };
+function stubAssets() {
+  return createFakePreparedAssets({
+    getTexture: () => undefined,
+    getConfiguredTexture: () => undefined,
+  });
 }
 
 function singleRoom(): CellComplexSpec {

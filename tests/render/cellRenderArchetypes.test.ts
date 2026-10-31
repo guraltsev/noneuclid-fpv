@@ -21,7 +21,7 @@ import {
   deriveCellRenderArchetypeCapacities,
   planCellRenderArchetypes,
 } from "../../src/render/three/cellRenderArchetypes";
-import type { PreparedWorldAssets } from "../../src/render/three/preloadWorldAssets";
+import { createFakePreparedAssets } from "../support/preparedAssets";
 
 describe("planCellRenderArchetypes", () => {
   it("builds floor, portal-frame and solid-wall archetypes, excluding sky caps and marmots", () => {
@@ -184,10 +184,8 @@ describe("buildCellRenderArchetypes root mesh", () => {
   });
 });
 
-function createPreparedAssets(): PreparedWorldAssets {
-  return {
-    getTexture: () => new THREE.Texture(),
-    getConfiguredTexture: () => new THREE.Texture(),
+function createPreparedAssets() {
+  return createFakePreparedAssets({
     instantiateGltf: () => ({
       scene: new THREE.Mesh(
         new THREE.BoxGeometry(0.5, 0.5, 0.5),
@@ -195,7 +193,7 @@ function createPreparedAssets(): PreparedWorldAssets {
       ),
       animations: [],
     }),
-  };
+  });
 }
 
 function createStaticObjectWorld(): CellComplexSpec {

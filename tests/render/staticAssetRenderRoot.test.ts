@@ -9,21 +9,19 @@ import { describe, expect, it } from "vitest";
 import type { AssetObjectSpec } from "../../src/cell-complex/specs";
 import { yawRigidTransform3 } from "../../src/math/rigidTransform3";
 import { buildDecorationMesh, staticMarmotAssetPath } from "../../src/render/three/buildDecorationMesh";
-import type { PreparedWorldAssets } from "../../src/render/three/preloadWorldAssets";
 import { buildStaticAssetRenderRoot } from "../../src/render/three/staticAssetRenderRoot";
 import { rigidTransformToThreeMatrix } from "../../src/render/three/worldAxes";
 import { createRuntimeObjectRegistry, createRuntimeStaticAssetObject } from "../../src/world-objects/runtimeObjectRegistry";
+import { createFakePreparedAssets } from "../support/preparedAssets";
 
-function stubAssets(): PreparedWorldAssets {
-  return {
-    getTexture: () => undefined,
-    getConfiguredTexture: () => undefined,
+function stubAssets() {
+  return createFakePreparedAssets({
     instantiateGltf() {
       const scene = new THREE.Group();
       scene.add(new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1)));
       return { scene, animations: [] };
     },
-  };
+  });
 }
 
 function meshes(root: THREE.Object3D): THREE.Mesh[] {

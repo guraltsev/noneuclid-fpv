@@ -8,7 +8,7 @@ import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import type { AssetObjectSpec } from "../../src/cell-complex/specs";
 import { buildDecorationMesh, buildStaticMarmotProxy } from "../../src/render/three/buildDecorationMesh";
-import type { PreparedWorldAssets } from "../../src/render/three/preloadWorldAssets";
+import { createFakePreparedAssets } from "../support/preparedAssets";
 
 describe("buildStaticMarmotProxy", () => {
   it("is one vertex-coloured mesh covering the twelve-box marmot silhouette", () => {
@@ -45,9 +45,7 @@ describe("buildDecorationMesh", () => {
       position: { x: 1, y: 0, z: 2 },
     };
     const preparedScene = new THREE.Group();
-    const assets: PreparedWorldAssets = {
-      getTexture: () => undefined,
-      getConfiguredTexture: () => undefined,
+    const assets = createFakePreparedAssets({
       instantiateGltf(assetPath) {
         expect(assetPath).toBe(objectSpec.assetPath);
         return {
@@ -55,7 +53,7 @@ describe("buildDecorationMesh", () => {
           animations: [],
         };
       },
-    };
+    });
 
     const decoration = buildDecorationMesh("room-a", objectSpec, assets);
 
