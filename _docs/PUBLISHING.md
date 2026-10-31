@@ -30,7 +30,10 @@ npm run publish:branch         # builds the checked-out branch and pushes it to 
 
 (`npm publish` is a different, npm-registry command; that is why the script is called `publish:branch`.)
 
-Options: `--force` (publish an unlisted branch, or rebuild a current one), `--prune` (also remove folders of branches
+Options: `--add` (append the checked-out branch to `branches` in `publish.config.json`, then publish it; commit the
+changed config so the workflow and other machines know the branch too; this is the way to start publishing a new branch),
+`--remove` (delete a branch's folder from `gh_pages` and, if listed by exact name, its entry in `branches`; works from any
+checked-out branch, so `--remove --branch old-experiment`; commit the changed config), `--force` (publish an unlisted branch, or rebuild a current one), `--prune` (also remove folders of branches
 that no longer exist on the remote), `--prune-only`, `--no-push` (commit to the local `gh_pages` only), `--branch <name>`,
 `--remote <name>`, `--config <file>`. `--check` only reports whether a build is needed.
 

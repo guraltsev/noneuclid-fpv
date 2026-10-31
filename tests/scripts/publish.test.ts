@@ -159,6 +159,40 @@ describe("publish end to end (temporary repositories)", { timeout: 60_000 }, () 
     expect((await publish({ ...quiet, force: true })).status).toBe("published");
   });
 
+  it("--add lists the branch in the config and then publishes it", async () => {
+    const { publish } = await loadPublish();
+    const quiet = { cwd: work, log: () => undefined };
+    git(work, "add", "-A");
+    git(work, "commit", "-q", "--allow-empty", "-m", "config");
+    git(work, "checkout", "-q", "-b", "scratch");
+    expect((await publish(quiet)).status).toBe("skipped");
+    expect((await publish({ ...quiet, add: true })).status).toBe("published");
+    const config = JSON.parse(fs.readFileSync(path.join(work, "publish.config.json"), "utf8"));
+    expect(config.branches).toEqual(["main", "feature/**", "scratch"]);
+    expect(config.siteBase).toBe("/site/");
+    expect(show("scratch/index.html").status).toBe(0);
+    // Adding again changes nothing.
+    await publish({ ...quiet, add: true, force: true });
+    expect(JSON.parse(fs.readFileSync(path.join(work, "publish.config.json"), "utf8")).branches).toHaveLength(3);
+  });
+
+  it("--remove deletes a branch's folder and its entry in the config", async () => {
+    const { publish } = await loadPublish();
+    const quiet = { cwd: work, log: () => undefined };
+    await publish(quiet);
+    git(work, "checkout", "-q", "-b", "scratch");
+    await publish({ ...quiet, add: true });
+    expect(show("scratch/index.html").status).toBe(0);
+
+    // Works from any checked-out branch, by name.
+    git(work, "checkout", "-q", "main");
+    expect((await publish({ ...quiet, remove: true, branch: "scratch" })).status).toBe("removed");
+    expect(show("scratch/index.html").status).not.toBe(0);
+    expect(show("main/index.html").status).toBe(0);
+    expect(Object.keys(JSON.parse(show("published.json").stdout).entries)).toEqual(["main"]);
+    expect(git(work, "rev-parse", "--abbrev-ref", "HEAD")).toBe("main");
+  });
+
   it("prunes folders of branches that no longer exist", async () => {
     const { publish } = await loadPublish();
     const quiet = { cwd: work, log: () => undefined };

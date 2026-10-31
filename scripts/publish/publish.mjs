@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Branch publisher for GitHub Pages: builds the current commit and copies the result into a folder of the `gh_pages`
  * branch (`gh_pages/<branch-folder>/`), records the commit in `gh_pages/published.json`, and keeps a root
  * `index.html` that redirects to the default branch's folder. GitHub Pages serves `gh_pages` ("Deploy from a branch").
@@ -6,7 +6,7 @@
  * workflow (.github/workflows/publish.yml) never do the same work twice. No dependencies, nothing specific to this
  * repository: configuration is `publish.config.json`. Documented in _docs/PUBLISHING.md.
  *
- *   node scripts/publish/publish.mjs [--branch <name>] [--force] [--check] [--prune] [--prune-only] [--no-push]
+ *   node scripts/publish/publish.mjs [--branch <name>] [--add] [--remove] [--force] [--check] [--prune] [--prune-only] [--no-push]
  *                                    [--remote <name>] [--config <file>]
  */
 import { spawnSync } from "node:child_process";
@@ -103,14 +103,33 @@ export async function publish(options = {}) {
       .filter(Boolean);
 
   const pruneOnly = options.pruneOnly === true;
+  const remove = options.remove === true;
+  const noBuild = pruneOnly || remove;
+  const outcome = remove ? "removed" : "pruned";
   let branch;
   let folder;
   let sha;
-  if (!pruneOnly) {
+  if (remove) {
+    branch = options.branch ?? git(["rev-parse", "--abbrev-ref", "HEAD"]).out;
+    if (branch === "HEAD") throw new Error("Detached HEAD: pass --branch <name>.");
+    folder = folderForBranch(branch);
+    if (config.branches.includes(branch)) {
+      config.branches = config.branches.filter((name) => name !== branch);
+      fs.writeFileSync(configFile, `${JSON.stringify({ ...fileConfig, branches: config.branches }, null, 2)}\n`);
+      log(`removed "${branch}" from "branches" in ${path.relative(root, configFile)}; commit that file.`);
+    } else if (branchMatches(branch, config.branches)) {
+      log(`note: "${branch}" still matches a pattern in "branches"; the workflow would publish it again on its next push.`);
+    }
+  } else if (!pruneOnly) {
     branch = options.branch ?? git(["rev-parse", "--abbrev-ref", "HEAD"]).out;
     if (branch === "HEAD") throw new Error("Detached HEAD: pass --branch <name>.");
     sha = git(["rev-parse", "HEAD"]).out;
     folder = folderForBranch(branch);
+    if (options.add && !branchMatches(branch, config.branches)) {
+      config.branches = [...config.branches, branch];
+      fs.writeFileSync(configFile, `${JSON.stringify({ ...fileConfig, branches: config.branches }, null, 2)}\n`);
+      log(`added "${branch}" to "branches" in ${path.relative(root, configFile)}; commit that file so the workflow knows it too.`);
+    }
     if (!options.force && !branchMatches(branch, config.branches)) {
       log(`branch "${branch}" is not in "branches" of the config; skipping (use --force to publish it).`);
       return { status: "skipped", branch };
@@ -121,7 +140,12 @@ export async function publish(options = {}) {
       return options.check ? { status: "check", build: false } : { status: "current", folder, sha };
     }
     if (options.check) return { status: "check", build: true };
-    if (git(["status", "--porcelain", "--untracked-files=no"]).out !== "") {
+    // The config file may differ (--add); the build does not depend on it.
+    const configPath = path.relative(root, configFile).split(path.sep).join("/");
+    const dirty = git(["diff", "--name-only", "HEAD"])
+      .out.split("\n")
+      .filter((name) => name !== "" && name !== configPath);
+    if (dirty.length > 0) {
       throw new Error("The working tree has uncommitted changes; commit them first so the published folder matches the commit.");
     }
   }
@@ -129,7 +153,7 @@ export async function publish(options = {}) {
   const siteBase = config.siteBase ?? siteBaseFromRemote(git(["remote", "get-url", remote]).out);
   let bytes = 0;
   const distDir = path.resolve(root, config.dist);
-  if (!pruneOnly) {
+  if (!noBuild) {
     const base = folderBase(siteBase, folder);
     log(`building ${branch} (${sha.slice(0, 7)}) with base ${base}`);
     const [command, ...args] = config.build.map((part) => part.replaceAll("{base}", base));
@@ -163,13 +187,19 @@ export async function publish(options = {}) {
         : emptyManifest(config.defaultBranch);
       manifest.default = config.defaultBranch;
       let message;
-      if (!pruneOnly) {
+      if (remove) {
+        if (!manifest.entries[folder]) log(`${folder}/ is not published.`);
+        fs.rmSync(path.join(dir, folder), { recursive: true, force: true });
+        const { [folder]: _gone, ...rest } = manifest.entries;
+        manifest = { ...manifest, entries: rest };
+        message = `Remove ${folder}`;
+      } else if (!pruneOnly) {
         fs.rmSync(path.join(dir, folder), { recursive: true, force: true });
         fs.cpSync(distDir, path.join(dir, folder), { recursive: true });
         manifest = withEntry(manifest, folder, { branch, sha, publishedAt: new Date().toISOString(), bytes });
         message = `Publish ${folder} @ ${sha.slice(0, 7)}`;
       }
-      if (pruneOnly || options.prune) {
+      if (pruneOnly || (options.prune && !remove)) {
         const { manifest: pruned, removed } = pruneManifest(manifest, [...liveBranches(), ...(branch ? [branch] : [])]);
         manifest = pruned;
         for (const name of removed) fs.rmSync(path.join(dir, name), { recursive: true, force: true });
@@ -186,7 +216,7 @@ export async function publish(options = {}) {
       const tree = inDir(["write-tree"]).out;
       if (tip && tree === git(["rev-parse", `${tip}^{tree}`]).out) {
         log("the published branch is already up to date.");
-        return pruneOnly ? { status: "pruned" } : { status: "current", folder, sha };
+        return noBuild ? { status: outcome } : { status: "current", folder, sha };
       }
       const parent = tip && config.history === "keep" ? ["-p", tip] : [];
       const commit = inDir(["commit-tree", tree, ...parent, "-m", message], { env: identity }).out;
@@ -199,9 +229,9 @@ export async function publish(options = {}) {
       const pushed = git(["push", "--quiet", remote, `${commit}:${pagesRef}`, ...lease], { allowFail: true });
       if (pushed.ok) {
         const total = totalBytes(manifest) / 1024 / 1024;
-        log(`${pruneOnly ? "pruned" : `published ${folder}/`} (${total.toFixed(0)} MiB in all).`);
+        log(`${remove ? `removed ${folder}/` : pruneOnly ? "pruned" : `published ${folder}/`} (${total.toFixed(0)} MiB in all).`);
         if (total > config.warnTotalMiB) log(`warning: the site is larger than ${config.warnTotalMiB} MiB; prune old branches.`);
-        return pruneOnly ? { status: "pruned" } : { status: "published", folder, sha, commit };
+        return noBuild ? { status: outcome } : { status: "published", folder, sha, commit };
       }
       log(`push rejected (attempt ${attempt}); someone else published meanwhile, retrying.`);
     } finally {
@@ -217,6 +247,8 @@ function parseArgs(argv) {
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === "--force") options.force = true;
+    else if (arg === "--add") options.add = true;
+    else if (arg === "--remove") options.remove = true;
     else if (arg === "--check") options.check = true;
     else if (arg === "--prune") options.prune = true;
     else if (arg === "--prune-only") options.pruneOnly = true;
