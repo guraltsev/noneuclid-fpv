@@ -21,7 +21,7 @@
     "docs:generate": "node scripts/docs/cli.mjs generate",
     "docs:check": "node scripts/docs/cli.mjs check",
     "docs:coverage": "node scripts/docs/cli.mjs coverage",
-    "publish:branch": "node scripts/publish/publish.mjs",
+    "publish:branch": "python scripts/pages_publish.py publish",
     "server":"node scripts/server/cli.mjs",
     "smoke": "node scripts/smoke/browser-smoke.mjs",
     "serve": "vite --port 5173",

@@ -1,0 +1,13 @@
+# Settings for scripts/pages_publish.py. See _docs/PUBLISHING.md.
+
+[publish]
+# Branches that are published (globs: * stays inside one / segment, ** crosses it).
+branches = ["main", "design/**"]
+default_branch = "main"
+history = "single"
+# The site is built with relative paths (vite base "./"), so no base path is needed.
+require_relative = true
+
+[build]
+command = "node scripts/build-pages.mjs"
+dist = "dist"

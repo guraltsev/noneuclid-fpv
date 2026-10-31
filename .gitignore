@@ -13,3 +13,5 @@ digest.txt
 public/assets/textures/*/*
 !public/assets/textures/*/runtime/
 assets-src/
+
+__pycache__/
