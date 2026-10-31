@@ -237,6 +237,17 @@ listing all ~40 of those individually would not add information beyond the table
   exemption as covering any frozen historical record, not just those two folder names, but a stricter reading
   would want these five paths fixed too (or explicitly marked historical in their own header). A current `grep
   -rn "render-contract" _docs .agents/jobs scripts` still finds these five.
+- **Review fix (coordinator, after the fresh-context review):** `_docs/design/012-engine-api.md` itself still had
+  3 stale `tests/render-contract/...` path citations (lines 632, 646: `frameAllocations.test.ts`; line 871:
+  `visiblePortalPaths.property.test.ts`) that the job's own grep sweep missed — only the one `funnelStaticCull`
+  sentence (decision 4) had been fixed. This is a live design doc for this project (not one of the five docs
+  deliberately left as frozen historical narrative above), so it fails the coordinator job's explicit job-43 gate
+  ("a grep for `render-contract` in `_docs/`... finds nothing"). Fixed by repointing the two `frameAllocations`
+  citations to `npm run bench -- frameAllocations` (matching the existing `funnelStaticCull` citation style, since
+  that benchmark also moved to `scripts/bench/` under decision 4) and the `visiblePortalPaths` citation to its new
+  path, `tests/render/visiblePortalPaths.property.test.ts`. Verified: a repeat grep across `_docs/`, `.agents/jobs/`
+  (outside `_done/`/`_reports/`) and `scripts/` now finds only the five disclosed historical docs and the
+  coordinator job's own gate-description sentence; `npm run docs:check` still passes.
 - **`aimTarget`'s five "prioritizes X over Y" cases and two "near their emitter, hitbox missed" cases** look like
   candidates for the audit's "thin the near-duplicate priority cases," but `aimTarget.ts`'s own module comment
   says its priority order is "not transitive by design," and reading all seven in full showed each covers a

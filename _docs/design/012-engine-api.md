@@ -629,7 +629,7 @@ docs tooling (`scripts/docs/lib.mjs`) already parses TypeScript with the compile
 ### P12. Performance budgets
 
 Make principle 8 measurable, for example: engine tick under X ms at Y objects on Quest; the frame allocation contract
-(`tests/render-contract/frameAllocations.test.ts`) stays green; a headless benchmark per world.
+(`npm run bench -- frameAllocations`) stays green; a headless benchmark per world.
 
 **Agreed (2026-10-30): the target is 90 Hz on Quest**, an 11.1 ms frame, shared with the browser, the WebXR compositor
 and GPU submission.
@@ -643,7 +643,7 @@ and GPU submission.
 | UI and overlays | 1 ms |
 | Headroom (browser, compositor, spikes) | the rest |
 
-No per-frame allocation when nothing changed (`tests/render-contract/frameAllocations.test.ts`). *Baseline:* the app
+No per-frame allocation when nothing changed (`npm run bench -- frameAllocations`). *Baseline:* the app
 already measures `moveMs`, `objectsMs`, `portalMs`, `uiMs` and the total (debug overlay and in-headset panel); read them
 on a Quest in two or three worlds (cube, genus-2, dodecahedron), walking and carrying a geodesic.
 
@@ -868,7 +868,7 @@ marked below. *Stages*, each useful on its own (S2 to S4 still **Proposed**):
   - **memory lives with the plugin**: cone data or precomputed tables sit in the plugin's side table keyed by trie
     node, not in the trie's node layout, so with the plugin off nothing is paid;
   - **conservative**: an oracle never rejects a visible word; the brute-force property test
-    (`tests/render-contract/visiblePortalPaths.property.test.ts`) runs against any oracle;
+    (`tests/render/visiblePortalPaths.property.test.ts`) runs against any oracle;
   - **metric-dependent**: the plugin declares its dependence on cell shapes and is invalidated or recomputed on
     deformation; experiences with continuous metric change leave it off.
 
