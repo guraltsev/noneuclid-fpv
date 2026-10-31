@@ -56,11 +56,6 @@ H6	tests/assets/publicAssetPolicy.test.ts	-
 H6	tests/docs/documentation.test.ts	-
 H6	tests/docs/documentation.test.ts	keeps module headers, exported JSDoc, layering, generated references and document links healthy
 H6	tests/docs/moduleImportRules.test.ts	-
-H6	tests/glue/debugSettings.test.ts	-
-H6	tests/glue/geometrySelection.test.ts	-
-H6	tests/glue/launchOptionsUrl.test.ts	-
-H6	tests/glue/readLaunchOptions.test.ts	-
-H6	tests/glue/serverChannel.test.ts	-
 H6	tests/render-contract/aimCrossMarker.test.ts	-
 H6	tests/render-contract/aimTarget.test.ts	-
 H6	tests/render-contract/aimTarget.test.ts	keeps short geodesic ray segments selectable near their emitter when the emitter hitbox is missed

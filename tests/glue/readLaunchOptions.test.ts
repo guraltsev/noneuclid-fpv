@@ -1,14 +1,100 @@
+/**
+ * `tests/glue/readLaunchOptions.test.ts` — unit tier.
+ *
+ * `readLaunchOptions` combines the launch defaults (an optional app config) with URL query parameters, URL
+ * parameters winning, into the one `LaunchOptions` the page side reads: the selected world, which UI controls to
+ * render, the debug level/panel mode/options/overlay, render quality, and VR comfort settings. `readAppConfigName`,
+ * `normalizeAppConfigName` and `readAppConfigForwardName` resolve which app config file a page loads, rejecting
+ * path traversal. These tests check reading each setting from the URL, defaults with no query at all, app config
+ * values as defaults overridden by URL params, legacy `portal-panels` mapping, every starter config shape, and
+ * config-name resolution and its safety rejections.
+ */
 import { describe, expect, it } from "vitest";
 import {
+  buildAppConfigUrl,
   normalizeAppConfig,
   normalizeAppConfigName,
-  buildAppConfigUrl,
   readAppConfigForwardName,
   readAppConfigName,
 } from "../../src/glue/appConfig";
 import { readLaunchOptions } from "../../src/glue/readLaunchOptions";
 
 describe("readLaunchOptions", () => {
+  it("reads debug launcher visibility and named debug options from URL params", () => {
+    const location = new URL(
+      "https://example.test/?world=cube&ui=WorldSelector,DebugButton&debugLevel=verbose&portalPanels=panel-with-text&debugOptions=runtime-diagnostics",
+    ) as unknown as Location;
+
+    expect(readLaunchOptions(location)).toMatchObject({
+      selectedWorldId: "cube",
+      uiOptions: ["WorldSelector", "DebugButton"],
+      renderWorldPicker: true,
+      renderDebugButton: true,
+      debugLevel: "verbose",
+      portalPanelMode: "panel-with-text",
+      debugOptions: ["runtime-diagnostics"],
+      debugOverlayEnabled: true,
+      debugOverlayItems: ["fps", "location", "portal-quantities"],
+    });
+  });
+
+  it("ignores unknown debug options", () => {
+    const location = new URL(
+      "https://example.test/?world=cube&ui=DebugButton&debugLevel=basic&debugOptions=runtime-diagnostics,unknown-option",
+    ) as unknown as Location;
+
+    expect(readLaunchOptions(location).debugOptions).toEqual(["runtime-diagnostics"]);
+  });
+
+  it("keeps known ui options even when only later options are requested", () => {
+    const location = new URL("https://example.test/?world=cube&ui=DebugButton") as unknown as Location;
+
+    expect(readLaunchOptions(location).uiOptions).toEqual(["DebugButton"]);
+  });
+
+  it("shows both controls by default when ui is not present", () => {
+    const location = new URL("https://example.test/?world=cube") as unknown as Location;
+
+    expect(readLaunchOptions(location)).toMatchObject({
+      uiOptions: ["WorldSelector", "DebugButton"],
+      renderWorldPicker: true,
+      renderDebugButton: true,
+      debugLevel: "off",
+    });
+  });
+
+  it("uses the explicit ui list to disable missing controls", () => {
+    const location = new URL("https://example.test/?world=cube&ui=DebugButton") as unknown as Location;
+
+    expect(readLaunchOptions(location)).toMatchObject({
+      uiOptions: ["DebugButton"],
+      renderWorldPicker: false,
+      renderDebugButton: true,
+    });
+  });
+
+  it("maps legacy portal-panels debug options to panel-with-text mode", () => {
+    const location = new URL(
+      "https://example.test/?world=cube&debug=true&debugOptions=portal-panels,runtime-diagnostics",
+    ) as unknown as Location;
+
+    expect(readLaunchOptions(location)).toMatchObject({
+      portalPanelMode: "panel-with-text",
+      debugOptions: ["runtime-diagnostics"],
+    });
+  });
+
+  it("reads debug overlay visibility and item selection from URL params", () => {
+    const location = new URL(
+      "https://example.test/?world=cube&debugOverlay=false&debugOverlayItems=location,portal-quantities",
+    ) as unknown as Location;
+
+    expect(readLaunchOptions(location)).toMatchObject({
+      debugOverlayEnabled: false,
+      debugOverlayItems: ["location", "portal-quantities"],
+    });
+  });
+
   it("disables render quality by default", () => {
     expect(readLaunchOptions(locationWithSearch("")).renderQualityEnabled).toBe(false);
   });
@@ -90,67 +176,71 @@ describe("readLaunchOptions", () => {
     });
   });
 
-  it.each([
-    ["001", "001-basic-cube"],
-    ["002", "002-basic-tetrahedron"],
-    ["003", "torus"],
-  ] as const)("supports the starter %s config shape", (configName, startingWorld) => {
-    const config = normalizeAppConfig({
-      startingWorld,
-      optionsMenu: {
-        configSelectionSection: false,
-        worldSelectionSection: false,
-        debugSection: false,
-      },
-      tools: {
+  it("supports every starter config's shape (001, 002, 003)", () => {
+    const starterConfigs: ReadonlyArray<readonly [string, string]> = [
+      ["001", "001-basic-cube"],
+      ["002", "002-basic-tetrahedron"],
+      ["003", "torus"],
+    ];
+
+    for (const [configName, startingWorld] of starterConfigs) {
+      const config = normalizeAppConfig({
+        startingWorld,
+        optionsMenu: {
+          configSelectionSection: false,
+          worldSelectionSection: false,
+          debugSection: false,
+        },
+        tools: {
+          placeFlags: true,
+          geodesicEmitters: true,
+          distances: true,
+          angles: true,
+        },
+        debug: {
+          level: "off",
+          portalPanels: "none",
+          renderQuality: false,
+          overlay: {
+            enabled: false,
+            items: {
+              fps: false,
+              location: false,
+              "portal-quantities": false,
+            },
+          },
+          options: {
+            "runtime-diagnostics": false,
+            "portal-path-debug": false,
+          },
+        },
+      });
+
+      expect(readLaunchOptions(locationWithSearch(""), config, configName), configName).toMatchObject({
+        selectedWorldId: startingWorld,
+        uiOptions: [],
+        renderWorldPicker: false,
+        renderDebugButton: false,
+        debugLevel: "off",
+        portalPanelMode: "none",
+        debugOptions: [],
+        debugOverlayEnabled: false,
+        debugOverlayItems: [],
+        renderQualityEnabled: false,
+        appConfigName: configName,
+      });
+      expect(config.tools, configName).toEqual({
         placeFlags: true,
         geodesicEmitters: true,
         distances: true,
         angles: true,
-      },
-      debug: {
-        level: "off",
-        portalPanels: "none",
-        renderQuality: false,
-        overlay: {
-          enabled: false,
-          items: {
-            fps: false,
-            location: false,
-            "portal-quantities": false,
-          },
-        },
-        options: {
-          "runtime-diagnostics": false,
-          "portal-path-debug": false,
-        },
-      },
-    });
-
-    expect(readLaunchOptions(locationWithSearch(""), config, configName)).toMatchObject({
-      selectedWorldId: startingWorld,
-      uiOptions: [],
-      renderWorldPicker: false,
-      renderDebugButton: false,
-      debugLevel: "off",
-      portalPanelMode: "none",
-      debugOptions: [],
-      debugOverlayEnabled: false,
-      debugOverlayItems: [],
-      renderQualityEnabled: false,
-      appConfigName: configName,
-    });
-    expect(config.tools).toEqual({
-      placeFlags: true,
-      geodesicEmitters: true,
-      distances: true,
-      angles: true,
-    });
-    expect(config.menu).toMatchObject({
-      configSelectionSectionEnabled: false,
-      worldSelectionSectionEnabled: false,
-      debugSectionEnabled: false,
-    });
+      });
+      expect(config.menu, configName).toMatchObject({
+        configSelectionSectionEnabled: false,
+        worldSelectionSectionEnabled: false,
+        debugSectionEnabled: false,
+      });
+    }
   });
 
   it("lets URL params override app config defaults", () => {

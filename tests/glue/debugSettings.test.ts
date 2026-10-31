@@ -1,39 +1,60 @@
+/**
+ * `tests/glue/debugSettings.test.ts` — unit tier.
+ *
+ * `canApplyDebugSettingsAtRuntime` says whether a change to the debug level, portal panel mode and enabled options
+ * can be applied to a running world without a reload: true exactly when every enabled option is declared
+ * runtime-mutable by the given support (by default, every known option is). `parseDebugOptions` and
+ * `serializeDebugOptions` read and write the comma-separated option list the URL and app config use;
+ * `hasActiveDebugOption` reports whether an option is both enabled and allowed at the current debug level. These
+ * tests check each outcome class of `canApplyDebugSettingsAtRuntime` (allowed when every option is mutable,
+ * allowed with none enabled, rejected when support excludes an enabled option) and the parse/serialize/active
+ * round trip.
+ */
 import { describe, expect, it } from "vitest";
 import { canApplyDebugSettingsAtRuntime } from "../../src/glue/debugSettings";
 import { hasActiveDebugOption, parseDebugOptions, serializeDebugOptions } from "../../src/glue/debugOptions";
 
 describe("canApplyDebugSettingsAtRuntime", () => {
-  it("allows the current runtime-mutable debug settings", () => {
-    expect(
-      canApplyDebugSettingsAtRuntime({
-        debugLevel: "basic",
-        portalPanelMode: "panel",
-        debugOptions: ["runtime-diagnostics"],
-      }),
-    ).toBe(true);
-  });
-
-  it("allows portal path debug settings to apply at runtime", () => {
+  it("allows settings when every enabled option is runtime-mutable by default", () => {
     expect(
       canApplyDebugSettingsAtRuntime({
         debugLevel: "verbose",
-        portalPanelMode: "text-only",
-        debugOptions: ["portal-path-debug", "portal-static-cull-debug", "portal-path-overlays"],
+        portalPanelMode: "panel-with-text",
+        debugOptions: ["runtime-diagnostics", "portal-path-debug", "portal-path-overlay-instances", "aim-collision-outlines"],
       }),
     ).toBe(true);
   });
 
-  it("still allows updates when no checkbox debug options are selected", () => {
+  it("allows settings with no enabled options regardless of support", () => {
     expect(
-      canApplyDebugSettingsAtRuntime({
-        debugLevel: "off",
-        portalPanelMode: "none",
-        debugOptions: [],
-      }),
+      canApplyDebugSettingsAtRuntime(
+        { debugLevel: "off", portalPanelMode: "none", debugOptions: [] },
+        { runtimeMutableOptions: [] },
+      ),
     ).toBe(true);
   });
 
-  it("parses portal path debug options and keeps them inactive at debug level off", () => {
+  it("rejects an enabled option that support does not declare runtime-mutable", () => {
+    expect(
+      canApplyDebugSettingsAtRuntime(
+        { debugLevel: "basic", portalPanelMode: "panel", debugOptions: ["forbidden-zone-wireframes"] },
+        { runtimeMutableOptions: ["runtime-diagnostics"] },
+      ),
+    ).toBe(false);
+  });
+
+  it("allows an enabled option that support declares runtime-mutable", () => {
+    expect(
+      canApplyDebugSettingsAtRuntime(
+        { debugLevel: "basic", portalPanelMode: "panel", debugOptions: ["forbidden-zone-wireframes"] },
+        { runtimeMutableOptions: ["forbidden-zone-wireframes"] },
+      ),
+    ).toBe(true);
+  });
+});
+
+describe("parsing and serializing debug options", () => {
+  it("parses a comma list, reports active options by level, and round-trips through serialize", () => {
     const parsed = parseDebugOptions(
       "portal-path-debug,portal-static-cull-debug,portal-path-overlays,portal-path-overlay-instances",
     );
@@ -49,51 +70,5 @@ describe("canApplyDebugSettingsAtRuntime", () => {
     expect(serializeDebugOptions(parsed)).toBe(
       "portal-path-debug,portal-static-cull-debug,portal-path-overlays,portal-path-overlay-instances",
     );
-  });
-
-  it("allows the new instance overlay debug option at runtime", () => {
-    expect(
-      canApplyDebugSettingsAtRuntime({
-        debugLevel: "basic",
-        portalPanelMode: "panel",
-        debugOptions: ["portal-path-overlay-instances"],
-      }),
-    ).toBe(true);
-  });
-
-  it("allows visible portal quantity debug summaries at runtime", () => {
-    expect(
-      canApplyDebugSettingsAtRuntime({
-        debugLevel: "basic",
-        portalPanelMode: "panel",
-        debugOptions: ["portal-visible-path-debug"],
-      }),
-    ).toBe(true);
-  });
-
-  it("parses and allows collision and aim debug options at runtime", () => {
-    const parsed = parseDebugOptions(
-      "forbidden-zone-wireframes,object-collision-wireframes,selectable-hitboxes,aim-collision-outlines",
-    );
-
-    expect(parsed).toEqual([
-      "forbidden-zone-wireframes",
-      "object-collision-wireframes",
-      "selectable-hitboxes",
-      "aim-collision-outlines",
-    ]);
-    expect(hasActiveDebugOption("basic", parsed, "forbidden-zone-wireframes")).toBe(true);
-    expect(hasActiveDebugOption("basic", parsed, "selectable-hitboxes")).toBe(true);
-    expect(hasActiveDebugOption("basic", parsed, "aim-collision-outlines")).toBe(true);
-    expect(serializeDebugOptions(parsed)).toBe(
-      "forbidden-zone-wireframes,object-collision-wireframes,selectable-hitboxes,aim-collision-outlines",
-    );
-    expect(
-      canApplyDebugSettingsAtRuntime({
-        debugLevel: "basic",
-        portalPanelMode: "none",
-        debugOptions: parsed,
-      }),
-    ).toBe(true);
   });
 });

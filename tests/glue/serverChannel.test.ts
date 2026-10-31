@@ -1,3 +1,13 @@
+/**
+ * `tests/glue/serverChannel.test.ts` — unit tier.
+ *
+ * `startServerChannel` is the page side of the local server's control channel (`_docs/tests.md` §8.5, §8.3): it
+ * connects only when the page carries the server's marker, says hello with the app's info, answers `call`/`list`/
+ * `eval` requests against the public API, forwards console output only while asked, and reconnects with a delay
+ * that doubles and caps at 30 s, resetting after a successful connection. These tests check each of those through
+ * an injected socket factory and timer (`FakeSocket`), never a real network — the one fake this file is a model
+ * for reuse elsewhere (`_docs/tests.md` §8.3).
+ */
 import { describe, expect, it } from "vitest";
 import { type ChannelSocket, startServerChannel } from "../../src/glue/serverChannel";
 

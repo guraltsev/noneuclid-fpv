@@ -1,3 +1,11 @@
+/**
+ * `tests/glue/launchOptionsUrl.test.ts` — unit tier.
+ *
+ * `removeLaunchOptionsFromUrl` strips the launch-option query params from a URL for display, keeping any other
+ * param and the config name; `buildUrlWithLaunchOptions` writes the current `LaunchOptions` back onto a URL for
+ * copying a reproducible link, writing a non-default config name but never the default one. These tests check
+ * both directions and that a stale config name is dropped rather than copied forward.
+ */
 import { describe, expect, it } from "vitest";
 import {
   buildUrlWithLaunchOptions,
