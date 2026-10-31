@@ -239,8 +239,9 @@ What is not:
 - **`src/runtime/runtimeMenuState.ts` mixes kinds of state**: the selected tool (simulation) and menu open / current page
   (per-client UI).
 - `src/runtime/runtimeCommands.ts` has a `RuntimeCommand` union with 4 kinds, of which 2 are dispatched (`go-home`,
-  `reload-world`). Console helpers such as `placeObjectAt` (`src/render/three/appDebugHelpers.ts`) are an ad hoc
-  precursor of the API.
+  `reload-world`). Console helpers such as `placeObjectAt` (`src/render/three/appDebugHelpers.ts`) were an ad hoc
+  precursor of the API; since 2026-10-31 `window.noneuclid.api` (`src/runtime/publicApi.ts`) wraps them as the first
+  slice of it (section 6, S1).
 - `npm run smoke` (headless browser smoke on four worlds) and `npm run edge` / `npm run cdp` (interactive browser
   debugging) exist and could drive the real renderer with the same command scripts.
 
@@ -748,12 +749,17 @@ today's app through its existing debug APIs (`window.noneuclidDebug`, `window.no
 `window.noneuclidGeometry`), and they attack the first goal directly (checks done by hand in a headset; for example
 issue 73 closes only when a headset check passes). Pieces that exist today: a Node static server
 (`scripts/smoke/staticServer.mjs`), remote debugging of desktop Edge (`npm run edge`, `npm run cdp`: eval, screenshot,
-console, record), the Windows-only local HTTPS server for headsets (`wwwserver/`). *Proposed stages*, each useful on
-its own:
+console, record), the Windows-only local HTTPS server for headsets (`wwwserver/`). **S0 and S1 are built (2026-10-31,
+jobs 39 and 40 in `.agents/jobs/_done/`, marked "needs review")**: `npm run server` serves the built app over HTTPS,
+`window.noneuclid.api` (`src/runtime/publicApi.ts`, dispatch in `src/runtime/apiCall.ts`) is the first slice of the
+engine API, and `npm run cdp` reaches it on desktop Edge or, through the channel, on any device. What remains of S1 is
+marked below. *Stages*, each useful on its own (S2 to S4 still **Proposed**):
 
 - **S0. One Node server serving the built app over HTTPS** on the local network, with the certificate of today's
   headset setup, replacing the Rebex server; the multiplayer-mode server from the start, without multiplayer yet.
-- **S1. A debug channel with an admin password.** Pages served by the server connect back automatically; an admin
+  **Built** (job 39).
+- **S1. A debug channel with an admin password. Built** (job 40); not yet done: the `docs:check` rule below (plain data
+  in every public function), which is no longer a stage but a proposal on its own. Pages served by the server connect back automatically; an admin
   command-line tool (like `npm run cdp`) lists connected devices (desktop or Quest, world, version), calls the existing
   debug APIs, captures the console, records values and takes screenshots where possible. Structured debug calls by
   default; arbitrary evaluation only when the server is started in development mode.
@@ -946,4 +952,5 @@ state holder and one command path; proposed: build its `appSession` as engine st
 | 2026-10-31 | Agreed: all public functions are exposed. Proposed: public means exported from the engine API entry point(s); plain-data signatures enforced by a docs:check extension; the registry generated from types and JSDoc. |
 | 2026-10-31 | Proposed (maintainer's question): no registry; literal calls on the public API object (path plus arguments over the channel); names by listing keys; types and descriptions only in optional generated metadata for help and agents. Replaces the generated registry. |
 | 2026-10-31 | Agreed: literal calls on the public API object, no registry. Jobs written for S0 and S1. |
+| 2026-10-31 | Status update (maintainer): S0 and S1 are implemented (jobs 39 and 40, done, awaiting review). The server allows real-time debugging and testing. Still open from S1: the `docs:check` plain-data rule. S3 (scenario scripts) can start. |
 | 2026-10-31 | Agreed: the channel uses WebSocket (the `ws` package on the server), not Server-Sent Events plus POST, because S2 and S4 need frequent messages in both directions. |
