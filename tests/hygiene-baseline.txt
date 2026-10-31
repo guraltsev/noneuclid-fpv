@@ -53,9 +53,6 @@ H5	tests/world-objects/simpleGeoCreature.test.ts	7b. host.placeAt into another c
 H5	tests/world-objects/simpleGeoCreature.test.ts	7c. a direct registry.update of a creature throws and leaves its pose unchanged
 H5	tests/world-objects/simpleGeoCreature.test.ts	8. reset and transformGeometry put the leader back on the creature
 H6	tests/assets/publicAssetPolicy.test.ts	-
-H6	tests/authoring/compileWorldScript.test.ts	-
-H6	tests/authoring/exampleWorlds.test.ts	-
-H6	tests/authoring/worldBuilder.test.ts	-
 H6	tests/docs/documentation.test.ts	-
 H6	tests/docs/documentation.test.ts	keeps module headers, exported JSDoc, layering, generated references and document links healthy
 H6	tests/docs/moduleImportRules.test.ts	-

@@ -1,3 +1,11 @@
+/**
+ * `tests/authoring/compileWorldScript.test.ts` — unit tier.
+ *
+ * `compileWorldScript` runs an authored `.world.js` script (`PolygonFace`, `Portal`, `OnFace`, and the rest of the
+ * world-builder API) and returns the `CellComplexSpec` it builds, or throws a readable error naming the script and
+ * the authoring mistake. These tests check a minimal script's compiled shape and visuals, that a bundled world
+ * script compiles to a spec that also passes runtime compilation, and the error message for an invalid side index.
+ */
 import { describe, expect, it } from "vitest";
 import { compileWorldScript } from "../../src/authoring/compileWorldScript";
 import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";

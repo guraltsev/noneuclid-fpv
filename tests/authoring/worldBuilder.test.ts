@@ -1,3 +1,12 @@
+/**
+ * `tests/authoring/worldBuilder.test.ts` — unit tier.
+ *
+ * `createWorldBuilder` is the imperative API behind `.world.js` scripts: `PolygonFace` and `Portal` build cells and
+ * their reciprocal portals, `OnFace` and the starting-object helpers (`startingHouse`, `startingQuestionCube`,
+ * `startingPosition`) attach library objects and derive the authored starting pose. These tests check face and
+ * portal construction (including authored-side validation and duplicate-portal rejection), floor materials,
+ * attached library objects, and each starting-object helper's derived pose and defaults.
+ */
 import { describe, expect, it } from "vitest";
 import {
   authorSideToSideIndex,

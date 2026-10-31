@@ -1,3 +1,14 @@
+/**
+ * `tests/authoring/exampleWorlds.test.ts` — unit tier.
+ *
+ * The bundled example worlds (one per Platonic solid, plus the genus-2 torus and the torus-moduli room) are the
+ * project's reference content: every compiled world must glue into its intended closed surface, with the right
+ * Euler characteristic and vertex cone angles (`_docs/MATHEMATICAL_MODEL.md` §2-3), no two objects sharing one
+ * asset, a starting house and question cube that do not overlap the starting player, and no starting-area object
+ * colliding with the player's spawn pose. These tests check each rule once over every bundled world (one failure
+ * names which world broke it), plus a few world-specific facts (the genus-2 torus as a paired octagon, the
+ * tetrahedron's equilateral faces and its stop sign's scale) that do not generalize across worlds.
+ */
 import { describe, expect, it } from "vitest";
 import { worldCatalog } from "../../src/authoring/worldCatalog";
 import {
@@ -38,8 +49,10 @@ const exampleWorlds = [
 ] as const;
 
 describe("example worlds", () => {
-  it.each(exampleWorlds)("does not repeat object assets within %s", (_name, world) => {
-    expect(repeatedObjectAssetPaths(world)).toEqual([]);
+  it("does not repeat object assets within any bundled world", () => {
+    for (const [name, world] of exampleWorlds) {
+      expect(repeatedObjectAssetPaths(world), name).toEqual([]);
+    }
   });
 
   it("exposes every Platonic solid as a selectable world", () => {
@@ -148,36 +161,38 @@ describe("example worlds", () => {
     expect(octagon?.visuals?.objects?.some((object) => object.class === "decoration")).toBe(false);
   });
 
-  it.each(exampleWorlds)("places the starter house and question cube in %s", (_name, world) => {
-    const startCell = world.cells.find((cell) => cell.id === world.startingPosition?.cellId);
-    const house = startCell?.visuals?.objects?.find((object) => object.id === "startingHouse");
-    const questionCube = startCell?.visuals?.objects?.find((object) => object.id === "startingQuestionCube");
+  it("places the starter house and question cube in every bundled world", () => {
+    for (const [name, world] of exampleWorlds) {
+      const startCell = world.cells.find((cell) => cell.id === world.startingPosition?.cellId);
+      const house = startCell?.visuals?.objects?.find((object) => object.id === "startingHouse");
+      const questionCube = startCell?.visuals?.objects?.find((object) => object.id === "startingQuestionCube");
 
-    expect(world.startingPosition).toMatchObject({
-      position: {
-        x: expect.any(Number),
-        y: expect.any(Number),
-        z: 0,
-      },
-      pitchRadians: 0,
-    });
-    expect(house).toMatchObject({
-      kind: "asset",
-      assetPath: "small_house/small_house.glb",
-    });
-    expect(questionCube).toMatchObject({
-      kind: "asset",
-      assetPath: "questionblock/questionBlock.glb",
-      displayHelpMessage: defaultStartingQuestionCubeMessage,
-      tutorialPages: defaultStartingQuestionCubeTutorialPages,
-      goalPages: expect.arrayContaining([
-        expect.objectContaining({
-          title: "Goal",
-          body: expect.any(String),
-        }),
-      ]),
-    });
-    expect(questionCube?.tutorialPages?.some((page) => page.body.includes(helpHubHomeGuidance))).toBe(true);
+      expect(world.startingPosition, name).toMatchObject({
+        position: {
+          x: expect.any(Number),
+          y: expect.any(Number),
+          z: 0,
+        },
+        pitchRadians: 0,
+      });
+      expect(house, name).toMatchObject({
+        kind: "asset",
+        assetPath: "small_house/small_house.glb",
+      });
+      expect(questionCube, name).toMatchObject({
+        kind: "asset",
+        assetPath: "questionblock/questionBlock.glb",
+        displayHelpMessage: defaultStartingQuestionCubeMessage,
+        tutorialPages: defaultStartingQuestionCubeTutorialPages,
+        goalPages: expect.arrayContaining([
+          expect.objectContaining({
+            title: "Goal",
+            body: expect.any(String),
+          }),
+        ]),
+      });
+      expect(questionCube?.tutorialPages?.some((page) => page.body.includes(helpHubHomeGuidance)), name).toBe(true);
+    }
   });
 
   it("keeps tetrahedron faces equilateral so portal-glued corners align", () => {
@@ -192,36 +207,38 @@ describe("example worlds", () => {
     }
   });
 
-  it.each(exampleWorlds)("keeps houses away from the starting player in %s", (_name, world) => {
-    const startCell = world.cells[0];
-    const playerBounds = getPlayerBounds(getStartPose(world, startCell.id));
-    const collidingHouses: string[] = [];
+  it("keeps houses away from the starting player in every bundled world", () => {
+    for (const [name, world] of exampleWorlds) {
+      const startCell = world.cells[0];
+      const playerBounds = getPlayerBounds(getStartPose(world, startCell.id));
+      const collidingHouses: string[] = [];
 
-    for (const object of startCell.visuals?.objects ?? []) {
-      if (object.kind !== "asset" || object.assetPath !== "small_house/small_house.glb") {
-        continue;
+      for (const object of startCell.visuals?.objects ?? []) {
+        if (object.kind !== "asset" || object.assetPath !== "small_house/small_house.glb") {
+          continue;
+        }
+
+        if (!object.collision) {
+          throw new Error(`Expected house ${object.id} to have collision bounds.`);
+        }
+
+        const objectBounds = getDynamicObjectCollisionBounds({
+          cellId: startCell.id,
+          localPose: yawRigidTransform3(object.yawRadians ?? 0, object.position),
+          collision: object.collision,
+        });
+
+        if (!objectBounds) {
+          throw new Error(`Expected house ${object.id} collision bounds to compile.`);
+        }
+
+        if (simpleCylinderIntersectsSimpleCylinder(playerBounds, objectBounds)) {
+          collidingHouses.push(object.id);
+        }
       }
 
-      if (!object.collision) {
-        throw new Error(`Expected house ${object.id} to have collision bounds.`);
-      }
-
-      const objectBounds = getDynamicObjectCollisionBounds({
-        cellId: startCell.id,
-        localPose: yawRigidTransform3(object.yawRadians ?? 0, object.position),
-        collision: object.collision,
-      });
-
-      if (!objectBounds) {
-        throw new Error(`Expected house ${object.id} collision bounds to compile.`);
-      }
-
-      if (simpleCylinderIntersectsSimpleCylinder(playerBounds, objectBounds)) {
-        collidingHouses.push(object.id);
-      }
+      expect(collidingHouses, name).toEqual([]);
     }
-
-    expect(collidingHouses).toEqual([]);
   });
 
   it("keeps tetrahedron starter-neighborhood collisions away from the starting player", () => {
@@ -250,7 +267,7 @@ describe("example worlds", () => {
     expect(simpleCylinderIntersectsSimpleCylinder(playerBounds, mouseBounds!)).toBe(false);
   });
 
-  it("keeps the tetrahedron stop sign at the corrected small scale", () => {
+  it("keeps the tetrahedron stop sign at its documented small scale", () => {
     const faceD = tetrahedron.cells.find((cell) => cell.id === "face-d");
     const stopSign = faceD?.visuals?.objects?.find((object) => object.id === "face-d-stop-sign");
 
