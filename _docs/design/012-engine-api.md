@@ -743,6 +743,61 @@ the core; a dynamic plugin registry.
 
 ## 6. Phasing and existing jobs
 
+**Agreed (2026-10-31): the local server is top priority.** Its early stages need no engine split: they work on
+today's app through its existing debug APIs (`window.noneuclidDebug`, `window.noneuclidPortalDebug`,
+`window.noneuclidGeometry`), and they attack the first goal directly (checks done by hand in a headset; for example
+issue 73 closes only when a headset check passes). Pieces that exist today: a Node static server
+(`scripts/smoke/staticServer.mjs`), remote debugging of desktop Edge (`npm run edge`, `npm run cdp`: eval, screenshot,
+console, record), the Windows-only local HTTPS server for headsets (`wwwserver/`). *Proposed stages*, each useful on
+its own:
+
+- **S0. One Node server serving the built app over HTTPS** on the local network, with the certificate of today's
+  headset setup, replacing the Rebex server; the multiplayer-mode server from the start, without multiplayer yet.
+- **S1. A debug channel with an admin password.** Pages served by the server connect back automatically; an admin
+  command-line tool (like `npm run cdp`) lists connected devices (desktop or Quest, world, version), calls the existing
+  debug APIs, captures the console, records values and takes screenshots where possible. Structured debug calls by
+  default; arbitrary evaluation only when the server is started in development mode.
+  **Agreed (2026-10-31): S1 comes first, together with administration through API calls that are built up
+  progressively as a tool.** **Agreed correction (maintainer): there is nothing remote about the calls; they are calls
+  on the state** (queries and commands), and the network is only one way to reach them (principle 7). The
+  public API object is the first slice of the engine API itself, reachable in process (tests, scenario scripts, later
+  the UI), from the browser console through one entry point (for example `window.noneuclid.api`, replacing today's
+  three globals), from desktop Edge through `npm run cdp` (which evaluates calls on it) and from any device through the
+  server channel; S1 is one more transport for it. **Agreed (2026-10-31): all public functions are exposed.**
+  *Proposed:* "public" means exported from the engine's API entry point(s), not merely exported from a module (module
+  exports include closures, mutable registries and three.js objects, such as the `create*(deps)` factories); a check
+  extending `docs:check` enforces that every public function takes and returns plain, serialisable data (principle 2).
+  **Agreed (2026-10-31, from the maintainer's question "can one avoid a registry and literally call?"): no registry;
+  literal calls on the public API object.** Shape:
+  1. the engine API object is what gets called: in the console or through `npm run cdp`, literally
+     `noneuclid.api.objects.placeAt(...)`; over the server channel, a message `{ path: ["objects", "placeAt"], args }`
+     is resolved by walking the API object and calling the function, awaiting it if asynchronous, results returned as
+     plain data. Only the API entry point's object is reachable, never module internals. API functions belong to an
+     engine instance (`engine.api`), so there are no hidden globals and tests can run several engines. Until the engine
+     API exists, the first functions on the object wrap today's debug helpers;
+  2. discovery of names is listing the object's keys; types and descriptions are erased at runtime, so arguments are
+     not checked before the call (a wrong argument fails inside the function, acceptable without adversaries), and
+     help text and agent tool definitions come from an optional JSON file generated at build time from types and JSDoc
+     (`scripts/docs/lib.mjs`, which already generates `_docs/generated/API_REFERENCE.md`), used only for `help` and
+     agents, never for calling;
+  3. three kinds of target: the server (connected devices, status), one device (read state, place an object,
+     screenshot), all devices (switch everyone's world, reload everyone), the last being classroom administration;
+  4. the same calls serve the command line, scenario scripts (S3), a later teacher web page and AI agents; the
+     descriptions double as their tool definitions (P11). **Agreed (2026-10-31): the admin interface is a command-line
+     tool like `npm run cdp`.** *Proposed:* the same tool with two backends: DevTools Protocol for desktop Edge (as
+     today) and the server channel for any device, so `eval`, `shot`, `console` and `record` work on a Quest too,
+     plus `call` for registered API calls, which behaves identically on both backends;
+  5. they are the first working slice of the engine API: today they wrap the existing debug helpers (the
+     `window.noneuclidDebug` helpers become the first functions on the API object), after the engine split they are
+     the engine's commands and queries; there is no parallel "remote" API.
+  Jobs: S0 is [job 39](../../.agents/jobs/39_local_node_https_server.md), S1 is
+  [job 40](../../.agents/jobs/40_state_api_object_and_server_channel.md) (written 2026-10-31).
+- **S2. Presence**: devices publish their pose and see simple avatars of the others; no shared world state yet.
+- **S3. Scenario scripts through the channel**: the admin sends a script to a device (load a world, place, act, read
+  state, compare), first through today's debug helpers, later through engine commands; manual headset checks become
+  scripts.
+- **S4. Shared world** with the server as authority (P5), after the engine split.
+
 **Proposed.** Split the program into phases, each useful on its own:
 
 - **Phase 0, headless single participant.** Move picking and tools out of `render/three` (job 32's `src/interaction/`),
@@ -884,3 +939,11 @@ state holder and one command path; proposed: build its `appSession` as engine st
 | 2026-10-31 | Thesis restated in the maintainer's words (a coding design philosophy makes the mapping possible; principles are its elements) and this project named a test case for it. Proposed: record tensions (counter-evidence) beside the evidence. |
 | 2026-10-31 | Agreed: the project is also a development playground for refining the philosophy into precise principles; the principle list is a working draft and its refinements are logged. |
 | 2026-10-31 | The thesis, tiers, principles, evidence and tensions moved to their own metadocument, `_docs/CODING_MATH.md`; this document keeps the agreed tier requirement and a pointer. |
+| 2026-10-31 | Agreed: the local server is top priority. Proposed stages S0 (Node HTTPS server) to S4 (shared world); S0 to S3 need no engine split. |
+| 2026-10-31 | Agreed: S1 first, with remote administration through progressively built API calls. Proposed: call registry, discovery, server/device/all targets, one tool for all users, growing into the engine API's debug and admin namespace. |
+| 2026-10-31 | Agreed: the admin interface is a command-line tool like `npm run cdp`. Proposed: one tool, two backends (DevTools Protocol for desktop Edge, server channel for any device). |
+| 2026-10-31 | Agreed correction: the calls are calls on the state, not remote calls; the registry is the first slice of the engine API, reachable in process, from the console, through cdp and through the server channel. |
+| 2026-10-31 | Agreed: all public functions are exposed. Proposed: public means exported from the engine API entry point(s); plain-data signatures enforced by a docs:check extension; the registry generated from types and JSDoc. |
+| 2026-10-31 | Proposed (maintainer's question): no registry; literal calls on the public API object (path plus arguments over the channel); names by listing keys; types and descriptions only in optional generated metadata for help and agents. Replaces the generated registry. |
+| 2026-10-31 | Agreed: literal calls on the public API object, no registry. Jobs written for S0 and S1. |
+| 2026-10-31 | Agreed: the channel uses WebSocket (the `ws` package on the server), not Server-Sent Events plus POST, because S2 and S4 need frequent messages in both directions. |

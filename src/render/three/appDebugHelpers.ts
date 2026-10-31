@@ -10,6 +10,7 @@ import { type StaticPortalPathCullResult } from "../../cell-complex/staticPortal
 import { type Vec3 } from "../../math/vec3";
 import { DEFAULT_PLAYER_EYE_HEIGHT_METERS } from "../../movement/playerBody";
 import { type PlayerPose } from "../../movement/playerPose";
+import { setApiNamespace } from "../../runtime/publicApi";
 import { type RuntimeToolId } from "../../runtime/runtimeMenuState";
 import { type LiveGeometryDebugState } from "../../runtime/worldGeometrySession";
 import {
@@ -295,11 +296,19 @@ export interface EndpointDebugDump {
 /** Publishes the helpers as window.noneuclidPortalDebug, replacing any previous object; pair with uninstallPortalDebugHelpers on teardown. */
 export function installPortalDebugHelpers(helpers: PortalDebugHelpers): void {
   (window as typeof window & { noneuclidPortalDebug?: PortalDebugHelpers }).noneuclidPortalDebug = helpers;
+  setApiNamespace("portal", {
+    checkCellPath: (text: string) => helpers.CheckCellPath(text),
+    showCellPath: (text: string) => helpers.ShowCellPath(text),
+    hideCellPaths: () => helpers.HideCellPaths(),
+    dumpCameraPose: () => helpers.DumpCameraPose(),
+    state: () => helpers.state,
+  });
 }
 
-/** Removes window.noneuclidPortalDebug. */
+/** Removes window.noneuclidPortalDebug and the public API namespace `portal`. */
 export function uninstallPortalDebugHelpers(): void {
   delete (window as typeof window & { noneuclidPortalDebug?: PortalDebugHelpers }).noneuclidPortalDebug;
+  setApiNamespace("portal", undefined);
 }
 
 /** Publishes the callbacks as window.noneuclidDebug and as the snake_case window globals (only snake_case names are global; PascalCase names are on the object only). */
@@ -325,10 +334,18 @@ export function installGeneralDebugHelpers(callbacks: GeneralDebugHelperCallback
   target.dump_locked_geodesic_words = helpers.dump_locked_geodesic_words;
   target.placeObjectAt = helpers.placeObjectAt;
   target.noneuclidDebug = helpers;
+  setApiNamespace("debug", {
+    dumpGeodesicCreatures: callbacks.dumpGeodesicCreatures,
+    dumpAllGeodesics: callbacks.dumpAllGeodesics,
+    dumpGeodesicPath: callbacks.dumpGeodesicPath,
+    dumpLockedGeodesicWords: callbacks.dumpLockedGeodesicWords,
+    placeObjectAt: callbacks.placeObjectAt,
+  });
 }
 
-/** Removes window.noneuclidDebug and the snake_case globals. */
+/** Removes window.noneuclidDebug, the snake_case globals and the public API namespace `debug`. */
 export function uninstallGeneralDebugHelpers(): void {
+  setApiNamespace("debug", undefined);
   const target = window as WindowWithGeneralDebugHelpers;
 
   delete target.debug_help;
@@ -340,8 +357,9 @@ export function uninstallGeneralDebugHelpers(): void {
   delete target.noneuclidDebug;
 }
 
-/** Removes window.noneuclidGeometry; installation happens in createThreeApp. */
+/** Removes window.noneuclidGeometry and the public API namespace `geometry`; installation happens in createThreeApp. */
 export function uninstallGeometryDebugHelpers(): void {
+  setApiNamespace("geometry", undefined);
   delete (window as WindowWithGeometryDebugHelpers).noneuclidGeometry;
 }
 

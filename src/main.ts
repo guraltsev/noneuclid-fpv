@@ -19,6 +19,8 @@ import { createLoadingStatus } from "./glue/loadingStatus";
 import { readLaunchOptions, type LaunchOptions } from "./glue/readLaunchOptions";
 import { createThreeApp, type ThreeApp } from "./render/three/createThreeApp";
 import { type OwnedPreparedWorldAssets, preloadWorldAssets } from "./render/three/preloadWorldAssets";
+import { getPublicApi, setApiNamespace } from "./runtime/publicApi";
+import { startServerChannel } from "./glue/serverChannel";
 import { installRuntimeDiagnostics } from "./render/three/runtimeDiagnostics";
 import "./style.css";
 
@@ -37,12 +39,33 @@ let activeApp: ThreeApp | undefined;
 let activeAssets: OwnedPreparedWorldAssets | undefined;
 let activeRunId = 0;
 
+// The public API object window.noneuclid.api lives here so that it survives app restarts; per-run namespaces
+// (debug, portal, geometry, view) are installed and removed by each app.
+setApiNamespace("app", {
+  info: () => ({
+    worldId: launchOptions.selectedWorldId,
+    configName: launchOptions.appConfigName,
+    userAgent: navigator.userAgent,
+    xrPresenting: activeApp?.renderer.xr.isPresenting ?? false,
+  }),
+  changeWorld: (worldId: string) => {
+    void restartApp(appElement, { ...launchOptions, selectedWorldId: worldId });
+  },
+  changeConfig: (configName: string) => {
+    void restartAppWithConfig(appElement, configName);
+  },
+  reload: () => {
+    void restartApp(appElement, launchOptions);
+  },
+});
+
 void startApp(appElement, initialLaunchLocation);
 
 /**
  * Loads the app config named in the URL, then starts the first run with launch options resolved against it; shows an error in the loading status on failure.
  */
 async function startApp(container: HTMLDivElement, initialLocation: Location): Promise<void> {
+  startServerChannel({ api: getPublicApi() });
   const loadingStatus = createLoadingStatus(container);
   try {
     loadingStatus.setPhase("Loading app config");

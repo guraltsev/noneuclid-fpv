@@ -1,4 +1,4 @@
-# Knowledge index
+﻿# Knowledge index
 
 Short notes on traps and non-obvious facts of this repository. Rules: `AGENTS.md`.
 
@@ -9,3 +9,4 @@ Short notes on traps and non-obvious facts of this repository. Rules: `AGENTS.md
 - [path-table-memory.md](path-table-memory.md): unculled portal-path tables exceed memory at depth 10; depths that fit per world.
 - [test-and-smoke-timing.md](test-and-smoke-timing.md): `npm test` takes about a minute (one file ~55 s); multi-world smoke has a known load flake.
 - [windows-shell.md](windows-shell.md): the Bash tool can return empty output with no error on this machine; use PowerShell.
+- [headless-edge-end-to-end.md](headless-edge-end-to-end.md): recipe and flags to test the local server channel end to end with headless Edge.

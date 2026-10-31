@@ -961,6 +961,17 @@ World catalog: the list of selectable bundled worlds and the lookup that turns a
 
 ## `runtime`
 
+### `runtime/apiCall.ts`
+
+Dispatch for the public API object (`window.noneuclid.api`): a call is a path of names through nested plain objects of functions, plus arguments, and its result is converted to plain JSON-safe data.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| type | `ApiObject` | A nested object whose leaves are functions (namespaces of the API). |
+| function | `callApi` | Walks `path` through own properties of plain objects starting at `api`, calls the function found there with `args`, awaits it and returns its result as plain data. |
+| function | `listApi` | Returns the names of the API's functions as `{ namespace: [function names] }` (nested objects use dotted namespace names), sorted. |
+| function | `toPlainData` | Converts a value to JSON-safe plain data: a `Map` with all-string keys becomes an object, any other `Map` an array of `[key, value]`; a `Set` and typed arrays become arrays; an `Error` becomes `{ name, message }`; funct… |
+
 ### `runtime/appCommandDispatcher.ts`
 
 Routes renderer-neutral RuntimeCommand values (from the desktop menu and the VR palette alike) to the host callbacks that actually reload, change world, go home or toggle the debug overlay.
@@ -986,6 +997,17 @@ Deformation family for the one-cell torus world: the cell "torus-room" is a pris
 | function | `nextTorusSkewStep` | Moves (widthMeters, skewXMeters, depthMeters) together from current toward target along a straight segment by at most maxStepMeters in the Euclidean metric, snapping to the target when the remaining distance is within m… |
 | function | `validateTorusSkewBaseSpec` | Returns errors unless the spec has exactly one cell, "torus-room", with 4 base vertices, positive finite height, portals side-0..side-3 on sides 0..3 paired 0<->2 and 1<->3 to itself, and a footprint that is the centred… |
 | function | `inferTorusSkewState` | Reads (w, a, b) from a base spec's torus-room footprint as w = \|v1 - v0\| and (a, b) = v3 - v0; throws if the cell is missing or the values are out of range. |
+
+### `runtime/publicApi.ts`
+
+Holder of the public API object `window.noneuclid.api`: a plain object of namespaces of functions that are calls on the app's state.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| type | `PublicApi` | The mutable API object: namespace name to an object of functions. |
+| interface | `NoneuclidGlobal` | The shape of `window.noneuclid`. |
+| function | `getPublicApi` | Returns `window.noneuclid.api`, creating `window.noneuclid` on first use. |
+| function | `setApiNamespace` | Installs (or, with `undefined`, removes) one namespace of the public API. |
 
 ### `runtime/runtimeCommands.ts`
 
@@ -1318,6 +1340,17 @@ Parses the page URL's query string into a LaunchOptions record, with precedence:
 | interface | `LaunchOptions` | Resolved settings for one run of the app: world, UI toggles, debug settings, comfort options and the app config they came from. |
 | function | `readLaunchOptions` | Builds LaunchOptions from a location's query string, the loaded app config and its name, applying URL > config > default precedence for each field. |
 
+### `glue/serverChannel.ts`
+
+Page side of the channel to the local server (scripts/server/localServer.mjs): a WebSocket over which an admin can call any function of this page's public API (src/runtime/apiCall.ts), list it, evaluate expressions (dev mode only) and read forwarded console output.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `ChannelSocket` | The slice of the WebSocket interface the channel uses (so tests can pass a fake). |
+| interface | `ServerChannelOptions` | Inputs of {@link startServerChannel}; everything but `api` defaults to the browser's own. |
+| interface | `ServerChannel` | Handle returned by {@link startServerChannel}. |
+| function | `startServerChannel` | Connects to the local server when the page was served by it, and answers its requests; returns a handle to stop it. |
+
 ### `glue/uiOptions.ts`
 
 Defines the optional UI widgets that launch options can show (WorldSelector, DebugButton) as a constant table that is the source of truth for the UiOptionId type, with canonical parse and serialize helpers for the comma-separated URL form.
@@ -1424,10 +1457,10 @@ Browser-console debug surface for the app: window-level helper installation, the
 | interface | `AllGeodesicsDebugDump` | Whole-world geodesic inventory: intervals, segments, anchors and curve-shortening pairs. |
 | interface | `EndpointDebugDump` | Identifies one geodesic endpoint and the anchor object it is attached to. |
 | function | `installPortalDebugHelpers` | Publishes the helpers as window.noneuclidPortalDebug, replacing any previous object; pair with uninstallPortalDebugHelpers on teardown. |
-| function | `uninstallPortalDebugHelpers` | Removes window.noneuclidPortalDebug. |
+| function | `uninstallPortalDebugHelpers` | Removes window.noneuclidPortalDebug and the public API namespace `portal`. |
 | function | `installGeneralDebugHelpers` | Publishes the callbacks as window.noneuclidDebug and as the snake_case window globals (only snake_case names are global; PascalCase names are on the object only). |
-| function | `uninstallGeneralDebugHelpers` | Removes window.noneuclidDebug and the snake_case globals. |
-| function | `uninstallGeometryDebugHelpers` | Removes window.noneuclidGeometry; installation happens in createThreeApp. |
+| function | `uninstallGeneralDebugHelpers` | Removes window.noneuclidDebug, the snake_case globals and the public API namespace `debug`. |
+| function | `uninstallGeometryDebugHelpers` | Removes window.noneuclidGeometry and the public API namespace `geometry`; installation happens in createThreeApp. |
 | function | `liveVisibilityFields` | Returns the live visibility fields (visible flag, screen area in pixels, clip rectangle in normalized device coordinates) for a portal path id, using the latest visible-path computation; delegates to describeVisiblePort… |
 | function | `pathToThreeMatrix` | Returns the Three.js-frame matrix mapping destination-cell coordinates into the root cell for a render path. |
 | function | `dumpCameraPose` | Logs the camera pose to the console (info and table) and returns it as a rounded dump. |
