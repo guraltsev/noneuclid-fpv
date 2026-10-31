@@ -33,19 +33,19 @@ rather than switching branches.
 | --- | --- | --- | --- |
 | 41 | done, needs review (two Uncertain items for the maintainer; no open review finding) | `653a8a2`, `d7fec50`, `8b49b4c` (repair) | fresh agent; 1 must-adjacent finding (below), fixed |
 | 42 | done, needs review (three Uncertain items for the maintainer; no open review finding) | `5520f78`..`05666ff` (11 commits, one per area + fixtures follow-up + report) | fresh agent; 0 must findings, 4 should-level reporting-wording notes (below), not fixed |
-| 43 | TBD | | |
+| 43 | done, needs review (two Uncertain items for the maintainer; 1 undisclosed must finding, fixed) | `d61865d`..`0a19214` (13 commits + repair) | fresh agent; 0 must findings (after the coordinator's own pre-review repair), 3 should-level notes (below), not fixed |
 | 44 | TBD | | |
 
 ## Indicators
 
 | Indicator | Start | After 41 | After 42 | After 43 | After 44 |
 | --- | --- | --- | --- | --- | --- |
-| Test lines / src lines | ~25.5k / ~46.7k | 25,851 / 48,974 | 25,908 / 48,974 | | |
-| Test files / tests (unit, process, release) | 160 files / 1,071 tests (undifferentiated) | unit 146f/942t; process 3f/18t; release 0f/0t | unit 131f/928t; process 3f/18t; release 0f/0t | | |
-| Unit tier serial time; slowest file | ~75s summed; portalPaths.test.ts ~62.5s | 73.50s; portalPaths.test.ts 66.36s | 8.23s; moduleImportRules.test.ts 2.11s | | |
-| Baseline lines (total; per rule) | n/a (baseline not created yet) | 257 total (H1:0 H2:0 H3:0 H4:3 H5:59 H6:193 H7:0 H8:0 H9:2) | 80 total, all in tests/render-contract/ (H1:0 H2:0 H3:0 H4:1 H5:0 H6:78 H7:0 H8:0 H9:1) | | |
-| Manual checks in tests/manual_smoke.md | 0 (file does not exist) | 0 (file still does not exist; job 44) | 0 (unchanged; job 44) | | |
-| Scenarios in tests/app | 0 | 0 (tests/app does not exist yet; job 44) | 0 (unchanged; job 44) | | |
+| Test lines / src lines | ~25.5k / ~46.7k | 25,851 / 48,974 | 25,908 / 48,974 | 25,781 / 48,974 | |
+| Test files / tests (unit, process, release) | 160 files / 1,071 tests (undifferentiated) | unit 146f/942t; process 3f/18t; release 0f/0t | unit 131f/928t; process 3f/18t; release 0f/0t | unit 127f/915t; process 3f/18t; release 0f/0t | |
+| Unit tier serial time; slowest file | ~75s summed; portalPaths.test.ts ~62.5s | 73.50s; portalPaths.test.ts 66.36s | 8.23s; moduleImportRules.test.ts 2.11s | 5.38s; moduleImportRules.test.ts 1.43s | |
+| Baseline lines (total; per rule) | n/a (baseline not created yet) | 257 total (H1:0 H2:0 H3:0 H4:3 H5:59 H6:193 H7:0 H8:0 H9:2) | 80 total, all in tests/render-contract/ (H1:0 H2:0 H3:0 H4:1 H5:0 H6:78 H7:0 H8:0 H9:1) | 0 total (H1-H9 all 0) | |
+| Manual checks in tests/manual_smoke.md | 0 (file does not exist) | 0 (file still does not exist; job 44) | 0 (unchanged; job 44) | 0 (unchanged; job 44) | |
+| Scenarios in tests/app | 0 | 0 (tests/app does not exist yet; job 44) | 0 (unchanged; job 44) | 0 (unchanged; job 44) | |
 
 ## Job 41
 
@@ -134,6 +134,69 @@ limit; the tetrahedron vertex-quotient test in `compileCellComplex.test.ts` was 
 audit (found independently — it never called the compiler under test).
 
 ## Job 43
+
+Renamed `tests/render-contract/` to `tests/render/`, built 5 shared boundary fakes in `tests/support/`
+(`fakeRenderer.ts`, `fakeXr.ts`, `fakeCanvas2d.ts`, `preparedAssets.ts`, `cameras.ts`), moved two more benchmarks
+(`funnelStaticCullBenchmark`, `frameAllocations`) to `scripts/bench/*.bench.ts`, and rewrote the render tests to
+stop asserting object/mesh identity, child counts, GLSL substrings, internal statistics counters, and
+`traverse()` spies, in favor of GPU-facing data, dispose behaviour, frame-snapshot reads, and visibility. Full
+report with the behaviour map, proof-run log, and a parallel-fork process note:
+[43_clean_render_tests_and_shared_fakes.md](../_done/43_clean_render_tests_and_shared_fakes.md).
+
+Headline results: `tests/hygiene-baseline.txt` is now fully empty (was 80, all in this area). Unit tier serial
+time dropped from 8.23s to 5.38s. No file in `tests/render/` builds its own renderer/XR/canvas/prepared-assets
+fake. 130 files / 1,008 tests passing; `src/` untouched across the whole job (confirmed empty `git diff --stat`).
+
+**Coordinator's own gate-out**: `npm run typecheck`, `npm test`, `npm run docs:check`, `npm run build && npm run
+test:release`, and `npm run test:report` (H1-H10 all `ok`) all passed, matching the job's own numbers. Also ran
+the job's own special gate (`.agents/jobs/00_coordinate_jobs_41_44.md`'s "Gates specific to these jobs"): confirmed
+`tests/render-contract/` no longer exists.
+
+**Pre-review finding and fix (coordinator).** Running that same gate's grep (`render-contract` across `_docs/`,
+`.agents/jobs/` outside `_done`/`_reports`, and `scripts/`) turned up `_docs/design/012-engine-api.md` itself
+still citing 3 stale paths (two `frameAllocations.test.ts` citations, one `visiblePortalPaths.property.test.ts`
+citation) that the job's own sweep missed — only the one `funnelStaticCull` sentence (decision 4) had been fixed.
+This is a live design doc, not one of the five docs the job deliberately left as frozen historical narrative, so
+it failed the gate as written. Fixed directly (commit `0a19214`): repointed the two `frameAllocations` citations
+to `npm run bench -- frameAllocations` (matching the existing `funnelStaticCull` citation style) and the
+`visiblePortalPaths` citation to its new path. Re-ran `npm run docs:check` and the grep; both clean. This repair
+was applied before delegating the fresh-context review, so the review scope excluded it.
+
+**Review finding.** The fresh-context review (`_docs/tests_hygiene.md` §4) checked decision 2's fake-sharing
+claim, decision 5's banned-assertion-pattern removal, decision 7's four duplicate-ownership cleanups, the H4 fix,
+the zero-net-`src/`-change claim, and independently spot-checked 8 of the ~38 files touched by the job's
+parallel-fork commit (`90c190b`) for soundness, not just trusting the sub-agent's own spot-check claim.
+**No must-level finding.** Three should-level notes, none blocking:
+
+1. Four pre-existing "keep" files the job did not touch — `protractorAngleRenderer.test.ts`,
+   `measureLengthRenderer.test.ts`, `buildDecorationMesh.test.ts`, `staticAssetRenderRoot.test.ts` — use
+   `traverse()` to assert object/mesh *names* that no production code reads back (pure implementation-detail
+   labels), which is exactly what decision 5 bans; the job's report never re-justifies them against decision 5
+   since they predate this job and were marked "keep" by the original audit. Contrast with
+   `xrControllerHandModels.test.ts`, where name-prefix classification is the module's actual documented contract,
+   so asserting names there is legitimate.
+2. `buildCellMesh.test.ts` and `scenePaletteLibraryAdapter.test.ts` assert `userData` fields extensively — on its
+   face a decision-5-banned pattern, but confirmed legitimate: both modules' own comments state the `userData`
+   payload is read downstream by real consumers. Not a defect; the report just never calls out the exception.
+3. A dangling cross-reference in the job's report: a note on `prerenderCells.test.ts`'s narrow fake points to
+   "see Uncertain," but the Uncertain section never discusses it (the underlying code is fine — it satisfies a
+   production function's own narrow `Pick<WebGLRenderer, ...>` parameter type, not an ad-hoc renderer fake).
+
+Not repaired (should-level, debt per job 00's process, not a blocker); recorded here instead of editing the job's
+own report. A natural follow-up for a later job: rewrite the 4 name-asserting "keep" files under point 1 to
+assert structural/geometric facts instead, or add an explicit decision-5 exception for "name is the documented
+classification key."
+
+The review also independently confirmed both of the job's own Uncertain items: `aimTarget.test.ts`'s 7
+"prioritizes/missed" cases are genuinely distinct pairwise cases (its module comment says the priority order is
+"non-transitive-by-design"), and the parallel-fork commit-boundary irregularity (one fork's commit absorbed all
+four forks' edits instead of 4 separate commits) did not hide anything — content verified sound.
+
+**Deviations/Uncertain carried from the job** (for the maintainer, below): the 5 historical docs
+(`006-...`, `011-...`, two `llm-handoff/*`, `llm-implementation-workflow.md`) still cite `render-contract` paths,
+left as frozen pre-job planning narrative rather than edited — a judgment call on how far decision 1's grep
+exemption for `_done`/`_reports` should extend; `scenePaletteLibraryAdapter.test.ts` kept 6 cases against the
+audit's suggested 1-2, trading the suggested count for not silently dropping adapter-only coverage.
 
 ## Job 44
 
