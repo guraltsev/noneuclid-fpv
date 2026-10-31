@@ -1,3 +1,14 @@
+/**
+ * Runtime-object portal instancing (src/render/three/renderPortalInstances.ts): writes one instance per
+ * (visible portal path x matching render record), its matrix composed from the path's root-frame transform and
+ * the record's cell-local pose, with `portalPathId`/`portalClipIndex` attributes for the clip shader. A record
+ * with `omitRootVisiblePath` skips its own depth-0 (root) path; a record with `suppressWithinCameraDistanceMeters`
+ * is dropped entirely once its root-frame position is closer than that distance to any given camera position —
+ * this is the player rover avatar's and a too-close ghost's suppression (the single owner of "ghost suppression";
+ * see tests/render/runtimeObjectGhostRecords.test.ts for which cells a ghost appears in at all). Instances beyond
+ * an archetype's capacity are dropped and counted in its diagnostics; buffer uploads are dirty-checked per
+ * instance.
+ */
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import {

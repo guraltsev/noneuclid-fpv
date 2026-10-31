@@ -1,3 +1,12 @@
+/**
+ * World asset preloading (src/render/three/preloadWorldAssets.ts): gathers every texture and glTF path a compiled
+ * world references (floor textures, cell objects, placed flags, geodesic ray models, the player rover, and the
+ * runtime tools' own assets even when unauthored) and loads them in parallel before the scene is built. Loader
+ * choice follows the file extension (.ktx2, .exr, otherwise an image texture, or glTF for anything else). An
+ * optional floor colour texture tolerates a failed load (the lookup then reports it missing); every other asset
+ * is required. The portal wall texture is generated in code, never downloaded. `dispose()` frees every loaded
+ * texture, configured clone and glTF resource exactly once, even if called twice.
+ */
 import * as THREE from "three";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { cube } from "../../src/authoring/exampleWorlds";
@@ -7,7 +16,6 @@ import {
   classifyAssetPreloadKind,
   collectWorldAssetPaths,
   preloadWorldAssets,
-  type PreparedKtx2Loader,
 } from "../../src/render/three/preloadWorldAssets";
 import { PORTAL_WALL_TEXTURE_KEY } from "../../src/render/three/portalWallTexture";
 import { standardUserRobotObject } from "../../src/world-objects/library";
@@ -85,7 +93,7 @@ describe("preloadWorldAssets", () => {
     const world = compileCellComplex(cube);
 
     await preloadWorldAssets(world, {
-      async createKtx2Loader(): Promise<PreparedKtx2Loader> {
+      async createKtx2Loader() {
         return {
           loadAsync: ktx2LoadAsync,
           dispose,
@@ -100,14 +108,14 @@ describe("preloadWorldAssets", () => {
 
   it("registers the generated portal wall texture without downloading it", async () => {
     const assets = await preloadWorldAssets(compileCellComplex(cube), {
-      async createKtx2Loader(): Promise<PreparedKtx2Loader> {
+      async createKtx2Loader() {
         return { loadAsync: async () => new THREE.Texture(), dispose() {} };
       },
     });
 
     expect(assets.getTexture(PORTAL_WALL_TEXTURE_KEY)).toBeInstanceOf(THREE.DataTexture);
     const urls = [...loadTextureAsync.mock.calls, ...loadGltfAsync.mock.calls].map((call) => String(call[0]));
-    expect(urls.some((url) => url.includes("_legacy/abstract") || url.includes("portal-wall"))).toBe(false);
+    expect(urls.some((url) => url.includes("portal-wall"))).toBe(false);
     assets.dispose();
   });
 
@@ -115,7 +123,7 @@ describe("preloadWorldAssets", () => {
     const world = compileCellComplex(createSingleFloorWorld());
 
     const assets = await preloadWorldAssets(world, {
-      async createKtx2Loader(): Promise<PreparedKtx2Loader> {
+      async createKtx2Loader() {
         return {
           loadAsync: async () => {
             throw new Error("simulated ktx2 failure");
@@ -145,7 +153,7 @@ describe("preloadWorldAssets", () => {
       return { scene, animations: [] };
     });
     const assets = await preloadWorldAssets(compileCellComplex(cube), {
-      async createKtx2Loader(): Promise<PreparedKtx2Loader> {
+      async createKtx2Loader() {
         return { loadAsync: async () => trackedTexture(), dispose() {} };
       },
     });

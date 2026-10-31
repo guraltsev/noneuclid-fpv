@@ -1,3 +1,13 @@
+/**
+ * Portal ghost render records (src/render/three/runtimeObjectGhostRecords.ts): for an object whose collision (or
+ * render footprint, if it has no collision but `footprintRadiusMeters` is given) crosses a portal side, emits one
+ * extra render record per cell the object's geometry now also occupies, so the object's clone is drawn there too
+ * (e.g. straddling a doorway, or a flat-torus corner where up to three translated copies are visible at once). No
+ * extra records for an object clear of every side. Also covers `computeRenderSourceFootprintRadius` (the render
+ * footprint used when there is no collision) and the player rover avatar's render records
+ * (src/render/three/playerRoverModel.ts), which always suppress their own root visible path and hide within 2 m
+ * of the camera so the avatar never obstructs the first-person view.
+ */
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import { exampleWorldSpecs } from "../support/arbitraries";
@@ -11,7 +21,9 @@ import type { CellComplexSpec } from "../../src/cell-complex/specs";
 import { yawRigidTransform3 } from "../../src/math/rigidTransform3";
 import { simpleCollisionCylinder } from "../../src/movement/dynamicObject";
 import { collectPortalGhostRuntimeObjectRenderRecords } from "../../src/render/three/runtimeObjectGhostRecords";
+import { createPlayerRoverRenderModel } from "../../src/render/three/playerRoverModel";
 import type { RuntimeCreatureObject } from "../../src/world-objects/runtimeObjectRegistry";
+import { createFakePreparedAssets } from "../support/preparedAssets";
 
 const squareRoomBase = [
   { x: -1, y: -1 },
@@ -109,6 +121,30 @@ describe("runtime object ghost records", () => {
     const object = creature("mouse-a", "torus-room", 0, 0, 0.3);
 
     expect(collectPortalGhostRuntimeObjectRenderRecords({ world, object, archetypeKeys: ["k"] })).toEqual([]);
+  });
+});
+
+describe("player rover render model", () => {
+  it("always omits its own root visible path and suppresses close to the camera", () => {
+    const assets = createFakePreparedAssets({
+      instantiateGltf: () => {
+        const scene = new THREE.Group();
+        scene.add(new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial()));
+        return { scene, animations: [] };
+      },
+    });
+    const model = createPlayerRoverRenderModel(assets);
+    const archetypeKeys = model!.collectSources().map((source) => source.archetypeKey);
+
+    const records = model!.collectRecords(
+      { cellId: "room-a", position: { x: 0.95, y: 0, z: 0 }, yawRadians: 0, pitchRadians: 0 },
+      archetypeKeys,
+    );
+
+    expect(records.map((record) => record.cellId)).toEqual(["room-a"]);
+    expect(records[0]?.omitRootVisiblePath).toBe(true);
+    expect(records[0]?.objectId).toBe("user-robot");
+    expect(records[0]?.suppressWithinCameraDistanceMeters).toBe(2);
   });
 });
 
