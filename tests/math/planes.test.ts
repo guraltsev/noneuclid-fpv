@@ -1,3 +1,12 @@
+/**
+ * `tests/math/planes.test.ts` — unit tier.
+ *
+ * A `Plane` is a normalized normal and offset, built from a point and a normal direction
+ * (`_docs/MATHEMATICAL_MODEL.md` §1, §2: a cell side's clearance uses the same signed-distance idea). These tests
+ * check the signed distance from a point to the plane and the three-way classification (front, back, or within
+ * `geometryTolerance` of the plane) that collision and portal code use to decide which side of a boundary a point
+ * is on.
+ */
 import { describe, expect, it } from "vitest";
 import { classifyPointToPlane, planeFromPointAndNormal, signedDistanceToPlane } from "../../src/math/planes";
 import { vec3 } from "../../src/math/vec3";

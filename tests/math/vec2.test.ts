@@ -1,3 +1,11 @@
+/**
+ * `tests/math/vec2.test.ts` — unit tier.
+ *
+ * `Vec2` is the plain `{x, y}` type used for polygon vertices and base-plane geometry (`_docs/MATHEMATICAL_MODEL.md`
+ * §2). These tests check the planar arithmetic primitives: the 2-D cross product (used to classify turns and
+ * windings), dot product, length, and the component-wise operations. `distanceSquaredVec3` is included here because
+ * it is the squared-distance primitive those same callers use in 3-D.
+ */
 import { describe, expect, it } from "vitest";
 import { addVec2, crossVec2, crossXY, dotVec2, lengthVec2, scaleVec2, subVec2 } from "../../src/math/vec2";
 import { distanceSquaredVec3 } from "../../src/math/vec3";
