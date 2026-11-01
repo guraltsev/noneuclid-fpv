@@ -1,6 +1,6 @@
 # Job 00 - Coordinate jobs 41-44 (test rehaul)
 
-Status: queued.
+Status: done, needs review on 2026-10-31.
 Coordinates: jobs [41](41_test_tiers_and_hygiene_checks.md), [42](42_clean_test_areas.md),
 [43](43_clean_render_tests_and_shared_fakes.md) and [44](44_api_scenario_runner_and_manual_checklist.md), which bring
 the suite up to the test policy and start replacing manual checks with tests through the public API. Job

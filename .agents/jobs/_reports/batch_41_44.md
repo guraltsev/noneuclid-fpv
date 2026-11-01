@@ -34,18 +34,18 @@ rather than switching branches.
 | 41 | done, needs review (two Uncertain items for the maintainer; no open review finding) | `653a8a2`, `d7fec50`, `8b49b4c` (repair) | fresh agent; 1 must-adjacent finding (below), fixed |
 | 42 | done, needs review (three Uncertain items for the maintainer; no open review finding) | `5520f78`..`05666ff` (11 commits, one per area + fixtures follow-up + report) | fresh agent; 0 must findings, 4 should-level reporting-wording notes (below), not fixed |
 | 43 | done, needs review (two Uncertain items for the maintainer; 1 undisclosed must finding, fixed) | `d61865d`..`0a19214` (13 commits + repair) | fresh agent; 0 must findings (after the coordinator's own pre-review repair), 3 should-level notes (below), not fixed |
-| 44 | TBD | | |
+| 44 | done, needs review (`test:release` does not pass 3/3 — a real, disclosed, unresolved flake; see below) | `3bbcd9d`, `efedfed` | fresh agent; 0 must findings, 1 should-level note (below), not fixed |
 
 ## Indicators
 
 | Indicator | Start | After 41 | After 42 | After 43 | After 44 |
 | --- | --- | --- | --- | --- | --- |
-| Test lines / src lines | ~25.5k / ~46.7k | 25,851 / 48,974 | 25,908 / 48,974 | 25,781 / 48,974 | |
-| Test files / tests (unit, process, release) | 160 files / 1,071 tests (undifferentiated) | unit 146f/942t; process 3f/18t; release 0f/0t | unit 131f/928t; process 3f/18t; release 0f/0t | unit 127f/915t; process 3f/18t; release 0f/0t | |
-| Unit tier serial time; slowest file | ~75s summed; portalPaths.test.ts ~62.5s | 73.50s; portalPaths.test.ts 66.36s | 8.23s; moduleImportRules.test.ts 2.11s | 5.38s; moduleImportRules.test.ts 1.43s | |
-| Baseline lines (total; per rule) | n/a (baseline not created yet) | 257 total (H1:0 H2:0 H3:0 H4:3 H5:59 H6:193 H7:0 H8:0 H9:2) | 80 total, all in tests/render-contract/ (H1:0 H2:0 H3:0 H4:1 H5:0 H6:78 H7:0 H8:0 H9:1) | 0 total (H1-H9 all 0) | |
-| Manual checks in tests/manual_smoke.md | 0 (file does not exist) | 0 (file still does not exist; job 44) | 0 (unchanged; job 44) | 0 (unchanged; job 44) | |
-| Scenarios in tests/app | 0 | 0 (tests/app does not exist yet; job 44) | 0 (unchanged; job 44) | 0 (unchanged; job 44) | |
+| Test lines / src lines | ~25.5k / ~46.7k | 25,851 / 48,974 | 25,908 / 48,974 | 25,781 / 48,974 | 26,772 / 48,974 |
+| Test files / tests (unit, process, release) | 160 files / 1,071 tests (undifferentiated) | unit 146f/942t; process 3f/18t; release 0f/0t | unit 131f/928t; process 3f/18t; release 0f/0t | unit 127f/915t; process 3f/18t; release 0f/0t | unit 127f/915t; process 3f/18t; release 5f/7t (static count; 11 tests at runtime, `it.each` undercounted) |
+| Unit tier serial time; slowest file | ~75s summed; portalPaths.test.ts ~62.5s | 73.50s; portalPaths.test.ts 66.36s | 8.23s; moduleImportRules.test.ts 2.11s | 5.38s; moduleImportRules.test.ts 1.43s | 5.50s; moduleImportRules.test.ts 1.37s (unchanged tier; job 44 only added release) |
+| Baseline lines (total; per rule) | n/a (baseline not created yet) | 257 total (H1:0 H2:0 H3:0 H4:3 H5:59 H6:193 H7:0 H8:0 H9:2) | 80 total, all in tests/render-contract/ (H1:0 H2:0 H3:0 H4:1 H5:0 H6:78 H7:0 H8:0 H9:1) | 0 total (H1-H9 all 0) | 0 total (unchanged) |
+| Manual checks in tests/manual_smoke.md | 0 (file does not exist) | 0 (file still does not exist; job 44) | 0 (unchanged; job 44) | 0 (unchanged; job 44) | 12 (M1-M12) |
+| Scenarios in tests/app | 0 | 0 (tests/app does not exist yet; job 44) | 0 (unchanged; job 44) | 0 (unchanged; job 44) | 5 files, 11 tests (appLoading, appCommands, torusDeformation, objectPlacement, creatures) |
 
 ## Job 41
 
@@ -200,7 +200,108 @@ audit's suggested 1-2, trading the suggested count for not silently dropping ada
 
 ## Job 44
 
+Extracted one shared CDP client (`scripts/lib/cdpClient.mjs`), built a release-tier scenario runner
+(`tests/support/scenario/`), wrote five scenarios (`tests/app/{appLoading,appCommands,torusDeformation,
+objectPlacement,creatures}.release.test.ts`), moved `scripts/smoke/browser-smoke.mjs` onto the public API, and
+wrote `tests/manual_smoke.md` (M1-M12), replacing the scattered manual checklists in `_docs/acceptance-checklists.md`
+and issues 56/57/58/59/71/73/75. Full report with the per-check conversion table, proof-run log, and a full
+diagnostic trail for the flake below: [44_api_scenario_runner_and_manual_checklist.md](../_done/44_api_scenario_runner_and_manual_checklist.md).
+
+Zero `src/` changes (confirmed by the coordinator): no function of `window.noneuclid.api` was added or changed,
+respecting this job's explicit scope boundary (job 45 is where that happens, blocked on the maintainer).
+
+**The headline problem: `npm run test:release` does not pass three times in a row.** The coordinator independently
+reproduced this exactly, running the command three more times after the job's own three runs (six runs total,
+all six showing the same pattern): `appLoading`, `torusDeformation`, `objectPlacement` and `creatures` passed
+cleanly every single time; `appCommands.release.test.ts` — the only scenario file that restarts the running app
+more than once inside one page — failed exactly one of its three tests every run, each time with a genuine
+CDP-level timeout (`Runtime.evaluate` got no response at all, not just slowly), on a *different* sub-case each
+time (`changeWorld` in the coordinator's run 1, `changeConfig` in runs 2 and 3; the job's own three runs saw
+`changeWorld` twice then `changeConfig` once). This is a real, 100%-reproducible-but-nondeterministic flake, not
+a one-off.
+
+The job's own report discloses this in full under `### Uncertain`, with a dedicated knowledge note
+(`.agents/knowledge/scenario-runner-browser-limits.md`) recording the diagnostic trail so it does not need
+re-running: several mitigations were tried and kept because they are sound on their own merits, not because any
+of them fixed the flake (a 12s per-CDP-command deadline so a hang rejects instead of blocking forever; a
+reconnecting `SessionBox` wrapper around the CDP WebSocket; abandoned-page cleanup between tests); several more
+were tried and reverted because they made no difference (halving round trips per poll, avoiding `app.changeWorld`
+specifically). A plain Node script driving the identical CDP calls outside Vitest did not reproduce the hang in
+several tries, so something about the Vitest worker environment plays a part, though what exactly is not
+confirmed. It is the same *class* of flake already on record for multi-world `npm run smoke`
+(`.agents/knowledge/test-and-smoke-timing.md`): a rerun of that script during this same investigation flipped
+from a real failure to `SMOKE OK` with no code change in between.
+
+No retry was added inside any test to hide this (forbidden by the job's own "Do not" list), and the job's own
+Checks table honestly records all three of its own runs as failing this gate. Per this coordinator job's own
+"Gates specific to these jobs" for job 44 ("a failure that does not repeat is a flake: list it in the batch
+report"), this is recorded here rather than blocking the batch: the behaviour under test is correctly specified
+and does work when the transport does not hang (fixing the test by weakening an assertion, adding a hidden
+retry, or extending the timeout past a true no-response hang would not address a transport-level problem and
+would just mask it). It is flagged below for the maintainer as warranting its own follow-up investigation,
+separate from this batch.
+
+**Review finding.** The fresh-context review (`_docs/tests_hygiene.md` §4) independently reproduced the flake
+once (same symptom, same file) and treated it as pre-disclosed per the coordinator's framing, then focused on
+the rest of the job: all 5 scenarios' proof claims (each assertion read closely and confirmed falsifiable, none
+tautological), scenario rule compliance (no DOM/old-globals access, no fixed sleeps, frame-bounded polling), the
+runner (fails rather than skips with no browser, per H9), decision 6's smoke-on-the-API migration, decision 1's
+CDP-client extraction (`tests/project/smokeArgs.test.ts` re-run, 7/7 pass), all 12 `tests/manual_smoke.md` entries
+and all 7 issue-pointer additions (spot-checked against `git show`, exact match), and the `torusDeformation`/
+`objectPlacement` scope restrictions (confirmed nothing stronger is asserted than disclosed). **No must-level
+finding.** One should-level note, not blocking: all 5 scenario module comments cite "audit's check #N," which
+sits close to `_docs/tests.md` §4.2's ban on history in a test comment, though H5's actual regex does not flag
+the word "audit" and decision 4 itself asked for the citation — worth a maintainer call on whether the
+convention should continue, not a hygiene violation as implemented. (Trivial cosmetic nit also noted: a stray
+extra blank line in the diff to `_issues/73_...md`.)
+
+**Deviations/Uncertain carried from the job** (for the maintainer, below): `appCommands`'s `changeWorld` case
+does not re-check the `debug` namespace (deliberate de-duplication, not an oversight, predates the flake
+investigation); `torusDeformation` asserts only `.target`, not `.current` convergence, because `.current` never
+moved from its initial value after `setTorusSkew` in this environment even in a standalone script outside
+Vitest — possibly a real gap in the live-deformation pipeline that queued job 30 (issues 55/82) is meant to
+address; decision 4.5's bundle-loading check (audit #66) was investigated but not written as a test because
+`inter-BNVRAYFH.js` loads eagerly on every page regardless of palette interaction, so "no uikit/Inter file before
+the palette opens" is not a true, stable rule for this build — recorded for job 34 instead; decision 5's
+`tests/render/fakeRendererContract.release.test.ts` was not added because the API exposes no renderer query (the
+`TODO(job44)` in `tests/support/fakeRenderer.ts` stays, for job 45).
+
 ## Questions for the maintainer
+
+1. **The `appCommands.release.test.ts` flake (job 44) needs its own follow-up, separate from this batch.** A real,
+   CDP-level `Runtime.evaluate` hang (no response at all) hit exactly one of its three restart tests on every one
+   of six runs across the job and the coordinator's own independent verification, with a different sub-case
+   failing each time. Full diagnostic trail in `.agents/knowledge/scenario-runner-browser-limits.md`. Several
+   mitigations were tried and ruled out; the root cause (something about the Vitest worker environment, since a
+   standalone Node script reproducing the identical calls did not hang) is not identified. It is the same class
+   of flake already on record for multi-world `npm run smoke`. Recommend a dedicated follow-up job/issue to
+   investigate the CDP/Vitest-worker interaction, rather than extending timeouts or retrying blindly.
+2. **`geometry.state().current` never converges toward a requested `torus-moduli` skew target** (job 44),
+   confirmed even in a standalone script outside Vitest/CDP: `buildInFlight` flips to `false` almost immediately
+   but `current.skewXMeters` never moves, and `lastBuildMs` reports as a large negative number. This may be a
+   real gap in the live-deformation/world-geometry-worker pipeline that queued job 30 ("Incremental deformation
+   rebuild pipeline", issues 55/82) is meant to address. Worth a look before or alongside that job.
+3. **Five historical docs still cite the pre-rename `tests/render-contract/` path** (job 43): `_docs/design/
+   006-non-euclidean-renderer-general-01.md`, `011-vr-hand-tools-palette.md`, two `_docs/llm-handoff/*` files, and
+   `_docs/llm-implementation-workflow.md`. Job 43 left them as frozen pre-job planning narrative (the same spirit
+   as the `_done`/`_reports` grep exemption, several already citing test files that do not exist under any name),
+   but decision 1's literal wording does not name this exemption. A maintainer call on whether to edit them, mark
+   them explicitly historical, or leave them is needed; they do not affect any passing check.
+4. **Scenario module comments cite "audit's check #N"** (job 44), referencing a review artifact
+   (`.agents/jobs/_reports/test_audit_2026_10_31.md`). This is close to `_docs/tests.md` §4.2's ban on a test
+   comment carrying "the issue, decision, task or review that added the test," though H5's literal regex does not
+   flag the word "audit," and decision 4 itself asked for the citation. Worth a decision on whether this
+   convention should continue past this batch.
+5. **The original job's stated baseline ("160 files, 1,071 tests") was never reproduced** (job 41): the repo at
+   batch start had 148 files, 1,071 tests — the test count matches, the file count does not. Not acted on; left
+   as a discrepancy for the record.
+6. **H4 flags `PreparedKtx2Loader`'s "injectable for tests" JSDoc** (job 41) even though it looks like legitimate
+   injection-seam design, because the check is a literal text match. Not changed; a design question for whoever
+   owns the hygiene checks, not a defect in this batch's work.
+7. **Bundle loading before the palette opens is not a stable rule** (job 44, audit #66): a fresh `cube` page
+   requests `assets/inter-BNVRAYFH.js` (~420 KB) and `assets/ktx2/basis_transcoder.js` immediately, with no
+   palette interaction, so "no uikit or Inter file loads before the palette opens" does not hold for this build.
+   Recorded here for job 34 (queued) rather than converted into a test.
 
 ## State of job 45
 
