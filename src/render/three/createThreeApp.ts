@@ -113,7 +113,6 @@ import {
   GeometryDebugHelpers,
   WindowWithGeometryDebugHelpers,
   installGeneralDebugHelpers,
-  mergeStaticPathCounts,
   uninstallGeneralDebugHelpers,
   uninstallGeometryDebugHelpers,
   visibleSummaryToRenderState,
@@ -122,10 +121,7 @@ import { logDebugStartupGuide } from "./appDebugLogging";
 import { installRenderInspectionApi, uninstallRenderInspectionApi } from "./renderInspection";
 import { XrHeadWorldPose } from "./carriedGeodesicCannon";
 import {
-  CellRenderArchetype,
-  buildCellRenderArchetypes,
   deriveCellRenderArchetypeCapacities,
-  disposeCellRenderArchetypes,
 } from "./cellRenderArchetypes";
 import { createDebugOverlay } from "./debugOverlay";
 import { createDebugVisualization } from "./debugVisualization";
@@ -139,9 +135,10 @@ import {
   captureWebGlRenderInfo,
   smoothFramePerformance,
 } from "./frameDiagnostics";
-import { type FrameRenderSnapshot, createEmptyFrameRenderSnapshot, createFrameRenderSnapshot } from "./frameRenderSnapshot";
+import { type FrameRenderSnapshot } from "./frameRenderSnapshot";
 import { createGeodesicRuntimeRenderSources } from "./geodesicCannonRenderer";
 import { createGeodesicCannonTools } from "./geodesicCannonTools";
+import { createPortalFramePass } from "./portalFramePass";
 import { createGeodesicDebugDumps } from "./geodesicDebugDumps";
 import { createGeodesicEmitterLabelController } from "./geodesicEmitterLabelController";
 import { createGeometryComputerMenu } from "./geometryComputerMenu";
@@ -154,43 +151,20 @@ import { createPortalClipData } from "./portalClipData";
 import {
   createPortalClipDistanceToggle,
   createPortalClipMaterialState,
-  updatePortalClipMaterialTextureEye,
 } from "./portalClipMaterial";
 import { createPortalClipPolygonOverlay } from "./portalClipPolygonOverlay";
 import { PortalDebugRuntimeDeps, createPortalDebugRuntime } from "./portalDebugRuntime";
-import {
-  PortalEyeRenderState,
-  countStereoPortalPaths,
-  transformVisiblePortalResultToRenderFrame,
-} from "./portalEyeFrameTransforms";
-import { buildStereoPortalFrame } from "./stereoPortalFrame";
-import {
-  PortalInstanceDebugRenderer,
-  createPortalInstanceDebugRenderer,
-} from "./portalInstanceDebug";
 import { PreparedWorldAssets } from "./preparedWorldAssets";
 import { prerenderCells } from "./prerenderCells";
 import { ProtractorAngleRuntime } from "./protractorAngleRenderer";
 import { renderCameraFarMeters, renderCameraNearMeters } from "./renderCameraClip";
 import {
-  PortalInstanceRenderDebugState,
-  buildVisiblePathsByDestinationCell,
-  createPortalInstanceDiagnostics,
-  createPortalInstanceRenderDebugState,
-  groupVisiblePortalPathsByDestinationCell,
-  omitPathsWithoutClipSlot,
-  updateCellRenderArchetypeInstances,
-} from "./renderPortalInstances";
-import {
-  getPortalViewportPixels,
   getWindowCssCanvasSize,
   renderAntialiasRequested,
   resolveRenderQualityPixelRatio,
 } from "./renderQuality";
 import {
   FramePerformanceRenderState,
-  PortalEyeRenderDebugState,
-  StereoPortalPathRenderState,
   WebGlRenderInfoState,
 } from "./renderState";
 import { RuntimeInputFrame } from "../../interaction/inputFrame";
@@ -225,7 +199,6 @@ import { createScenePaletteController } from "./scenePaletteController";
 import { createToolObjectRuntimes } from "./toolObjectRuntimes";
 import { createUnderCellInfinityFloor } from "./underCellFloor";
 import { VisiblePortalPathOptions, defaultMinPortalScreenAreaPixels } from "../../visibility/visiblePortalPaths";
-import { ComputeVisiblePortalPathsResult, VisiblePortalPath, computeVisiblePortalPaths } from "./visiblePortalPaths";
 import {
   VrComfortOptions,
   createVrComfortVignette,
@@ -243,14 +216,6 @@ import {
   headLocalMetersFromViewerPose,
   headYawRadiansFromViewerPose,
 } from "./xrPlayerRig";
-import {
-  XrPortalEyeRenderRoot,
-  XrPortalEyeRenderRootTarget,
-  createXrPortalEyeRenderRootTarget,
-  resolveXrPortalEyeRenderRoot,
-} from "./xrPortalEye";
-import { createMonoPortalRenderRoots } from "./portalFrameRender";
-import { createPortalEyeActivator } from "./portalEyeActivation";
 import { createXrScenePaletteInput } from "./xrScenePaletteInput";
 
 /**
@@ -458,11 +423,13 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     readRenderDebugFields: () => ({
       framePerformance: smoothedFramePerformance,
       webGlRenderInfo: latestWebGlRenderInfo,
-      visiblePortalPathCount: latestVisibleResult?.paths.length,
-      visiblePortalPaths: latestVisibleResult ? visibleSummaryToRenderState(latestVisibleResult.summary) : undefined,
-      portalInstances: portalInstanceRenderState,
-      portalEyes: createPortalEyeDebugStates(),
-      stereoPortalPaths: stereoPortalPathState,
+      visiblePortalPathCount: portalFrame.latestVisibleResult()?.paths.length,
+      visiblePortalPaths: portalFrame.latestVisibleResult()
+        ? visibleSummaryToRenderState(portalFrame.latestVisibleResult()!.summary)
+        : undefined,
+      portalInstances: portalFrame.instanceRenderState(),
+      portalEyes: portalFrame.eyeDebugStates(),
+      stereoPortalPaths: portalFrame.stereoPathState(),
     }),
   });
   const clipPolygonOverlay = createPortalClipPolygonOverlay(container);
@@ -677,7 +644,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   const geodesicRuntimeArchetypeKeys = geodesicRuntimeRenderSources.map((source) => source.archetypeKey);
   const runtimeObjectRenderDiagnostics = createRuntimeObjectRenderArchetypeDiagnostics();
   const playerRoverRenderModel = createPlayerRoverRenderModel(options.assets);
-  const portalInstanceDiagnostics = createPortalInstanceDiagnostics();
   const portalClipData = createPortalClipData({ maxVisiblePaths });
   // Hardware clip distances (WEBGL_clip_cull_distance) when available, otherwise a fragment compare and discard.
   const portalClipDistanceToggle = createPortalClipDistanceToggle(renderer);
@@ -687,7 +653,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   console.info(
     portalClipDistanceToggle ? "Portal clip mode: hardware clip distances" : "Portal clip mode: fragment discard",
   );
-  let portalClipOverflowWarned = false;
   // Clip distances may only be enabled while patched programs draw: onBeforeRender / onAfterRender of patched meshes.
   const enablePortalClipDistances = (): void => portalClipDistanceToggle?.enable();
   const disablePortalClipDistances = (): void => portalClipDistanceToggle?.disable();
@@ -710,16 +675,12 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     session,
     buildArchetype: (source, capacity) => {
       const archetype = buildRuntimeObjectRenderArchetype(source, capacity, portalClipMaterialState);
-      archetype.mesh.onBeforeRender = (renderer, _scene, renderCamera) => {
-        portalEyeActivator.beforeMesh(renderer, renderCamera);
-        enablePortalClipDistances();
-      };
-      archetype.mesh.onAfterRender = disablePortalClipDistances;
+      archetype.mesh.onBeforeRender = (renderer, _scene, renderCamera) => portalFrame.beforeMeshRender(renderer, renderCamera);
+      archetype.mesh.onAfterRender = portalFrame.afterMeshRender;
       return archetype;
     },
   });
   // Portal-render values of the current frame, built once by the portal pass (see frameRenderSnapshot.ts).
-  let latestFrameSnapshot: FrameRenderSnapshot | undefined;
   // Event-driven requests; the frame performs the sync and clears the flags. Tools call these through their
   // `syncRuntimeObjectPortalInstances` / `syncSelectableHitboxDebug` deps.
   let runtimeObjectInstanceSyncRequested = false;
@@ -733,56 +694,25 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     selectableHitboxDebugSyncRequested = true;
   }
   function currentFrameSnapshot(): FrameRenderSnapshot {
-    return latestFrameSnapshot ?? createEmptyFrameRenderSnapshot(aimFrameSerial, session.get().playerPose.cellId);
+    return portalFrame.frameSnapshot(aimFrameSerial);
   }
-  // Portal visibility results for the current frame. Written by syncPortalInstances
-  // (and cleared on geometry commit); read by debug and tooltip code.
-  let latestVisibleResult: ComputeVisiblePortalPathsResult | undefined;
-  // Per-eye results in stereo XR (empty on desktop); activePortalEyeIndex is set while rendering each eye in
-  // onBeforeRender via portalEyeActivator.
-  let portalEyeRenderStates: readonly PortalEyeRenderState[] = [];
-  let activePortalEyeIndex = 0;
-  // Split-root stereo (eyes with different root cell or frame) clips each eye's root to its own eye; otherwise the
-  // root is drawn unclipped. Set by every portal pass; the root-group map is only present in split-root stereo.
-  let portalRootsUnclipped = true;
-  let portalRootGroupByPathId: ReadonlyMap<number, number> | undefined;
-  let stereoPortalPathState: StereoPortalPathRenderState | undefined;
-  const portalEyeActivator = createPortalEyeActivator({
-    getEyeCount: () => portalEyeRenderStates.length,
-    applyEye: (eyeIndex) => {
-      activePortalEyeIndex = eyeIndex;
-      updatePortalClipMaterialTextureEye(portalClipMaterialState, eyeIndex);
-    },
+  const portalFrame = createPortalFramePass({
+    scene,
+    camera,
+    renderer,
+    session,
+    visiblePortalPathOptions,
+    getWorld: activeWorld,
+    getStaticCull: activeStaticCull,
+    portalClipData,
+    portalClipMaterialState,
+    enablePortalClipDistances,
+    disablePortalClipDistances,
   });
-  // One persistent camera and matrix per XR eye for re-rooted eyes (see resolveXrPortalEyeRenderRoot).
-  const portalEyeRootTargets: XrPortalEyeRenderRootTarget[] = [];
-  // The one-element render-root list of the mono portal pass, rewritten in place each frame.
-  const monoPortalRoots = createMonoPortalRenderRoots(camera);
-  // Scratch positions per eye for the frame snapshot; alias scratch, valid until the next portal pass.
-  const runtimeObjectCameraPositionScratch: THREE.Vector3[] = [];
-  const frameCameraPositions: THREE.Vector3[] = [];
-  scene.onBeforeRender = () => portalEyeActivator.beginRender();
   // Inputs of the last per-frame refreshMeasuredGeodesicLengths run (version -1: never run).
   const measuredLengthsRefreshed = { version: -1, cellId: "", x: Number.NaN, y: Number.NaN, z: Number.NaN };
   // The palette definition is rebuilt only when the menu state, input mode or reload-confirmation flag changes.
   const paletteDefinitionCache = createPaletteDefinitionCache(appConfig);
-  let portalInstanceRenderState: PortalInstanceRenderDebugState = {
-    enabled: true,
-    ShowCellPathRendersInstances: session.get().showCellPathRendersInstances,
-    archetypeCount: 0,
-    totalCapacity: 0,
-    renderedInstanceCount: 0,
-    renderedInstanceCountByCell: [],
-    capacityOverflowCount: 0,
-    capacityOverflowArchetypes: [],
-    normalVisiblePathRenderingActive: false,
-    visiblePathIds: [],
-    visiblePathDestinations: [],
-    visiblePathOverflowCount: 0,
-    portalClipMode: portalClipMaterialState.hardwareClipDistances ? "hardware" : "fragment",
-  };
-  let cellRenderArchetypes: readonly CellRenderArchetype[] = [];
-  let portalInstanceDebugRenderer: PortalInstanceDebugRenderer | undefined;
   // Id of the cell whose group in cellMeshes is currently visible; updated by updateVisibleCell.
   let visibleCellId: string | undefined = session.get().playerPose.cellId;
 
@@ -1029,7 +959,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   // Initial build: cell groups and archetypes, camera pose, first visibility pass (before any frame runs).
   rebuildCellMeshes();
   applyDesktopCameraPose();
-  syncPlayerCellPortalInstances();
+  portalFrame.syncPlayerCell(aimFrameSerial);
   // Dependencies for the portal debug runtime; `live` reads current shell state on demand. The runtime is
   // recreated (not mutated) when the world or debug settings change.
   const portalDebugRuntimeDeps: PortalDebugRuntimeDeps = {
@@ -1044,14 +974,14 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     geometrySession,
     activeWorld,
     activeStaticCull,
-    createPortalEyeDebugStates,
+    createPortalEyeDebugStates: portalFrame.eyeDebugStates,
     live: () => ({
       debugLevel: session.get().debugSettings.debugLevel,
       debugOptions: session.get().debugSettings.debugOptions,
       playerPose: session.get().playerPose,
-      latestVisibleResult,
-      portalInstanceDebugRenderer,
-      portalInstanceRenderState,
+      latestVisibleResult: portalFrame.latestVisibleResult(),
+      portalInstanceDebugRenderer: portalFrame.instanceDebugRenderer(),
+      portalInstanceRenderState: portalFrame.instanceRenderState(),
       showCellPathRendersInstances: session.get().showCellPathRendersInstances,
       menuState: currentMenuState(),
       smoothedFrameRateFps,
@@ -1466,16 +1396,10 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
 
     // Phase 3/4: compute visible portal paths (stereo: one result per eye, unioned) and write the instance
     // transforms and clip data consumed by onBeforeRender during renderer.render.
-    if (xrActive && portalCullingCameras.length > 1) {
-      syncPortalInstances(portalCullingCameras.map(resolvePortalEyeRenderRoot));
+    if (xrActive) {
+      portalFrame.syncXr(portalCullingCameras, aimFrameSerial);
     } else {
-      const cullingCamera = portalCullingCameras[0] ?? camera;
-      if (xrActive) {
-        const eyeRoot = resolvePortalEyeRenderRoot(cullingCamera, 0);
-        syncPortalInstances(monoPortalRoots.set(eyeRoot.rootCellId, eyeRoot.camera, eyeRoot.renderFromRootMatrix));
-      } else {
-        syncPortalInstances(monoPortalRoots.set(session.get().playerPose.cellId, cullingCamera));
-      }
+      portalFrame.syncDesktop(portalCullingCameras[0] ?? camera, aimFrameSerial);
     }
     // Phase 4 (objects): the only runtime-object instance write of the frame, from the snapshot the portal pass built.
     runtimeObjectInstanceSync.sync(currentFrameSnapshot());
@@ -1574,10 +1498,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     transformRuntimeObjectsForGeometryCommit(mapByCellId, snapshot);
     activeWorldBundle = createActiveWorldBundle(snapshot);
     // Visibility results refer to old path ids; drop them until the next sync.
-    latestVisibleResult = undefined;
-    portalEyeRenderStates = [];
-    resetStereoPortalState();
-    activePortalEyeIndex = 0;
+    portalFrame.reset();
     clearGeometryToolStateAfterCommit();
     rebuildCellMeshes();
     for (const runtime of dynamicObjectRuntimes) {
@@ -1588,7 +1509,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     }
     // Cell instances of the new world are written now; the objects and the hitbox debug are synced later in this
     // same frame (the commit runs at frame start), so this does not write them.
-    syncPlayerCellPortalInstances();
+    portalFrame.syncPlayerCell(aimFrameSerial);
     syncDynamicObjectDebugWireframes();
     syncStaticObjectCollisionWireframes();
     applyDesktopCameraPose();
@@ -1803,7 +1724,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       hasActiveDebugOption(settings.debugLevel, settings.debugOptions, "runtime-diagnostics"),
     );
     rebuildCellMeshes();
-    syncPlayerCellPortalInstances();
+    portalFrame.syncPlayerCell(aimFrameSerial);
     portalDebugRuntime.dispose();
     portalDebugRuntime = createPortalDebugRuntime(portalDebugRuntimeDeps);
     logDebugStartupGuide(session.get().debugSettings.debugLevel, session.get().debugSettings.debugOptions);
@@ -1949,12 +1870,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       }
       scene.remove(underCellInfinityFloor);
       disposeObject3D(underCellInfinityFloor);
-      for (const archetype of cellRenderArchetypes) {
-        scene.remove(archetype.mesh);
-        scene.remove(archetype.rootMesh);
-      }
-      disposeCellRenderArchetypes(cellRenderArchetypes);
-      portalInstanceDebugRenderer?.dispose();
+      portalFrame.dispose();
       portalClipData.dispose();
       for (const archetype of runtimeObjectRenderArchetypesByKey.values()) {
         runtimeObjectRenderRoot.remove(archetype.mesh);
@@ -2161,19 +2077,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     }
   }
 
-  function createPortalEyeDebugStates(): readonly PortalEyeRenderDebugState[] | undefined {
-    if (portalEyeRenderStates.length === 0) {
-      return undefined;
-    }
-
-    return portalEyeRenderStates.map((state) => ({
-      eyeIndex: state.eyeIndex,
-      rootCellId: state.rootCellId,
-      visiblePathCount: state.result.paths.length,
-      maxVisibleDepth: state.result.summary.maxVisibleDepth,
-    }));
-  }
-
   // Tears down and recreates the per-cell groups and instanced render archetypes for the active world,
   // preserving which cell is visible. Called at startup, on geometry commit and on debug-setting changes.
   function rebuildCellMeshes(): void {
@@ -2181,14 +2084,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     cellRootsGeneration += 1;
     const currentlyVisibleCellId = visibleCellId ?? session.get().playerPose.cellId;
 
-    portalInstanceDebugRenderer?.dispose();
-    portalInstanceDebugRenderer = undefined;
-    for (const archetype of cellRenderArchetypes) {
-      scene.remove(archetype.mesh);
-      scene.remove(archetype.rootMesh);
-    }
-    disposeCellRenderArchetypes(cellRenderArchetypes);
-    cellRenderArchetypes = [];
+    portalFrame.disposeArchetypes();
     for (const runtime of dynamicObjectRuntimes) {
       runtime.root.removeFromParent();
     }
@@ -2225,248 +2121,20 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       .get(deformation.kind)
       ?.floorUvFrames?.(options.worldSpec, deformation as never);
 
-    cellRenderArchetypes = buildCellRenderArchetypes(activeWorld(), {
+    portalFrame.buildArchetypes(activeWorld(), {
       floorUvFramesByCellId,
       debugLevel: session.get().debugSettings.debugLevel,
       portalPanelMode: session.get().debugSettings.portalPanelMode,
       eyeHeightMeters: DEFAULT_PLAYER_EYE_HEIGHT_METERS,
       assets: options.assets,
       capacitiesByCellId: activeWorldBundle.archetypeCapacitiesByCellId,
-      portalClipMaterialState,
       showForbiddenZoneWireframes: false,
     });
-    for (const archetype of cellRenderArchetypes) {
-      archetype.mesh.onBeforeRender = (renderer, _scene, renderCamera) => {
-        portalEyeActivator.beforeMesh(renderer, renderCamera);
-        enablePortalClipDistances();
-      };
-      archetype.mesh.onAfterRender = disablePortalClipDistances;
-      scene.add(archetype.mesh);
-      scene.add(archetype.rootMesh);
-    }
-    portalInstanceDebugRenderer = createPortalInstanceDebugRenderer(scene, cellRenderArchetypes);
     for (const runtime of placedFlagRuntimes.values()) {
       runtime.syncParent(cellMeshes);
     }
     syncStaticObjectCollisionWireframes();
     visibleCellId = currentlyVisibleCellId;
-  }
-
-  function resolvePortalEyeRenderRoot(cullingCamera: THREE.Camera, eyeIndex: number): XrPortalEyeRenderRoot {
-    return resolveXrPortalEyeRenderRoot({
-      world: activeWorld(),
-      sourceCellId: session.get().playerPose.cellId,
-      anchorPoint: session.get().playerPose.position,
-      camera: cullingCamera,
-      target: (portalEyeRootTargets[eyeIndex] ??= createXrPortalEyeRenderRootTarget()),
-    });
-  }
-
-  // Mono visibility pass from the player's cell with the main camera.
-  function syncPlayerCellPortalInstances(): void {
-    syncPortalInstances(monoPortalRoots.set(session.get().playerPose.cellId, camera));
-  }
-
-  // The one visibility pass. `renderRoots` holds one root per eye: a single root is the mono pass, several are the
-  // stereo (XR) pass. If any root cell has no static cull table, visibility is cleared and nothing is instanced.
-  function syncPortalInstances(renderRoots: readonly XrPortalEyeRenderRoot[]): void {
-    portalInstanceDiagnostics.reset();
-    portalEyeRenderStates = [];
-    resetStereoPortalState();
-    activePortalEyeIndex = 0;
-    updatePortalClipMaterialTextureEye(portalClipMaterialState, activePortalEyeIndex);
-    const hasTables = renderRoots.every((renderRoot) =>
-      activeStaticCull().tables.tablesByRootCellId.has(renderRoot.rootCellId)
-    );
-
-    if (!hasTables) {
-      clearPortalInstances(renderRoots[0]?.rootCellId ?? session.get().playerPose.cellId);
-    } else if (renderRoots.length === 1) {
-      syncMonoPortalFrame(renderRoots[0]);
-    } else {
-      syncStereoPortalFrame(renderRoots);
-    }
-  }
-
-  // Empty visibility result: no visible paths, no clip data, no instances.
-  function clearPortalInstances(rootCellId: string): void {
-    latestVisibleResult = undefined;
-    latestFrameSnapshot = createEmptyFrameRenderSnapshot(aimFrameSerial, rootCellId);
-    portalClipData.update([]);
-    updateCellRenderArchetypeInstances(cellRenderArchetypes, new Map(), portalInstanceDiagnostics);
-    portalInstanceRenderState = createPortalInstanceRenderDebugState(
-      cellRenderArchetypes,
-      new Map(),
-      portalInstanceDiagnostics,
-      {
-        enabled: false,
-        showCellPathRendersInstances: session.get().showCellPathRendersInstances,
-        normalVisiblePathRenderingActive: false,
-      },
-    );
-  }
-
-  // Mono pass body: computes visible portal paths from `renderRoot` (its cell has a static cull table).
-  function syncMonoPortalFrame(renderRoot: XrPortalEyeRenderRoot): void {
-    const table = activeStaticCull().tables.tablesByRootCellId.get(renderRoot.rootCellId)!;
-    const computed = computeVisiblePortalPaths({
-      world: activeWorld(),
-      rootCellId: renderRoot.rootCellId,
-      pathTable: table,
-      camera: renderRoot.camera,
-      viewportPixels: getPortalViewportPixels(renderer),
-      options: visiblePortalPathOptions,
-    });
-    const renderedComputed = transformVisiblePortalResultToRenderFrame(computed, renderRoot.renderFromRootMatrix);
-    const summary = mergeStaticPathCounts(renderedComputed.summary, activeStaticCull(), renderRoot.rootCellId);
-    latestVisibleResult = {
-      ...renderedComputed,
-      summary,
-    };
-    portalClipData.update(latestVisibleResult.paths);
-    const visiblePathsByDestinationCell = omitPathsWithoutClipSlot(
-      buildVisiblePathsByDestinationCell(table.pathsByDestinationCellId, latestVisibleResult.visiblePathById),
-      portalClipData.clipIndexByPathId,
-    );
-    updatePortalVisiblePathInstances(visiblePathsByDestinationCell, true);
-    latestFrameSnapshot = createFrameRenderSnapshot({
-      serial: aimFrameSerial,
-      rootCellId: renderRoot.rootCellId,
-      visiblePathsByDestinationCell,
-      clipIndexByPathId: portalClipData.clipIndexByPathId,
-      cameraPositions: monoCameraPositions(renderRoot),
-    });
-    portalInstanceRenderState = createPortalInstanceRenderStateFromVisibleResult(
-      latestFrameSnapshot.visiblePathsByDestinationCell,
-      latestVisibleResult,
-      true,
-    );
-  }
-
-  // Stereo pass body: each eye has its own root and result; the union of paths is instanced once and per-eye
-  // clip data selects the eye in onBeforeRender. latestVisibleResult holds eye 0 only.
-  function syncStereoPortalFrame(renderRoots: readonly XrPortalEyeRenderRoot[]): void {
-    const frame = buildStereoPortalFrame({
-      world: activeWorld(),
-      staticCull: activeStaticCull(),
-      renderRoots,
-      viewportPixels: getPortalViewportPixels(renderer),
-      options: visiblePortalPathOptions,
-    })!;
-    portalEyeRenderStates = frame.eyeStates;
-    portalRootsUnclipped = !frame.splitRoots;
-    portalRootGroupByPathId = frame.splitRoots ? frame.rootGroupByPathId : undefined;
-
-    latestVisibleResult = portalEyeRenderStates[0]?.result;
-    activePortalEyeIndex = 0;
-    updatePortalClipMaterialTextureEye(portalClipMaterialState, activePortalEyeIndex);
-    if (latestVisibleResult) {
-      frameCameraPositions.length = renderRoots.length;
-      renderRoots.forEach((renderRoot, eyeIndex) => {
-        frameCameraPositions[eyeIndex] = runtimeObjectCameraPosition(
-          renderRoot.camera,
-          renderRoot.renderFromRootMatrix,
-          eyeIndex,
-        );
-      });
-      const cameraPositions = frameCameraPositions;
-      portalClipData.updateStereo(portalEyeRenderStates.map((state) => state.result.paths));
-      stereoPortalPathState = countStereoPortalPaths(
-        portalEyeRenderStates,
-        portalClipData.acceptedPathIds,
-        frame.splitRoots,
-      );
-      // Only paths that won a clip slot are instanced, in rank order (per-cell capacity cuts follow the rank).
-      const visiblePathsByDestinationCell = omitPathsWithoutClipSlot(
-        groupVisiblePortalPathsByDestinationCell(portalClipData.rankedAcceptedPaths),
-        portalClipData.clipIndexByPathId,
-      );
-      updatePortalVisiblePathInstances(visiblePathsByDestinationCell, portalRootsUnclipped);
-      latestFrameSnapshot = createFrameRenderSnapshot({
-        serial: aimFrameSerial,
-        rootCellId: portalEyeRenderStates[0]?.rootCellId ?? session.get().playerPose.cellId,
-        visiblePathsByDestinationCell,
-        clipIndexByPathId: portalClipData.clipIndexByPathId,
-        cameraPositions,
-        unclippedRoot: portalRootsUnclipped,
-        rootGroupByPathId: portalRootGroupByPathId,
-      });
-      portalInstanceRenderState = createPortalInstanceRenderStateFromVisibleResult(
-        latestFrameSnapshot.visiblePathsByDestinationCell,
-        latestVisibleResult,
-        true,
-      );
-    } else {
-      clearPortalInstances(renderRoots[0]?.rootCellId ?? session.get().playerPose.cellId);
-    }
-  }
-
-  function resetStereoPortalState(): void {
-    portalRootsUnclipped = true;
-    portalRootGroupByPathId = undefined;
-    stereoPortalPathState = undefined;
-  }
-
-  // `separateRoot`: draw the depth-0 path with each archetype's unpatched root mesh and no clip test (valid when all
-  // eyes share one root identity); false clips each depth-0 instance to the eye that owns it (split roots).
-  function updatePortalVisiblePathInstances(
-    visiblePathsByDestinationCell: ReadonlyMap<string, readonly VisiblePortalPath[]>,
-    separateRoot: boolean,
-  ): void {
-    if (portalClipData.visiblePathOverflowCount > 0 && !portalClipOverflowWarned) {
-      portalClipOverflowWarned = true;
-      console.warn(
-        `Portal clip slots exhausted: ${portalClipData.visiblePathOverflowCount} visible paths are not drawn.`,
-      );
-    }
-
-    updateCellRenderArchetypeInstances(
-      cellRenderArchetypes,
-      visiblePathsByDestinationCell,
-      portalInstanceDiagnostics,
-      portalClipData.clipIndexByPathId,
-      { separateRoot, unclippedRoot: separateRoot },
-    );
-  }
-
-  function createPortalInstanceRenderStateFromVisibleResult(
-    visiblePathsByDestinationCell: ReadonlyMap<string, readonly VisiblePortalPath[]>,
-    result: ComputeVisiblePortalPathsResult,
-    normalVisiblePathRenderingActive: boolean,
-  ): PortalInstanceRenderDebugState {
-    return createPortalInstanceRenderDebugState(
-      cellRenderArchetypes,
-      visiblePathsByDestinationCell,
-      portalInstanceDiagnostics,
-      {
-        enabled: true,
-        showCellPathRendersInstances: session.get().showCellPathRendersInstances,
-        normalVisiblePathRenderingActive,
-        visiblePaths: result.paths,
-        visiblePathOverflowCount: portalClipData.visiblePathOverflowCount,
-        portalClipMode: portalClipMaterialState.hardwareClipDistances ? "hardware" : "fragment",
-      },
-    );
-  }
-
-  /**
-   * Viewer position in the render frame for eye `eyeIndex`. Aliases per-eye scratch: valid until the next portal pass.
-   */
-  function runtimeObjectCameraPosition(
-    renderCamera: THREE.Camera = camera,
-    renderFromRootMatrix?: THREE.Matrix4,
-    eyeIndex = 0,
-  ): THREE.Vector3 {
-    renderCamera.updateMatrixWorld(true);
-    const position = (runtimeObjectCameraPositionScratch[eyeIndex] ??= new THREE.Vector3());
-    position.setFromMatrixPosition(renderCamera.matrixWorld);
-    return renderFromRootMatrix ? position.applyMatrix4(renderFromRootMatrix) : position;
-  }
-
-  function monoCameraPositions(renderRoot: XrPortalEyeRenderRoot): readonly THREE.Vector3[] {
-    frameCameraPositions.length = 1;
-    frameCameraPositions[0] = runtimeObjectCameraPosition(renderRoot.camera, renderRoot.renderFromRootMatrix, 0);
-    return frameCameraPositions;
   }
 
   function syncDesktopPalette(): void {

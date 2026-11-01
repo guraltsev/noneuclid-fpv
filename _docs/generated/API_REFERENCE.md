@@ -2337,6 +2337,16 @@ Utilities for combining the per-eye visibility results of stereo (VR) rendering 
 | function | `rankStereoUnionPaths` | Union of the eyes' paths, ranked round-robin: eye 0's next unseen path, eye 1's next unseen path, and so on. |
 | function | `countStereoPortalPaths` | Path statistics of a two-eye frame for the debug state (undefined unless there are exactly 2 eyes). |
 
+### `render/three/portalFramePass.ts`
+
+The portal pass of a frame: which portal paths are visible from the render roots (one per eye), the instance transforms and clip data written for them, and the results the rest of the app reads afterwards.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `PortalFramePassDeps` | Dependencies of {@link createPortalFramePass}. |
+| interface | `PortalFramePass` | Handle of the portal pass; see the module comment. |
+| function | `createPortalFramePass` | Creates the portal pass over `deps`. |
+
 ### `render/three/portalFrameRender.ts`
 
 Render-root list for the mono portal visibility pass.
