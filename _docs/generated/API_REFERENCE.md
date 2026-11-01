@@ -687,6 +687,20 @@ The editing state of the geodesic emitter (cannon) tools, as plain data: which c
 | --- | --- | --- |
 | interface | `GeodesicCannonToolState` | Editing state of the geodesic emitter (cannon) tools. |
 
+### `world-objects/geodesic/carryEnd.ts`
+
+What an emitter does to its geodesics when it has been carried: rebuild after a move, the final rebuild when the carry ends, and the removal of the emitter when it is destroyed.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `EmitterGeodesicRebuild` | What a rebuild of an emitter's geodesics touched. |
+| function | `rebuildEmitterGeodesics` | Rebuilds the geodesics that depend on an emitter after it moved. |
+| interface | `CarriedEmitterRelease` | What releasing a carried emitter touched. |
+| function | `releaseCarriedEmitter` | The emitter has stopped being carried, whether it was put down or dropped where it stood: its geodesics are rebuilt one last time without the safety net of the carry, and the intersection objects whose geodesics no long… |
+| interface | `DestroyedEmitter` | What destroying an emitter removed. |
+| function | `destroyEmitter` | The emitter ends: it is removed together with its geodesics and the intersection objects that depended on them. |
+| function | `collectEmitterGeodesicIds` | The ids of every geodesic that belongs to an emitter: its own, its active one and those other emitters record as connected to it. |
+
 ### `world-objects/geodesic/curveShortening.ts`
 
 Curve shortening: tie-and-detach of two endpoint roles into a curve-shortening pair, and its exact resolution in one tick.

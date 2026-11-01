@@ -137,10 +137,27 @@ describe("one displacement step", () => {
     expect(reactToDisplacement({ world, object, step: { x: 1, y: 0 } })).toEqual({ detach: {} });
   });
 
-  it("places an object that ends its step inside a zone (touching is the caller's rule)", () => {
+  it("places an object with no collision shape that ends a step in a zone", () => {
     const world = compileLargePortalWorld();
 
     expect("placement" in reactToDisplacement({ world, object: placeIn("a", 4, 0.05), step: { x: 0.95, y: 0 } })).toBe(true);
+  });
+
+  it("destroys an emitter whose step ends with its body inside a zone", () => {
+    const emitter = createGeodesicCannonObject({ id: "e", cellId: "right", localPose: yawRigidTransform3(0, vec3(7, -7, 0)) });
+    const object = { ...placeIn("right", 7, -7), collision: emitter.collision };
+
+    // Ends at (7.4, -7.4), 0.14 m from the corner (7.5, -7.5) whose zone has radius 0.15 m: inside, not a sweep.
+    expect(reactToDisplacement({ world: cubeWorld(), object, step: { x: 0.4, y: -0.4 } })).toEqual({ destroy: { reason: "forbidden-zone" } });
+    // The same direction ending clear of the zone and the body (0.15 m + the emitter's radius) is a plain move.
+    expect("placement" in reactToDisplacement({ world: cubeWorld(), object, step: { x: 0.1, y: -0.1 } })).toBe(true);
+  });
+
+  it("drops, not destroys, an emitter whose step only passes through a zone", () => {
+    const emitter = createGeodesicCannonObject({ id: "e", cellId: "right", localPose: yawRigidTransform3(0, vec3(7, -7, 0)) });
+    const object = { ...placeIn("right", 7, -7), collision: emitter.collision, radiusMeters: emitter.collision?.radius };
+
+    expect(reactToDisplacement({ world: cubeWorld(), object, step: { x: 0.7071, y: -0.7071 } })).toEqual({ detach: {} });
   });
 
   it("turns the yaw with the face crossed, on the cube", () => {
@@ -215,6 +232,15 @@ describe("the stream of steps", () => {
     expect(moves).toHaveLength(1);
     expect(place.cellId).toBe("right");
     expect(place.position.y).toBeCloseTo(-7, 9);
+  });
+
+  it("ends the stream without committing the step when the emitter is destroyed", () => {
+    const emitter = createGeodesicCannonObject({ id: "e", cellId: "right", localPose: yawRigidTransform3(0, vec3(7, -7, 0)) });
+    const object = { ...placeIn("right", 7, -7), collision: emitter.collision };
+    const stream = carry(cubeWorld(), object, target("right", 7.4, -7.4));
+
+    expect(stream.end).toBe("destroyed");
+    expect(stream.moves).toEqual([]);
   });
 
   it("stops short of a wall after a gliding step and reports it", () => {

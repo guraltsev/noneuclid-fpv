@@ -16,9 +16,16 @@
  *   - The step (not the object) sweeps across a portal junction's exclusion zone: the object stays at its last valid position and is
  *     detached (`{ detach }`), so it stays continuous and no portal word becomes illegal. The kick that will later send it flying is the
  *     `impulse` of the same outcome.
- *   - An object that ends a step inside an exclusion zone is reported as placed there; what happens to it is the caller's rule
- *     (the cannon tool destroys it, as before).
- * - Release is a detach and nothing else.
+ *   - An object that ends a step inside an exclusion zone (its collision shape, when it gives one, overlaps a zone) is destroyed:
+ *     the reaction is `{ destroy: { reason: "forbidden-zone" } }`. The object decides this itself; a carrier only applies it. An object
+ *     that gives no collision shape cannot touch a zone and is placed. Later, touching a zone will end the carry with a kick instead,
+ *     which is `{ detach: { impulse } }` in place of `{ destroy }` here and nowhere else.
+ *   - The two zone rules differ at one edge, on purpose and as before: a step that only passes through a zone is dropped at its last
+ *     valid position (continuity), while a step that ends inside one, including a step the wall stopped inside one, destroys the object.
+ * - Release is a detach and nothing else on the carrier's side. What the emitter does to its geodesics when the carry ends (the final
+ *   rebuild without the carry's safety net, pruning what vanished), and what it does when it is destroyed, are rules of the emitter, in
+ *   `geodesic/carryEnd.ts`: `releaseCarriedEmitter` and `destroyEmitter`. Every carrier ends a carry through them, whether the emitter was
+ *   put down, dropped by a swept junction or destroyed.
  * - Carriers should not carry an object another carrier holds; if they do, the steps interleave, which is safe (every step is checked
  *   on its own) but erratic. The contract stays stateless and keeps no table of carriers.
  *
@@ -36,10 +43,13 @@ import {
   identityRigidTransform3,
   invertRigidTransform3,
   transformPoint3,
+  yawRigidTransform3,
   type RigidTransform3,
 } from "../math/rigidTransform3";
 import { degenerateLengthMeters } from "../math/tolerances";
 import { vec3, type Vec3 } from "../math/vec3";
+import { testCellCollision } from "../movement/collision";
+import type { DynamicObjectCollisionShape } from "../movement/dynamicObject";
 import { sanitizeYaw } from "./geodesic/objects";
 
 /** Longest displacement step the reaction is defined for, in meters. */
@@ -75,6 +85,8 @@ export interface CarriedPlace {
   readonly yawRadians: number;
   /** Radius of the object's body, used to keep a swept step out of the exclusion zones; default 0. */
   readonly radiusMeters?: number;
+  /** The object's collision shape, used to decide whether it touches a forbidden zone where it ends a step; without one it cannot touch a zone. */
+  readonly collision?: DynamicObjectCollisionShape;
 }
 
 /** A displacement step: a vector in the frame of the cell the object is in, at most `carryStepCapMeters` long. */
@@ -104,7 +116,8 @@ export type CarryStayReason = "wall" | "step-exceeds-cap" | "walk-failed";
 export type CarryReaction =
   | CarryMove
   | { readonly stay: CarryStayReason }
-  | { readonly detach: { readonly impulse?: Vec3 } };
+  | { readonly detach: { readonly impulse?: Vec3 } }
+  | { readonly destroy: { readonly reason: "forbidden-zone" } };
 
 /** The reaction of a carried object to one displacement step; see the module header for the rules. Pure. */
 export function reactToDisplacement(input: {
@@ -169,7 +182,32 @@ export function reactToDisplacement(input: {
     })),
   };
 
+  if (touchesForbiddenZone(world, object.collision, move.placement)) {
+    return { destroy: { reason: "forbidden-zone" } };
+  }
+
   return stoppedByWall ? { ...move, stoppedByWall: true } : move;
+}
+
+// Whether the object's collision shape, at the place a step leaves it, overlaps a forbidden zone of that cell.
+function touchesForbiddenZone(
+  world: CompiledCellComplex,
+  collision: DynamicObjectCollisionShape | undefined,
+  placement: CarryPlacement,
+): boolean {
+  const cell = world.cellsById.get(placement.cellId);
+  if (!cell || !collision) {
+    return false;
+  }
+
+  return testCellCollision({
+    cell,
+    object: {
+      cellId: placement.cellId,
+      localPose: yawRigidTransform3(placement.yawRadians, placement.position),
+      collision,
+    },
+  }).reason === "forbidden-zone";
 }
 
 // Whether the walked segment passes through the exclusion zone of a junction (widened by the body radius) without ending inside that zone.
@@ -277,6 +315,7 @@ export type CarryAdvanceEnd =
   | "step-limited"
   | "wall"
   | "detached"
+  | "destroyed"
   | "refused"
   | "no-route";
 
@@ -327,6 +366,9 @@ export function carryTowardTarget(input: {
     });
     if ("detach" in reaction) {
       return { place, steps, end: "detached", ...(reaction.detach.impulse ? { impulse: reaction.detach.impulse } : {}) };
+    }
+    if ("destroy" in reaction) {
+      return { place, steps, end: "destroyed" };
     }
     if ("stay" in reaction) {
       return { place, steps, end: "wall" };

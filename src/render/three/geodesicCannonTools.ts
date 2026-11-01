@@ -15,25 +15,20 @@ import * as THREE from "three";
 import { type CompiledCellComplex } from "../../cell-complex/compileCellComplex";
 import { yawRigidTransform3 } from "../../math/rigidTransform3";
 import { type Vec3, normalizeVec3 } from "../../math/vec3";
-import { getDynamicObjectCollisionBounds, testCellCollision } from "../../movement/collision";
+import { getDynamicObjectCollisionBounds } from "../../movement/collision";
 import type { AppSession } from "../../runtime/appSession";
 import type { RuntimeCommand } from "../../runtime/runtimeCommands";
 import { type GeodesicEndpointSelection } from "../../world-objects/geodesic/objects";
 import type { GeodesicCannonToolState } from "../../world-objects/geodesic/cannonToolState";
-import {
-  pruneMissingGeodesicIntersectionObjects,
-  withDeferredGeodesicIntersections,
-} from "../../world-objects/geodesic/intersections";
+import { pruneMissingGeodesicIntersectionObjects } from "../../world-objects/geodesic/intersections";
 import {
   getGeodesicEndpointAttachmentsForAnchor,
   resolveGeodesicEndpointSelectionFromSegmentHit,
 } from "../../world-objects/geodesic/endpoints";
-import { collectGeodesicPortalWord, getGeodesicSegments } from "../../world-objects/geodesic/segments";
+import { getGeodesicSegments } from "../../world-objects/geodesic/segments";
 import {
-  collectLockedIncidentGeodesicIdsForEmitter,
   isGeodesicLocked,
   removeGeodesic,
-  removeGeodesicCannonAndSegments,
   removeUnlockedGeodesicsFromCannon,
 } from "../../world-objects/geodesic/lifecycle";
 import { tieAndDetachGeodesicEndpoints } from "../../world-objects/geodesic/curveShortening";
@@ -43,7 +38,6 @@ import {
   placeGeodesicCannonAtGeodesicVertex,
   placeGeodesicCannonOnGeodesic,
   moveEmitterAlongRoute,
-  rebuildConnectedGeodesicBetweenEmitters,
   rebuildGeodesicToLength,
   shootGeodesic,
 } from "../../world-objects/geodesic/cannon";
@@ -61,6 +55,7 @@ import {
 import { createDesktopControls } from "./desktopControls";
 import { resolveGeodesicCannonAimYawFromAbsolutePoints } from "./geodesicCannonAimTarget";
 import { carryMaxSpeedMetersPerSecond, carryTowardTarget, locateCarrierTarget } from "../../world-objects/carry";
+import { destroyEmitter, rebuildEmitterGeodesics, releaseCarriedEmitter } from "../../world-objects/geodesic/carryEnd";
 import {
   RootAimRay,
   getAimForwardVector,
@@ -521,8 +516,16 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
     const cannonId = deps.session.get().carry?.objectId;
     const cannon = cannonId ? runtimeObjectRegistry.get(cannonId) : undefined;
     if (cannon?.kind === "geodesic-cannon") {
-      rebuildCarriedGeodesicFromCannon(cannon);
-      removeProtractorAnglesForMissingVertices(pruneMissingGeodesicIntersectionObjects(runtimeObjectRegistry));
+      // The emitter decides what stopping a carry means for its geodesics; the tool refreshes what it draws.
+      const release = releaseCarriedEmitter({
+        world: deps.getWorld(),
+        registry: runtimeObjectRegistry,
+        emitterId: cannon.id,
+        activeGeodesicId: deps.session.get().cannonToolState.activeGeodesicId,
+        rotationTargetLengthMeters: geodesicCannonRotationTargetLengthMeters,
+      });
+      refreshAfterEmitterRebuild(cannon.id, release);
+      removeProtractorAnglesForMissingVertices(release.prunedIntersectionIds);
       syncRuntimeObjectPortalInstances();
       syncSelectableHitboxDebug();
     }
@@ -737,7 +740,6 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
       return;
     }
     const emitterBody = getDynamicObjectCollisionBounds(runtimeObjectToDynamicObjectState(cannon));
-    let destroyed = false;
     const advance = carryTowardTarget({
       world: deps.getWorld(),
       object: {
@@ -745,6 +747,7 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
         position: cannon.localPose.translation,
         yawRadians: cannon.aimYawRadians,
         radiusMeters: emitterBody?.radius,
+        collision: cannon.collision,
       },
       target: { cellId: hand.cellId, point: { x: hand.point.x, y: hand.point.y, z: 0 } },
       maxTravelMeters: deltaSeconds === undefined ? undefined : carryMaxSpeedMetersPerSecond * deltaSeconds,
@@ -754,13 +757,6 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
           cellId: move.placement.cellId,
           localPose: yawRigidTransform3(move.placement.yawRadians, move.placement.position),
         };
-        // Dragging the emitter into a forbidden zone destroys it (and its geodesics) rather than leaving it there.
-        if (carriedGeodesicCannonTouchesForbiddenZone(placed)) {
-          deleteCarriedGeodesicCannon(cannon.id);
-          destroyed = true;
-          return false;
-        }
-
         const moved = moveEmitterAlongRoute({
           registry: runtimeObjectRegistry,
           emitterId: cannon.id,
@@ -775,14 +771,21 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
         return moved.moved;
       },
     });
-    if (destroyed) {
+    if (advance.end === "destroyed") {
+      // The emitter touched a forbidden zone and ended: it goes, with its geodesics.
+      destroyCarriedGeodesicCannon(cannon.id);
       return;
     }
     if (advance.steps > 0) {
-      const nextCannon = runtimeObjectRegistry.get(cannon.id);
-      if (nextCannon?.kind === "geodesic-cannon") {
-        rebuildCarriedGeodesicFromCannon(nextCannon, { preserveGeodesicOnRebuildFailure: true });
-      }
+      const rebuild = rebuildEmitterGeodesics({
+        world: deps.getWorld(),
+        registry: runtimeObjectRegistry,
+        emitterId: cannon.id,
+        activeGeodesicId: deps.session.get().cannonToolState.activeGeodesicId,
+        rotationTargetLengthMeters: geodesicCannonRotationTargetLengthMeters,
+        preserveGeodesicOnRebuildFailure: true,
+      });
+      refreshAfterEmitterRebuild(cannon.id, rebuild);
       syncRuntimeObjectPortalInstances();
       syncSelectableHitboxDebug();
     }
@@ -793,80 +796,40 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
     }
     syncCarriedGeodesicCannonGlow(anchor);
   }
-  function rebuildCarriedGeodesicFromCannon(
-    cannon: Extract<RuntimeWorldObject, { readonly kind: "geodesic-cannon" }>,
-    options: { readonly preserveGeodesicOnRebuildFailure?: boolean } = {},
+  // Draws again what depends on the geodesics an emitter just rebuilt: measured lengths, protractor angles and, when the emitter's plain
+  // active geodesic was regrown, the cannon tool's selection of it. What was rebuilt is the emitter's rule (geodesic/carryEnd.ts).
+  function refreshAfterEmitterRebuild(
+    cannonId: string,
+    rebuild: { readonly rebuiltGeodesicIds: readonly string[]; readonly regrownActiveGeodesicId?: string },
   ): void {
-    // Three cases: locked geodesics incident to this emitter (rebuilt as connected geodesics between emitters),
-    // else a single locked active geodesic, else a plain unlocked active geodesic regrown from the cannon.
-    const geodesicId = cannon.activeGeodesicId ?? deps.session.get().cannonToolState.activeGeodesicId;
-    const lockedIncidentGeodesicIds = collectLockedIncidentGeodesicIdsForEmitter(runtimeObjectRegistry, cannon.id);
-    if (lockedIncidentGeodesicIds.length === 0 && !geodesicId) {
-      return;
+    for (const geodesicId of rebuild.rebuiltGeodesicIds) {
+      refreshMeasuredGeodesicLengthsForGeodesic(geodesicId);
     }
-
-    const rebuildLocked = (lockedGeodesicId: string): void => {
-      rebuildConnectedGeodesicBetweenEmitters({
-        world: deps.getWorld(),
-        registry: runtimeObjectRegistry,
-        geodesicId: lockedGeodesicId,
-        carriedEmitterId: cannon.id,
-        carriedPortalWord: collectGeodesicPortalWord(deps.getWorld(), runtimeObjectRegistry, lockedGeodesicId),
-        preserveGeodesicOnRebuildFailure: options.preserveGeodesicOnRebuildFailure,
-      });
-    };
-
-    if (lockedIncidentGeodesicIds.length > 0) {
-      const rebuiltGeodesicIds: string[] = [];
-      // One scope per carry frame: the intersection markers are recomputed once, after all incident geodesics are rebuilt.
-      withDeferredGeodesicIntersections(runtimeObjectRegistry, () => {
-        for (const incidentGeodesicId of lockedIncidentGeodesicIds) {
-          rebuildLocked(incidentGeodesicId);
-          rebuiltGeodesicIds.push(incidentGeodesicId);
-        }
-      });
-      for (const rebuiltGeodesicId of rebuiltGeodesicIds) {
-        refreshMeasuredGeodesicLengthsForGeodesic(rebuiltGeodesicId);
-      }
-      refreshProtractorAnglesForGeodesics(rebuiltGeodesicIds);
-    } else if (geodesicId && isGeodesicLocked(runtimeObjectRegistry, geodesicId)) {
-      rebuildLocked(geodesicId);
-      refreshProtractorAnglesForGeodesic(geodesicId);
-      refreshMeasuredGeodesicLengthsForGeodesic(geodesicId);
-    } else if (geodesicId) {
-      rebuildActiveGeodesicFromCannon(cannon, { connectEmitters: false, breakOnForbiddenZone: true });
-      refreshProtractorAnglesForGeodesic(geodesicId);
-      refreshMeasuredGeodesicLengthsForGeodesic(geodesicId);
+    refreshProtractorAnglesForGeodesics(rebuild.rebuiltGeodesicIds);
+    if (rebuild.regrownActiveGeodesicId) {
+      deps.dispatch({ kind: "set-cannon-tool-state", state: {
+        selectedCannonId: cannonId,
+        activeGeodesicId: rebuild.regrownActiveGeodesicId,
+      } });
     }
   }
 
-  function carriedGeodesicCannonTouchesForbiddenZone(
-    cannon: Extract<RuntimeWorldObject, { readonly kind: "geodesic-cannon" }>,
-  ): boolean {
-    const cell = deps.getWorld().cellsById.get(cannon.cellId);
-    if (!cell) {
-      return false;
-    }
-
-    return testCellCollision({
-      cell,
-      object: runtimeObjectToDynamicObjectState(cannon),
-    }).reason === "forbidden-zone";
-  }
-
-  function deleteCarriedGeodesicCannon(cannonId: string): void {
-    const geodesicIds = collectIncidentGeodesicIdsForCannon(cannonId);
-    for (const geodesicId of geodesicIds) {
-      removeProtractorAnglesForGeodesic(geodesicId);
-      removeMeasuredGeodesicLengthsForGeodesic(geodesicId);
-    }
-
-    removeGeodesicCannonAndSegments(runtimeObjectRegistry, cannonId);
+  // The emitter touched a forbidden zone and ends. The emitter's rule removes it with its geodesics; the tool drops the overlays of those
+  // geodesics, clears its own state and redraws.
+  function destroyCarriedGeodesicCannon(cannonId: string): void {
+    const destroyed = destroyEmitter({
+      registry: runtimeObjectRegistry,
+      emitterId: cannonId,
+      removeDerivedObjectsOfGeodesic: (geodesicId) => {
+        removeProtractorAnglesForGeodesic(geodesicId);
+        removeMeasuredGeodesicLengthsForGeodesic(geodesicId);
+      },
+    });
     deps.dispatch({ kind: "set-cannon-tool-state", state: {} });
     geodesicCannonRotationTargetLengthMeters = undefined;
     deps.dispatch({ kind: "clear-selected-tool" });
     clearCarriedGeodesicCannonGlow();
-    removeProtractorAnglesForMissingVertices(pruneMissingGeodesicIntersectionObjects(runtimeObjectRegistry));
+    removeProtractorAnglesForMissingVertices(destroyed.prunedIntersectionIds);
     syncRuntimeObjectPortalInstances();
     syncSelectableHitboxDebug();
     syncDesktopPalette();
@@ -890,29 +853,6 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
     if (carriedGeodesicCannonGlow) {
       carriedGeodesicCannonGlow.visible = false;
     }
-  }
-
-  function collectIncidentGeodesicIdsForCannon(cannonId: string): readonly string[] {
-    const ids = new Set<string>();
-    const cannon = runtimeObjectRegistry.get(cannonId);
-    if (cannon?.kind === "geodesic-cannon") {
-      for (const geodesicId of cannon.geodesicIds) {
-        ids.add(geodesicId);
-      }
-      if (cannon.activeGeodesicId) {
-        ids.add(cannon.activeGeodesicId);
-      }
-    }
-
-    for (const object of runtimeObjectRegistry.getObjectsOfKind("geodesic-cannon")) {
-      for (const [geodesicId, connection] of Object.entries(object.geodesicConnectionsById ?? {})) {
-        if (connection.outgoingEmitterId === cannonId || connection.incomingEmitterId === cannonId) {
-          ids.add(geodesicId);
-        }
-      }
-    }
-
-    return [...ids];
   }
 
   function updateActiveGeodesicCannonRotation(yawDeltaRadians: number, finishRequested: boolean): void {

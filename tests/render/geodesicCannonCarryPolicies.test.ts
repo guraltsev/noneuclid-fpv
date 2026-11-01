@@ -116,6 +116,20 @@ describe("the carry tool applies the agreed policies", () => {
     expect(registry.get("lamp")?.localPose.translation.y).toBeCloseTo(4.7, 6);
   });
 
+  it("destroys the emitter and its geodesic when the hand puts it inside a forbidden zone", () => {
+    const { registry, tools, selectedTool } = setupRooms(3.5, 2.5);
+
+    tools.startGeodesicCannonCarry("cannon-a");
+    // The hand is 0.22 m from the corner (5, 5) of the room, inside its exclusion zone widened by the emitter's body, and the glide
+    // does not cross a portal on the way: the emitter ends its step in the zone.
+    tools.updateCarriedGeodesicCannonPose(true, handAt(4.9, 4.8));
+
+    expect(registry.get("cannon-a")).toBeUndefined();
+    expect(registry.get("g-a")).toBeUndefined();
+    expect(registry.get("cannon-b")).toBeDefined();
+    expect(selectedTool()).toBe("none");
+  });
+
   it("glides to the hand no faster than the speed cap when told how much time passed", () => {
     const { registry, tools } = setupRooms(4.5, 2.5);
     const frameSeconds = 1 / 60;
