@@ -11,7 +11,7 @@
     "test:unit": "vitest run --project unit",
     "test": "vitest run --project unit --project process",
     "test:watch": "vitest --project unit",
-    "test:release": "npm run build && vitest run --project release --passWithNoTests",
+    "test:release": "npm run build && vitest run --project release --passWithNoTests --no-file-parallelism",
     "test:report": "node scripts/tests/cli.mjs report",
     "test:coverage": "vitest run --project unit --coverage",
     "bench": "node scripts/bench/run.mjs",

@@ -23,7 +23,9 @@ echo "pre-push: npm run build" >&2
 npm run --silent build >/dev/null
 
 echo "pre-push: npx vitest run --project release" >&2
-npx vitest run --project release --passWithNoTests
+# --no-file-parallelism: the release scenarios share one headless browser (tests/support/scenario/globalSetup.ts);
+# running test files in parallel starves it of CPU and corrupts it for the rest of the run (job 44's Report).
+npx vitest run --project release --passWithNoTests --no-file-parallelism
 
 smoke_browser="${BROWSER:-}"
 if [ -z "$smoke_browser" ]; then

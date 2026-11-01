@@ -83,3 +83,5 @@ defects; the LP in this issue replaces all of them:
 - Projection construction and the intersection test use different parallelism thresholds.
 
 Needs rendering comparisons before and after, not a blind change.
+
+Manual check: tests/manual_smoke.md M6.

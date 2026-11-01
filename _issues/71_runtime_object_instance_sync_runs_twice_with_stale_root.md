@@ -97,3 +97,5 @@ computed for. The same stale join feeds aim picking (issue 72).
   were computed for. Test with a portal-crossing step followed by `resolveCurrentAimTarget`.
 - With 40 placed flags, the `objectsMs + portalMs` debug timings drop measurably. Record before/after numbers in
   the PR.
+
+Manual check: tests/manual_smoke.md M10.

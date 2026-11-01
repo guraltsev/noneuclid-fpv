@@ -132,3 +132,5 @@ Draw calls and material variants:
 
 - `scenePaletteController` serialises the whole palette definition every frame to detect changes. Replace this with a
   version counter.
+
+Manual check: tests/manual_smoke.md M7.

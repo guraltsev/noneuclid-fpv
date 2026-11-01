@@ -92,3 +92,5 @@ Remaining stereo items from issue 21:
   - Left and right portal edges stay stable and do not fight.
   - Recursive views reach the same depth as the desktop settings allow.
   - Compare `portal ms` before and after, in the same world and viewpoint.
+
+Manual check: tests/manual_smoke.md M6.

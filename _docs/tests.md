@@ -400,13 +400,16 @@ holding both its examples and its properties.
 | --- | --- |
 | `npm run test:unit` | `unit` |
 | `npm test` | `unit` and `process`; what an agent runs before saying a change is done |
-| `npm run test:release` | `release`: builds, then the `release` files and the browser smoke |
+| `npm run test:release` | `release`: builds, then the `release` files (scenarios against the built site) |
 | `npm run test:report` | the indicators of §2.3 and the hygiene check ([tests_hygiene.md](tests_hygiene.md) §6) |
 
-Status (2026-10-31): job 41 built the suffixes, the `vitest.workspace.ts` projects and the commands above.
-`npm run test:release` builds and passes with no tests (no `*.release.test.ts` file exists yet; job 44 adds the first
-scenarios). The browser smoke still runs separately as `npm run smoke` (flags in [DEVELOPMENT.md](DEVELOPMENT.md));
-job 44 is expected to fold it into the `release` tier.
+Status (2026-10-31): job 41 built the suffixes, the `vitest.workspace.ts` projects and the commands above; job 44
+added the first scenarios (`tests/app/*.release.test.ts`) and moved the browser smoke onto the API. `npm run
+test:release` passes `--no-file-parallelism` on the command line (like `--passWithNoTests`, `fileParallelism` is a
+root-only Vitest 1.6 option): every scenario file opens pages on the one shared, software-rendered headless
+browser `tests/support/scenario/globalSetup.ts` launches, and running them in parallel starves it of CPU. The
+browser smoke still runs separately as `npm run smoke` (flags in [DEVELOPMENT.md](DEVELOPMENT.md)), now checking
+`window.noneuclid.api` instead of the retired debug globals; it is not folded into the `release` project.
 
 `git push` runs typecheck, `npm test`, the build, `npx vitest run --project release` and the browser smoke through the
 pre-push hook (`.githooks/`). Before
@@ -485,8 +488,8 @@ These functions belong to the engine API and are agreed in [012](design/012-engi
 gaps.
 
 Old global objects (`window.noneuclidDebug`, `window.noneuclidPortalDebug`, `window.noneuclidGeometry`), the debug
-overlay's text and `window.__noneuclidDiagnostics` are not the API; scenarios never read them. The browser smoke still
-pokes the old globals; job 44 moves it onto the API.
+overlay's text and `window.__noneuclidDiagnostics` are not the API; scenarios never read them. The browser smoke
+checks the API too (`app.info()`, `debug`), not the old globals, since job 44.
 
 ### 8.6 Manual checks
 
@@ -496,11 +499,12 @@ pokes the old globals; job 44 moves it onto the API.
 - What stays manual here: stereo correctness in a headset (both eyes, straddling portals, recursion depth per eye),
   comfort and stutter, real controllers and hand input, the shader driver on the Quest, frame time on the Quest, the
   look of textures and models, and the asset provenance review before publishing.
-- Status (2026-10-31): `tests/manual_smoke.md` does not exist. Manual checks are scattered over
-  [acceptance-checklists.md](acceptance-checklists.md) (the headset smoke checklist, never run), the job reports in
-  `.agents/jobs/_reports/`, and the "Checks" sections of jobs in `.agents/jobs/_done/`; several open issues
-  (56, 57, 58, 59, 71, 73, 75) wait only on them. The inventory and classification of these checks is in
-  `.agents/jobs/_reports/test_audit_2026_10_31.md`; jobs 44 and 45 convert them.
+- Status (2026-10-31): job 44 created `tests/manual_smoke.md` (M1-M12) from the scattered checks in
+  [acceptance-checklists.md](acceptance-checklists.md), the job reports in `.agents/jobs/_reports/`, and the
+  "Checks" sections of jobs in `.agents/jobs/_done/`, and pointed issues 56, 57, 58, 59, 71, 73 and 75 at it; the
+  class-A checks the API can already reach became `release`-tier scenarios instead (`tests/app/`). The remaining
+  checks that need an API function job 45 has not yet added stay manual, counted as gaps. The inventory and
+  classification of every check is in `.agents/jobs/_reports/test_audit_2026_10_31.md`.
 
 ### 8.7 Known costs
 

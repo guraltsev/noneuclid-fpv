@@ -30,6 +30,22 @@ export default defineWorkspace([
     test: {
       name: "release",
       include: ["tests/**/*.release.test.ts"],
+      // Builds dist/, serves it under a sub-path and launches one headless Chromium-based browser for the whole
+      // project run (tests/support/scenario/globalSetup.ts); scenario files reach it through openApp().
+      globalSetup: ["tests/support/scenario/globalSetup.ts"],
+      setupFiles: ["tests/support/scenario/releaseSetup.ts"],
+      // `fileParallelism` is a root-only run option in Vitest 1.6, like `passWithNoTests` above: setting it on a
+      // workspace project is silently ignored, so `npm run test:release` passes `--no-file-parallelism` on the
+      // command line instead. Every scenario file opens pages on the one shared, software-rendered (SwiftShader)
+      // browser; running files in parallel starves it of CPU (seen while writing this project: a page's own
+      // DevTools calls stopped getting answers at all, well past any sane timeout) and corrupts it for the rest
+      // of the run (closing an unrelated tab's target can throw "Execution context was destroyed" on a page that
+      // never touched it).
+      // Scenarios drive a real browser and a background build worker; give them more room than the default 5 s.
+      // A load takes well under 5 s in practice; the margin absorbs occasional machine-level slowness rather than
+      // failing a scenario for it.
+      testTimeout: 45000,
+      hookTimeout: 45000,
     },
   },
   {

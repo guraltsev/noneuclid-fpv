@@ -44,7 +44,7 @@ npm run build:pages
 npm run smoke -- --world cube,dodecahedron,torus-moduli
 ```
 
-The script serves `dist/` itself under a sub-path (`/smoke/relocated/`, which checks that the build is relocatable), with real 404s like GitHub Pages (no HTML fallback), loads one page per world, opens and closes the menu (right click, Escape), and prints `SMOKE OK` or `SMOKE FAILED` per world. A world fails on:
+The script serves `dist/` itself under a sub-path (`/smoke/relocated/`, which checks that the build is relocatable), with real 404s like GitHub Pages (no HTML fallback), loads one page per world, checks the public API (`window.noneuclid.api`: `app.info()` reports the world that was requested, and the `debug` namespace is installed), opens and closes the menu (right click, Escape), and prints `SMOKE OK` or `SMOKE FAILED` per world. A world fails on:
 
 - an uncaught exception;
 - a console message with `[noneuclid] frame error` or `frames in a row failed`;
@@ -52,7 +52,11 @@ The script serves `dist/` itself under a sub-path (`/smoke/relocated/`, which ch
 - a request answered with HTTP status 400 or more, or a network failure that was not cancelled (`/favicon.ico` is ignored);
 - a loading screen with the error class;
 - a loading screen still present after the timeout;
-- no `canvas` element.
+- no `canvas` element;
+- `window.noneuclid.api.app.info()` not reporting the requested world, or `window.noneuclid.api.debug` not installed.
+
+A growing set of checks runs as scenarios against the built site instead, through the same public API, in the
+`release` Vitest project (`npm run test:release`; `tests/app/*.release.test.ts`, `_docs/tests.md` §6, §8.5).
 
 Other console errors and warnings are printed but do not fail the run. Flags:
 

@@ -18,6 +18,7 @@
  * Environment (DevTools backend): CDP_PORT (default 9222), CDP_MATCH (substring of the page url, default "localhost:").
  */
 import fs from "node:fs";
+import { createCdpSession, listTargets } from "../lib/cdpClient.mjs";
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -60,7 +61,7 @@ async function attachDevTools() {
   const match = process.env.CDP_MATCH ?? "localhost:";
   let targets;
   try {
-    targets = await (await fetch(`http://127.0.0.1:${port}/json`)).json();
+    targets = await listTargets(port);
   } catch {
     console.error(`nothing listens on ${port}; run "npm run edge" first.`);
     process.exit(2);
@@ -70,38 +71,8 @@ async function attachDevTools() {
     console.error("no page matching", match, "among", targets.map((t) => t.url));
     process.exit(2);
   }
-  const ws = new WebSocket(target.webSocketDebuggerUrl);
-  await new Promise((resolve, reject) => {
-    ws.onopen = resolve;
-    ws.onerror = reject;
-  });
-  let nextId = 0;
-  const pending = new Map();
-  const listeners = [];
-  ws.onmessage = (event) => {
-    const message = JSON.parse(event.data);
-    if (message.id && pending.has(message.id)) {
-      const { resolve, reject } = pending.get(message.id);
-      pending.delete(message.id);
-      if (message.error) reject(new Error(message.error.message));
-      else resolve(message.result);
-    } else {
-      for (const listener of listeners) listener(message);
-    }
-  };
-  const send = (method, params = {}) =>
-    new Promise((resolve, reject) => {
-      const id = ++nextId;
-      pending.set(id, { resolve, reject });
-      ws.send(JSON.stringify({ id, method, params }));
-    });
-  const evaluate = async (expression) => {
-    const result = await send("Runtime.evaluate", { expression, returnByValue: true, awaitPromise: true });
-    if (result.exceptionDetails) {
-      throw new Error(result.exceptionDetails.exception?.description ?? result.exceptionDetails.text);
-    }
-    return result.result.value;
-  };
+  const session = await createCdpSession(target.webSocketDebuggerUrl);
+  const evaluate = session.evaluate;
   const listExpression = `(() => {
     const out = {};
     const visit = (o, p) => {
@@ -128,18 +99,17 @@ async function attachDevTools() {
     evaluate: (expression) => evaluate(expression),
     async screenshot(file) {
       const png = file.endsWith(".png");
-      const { data } = await send("Page.captureScreenshot", png ? { format: "png" } : { format: "jpeg", quality: 70 });
-      fs.writeFileSync(file, Buffer.from(data, "base64"));
+      const data = await session.screenshot(png ? { format: "png" } : { format: "jpeg", quality: 70 });
+      fs.writeFileSync(file, data);
     },
     async streamConsole(seconds, print) {
-      listeners.push((m) => {
+      session.onMessage((m) => {
         if (m.method === "Runtime.consoleAPICalled") {
           print(`[${m.params.type}]`, m.params.args.map((a) => a.value ?? a.description ?? "").join(" ").slice(0, 400));
         } else if (m.method === "Runtime.exceptionThrown") {
           print("[exception]", (m.params.exceptionDetails.exception?.description ?? m.params.exceptionDetails.text).slice(0, 600));
         }
       });
-      await send("Runtime.enable");
       await sleep(seconds * 1000);
     },
     async record(expression, seconds, print) {
@@ -168,7 +138,7 @@ async function attachDevTools() {
       }
       print("frames:", frames.length);
     },
-    close: () => ws.close(),
+    close: () => session.close(),
   };
 }
 

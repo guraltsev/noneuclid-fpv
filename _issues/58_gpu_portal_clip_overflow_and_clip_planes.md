@@ -89,3 +89,5 @@ hardware clip distances or by a single varying.
 - A GPU timing (EXT_disjoint_timer_query) of the default world at depth 10 on desktop and Quest shows lower fragment
   time than the current shader. Record the numbers in the PR.
 - A pixel test shows clip leakage of at most 1 px for polygons with edges shorter than 2 px.
+
+Manual check: tests/manual_smoke.md M9.

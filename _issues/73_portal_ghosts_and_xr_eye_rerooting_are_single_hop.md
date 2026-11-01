@@ -106,3 +106,5 @@ Two render-side helpers assume that only one portal is involved at a time:
 
 Status update 2026-10-29: implemented in [job 17](../.agents/jobs/_done/17_multi_hop_ghosts_and_eye_rerooting.md) (commit d96f09d); left open only for the headset check, see the job's Report.
 
+Manual check: tests/manual_smoke.md M8.
+

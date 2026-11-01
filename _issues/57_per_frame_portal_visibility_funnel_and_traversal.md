@@ -110,3 +110,5 @@ Issue 21's unfinished steps are tracked here:
   survives, and avoid transient maps in inner loops. Document scratch-buffer ownership in code comments. Current
   allocations: per-path `rigidTransformToThreeMatrix`, NDC projection arrays, Sutherland-Hodgman arrays, and a matrix
   `clone()` in `transformVisiblePortalResultToRenderFrame`.
+
+Manual check: tests/manual_smoke.md M6.
