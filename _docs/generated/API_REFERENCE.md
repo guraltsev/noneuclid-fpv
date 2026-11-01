@@ -2518,6 +2518,12 @@ Creates "ghost" render records so a dynamic object that overlaps a portal is dra
 | Kind | Name | Summary |
 | --- | --- | --- |
 | const | `defaultPortalGhostActivationClearanceMeters` | Default distance in meters (0.02) beyond which an object is considered too far from a portal wall to need a ghost. |
+| type | `PortalGhostRecordFlags` | The record fields a drawn part may set besides its place, copied onto its own record and onto every ghost of it (the viewer's own body hides near the camera, for example). |
+| type | `PortalGhostedRecords` | Render records that went through the portal-ghost rule: made by {@link collectRuntimeObjectRenderRecordsWithPortalGhosts} (a measured render footprint was required) or by {@link exemptFromPortalGhosts} (a reason was req… |
+| const | `portalGhostExemptions` | The records that deliberately get no portal ghosts, each with the reason. |
+| type | `PortalGhostExemption` | Why a source of records is exempt from portal ghosts; the key of {@link portalGhostExemptions}. |
+| function | `exemptFromPortalGhosts` | Marks `records` as deliberately without portal ghosts, for a reason that {@link portalGhostExemptions} states. |
+| function | `concatPortalGhostedRecords` | The concatenation of already-ghosted record groups (the parts of one object, say); still ghosted. |
 | type | `PortalGhostRenderableObject` | A dynamic object with an id, i.e. |
 | interface | `PortalGhostRuntimeObjectRenderRecordRequest` | Input for ghost-record collection. |
 | function | `collectRuntimeObjectRenderRecordsWithPortalGhosts` | The one way a part of an object gets its render records: one record per archetype key in the object's own cell, then its portal ghosts (see {@link collectPortalGhostRuntimeObjectRenderRecords}). |
@@ -2529,6 +2535,8 @@ Runtime-object instance sync: brings the instanced render archetypes of runtime 
 
 | Kind | Name | Summary |
 | --- | --- | --- |
+| const | `runtimeObjectRecordSources` | Every source of render records of the sync. |
+| type | `RuntimeObjectRecordSource` | One source of the sync's render records; an element of {@link runtimeObjectRecordSources}. |
 | interface | `RuntimeObjectInstanceSyncDeps` | Inputs of {@link createRuntimeObjectInstanceSync}; the maps are shared with the tool object runtimes and mutated here. |
 | interface | `RuntimeObjectInstanceSync` | Handle returned by {@link createRuntimeObjectInstanceSync}. |
 | function | `createRuntimeObjectInstanceSync` | Creates the instance sync. |

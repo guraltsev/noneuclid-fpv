@@ -21,7 +21,10 @@ import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
 import type { CellComplexSpec } from "../../src/cell-complex/specs";
 import { yawRigidTransform3 } from "../../src/math/rigidTransform3";
 import { simpleCollisionCylinder } from "../../src/movement/dynamicObject";
-import { collectPortalGhostRuntimeObjectRenderRecords } from "../../src/render/three/runtimeObjectGhostRecords";
+import {
+  collectPortalGhostRuntimeObjectRenderRecords,
+  collectRuntimeObjectRenderRecordsWithPortalGhosts,
+} from "../../src/render/three/runtimeObjectGhostRecords";
 import { createPlayerRoverRenderModel } from "../../src/render/three/playerRoverModel";
 import type { RuntimeCreatureObject } from "../../src/world-objects/runtimeObjectBase";
 import { createSimpleGeoCreature } from "../../src/world-objects/simpleGeoCreature";
@@ -178,8 +181,38 @@ describe("runtime object ghost records", () => {
   });
 });
 
+describe("record flags and part matrix", () => {
+  const world = compileCellComplex(twoRoomsWithPortal());
+  const object = creature("mouse-a", "room-a", 0.95, 0);
+
+  it("puts the record flags on the object's own record and on every ghost", () => {
+    const records = collectRuntimeObjectRenderRecordsWithPortalGhosts({
+      world,
+      object,
+      archetypeKeys: ["k"],
+      renderFootprint: drawnAround(0.1),
+      recordFlags: { omitRootVisiblePath: true, suppressWithinCameraDistanceMeters: 2 },
+    });
+
+    expect(records.length).toBeGreaterThan(1);
+    expect(records.every((record) => record.omitRootVisiblePath === true && record.suppressWithinCameraDistanceMeters === 2)).toBe(true);
+  });
+
+  it("applies the part matrix after the pose on the own record and on every ghost", () => {
+    const part = new THREE.Matrix4().makeScale(2, 3, 4);
+    const plain = collectRuntimeObjectRenderRecordsWithPortalGhosts({ world, object, archetypeKeys: ["k"], renderFootprint: drawnAround(0.1) });
+    const scaled = collectRuntimeObjectRenderRecordsWithPortalGhosts({ world, object, archetypeKeys: ["k"], renderFootprint: drawnAround(0.1), partMatrix: part });
+
+    expect(scaled.length).toBe(plain.length);
+    scaled.forEach((record, index) => {
+      const expected = plain[index].localMatrix.clone().multiply(part);
+      record.localMatrix.elements.forEach((value, element) => expect(value).toBeCloseTo(expected.elements[element], 9));
+    });
+  });
+});
+
 describe("player rover render model", () => {
-  it("always omits its own root visible path and suppresses close to the camera", () => {
+  it("is placed at the player pose; its records omit the root path and hide near the camera", () => {
     const assets = createFakePreparedAssets({
       instantiateGltf: () => {
         const scene = new THREE.Group();
@@ -187,18 +220,16 @@ describe("player rover render model", () => {
         return { scene, animations: [] };
       },
     });
-    const model = createPlayerRoverRenderModel(assets);
-    const archetypeKeys = model!.collectSources().map((source) => source.archetypeKey);
+    const model = createPlayerRoverRenderModel(assets)!;
+    const archetypeKeys = model.collectSources().map((source) => source.archetypeKey);
+    const placed = model.placement({ cellId: "room-a", position: { x: 0.95, y: 0, z: 0 }, yawRadians: 0, pitchRadians: 0 });
 
-    const records = model!.collectRecords(
-      { cellId: "room-a", position: { x: 0.95, y: 0, z: 0 }, yawRadians: 0, pitchRadians: 0 },
-      archetypeKeys,
-    );
-
-    expect(records.map((record) => record.cellId)).toEqual(["room-a"]);
-    expect(records[0]?.omitRootVisiblePath).toBe(true);
-    expect(records[0]?.objectId).toBe("user-robot");
-    expect(records[0]?.suppressWithinCameraDistanceMeters).toBe(2);
+    expect(archetypeKeys.every((key) => key.startsWith(`${model.archetypeKeyPrefix}:mesh:`))).toBe(true);
+    expect(placed.cellId).toBe("room-a");
+    expect(placed.id).toBe("user-robot");
+    expect(placed.localPose.translation).toEqual({ x: 0.95, y: 0, z: 0 });
+    expect(model.recordFlags.omitRootVisiblePath).toBe(true);
+    expect(model.recordFlags.suppressWithinCameraDistanceMeters).toBe(2);
   });
 });
 

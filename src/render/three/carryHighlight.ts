@@ -12,8 +12,8 @@ import * as THREE from "three";
 import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex";
 import type { DynamicObjectState } from "../../movement/dynamicObject";
 import { carryHighlightShapeOf, type CarryHighlightShape } from "../../world-objects/carryHighlightShape";
-import { collectRuntimeObjectRenderRecordsWithPortalGhosts } from "./runtimeObjectGhostRecords";
-import { collectRuntimeObjectRenderSourceMeshes, type RuntimeObjectRenderRecord, type RuntimeObjectRenderSourceMesh } from "./runtimeObjectRenderRecords";
+import { collectRuntimeObjectRenderRecordsWithPortalGhosts, exemptFromPortalGhosts, type PortalGhostedRecords } from "./runtimeObjectGhostRecords";
+import { collectRuntimeObjectRenderSourceMeshes, type RuntimeObjectRenderSourceMesh } from "./runtimeObjectRenderRecords";
 import { worldPointToThree } from "./worldAxes";
 
 /** Archetype-key prefix of the highlight shape (the key is `<prefix>:mesh:0`). */
@@ -59,10 +59,10 @@ export function createCarryHighlightSource(): RuntimeObjectRenderSourceMesh {
 export function collectCarryHighlightRecords(
   object: CarryHighlightObject,
   world: CompiledCellComplex,
-): readonly RuntimeObjectRenderRecord[] {
+): PortalGhostedRecords {
   const shape = carryHighlightShapeOf(object);
   if (!shape) {
-    return [];
+    return exemptFromPortalGhosts("nothing-drawn", []);
   }
 
   // The shape in the object's own frame (the record matrix already carries the pose, so the shape turns with the object): translate to its
@@ -81,5 +81,6 @@ export function collectCarryHighlightRecords(
     object: { ...object, id: highlightId },
     archetypeKeys: [carryHighlightArchetypeKey],
     renderFootprint: { center: { x: shape.centre.x, y: shape.centre.y }, radiusMeters: reach },
-  }).map((record) => ({ ...record, localMatrix: record.localMatrix.clone().multiply(fromCentre) }));
+    partMatrix: fromCentre,
+  });
 }

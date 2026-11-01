@@ -22,7 +22,12 @@ import type { FrameRenderSnapshot } from "./frameRenderSnapshot";
 import { collectGeodesicBodyPlacements, collectGeodesicRuntimeRenderRecords } from "./geodesicCannonRenderer";
 import type { PlayerRoverRenderModel } from "./playerRoverModel";
 import { updateRuntimeObjectRenderArchetypeInstances } from "./renderPortalInstances";
-import { collectRuntimeObjectRenderRecordsWithPortalGhosts } from "./runtimeObjectGhostRecords";
+import {
+  collectRuntimeObjectRenderRecordsWithPortalGhosts,
+  concatPortalGhostedRecords,
+  exemptFromPortalGhosts,
+  type PortalGhostedRecords,
+} from "./runtimeObjectGhostRecords";
 import {
   type RuntimeObjectRenderArchetype,
   type RuntimeObjectRenderArchetypeDiagnostics,
@@ -40,6 +45,22 @@ import {
   placedFlagModelArchetypeKeyPrefix,
 } from "./runtimeObjectRenderRecords";
 import { isGeodesicRuntimeRenderObject, runtimeObjectArchetypeKeyPrefix } from "./runtimeSceneUtils";
+
+/**
+ * Every source of render records of the sync. Each hands over `PortalGhostedRecords` (a measured render footprint for the ghost function, or an
+ * exemption with a reason), which is the only thing the sync accepts. Adding a source means adding its id here; the contract test
+ * (`tests/render/runtimeObjectPortalGhostContract.test.ts`) is keyed by this list and fails to typecheck until the new source has a case.
+ */
+export const runtimeObjectRecordSources = [
+  "runtime-objects",
+  "geodesic-body-parts",
+  "geodesic-segments",
+  "carry-highlight",
+  "player-rover",
+] as const;
+
+/** One source of the sync's render records; an element of {@link runtimeObjectRecordSources}. */
+export type RuntimeObjectRecordSource = (typeof runtimeObjectRecordSources)[number];
 
 /** Inputs of {@link createRuntimeObjectInstanceSync}; the maps are shared with the tool object runtimes and mutated here. */
 export interface RuntimeObjectInstanceSyncDeps {
@@ -82,7 +103,7 @@ interface CachedObjectRecords {
   readonly object: RuntimeWorldObject;
   readonly world: CompiledCellComplex;
   readonly archetypeKeys: readonly string[];
-  readonly records: readonly RuntimeObjectRenderRecord[];
+  readonly records: PortalGhostedRecords;
 }
 
 const meshKeySeparator = ":mesh:";
@@ -265,10 +286,12 @@ export function createRuntimeObjectInstanceSync(deps: RuntimeObjectInstanceSyncD
     return activeKeys;
   }
 
+  // The records of every source of the frame. Each source hands over `PortalGhostedRecords`, which exist only as the result of the one ghost
+  // function (with a measured render footprint) or of an explicit exemption with a reason, so no source can add raw records.
   function collectRecords(objects: readonly RuntimeWorldObject[]): readonly RuntimeObjectRenderRecord[] {
     const world = deps.getWorld();
     const seenIds = new Set<string>();
-    const records: RuntimeObjectRenderRecord[] = [];
+    const groups: PortalGhostedRecords[] = [];
     const carriedId = deps.session.get().carry?.objectId;
     let carriedObject: RuntimeWorldObject | undefined;
 
@@ -287,30 +310,30 @@ export function createRuntimeObjectInstanceSync(deps: RuntimeObjectInstanceSyncD
       const cached = recordCacheByObjectId.get(object.id);
 
       if (cached && cached.object === object && cached.world === world && sameStrings(cached.archetypeKeys, archetypeKeys)) {
-        records.push(...cached.records);
+        groups.push(cached.records);
         continue;
       }
 
-      let objectRecords: readonly RuntimeObjectRenderRecord[];
+      let objectRecords: PortalGhostedRecords;
       if (geodesic && object.kind === "geodesic-segment") {
         // A segment is computed per cell and continues as the next segment: it has no body parts to ghost.
-        objectRecords = collectGeodesicRuntimeRenderRecords(object, deps.geodesicArchetypeKeys);
+        objectRecords = exemptFromPortalGhosts("geodesic-segment", collectGeodesicRuntimeRenderRecords(object, deps.geodesicArchetypeKeys));
       } else if (geodesic) {
         // Cannon post and heads, intersection balloon: each body part is placed and ghosted like any other object.
         stats.ghostComputations += 1;
-        objectRecords = collectGeodesicBodyPlacements(object, deps.geodesicArchetypeKeys).flatMap((placement) =>
+        objectRecords = concatPortalGhostedRecords(collectGeodesicBodyPlacements(object, deps.geodesicArchetypeKeys).map((placement) =>
           collectRuntimeObjectRenderRecordsWithPortalGhosts({
             world,
             object: { ...runtimeObjectToDynamicObjectState(object), id: placement.objectId, localPose: placement.localPose },
             archetypeKeys: placement.archetypeKeys,
             renderFootprint: renderFootprintOf(archetypeKeyPrefix(placement.archetypeKeys[0]), placement.archetypeKeys),
           })
-        );
+        ));
       } else {
         stats.ghostComputations += 1;
         // An object whose archetypes are not collected yet draws nothing, so there is nothing to ghost.
         objectRecords = archetypeKeys.length === 0
-          ? []
+          ? exemptFromPortalGhosts("nothing-drawn", [])
           : collectRuntimeObjectRenderRecordsWithPortalGhosts({
             world,
             object,
@@ -320,12 +343,12 @@ export function createRuntimeObjectInstanceSync(deps: RuntimeObjectInstanceSyncD
       }
 
       recordCacheByObjectId.set(object.id, { object, world, archetypeKeys: [...archetypeKeys], records: objectRecords });
-      records.push(...objectRecords);
+      groups.push(objectRecords);
     }
 
     // The highlight has its own portal ghosts, decided by its own reach (see carryHighlight.ts), not by the object's records.
     if (carriedObject) {
-      records.push(...collectCarryHighlightRecords(carryHighlightObject(carriedObject), world));
+      groups.push(collectCarryHighlightRecords(carryHighlightObject(carriedObject), world));
     }
 
     for (const id of [...recordCacheByObjectId.keys()]) {
@@ -334,13 +357,26 @@ export function createRuntimeObjectInstanceSync(deps: RuntimeObjectInstanceSyncD
       }
     }
 
-    if (deps.playerRoverRenderModel) {
-      records.push(...deps.playerRoverRenderModel.collectRecords(deps.session.get().playerPose, renderSourcesByKey.keys()));
+    // The player's own avatar moves every frame, so it is never cached; it is ghosted like every other drawn part (the far side of a portal it stands at).
+    const rover = deps.playerRoverRenderModel;
+    if (rover) {
+      const roverKeys = archetypeKeysByPrefix.get(rover.archetypeKeyPrefix) ?? noKeys;
+      stats.ghostComputations += 1;
+      groups.push(
+        roverKeys.length === 0
+          ? exemptFromPortalGhosts("nothing-drawn", [])
+          : collectRuntimeObjectRenderRecordsWithPortalGhosts({
+            world,
+            object: rover.placement(deps.session.get().playerPose),
+            archetypeKeys: roverKeys,
+            renderFootprint: renderFootprintOf(rover.archetypeKeyPrefix, roverKeys),
+            recordFlags: rover.recordFlags,
+          }),
+      );
     }
 
-    return records;
+    return concatPortalGhostedRecords(groups);
   }
-
   function syncArchetypes(
     activeKeys: ReadonlySet<string>,
     recordsByArchetypeKey: ReadonlyMap<string, readonly RuntimeObjectRenderRecord[]>,

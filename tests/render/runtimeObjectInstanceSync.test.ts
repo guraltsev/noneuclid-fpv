@@ -172,16 +172,9 @@ describe("runtimeObjectInstanceSync", () => {
       root: roverSource.root,
       objectId: "rover",
       collectSources: () => [roverSource],
-      collectRecords: () => [
-        {
-          objectId: "rover",
-          cellId: "room-b",
-          archetypeKey: roverSource.archetypeKey,
-          localMatrix: new THREE.Matrix4(),
-          omitRootVisiblePath: true,
-          suppressWithinCameraDistanceMeters: 2,
-        },
-      ],
+      archetypeKeyPrefix: "player-avatar:rover",
+      placement: (pose) => ({ id: "rover", cellId: pose.cellId, localPose: yawRigidTransform3(0, pose.position) }),
+      recordFlags: { omitRootVisiblePath: true, suppressWithinCameraDistanceMeters: 2 },
     };
     const { sync, renderArchetypesByKey } = setup([mouse("mouse-1")], rover);
     const paths = { "room-b": [path("room-b", 5, 1)] };

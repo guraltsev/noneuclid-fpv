@@ -2,21 +2,21 @@
  * Render model for the player's own rover avatar.
  *
  * Instantiates the rover glTF from prepared assets, exposes its meshes as instancing sources, and
- * produces per-frame render records placing the avatar at the player pose. The pose is expressed in the
- * player's cell-local world frame (x right, y forward, z up, meters, yaw about +z) and converted to a
- * Three.js matrix through `rigidTransformToThreeMatrix`. Records are flagged to be hidden when the
- * camera is within 2 m so the avatar does not obstruct the first-person view.
+ * describes where the avatar stands for the player pose: the object (cell and cell-local pose, x right,
+ * y forward, z up, meters, yaw about +z) and the record flags (hidden when the camera is within 2 m, so
+ * the avatar does not obstruct the first-person view, and not drawn in the root cell itself). The instance
+ * sync turns that into render records through the one portal-ghost mechanism, like every other drawn part,
+ * so the avatar is also drawn on the far side of a portal it stands at.
  */
 import * as THREE from "three";
 import { yawRigidTransform3 } from "../../math/rigidTransform3";
 import type { PlayerPose } from "../../movement/playerPose";
 import type { PreparedWorldAssets } from "./preparedWorldAssets";
+import type { PortalGhostRecordFlags, PortalGhostRenderableObject } from "./runtimeObjectGhostRecords";
 import {
   collectRuntimeObjectRenderSourceMeshes,
-  type RuntimeObjectRenderRecord,
   type RuntimeObjectRenderSourceMesh,
 } from "./runtimeObjectRenderRecords";
-import { rigidTransformToThreeMatrix } from "./worldAxes";
 import { standardUserRobotObject } from "../../world-objects/library";
 
 /** Asset path of the rover glTF (taken from the standard user robot object definition). */
@@ -34,13 +34,12 @@ export interface PlayerRoverRenderModel {
   readonly objectId: string;
   /** Enumerates the rover's meshes as instancing sources, with archetype keys prefixed `player-avatar:<objectId>`. */
   collectSources(): readonly RuntimeObjectRenderSourceMesh[];
-  /**
-   * Returns one render record per rover mesh whose archetype key is in `archetypeKeys`, all sharing the pose matrix of `playerPose`.
-   */
-  collectRecords(
-    playerPose: PlayerPose,
-    archetypeKeys: Iterable<string>,
-  ): readonly RuntimeObjectRenderRecord[];
+  /** The archetype-key prefix of the rover's meshes (their keys are `<prefix>:mesh:<n>`); names the group a footprint is measured over. */
+  readonly archetypeKeyPrefix: string;
+  /** The rover as a placed object at `playerPose`: its id, cell and cell-local pose (yaw about +z at the feet position). */
+  placement(playerPose: PlayerPose): PortalGhostRenderableObject;
+  /** The record flags of every rover record, ghosts included: hidden near a camera, and not drawn in the root cell's own path. */
+  readonly recordFlags: PortalGhostRecordFlags;
 }
 
 /**
@@ -76,24 +75,19 @@ export function createPlayerRoverRenderModel(
         playerRoverArchetypePrefix,
       );
     },
-    collectRecords(playerPose, archetypeKeys) {
-      // Pose to Three.js matrix: yaw about world +z at the player position, then world-to-Three basis change.
-      const localMatrix = rigidTransformToThreeMatrix(
-        yawRigidTransform3(playerPose.yawRadians, playerPose.position),
-      );
-      const matchingArchetypeKeys = [...archetypeKeys]
-        .filter((key) => key.startsWith(`${playerRoverArchetypePrefix}:mesh:`));
-      const baseRecords = matchingArchetypeKeys.map((archetypeKey) => ({
-        objectId: playerRoverObjectId,
+    archetypeKeyPrefix: playerRoverArchetypePrefix,
+    placement(playerPose) {
+      return {
+        id: playerRoverObjectId,
         cellId: playerPose.cellId,
-        archetypeKey,
-        localMatrix,
-        // Avatar meshes are rendered via instancing records only; the root's own visibility path is skipped.
-        omitRootVisiblePath: true,
-        suppressWithinCameraDistanceMeters: playerRoverCameraSuppressionDistanceMeters,
-      }));
-
-      return baseRecords;
+        // Yaw about world +z at the player position; the record matrix adds the world-to-Three basis change.
+        localPose: yawRigidTransform3(playerPose.yawRadians, playerPose.position),
+      };
+    },
+    // Avatar meshes are rendered via instancing records only; the root's own visibility path is skipped.
+    recordFlags: {
+      omitRootVisiblePath: true,
+      suppressWithinCameraDistanceMeters: playerRoverCameraSuppressionDistanceMeters,
     },
   };
 }

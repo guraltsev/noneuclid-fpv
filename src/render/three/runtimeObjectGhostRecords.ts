@@ -14,8 +14,13 @@
  * Around a cone vertex the same cell can appear in two copies. Copies in the same cell whose centres are closer than
  * twice the footprint radius overlap, so only the first one (breadth-first order, the real object first) is kept.
  * This also merges the two wedges through which a flat copy is reached. See `_docs/MATHEMATICAL_MODEL.md` section 8.
+ *
+ * Every source of render records of the instance sync (ordinary objects, geodesic body parts, the carry highlight, the player's rover) hands over
+ * `PortalGhostedRecords`: records that came out of {@link collectRuntimeObjectRenderRecordsWithPortalGhosts}, which needs a footprint, or
+ * out of {@link exemptFromPortalGhosts}, which needs a stated reason. The sync accepts nothing else, so a new source cannot add raw records.
  */
 
+import type * as THREE from "three";
 import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex";
 import { collectDevelopedDisk } from "../../cell-complex/developedDisk";
 import { composeRigidTransform3, transformPoint3 } from "../../math/rigidTransform3";
@@ -26,6 +31,41 @@ import type { RenderFootprint, RuntimeObjectRenderRecord } from "./runtimeObject
 
 /** Default distance in meters (0.02) beyond which an object is considered too far from a portal wall to need a ghost. */
 export const defaultPortalGhostActivationClearanceMeters = 0.02;
+
+/** The record fields a drawn part may set besides its place, copied onto its own record and onto every ghost of it (the viewer's own body hides near the camera, for example). */
+export type PortalGhostRecordFlags = Pick<RuntimeObjectRenderRecord, "omitRootVisiblePath" | "suppressWithinCameraDistanceMeters">;
+
+declare const portalGhostedBrand: unique symbol;
+
+/**
+ * Render records that went through the portal-ghost rule: made by {@link collectRuntimeObjectRenderRecordsWithPortalGhosts} (a measured render
+ * footprint was required) or by {@link exemptFromPortalGhosts} (a reason was required). The instance sync takes only this type.
+ */
+export type PortalGhostedRecords = readonly RuntimeObjectRenderRecord[] & { readonly [portalGhostedBrand]: true };
+
+/** The records that deliberately get no portal ghosts, each with the reason. */
+export const portalGhostExemptions = {
+  "nothing-drawn": "the source draws nothing at the moment (no archetypes collected yet, or no shape to draw), so there is nothing to ghost",
+  "geodesic-segment":
+    "a segment is computed per cell and continues as the next segment of the geodesic in the next cell; ghosting it would draw it twice",
+} as const;
+
+/** Why a source of records is exempt from portal ghosts; the key of {@link portalGhostExemptions}. */
+export type PortalGhostExemption = keyof typeof portalGhostExemptions;
+
+/** Marks `records` as deliberately without portal ghosts, for a reason that {@link portalGhostExemptions} states. */
+export function exemptFromPortalGhosts(reason: PortalGhostExemption, records: readonly RuntimeObjectRenderRecord[]): PortalGhostedRecords {
+  if (!portalGhostExemptions[reason]) {
+    throw new Error(`Unknown portal-ghost exemption "${reason}".`);
+  }
+
+  return records as unknown as PortalGhostedRecords;
+}
+
+/** The concatenation of already-ghosted record groups (the parts of one object, say); still ghosted. */
+export function concatPortalGhostedRecords(groups: readonly PortalGhostedRecords[]): PortalGhostedRecords {
+  return groups.flat() as unknown as PortalGhostedRecords;
+}
 
 /** A dynamic object with an id, i.e. anything that can have ghost records. */
 export type PortalGhostRenderableObject = DynamicObjectState & {
@@ -47,6 +87,10 @@ export interface PortalGhostRuntimeObjectRenderRecordRequest {
    * Not read when `archetypeKeys` is empty (nothing is drawn, so nothing is ghosted).
    */
   readonly renderFootprint: RenderFootprint;
+  /** Copied onto every record, the object's own and each ghost. */
+  readonly recordFlags?: PortalGhostRecordFlags;
+  /** The part's own matrix in the object's frame (Three axes), applied after the object's pose to every record; identity when absent. */
+  readonly partMatrix?: THREE.Matrix4;
 }
 
 /**
@@ -56,9 +100,9 @@ export interface PortalGhostRuntimeObjectRenderRecordRequest {
  */
 export function collectRuntimeObjectRenderRecordsWithPortalGhosts(
   request: PortalGhostRuntimeObjectRenderRecordRequest,
-): readonly RuntimeObjectRenderRecord[] {
+): PortalGhostedRecords {
   const archetypeKeys = [...request.archetypeKeys];
-  const localMatrix = rigidTransformToThreeMatrix(request.object.localPose);
+  const localMatrix = withPartMatrix(rigidTransformToThreeMatrix(request.object.localPose), request.partMatrix);
 
   return [
     ...archetypeKeys.map((archetypeKey) => ({
@@ -66,9 +110,15 @@ export function collectRuntimeObjectRenderRecordsWithPortalGhosts(
       cellId: request.object.cellId,
       archetypeKey,
       localMatrix,
+      ...request.recordFlags,
     })),
     ...collectPortalGhostRuntimeObjectRenderRecords({ ...request, archetypeKeys }),
-  ];
+  ] as unknown as PortalGhostedRecords;
+}
+
+// The record matrix of a pose, followed by the part's own matrix when it has one (a new matrix; the arguments are not modified).
+function withPartMatrix(poseMatrix: THREE.Matrix4, partMatrix: THREE.Matrix4 | undefined): THREE.Matrix4 {
+  return partMatrix ? poseMatrix.clone().multiply(partMatrix) : poseMatrix;
 }
 
 /**
@@ -114,7 +164,10 @@ export function collectPortalGhostRuntimeObjectRenderRecords(
       continue;
     }
 
-    const ghostMatrix = rigidTransformToThreeMatrix(composeRigidTransform3(node.cellFromStart, object.localPose));
+    const ghostMatrix = withPartMatrix(
+      rigidTransformToThreeMatrix(composeRigidTransform3(node.cellFromStart, object.localPose)),
+      request.partMatrix,
+    );
 
     for (const archetypeKey of archetypeKeys) {
       records.push({
@@ -122,6 +175,7 @@ export function collectPortalGhostRuntimeObjectRenderRecords(
         cellId: node.cellId,
         archetypeKey,
         localMatrix: ghostMatrix,
+        ...request.recordFlags,
       });
     }
   }

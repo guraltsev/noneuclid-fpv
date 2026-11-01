@@ -21,3 +21,14 @@ Rules (maintainer, 2026-11-01):
   reaching the portal is ghosted while a collision cylinder reaching it is not, and that an unmeasurable model fails loudly.
 - Found while measuring: the butterfly's collision offset `y` has the opposite sign to the drawn model's centre (`butterflyAssetBounds.centerYMetersAtAuthorScale` is +0.036, the
   model's centre is at -0.036 in world y after the creature view's half turn): a 7 cm mismatch of the collision cylinder, not fixed here.
+- **Every source goes through one registration** (2026-11-01, after the player's rover turned out to have no ghosts because `playerRoverModel.collectRecords` pushed raw records outside the object loop).
+  The instance sync accepts only `PortalGhostedRecords` (`runtimeObjectGhostRecords.ts`): a branded array that exists only as the result of
+  `collectRuntimeObjectRenderRecordsWithPortalGhosts` (a measured footprint is required) or of `exemptFromPortalGhosts(reason, records)` (the reason is a key of
+  `portalGhostExemptions`: `geodesic-segment`, `nothing-drawn`). Raw records are a type error, so a new source cannot append them. The sources are listed in
+  `runtimeObjectRecordSources` (runtime objects, geodesic body parts, geodesic segments [exempt], carry highlight, player rover); the contract test's table is keyed by that list.
+  Static cell meshes (`cellRenderArchetypes`) and the debug meshes are not records: they are drawn per cell through the portal paths, not placed as objects.
+- **The player's rover**: `PlayerRoverRenderModel` no longer builds records; it gives `placement(playerPose)` (id, cell, yaw pose), `archetypeKeyPrefix` and `recordFlags`
+  (`omitRootVisiblePath`, `suppressWithinCameraDistanceMeters`). The ghost function copies the flags onto the own record and every ghost, so the avatar is hidden near a camera and
+  not drawn in the root cell's own path wherever it appears. Its drawn disk (from `rover.glb` at scale 0.1925 and the half turn) is centre (0, 0.146), radius 0.963 m, so the
+  player is ghosted within about 1 m of a portal. The rover is never cached (it moves every frame), so its ghost disk is recomputed each sync.
+- A part's own matrix in the object's frame (the highlight's ellipsoid scale) is the ghost request's `partMatrix`, applied to the own record and every ghost; do not post-process records.
