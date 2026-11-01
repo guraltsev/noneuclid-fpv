@@ -85,7 +85,7 @@ Four commits on branch `job-46` (from `job-47`): `3b4e2d0` (step 1), `d9262bf` (
   `{ state, effects }` plus `applyRuntimeCommand(session, command)`. Effects (`RuntimeEffect`) are listed in the order the host runs them, including where the
   palette is redrawn (`sync-palette`). `appCommandDispatcher.ts` is deleted; the shell has one `dispatchRuntimeCommand` that applies the reducer and runs the
   effects in `runRuntimeEffect`.
-- **Shell.** `createThreeApp.ts` has no `menuState = ` (was 39) and 31 top-level `let`s left (were about 46). The palette callbacks are one-line dispatches (about 200
+- **Shell.** `createThreeApp.ts` has no `menuState = ` (was 39) and 31 top-level `let`s left (were 43). The palette callbacks are one-line dispatches (about 200
   lines of handlers gone). The factories `aimInteraction`, `geodesicCannonTools`, `geodesicDebugDumps`, `debugVisualization`, `geodesicEmitterLabelController`,
   `runtimeObjectInstanceSync`, `toolObjectRuntimes`, `geometryComputerMenu`, `scenePaletteController` and `portalDebugRuntime` take the session (reads) and
   `dispatch` (writes); no deps interface has a get/set pair for shell state any more.
@@ -112,7 +112,7 @@ Four commits on branch `job-46` (from `job-47`): `3b4e2d0` (step 1), `d9262bf` (
   dispatch redraws too). Harmless but redundant.
 
 ### Not done
-- **`createThreeApp.ts` is 3,142 lines, not under 1,500** (it was 3,244 before job 46, 3,164 after step 1). The stretch goal was not reached: the file's size comes from the
+- **`createThreeApp.ts` is 3,142 non-blank lines (3,3xx with blanks), not under 1,500** (it was 3,244 non-blank lines before job 46). The stretch goal was not reached: the file's size comes from the
   frame loop, XR, geometry commits, the portal pass, the debug helpers and about 30 factory wirings, none of which is session state. Moving them out is job 33's subject.
 - **State left outside the session** (each is render or frame state, not something a UI action decides): the XR session and debug state (`xrSessionState`, `xrDebugState`,
   `activeXrSession`), `aimFrameSerial`, `visibleCellId`, the portal pass results (`latestVisibleResult`, `portalEyeRenderStates`, `portalInstanceRenderState`, ...),
