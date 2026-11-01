@@ -1340,7 +1340,7 @@ Defines AppState, the initial immutable bundle of compiled world, player body an
 
 | Kind | Name | Summary |
 | --- | --- | --- |
-| interface | `AppState` | Initial application state for one world run: compiled world, player body, player pose and selected tool. |
+| interface | `AppState` | Initial application state for one world run: compiled world, player body and player pose. |
 | function | `createInitialAppState` | Creates the AppState for a compiled world, placing the player at world.startingPosition (yaw and pitch default to 0) or at the default pose in cells[0]; throws if the world has no cells. |
 
 ### `runtime/publicApi.ts`
@@ -2106,6 +2106,15 @@ Utilities for combining the per-eye visibility results of stereo (VR) rendering 
 | function | `remapStereoPortalPathIds` | Reassigns path ids consecutively (from 0, in first-seen order) so equal `(root, pathId)` pairs share an id across eyes and different roots stay distinct; the input is not modified. |
 | function | `rankStereoUnionPaths` | Union of the eyes' paths, ranked round-robin: eye 0's next unseen path, eye 1's next unseen path, and so on. |
 | function | `countStereoPortalPaths` | Path statistics of a two-eye frame for the debug state (undefined unless there are exactly 2 eyes). |
+
+### `render/three/portalFrameRender.ts`
+
+Render-root list for the mono portal visibility pass.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `MonoPortalRenderRoots` | Reusable one-element render-root list for the mono pass. |
+| function | `createMonoPortalRenderRoots` | Creates the holder; the list it returns holds one root whose fields `set` overwrites. |
 
 ### `render/three/portalInstanceDebug.ts`
 

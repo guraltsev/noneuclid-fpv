@@ -25,8 +25,8 @@
  *    portal. Then the camera/XR rig is synced to the pose, the aim ray is resolved, and the selected tool
  *    handles the primary/carry/interact actions. Creatures, flags and curve-shortening geodesics advance.
  * 3. Portal visibility: `updateVisibleCell` shows only the player's cell mesh, the culling cameras are placed
- *    (one per eye in stereo XR), and `computeVisiblePortalPaths` (inside `syncPortalInstanceRender` /
- *    `syncStereoPortalInstanceRender`) selects visible portal paths from the static per-root cull tables.
+ *    (one per eye in stereo XR), and `computeVisiblePortalPaths` (inside `syncPortalInstances`)
+ *    selects visible portal paths from the static per-root cull tables.
  *    The portal pass builds one `FrameRenderSnapshot` (rendered root cell, visible paths, clip rows, viewer
  *    positions) and stores it as `latestFrameSnapshot`.
  * 4. Instance sync: visible paths become per-cell instanced-mesh transforms and clip-plane data
@@ -257,9 +257,9 @@ import {
   XrPortalEyeRenderRoot,
   XrPortalEyeRenderRootTarget,
   createXrPortalEyeRenderRootTarget,
-  identityRenderFromRootMatrix,
   resolveXrPortalEyeRenderRoot,
 } from "./xrPortalEye";
+import { createMonoPortalRenderRoots } from "./portalFrameRender";
 import { createPortalEyeActivator } from "./portalEyeActivation";
 import { createXrScenePaletteInput } from "./xrScenePaletteInput";
 import { createXrSessionRestartCoordinator } from "./xrSessionRestart";
@@ -879,8 +879,8 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   function currentFrameSnapshot(): FrameRenderSnapshot {
     return latestFrameSnapshot ?? createEmptyFrameRenderSnapshot(aimFrameSerial, playerPose.cellId);
   }
-  // Portal visibility results for the current frame. Written by syncPortalInstanceRender /
-  // syncStereoPortalInstanceRender (and cleared on geometry commit); read by debug and tooltip code.
+  // Portal visibility results for the current frame. Written by syncPortalInstances
+  // (and cleared on geometry commit); read by debug and tooltip code.
   let latestVisibleResult: ComputeVisiblePortalPathsResult | undefined;
   // Per-eye results in stereo XR (empty on desktop); activePortalEyeIndex is set while rendering each eye in
   // onBeforeRender via portalEyeActivator.
@@ -900,6 +900,8 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   });
   // One persistent camera and matrix per XR eye for re-rooted eyes (see resolveXrPortalEyeRenderRoot).
   const portalEyeRootTargets: XrPortalEyeRenderRootTarget[] = [];
+  // The one-element render-root list of the mono portal pass, rewritten in place each frame.
+  const monoPortalRoots = createMonoPortalRenderRoots(camera);
   // Scratch positions per eye for the frame snapshot; alias scratch, valid until the next portal pass.
   const runtimeObjectCameraPositionScratch: THREE.Vector3[] = [];
   const frameCameraPositions: THREE.Vector3[] = [];
@@ -1115,7 +1117,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   // Initial build: cell groups and archetypes, camera pose, first visibility pass (before any frame runs).
   rebuildCellMeshes();
   applyDesktopCameraPose();
-  syncPortalInstanceRender();
+  syncPlayerCellPortalInstances();
   // Dependencies for the portal debug runtime; `live` reads current shell state on demand. The runtime is
   // recreated (not mutated) when the world or debug settings change.
   const portalDebugRuntimeDeps: PortalDebugRuntimeDeps = {
@@ -1558,14 +1560,15 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     // Phase 3/4: compute visible portal paths (stereo: one result per eye, unioned) and write the instance
     // transforms and clip data consumed by onBeforeRender during renderer.render.
     if (xrActive && portalCullingCameras.length > 1) {
-      syncStereoPortalInstanceRender(portalCullingCameras.map(resolvePortalEyeRenderRoot));
+      syncPortalInstances(portalCullingCameras.map(resolvePortalEyeRenderRoot));
     } else {
       const cullingCamera = portalCullingCameras[0] ?? camera;
-      syncPortalInstanceRender(xrActive ? resolvePortalEyeRenderRoot(cullingCamera, 0) : {
-        rootCellId: playerPose.cellId,
-        camera: cullingCamera,
-        renderFromRootMatrix: identityRenderFromRootMatrix,
-      });
+      if (xrActive) {
+        const eyeRoot = resolvePortalEyeRenderRoot(cullingCamera, 0);
+        syncPortalInstances(monoPortalRoots.set(eyeRoot.rootCellId, eyeRoot.camera, eyeRoot.renderFromRootMatrix));
+      } else {
+        syncPortalInstances(monoPortalRoots.set(playerPose.cellId, cullingCamera));
+      }
     }
     // Phase 4 (objects): the only runtime-object instance write of the frame, from the snapshot the portal pass built.
     runtimeObjectInstanceSync.sync(currentFrameSnapshot());
@@ -1679,7 +1682,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     }
     // Cell instances of the new world are written now; the objects and the hitbox debug are synced later in this
     // same frame (the commit runs at frame start), so this does not write them.
-    syncPortalInstanceRender();
+    syncPlayerCellPortalInstances();
     syncDynamicObjectDebugWireframes();
     syncStaticObjectCollisionWireframes();
     applyDesktopCameraPose();
@@ -1901,7 +1904,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       hasActiveDebugOption(settings.debugLevel, settings.debugOptions, "runtime-diagnostics"),
     );
     rebuildCellMeshes();
-    syncPortalInstanceRender();
+    syncPlayerCellPortalInstances();
     portalDebugRuntime.dispose();
     portalDebugRuntime = createPortalDebugRuntime(portalDebugRuntimeDeps);
     logDebugStartupGuide(debugLevel, debugOptions);
@@ -2543,41 +2546,53 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     });
   }
 
-  // Mono visibility pass: computes visible portal paths from `renderRoot` and writes instance/clip data.
-  // Defaults to the player's cell and the main camera. If the root cell has no static cull table, visibility
-  // is cleared and nothing is instanced.
-  function syncPortalInstanceRender(
-    renderRoot: XrPortalEyeRenderRoot = {
-      rootCellId: playerPose.cellId,
-      camera,
-      renderFromRootMatrix: identityRenderFromRootMatrix,
-    },
-  ): void {
+  // Mono visibility pass from the player's cell with the main camera.
+  function syncPlayerCellPortalInstances(): void {
+    syncPortalInstances(monoPortalRoots.set(playerPose.cellId, camera));
+  }
+
+  // The one visibility pass. `renderRoots` holds one root per eye: a single root is the mono pass, several are the
+  // stereo (XR) pass. If any root cell has no static cull table, visibility is cleared and nothing is instanced.
+  function syncPortalInstances(renderRoots: readonly XrPortalEyeRenderRoot[]): void {
     portalInstanceDiagnostics.reset();
     portalEyeRenderStates = [];
     resetStereoPortalState();
     activePortalEyeIndex = 0;
     updatePortalClipMaterialTextureEye(portalClipMaterialState, activePortalEyeIndex);
-    const table =activeStaticCull().tables.tablesByRootCellId.get(renderRoot.rootCellId);
+    const hasTables = renderRoots.every((renderRoot) =>
+      activeStaticCull().tables.tablesByRootCellId.has(renderRoot.rootCellId)
+    );
 
-    if (!table) {
-      latestVisibleResult = undefined;
-      latestFrameSnapshot = createEmptyFrameRenderSnapshot(aimFrameSerial, renderRoot.rootCellId);
-      portalClipData.update([]);
-      updateCellRenderArchetypeInstances(cellRenderArchetypes, new Map(), portalInstanceDiagnostics);
-      portalInstanceRenderState = createPortalInstanceRenderDebugState(
-        cellRenderArchetypes,
-        new Map(),
-        portalInstanceDiagnostics,
-        {
-          enabled: false,
-          showCellPathRendersInstances,
-          normalVisiblePathRenderingActive: false,
-        },
-      );
-      return;
+    if (!hasTables) {
+      clearPortalInstances(renderRoots[0]?.rootCellId ?? playerPose.cellId);
+    } else if (renderRoots.length === 1) {
+      syncMonoPortalFrame(renderRoots[0]);
+    } else {
+      syncStereoPortalFrame(renderRoots);
     }
+  }
 
+  // Empty visibility result: no visible paths, no clip data, no instances.
+  function clearPortalInstances(rootCellId: string): void {
+    latestVisibleResult = undefined;
+    latestFrameSnapshot = createEmptyFrameRenderSnapshot(aimFrameSerial, rootCellId);
+    portalClipData.update([]);
+    updateCellRenderArchetypeInstances(cellRenderArchetypes, new Map(), portalInstanceDiagnostics);
+    portalInstanceRenderState = createPortalInstanceRenderDebugState(
+      cellRenderArchetypes,
+      new Map(),
+      portalInstanceDiagnostics,
+      {
+        enabled: false,
+        showCellPathRendersInstances,
+        normalVisiblePathRenderingActive: false,
+      },
+    );
+  }
+
+  // Mono pass body: computes visible portal paths from `renderRoot` (its cell has a static cull table).
+  function syncMonoPortalFrame(renderRoot: XrPortalEyeRenderRoot): void {
+    const table = activeStaticCull().tables.tablesByRootCellId.get(renderRoot.rootCellId)!;
     const computed = computeVisiblePortalPaths({
       world: activeWorld(),
       rootCellId: renderRoot.rootCellId,
@@ -2612,40 +2627,9 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     );
   }
 
-  // Stereo (per-eye) visibility pass for XR: each eye has its own root and result; the union of paths is
-  // instanced once and per-eye clip data selects the eye in onBeforeRender. latestVisibleResult holds eye 0
-  // only. If any eye's root cell lacks a cull table, visibility is cleared as in the mono pass.
-  function syncStereoPortalInstanceRender(renderRoots: readonly XrPortalEyeRenderRoot[]): void {
-    portalInstanceDiagnostics.reset();
-    const hasTables = renderRoots.every((renderRoot) =>
-      activeStaticCull().tables.tablesByRootCellId.has(renderRoot.rootCellId)
-    );
-
-    if (!hasTables) {
-      latestVisibleResult = undefined;
-      latestFrameSnapshot = createEmptyFrameRenderSnapshot(
-        aimFrameSerial,
-        renderRoots[0]?.rootCellId ?? playerPose.cellId,
-      );
-      portalEyeRenderStates = [];
-      resetStereoPortalState();
-      activePortalEyeIndex = 0;
-      updatePortalClipMaterialTextureEye(portalClipMaterialState, activePortalEyeIndex);
-      portalClipData.update([]);
-      updateCellRenderArchetypeInstances(cellRenderArchetypes, new Map(), portalInstanceDiagnostics);
-      portalInstanceRenderState = createPortalInstanceRenderDebugState(
-        cellRenderArchetypes,
-        new Map(),
-        portalInstanceDiagnostics,
-        {
-          enabled: false,
-          showCellPathRendersInstances,
-          normalVisiblePathRenderingActive: false,
-        },
-      );
-      return;
-    }
-
+  // Stereo pass body: each eye has its own root and result; the union of paths is instanced once and per-eye
+  // clip data selects the eye in onBeforeRender. latestVisibleResult holds eye 0 only.
+  function syncStereoPortalFrame(renderRoots: readonly XrPortalEyeRenderRoot[]): void {
     const frame = buildStereoPortalFrame({
       world: activeWorld(),
       staticCull: activeStaticCull(),
@@ -2697,22 +2681,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
         true,
       );
     } else {
-      latestFrameSnapshot = createEmptyFrameRenderSnapshot(
-        aimFrameSerial,
-        renderRoots[0]?.rootCellId ?? playerPose.cellId,
-      );
-      portalClipData.update([]);
-      updateCellRenderArchetypeInstances(cellRenderArchetypes, new Map(), portalInstanceDiagnostics);
-      portalInstanceRenderState = createPortalInstanceRenderDebugState(
-        cellRenderArchetypes,
-        new Map(),
-        portalInstanceDiagnostics,
-        {
-          enabled: false,
-          showCellPathRendersInstances,
-          normalVisiblePathRenderingActive: false,
-        },
-      );
+      clearPortalInstances(renderRoots[0]?.rootCellId ?? playerPose.cellId);
     }
   }
 

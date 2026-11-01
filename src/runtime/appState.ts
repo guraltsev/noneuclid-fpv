@@ -8,14 +8,12 @@ import { createDefaultPlayerBody, type PlayerBody } from "../movement/playerBody
 import { createDefaultPlayerPose, type PlayerPose } from "../movement/playerPose";
 
 /**
- * Initial application state for one world run: compiled world, player body, player pose and selected tool.
+ * Initial application state for one world run: compiled world, player body and player pose.
  */
 export interface AppState {
   readonly world: CompiledCellComplex;
   readonly playerBody: PlayerBody;
   readonly playerPose: PlayerPose;
-  /** Tool selected at startup; always "none" from createInitialAppState. */
-  readonly selectedTool: "none" | "straight-ray" | "marker";
 }
 
 /**
@@ -39,6 +37,5 @@ export function createInitialAppState(world: CompiledCellComplex): AppState {
           pitchRadians: world.startingPosition.pitchRadians ?? 0,
         }
       : createDefaultPlayerPose(startCell.id),
-    selectedTool: "none",
   };
 }
