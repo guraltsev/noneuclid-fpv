@@ -112,7 +112,7 @@ Four commits on branch `job-46` (from `job-47`): `3b4e2d0` (step 1), `d9262bf` (
   dispatch redraws too). Harmless but redundant.
 
 ### Not done
-- **`createThreeApp.ts` is 3,142 non-blank lines (3,3xx with blanks), not under 1,500** (it was 3,244 non-blank lines before job 46). The stretch goal was not reached: the file's size comes from the
+- **`createThreeApp.ts` is 3,142 non-blank lines (3,361 with blanks; 3,471 before), not under 1,500** (it was 3,244 non-blank lines before job 46). The stretch goal was not reached: the file's size comes from the
   frame loop, XR, geometry commits, the portal pass, the debug helpers and about 30 factory wirings, none of which is session state. Moving them out is job 33's subject.
 - **State left outside the session** (each is render or frame state, not something a UI action decides): the XR session and debug state (`xrSessionState`, `xrDebugState`,
   `activeXrSession`), `aimFrameSerial`, `visibleCellId`, the portal pass results (`latestVisibleResult`, `portalEyeRenderStates`, `portalInstanceRenderState`, ...),
