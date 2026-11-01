@@ -49,6 +49,28 @@ export interface PortalGhostRuntimeObjectRenderRecordRequest {
   readonly footprintOverride?: { readonly radiusMeters: number; readonly center: { readonly x: number; readonly y: number } };
 }
 
+/**
+ * The one way a part of an object gets its render records: one record per archetype key in the object's own cell, then its portal ghosts
+ * (see {@link collectPortalGhostRuntimeObjectRenderRecords}). The instance sync uses it for every ordinary object, for every body part of a geodesic
+ * object (cannon post, cannon heads, intersection balloon) and for the carry highlight, so no kind of object has portal-ghost logic of its own.
+ */
+export function collectRuntimeObjectRenderRecordsWithPortalGhosts(
+  request: PortalGhostRuntimeObjectRenderRecordRequest,
+): readonly RuntimeObjectRenderRecord[] {
+  const archetypeKeys = [...request.archetypeKeys];
+  const localMatrix = rigidTransformToThreeMatrix(request.object.localPose);
+
+  return [
+    ...archetypeKeys.map((archetypeKey) => ({
+      objectId: request.object.id,
+      cellId: request.object.cellId,
+      archetypeKey,
+      localMatrix,
+    })),
+    ...collectPortalGhostRuntimeObjectRenderRecords({ ...request, archetypeKeys }),
+  ];
+}
+
 /** Returns ghost render records, in every cell copy the object's footprint reaches (empty if none, or if the cell, footprint or key list is missing). */
 export function collectPortalGhostRuntimeObjectRenderRecords(
   request: PortalGhostRuntimeObjectRenderRecordRequest,

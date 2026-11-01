@@ -19,10 +19,10 @@ import type { RuntimeObjectRegistry, RuntimeWorldObject } from "../../world-obje
 import { runtimeObjectToDynamicObjectState } from "../../world-objects/runtimeObjectBase";
 import { collectCarryHighlightRecords, createCarryHighlightSource, type CarryHighlightObject } from "./carryHighlight";
 import type { FrameRenderSnapshot } from "./frameRenderSnapshot";
-import { collectGeodesicRuntimeRenderRecords } from "./geodesicCannonRenderer";
+import { collectGeodesicBodyPlacements, collectGeodesicRuntimeRenderRecords } from "./geodesicCannonRenderer";
 import type { PlayerRoverRenderModel } from "./playerRoverModel";
 import { updateRuntimeObjectRenderArchetypeInstances } from "./renderPortalInstances";
-import { collectPortalGhostRuntimeObjectRenderRecords } from "./runtimeObjectGhostRecords";
+import { collectRuntimeObjectRenderRecordsWithPortalGhosts } from "./runtimeObjectGhostRecords";
 import {
   type RuntimeObjectRenderArchetype,
   type RuntimeObjectRenderArchetypeDiagnostics,
@@ -39,7 +39,6 @@ import {
   placedFlagModelArchetypeKeyPrefix,
 } from "./runtimeObjectRenderRecords";
 import { isGeodesicRuntimeRenderObject, runtimeObjectArchetypeKeyPrefix } from "./runtimeSceneUtils";
-import { rigidTransformToThreeMatrix } from "./worldAxes";
 
 /** Inputs of {@link createRuntimeObjectInstanceSync}; the maps are shared with the tool object runtimes and mutated here. */
 export interface RuntimeObjectInstanceSyncDeps {
@@ -95,6 +94,11 @@ function carryHighlightObject(object: RuntimeWorldObject): CarryHighlightObject 
     id: object.id,
     carryHighlight: "carryHighlight" in object ? object.carryHighlight : undefined,
   };
+}
+// The archetype-key prefix (the key without its trailing `:mesh:<n>`), which names the source group a footprint is measured over.
+function archetypeKeyPrefix(archetypeKey: string): string {
+  const separator = archetypeKey.lastIndexOf(meshKeySeparator);
+  return separator < 0 ? archetypeKey : archetypeKey.slice(0, separator);
 }
 function sameStrings(left: readonly string[], right: readonly string[]): boolean {
   return left.length === right.length && left.every((value, index) => value === right[index]);
@@ -278,25 +282,28 @@ export function createRuntimeObjectInstanceSync(deps: RuntimeObjectInstanceSyncD
       }
 
       let objectRecords: readonly RuntimeObjectRenderRecord[];
-      if (geodesic) {
+      if (geodesic && object.kind === "geodesic-segment") {
+        // A segment is computed per cell and continues as the next segment: it has no body parts to ghost.
         objectRecords = collectGeodesicRuntimeRenderRecords(object, deps.geodesicArchetypeKeys);
-      } else {
-        const localMatrix = rigidTransformToThreeMatrix(object.localPose);
+      } else if (geodesic) {
+        // Cannon post and heads, intersection balloon: each body part is placed and ghosted like any other object.
         stats.ghostComputations += 1;
-        objectRecords = [
-          ...archetypeKeys.map((archetypeKey) => ({
-            objectId: object.id,
-            cellId: object.cellId,
-            archetypeKey,
-            localMatrix,
-          })),
-          ...collectPortalGhostRuntimeObjectRenderRecords({
+        objectRecords = collectGeodesicBodyPlacements(object, deps.geodesicArchetypeKeys).flatMap((placement) =>
+          collectRuntimeObjectRenderRecordsWithPortalGhosts({
             world,
-            object,
-            archetypeKeys,
-            footprintRadiusMeters: footprintRadius(prefix, archetypeKeys),
-          }),
-        ];
+            object: { ...runtimeObjectToDynamicObjectState(object), id: placement.objectId, localPose: placement.localPose },
+            archetypeKeys: placement.archetypeKeys,
+            footprintRadiusMeters: footprintRadius(archetypeKeyPrefix(placement.archetypeKeys[0]), placement.archetypeKeys),
+          })
+        );
+      } else {
+        stats.ghostComputations += 1;
+        objectRecords = collectRuntimeObjectRenderRecordsWithPortalGhosts({
+          world,
+          object,
+          archetypeKeys,
+          footprintRadiusMeters: footprintRadius(prefix, archetypeKeys),
+        });
       }
 
       recordCacheByObjectId.set(object.id, { object, world, archetypeKeys: [...archetypeKeys], records: objectRecords });

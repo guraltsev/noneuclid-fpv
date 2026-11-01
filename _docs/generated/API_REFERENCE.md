@@ -1821,7 +1821,7 @@ The translucent shape drawn around an object that is being carried.
 | const | `carryHighlightArchetypeKey` | Archetype key of the highlight shape. |
 | type | `CarryHighlightObject` | What the highlight needs of a carried object: an id, a pose, and a declared highlight shape or a collision shape to derive one from. |
 | function | `createCarryHighlightSource` | Builds the render source of the highlight: a unit sphere, scaled per record (non-uniformly for an ellipsoid) to the object it surrounds. |
-| function | `collectCarryHighlightRecords` | The records of the highlight shape for `object`: one in the object's own cell, and one in every other cell copy that the shape's own horizontal reach touches across portals (the portal ghosts of the shape). |
+| function | `collectCarryHighlightRecords` | The records of the highlight shape for `object`: one in the object's own cell, and one in every other cell copy that the shape's own horizontal reach touches across portals (the portal ghosts of the shape), through the … |
 
 ### `render/three/cellRenderArchetypes.ts`
 
@@ -2024,7 +2024,9 @@ Render sources and per-frame render records for geodesic cannons, geodesic segme
 | const | `geodesicRayEmitterPosition` | Position of the lightsaber (beam emission point) in the cannon's local Three.js frame, meters; y matches the beam height used for aiming and ray tracing. |
 | function | `createGeodesicRuntimeRenderSources` | Builds all source meshes for geodesic objects: four segment ribbon variants, cannon post, cannon head and intersection balloon. |
 | function | `getGeodesicRayArchetypeKeys` | Filters `sources` down to the archetype keys of cannon post and head meshes. |
-| function | `collectGeodesicRuntimeRenderRecords` | Produces the render records for one geodesic object, one per matching archetype mesh. |
+| interface | `GeodesicBodyPlacement` | A body part of a geodesic object: meshes drawn at a pose of the object (the cannon post, a cannon head, an intersection balloon). |
+| function | `collectGeodesicBodyPlacements` | The body parts of one geodesic object, in drawing order (none for a segment, and none when `geodesicArchetypeKeys` has no matching key). |
+| function | `collectGeodesicRuntimeRenderRecords` | Produces the render records of one geodesic object in its own cell, one per matching archetype mesh (no portal ghosts; the instance sync adds them for the body parts, see {@link collectGeodesicBodyPlacements}). |
 | function | `composeSegmentMatrix` | Returns the Three.js model matrix mapping the unit ribbon (x from 0 to 1) onto `segment`. |
 
 ### `render/three/geodesicCannonTools.ts`
@@ -2517,6 +2519,7 @@ Creates "ghost" render records so a dynamic object that overlaps a portal is dra
 | const | `defaultPortalGhostActivationClearanceMeters` | Default distance in meters (0.02) beyond which an object is considered too far from a portal wall to need a ghost. |
 | type | `PortalGhostRenderableObject` | A dynamic object with an id, i.e. |
 | interface | `PortalGhostRuntimeObjectRenderRecordRequest` | Input for ghost-record collection. |
+| function | `collectRuntimeObjectRenderRecordsWithPortalGhosts` | The one way a part of an object gets its render records: one record per archetype key in the object's own cell, then its portal ghosts (see {@link collectPortalGhostRuntimeObjectRenderRecords}). |
 | function | `collectPortalGhostRuntimeObjectRenderRecords` | Returns ghost render records, in every cell copy the object's footprint reaches (empty if none, or if the cell, footprint or key list is missing). |
 
 ### `render/three/runtimeObjectInstanceSync.ts`

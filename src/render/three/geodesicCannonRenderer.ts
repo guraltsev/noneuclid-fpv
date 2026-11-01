@@ -16,7 +16,7 @@ import {
   type GeodesicIntersectionObject,
   type GeodesicSegmentObject,
 } from "../../world-objects/geodesic/objects";
-import { yawRigidTransform3 } from "../../math/rigidTransform3";
+import { yawRigidTransform3, type RigidTransform3 } from "../../math/rigidTransform3";
 import { collectRuntimeObjectRenderSourceMeshes, type RuntimeObjectRenderRecord, type RuntimeObjectRenderSourceMesh } from "./runtimeObjectRenderRecords";
 import type { PreparedWorldAssets } from "./preparedWorldAssets";
 import { rigidTransformToThreeMatrix } from "./worldAxes";
@@ -98,7 +98,62 @@ export function getGeodesicRayArchetypeKeys(
 }
 
 /**
- * Produces the render records for one geodesic object, one per matching archetype mesh.
+ * A body part of a geodesic object: meshes drawn at a pose of the object (the cannon post, a cannon head, an intersection balloon).
+ *
+ * A body part is an ordinary rigid object piece, so it gets portal ghosts exactly like the parts of any other object (the instance sync sends
+ * every placement through `collectRuntimeObjectRenderRecordsWithPortalGhosts`). A geodesic segment is not a body part: it is computed per cell
+ * and continues in the next cell as the next segment, so it has no placement and no ghosts (ghosting it would draw it twice).
+ */
+export interface GeodesicBodyPlacement {
+  /** Object id of the records of this part (`<cannonId>:<geodesicId>:head` for a head). */
+  readonly objectId: string;
+  /** Cell whose frame `localPose` uses. */
+  readonly cellId: string;
+  /** Cell-local pose of the part; its ghosts are this pose carried through the developed portals. */
+  readonly localPose: RigidTransform3;
+  /** Archetype keys of the part's meshes (only keys that exist in the built sources). */
+  readonly archetypeKeys: readonly string[];
+}
+
+/**
+ * The body parts of one geodesic object, in drawing order (none for a segment, and none when `geodesicArchetypeKeys` has no matching key).
+ *
+ * For a cannon: the post at the cannon pose, plus one head per geodesic id with the head yawed to that emitter's aim (falls back to the active
+ * geodesic id when the cannon lists none). For an intersection: the balloon at its pose.
+ */
+export function collectGeodesicBodyPlacements(
+  object: GeodesicCannonObject | GeodesicSegmentObject | GeodesicIntersectionObject,
+  geodesicArchetypeKeys: readonly string[] = [],
+): readonly GeodesicBodyPlacement[] {
+  const keysWithPrefix = (prefix: string): readonly string[] => geodesicArchetypeKeys.filter((key) => key.startsWith(`${prefix}:`));
+  const placements: GeodesicBodyPlacement[] = [];
+
+  if (object.kind === "geodesic-cannon") {
+    placements.push({ objectId: object.id, cellId: object.cellId, localPose: object.localPose, archetypeKeys: keysWithPrefix(geodesicRayPostArchetypePrefix) });
+    const headKeys = keysWithPrefix(geodesicRayHeadArchetypePrefix);
+    const geodesicIds = object.geodesicIds.length > 0
+      ? object.geodesicIds
+      : object.activeGeodesicId
+        ? [object.activeGeodesicId]
+        : [];
+    for (const geodesicId of geodesicIds) {
+      placements.push({
+        objectId: `${object.id}:${geodesicId}:head`,
+        cellId: object.cellId,
+        localPose: emitterYawPose(object, geodesicId),
+        archetypeKeys: headKeys,
+      });
+    }
+  } else if (object.kind === "geodesic-intersection") {
+    placements.push({ objectId: object.id, cellId: object.cellId, localPose: object.localPose, archetypeKeys: keysWithPrefix(geodesicIntersectionArchetypePrefix) });
+  }
+
+  return placements.filter((placement) => placement.archetypeKeys.length > 0);
+}
+
+/**
+ * Produces the render records of one geodesic object in its own cell, one per matching archetype mesh (no portal ghosts; the instance sync adds
+ * them for the body parts, see {@link collectGeodesicBodyPlacements}).
  *
  * For a cannon: one record per post mesh at the cannon pose, plus one record per (geodesic id, head mesh) with the head yawed to that
  * emitter's aim (`<cannonId>:<geodesicId>:head` object ids; falls back to the active geodesic id when the cannon lists none).
@@ -110,40 +165,16 @@ export function collectGeodesicRuntimeRenderRecords(
   object: GeodesicCannonObject | GeodesicSegmentObject | GeodesicIntersectionObject,
   geodesicArchetypeKeys: readonly string[] = [],
 ): readonly RuntimeObjectRenderRecord[] {
-  if (object.kind === "geodesic-cannon") {
-    const localMatrix = rigidTransformToThreeMatrix(object.localPose);
-    const postRecords = geodesicArchetypeKeys
-      .filter((key) => key.startsWith(`${geodesicRayPostArchetypePrefix}:`))
-      .map((archetypeKey) => ({
-        objectId: object.id,
-        cellId: object.cellId,
+  if (object.kind === "geodesic-cannon" || object.kind === "geodesic-intersection") {
+    return collectGeodesicBodyPlacements(object, geodesicArchetypeKeys).flatMap((placement) => {
+      const localMatrix = rigidTransformToThreeMatrix(placement.localPose);
+      return placement.archetypeKeys.map((archetypeKey) => ({
+        objectId: placement.objectId,
+        cellId: placement.cellId,
         archetypeKey,
         localMatrix,
       }));
-    const headKeys = geodesicArchetypeKeys.filter((key) => key.startsWith(`${geodesicRayHeadArchetypePrefix}:`));
-    const geodesicIds = object.geodesicIds.length > 0
-      ? object.geodesicIds
-      : object.activeGeodesicId
-        ? [object.activeGeodesicId]
-        : [];
-    const headRecords = geodesicIds.flatMap((geodesicId) => headKeys.map((archetypeKey) => ({
-      objectId: `${object.id}:${geodesicId}:head`,
-      cellId: object.cellId,
-      archetypeKey,
-      localMatrix: composeEmitterYawMatrix(object, geodesicId),
-    })));
-    return [...postRecords, ...headRecords];
-  }
-
-  if (object.kind === "geodesic-intersection") {
-    return geodesicArchetypeKeys
-      .filter((key) => key.startsWith(`${geodesicIntersectionArchetypePrefix}:`))
-      .map((archetypeKey) => ({
-        objectId: object.id,
-        cellId: object.cellId,
-        archetypeKey,
-        localMatrix: rigidTransformToThreeMatrix(object.localPose),
-      }));
+    });
   }
 
   return [
@@ -164,9 +195,9 @@ export function collectGeodesicRuntimeRenderRecords(
 }
 
 // Yaw about world +z at the cannon's position, using the per-geodesic emitter yaw when set, else the cannon's aim yaw.
-function composeEmitterYawMatrix(cannon: GeodesicCannonObject, geodesicId: string): THREE.Matrix4 {
+function emitterYawPose(cannon: GeodesicCannonObject, geodesicId: string): RigidTransform3 {
   const yawRadians = cannon.geodesicEmitterYawRadiansById?.[geodesicId] ?? cannon.aimYawRadians;
-  return rigidTransformToThreeMatrix(yawRigidTransform3(yawRadians, cannon.localPose.translation));
+  return yawRigidTransform3(yawRadians, cannon.localPose.translation);
 }
 
 /**

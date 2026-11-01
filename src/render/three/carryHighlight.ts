@@ -13,9 +13,9 @@ import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex"
 import { transformPoint3 } from "../../math/rigidTransform3";
 import type { DynamicObjectState } from "../../movement/dynamicObject";
 import { carryHighlightShapeOf, type CarryHighlightShape } from "../../world-objects/carryHighlightShape";
-import { collectPortalGhostRuntimeObjectRenderRecords } from "./runtimeObjectGhostRecords";
+import { collectRuntimeObjectRenderRecordsWithPortalGhosts } from "./runtimeObjectGhostRecords";
 import { collectRuntimeObjectRenderSourceMeshes, type RuntimeObjectRenderRecord, type RuntimeObjectRenderSourceMesh } from "./runtimeObjectRenderRecords";
-import { rigidTransformToThreeMatrix, worldPointToThree } from "./worldAxes";
+import { worldPointToThree } from "./worldAxes";
 
 /** Archetype-key prefix of the highlight shape (the key is `<prefix>:mesh:0`). */
 export const carryHighlightArchetypePrefix = "carry-highlight";
@@ -50,13 +50,12 @@ export function createCarryHighlightSource(): RuntimeObjectRenderSourceMesh {
 
 /**
  * The records of the highlight shape for `object`: one in the object's own cell, and one in every other cell copy that the shape's own
- * horizontal reach touches across portals (the portal ghosts of the shape).
+ * horizontal reach touches across portals (the portal ghosts of the shape), through the general ghost mechanism
+ * (`collectRuntimeObjectRenderRecordsWithPortalGhosts`).
  *
- * The ghosts are decided by the shape's reach, not by the object's collision footprint or by where the object's own meshes have records: the
- * shape is wider than a thin object (an emitter's post), and some objects (geodesic emitters) have no ghosts of their own. So the shape is
- * always whole on the side of a portal the viewer is on, never cut at the portal. A ghost that lands on the same place as the shape itself
- * in the viewer's frame is drawn once, unclipped, by the instance writer. Returns nothing when the object declares no shape and has no
- * collision shape to derive a sphere from.
+ * The ghosts are decided by the shape's reach, not by the object's collision footprint: the shape can be wider than a thin object (an
+ * emitter's post). So the shape is always whole on the side of a portal the viewer is on, never cut at the portal. Returns nothing when the
+ * object declares no shape and has no collision shape to derive a sphere from.
  */
 export function collectCarryHighlightRecords(
   object: CarryHighlightObject,
@@ -77,31 +76,12 @@ export function collectCarryHighlightRecords(
   // The shape's horizontal reach from its centre (the longest horizontal semi-axis), around the centre's cell-local place.
   const reach = Math.max(Math.abs(shape.radii.x), Math.abs(shape.radii.y));
   const centreInCell = transformPoint3(object.localPose, { x: shape.centre.x, y: shape.centre.y, z: 0 });
-  const places: readonly RuntimeObjectRenderRecord[] = [
-    {
-      objectId: highlightId,
-      cellId: object.cellId,
-      archetypeKey: carryHighlightArchetypeKey,
-      localMatrix: rigidTransformToThreeMatrix(object.localPose),
-    },
-    ...collectPortalGhostRuntimeObjectRenderRecords({
-      world,
-      object: { ...object, id: highlightId },
-      archetypeKeys: [carryHighlightArchetypeKey],
-      footprintOverride: { radiusMeters: reach, center: { x: centreInCell.x, y: centreInCell.y } },
-    }),
-  ];
-  const seen = new Set<string>();
-  const highlights: RuntimeObjectRenderRecord[] = [];
-
-  for (const place of places) {
-    const key = `${place.cellId}|${place.localMatrix.elements.join(",")}`;
-    if (seen.has(key)) {
-      continue;
-    }
-    seen.add(key);
-    highlights.push({ ...place, localMatrix: place.localMatrix.clone().multiply(fromCentre) });
-  }
-
-  return highlights;
+  // The same general mechanism as every other part of every object: the record in the object's own cell and its portal ghosts, the ghost disk
+  // taken around the shape's centre with the shape's own reach (the object's collision footprint would be too small for a wide shape).
+  return collectRuntimeObjectRenderRecordsWithPortalGhosts({
+    world,
+    object: { ...object, id: highlightId },
+    archetypeKeys: [carryHighlightArchetypeKey],
+    footprintOverride: { radiusMeters: reach, center: { x: centreInCell.x, y: centreInCell.y } },
+  }).map((record) => ({ ...record, localMatrix: record.localMatrix.clone().multiply(fromCentre) }));
 }
