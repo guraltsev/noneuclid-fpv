@@ -94,6 +94,21 @@ export interface GeneralDebugHelpers {
   DumpLockedGeodesicWords(): readonly GeodesicWordDebugDump[];
   /** Moves the owned object `id` to `cellId` at cell-local (x, y) meters with the given yaw in degrees; logs and returns whether the object has an owner. */
   placeObjectAt(id: string, cellId: string, x: number, y: number, yawDegrees: number): boolean;
+  /** The player's pose: cell, cell-local feet position (meters) and view angles in degrees. */
+  playerPose(): PlayerPoseDebugDump;
+  /** Puts the player at `cellId`, cell-local (x, y) meters on the floor, with the given yaw and pitch in degrees (pitch keeps its value when omitted); throws for an unknown cell or a non-finite number; returns the pose set. */
+  setPlayerPose(cellId: string, x: number, y: number, yawDegrees: number, pitchDegrees?: number): PlayerPoseDebugDump;
+}
+
+/** The player's pose as plain data; the inverse of what `setPlayerPose` takes. */
+export interface PlayerPoseDebugDump {
+  readonly cellId: string;
+  /** Feet position in the cell-local frame, meters (z is the height above the floor). */
+  readonly position: { readonly x: number; readonly y: number; readonly z: number };
+  /** Heading about +z, counterclockwise from above (yaw 0 looks along +y), degrees. */
+  readonly yawDegrees: number;
+  /** Look elevation, degrees; negative looks down. */
+  readonly pitchDegrees: number;
 }
 
 /** Implementations supplied by createThreeApp#shell to {@link installGeneralDebugHelpers}; each callback is stored as given. */
@@ -104,6 +119,8 @@ export interface GeneralDebugHelperCallbacks {
   readonly dumpGeodesicPath: (geodesicId?: string) => GeodesicPathDebugDump | undefined;
   readonly dumpLockedGeodesicWords: () => readonly GeodesicWordDebugDump[];
   readonly placeObjectAt: (id: string, cellId: string, x: number, y: number, yawDegrees: number) => boolean;
+  readonly playerPose: () => PlayerPoseDebugDump;
+  readonly setPlayerPose: (cellId: string, x: number, y: number, yawDegrees: number, pitchDegrees?: number) => PlayerPoseDebugDump;
 }
 
 /** The window object augmented with the optional general debug globals. */
@@ -316,6 +333,8 @@ export function installGeneralDebugHelpers(callbacks: GeneralDebugHelperCallback
     dump_locked_geodesic_words: callbacks.dumpLockedGeodesicWords,
     DumpLockedGeodesicWords: callbacks.dumpLockedGeodesicWords,
     placeObjectAt: callbacks.placeObjectAt,
+    playerPose: callbacks.playerPose,
+    setPlayerPose: callbacks.setPlayerPose,
   };
 
   target.debug_help = helpers.debug_help;
@@ -331,6 +350,8 @@ export function installGeneralDebugHelpers(callbacks: GeneralDebugHelperCallback
     dumpGeodesicPath: callbacks.dumpGeodesicPath,
     dumpLockedGeodesicWords: callbacks.dumpLockedGeodesicWords,
     placeObjectAt: callbacks.placeObjectAt,
+    playerPose: callbacks.playerPose,
+    setPlayerPose: callbacks.setPlayerPose,
   });
 }
 

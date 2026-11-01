@@ -211,7 +211,7 @@ It does not answer questions about stereo or controller input; those need a head
 `npm run cdp` has a second backend that reaches any device (a headset, another desktop) through the local server
 ([DEPLOYMENT.md](DEPLOYMENT.md), "Local HTTPS server for a headset"). Every page served by that server joins a
 WebSocket channel and exposes its public API, `window.noneuclid.api`: namespaces `app` (`info`, `changeWorld`,
-`changeConfig`, `reload`), `debug`, `portal`, `geometry` (torus-skew worlds only) and `view` (`screenshot`). A call is a
+`changeConfig`, `reload`), `debug` (including `playerPose` and `setPlayerPose`), `portal`, `render` (see 3b), `geometry` (torus-skew worlds only) and `view` (`screenshot`). A call is a
 literal function call on that object; `help` lists what exists.
 
 ```powershell
@@ -235,6 +235,31 @@ npm run cdp -- --server wss://192.168.1.50:11446 console 15
 - A self-signed certificate is accepted with a warning; pass `--ca <file>` to trust a certificate file instead.
 - `help` and `call` also work on the DevTools backend (without `--server`), evaluated in the attached page.
 - `shot` fails while the device is presenting in XR.
+
+## 3b. Reproducing a scene and inspecting the render pipeline
+
+For a bug of the kind "this object is missing, or cut off, on the far side of a portal", put the player in a reproducible place and ask the
+pipeline what it did. All of it is plain data over the public API, so it works on the DevTools backend and on any device through the server.
+
+```powershell
+npm run cdp -- call debug.setPlayerPose '"face-c"' 9.96735 6.593276 -58.12 -11.75   # cell, x, y (cell-local meters), yaw, pitch (degrees)
+npm run cdp -- call debug.playerPose                                                 # the same, read back
+npm run cdp -- shot scene.png
+```
+
+The `render` namespace reads what the last frame's instance sync did; it changes nothing and costs nothing per frame while it is not called.
+Positions are in world axes (x, y, z up), in the frame named in each field (`positionInCell`: the record's cell; `positionInRoot`: the rendered root cell).
+
+| Call | Answers |
+| --- | --- |
+| `render.recordSources` | Which sources made render records (`runtime-objects`, `geodesic-body-parts`, `geodesic-segments`, `carry-highlight`, `player-rover`) and how many. |
+| `render.records {objectId?, source?, archetypePrefix?, limit?}` | The records themselves: object, cell, archetype key, where the record puts the object in its cell, and its flags (`omitRootVisiblePath`, `suppressWithinCameraDistanceMeters`). A ghost is a record in another cell than the object's own. |
+| `render.explainGhosts <objectId>` | For each drawn part of the object (the player's rover included): the render footprint used, the developed disk it asked for, and for every cell copy the disk reached whether it is the `own` cell, gets a `ghost`, or is dropped as a `duplicate` of a kept copy. Same code as the records come from. |
+| `render.instances {archetypePrefix?, objectId?, detail?, limit?}` | The live archetypes: capacity, instances drawn, instances per destination cell and, with `detail`, each instance's path id, cell, depth, clip row (`-2` unclipped, `-1` no slot) and root-frame position. |
+| `render.explainInstances <objectId>` | For every record of the object and every visible path to its cell: `written`, `omitted-root-path`, `suppressed-near-camera` (with the distance to the camera), `merged-into-root-copy` or `over-capacity`. Re-runs the writer on the last frame's inputs, so it writes what it wrote before. |
+
+A missing far-side copy is then a three-step question: is there a record in that cell (`records`), did the ghost rule keep the cell copy
+(`explainGhosts`), and was the record drawn on the visible paths to that cell (`explainInstances`).
 
 ## 4. Ending the session
 

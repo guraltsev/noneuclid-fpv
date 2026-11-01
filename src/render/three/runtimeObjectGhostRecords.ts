@@ -22,7 +22,7 @@
 
 import type * as THREE from "three";
 import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex";
-import { collectDevelopedDisk } from "../../cell-complex/developedDisk";
+import { collectDevelopedDisk, type DevelopedDiskNode } from "../../cell-complex/developedDisk";
 import { composeRigidTransform3, transformPoint3 } from "../../math/rigidTransform3";
 import { vec3 } from "../../math/vec3";
 import type { DynamicObjectState } from "../../movement/dynamicObject";
@@ -121,18 +121,50 @@ function withPartMatrix(poseMatrix: THREE.Matrix4, partMatrix: THREE.Matrix4 | u
   return partMatrix ? poseMatrix.clone().multiply(partMatrix) : poseMatrix;
 }
 
-/**
- * Returns ghost render records, in every cell copy the object's render footprint reaches (empty if none, or if the cell or key list is missing).
- * Throws if the footprint radius is not positive: an unmeasured drawn part must fail loudly, not be left without ghosts.
- */
-export function collectPortalGhostRuntimeObjectRenderRecords(
-  request: PortalGhostRuntimeObjectRenderRecordRequest,
-): readonly RuntimeObjectRenderRecord[] {
-  const { object, world } = request;
-  const archetypeKeys = [...request.archetypeKeys];
+/** What the ghost rule decided for one cell copy the developed disk reached. */
+export interface PortalGhostCopyDecision {
+  /** Position in the disk's breadth-first order; 0 is the object's own cell. */
+  readonly index: number;
+  readonly cellId: string;
+  /** Portal hops from the object's own cell. */
+  readonly depth: number;
+  /** Side of this copy through which the disk reached it; undefined for the own cell. */
+  readonly entrySideIndex?: number;
+  /** The footprint centre in this copy's cell frame (x, y meters). */
+  readonly center: { readonly x: number; readonly y: number };
+  /** "own": the object's own cell; "ghost": a record is made; "duplicate": dropped because it overlaps the kept copy `duplicateOfIndex` in the same cell. */
+  readonly outcome: "own" | "ghost" | "duplicate";
+  readonly duplicateOfIndex?: number;
+}
 
-  if (archetypeKeys.length === 0 || !world.cellsById.has(object.cellId)) {
-    return [];
+/** The decision of the ghost rule for one drawn part, as plain data (see {@link explainPortalGhosts}). */
+export interface PortalGhostExplanation {
+  readonly objectId: string;
+  readonly cellId: string;
+  /** The footprint used, in the object's own frame. */
+  readonly footprint: RenderFootprint;
+  /** The footprint centre in the object's cell frame (x, y meters), the disk's centre before the disk's own inward nudge. */
+  readonly diskCenter: { readonly x: number; readonly y: number };
+  /** Footprint radius plus the activation clearance: the radius asked of the developed disk. */
+  readonly diskRadiusMeters: number;
+  readonly activationClearanceMeters: number;
+  /** True when the disk stopped at its node limit, so some reachable copies may be missing. */
+  readonly truncated: boolean;
+  readonly copies: readonly PortalGhostCopyDecision[];
+}
+
+interface PortalGhostDevelopment {
+  readonly explanation: PortalGhostExplanation;
+  /** The disk nodes that get a ghost record, with their index in the explanation's `copies`. */
+  readonly ghostNodes: readonly { readonly node: DevelopedDiskNode; readonly index: number }[];
+}
+
+// The one place the ghost rule is decided: the records and the explanation both come from it.
+function developPortalGhosts(request: PortalGhostRuntimeObjectRenderRecordRequest): PortalGhostDevelopment | undefined {
+  const { object, world } = request;
+
+  if (!world.cellsById.has(object.cellId)) {
+    return undefined;
   }
 
   const radius = request.renderFootprint.radiusMeters;
@@ -145,33 +177,87 @@ export function collectPortalGhostRuntimeObjectRenderRecords(
   const center = transformPoint3(object.localPose, vec3(request.renderFootprint.center.x, request.renderFootprint.center.y, 0));
   const clearance = request.activationClearanceMeters ?? defaultPortalGhostActivationClearanceMeters;
   const disk = collectDevelopedDisk({ world, cellId: object.cellId, center, radiusMeters: radius + clearance });
-  const kept: { readonly cellId: string; readonly x: number; readonly y: number }[] = [];
-  const records: RuntimeObjectRenderRecord[] = [];
+  const kept: { readonly index: number; readonly cellId: string; readonly x: number; readonly y: number }[] = [];
+  const copies: PortalGhostCopyDecision[] = [];
+  const ghostNodes: { readonly node: DevelopedDiskNode; readonly index: number }[] = [];
 
   for (const [index, node] of disk.nodes.entries()) {
     const ghostCenter = transformPoint3(node.cellFromStart, vec3(center.x, center.y, 0));
-    const conflicts = kept.some(
+    const conflict = kept.find(
       (other) => other.cellId === node.cellId && Math.hypot(other.x - ghostCenter.x, other.y - ghostCenter.y) < 2 * radius,
     );
+    const base = { index, cellId: node.cellId, depth: node.depth, entrySideIndex: node.entrySideIndex, center: { x: ghostCenter.x, y: ghostCenter.y } };
 
-    if (conflicts) {
+    if (conflict) {
+      copies.push({ ...base, outcome: "duplicate", duplicateOfIndex: conflict.index });
       continue;
     }
 
-    kept.push({ cellId: node.cellId, x: ghostCenter.x, y: ghostCenter.y });
+    kept.push({ index, cellId: node.cellId, x: ghostCenter.x, y: ghostCenter.y });
 
     if (index === 0) {
+      copies.push({ ...base, outcome: "own" });
       continue;
     }
 
+    copies.push({ ...base, outcome: "ghost" });
+    ghostNodes.push({ node, index });
+  }
+
+  return {
+    explanation: {
+      objectId: object.id,
+      cellId: object.cellId,
+      footprint: request.renderFootprint,
+      diskCenter: { x: center.x, y: center.y },
+      diskRadiusMeters: radius + clearance,
+      activationClearanceMeters: clearance,
+      truncated: disk.truncated,
+      copies,
+    },
+    ghostNodes,
+  };
+}
+
+/**
+ * Returns what the ghost rule decides for a drawn part, as plain data: the disk it develops and, for every cell copy the disk reaches, whether the
+ * copy is the object's own cell, gets a ghost record, or is dropped as a duplicate of a kept copy. It is the same code as the records come from.
+ * Undefined if the object's cell is not in the world. Throws if the footprint radius is not positive, like the record collection.
+ */
+export function explainPortalGhosts(request: PortalGhostRuntimeObjectRenderRecordRequest): PortalGhostExplanation | undefined {
+  return developPortalGhosts(request)?.explanation;
+}
+
+/**
+ * Returns ghost render records, in every cell copy the object's render footprint reaches (empty if none, or if the cell or key list is missing).
+ * Throws if the footprint radius is not positive: an unmeasured drawn part must fail loudly, not be left without ghosts.
+ */
+export function collectPortalGhostRuntimeObjectRenderRecords(
+  request: PortalGhostRuntimeObjectRenderRecordRequest,
+): readonly RuntimeObjectRenderRecord[] {
+  const archetypeKeys = [...request.archetypeKeys];
+
+  if (archetypeKeys.length === 0) {
+    return [];
+  }
+
+  const development = developPortalGhosts(request);
+
+  if (!development) {
+    return [];
+  }
+
+  const records: RuntimeObjectRenderRecord[] = [];
+
+  for (const { node } of development.ghostNodes) {
     const ghostMatrix = withPartMatrix(
-      rigidTransformToThreeMatrix(composeRigidTransform3(node.cellFromStart, object.localPose)),
+      rigidTransformToThreeMatrix(composeRigidTransform3(node.cellFromStart, request.object.localPose)),
       request.partMatrix,
     );
 
     for (const archetypeKey of archetypeKeys) {
       records.push({
-        objectId: object.id,
+        objectId: request.object.id,
         cellId: node.cellId,
         archetypeKey,
         localMatrix: ghostMatrix,

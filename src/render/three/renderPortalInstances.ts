@@ -323,6 +323,23 @@ export function updateCellRenderArchetypeInstances(
   }
 }
 
+/** What the instance writer did with one record on one visible path of the record's cell (see `onDecision` of {@link updateRuntimeObjectRenderArchetypeInstances}). */
+export interface RuntimeObjectInstanceDecision {
+  readonly record: RuntimeObjectRenderRecord;
+  readonly path: VisiblePortalPath;
+  /**
+   * "written": an instance was written (`instanceIndex`); "omitted-root-path": the record skips the depth-0 path; "suppressed-near-camera":
+   * the instance would lie within the record's suppression distance of a camera (`cameraDistanceMeters`); "merged-into-root-copy": the
+   * placement is also drawn by the unclipped depth-0 copy, so this one is not written; "over-capacity": the archetype is full.
+   */
+  readonly outcome: "written" | "omitted-root-path" | "suppressed-near-camera" | "merged-into-root-copy" | "over-capacity";
+  readonly instanceIndex?: number;
+  /** Root-frame (Three axes) distance from the instance to the nearest camera, when the record has a suppression distance. */
+  readonly cameraDistanceMeters?: number;
+  /** Root-frame (Three axes) position of the instance origin. */
+  readonly position: { readonly x: number; readonly y: number; readonly z: number };
+}
+
 /**
  * Writes instances for runtime objects (flags, markers, creatures...) once per visible path of the cell containing each record.
  *
@@ -349,8 +366,14 @@ export function updateRuntimeObjectRenderArchetypeInstances(
     readonly unclippedRoot?: boolean;
     /** Root group per path id (split-root stereo): copies of different groups never merge, they are drawn in different eyes. */
     readonly rootGroupByPathId?: ReadonlyMap<number, number>;
+    /**
+     * Called once per (record, visible path) with what the writer did, for inspection (`render.explainInstances`); the decisions are made by the
+     * same code that writes the instances. Absent in the frame loop, where it costs one undefined test per pair.
+     */
+    readonly onDecision?: (decision: RuntimeObjectInstanceDecision) => void;
   } = {},
 ): void {
+  const onDecision = options.onDecision;
   const unclippedRoot = options.unclippedRoot ?? true;
   const rootGroupByPathId = options.rootGroupByPathId;
   const composedMatrix = composedMatrixScratch;
@@ -397,17 +420,20 @@ export function updateRuntimeObjectRenderArchetypeInstances(
 
       for (const path of paths) {
         if (record.omitRootVisiblePath && path.depth === 0) {
+          onDecision?.(decisionFor(record, path, "omitted-root-path", undefined, options.cameraPositions));
           continue;
         }
 
         composedMatrix.multiplyMatrices(path.rootFromDestinationMatrix, record.localMatrix);
         if (isRuntimeObjectRecordSuppressedNearCamera(record, composedMatrix, composedPosition, options.cameraPositions)) {
+          onDecision?.(decisionFor(record, path, "suppressed-near-camera", composedMatrix, options.cameraPositions));
           continue;
         }
 
         const key = placementKeyForPath(record, path, composedMatrix, rootGroupByPathId);
         if (lowestDepthByPlacement.get(key) === 0 && unclippedRoot) {
           if (path.depth !== 0 || writtenPlacements.has(key)) {
+            onDecision?.(decisionFor(record, path, "merged-into-root-copy", composedMatrix, options.cameraPositions));
             continue;
           }
           writtenPlacements.add(key);
@@ -416,8 +442,11 @@ export function updateRuntimeObjectRenderArchetypeInstances(
         requestedCount += 1;
 
         if (count >= archetype.capacity) {
+          onDecision?.(decisionFor(record, path, "over-capacity", composedMatrix, options.cameraPositions));
           continue;
         }
+
+        onDecision?.(decisionFor(record, path, "written", composedMatrix, options.cameraPositions, count));
 
         writeInstanceIfChanged(
           archetype,
@@ -438,6 +467,32 @@ export function updateRuntimeObjectRenderArchetypeInstances(
       diagnostics.recordCapacityOverflow(archetype, requestedCount);
     }
   }
+}
+
+// The decision record handed to `onDecision`; only called when a trace was asked for, so its allocation is not on the frame path.
+function decisionFor(
+  record: RuntimeObjectRenderRecord,
+  path: VisiblePortalPath,
+  outcome: RuntimeObjectInstanceDecision["outcome"],
+  composed: THREE.Matrix4 | undefined,
+  cameraPositions: readonly THREE.Vector3[] | undefined,
+  instanceIndex?: number,
+): RuntimeObjectInstanceDecision {
+  const position = composed
+    ? { x: composed.elements[12], y: composed.elements[13], z: composed.elements[14] }
+    : { x: Number.NaN, y: Number.NaN, z: Number.NaN };
+  const distances = composed && record.suppressWithinCameraDistanceMeters !== undefined && cameraPositions
+    ? cameraPositions.map((camera) => Math.hypot(camera.x - position.x, camera.y - position.y, camera.z - position.z))
+    : [];
+
+  return {
+    record,
+    path,
+    outcome,
+    instanceIndex,
+    cameraDistanceMeters: distances.length > 0 ? Math.min(...distances) : undefined,
+    position,
+  };
 }
 
 // Which of an archetype's three buffers received a different value in the current update (reset per archetype).

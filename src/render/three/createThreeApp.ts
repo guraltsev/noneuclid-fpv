@@ -120,6 +120,7 @@ import { createAimCrossMarker } from "./aimCrossMarker";
 import { createAimInteraction } from "./aimInteraction";
 import {
   GeometryDebugHelpers,
+  PlayerPoseDebugDump,
   WindowWithGeometryDebugHelpers,
   installGeneralDebugHelpers,
   mergeStaticPathCounts,
@@ -128,6 +129,7 @@ import {
   visibleSummaryToRenderState,
 } from "./appDebugHelpers";
 import { logDebugStartupGuide } from "./appDebugLogging";
+import { installRenderInspectionApi, uninstallRenderInspectionApi } from "./renderInspection";
 import { XrHeadWorldPose } from "./carriedGeodesicCannon";
 import {
   CellRenderArchetype,
@@ -1061,7 +1063,10 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     dumpGeodesicPath: dumpGeodesicPath,
     dumpLockedGeodesicWords: dumpLockedGeodesicWords,
     placeObjectAt: debugPlaceObjectAt,
+    playerPose: debugPlayerPose,
+    setPlayerPose: debugSetPlayerPose,
   });
+  installRenderInspectionApi(runtimeObjectInstanceSync.inspection);
   installGeometryDebugHelpersIfAvailable();
   setApiNamespace("view", {
     screenshot() {
@@ -1808,6 +1813,8 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       dumpGeodesicPath: dumpGeodesicPath,
       dumpLockedGeodesicWords: dumpLockedGeodesicWords,
       placeObjectAt: debugPlaceObjectAt,
+      playerPose: debugPlayerPose,
+      setPlayerPose: debugSetPlayerPose,
     });
     installGeometryDebugHelpersIfAvailable();
     for (const runtime of dynamicObjectRuntimes) {
@@ -1960,6 +1967,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       runtimeObjectRenderRoot.removeFromParent();
       portalDebugRuntime.dispose();
       uninstallGeneralDebugHelpers();
+      uninstallRenderInspectionApi();
       uninstallGeometryDebugHelpers();
       setApiNamespace("view", undefined);
       geometrySession.dispose();
@@ -2771,6 +2779,37 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     if (currentMenuState().isOpen || currentMenuState().selectedTool !== "none") {
       dispatchRuntimeCommand({ kind: "cancel-menu-and-tool" });
     }
+  }
+
+  function debugPlayerPose(): PlayerPoseDebugDump {
+    const pose = session.get().playerPose;
+    const round = (value: number): number => Math.round(value * 1e6) / 1e6;
+    return {
+      cellId: pose.cellId,
+      position: { x: round(pose.position.x), y: round(pose.position.y), z: round(pose.position.z) },
+      yawDegrees: round((pose.yawRadians * 180) / Math.PI),
+      pitchDegrees: round((pose.pitchRadians * 180) / Math.PI),
+    };
+  }
+
+  function debugSetPlayerPose(cellId: string, x: number, y: number, yawDegrees: number, pitchDegrees?: number): PlayerPoseDebugDump {
+    if (!activeWorld().cellsById.has(cellId)) {
+      throw new Error(`no cell "${cellId}" in the active world`);
+    }
+    if (![x, y, yawDegrees, pitchDegrees ?? 0].every(Number.isFinite)) {
+      throw new Error("setPlayerPose needs finite numbers");
+    }
+    const current = session.get().playerPose;
+    dispatchRuntimeCommand({
+      kind: "set-player-pose",
+      pose: {
+        cellId,
+        position: { x, y, z: 0 },
+        yawRadians: (yawDegrees * Math.PI) / 180,
+        pitchRadians: pitchDegrees === undefined ? current.pitchRadians : (pitchDegrees * Math.PI) / 180,
+      },
+    });
+    return debugPlayerPose();
   }
 
   function debugPlaceObjectAt(id: string, cellId: string, x: number, y: number, yawDegrees: number): boolean {

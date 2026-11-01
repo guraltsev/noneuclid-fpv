@@ -1714,6 +1714,7 @@ Browser-console debug surface for the app: window-level helper installation, the
 | --- | --- | --- |
 | interface | `PortalDebugHelpers` | Console API installed as window.noneuclidPortalDebug (by createPortalDebugRuntime) for inspecting portal paths, visibility, and clip polygons. |
 | interface | `GeneralDebugHelpers` | Console API installed as window.noneuclidDebug; each function exists under a snake_case and a PascalCase name. |
+| interface | `PlayerPoseDebugDump` | The player's pose as plain data; the inverse of what `setPlayerPose` takes. |
 | interface | `GeneralDebugHelperCallbacks` | Implementations supplied by createThreeApp#shell to {@link installGeneralDebugHelpers}; each callback is stored as given. |
 | type | `WindowWithGeneralDebugHelpers` | The window object augmented with the optional general debug globals. |
 | interface | `GeometryDebugHelpers` | Console API installed as window.noneuclidGeometry (by createThreeApp#shell) for driving the torus-skew geometry deformation. |
@@ -2444,6 +2445,34 @@ Camera near clip distance in meters (0.03).
 | const | `renderCameraFarMeters` | Camera far clip distance in meters (250). |
 | function | `renderCameraDepthRangeRatio` | Returns far / near (about 8333), a rough measure of depth-buffer precision demand. |
 
+### `render/three/renderInspection.ts`
+
+Read-only inspection of what the runtime-object render pipeline did with the last frame: which records exist and where they come from, what the portal-ghost rule decided for a drawn part, which instances were written for an archetype and with which path and clip row, and why a record was not drawn on a path.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `InspectedRecordGroup` | One source's records of the last collection: the records of one drawn part group, with the source that made them. |
+| interface | `InspectedGhostPart` | How one drawn part gets its ghosts, as the sync would build it now. |
+| interface | `RenderInspectionContext` | What the sync hands to the inspection functions. |
+| interface | `InspectedPosition` | Plain position in world axes (x, y, z up), meters. |
+| interface | `InspectedRecordSource` | One record source with how much it produced in the last collection. |
+| interface | `InspectedRecord` | One render record as plain data. |
+| interface | `InspectRecordsFilter` | Filter of {@link inspectRecords}; every member narrows the result. |
+| interface | `InspectedRecords` | Result of {@link inspectRecords}. |
+| interface | `InspectedObjectGhosts` | The ghost decisions of one object: one entry per drawn part. |
+| interface | `InspectInstancesFilter` | Filter of {@link inspectInstances}. |
+| interface | `InspectedInstance` | One written instance as plain data. |
+| interface | `InspectedArchetypeInstances` | One archetype's instances. |
+| interface | `InspectedInstanceDecision` | Why one record was or was not drawn on one visible path. |
+| interface | `InspectedObjectInstances` | The writer decisions for one object, over every archetype it has records in. |
+| function | `inspectRecordSources` | Lists the record sources of the last collection with the number of groups and records each produced. |
+| function | `inspectRecords` | Lists the render records of the last collection that match `filter`, with where each puts its object in its own cell and its flags. |
+| function | `explainObjectGhosts` | Explains the ghost rule for each drawn part of the object `objectId` (or of the player's rover, by its object id): the footprint used, the disk developed from it and, for each cell copy the disk reaches, whether it is t… |
+| function | `inspectInstances` | Lists the live archetypes that match `filter` with their instance counts per cell and, with `detail`, every written instance (placement, path, clip row). |
+| function | `explainObjectInstances` | Explains, for every record of the object `objectId` and every visible path to the record's cell, whether an instance was written and, if not, why (the record skips the root path, it is hidden near a camera, it is merged… |
+| function | `installRenderInspectionApi` | Publishes the inspection functions as the public API namespace `render`; pair with {@link uninstallRenderInspectionApi} on teardown. |
+| function | `uninstallRenderInspectionApi` | Removes the public API namespace `render`. |
+
 ### `render/three/renderPortalInstances.ts`
 
 Fills the per-frame instance buffers that draw each visible portal path as an instance of its destination cell.
@@ -2461,6 +2490,7 @@ Fills the per-frame instance buffers that draw each visible portal path as an in
 | function | `flattenVisiblePortalPathGroups` | Merges grouped visible paths back into one list, de-duplicated by `pathId` and sorted ascending by id. |
 | function | `omitPathsWithoutClipSlot` | Removes depth > 0 paths that have no clip slot, so they get no instance at all instead of being drawn fully clipped. |
 | function | `updateCellRenderArchetypeInstances` | Writes instance matrices and clip attributes for every cell archetype from the visible paths of its cell. |
+| interface | `RuntimeObjectInstanceDecision` | What the instance writer did with one record on one visible path of the record's cell (see `onDecision` of {@link updateRuntimeObjectRenderArchetypeInstances}). |
 | function | `updateRuntimeObjectRenderArchetypeInstances` | Writes instances for runtime objects (flags, markers, creatures...) once per visible path of the cell containing each record. |
 | function | `createPortalInstanceRenderDebugState` | Assembles a `PortalInstanceRenderDebugState` from the archetypes' current counts, overflow diagnostics and optional clip-data statistics. |
 | function | `visiblePortalSummaryToRenderState` | Projects a visibility debug summary onto the counters stored in render state (drops the root cell id). |
@@ -2527,6 +2557,9 @@ Creates "ghost" render records so a dynamic object that overlaps a portal is dra
 | type | `PortalGhostRenderableObject` | A dynamic object with an id, i.e. |
 | interface | `PortalGhostRuntimeObjectRenderRecordRequest` | Input for ghost-record collection. |
 | function | `collectRuntimeObjectRenderRecordsWithPortalGhosts` | The one way a part of an object gets its render records: one record per archetype key in the object's own cell, then its portal ghosts (see {@link collectPortalGhostRuntimeObjectRenderRecords}). |
+| interface | `PortalGhostCopyDecision` | What the ghost rule decided for one cell copy the developed disk reached. |
+| interface | `PortalGhostExplanation` | The decision of the ghost rule for one drawn part, as plain data (see {@link explainPortalGhosts}). |
+| function | `explainPortalGhosts` | Returns what the ghost rule decides for a drawn part, as plain data: the disk it develops and, for every cell copy the disk reaches, whether the copy is the object's own cell, gets a ghost record, or is dropped as a dup… |
 | function | `collectPortalGhostRuntimeObjectRenderRecords` | Returns ghost render records, in every cell copy the object's render footprint reaches (empty if none, or if the cell or key list is missing). |
 
 ### `render/three/runtimeObjectInstanceSync.ts`
