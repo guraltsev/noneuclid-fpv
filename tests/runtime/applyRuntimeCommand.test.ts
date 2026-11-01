@@ -40,6 +40,7 @@ function stateWith(menu?: Partial<RuntimeMenuState>, appConfig: AppConfig = defa
     menuState: { ...createRuntimeMenuState({ selectedWorldId: "cube" }), ...menu },
     appConfig,
     debugSettings: { debugLevel: "off", portalPanelMode: "none", debugOptions: [] },
+    showCellPathRendersInstances: false,
     vrComfortOptions: defaultVrComfortOptions,
     playerPose: createDefaultPlayerPose("room-a"),
     cannonToolState: {},
@@ -438,6 +439,21 @@ describe("applyRuntimeCommand: cannon and geometry computer actions", () => {
 });
 
 describe("applyRuntimeCommand: tool and player state", () => {
+  it("flips the portal-path instance switch, and re-derives it from the debug options", () => {
+    const flipped = reduce({ kind: "set-show-cell-path-renders-instances", enabled: true });
+
+    expect(flipped.state.showCellPathRendersInstances).toBe(true);
+    expect(flipped.effects).toEqual([]);
+
+    const adopted = reduce({
+      kind: "adopt-debug-settings",
+      settings: { debugLevel: "basic", portalPanelMode: "none", debugOptions: ["portal-path-overlay-instances"] },
+    });
+
+    expect(adopted.state.showCellPathRendersInstances).toBe(true);
+    expect(reduce({ kind: "set-debug-enabled", enabled: false }, adopted.state).state.showCellPathRendersInstances).toBe(false);
+  });
+
   it("replaces the cannon tool state", () => {
     const result = reduce({ kind: "set-cannon-tool-state", state: { selectedCannonId: "c", activeGeodesicId: "g" } });
 

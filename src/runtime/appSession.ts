@@ -25,6 +25,8 @@ export interface AppSessionState {
   readonly appConfig: AppConfig;
   /** Real state: the debug settings in force; follows the menu's debug fields (cheap derived) except when the host sets them from outside. */
   readonly debugSettings: DebugSettings;
+  /** Real state: the portal-path overlay's instance switch; set from the debug options whenever they change, and flipped by the portal debug helper. */
+  readonly showCellPathRendersInstances: boolean;
   /** Real state: the VR comfort options in force; the anti-nausea flag follows the menu. */
   readonly vrComfortOptions: VrComfortOptions;
   /** Real state: the player's cell and cell-local pose. */

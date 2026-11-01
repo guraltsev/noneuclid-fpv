@@ -5,6 +5,8 @@
  * Effects are listed in the order the host must run them, including where the palette is redrawn ("sync-palette").
  */
 import { isRuntimeToolEnabled } from "../glue/appConfig";
+import { hasActiveDebugOption } from "../glue/debugOptions";
+import type { DebugSettings } from "../glue/debugSettings";
 import type { RuntimeToolId } from "../glue/toolIds";
 import type { AppSession, AppSessionState } from "./appSession";
 import type { RuntimeCommand, RuntimeEffect } from "./runtimeCommands";
@@ -76,7 +78,7 @@ export function reduceRuntimeCommand(state: AppSessionState, command: RuntimeCom
   const effectsOnly = (...effects: RuntimeEffect[]): RuntimeCommandResult => ({ state, effects });
   /** Debug-field transitions: change the menu, take the debug settings from it, then re-apply them (which also redraws the palette). */
   const debugChange = (next: RuntimeMenuState): RuntimeCommandResult => ({
-    state: { ...state, menuState: next, debugSettings: createDebugSettingsFromRuntimeMenuState(next) },
+    state: withDebugSettings({ ...state, menuState: next }, createDebugSettingsFromRuntimeMenuState(next)),
     effects: [{ kind: "apply-debug-state" }],
   });
 
@@ -225,6 +227,8 @@ export function reduceRuntimeCommand(state: AppSessionState, command: RuntimeCom
         },
         effects: [{ kind: "apply-comfort-state" }],
       };
+    case "set-show-cell-path-renders-instances":
+      return { state: { ...state, showCellPathRendersInstances: command.enabled }, effects: [] };
     case "set-cannon-tool-state":
       return { state: { ...state, cannonToolState: command.state }, effects: [] };
     case "set-protractor-tool-state":
@@ -240,8 +244,7 @@ export function reduceRuntimeCommand(state: AppSessionState, command: RuntimeCom
       });
       return {
         state: {
-          ...state,
-          debugSettings: command.settings,
+          ...withDebugSettings(state, command.settings),
           menuState: {
             ...menu,
             debugEnabled: seeded.debugEnabled,
@@ -273,6 +276,19 @@ export function reduceRuntimeCommand(state: AppSessionState, command: RuntimeCom
     case "delete-sign":
       return effectsOnly({ ...command });
   }
+}
+
+/** The state with new debug settings; the portal-path overlay switch follows the debug options. */
+function withDebugSettings(state: AppSessionState, debugSettings: DebugSettings): AppSessionState {
+  return {
+    ...state,
+    debugSettings,
+    showCellPathRendersInstances: hasActiveDebugOption(
+      debugSettings.debugLevel,
+      debugSettings.debugOptions,
+      "portal-path-overlay-instances",
+    ),
+  };
 }
 
 /** Closes the menu and selects no tool; the host drops every tool's pending selection first. */

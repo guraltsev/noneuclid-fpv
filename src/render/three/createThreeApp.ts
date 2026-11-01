@@ -414,11 +414,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   let smoothedFrameRateFps: number | undefined;
   let smoothedFramePerformance: FramePerformanceRenderState | undefined;
   let latestWebGlRenderInfo: WebGlRenderInfoState | undefined;
-  let showCellPathRendersInstances = hasActiveDebugOption(
-    options.debugLevel,
-    options.debugOptions,
-    "portal-path-overlay-instances",
-  );
   // The session: the one record of shell state that commands change (appSession.ts). The menu state (page,
   // selected tool, debug toggles) is replaced only by applyRuntimeCommand; read it with currentMenuState().
   const session = createAppSession({
@@ -441,6 +436,11 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       debugOptions: options.debugOptions,
     },
     vrComfortOptions: options.vrComfortOptions,
+    showCellPathRendersInstances: hasActiveDebugOption(
+      options.debugLevel,
+      options.debugOptions,
+      "portal-path-overlay-instances",
+    ),
     playerPose: appState.playerPose,
     cannonToolState: {},
     protractorToolState: {},
@@ -833,7 +833,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   const paletteDefinitionCache = createPaletteDefinitionCache(appConfig);
   let portalInstanceRenderState: PortalInstanceRenderDebugState = {
     enabled: true,
-    ShowCellPathRendersInstances: showCellPathRendersInstances,
+    ShowCellPathRendersInstances: session.get().showCellPathRendersInstances,
     archetypeCount: 0,
     totalCapacity: 0,
     renderedInstanceCount: 0,
@@ -1043,16 +1043,14 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       latestVisibleResult,
       portalInstanceDebugRenderer,
       portalInstanceRenderState,
-      showCellPathRendersInstances,
+      showCellPathRendersInstances: session.get().showCellPathRendersInstances,
       menuState: currentMenuState(),
       smoothedFrameRateFps,
       smoothedFramePerformance,
       latestWebGlRenderInfo,
       xrDebugState,
     }),
-    setShowCellPathRendersInstances: (value) => {
-      showCellPathRendersInstances = value;
-    },
+    dispatch: dispatchRuntimeCommand,
   };
 
   let portalDebugRuntime = createPortalDebugRuntime(portalDebugRuntimeDeps);
@@ -1795,11 +1793,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   // Rebuilds everything that depends on the debug settings in force (session.debugSettings, set by the reducer).
   function applyDebugSettings(): void {
     const settings = session.get().debugSettings;
-    showCellPathRendersInstances = hasActiveDebugOption(
-      settings.debugLevel,
-      settings.debugOptions,
-      "portal-path-overlay-instances",
-    );
     installRuntimeDiagnostics(
       activeWorld(),
       settings.debugLevel,
@@ -2440,7 +2433,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       portalInstanceDiagnostics,
       {
         enabled: false,
-        showCellPathRendersInstances,
+        showCellPathRendersInstances: session.get().showCellPathRendersInstances,
         normalVisiblePathRenderingActive: false,
       },
     );
@@ -2580,7 +2573,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       portalInstanceDiagnostics,
       {
         enabled: true,
-        showCellPathRendersInstances,
+        showCellPathRendersInstances: session.get().showCellPathRendersInstances,
         normalVisiblePathRenderingActive,
         visiblePaths: result.paths,
         visiblePathOverflowCount: portalClipData.visiblePathOverflowCount,

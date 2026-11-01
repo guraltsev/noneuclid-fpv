@@ -13,6 +13,7 @@ export function createTestAppSession(overrides: Partial<AppSessionState> = {}): 
     menuState: createRuntimeMenuState({ selectedWorldId: "test" }),
     appConfig: defaultAppConfig,
     debugSettings: { debugLevel: "off", portalPanelMode: "none", debugOptions: [] },
+    showCellPathRendersInstances: false,
     vrComfortOptions: defaultVrComfortOptions,
     playerPose: createDefaultPlayerPose("room-a"),
     cannonToolState: {},

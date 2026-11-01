@@ -4,6 +4,7 @@
  * Portal paths are named by space-separated portal indices relative to the player's current root cell. Overlay geometry is built in the root cell frame (meters; world x right, y forward, z up) and converted to Three.js through worldAxes.
  * Lifecycle: the owner must call dispose() before discarding the runtime; it removes overlays, hides the debug overlay, and uninstalls the window helpers.
  */
+import type { RuntimeCommand } from "../../runtime/runtimeCommands";
 import * as THREE from "three";
 import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex";
 import { checkPortalPathString, createPortalPathDebugState } from "../../cell-complex/portalPathDebug";
@@ -93,8 +94,8 @@ export interface PortalDebugRuntimeDeps {
   createPortalEyeDebugStates(): readonly PortalEyeRenderDebugState[] | undefined;
   /** Getter returning the shell's current mutable state; call it each time rather than caching the result. */
   live(): PortalDebugRuntimeLiveState;
-  /** Callback writing back the shell's flag toggled via the console helper. */
-  setShowCellPathRendersInstances(value: boolean): void;
+  /** Runs a command through the shell's one command path (the console helper flips the cell-path instance switch). */
+  dispatch(command: RuntimeCommand): void;
 }
 
 /** Handle returned by {@link createPortalDebugRuntime}. */
@@ -401,7 +402,7 @@ export function createPortalDebugRuntime(deps: PortalDebugRuntimeDeps): PortalDe
       return deps.live().showCellPathRendersInstances;
     },
     set ShowCellPathRendersInstances(value: boolean) {
-      deps.setShowCellPathRendersInstances(Boolean(value));
+      deps.dispatch({ kind: "set-show-cell-path-renders-instances", enabled: Boolean(value) });
     },
     candidateTables,
     staticCull,
