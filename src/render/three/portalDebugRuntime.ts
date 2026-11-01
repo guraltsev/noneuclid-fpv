@@ -8,7 +8,7 @@ import * as THREE from "three";
 import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex";
 import { checkPortalPathString, createPortalPathDebugState } from "../../cell-complex/portalPathDebug";
 import { buildStaticallyCulledPortalPathTables, type StaticPortalPathCullResult } from "../../cell-complex/staticPortalPathCull";
-import { type DebugLevelId } from "../../glue/debugLevels";
+import { type DebugLevelId } from "../../diagnostics/debugLevels";
 import { type DebugOptionId, hasActiveDebugOption } from "../../glue/debugOptions";
 import { transformPoint3 } from "../../math/rigidTransform3";
 import { vec3 } from "../../math/vec3";

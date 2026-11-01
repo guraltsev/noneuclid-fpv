@@ -6,25 +6,8 @@
 import { yawRigidTransform3 } from "../math/rigidTransform3";
 import type { Vec3 } from "../math/vec3";
 import type { GeodesicSegmentObject } from "./geodesic/objects";
-import type { RuntimeObjectRegistry, RuntimeWorldObjectBase } from "./runtimeObjectRegistry";
-
-/**
- * Registry record for a length label attached to a geodesic.
- * `lengthMeters` is the total length of all segments of `geodesicId` (across every cell), while `labelPoint` and `segmentId` identify where, in `cellId`'s frame, the label is anchored.
- */
-export interface MeasuredGeodesicLengthObject extends RuntimeWorldObjectBase {
-  readonly kind: "measured-geodesic-length";
-  /** Id of the measured geodesic interval. */
-  readonly geodesicId: string;
-  /** Optional display name used in place of `geodesicId` in the label text. */
-  readonly label?: string;
-  /** Total length of the geodesic in meters, summed over all of its segments in every cell. */
-  readonly lengthMeters: number;
-  /** Anchor point of the label in the cell-local frame of `cellId` (meters), lying on the anchoring segment. */
-  readonly labelPoint: Vec3;
-  /** Id of the segment (in `cellId`) the label is anchored to. */
-  readonly segmentId?: string;
-}
+import type { RuntimeObjectRegistry } from "./runtimeObjectRegistry";
+import type { MeasuredGeodesicLengthObject } from "./toolObjects";
 
 /**
  * Creates a length label for a geodesic, anchored on the segment of that geodesic in the player's cell that is closest to the player.

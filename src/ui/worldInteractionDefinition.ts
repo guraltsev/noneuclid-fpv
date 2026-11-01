@@ -3,7 +3,7 @@
  * createWorldFocusMessageDefinition decides the actions from the object's kind and the active tool (for example, a geodesic segment offers Measure under the length tool, Select side under the protractor, otherwise Extend or a disabled Locked entry). Both the desktop focus tooltip and the VR panel render this one definition, and the help lens reuses it.
  * Everything is a pure function of its inputs and returns fresh immutable records.
  */
-import type { RuntimeToolId } from "../runtime/runtimeMenuState";
+import type { RuntimeToolId } from "../glue/toolIds";
 import type { RuntimeWorldObject } from "../world-objects/runtimeObjectRegistry";
 import type { InputIntent, InputMode } from "./inputIntents";
 import { getInputHintGlyph } from "./inputIntents";

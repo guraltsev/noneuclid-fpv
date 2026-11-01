@@ -5,7 +5,8 @@ import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex"
 import { getDynamicObjectCollisionBounds, simpleCylinderIntersectsSimpleCylinder, testCellCollision } from "../../movement/collision";
 import { yawRigidTransform3 } from "../../math/rigidTransform3";
 import { addVec3, distanceSquaredVec3, scaleVec3, type Vec3 } from "../../math/vec3";
-import { type RuntimeObjectRegistry, runtimeObjectToDynamicObjectState } from "../runtimeObjectRegistry";
+import { type RuntimeObjectRegistry } from "../runtimeObjectRegistry";
+import { runtimeObjectToDynamicObjectState } from "../runtimeObjectBase";
 import {
   canExtendGeodesicSegment,
   createFreeGeodesicEndObject,

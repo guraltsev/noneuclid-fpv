@@ -18,30 +18,10 @@ import { lengthVec2, subVec2 } from "../../math/vec2";
 import { vec3 } from "../../math/vec3";
 import type { RuntimeObjectRegistry, RuntimeWorldObject } from "../runtimeObjectRegistry";
 import { developSleeve, geodesicCornerClearanceMeters, solveTautPath } from "./sleeve";
-import {
-  canObjectAttachGeodesics,
-  createCurveShorteningPairObject,
-  createFreeGeodesicEndObject,
-  createGeodesicCornerObject,
-  createGeodesicIntervalObject,
-  type CurveShorteningPairObject,
-  GEODESIC_MIN_LENGTH_METERS,
-  type GeodesicCornerObject,
-  type GeodesicEndpointSelection,
-  type GeodesicIntervalObject,
-  type GeodesicPortalTraversal,
-  type GeodesicSegmentObject,
-  getAnchorBeamPoint,
-  getGeodesicCannonEmitterPoint,
-  getOppositeEndRole,
-  type TraceGeodesicSegmentResult,
-} from "./objects";
-import {
-  getPortalWordBetweenEndpointRoles,
-  reduceAdjacentInversePortalTraversals,
-  reverseGeodesicPortalWord,
-  samePortalWord,
-} from "./portalWord";
+import { createCurveShorteningPairObject, createFreeGeodesicEndObject, createGeodesicCornerObject, createGeodesicIntervalObject, type CurveShorteningPairObject, GEODESIC_MIN_LENGTH_METERS, type GeodesicCornerObject, type GeodesicEndpointSelection, type GeodesicIntervalObject, type GeodesicPortalTraversal, type GeodesicSegmentObject, getGeodesicCannonEmitterPoint, getOppositeEndRole, type TraceGeodesicSegmentResult } from "./objects";
+import { canObjectAttachGeodesics, getAnchorBeamPoint } from "./anchors";
+import { getPortalWordBetweenEndpointRoles, reverseGeodesicPortalWord, samePortalWord } from "./portalWord";
+import { reduceAdjacentInversePortalTraversals } from "./objects";
 import { requestGeodesicIntersectionUpdate, withDeferredGeodesicIntersections } from "./intersections";
 import { removeUnusedFreeGeodesicEnds } from "./endpoints";
 import {

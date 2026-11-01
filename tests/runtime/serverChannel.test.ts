@@ -9,7 +9,7 @@
  * for reuse elsewhere (`_docs/tests.md` §8.3).
  */
 import { describe, expect, it } from "vitest";
-import { type ChannelSocket, startServerChannel } from "../../src/glue/serverChannel";
+import { type ChannelSocket, startServerChannel } from "../../src/runtime/serverChannel";
 
 class FakeSocket implements ChannelSocket {
   sent: unknown[] = [];

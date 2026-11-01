@@ -22,7 +22,7 @@ import {
 import { countStereoPortalPaths } from "../../src/render/three/portalEyeFrameTransforms";
 import { resolvePortalInstanceClipIndex } from "../../src/render/three/renderPortalInstances";
 import { buildStereoPortalFrame } from "../../src/render/three/stereoPortalFrame";
-import type { VisiblePortalPathOptions } from "../../src/render/three/visiblePortalPaths";
+import type { VisiblePortalPathOptions } from "../../src/visibility/visiblePortalPaths";
 import { threePointToWorld, worldPointToThree } from "../../src/render/three/worldAxes";
 import { resolveXrPortalEyeRenderRoot, type XrPortalEyeRenderRoot } from "../../src/render/three/xrPortalEye";
 

@@ -10,9 +10,9 @@
  * the root, including those of the cloned sign model, which are shared with the preloaded glTF (so they are re-uploaded lazily if used again).
  */
 import * as THREE from "three";
-import type { PlacedFlagObject } from "../../world-objects/placedFlags";
+import type { PlacedFlagObject } from "../../world-objects/toolObjects";
 import { placedFlagAssetPaths } from "../../world-objects/placedFlags";
-import type { PreparedWorldAssets } from "./preloadWorldAssets";
+import type { PreparedWorldAssets } from "./preparedWorldAssets";
 import { applyWorldRigidTransform } from "./worldAxes";
 
 /** Lifecycle handle for one placed sign in the scene. */

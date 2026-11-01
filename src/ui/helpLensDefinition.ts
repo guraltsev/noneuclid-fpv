@@ -3,7 +3,7 @@
  * When the player is focusing a world object the lens describes that object and its available actions; otherwise it describes the currently selected tool (or the generic Explore text).
  * Input glyphs come from inputIntents.ts so the same definition renders correctly for keyboard/mouse and for VR controllers. The module is pure and builds fresh immutable records on each call.
  */
-import type { RuntimeToolId } from "../runtime/runtimeMenuState";
+import type { RuntimeToolId } from "../glue/toolIds";
 import type { InputMode } from "./inputIntents";
 import { formatBodyForInputMode } from "./inputModeText";
 import { getInputHintGlyph, type InputHintGlyph } from "./inputIntents";

@@ -4,7 +4,7 @@
  */
 import { vi } from "vitest";
 import type { RestartableXrSession } from "../../src/render/three/xrSessionRestart";
-import type { XrNavigatorLike } from "../../src/render/three/xrSessionState";
+import type { XrNavigatorLike } from "../../src/interaction/xrSessionState";
 
 /** `navigator`-like object whose `xr.isSessionSupported` resolves to `supported` (or throws `rejection`). */
 export function createFakeXrNavigator(supported: boolean, rejection?: unknown): XrNavigatorLike {

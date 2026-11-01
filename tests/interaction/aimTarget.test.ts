@@ -1,23 +1,20 @@
 /**
- * Aim-ray resolution (src/render/three/aimTarget.ts, aimInteraction.ts): the closest interactable hit along a
+ * Aim-ray resolution (src/interaction/aimTarget.ts): the closest interactable hit along a
  * ray walked through the glued cells (objects, the floor, geodesic ray segments, geodesic emitters and their
  * handles, geodesic intersection balloons, protractor-angle labels), with "sticky" objects snapping to a
  * declared local point. Hits within a priority tolerance of each other are ordered by kind rather than strict
  * distance (protractor label > cannon > geodesic intersection > geodesic segment > floor); this order is not
- * transitive by design, so each pairwise preference is its own rule. `createAimInteraction` caches one resolution
- * per distinct ray, ignored-geodesic set and frame serial, invalidated explicitly or by a new frame.
+ * transitive by design, so each pairwise preference is its own rule.
  *
  * Not asserted here (tests.md §2.2): the exact tuning constants of the emitter's enlarged aim sphere/cylinder (an
  * implementation detail; the selection and miss behaviour at their boundary is what is tested), and resolver call
  * counts as a proxy for the cache (its outcome — a stale result until invalidated — is asserted directly instead).
  */
-import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
 import { buildPortalPathTables, type PortalRenderPath } from "../../src/cell-complex/portalPaths";
 import type { CellComplexSpec } from "../../src/cell-complex/specs";
-import { yawRigidTransform3 } from "../../src/math/rigidTransform3";
-import { createAimInteraction } from "../../src/render/three/aimInteraction";
+import { transformPoint3, yawRigidTransform3 } from "../../src/math/rigidTransform3";
 import { createPlacedFlagObject } from "../../src/world-objects/placedFlags";
 import { createRuntimeObjectRegistry } from "../../src/world-objects/runtimeObjectRegistry";
 import {
@@ -27,24 +24,20 @@ import {
   type GeodesicSegmentObject,
 } from "../../src/world-objects/geodesic/objects";
 import { createProtractorAngleObject } from "../../src/world-objects/protractorTool";
-import {
-  getGeodesicEmitterAimSphereCenter,
-  resolveAimTarget,
-  resolveAimTargets,
-} from "../../src/render/three/aimTarget";
-import { rigidTransformToThreeMatrix, worldPointToThree } from "../../src/render/three/worldAxes";
+import { getGeodesicEmitterAimSphereCenter, resolveAimTarget, resolveAimTargets, type AimRay } from "../../src/interaction/aimTarget";
+import { normalizeVec3, subVec3 } from "../../src/math/vec3";
 
 describe("resolveAimTarget", () => {
   it("resolves the floor point in the current cell", () => {
     const world = compileCellComplex(singleRoomWorld());
     const registry = createRuntimeObjectRegistry();
     const rootPath = buildPortalPathTables(world, { maxDepth: 0 }).tablesByRootCellId.get("room")!.pathsById.get(0)!;
-    const camera = cameraLookingAt({ x: 0, y: -2, z: 1.5 }, { x: 0, y: 0, z: 0 });
+    const ray = aimRayLookingAt({ x: 0, y: -2, z: 1.5 }, { x: 0, y: 0, z: 0 });
 
     const target = resolveAimTarget({
       world,
       registry,
-      camera,
+      ray,
       rootCellId: rootPath.destinationCellId,
     });
 
@@ -69,12 +62,12 @@ describe("resolveAimTarget", () => {
     });
     const registry = createRuntimeObjectRegistry([flag]);
     const rootPath = buildPortalPathTables(world, { maxDepth: 0 }).tablesByRootCellId.get("room")!.pathsById.get(0)!;
-    const camera = cameraLookingAt({ x: 0, y: -2, z: 0.575 }, { x: 0, y: 0, z: 0.575 });
+    const ray = aimRayLookingAt({ x: 0, y: -2, z: 0.575 }, { x: 0, y: 0, z: 0.575 });
 
     const target = resolveAimTarget({
       world,
       registry,
-      camera,
+      ray,
       rootCellId: rootPath.destinationCellId,
     });
 
@@ -95,7 +88,7 @@ describe("resolveAimTarget", () => {
     const registry = createRuntimeObjectRegistry([emitter]);
     const rootPath = buildPortalPathTables(world, { maxDepth: 0 }).tablesByRootCellId.get("room")!.pathsById.get(0)!;
     const sphereCenter = getGeodesicEmitterAimSphereCenter(emitter);
-    const camera = cameraLookingAt(
+    const ray = aimRayLookingAt(
       { x: 0, y: 0, z: sphereCenter.z },
       { x: 40, y: 0.18, z: sphereCenter.z },
     );
@@ -103,7 +96,7 @@ describe("resolveAimTarget", () => {
     const target = resolveAimTarget({
       world,
       registry,
-      camera,
+      ray,
       rootCellId: rootPath.destinationCellId,
       maxDistanceMeters: 24,
     });
@@ -123,12 +116,12 @@ describe("resolveAimTarget", () => {
     });
     const registry = createRuntimeObjectRegistry([emitter]);
     const rootPath = buildPortalPathTables(world, { maxDepth: 0 }).tablesByRootCellId.get("room")!.pathsById.get(0)!;
-    const camera = cameraLookingAt({ x: 0, y: 0.2, z: 1.08 }, { x: 40, y: 0.2, z: 1.08 });
+    const ray = aimRayLookingAt({ x: 0, y: 0.2, z: 1.08 }, { x: 40, y: 0.2, z: 1.08 });
 
     const target = resolveAimTarget({
       world,
       registry,
-      camera,
+      ray,
       rootCellId: rootPath.destinationCellId,
       maxDistanceMeters: 24,
     });
@@ -142,12 +135,12 @@ describe("resolveAimTarget", () => {
     const pathTable = buildPortalPathTables(world, { maxDepth: 1 }).tablesByRootCellId.get("room-a")!;
     const destinationPath = pathTable.paths.find((path) => path.destinationCellId === "room-b")!;
     const rootTarget = destinationLocalPointInRoot(destinationPath, { x: 0, y: 0, z: 0 });
-    const camera = cameraLookingAt({ x: 0, y: 0, z: 1.5 }, rootTarget);
+    const ray = aimRayLookingAt({ x: 0, y: 0, z: 1.5 }, rootTarget);
 
     const target = resolveAimTarget({
       world,
       registry,
-      camera,
+      ray,
       rootCellId: "room-a",
     });
 
@@ -165,12 +158,12 @@ describe("resolveAimTarget", () => {
     const pathTable = buildPortalPathTables(world, { maxDepth: 1 }).tablesByRootCellId.get("room-a")!;
     const destinationPath = pathTable.paths.find((path) => path.destinationCellId === "room-b")!;
     const rootTarget = destinationLocalPointInRoot(destinationPath, { x: -1, y: -1, z: 0 });
-    const camera = cameraLookingAt({ x: 0, y: 0, z: 1.5 }, rootTarget);
+    const ray = aimRayLookingAt({ x: 0, y: 0, z: 1.5 }, rootTarget);
 
     const target = resolveAimTarget({
       world,
       registry,
-      camera,
+      ray,
       rootCellId: "room-a",
     });
 
@@ -182,12 +175,12 @@ describe("resolveAimTarget", () => {
     const segment = createGeodesicSegment();
     const registry = createRuntimeObjectRegistry([segment]);
     const rootPath = buildPortalPathTables(world, { maxDepth: 0 }).tablesByRootCellId.get("room")!.pathsById.get(0)!;
-    const camera = cameraLookingAt({ x: 0, y: -2, z: 1.08 }, { x: 0, y: 0, z: 1.08 });
+    const ray = aimRayLookingAt({ x: 0, y: -2, z: 1.08 }, { x: 0, y: 0, z: 1.08 });
 
     const target = resolveAimTarget({
       world,
       registry,
-      camera,
+      ray,
       rootCellId: rootPath.destinationCellId,
     });
 
@@ -212,12 +205,12 @@ describe("resolveAimTarget", () => {
     });
     const registry = createRuntimeObjectRegistry([cannon, segment]);
     const rootPath = buildPortalPathTables(world, { maxDepth: 0 }).tablesByRootCellId.get("room")!.pathsById.get(0)!;
-    const camera = cameraLookingAt({ x: 0.5, y: 0.12, z: 1.5 }, { x: 0.5, y: 0.12, z: 1.08 });
+    const ray = aimRayLookingAt({ x: 0.5, y: 0.12, z: 1.5 }, { x: 0.5, y: 0.12, z: 1.08 });
 
     const target = resolveAimTarget({
       world,
       registry,
-      camera,
+      ray,
       rootCellId: rootPath.destinationCellId,
     });
 
@@ -241,12 +234,12 @@ describe("resolveAimTarget", () => {
     });
     const registry = createRuntimeObjectRegistry([cannon, segment]);
     const rootPath = buildPortalPathTables(world, { maxDepth: 0 }).tablesByRootCellId.get("room")!.pathsById.get(0)!;
-    const camera = cameraLookingAt({ x: 0, y: -0.35, z: 1.08 }, { x: 0.8, y: 0, z: 1.08 });
+    const ray = aimRayLookingAt({ x: 0, y: -0.35, z: 1.08 }, { x: 0.8, y: 0, z: 1.08 });
 
     const target = resolveAimTarget({
       world,
       registry,
-      camera,
+      ray,
       rootCellId: rootPath.destinationCellId,
     });
 
@@ -273,7 +266,7 @@ describe("resolveAimTarget", () => {
     const firstTarget = resolveAimTarget({
       world,
       registry,
-      camera: cameraLookingAt(
+      ray: aimRayLookingAt(
         { x: 0.32, y: -2, z: geodesicRayBeamHeightMeters },
         { x: 0.32, y: 0, z: geodesicRayBeamHeightMeters },
       ),
@@ -282,7 +275,7 @@ describe("resolveAimTarget", () => {
     const secondTarget = resolveAimTarget({
       world,
       registry,
-      camera: cameraLookingAt(
+      ray: aimRayLookingAt(
         { x: 2, y: 0.32, z: geodesicRayBeamHeightMeters },
         { x: 0, y: 0.32, z: geodesicRayBeamHeightMeters },
       ),
@@ -314,7 +307,7 @@ describe("resolveAimTarget", () => {
     const target = resolveAimTarget({
       world,
       registry,
-      camera: cameraLookingAt(
+      ray: aimRayLookingAt(
         { x: 2, y: 0.32, z: geodesicRayBeamHeightMeters },
         { x: 0, y: 0.32, z: geodesicRayBeamHeightMeters },
       ),
@@ -345,7 +338,7 @@ describe("resolveAimTarget", () => {
     const target = resolveAimTarget({
       world,
       registry,
-      camera: cameraLookingAt(
+      ray: aimRayLookingAt(
         { x: 0, y: -2, z: geodesicRayBeamHeightMeters - 0.3 },
         { x: 0, y: 0, z: geodesicRayBeamHeightMeters - 0.3 },
       ),
@@ -371,7 +364,7 @@ describe("resolveAimTarget", () => {
     const bodyTarget = resolveAimTarget({
       world,
       registry,
-      camera: cameraLookingAt(
+      ray: aimRayLookingAt(
         { x: 0.5, y: 0.14, z: 1.5 },
         { x: 0.5, y: 0.14, z: geodesicRayBeamHeightMeters },
       ),
@@ -381,7 +374,7 @@ describe("resolveAimTarget", () => {
     const endTarget = resolveAimTarget({
       world,
       registry,
-      camera: cameraLookingAt(
+      ray: aimRayLookingAt(
         { x: 0.85, y: 0.14, z: 1.5 },
         { x: 0.85, y: 0.14, z: geodesicRayBeamHeightMeters },
       ),
@@ -408,12 +401,12 @@ describe("resolveAimTarget", () => {
     });
     const registry = createRuntimeObjectRegistry([cannon, segment]);
     const rootPath = buildPortalPathTables(world, { maxDepth: 0 }).tablesByRootCellId.get("room")!.pathsById.get(0)!;
-    const camera = cameraLookingAt({ x: 0.95, y: -2, z: 1.08 }, { x: 0.95, y: 0, z: 1.08 });
+    const ray = aimRayLookingAt({ x: 0.95, y: -2, z: 1.08 }, { x: 0.95, y: 0, z: 1.08 });
 
     const target = resolveAimTarget({
       world,
       registry,
-      camera,
+      ray,
       rootCellId: rootPath.destinationCellId,
     });
 
@@ -433,12 +426,12 @@ describe("resolveAimTarget", () => {
     });
     const registry = createRuntimeObjectRegistry([segment, vertex]);
     const rootPath = buildPortalPathTables(world, { maxDepth: 0 }).tablesByRootCellId.get("room")!.pathsById.get(0)!;
-    const camera = cameraLookingAt({ x: 0, y: -2, z: 1.23 }, { x: 0, y: 0, z: 1.23 });
+    const ray = aimRayLookingAt({ x: 0, y: -2, z: 1.23 }, { x: 0, y: 0, z: 1.23 });
 
     const target = resolveAimTarget({
       world,
       registry,
-      camera,
+      ray,
       rootCellId: rootPath.destinationCellId,
     });
 
@@ -460,12 +453,12 @@ describe("resolveAimTarget", () => {
     });
     const registry = createRuntimeObjectRegistry([vertex, cannon]);
     const rootPath = buildPortalPathTables(world, { maxDepth: 0 }).tablesByRootCellId.get("room")!.pathsById.get(0)!;
-    const camera = cameraLookingAt({ x: 0, y: -2, z: sphereCenter.z }, sphereCenter);
+    const ray = aimRayLookingAt({ x: 0, y: -2, z: sphereCenter.z }, sphereCenter);
 
     const target = resolveAimTarget({
       world,
       registry,
-      camera,
+      ray,
       rootCellId: rootPath.destinationCellId,
     });
 
@@ -483,12 +476,12 @@ describe("resolveAimTarget", () => {
     });
     const registry = createRuntimeObjectRegistry([vertex]);
     const rootPath = buildPortalPathTables(world, { maxDepth: 0 }).tablesByRootCellId.get("room")!.pathsById.get(0)!;
-    const camera = cameraLookingAt({ x: 0, y: -2, z: 1.33 }, { x: 0, y: 0, z: 1.33 });
+    const ray = aimRayLookingAt({ x: 0, y: -2, z: 1.33 }, { x: 0, y: 0, z: 1.33 });
 
     const target = resolveAimTarget({
       world,
       registry,
-      camera,
+      ray,
       rootCellId: rootPath.destinationCellId,
     });
 
@@ -509,7 +502,7 @@ describe("resolveAimTarget", () => {
     if (!labelCenter) {
       throw new Error("Expected protractor angle label hitbox.");
     }
-    const camera = cameraLookingAt(
+    const ray = aimRayLookingAt(
       { x: labelCenter.x, y: -2, z: labelCenter.z },
       labelCenter,
     );
@@ -517,7 +510,7 @@ describe("resolveAimTarget", () => {
     const target = resolveAimTarget({
       world,
       registry,
-      camera,
+      ray,
       rootCellId: rootPath.destinationCellId,
     });
 
@@ -537,7 +530,7 @@ describe("resolveAimTarget", () => {
     if (!labelCenter) {
       throw new Error("Expected protractor angle label hitbox.");
     }
-    const camera = cameraLookingAt(
+    const ray = aimRayLookingAt(
       { x: labelCenter.x + 0.5, y: -2, z: labelCenter.z },
       { x: labelCenter.x + 0.5, y: labelCenter.y, z: labelCenter.z },
     );
@@ -545,7 +538,7 @@ describe("resolveAimTarget", () => {
     const target = resolveAimTarget({
       world,
       registry,
-      camera,
+      ray,
       rootCellId: rootPath.destinationCellId,
     });
 
@@ -572,7 +565,7 @@ describe("resolveAimTarget", () => {
     });
     const registry = createRuntimeObjectRegistry([cannon, angle]);
     const rootPath = buildPortalPathTables(world, { maxDepth: 0 }).tablesByRootCellId.get("room")!.pathsById.get(0)!;
-    const camera = cameraLookingAt(
+    const ray = aimRayLookingAt(
       { x: labelCenter.x, y: -2, z: labelCenter.z },
       labelCenter,
     );
@@ -580,7 +573,7 @@ describe("resolveAimTarget", () => {
     const target = resolveAimTarget({
       world,
       registry,
-      camera,
+      ray,
       rootCellId: rootPath.destinationCellId,
     });
 
@@ -602,7 +595,7 @@ describe("resolveAimTarget", () => {
     });
     const registry = createRuntimeObjectRegistry([vertex, angle]);
     const rootPath = buildPortalPathTables(world, { maxDepth: 0 }).tablesByRootCellId.get("room")!.pathsById.get(0)!;
-    const camera = cameraLookingAt(
+    const ray = aimRayLookingAt(
       { x: labelCenter.x, y: -2, z: labelCenter.z },
       labelCenter,
     );
@@ -610,7 +603,7 @@ describe("resolveAimTarget", () => {
     const target = resolveAimTarget({
       world,
       registry,
-      camera,
+      ray,
       rootCellId: rootPath.destinationCellId,
     });
 
@@ -623,12 +616,12 @@ describe("resolveAimTarget", () => {
     const segment = createGeodesicSegment({ geodesicId: "g-active" });
     const registry = createRuntimeObjectRegistry([segment]);
     const rootPath = buildPortalPathTables(world, { maxDepth: 0 }).tablesByRootCellId.get("room")!.pathsById.get(0)!;
-    const camera = cameraLookingAt({ x: 0, y: -2, z: 1.08 }, { x: 0, y: 0, z: 1.08 });
+    const ray = aimRayLookingAt({ x: 0, y: -2, z: 1.08 }, { x: 0, y: 0, z: 1.08 });
 
     const target = resolveAimTarget({
       world,
       registry,
-      camera,
+      ray,
       rootCellId: rootPath.destinationCellId,
       ignoredGeodesicIds: ["g-active"],
     });
@@ -641,12 +634,12 @@ describe("resolveAimTarget", () => {
     const segment = createGeodesicSegment({ geodesicId: "g-other" });
     const registry = createRuntimeObjectRegistry([segment]);
     const rootPath = buildPortalPathTables(world, { maxDepth: 0 }).tablesByRootCellId.get("room")!.pathsById.get(0)!;
-    const camera = cameraLookingAt({ x: 0, y: -2, z: 1.08 }, { x: 0, y: 0, z: 1.08 });
+    const ray = aimRayLookingAt({ x: 0, y: -2, z: 1.08 }, { x: 0, y: 0, z: 1.08 });
 
     const target = resolveAimTarget({
       world,
       registry,
-      camera,
+      ray,
       rootCellId: rootPath.destinationCellId,
       ignoredGeodesicIds: ["g-active"],
     });
@@ -666,12 +659,12 @@ describe("resolveAimTarget", () => {
     });
     const registry = createRuntimeObjectRegistry([first, tail]);
     const rootPath = buildPortalPathTables(world, { maxDepth: 0 }).tablesByRootCellId.get("room")!.pathsById.get(0)!;
-    const camera = cameraLookingAt({ x: 0.2, y: -2, z: 1.08 }, { x: 0.2, y: 0, z: 1.08 });
+    const ray = aimRayLookingAt({ x: 0.2, y: -2, z: 1.08 }, { x: 0.2, y: 0, z: 1.08 });
 
     const target = resolveAimTarget({
       world,
       registry,
-      camera,
+      ray,
       rootCellId: rootPath.destinationCellId,
     });
 
@@ -690,12 +683,12 @@ describe("resolveAimTarget", () => {
     });
     const registry = createRuntimeObjectRegistry([segment]);
     const rootPath = buildPortalPathTables(world, { maxDepth: 0 }).tablesByRootCellId.get("room")!.pathsById.get(0)!;
-    const camera = cameraLookingAt({ x: -0.7, y: -0.25, z: 1.05 }, { x: 0.45, y: 0.08, z: 1.02 });
+    const ray = aimRayLookingAt({ x: -0.7, y: -0.25, z: 1.05 }, { x: 0.45, y: 0.08, z: 1.02 });
 
     const target = resolveAimTarget({
       world,
       registry,
-      camera,
+      ray,
       rootCellId: rootPath.destinationCellId,
     });
 
@@ -711,12 +704,12 @@ describe("resolveAimTarget", () => {
     });
     const registry = createRuntimeObjectRegistry([segment]);
     const rootPath = buildPortalPathTables(world, { maxDepth: 0 }).tablesByRootCellId.get("room")!.pathsById.get(0)!;
-    const camera = cameraLookingAt({ x: -3.5, y: -0.9, z: 1.08 }, { x: 0.55, y: 0, z: 1.08 });
+    const ray = aimRayLookingAt({ x: -3.5, y: -0.9, z: 1.08 }, { x: 0.55, y: 0, z: 1.08 });
 
     const target = resolveAimTarget({
       world,
       registry,
-      camera,
+      ray,
       rootCellId: rootPath.destinationCellId,
     });
 
@@ -738,12 +731,12 @@ describe("resolveAimTarget", () => {
     const pathTable = buildPortalPathTables(world, { maxDepth: 1 }).tablesByRootCellId.get("room-a")!;
     const destinationPath = pathTable.paths.find((path) => path.destinationCellId === "room-b")!;
     const rootTarget = destinationLocalPointInRoot(destinationPath, { x: 0, y: 0, z: 1.08 });
-    const camera = cameraLookingAt({ x: 0, y: 0, z: 1.08 }, rootTarget);
+    const ray = aimRayLookingAt({ x: 0, y: 0, z: 1.08 }, rootTarget);
 
     const target = resolveAimTarget({
       world,
       registry,
-      camera,
+      ray,
       rootCellId: "room-a",
     });
 
@@ -771,7 +764,7 @@ describe("ray walk", () => {
     const targets = resolveAimTargets({
       world,
       registry,
-      camera: cameraLookingAt({ x: 0, y: -0.5, z: 1.45 }, { x: 2, y: 0, z: 0.5 }),
+      ray: aimRayLookingAt({ x: 0, y: -0.5, z: 1.45 }, { x: 2, y: 0, z: 0.5 }),
       rootCellId: "room-a",
     });
 
@@ -788,7 +781,7 @@ describe("ray walk", () => {
     const targets = resolveAimTargets({
       world,
       registry,
-      camera: cameraLookingAt({ x: 0, y: 0.5, z: 0.5 }, { x: 0.8, y: 1, z: 0.5 }),
+      ray: aimRayLookingAt({ x: 0, y: 0.5, z: 0.5 }, { x: 0.8, y: 1, z: 0.5 }),
       rootCellId: "room-a",
     });
 
@@ -802,7 +795,7 @@ describe("ray walk", () => {
     const targets = resolveAimTargets({
       world,
       registry,
-      camera: cameraLookingAt({ x: 0, y: 0, z: 0.5 }, { x: 2, y: 0, z: 0.5 }),
+      ray: aimRayLookingAt({ x: 0, y: 0, z: 0.5 }, { x: 2, y: 0, z: 0.5 }),
       rootCellId: "room-a",
     });
 
@@ -815,7 +808,7 @@ describe("ray walk", () => {
     const targets = resolveAimTargets({
       world,
       registry,
-      camera: cameraLookingAt({ x: 0, y: 0, z: 0.5 }, { x: 2.9, y: 1.15, z: 0.5 }),
+      ray: aimRayLookingAt({ x: 0, y: 0, z: 0.5 }, { x: 2.9, y: 1.15, z: 0.5 }),
       rootCellId: "room-a",
     });
 
@@ -828,13 +821,13 @@ describe("ray walk", () => {
     const through = resolveAimTargets({
       world,
       registry,
-      camera: cameraLookingAt({ x: 0, y: 0, z: 1.45 }, { x: 1, y: 0, z: 1.2 }),
+      ray: aimRayLookingAt({ x: 0, y: 0, z: 1.45 }, { x: 1, y: 0, z: 1.2 }),
       rootCellId: "room-a",
     });
     const below = resolveAimTargets({
       world,
       registry,
-      camera: cameraLookingAt({ x: 0, y: 0, z: 0.9 }, { x: 1, y: 0, z: 0.8 }),
+      ray: aimRayLookingAt({ x: 0, y: 0, z: 0.9 }, { x: 1, y: 0, z: 0.8 }),
       rootCellId: "room-a",
     });
 
@@ -847,7 +840,7 @@ describe("ray walk", () => {
     const targets = resolveAimTargets({
       world,
       registry: createRuntimeObjectRegistry(),
-      camera: cameraLookingAt({ x: 0, y: 0, z: 1.5 }, { x: 0, y: 0, z: 0 }),
+      ray: aimRayLookingAt({ x: 0, y: 0, z: 1.5 }, { x: 0, y: 0, z: 0 }),
       rootCellId: "room-a",
     });
 
@@ -861,7 +854,7 @@ describe("ray walk", () => {
     const targets = resolveAimTargets({
       world,
       registry: createRuntimeObjectRegistry(),
-      camera: cameraLookingAt({ x: 1.2, y: 0, z: 1.4 }, { x: 1.2, y: 0, z: 0 }),
+      ray: aimRayLookingAt({ x: 1.2, y: 0, z: 1.4 }, { x: 1.2, y: 0, z: 0 }),
       rootCellId: "room-a",
       rootAnchorPoint: { x: 0.8, y: 0, z: 1.4 },
     });
@@ -874,45 +867,6 @@ describe("ray walk", () => {
     expect(targets[0]?.rootPoint.x).toBeCloseTo(1.2);
     expect(targets[0]?.rootPoint.y).toBeCloseTo(0);
     expect(targets[0]?.rootPoint.z).toBeCloseTo(0);
-  });
-
-  it("keeps a resolution for the same ray and frame until invalidated or the frame advances", () => {
-    const world = compileCellComplex(rayWalkWorld());
-    const segment = createGeodesicSegment({ cellId: "room-a", start: { x: 0, y: 0, z: 1.08 } });
-    const registry = createRuntimeObjectRegistry([segment]);
-    let frameSerial = 1;
-    const interaction = createAimInteraction({
-      camera: new THREE.PerspectiveCamera(),
-      renderer: {} as THREE.WebGLRenderer,
-      xrRig: {} as never,
-      runtimeObjectRegistry: registry,
-      getWorld: () => world,
-      getDebugLevel: () => "off" as never,
-      getMenuState: () => ({ selectedTool: "none" }) as never,
-      getCannonToolState: () => ({ activeGeodesicId: undefined }) as never,
-      getPlayerPose: () => ({ cellId: "room-a", position: { x: 0, y: 0, z: 0 }, yawRadians: 0, pitchRadians: 0 }),
-      getFrameSerial: () => frameSerial,
-    });
-    const camera = cameraLookingAt({ x: 0, y: -0.5, z: 1.08 }, { x: 0, y: 0, z: 1.08 });
-    const ray = {
-      origin: camera.position.clone(),
-      direction: new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion),
-      quaternion: camera.quaternion.clone(),
-    };
-
-    expect(interaction.resolveCurrentAimTarget(ray)?.object?.id).toBe("segment-a");
-
-    registry.remove("segment-a");
-    expect(interaction.resolveCurrentAimTarget(ray)?.object?.id).toBe("segment-a");
-
-    interaction.invalidateAimCache();
-    expect(interaction.resolveCurrentAimTarget(ray)).toBeUndefined();
-
-    registry.add(segment);
-    expect(interaction.resolveCurrentAimTarget(ray)).toBeUndefined();
-
-    frameSerial = 2;
-    expect(interaction.resolveCurrentAimTarget(ray)?.object?.id).toBe("segment-a");
   });
 });
 
@@ -935,27 +889,18 @@ function rayWalkWorld(roomBHeightMeters = 2): CellComplexSpec {
     ],
   };
 }
-function cameraLookingAt(
+function aimRayLookingAt(
   position: { readonly x: number; readonly y: number; readonly z: number },
   target: { readonly x: number; readonly y: number; readonly z: number },
-): THREE.PerspectiveCamera {
-  const camera = new THREE.PerspectiveCamera(70, 1, 0.01, 100);
-  camera.position.copy(worldPointToThree(position));
-  camera.lookAt(worldPointToThree(target));
-  camera.updateMatrixWorld(true);
-  return camera;
+): AimRay {
+  return { origin: position, direction: normalizeVec3(subVec3(target, position)) };
 }
 
 function destinationLocalPointInRoot(
   path: PortalRenderPath,
   point: { readonly x: number; readonly y: number; readonly z: number },
 ): { readonly x: number; readonly y: number; readonly z: number } {
-  const rootPoint = worldPointToThree(point).applyMatrix4(rigidTransformToThreeMatrix(path.rootFromDestination));
-  return {
-    x: rootPoint.x,
-    y: -rootPoint.z,
-    z: rootPoint.y,
-  };
+  return transformPoint3(path.rootFromDestination, point);
 }
 
 function singleRoomWorld(): CellComplexSpec {

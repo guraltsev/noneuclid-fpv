@@ -6,10 +6,8 @@
  * shared wireframe helpers). Used only by collision-debug visualisation.
  */
 import * as THREE from "three";
-import {
-  runtimeObjectToDynamicObjectState,
-  type RuntimeWorldObject,
-} from "../../world-objects/runtimeObjectRegistry";
+import { type RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
+import { runtimeObjectToDynamicObjectState } from "../../world-objects/runtimeObjectBase";
 import { buildObjectCollisionWireframeInCellAxes } from "./debugCollisionWireframes";
 
 /**

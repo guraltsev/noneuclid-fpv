@@ -14,7 +14,7 @@ import {
   computeContinuousTurn,
   computeJoystickLocomotion,
   computePhysicalRoomScaleDisplacement,
-} from "../../src/render/three/vrLocomotion";
+} from "../../src/interaction/vrLocomotion";
 import {
   globalHorizontalDeltaToPlayerLocal,
   createXrPlayerRig,

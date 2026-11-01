@@ -5,11 +5,11 @@
  */
 import * as THREE from "three";
 import { type CompiledCellComplex } from "../../cell-complex/compileCellComplex";
-import { type DebugLevelId } from "../../glue/debugLevels";
+import { type DebugLevelId } from "../../diagnostics/debugLevels";
 import { type DebugOptionId, hasActiveDebugOption } from "../../glue/debugOptions";
-import { type GeodesicMarmotRuntime } from "../../world-objects/geodesicMarmot";
+import { type GeodesicMarmotRuntime } from "./creatures/geodesicMarmotView";
 import { type RuntimeObjectRegistry } from "../../world-objects/runtimeObjectRegistry";
-import { type SimpleGeoCreatureRuntime } from "../../world-objects/simpleGeoCreature";
+import { type SimpleGeoCreatureRuntime } from "./creatures/simpleGeoCreatureView";
 import {
   buildAimCollisionOutlineDebugMesh,
   buildSelectableHitboxDebugMesh,

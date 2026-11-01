@@ -25,12 +25,8 @@ import {
 import { createRuntimeObjectInstanceSync } from "../../src/render/three/runtimeObjectInstanceSync";
 import type { RuntimeObjectRenderSourceMesh } from "../../src/render/three/runtimeObjectRenderRecords";
 import { rigidTransformToThreeMatrix } from "../../src/render/three/worldAxes";
-import {
-  createRuntimeObjectRegistry,
-  createRuntimeStaticAssetObject,
-  type RuntimeCreatureObject,
-  type RuntimeWorldObject,
-} from "../../src/world-objects/runtimeObjectRegistry";
+import { createRuntimeObjectRegistry, createRuntimeStaticAssetObject, type RuntimeWorldObject } from "../../src/world-objects/runtimeObjectRegistry";
+import { type RuntimeCreatureObject } from "../../src/world-objects/runtimeObjectBase";
 import { createPlainWorldObject } from "../../src/world-objects/worldObjectOwner";
 import { createPlacedFlagObject } from "../../src/world-objects/placedFlags";
 import type { PlayerPose } from "../../src/movement/playerPose";

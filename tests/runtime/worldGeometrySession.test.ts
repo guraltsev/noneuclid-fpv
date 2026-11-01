@@ -12,7 +12,7 @@ import { describe, expect, it } from "vitest";
 import { torus } from "../../src/authoring/exampleWorlds";
 import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
 import { buildStaticallyCulledPortalPathTables } from "../../src/cell-complex/staticPortalPathCull";
-import { deformationStatesEqual } from "../../src/runtime/worldGeometryDeformations";
+import { deformationStatesEqual } from "../../src/cell-complex/worldGeometryDeformations";
 import { createWorldGeometrySession, type WorldGeometrySnapshot } from "../../src/runtime/worldGeometrySession";
 import {
   buildWorldGeometrySnapshotForRequest,
@@ -20,7 +20,7 @@ import {
   type BuildWorldGeometrySnapshotResponse,
 } from "../../src/runtime/worldGeometryWorker";
 import type { WorldGeometryBuildClient } from "../../src/runtime/worldGeometryWorkerClient";
-import type { TorusSkewDeformationState } from "../../src/runtime/deformations/torusSkewDeformation";
+import type { TorusSkewDeformationState } from "../../src/cell-complex/worldGeometryDeformations";
 
 describe("world geometry session", () => {
   it("keeps only one build in flight", () => {

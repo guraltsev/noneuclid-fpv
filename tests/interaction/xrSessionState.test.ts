@@ -14,7 +14,7 @@ import {
   statusLabel,
   transitionXrSessionState,
   type XrNavigatorLike,
-} from "../../src/render/three/xrSessionState";
+} from "../../src/interaction/xrSessionState";
 import { createFakeXrNavigator } from "../support/fakeXr";
 
 describe("XR session state", () => {

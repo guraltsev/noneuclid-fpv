@@ -7,7 +7,7 @@ import * as THREE from "three";
 import type { AssetObjectSpec } from "../../cell-complex/specs";
 import type { RigidTransform3 } from "../../math/rigidTransform3";
 import { buildDecorationMesh } from "./buildDecorationMesh";
-import type { PreparedWorldAssets } from "./preloadWorldAssets";
+import type { PreparedWorldAssets } from "./preparedWorldAssets";
 import { rigidTransformToThreeMatrix } from "./worldAxes";
 
 /**

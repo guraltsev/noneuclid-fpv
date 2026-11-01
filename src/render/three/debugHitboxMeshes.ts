@@ -6,12 +6,13 @@
 import * as THREE from "three";
 import { type SimpleCylinderBounds, getDynamicObjectCollisionBounds } from "../../movement/collision";
 import { createProtractorAngleLabelHitbox } from "../../world-objects/protractorTool";
-import { type RuntimeWorldObject, runtimeObjectToDynamicObjectState } from "../../world-objects/runtimeObjectRegistry";
+import { type RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
+import { runtimeObjectToDynamicObjectState } from "../../world-objects/runtimeObjectBase";
 import {
   geodesicSegmentAimRadiusMeters,
   getGeodesicEmitterAimCylinderBounds,
   getGeodesicEmitterAimSphereCenter,
-} from "./aimTarget";
+} from "../../interaction/aimTarget";
 import { worldPointToThree } from "./worldAxes";
 
 /** Color (hex RGB) of geodesic segment selectable-hitbox meshes. */

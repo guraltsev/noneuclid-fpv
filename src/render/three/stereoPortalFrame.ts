@@ -18,7 +18,8 @@ import {
   transformVisiblePortalResultToRenderFrame,
   type PortalEyeRenderState,
 } from "./portalEyeFrameTransforms";
-import { computeVisiblePortalPaths, type VisiblePortalPathOptions } from "./visiblePortalPaths";
+import { type VisiblePortalPathOptions } from "../../visibility/visiblePortalPaths";
+import { computeVisiblePortalPaths } from "./visiblePortalPaths";
 import type { XrPortalEyeRenderRoot } from "./xrPortalEye";
 
 /** Largest per-element difference at which two render-from-root matrices count as the same frame. */

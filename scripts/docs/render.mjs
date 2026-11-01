@@ -7,6 +7,8 @@
 import {
   layers,
   layerEdges,
+  layerMayImport,
+  layerOrder,
   layerViolations,
   loadLayeringBaseline,
   reachableFrom,
@@ -38,8 +40,6 @@ function groupByLayer(modules) {
   return groups;
 }
 
-const layerOrder = ["math", "cell-complex", "movement", "examples", "world-assets", "world-objects", "authoring", "runtime", "ui", "glue", "render", "root"];
-
 export function renderArchitectureReference(modules) {
   const groups = groupByLayer(modules);
   const reachable = reachableFrom(modules);
@@ -67,7 +67,7 @@ export function renderArchitectureReference(modules) {
     if (!list) continue;
     const rule = layers[name];
     const lines = list.reduce((sum, m) => sum + m.lines, 0);
-    const may = rule.may.includes("*") ? "anything" : rule.may.length === 0 ? "nothing" : rule.may.map((l) => `\`${l}\``).join(", ");
+    const may = rule.may.includes("*") ? "every lower layer" : rule.may.length === 0 ? "nothing" : rule.may.map((l) => `\`${l}\``).join(", ");
     out.push(`| \`${name}\` | ${list.length} | ${lines.toLocaleString("en-US")} | ${may} | ${cell(rule.description)} |`);
   }
   out.push("");
@@ -78,8 +78,7 @@ export function renderArchitectureReference(modules) {
   for (const name of layerOrder) if (groups.has(name)) out.push(`  ${name.replace(/-/g, "_")}["${name}"]`);
   for (const [edge, count] of [...edges].sort()) {
     const [from, to] = edge.split(" -> ");
-    const rule = layers[from];
-    const allowed = rule && (rule.may.includes("*") || rule.may.includes(to));
+    const allowed = layerMayImport(from, to);
     out.push(`  ${from.replace(/-/g, "_")} ${allowed ? "-->" : "-.->"}|${count}| ${to.replace(/-/g, "_")}`);
   }
   out.push("```\n");

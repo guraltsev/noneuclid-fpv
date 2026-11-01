@@ -5,13 +5,10 @@
  */
 import { defaultWorldId, findWorldCatalogEntry, normalizeWorldId } from "../authoring/worldCatalog";
 import { parseDebugOptions, type DebugOptionId } from "./debugOptions";
-import { parseDebugLevel, type DebugLevelId } from "./debugLevels";
+import { parseDebugLevel, type DebugLevelId } from "../diagnostics/debugLevels";
 import { parsePortalPanelMode, type PortalPanelModeId } from "./portalPanelMode";
 import { parseUiOptions, type UiOptionId } from "./uiOptions";
-import {
-  parseRuntimeDebugOverlayItems,
-  type RuntimeDebugOverlayItemId,
-} from "../runtime/runtimeMenuState";
+import { parseRuntimeDebugOverlayItems, type RuntimeDebugOverlayItemId } from "./toolIds";
 import { defaultAppConfig, defaultAppConfigName, type AppConfig } from "./appConfig";
 import { defaultVrComfortOptions, type VrComfortOptions } from "./vrComfortOptions";
 

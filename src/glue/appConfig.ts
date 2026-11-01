@@ -5,9 +5,9 @@
  */
 import { findWorldCatalogEntry, normalizeWorldId, defaultWorldId } from "../authoring/worldCatalog";
 import { debugOptionDefinitions, type DebugOptionId } from "./debugOptions";
-import { parseDebugLevel, type DebugLevelId } from "./debugLevels";
+import { parseDebugLevel, type DebugLevelId } from "../diagnostics/debugLevels";
 import { parsePortalPanelMode, type PortalPanelModeId } from "./portalPanelMode";
-import type { RuntimeDebugOverlayItemId, RuntimeToolId } from "../runtime/runtimeMenuState";
+import type { RuntimeDebugOverlayItemId, RuntimeToolId } from "./toolIds";
 import { publicUrl } from "./assetUrls";
 
 /** Id of a main-menu tool that an app config can switch on or off. */

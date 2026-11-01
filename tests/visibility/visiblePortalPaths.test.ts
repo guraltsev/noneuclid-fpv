@@ -1,5 +1,5 @@
 /**
- * Visible portal paths (src/render/three/visiblePortalPaths.ts): per-frame, camera-visible portal-path discovery.
+ * Visible portal paths (src/visibility/visiblePortalPaths.ts): per-frame, camera-visible portal-path discovery.
  * Walks a portal-path table from the root, clipping each portal's aperture by its parent's surviving sector and
  * the camera frustum, and keeps a path only while its clip polygon has positive screen area (in pixels) at least
  * `minPortalScreenAreaPixels`; a path whose polygon vanishes (behind the camera, outside the frustum, or clipped
@@ -16,12 +16,9 @@ import { twoPrismLoop } from "../fixtures/cell-complex/twoPrismLoop";
 import { twoRoomsWithPortal } from "../fixtures/cell-complex/twoRoomWorld";
 import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
 import { buildPortalPathTables } from "../../src/cell-complex/portalPaths";
-import {
-  computeIndependentVisiblePortalPaths,
-  computeVisiblePortalPaths,
-  describeVisiblePortalPath,
-  type ComputeVisiblePortalPathsResult,
-} from "../../src/render/three/visiblePortalPaths";
+import { describeVisiblePortalPath, type ComputeVisiblePortalPathsResult as VisibilityResult } from "../../src/visibility/visiblePortalPaths";
+import { identityRigidTransform3, type RigidTransform3 } from "../../src/math/rigidTransform3";
+import { computeIndependentVisiblePortalPaths, computeVisiblePortalPaths } from "../support/visibilityHarness";
 import { buildStaticallyCulledPortalPathTables } from "../../src/cell-complex/staticPortalPathCull";
 import type { CellComplexSpec } from "../../src/cell-complex/specs";
 import type { PortalPathTable } from "../../src/cell-complex/portalPaths";
@@ -31,9 +28,11 @@ import {
   clipSectorByPortal,
   funnelClipPlanes,
   type DirectionSector,
-} from "../../src/render/three/portalFunnel";
+} from "../../src/visibility/portalFunnel";
 import { threePointToWorld } from "../../src/render/three/worldAxes";
 import { createCameraAt } from "../support/cameras";
+
+type ComputeVisiblePortalPathsResult = VisibilityResult<RigidTransform3>;
 
 describe("computeVisiblePortalPaths", () => {
   it("includes the root path when requested", () => {
@@ -603,7 +602,7 @@ function fakeVisibleResult(pathIds: readonly number[]): Pick<ComputeVisiblePorta
           pathId,
           destinationCellId: "room-b",
           depth: 1,
-          rootFromDestinationMatrix: new THREE.Matrix4(),
+          rootFromDestinationMatrix: identityRigidTransform3,
           clipPlanes: new Float64Array(16),
           terminal: false,
           clipPolygonNdc: [],
@@ -629,7 +628,7 @@ function expectVisibleResultsEquivalent(
     expect(actualPath.pathId).toBe(expectedPath.pathId);
     expect(actualPath.destinationCellId).toBe(expectedPath.destinationCellId);
     expect(actualPath.depth).toBe(expectedPath.depth);
-    expect(actualPath.rootFromDestinationMatrix.elements).toEqual(expectedPath.rootFromDestinationMatrix.elements);
+    expect(actualPath.rootFromDestinationMatrix).toEqual(expectedPath.rootFromDestinationMatrix);
     expect(actualPath.clipPolygonNdc).toHaveLength(expectedPath.clipPolygonNdc.length);
     actualPath.clipPolygonNdc.forEach((point, pointIndex) => {
       expect(point.x).toBeCloseTo(expectedPath.clipPolygonNdc[pointIndex].x, 12);

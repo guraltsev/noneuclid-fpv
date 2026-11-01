@@ -8,15 +8,11 @@ import { formatBodyForInputMode } from "./inputModeText";
 import { worldCatalog } from "../authoring/worldCatalog";
 import { helpHubHomeGuidance } from "../world-objects/helpHubCopy";
 import { portalPanelModeDefinitions } from "../glue/portalPanelMode";
-import type {
-  RuntimeDebugOverlayItemId,
-  RuntimeMenuConsoleLogLevelId,
-  RuntimeMenuPageId,
-  RuntimeMenuState,
-  RuntimeToolId,
-} from "../runtime/runtimeMenuState";
+import type { RuntimeMenuConsoleLogLevelId, RuntimeMenuPageId, RuntimeMenuState } from "../runtime/runtimeMenuState";
+import type { RuntimeDebugOverlayItemId, RuntimeToolId } from "../glue/toolIds";
 import type { InputMode } from "./inputIntents";
-import { placedFlagMaxMessageLength, placedFlagTypes, type PlacedFlagType } from "../world-objects/placedFlags";
+import { placedFlagMaxMessageLength } from "../world-objects/placedFlags";
+import { placedFlagTypes, type PlacedFlagType } from "../world-objects/toolObjects";
 
 /** Option of a select-style control: stable id and display label. */
 export interface PaletteSelectOption {

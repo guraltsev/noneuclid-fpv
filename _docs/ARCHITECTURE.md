@@ -59,25 +59,29 @@ cannons).
 
 ## Layers and the dependency rule
 
-Dependencies point downward; lower layers never import higher ones.
+Dependencies point downward; lower layers never import higher ones. The layers form a strict order, and the module graph has no import cycles (type-only imports count).
 
 ```text
-math → cell-complex → movement → world-objects → runtime/ui/authoring → glue → render → main
+math, examples → cell-complex → diagnostics, visibility, movement → world-assets → world-objects → authoring → glue → interaction → runtime → ui → render → main
 ```
 
 The exact allowed edges, the live dependency graph (Mermaid) and the list of *known violations* are in the
 [generated reference](generated/ARCHITECTURE_REFERENCE.md#layer-dependency-graph). The rule that matters most: **`math`,
 `cell-complex`, `movement` and (ideally) `world-objects` and `runtime` must be runnable and testable without a browser.**
-The tests under `tests/` for those layers run in plain Node. Today a few edges break the rule (for example
-`world-objects` reaching into `render` for mesh builders); they are frozen in `scripts/docs/layering-baseline.json`
-and listed in the generated reference, and the check rejects new ones.
+The tests under `tests/` for those layers run in plain Node. Three.js and `@pmndrs/*` may be imported only from `render` (and the
+entry point). `npm run docs:check` rejects a layer edge the order does not allow, an npm import outside its layer, and any import
+cycle; known layering exceptions would be frozen in `scripts/docs/layering-baseline.json` (it is empty today) and listed in the
+generated reference, and the check rejects new ones.
 
 | Layer | Responsibility | Entry points |
 | --- | --- | --- |
 | `src/math` | vectors, rigid transforms, planes, polygons | `src/math/rigidTransform3.ts#composeRigidTransform3` |
 | `src/cell-complex` | specs, compilation, portal paths, culling | `src/cell-complex/compileCellComplex.ts#compileCellComplex` |
+| `src/diagnostics` | debug levels and the runtime diagnostics recorder | `src/diagnostics/runtimeDiagnostics.ts#runtimeDiagnostics` |
+| `src/visibility` | per-frame portal visibility against a camera (no renderer) | `src/visibility/visiblePortalPaths.ts#computeVisiblePortalPaths` |
 | `src/movement` | collision, motion, portal crossing | `src/movement/movePlayer.ts#movePlayer` |
 | `src/world-objects` | runtime objects and tools (flags, emitters, measurements, creatures) | `src/world-objects/runtimeObjectRegistry.ts#createRuntimeObjectRegistry` |
+| `src/interaction` | input frames, aim picking, VR locomotion, XR session state (no renderer) | `src/interaction/aimTarget.ts#resolveAimTargets` |
 | `src/runtime` | menu state machine, commands, live geometry session | `src/runtime/worldGeometrySession.ts#createWorldGeometrySession` |
 | `src/ui` | renderer-neutral palette/help/tooltips and input intents | `src/ui/paletteDefinition.ts#createPaletteDefinition` |
 | `src/glue` | launch options, debug settings, app config, asset URLs | `src/glue/readLaunchOptions.ts#readLaunchOptions` |
@@ -87,7 +91,7 @@ and listed in the generated reference, and the check rejects new ones.
 
 `src/main.ts` is deliberately small: read launch options from the URL, load the app config, then
 (`restartApp`) load the world spec, compile it, preload assets (`src/render/three/preloadWorldAssets.ts#preloadWorldAssets`),
-build the initial `AppState` (`src/appState.ts#createInitialAppState`) and call `createThreeApp`. Changing world, config
+build the initial `AppState` (`src/runtime/appState.ts#createInitialAppState`) and call `createThreeApp`. Changing world, config
 or debug options disposes the running app and starts a new one; a monotonically increasing run id discards a start that
 was superseded while it was loading.
 
@@ -112,12 +116,12 @@ was superseded while it was loading.
 ## Live geometry deformation
 
 Some worlds can be *deformed while you stand in them* (for example a torus whose lattice is skewed). A deformation is a
-point in a family (`src/runtime/worldGeometryDeformations.ts#WorldDeformationFamily`); the session
+point in a family (`src/cell-complex/worldGeometryDeformations.ts#WorldDeformationFamily`); the session
 (`src/runtime/worldGeometrySession.ts#createWorldGeometrySession`) holds a *current* and a *target* state, builds the
 deformed spec and recompiles it (including the static visibility cull) off the main thread in a worker, and exposes the
 finished `WorldGeometrySnapshot`. The frame loop polls once at the start of each frame
 (`commitReadyWorldGeometrySnapshot`) and, if a new snapshot exists, transports the player and every runtime object
-across the change with per-cell maps (`src/runtime/worldGeometryDeformations.ts#CellDeformationMap`) before swapping the
+across the change with per-cell maps (`src/cell-complex/worldGeometryDeformations.ts#CellDeformationMap`) before swapping the
 world, so no frame ever renders a half-updated complex. Tool state that cannot be transported (active geodesic edits,
 protractor selections) is cleared on commit.
 
@@ -186,7 +190,7 @@ checked by a manual/headless smoke run (see [DEVELOPMENT.md](DEVELOPMENT.md)).
 | --- | --- |
 | `scripts/docs/lib.mjs` | scans the code with the TypeScript compiler API (modules, headers, imports, exports, JSDoc) |
 | `npm run docs:generate` | rewrites `_docs/generated/*` from the code |
-| `npm run docs:check` / `tests/docs/documentation.test.ts` | fails on: a module without a header comment; an exported symbol without JSDoc; a stale generated file; a layering violation not in the baseline; a dangling `` `src/<dir>/<file>.ts#<symbol>` `` reference in the hand-written documents |
+| `npm run docs:check` / `tests/docs/documentation.test.ts` | fails on: a module without a header comment; an exported symbol without JSDoc; a stale generated file; a layering violation not in the baseline; a `three` import outside `render`; an import cycle; a dangling `` `src/<dir>/<file>.ts#<symbol>` `` reference in the hand-written documents |
 | `npm run docs:coverage [dir]` | lists what is still undocumented |
 
 Rules for contributors: put the *why* and the *contract* in the code comment next to the code (header + JSDoc), put the

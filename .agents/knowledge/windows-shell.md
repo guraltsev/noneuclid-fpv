@@ -15,3 +15,8 @@
   (doc/baseline fixes) from a commit whose message claimed to include them, caught only by diffing the commit
   afterward. After any `git add` with multiple paths, re-run `git status --short` and read the first column
   (staged) vs. second (unstaged) for every path you expect, rather than assuming the add worked.
+- Some working-copy files are CRLF (`core.autocrlf`; the index is LF), e.g. `src/runtime/runtimeMenuState.ts`, so a Node script that
+  matches multi-line text with `"\n"` finds nothing and a "cut from marker A to marker B" script throws or, worse, cuts to the end of
+  the file. Read with `.replace(/\r\n/g, "\n")`, edit, and write back (LF in the working copy is fine; git normalises it). A bash
+  `node -e '...'` with embedded quotes can also silently do nothing here: write the script to a file and run that.
+- A script that renders a file through `Set-Content -Encoding utf8` in Windows PowerShell 5.1 adds a BOM; `[IO.File]::WriteAllText` does not.

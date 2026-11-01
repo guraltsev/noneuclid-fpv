@@ -14,7 +14,7 @@ import {
   createDefaultWorldDeformationFamilyRegistry,
   getWorldDeformationFamilyOrThrow,
 } from "./worldGeometryDeformationFamilies";
-import type { WorldDeformationState } from "./worldGeometryDeformations";
+import type { WorldDeformationState } from "../cell-complex/worldGeometryDeformations";
 
 /**
  * Message sent to the geometry builder: the undeformed base spec, the deformation state to realize, and portal-path culling parameters.

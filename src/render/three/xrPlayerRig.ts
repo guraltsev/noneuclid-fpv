@@ -12,8 +12,8 @@ import type { MoveResult } from "../../movement/movePlayer";
 import { DEFAULT_PLAYER_EYE_HEIGHT_METERS } from "../../movement/playerBody";
 import type { PlayerPose } from "../../movement/playerPose";
 import { vec3, type Vec3 } from "../../math/vec3";
-import type { RuntimeInputFrame } from "./renderState";
-import { computePhysicalRoomScaleDisplacement } from "./vrLocomotion";
+import type { RuntimeInputFrame } from "../../interaction/inputFrame";
+import { computePhysicalRoomScaleDisplacement } from "../../interaction/vrLocomotion";
 import { worldPointToThree } from "./worldAxes";
 import { defaultVrComfortOptions, type VrComfortOptions } from "./vrComfort";
 

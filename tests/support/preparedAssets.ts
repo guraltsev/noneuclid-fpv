@@ -5,7 +5,7 @@
  * `overrides` for the methods a test reads or asserts on.
  */
 import * as THREE from "three";
-import type { PreparedGltfAsset, PreparedWorldAssets } from "../../src/render/three/preloadWorldAssets";
+import type { PreparedGltfAsset, PreparedWorldAssets } from "../../src/render/three/preparedWorldAssets";
 
 export function createFakePreparedAssets(overrides: Partial<PreparedWorldAssets> = {}): PreparedWorldAssets {
   return {

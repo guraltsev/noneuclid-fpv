@@ -11,13 +11,9 @@ import {
   type StaticWorldDeformationState,
   type WorldDeformationFamily,
   type WorldDeformationState,
-} from "./worldGeometryDeformations";
-import {
-  createTorusSkewDeformationFamily,
-  defaultTorusSkewDeformationState,
-  inferTorusSkewState,
-  type TorusSkewDeformationState,
-} from "./deformations/torusSkewDeformation";
+} from "../cell-complex/worldGeometryDeformations";
+import { createTorusSkewDeformationFamily, defaultTorusSkewDeformationState, inferTorusSkewState } from "../cell-complex/deformations/torusSkewDeformation";
+import { type TorusSkewDeformationState } from "../cell-complex/worldGeometryDeformations";
 
 /** Lookup table from deformation kind to its WorldDeformationFamily. */
 export interface WorldDeformationFamilyRegistry {

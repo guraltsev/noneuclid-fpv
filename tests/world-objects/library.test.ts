@@ -12,10 +12,7 @@
 import { describe, expect, it } from "vitest";
 import { worldObjectLibrary } from "../../src/world-objects/library";
 import { standardUserRobotObject, userObjectClass } from "../../src/world-objects/library";
-import {
-  butterflyVerticalOscillationHeightMagnitudeMeters,
-  butterflyVerticalOscillationRateHz,
-} from "../../src/world-objects/simpleGeoCreature";
+import { butterflyVerticalOscillationHeightMagnitudeMeters, butterflyVerticalOscillationRateHz } from "../../src/world-objects/creatures/simpleGeoCreatureBehavior";
 
 describe("worldObjectLibrary", () => {
   it("maps static wrappers to the expected asset paths and ids", () => {

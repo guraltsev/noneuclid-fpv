@@ -2,7 +2,7 @@
  * Page side of the channel to the local server (scripts/server/localServer.mjs): a WebSocket over which an admin can call any function of this page's public API (src/runtime/apiCall.ts), list it, evaluate expressions (dev mode only) and read forwarded console output.
  * The channel starts only when the page carries `<meta name="noneuclid-server" content="/__noneuclid/channel">`, which only the local server adds; on GitHub Pages, the Vite dev server and the smoke server nothing happens.
  */
-import { type ApiObject, callApi, listApi, toPlainData } from "../runtime/apiCall";
+import { type ApiObject, callApi, listApi, toPlainData } from "./apiCall";
 
 /** The slice of the WebSocket interface the channel uses (so tests can pass a fake). */
 export interface ChannelSocket {

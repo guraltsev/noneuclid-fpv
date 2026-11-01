@@ -117,7 +117,7 @@ queued job, despite their numbers (they were numbered after the existing queue t
 | [29](_done/29_frame_loop_allocation_and_draw_calls.md) | Frame-loop allocation and per-object draw calls | done, needs review | [75](../../_issues/75_frame_loop_allocation_and_per_object_draw_calls.md) |  |
 | [30](30_deformation_rebuild_pipeline.md) | Incremental deformation rebuild pipeline | queued | [55](../../_issues/55_live_deformation_rebuild_cost_and_se2_transforms.md), [82](../../_issues/82_deformation_commit_rebuilds_whole_scene_and_reuploads_floor_texture.md) |  |
 | [31](31_app_shell_state_holder.md) | One state holder and one command path for the app shell | queued | - | 77 |
-| [32](32_layer_dag.md) | Make the layer rule a real DAG | queued | [78](../../_issues/78_enforce_layer_dag_and_move_domain_logic_out_of_render.md) |  |
+| [32](_done/32_layer_dag.md) | Make the layer rule a real DAG | done, needs review | [78](../../_issues/78_enforce_layer_dag_and_move_domain_logic_out_of_render.md) |  |
 | [33](33_decompose_runtime_monoliths.md) | Decompose runtime monoliths and retire legacy paths | queued | - | 38 |
 | [34](34_type_strictness_lint_bundle.md) | Type strictness, linting and bundle configuration | queued | - | 80 |
 | [35](35_torus_family_as_teichmuller_space.md) | Treat the torus family as TeichmÃƒÂ¼ller space | queued | - | 54 |

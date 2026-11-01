@@ -6,7 +6,7 @@
  * (stick move or turn) is active, which reduces the visual-vestibular mismatch.
  */
 import * as THREE from "three";
-import type { RuntimeInputFrame } from "./renderState";
+import type { RuntimeInputFrame } from "../../interaction/inputFrame";
 import { defaultVrComfortOptions, type VrComfortOptions } from "../../glue/vrComfortOptions";
 
 export { defaultVrComfortOptions, type VrComfortOptions };

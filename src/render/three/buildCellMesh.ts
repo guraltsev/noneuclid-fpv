@@ -13,7 +13,7 @@
 import * as THREE from "three";
 import { floorLatticeUv, floorMetricUv, type FloorLatticeUvFrame } from "../../cell-complex/floorUv";
 import type { CompiledPrismCell } from "../../cell-complex/prismCells";
-import type { DebugLevelId } from "../../glue/debugLevels";
+import type { DebugLevelId } from "../../diagnostics/debugLevels";
 import {
   shouldRenderPortalPlacard,
   shouldRenderPortalText,
@@ -21,7 +21,7 @@ import {
   type PortalPanelModeId,
 } from "../../glue/portalPanelMode";
 import { buildPortalMesh } from "./buildPortalMesh";
-import type { PreparedWorldAssets } from "./preloadWorldAssets";
+import type { PreparedWorldAssets } from "./preparedWorldAssets";
 import { SCENE_BACKGROUND_COLOR } from "./sceneColors";
 import { buildForbiddenZoneWireframe } from "./debugCollisionWireframes";
 

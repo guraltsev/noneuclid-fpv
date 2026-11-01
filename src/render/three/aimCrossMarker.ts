@@ -4,7 +4,7 @@
  * The cross is oriented so its plane is tangent to the surface and its right axis follows the camera/controller right axis projected onto that plane.
  */
 import * as THREE from "three";
-import type { AimTarget } from "./aimTarget";
+import type { AimTarget } from "../../interaction/aimTarget";
 import { worldPointToThree } from "./worldAxes";
 
 /**

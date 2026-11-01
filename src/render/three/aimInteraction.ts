@@ -8,7 +8,7 @@ import * as THREE from "three";
 import { type CompiledCellComplex } from "../../cell-complex/compileCellComplex";
 import { type PlayerPose } from "../../movement/playerPose";
 import { DEFAULT_PLAYER_EYE_HEIGHT_METERS } from "../../movement/playerBody";
-import { type DebugLevelId } from "../../glue/debugLevels";
+import { type DebugLevelId } from "../../diagnostics/debugLevels";
 import { type RuntimeMenuState } from "../../runtime/runtimeMenuState";
 import {
   createWorldFocusMessageDefinition,
@@ -17,7 +17,8 @@ import {
 import { canExtendGeodesicSegment } from "../../world-objects/geodesic/objects";
 import { isGeodesicLocked } from "../../world-objects/geodesic/lifecycle";
 import { type RuntimeObjectRegistry, type RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
-import { AimTarget, resolveAimTargets as defaultResolveAimTargets } from "./aimTarget";
+import { AimTarget } from "../../interaction/aimTarget";
+import { resolveAimTargets as defaultResolveAimTargets } from "./aimTarget";
 import { formatVec3, roundNumber } from "./appDebugHelpers";
 import { GeodesicCannonToolState } from "./geodesicCannonTools";
 import { renderCameraFarMeters, renderCameraNearMeters } from "./renderCameraClip";
@@ -27,13 +28,6 @@ import {
   getRuntimeObjectInteractionRangeMeters,
 } from "./rootAimRay";
 import { createXrPlayerRig, xrRigidTransformLocalMatrix } from "./xrPlayerRig";
-
-/** The interactable object the aim ray currently rests on. */
-export interface FocusedRuntimeObject {
-  readonly object: RuntimeWorldObject;
-  readonly distance: number;
-  readonly tooltipAnchor: { readonly x: number; readonly y: number; readonly z: number };
-}
 
 /** Dependencies for {@link createAimInteraction}; createThreeApp#shell supplies the live camera, renderer and rig objects as values and the changing state as getters. */
 export interface AimInteractionDeps {

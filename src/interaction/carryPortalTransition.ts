@@ -7,10 +7,10 @@
  * cell complex. Invariant: a transition is reported only if the portal found in the previous cell
  * actually leads to the cell the move ended in; otherwise nothing is reported.
  */
-import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex";
-import type { GeodesicCarryPortalTransition } from "../../world-objects/geodesic/objects";
-import type { SegmentWalkCrossing } from "../../cell-complex/segmentWalk";
-import type { movePlayer } from "../../movement/movePlayer";
+import type { CompiledCellComplex } from "../cell-complex/compileCellComplex";
+import type { GeodesicCarryPortalTransition } from "../world-objects/geodesic/objects";
+import type { SegmentWalkCrossing } from "../cell-complex/segmentWalk";
+import type { movePlayer } from "../movement/movePlayer";
 
 /** Minimal structural subset of a movement result required to detect a portal crossing. */
 interface PortalMoveResult {

@@ -216,7 +216,7 @@ round trip through a reciprocal pair returns the original pose up to floating-po
 
 Every gluing rotation is a yaw, so after every crossing the pose (and each composed `cellFromStart` of the segment walk and the developed disk) is re-projected to a pure yaw, $R\leftarrow\mathrm{yaw}(\operatorname{atan2}(R_{10},R_{00}))$ (`src/math/rigidTransform3.ts#orthonormalizeYawRigidTransform3`); $10^5$ crossings of a reciprocal pair then keep $|R^TR-I|$ and $|\det R-1|$ near $10^{-16}$. The gluing rotation itself is built from the single angle between the side tangents (`src/cell-complex/compilePortalTransforms.ts`).
 
-**Creatures follow a leader on their geodesic.** A mouse or butterfly owns an invisible leader that walks its geodesic exactly with the segment-walk kernel (no obstacles), together with the map $T$ from the leader's cell frame to the creature's cell frame; $T$ is updated whenever either one crosses a portal ($T\leftarrow T\,g^{-1}$ for a leader crossing $g$, $T\leftarrow h\,T$ when the creature's move has `cellFromStart` $h$), so it always describes the side of each cone vertex on which the two paths actually ran. Each tick the creature moves toward the leader's position plus its wobble, through the same slide as any mover (zones on), at no more than 1.5 times its speed; the leader advances only while the creature lags it by less than 0.5 m. Nothing in the way means the creature is the leader. At a forbidden-zone disc with centre $v$ the creature must pass $v$ on the geodesic's side, $\sigma=\operatorname{sign}\operatorname{cross}(d_L,v-L)$ (a line through $v$ counts as $-1$, the segment-walk tie rule): when its step would enter the disc it walks to the contact point and continues along the tangent $t=\sigma\,\mathrm{rot}_{90^\circ}(n)$, $n$ the outward normal, which keeps $v$ on the required side, and a creature already touching the zone on the other side orbits toward the required side (`src/world-objects/simpleGeoCreature.ts#applyForbiddenZoneSideRule`). Once past the zone it rejoins the leader and the same geodesic. Whenever the creature is displaced from outside (a placement through `objectHost.placeAt`, a reset or a deformation commit) the leader is re-seeded on it, so the lag is always bounded by the leash.
+**Creatures follow a leader on their geodesic.** A mouse or butterfly owns an invisible leader that walks its geodesic exactly with the segment-walk kernel (no obstacles), together with the map $T$ from the leader's cell frame to the creature's cell frame; $T$ is updated whenever either one crosses a portal ($T\leftarrow T\,g^{-1}$ for a leader crossing $g$, $T\leftarrow h\,T$ when the creature's move has `cellFromStart` $h$), so it always describes the side of each cone vertex on which the two paths actually ran. Each tick the creature moves toward the leader's position plus its wobble, through the same slide as any mover (zones on), at no more than 1.5 times its speed; the leader advances only while the creature lags it by less than 0.5 m. Nothing in the way means the creature is the leader. At a forbidden-zone disc with centre $v$ the creature must pass $v$ on the geodesic's side, $\sigma=\operatorname{sign}\operatorname{cross}(d_L,v-L)$ (a line through $v$ counts as $-1$, the segment-walk tie rule): when its step would enter the disc it walks to the contact point and continues along the tangent $t=\sigma\,\mathrm{rot}_{90^\circ}(n)$, $n$ the outward normal, which keeps $v$ on the required side, and a creature already touching the zone on the other side orbits toward the required side (`src/world-objects/creatures/simpleGeoCreatureBehavior.ts#applyForbiddenZoneSideRule`). Once past the zone it rejoins the leader and the same geodesic. Whenever the creature is displaced from outside (a placement through `objectHost.placeAt`, a reset or a deformation commit) the leader is re-seeded on it, so the lag is always bounded by the leash.
 ## 6. Geodesics
 
 A **geodesic** here is a locally straight horizontal path at the constant beam height
@@ -332,7 +332,7 @@ Three.js frame (`src/render/three/worldAxes.ts#rigidTransformToThreeMatrix`); ya
 Three.js $y$. Cell meshes are authored directly in Three.js axes.
 
 **Which paths are visible.** `src/render/three/visiblePortalPaths.ts#computeVisiblePortalPaths` decides visibility with the
-*exact funnel* of `src/render/three/portalFunnel.ts`, in the root cell's world axes ($x$ right, $y$ forward, $z$ up). The
+*exact funnel* of `src/visibility/portalFunnel.ts`, in the root cell's world axes ($x$ right, $y$ forward, $z$ up). The
 eye $E=(e,z_e)$ lies in the root cell. For a path $p$ whose newest portal developed into the root frame has endpoints
 $L$ (left) and $R$ (right) and aperture top $h$ (`src/cell-complex/orientedPortal.ts#developPortalSegment`):
 
@@ -438,14 +438,14 @@ for example, a protractor label beats a geodesic segment).
 
 ## 9. Live deformation of the complex
 
-A *deformation family* (`src/runtime/worldGeometryDeformations.ts#WorldDeformationFamily`) is a parameterised set of cell
+A *deformation family* (`src/cell-complex/worldGeometryDeformations.ts#WorldDeformationFamily`) is a parameterised set of cell
 complexes with fixed topology. Its state is a point in the parameter space; the family can apply a state to the base
 spec, produce **per-cell maps** carrying points and headings from the old complex to the new one
-(`src/runtime/worldGeometryDeformations.ts#CellDeformationMap`), take a bounded step towards a target
+(`src/cell-complex/worldGeometryDeformations.ts#CellDeformationMap`), take a bounded step towards a target
 state, and validate that a new snapshot preserves topology.
 
 The implemented family is the **skewed flat torus**
-(`src/runtime/deformations/torusSkewDeformation.ts#createTorusSkewDeformationFamily`): one cell over the parallelogram with
+(`src/cell-complex/deformations/torusSkewDeformation.ts#createTorusSkewDeformationFamily`): one cell over the parallelogram with
 edges $u=(w,0)$ and $v=(a,b)$, opposite sides glued by translation, so the world is the flat torus $\mathbb R^2/(\mathbb Zu+\mathbb Zv)$.
 The shipped UI keeps the width $w$ fixed; the skew $a\in[0,2w]$ and depth $b\in[w/2,2w]$ are the parameters. The footprint is centred, with
 vertices at $\pm u/2\pm v/2$. A point with lattice coordinates $(\alpha,\beta)$ — $p=o+\alpha u+\beta v$, $o=-(u+v)/2$ — is
@@ -465,7 +465,7 @@ creatures, which move ignoring zones, use walls only.
 **Headings.** Forward is the body +y axis $R e_y=(-\sin\psi,\cos\psi)$ for every yaw pose (player, creatures,
 marmots, flags). A commit carries the forward vector by the linear part $A$ of the cell map,
 $f'=A f/|A f|$, and rebuilds the yaw as $\psi'=\operatorname{atan2}(-f'_x,f'_y)$
-(`src/runtime/worldGeometryDeformations.ts#transformRigidPoseWithMap`); a marmot's velocity becomes $|v|\,f'$.
+(`src/cell-complex/worldGeometryDeformations.ts#transformRigidPoseWithMap`); a marmot's velocity becomes $|v|\,f'$.
 Because $A$ maps the lattice to the lattice, a body walking along a closed geodesic of class $(p,q)\in\mathbb Z^2$
 still walks along one of class $(p,q)$ after the commit. Geodesic cannon yaws are direction angles
 ($(\cos\psi,\sin\psi)$) and are carried as directions (`src/render/three/runtimeSceneUtils.ts#transformYawWithMap`).

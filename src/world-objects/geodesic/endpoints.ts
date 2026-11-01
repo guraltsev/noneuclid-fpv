@@ -4,19 +4,8 @@
 import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex";
 import { transformPoint3 } from "../../math/rigidTransform3";
 import type { RuntimeObjectRegistry, RuntimeWorldObject } from "../runtimeObjectRegistry";
-import {
-  canObjectAttachGeodesics,
-  GEODESIC_MIN_LENGTH_METERS,
-  type GeodesicCannonObject,
-  type GeodesicEndpointAttachment,
-  type GeodesicEndpointSelection,
-  type GeodesicEndRole,
-  type GeodesicIntervalObject,
-  type GeodesicPortalTraversal,
-  getAnchorBeamPoint,
-  intersectionTolerance,
-  type LiftedGeodesicEndpoint,
-} from "./objects";
+import { GEODESIC_MIN_LENGTH_METERS, type GeodesicCannonObject, type GeodesicEndpointAttachment, type GeodesicEndpointSelection, type GeodesicEndRole, type GeodesicIntervalObject, type GeodesicPortalTraversal, intersectionTolerance, type LiftedGeodesicEndpoint } from "./objects";
+import { canObjectAttachGeodesics, getAnchorBeamPoint } from "./anchors";
 import { reverseGeodesicPortalWord } from "./portalWord";
 import { inversePortalTransform } from "./development";
 

@@ -20,11 +20,11 @@ import {
   buildStaticallyCulledPortalPathTables,
   type StaticPortalPathCullResult,
 } from "../../cell-complex/staticPortalPathCull";
-import type { DebugLevelId } from "../../glue/debugLevels";
+import type { DebugLevelId } from "../../diagnostics/debugLevels";
 import type { PortalPanelModeId } from "../../glue/portalPanelMode";
 import { buildCellMesh } from "./buildCellMesh";
 import { patchPortalClipMaterial, type PortalClipMaterialState } from "./portalClipMaterial";
-import type { PreparedWorldAssets } from "./preloadWorldAssets";
+import type { PreparedWorldAssets } from "./preparedWorldAssets";
 import { disposeMaterial, disposeObject3D } from "./runtimeSceneUtils";
 
 /** Category of a cell mesh part; "ceiling" and floor-outline meshes have no kind and are not instanced. */

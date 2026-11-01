@@ -12,14 +12,15 @@
 import * as THREE from "three";
 import { type PlayerPose } from "../../movement/playerPose";
 import { refreshMeasuredGeodesicLengthObject } from "../../world-objects/measureLengthTool";
-import { type ProtractorAngleObject, refreshProtractorAngleObject } from "../../world-objects/protractorTool";
+import { refreshProtractorAngleObject } from "../../world-objects/protractorTool";
+import { type ProtractorAngleObject } from "../../world-objects/toolObjects";
 import { type RuntimeObjectRegistry, type RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
 import {
   MeasuredGeodesicLengthRuntime,
   createMeasuredGeodesicLengthRuntime,
 } from "./measureLengthRenderer";
 import { PlacedFlagRuntime, createPlacedFlagRuntime } from "./placedFlagRenderer";
-import { PreparedWorldAssets } from "./preloadWorldAssets";
+import { PreparedWorldAssets } from "./preparedWorldAssets";
 import { ProtractorAngleRuntime, createProtractorAngleRuntime } from "./protractorAngleRenderer";
 import {
   RuntimeObjectRenderArchetype,

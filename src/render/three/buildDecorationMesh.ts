@@ -9,8 +9,8 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import type { AssetObjectSpec, CellObjectSpec } from "../../cell-complex/specs";
-import { runtimeDiagnostics } from "./runtimeDiagnostics";
-import type { PreparedGltfAsset, PreparedWorldAssets } from "./preloadWorldAssets";
+import { runtimeDiagnostics } from "../../diagnostics/runtimeDiagnostics";
+import type { PreparedGltfAsset, PreparedWorldAssets } from "./preparedWorldAssets";
 import { worldPointToThree, worldYawRadiansToThree } from "./worldAxes";
 
 /** Legacy asset path that is replaced by the procedural marmot proxy instead of loading a glTF. */

@@ -31,8 +31,9 @@ import type {
   RuntimeObjectRenderArchetypeDiagnostics,
 } from "./runtimeObjectRenderArchetypes";
 import type { RuntimeObjectRenderRecord } from "./runtimeObjectRenderRecords";
-import { clipPlaneArrayLength, writeAlwaysInsideClipPlanes } from "./portalFunnel";
-import type { VisiblePortalPath, VisiblePortalPathDebugSummary } from "./visiblePortalPaths";
+import { clipPlaneArrayLength, writeAlwaysInsideClipPlanes } from "../../visibility/portalFunnel";
+import type { VisiblePortalPathDebugSummary } from "../../visibility/visiblePortalPaths";
+import type { VisiblePortalPath } from "./visiblePortalPaths";
 
 /** Snapshot of instanced portal rendering for the debug overlay and console helpers. */
 export interface PortalInstanceRenderDebugState {

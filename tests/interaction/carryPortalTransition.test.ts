@@ -10,7 +10,7 @@ import { movePlayer } from "../../src/movement/movePlayer";
 import {
   resolveGeodesicCarryPortalTransitionFromMove,
   resolveGeodesicCarryPortalTransitionsFromCrossings,
-} from "../../src/render/three/geodesicCarryPortalTransition";
+} from "../../src/interaction/carryPortalTransition";
 import type { SegmentWalkCrossing } from "../../src/cell-complex/segmentWalk";
 import { identityRigidTransform3 } from "../../src/math/rigidTransform3";
 

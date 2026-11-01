@@ -7,8 +7,8 @@
  * Held buttons in `createXrInputFrame` are level signals; only `createXrControls` converts them to rising-edge requests.
  */
 import { vec3 } from "../../math/vec3";
-import type { RuntimeInputFrame } from "./renderState";
-import { computeContinuousTurn, computeJoystickLocomotion, type StickAxes } from "./vrLocomotion";
+import type { RuntimeInputFrame } from "../../interaction/inputFrame";
+import { computeContinuousTurn, computeJoystickLocomotion, type StickAxes } from "../../interaction/vrLocomotion";
 import { defaultVrComfortOptions, type VrComfortOptions } from "./vrComfort";
 
 /**

@@ -5,35 +5,10 @@ import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex"
 import { transformPoint3, yawRigidTransform3 } from "../../math/rigidTransform3";
 import { addVec3, distanceSquaredVec3, scaleVec3, type Vec3 } from "../../math/vec3";
 import type { RuntimeObjectRegistry, RuntimeWorldObject } from "../runtimeObjectRegistry";
-import {
-  canObjectAttachGeodesics,
-  createGeodesicIntervalObject,
-  directionFromYaw,
-  emitterConnectionToleranceMeters,
-  type FreeGeodesicEndObject,
-  GEODESIC_MIN_LENGTH_METERS,
-  type GeodesicCannonObject,
-  type GeodesicCarryPortalTransition,
-  type GeodesicEndRole,
-  type GeodesicIntervalObject,
-  type GeodesicPortalTraversal,
-  type GeodesicTraceBuildResult,
-  getGeodesicCannonEmitterPoint,
-  getOppositeEndRole,
-  intersectionTolerance,
-  isFreeGeodesicEndObject,
-  type LiftedGeodesicEndpoint,
-  minGeodesicSegmentLengthMeters,
-  type TraceGeodesicSegmentResult,
-} from "./objects";
-import {
-  applyAnchorCrossingTraversals,
-  collectPortalWordFromTraces,
-  portalTraversalFromCarryTransition,
-  portalWordAfterAnchorCrossing,
-  reduceAdjacentInversePortalTraversals,
-  samePortalWord,
-} from "./portalWord";
+import { createGeodesicIntervalObject, directionFromYaw, emitterConnectionToleranceMeters, type FreeGeodesicEndObject, GEODESIC_MIN_LENGTH_METERS, type GeodesicCannonObject, type GeodesicCarryPortalTransition, type GeodesicEndRole, type GeodesicIntervalObject, type GeodesicPortalTraversal, type GeodesicTraceBuildResult, getGeodesicCannonEmitterPoint, getOppositeEndRole, intersectionTolerance, isFreeGeodesicEndObject, type LiftedGeodesicEndpoint, minGeodesicSegmentLengthMeters, type TraceGeodesicSegmentResult } from "./objects";
+import { canObjectAttachGeodesics } from "./anchors";
+import { applyAnchorCrossingTraversals, collectPortalWordFromTraces, portalTraversalFromCarryTransition, portalWordAfterAnchorCrossing, samePortalWord } from "./portalWord";
+import { reduceAdjacentInversePortalTraversals } from "./objects";
 import { traceGeodesicPathForConnectionMode, traceTerminalToBuildTerminal } from "./trace";
 import { requestGeodesicIntersectionUpdate, withDeferredGeodesicIntersections } from "./intersections";
 import {

@@ -22,7 +22,7 @@ import { yawRigidTransform3 } from "../../src/math/rigidTransform3";
 import { simpleCollisionCylinder } from "../../src/movement/dynamicObject";
 import { collectPortalGhostRuntimeObjectRenderRecords } from "../../src/render/three/runtimeObjectGhostRecords";
 import { createPlayerRoverRenderModel } from "../../src/render/three/playerRoverModel";
-import type { RuntimeCreatureObject } from "../../src/world-objects/runtimeObjectRegistry";
+import type { RuntimeCreatureObject } from "../../src/world-objects/runtimeObjectBase";
 import { createFakePreparedAssets } from "../support/preparedAssets";
 
 const squareRoomBase = [

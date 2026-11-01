@@ -4,7 +4,7 @@
  * The button is enabled only when immersive VR is supported and the status is available, ended, or failed.
  * The "unsupported" and "insecure-context" messages auto-dismiss after `XR_UNAVAILABLE_MESSAGE_DURATION_MS`, once per status episode.
  */
-import type { XrSessionState } from "./xrSessionState";
+import type { XrSessionState } from "../../interaction/xrSessionState";
 
 /**
  * How long, in milliseconds, the "VR unavailable" message stays visible before the overlay hides itself.

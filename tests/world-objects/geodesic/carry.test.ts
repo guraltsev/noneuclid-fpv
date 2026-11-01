@@ -14,10 +14,8 @@
  */
 import { describe, expect, it } from "vitest";
 import { moveDynamicObject } from "../../../src/movement/moveDynamicObject";
-import {
-  createRuntimeObjectRegistry,
-  runtimeObjectToDynamicObjectState,
-} from "../../../src/world-objects/runtimeObjectRegistry";
+import { createRuntimeObjectRegistry } from "../../../src/world-objects/runtimeObjectRegistry";
+import { runtimeObjectToDynamicObjectState } from "../../../src/world-objects/runtimeObjectBase";
 import {
   createGeodesicCannonObject,
   createGeodesicIntervalObject,

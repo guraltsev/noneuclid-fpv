@@ -11,7 +11,7 @@ import { type Vec3 } from "../../math/vec3";
 import { DEFAULT_PLAYER_EYE_HEIGHT_METERS } from "../../movement/playerBody";
 import { type PlayerPose } from "../../movement/playerPose";
 import { setApiNamespace } from "../../runtime/publicApi";
-import { type RuntimeToolId } from "../../runtime/runtimeMenuState";
+import { type RuntimeToolId } from "../../glue/toolIds";
 import { type LiveGeometryDebugState } from "../../runtime/worldGeometrySession";
 import {
   type GeodesicCarryPortalTransition,
@@ -24,13 +24,8 @@ import { type GeodesicCreatureDebugDump } from "./geodesicCreatureDebug";
 import { type PortalInstanceRenderDebugState } from "./renderPortalInstances";
 import { type RenderQualityState, createRenderQualityState } from "./renderQuality";
 import { type VisiblePortalPathRenderState } from "./renderState";
-import {
-  type ComputeVisiblePortalPathsResult,
-  type VisiblePortalPath,
-  type VisiblePortalPathDebugSummary,
-  type VisiblePortalPathLookupResult,
-  describeVisiblePortalPath,
-} from "./visiblePortalPaths";
+import { type VisiblePortalPathDebugSummary, type VisiblePortalPathLookupResult, describeVisiblePortalPath } from "../../visibility/visiblePortalPaths";
+import { type ComputeVisiblePortalPathsResult, type VisiblePortalPath } from "./visiblePortalPaths";
 import { rigidTransformToThreeMatrix } from "./worldAxes";
 
 /** Console API installed as window.noneuclidPortalDebug (by createPortalDebugRuntime) for inspecting portal paths, visibility, and clip polygons. Paths are resolved relative to the player's current root cell. */

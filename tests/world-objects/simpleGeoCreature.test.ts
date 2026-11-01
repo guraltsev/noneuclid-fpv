@@ -33,16 +33,12 @@ import {
 } from "../../src/math/rigidTransform3";
 import { simpleCollisionCylinder, type DynamicObjectState } from "../../src/movement/dynamicObject";
 import { collectGeodesicCreatureDebugDump } from "../../src/render/three/geodesicCreatureDebug";
-import type { PreparedWorldAssets } from "../../src/render/three/preloadWorldAssets";
+import type { PreparedWorldAssets } from "../../src/render/three/preparedWorldAssets";
 import { createRuntimeObjectRegistry } from "../../src/world-objects/runtimeObjectRegistry";
 import { createObjectHost } from "../../src/world-objects/worldObjectOwner";
-import {
-  applyForbiddenZoneSideRule,
-  geodesicSideOfPoint,
-  createSimpleGeoCreature,
-  createSimpleGeoCreatureRuntime,
-  forbiddenZoneLateralOscillationScale,
-} from "../../src/world-objects/simpleGeoCreature";
+import { createSimpleGeoCreature } from "../../src/world-objects/simpleGeoCreature";
+import { applyForbiddenZoneSideRule, geodesicSideOfPoint, forbiddenZoneLateralOscillationScale } from "../../src/world-objects/creatures/simpleGeoCreatureBehavior";
+import { createSimpleGeoCreatureRuntime } from "../../src/render/three/creatures/simpleGeoCreatureView";
 
 const squareRoomBase = [
   { x: -1, y: -1 },

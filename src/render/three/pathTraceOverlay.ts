@@ -7,7 +7,7 @@
  * and dispose them (see `hideCellPathOverlays`).
  */
 import * as THREE from "three";
-import { type AppState } from "../../appState";
+import { type AppState } from "../../runtime/appState";
 import { type PortalRenderPath } from "../../cell-complex/portalPaths";
 import { type CompiledPrismCell } from "../../cell-complex/prismCells";
 import {

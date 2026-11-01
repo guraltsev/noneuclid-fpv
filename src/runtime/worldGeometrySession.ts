@@ -17,7 +17,7 @@ import {
   deformationStatesEqual,
   type DynamicGeometryStepOptions,
   type WorldDeformationState,
-} from "./worldGeometryDeformations";
+} from "../cell-complex/worldGeometryDeformations";
 import {
   createDefaultWorldGeometryBuildClient,
   type WorldGeometryBuildClient,

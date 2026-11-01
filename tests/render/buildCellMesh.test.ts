@@ -21,7 +21,7 @@ import type { CellComplexSpec } from "../../src/cell-complex/specs";
 import { buildCellMesh } from "../../src/render/three/buildCellMesh";
 import { SCENE_BACKGROUND_COLOR } from "../../src/render/three/sceneColors";
 import { PORTAL_WALL_TEXTURE_KEY } from "../../src/render/three/portalWallTexture";
-import type { PreparedWorldAssets } from "../../src/render/three/preloadWorldAssets";
+import type { PreparedWorldAssets } from "../../src/render/three/preparedWorldAssets";
 import { installFakeCanvas2d } from "../support/fakeCanvas2d";
 import { createFakePreparedAssets } from "../support/preparedAssets";
 

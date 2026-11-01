@@ -8,10 +8,8 @@
  */
 import * as THREE from "three";
 import { type Vec3 } from "../../math/vec3";
-import {
-  type ProtractorCenterSelection,
-  type ProtractorDirectedGeodesic,
-} from "../../world-objects/protractorTool";
+import { type ProtractorCenterSelection } from "../../world-objects/protractorTool";
+import { type ProtractorDirectedGeodesic } from "../../world-objects/toolObjects";
 import { worldPointToThree } from "./worldAxes";
 
 type ProtractorToolFeedbackOptions = Parameters<typeof createProtractorToolFeedback>[0];

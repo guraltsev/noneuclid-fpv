@@ -6,7 +6,7 @@ import type { LaunchOptions } from "./readLaunchOptions";
 import { serializeDebugOptions } from "./debugOptions";
 import { serializeUiOptions } from "./uiOptions";
 import { defaultAppConfigName } from "./appConfig";
-import { serializeRuntimeDebugOverlayItems } from "../runtime/runtimeMenuState";
+import { serializeRuntimeDebugOverlayItems } from "./toolIds";
 
 const launchOptionSearchParams = [
   "world",

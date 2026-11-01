@@ -10,7 +10,7 @@ import {
   type WebGlRenderInfoState,
   type XrDebugRenderState,
 } from "./renderState";
-import { type XrSessionState } from "./xrSessionState";
+import { type XrSessionState } from "../../interaction/xrSessionState";
 
 /** Blends the new per-phase frame timings into the previous smoothed ones (returns next unchanged when there is no previous sample). */
 export function smoothFramePerformance(

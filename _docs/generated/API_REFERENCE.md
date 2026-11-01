@@ -142,6 +142,20 @@ Derives the rigid gluing map of every portal from the geometry of the two sides 
 | --- | --- | --- |
 | function | `compilePortalTransforms` | Compiles every portal of every cell, returning for each cell id its CompiledPortal list in authored order. |
 
+### `cell-complex/deformations/torusSkewDeformation.ts`
+
+Deformation family for the one-cell torus world: the cell "torus-room" is a prism whose footprint is a parallelogram with edge vectors u = (w, 0) and v = (a, b), and opposite sides glued by translation (side-0 with side-2, side-1 with side-3).
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| const | `defaultTorusSkewDeformationState` | Default torus parameters: w = 15 m, b = 15 m, a = 0 (a square). |
+| function | `createTorusSkewDeformationFamily` | Creates the "torus-skew" WorldDeformationFamily; applyToSpec rebuilds the parallelogram footprint and carries startingPosition and cell objects from the inferred base state to the requested one. |
+| function | `buildTorusParallelogramVertices` | Returns the four footprint vertices (counter-clockwise, centered at the origin) of the parallelogram spanned by u = (w, 0) and v = (a, b). |
+| function | `createTorusSkewCellDeformationMaps` | Builds the single-entry map {torus-room} that preserves lattice coordinates between the previous and next parallelogram frames and leaves z unchanged. |
+| function | `nextTorusSkewStep` | Moves (widthMeters, skewXMeters, depthMeters) together from current toward target along a straight segment by at most maxStepMeters in the Euclidean metric, snapping to the target when the remaining distance is within m… |
+| function | `validateTorusSkewBaseSpec` | Returns errors unless the spec has exactly one cell, "torus-room", with 4 base vertices, positive finite height, portals side-0..side-3 on sides 0..3 paired 0<->2 and 1<->3 to itself, and a footprint that is the centred… |
+| function | `inferTorusSkewState` | Reads (w, a, b) from a base spec's torus-room footprint as w = \|v1 - v0\| and (a, b) = v3 - v0; throws if the cell is missing or the values are out of range. |
+
 ### `cell-complex/describeGeometry.ts`
 
 Human-readable text summary of an authored cell-complex spec, for logging and debugging.
@@ -327,6 +341,102 @@ Cell-complex spec validator: structural checks on a CellComplexSpec before it is
 | const | `gluedSideLengthToleranceMeters` | Largest allowed length difference, in meters, between the two sides glued by a portal pair. |
 | function | `validateCellComplexSpec` | Validates a world spec and returns the list of problems found, empty when valid. |
 
+### `cell-complex/worldGeometryDeformations.ts`
+
+Family-independent vocabulary and helpers for live deformation of a cell complex while preserving its combinatorics (cells, sides, portals and their pairing).
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `TorusSkewDeformationState` | Parameters (meters) of the torus-room parallelogram: horizontal edge w, skew a and depth b. |
+| interface | `StaticWorldDeformationState` | Deformation state of a world that is never deformed. |
+| type | `WorldDeformationState` | Union of all deformation parameter records, discriminated by kind; extend it when adding a family. |
+| interface | `DynamicGeometryStepOptions` | Step-size limits for moving a deformation state toward its target one rebuild at a time. |
+| interface | `CellDeformationMap` | Spatial map between a cell's previous and next local frames (cell-local meters), used to carry points and headings across a geometry commit. |
+| interface | `WorldDeformationFamily` | Strategy object defining one family of deformations of a cell-complex spec, parameterized by its state type. |
+| interface | `PrismBaseReplacement` | Replacement footprint (2D vertices in order, meters) for one prism cell identified by id. |
+| interface | `RuntimePoseInCell` | Rigid pose expressed in the local frame of a named cell. |
+| function | `applyPrismBaseReplacements` | Returns a spec whose listed cells have their baseVertices replaced (copied) while all else is shared with the input; throws if any replacement names a missing cell. |
+| function | `transformPoseWithCellMaps` | Maps a cell-local pose through the map for its cell, or returns undefined if that cell has no map. |
+| function | `transformRigidPoseWithMap` | Maps a pose by sending its translation through mapPoint and its forward vector R·e_y (the rotation's second column, projected to the horizontal plane) through mapDirection; the new yaw makes R'·e_y parallel to the mappe… |
+| function | `transformPositionedObjectSpecWithMap` | Returns a copy of a cell-object spec with position and yaw (turnRadians or yawRadians, whichever is defined) mapped; for marmots the velocity direction is mapped by the linear part, its speed kept, and the yaw re-derive… |
+| function | `transformStartingPositionWithMap` | Maps a spec's startingPosition through the map for its cell; returns it unchanged if there is no map and undefined if there is no starting position. |
+| function | `transformCellObjectsWithMaps` | Returns the cell with every visuals.objects entry mapped by the cell's map, or the same cell if it has no map or no objects. |
+| function | `createIdentityCellDeformationMaps` | Creates a copy-through map for every cell of the world, used by families that do not move anything. |
+| function | `validateTopologyPreservingSnapshot` | Lists differences in cell ids, side counts, heights, portal ids, side indices and pairings between two compiled worlds, plus any portal pair in the next world whose two sides differ in length by more than 1e-6 m. |
+| function | `assertTopologyPreservingSnapshot` | Throws an Error listing every difference found by validateTopologyPreservingSnapshot, if any. |
+| function | `deformationStatesEqual` | Compares two states structurally over their own enumerable keys, independent of key order; numbers are compared with === (so NaN differs from NaN and 0 equals -0). |
+| type | `DeformablePositionedObject` | Alias of PositionedCellObjectSpec for objects that deformation maps can move. |
+
+## `diagnostics`
+
+### `diagnostics/debugLevels.ts`
+
+Defines the debug levels (off, basic, verbose) as a single constant table that is the source of truth for the DebugLevelId type, the settings UI and URL parsing.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| const | `debugLevelDefinitions` | Ordered table of debug levels with id, menu label and description. |
+| type | `DebugLevelId` | Id of a debug level, derived from debugLevelDefinitions. |
+| function | `parseDebugLevel` | Returns the matching DebugLevelId for an exact id string, or undefined for null, empty or unknown input. |
+| function | `isDebugLevelEnabled` | Returns true for every level except "off". |
+| function | `isVerboseDebugLevel` | Returns true only for "verbose". |
+
+### `diagnostics/runtimeDiagnostics.ts`
+
+Optional runtime diagnostics: asset load tracking, portal transition log, slow-frame warnings and a browser long-task watcher.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| function | `installRuntimeDiagnostics` | Installs (or, when disabled, clears) the global diagnostics recorder for `world`. |
+| function | `runtimeDiagnostics` | Returns the current diagnostics recorder, which is a no-op object when diagnostics are not enabled. |
+
+## `visibility`
+
+### `visibility/portalFunnel.ts`
+
+The exact per-frame visibility funnel: plan-direction sectors from the eye, clipped portal by portal, and the four half-spaces through the eye that bound a path's visible region.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| type | `DirectionSector` | Plan directions from the eye: all directions, or the ccw sector from `right` to `left` (angle in [0, pi]). |
+| const | `sectorSlotSize` | Number of `Float64Array` slots of one packed sector: right.x, right.y, left.x, left.y (NaN in slot 0 = full). |
+| const | `clipPlaneCount` | Number of clip planes of a path. |
+| const | `clipPlaneArrayLength` | Length of the `Float64Array` that holds a path's clip planes (4 planes x 4 numbers). |
+| function | `writeFullSector` | Writes the packed "all directions" sector at `offset`. |
+| function | `clipPackedSector` | Keeps `{d : d . |
+| function | `clipPackedSectorByPortal` | Clips the packed sector at `input[inOffset]` by a portal seen from eye `(ex, ey)`: first by `rotCW(L - e)` then by `rotCCW(R - e)`. |
+| function | `unpackDirectionSector` | Converts a packed sector to the object form. |
+| function | `clipDirectionSector` | Keeps the plan directions `d` of `sector` with `d . |
+| function | `clipSectorByPortal` | Clips `sector` by a portal seen from `eye`: `rotCW(L - e)` first, then `rotCCW(R - e)`. |
+| function | `writeAlwaysInsideClipPlanes` | Writes four "always inside" planes (the root path) at `out[offset .. |
+| function | `writeFunnelClipPlanes` | Writes the four clip planes of a path at `out[offset .. |
+| function | `funnelClipPlanes` | Convenience wrapper over {@link writeFunnelClipPlanes} taking a `Vec3` eye and object sector boundaries. |
+| function | `clipPlanesToNdcPolygon` | Clips the NDC square `[-1,1]^2` by the half-planes of the image of `planes` (4 planes, Three frame, through the eye) and writes the polygon vertices (x, y pairs) to `out`; returns the vertex count (0 when empty, at most… |
+
+### `visibility/visiblePortalPaths.ts`
+
+Per-frame portal visibility: decides which entries of a root cell's portal-path table are visible on screen and returns, for each, its placement, the four planes through the eye that bound its visible region, and the convex NDC polygon through which its destination cell may be drawn.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `Vec2` | A 2D point; used for normalized device coordinates, where the visible square is [-1,1] x [-1,1] with +y up. |
+| interface | `Rect2` | Axis-aligned rectangle in NDC (min/max inclusive); the bounding box of a clip polygon. |
+| const | `defaultMinPortalScreenAreaPixels` | Paths whose on-screen area is below this many physical pixels are kept but their children are not visited. |
+| interface | `VisibilityCamera` | A camera for the visibility pass: where the eye is and how the root cell frame is viewed and projected. |
+| interface | `ComputeVisiblePortalPathsInput` | Inputs for {@link computeVisiblePortalPaths}: a path table plus the camera and viewport it is evaluated against. |
+| interface | `ComputeIndependentVisiblePortalPathsInput` | Inputs for {@link computeIndependentVisiblePortalPaths}: like the single variant, but `cameras` is required and each is evaluated separately. |
+| interface | `VisiblePortalPathOptions` | Culling, budget and ordering knobs for portal visibility. |
+| interface | `VisiblePortalPath` | One visible portal path: a destination cell to draw, its placement in the root frame, its clip planes and its screen-space clip polygon. |
+| interface | `VisiblePortalPathDebugSummary` | Counters describing one visibility pass, for the debug overlay. |
+| interface | `ComputeVisiblePortalPathsResult` | Result of a visibility pass: the kept paths in render order plus an id lookup and diagnostics. |
+| interface | `VisiblePortalPathLookupResult` | Debug answer to "is this path visible right now?", with its area and bounds when it is. |
+| function | `computeVisiblePortalPaths` | Computes the visible portal paths for a root cell from one camera. |
+| function | `computeIndependentVisiblePortalPaths` | Computes one visibility result per camera, each evaluated against that camera alone (own eye position, own funnel). |
+| function | `ndcRectForPolygon` | Returns the axis-aligned NDC bounding box of a polygon; yields infinities for an empty polygon. |
+| function | `ndcPolygonAreaPixels` | Converts an NDC polygon's area to pixels of the given viewport. |
+| function | `summarizeVisiblePathCountByDepth` | Builds an ascending-by-depth histogram of how many paths exist at each depth. |
+| function | `describeVisiblePortalPath` | Looks up a path id in the latest visibility result and reports whether it is visible, with its pixel area and NDC bounds if so. |
+
 ## `movement`
 
 ### `movement/collision.ts`
@@ -469,6 +579,40 @@ Floor texture library: the named floor appearances world scripts can use, via th
 | function | `normalizeFloorMaterial` | Converts a floor argument into a plain FloorMaterialSpec: a string becomes a flat-color floor, a library material is shallow-copied (dropping the brand). |
 
 ## `world-objects`
+
+### `world-objects/creatures/geodesicMarmotBehavior.ts`
+
+Motion of the geodesic marmot, with no renderer: the state it owns, how it advances each frame along its heading (a locally straight geodesic that stays straight as portals re-express the frame), and how it follows geometry changes.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `GeodesicMarmotBehavior` | The motion state of one marmot, owned by its view. |
+| function | `createGeodesicMarmotBehavior` | Creates the behavior for a marmot starting in `startCellId`. |
+
+### `world-objects/creatures/simpleGeoCreatureBehavior.ts`
+
+Motion of the simple geodesic creatures (the mouse and the butterfly), with no renderer: the state a creature owns, how it advances each frame, and how it follows geometry changes.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `SimpleGeoCreatureBehavior` | The motion state of one creature, owned by its view. |
+| const | `creatureLeashMeters` | The leader advances only while the creature lags it by less than this many meters, so it waits for a blocked creature. |
+| function | `createSimpleGeoCreatureBehavior` | Creates the behavior for a creature starting in `startCellId`. |
+| function | `geodesicSideOfPoint` | Sign of the side on which the point `v` lies relative to the oriented line through `leaderPoint` with direction `leaderForward`: +1 when `v` is to the left, -1 when it is to the right. |
+| function | `applyForbiddenZoneSideRule` | Replaces a desired horizontal displacement that would run into a zone disc by one that goes round the disc with the zone centre on the required side. |
+| function | `forbiddenZoneLateralOscillationScale` | Returns a factor in [0, 1] that fades the sideways wobble out near forbidden zones. |
+| function | `butterflyVerticalOscillationRateHz` | Returns the butterfly's instantaneous vertical bob rate in Hz at `elapsedSeconds`, or 0 for non-butterflies. |
+| function | `butterflyVerticalOscillationHeightMagnitudeMeters` | Returns the butterfly's vertical bob amplitude in meters (10% of its collision height, capped at 0.08 m), or 0 for non-butterflies. |
+
+### `world-objects/geodesic/anchors.ts`
+
+Anchors of geodesic intervals: which registry objects can hold an endpoint, and where the beam of one starts in its cell frame.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| function | `isGeodesicCornerObject` | Type guard: true when the object is a `GeodesicCornerObject`. |
+| function | `canObjectAttachGeodesics` | True when the object may be the anchor of a geodesic interval endpoint. |
+| function | `getAnchorBeamPoint` | Beam-height point of an anchor object in its cell frame. |
 
 ### `world-objects/geodesic/cannon.ts`
 
@@ -622,7 +766,6 @@ Geodesic emitters ("cannons"), geodesic intervals and curve shortening on a glue
 | function | `isGeodesicCannonObject` | Type guard: true when the object is a `GeodesicCannonObject`. |
 | function | `isGeodesicIntervalObject` | Type guard: true when the object is a `GeodesicIntervalObject`. |
 | function | `isFreeGeodesicEndObject` | Type guard: true when the object is a `FreeGeodesicEndObject`. |
-| function | `isGeodesicCornerObject` | Type guard: true when the object is a `GeodesicCornerObject`. |
 | function | `createGeodesicCornerObject` | Builds a corner anchor at `point` (cell-local meters, z = beam height) in cell `cellId`, wrapping the disk `junctionId` on `side`. |
 | function | `isCurveShorteningPairObject` | Type guard: true when the object is a `CurveShorteningPairObject`. |
 | function | `createFreeGeodesicEndObject` | Builds a free-end anchor at `point` (cell-local meters, including its beam height in z) in cell `cellId`. |
@@ -632,12 +775,11 @@ Geodesic emitters ("cannons"), geodesic intervals and curve shortening on a glue
 | function | `canExtendGeodesicSegment` | True unless the segment ended at a wall, forbidden zone or emitter (those terminals cannot be continued). |
 | function | `resolveGeodesicCannonAimYawRadians` | Yaw (radians, normalized by `sanitizeYaw`) from the cannon toward a cell-local target point. |
 | function | `getGeodesicCannonEmitterPoint` | Point where the cannon's beam starts, in the cannon's cell frame. |
-| function | `canObjectAttachGeodesics` | True when the object may be the anchor of a geodesic interval endpoint. |
-| function | `getAnchorBeamPoint` | Beam-height point of an anchor object in its cell frame. |
 | function | `getOppositeEndRole` | The other endpoint role: `start` for `end` and `end` for `start`. |
 | function | `directionFromYaw` | Unit horizontal direction of a yaw (radians counter-clockwise from +x). |
 | function | `normalizeHorizontalDirection` | Normalizes the horizontal part of a direction; the result has `z = 0`. |
 | function | `sanitizeYaw` | Wraps an angle to (-pi, pi] via atan2(sin, cos); non-finite input becomes 0. |
+| function | `reduceAdjacentInversePortalTraversals` | Freely reduces a portal word by cancelling adjacent inverse traversals. |
 
 ### `world-objects/geodesic/perfCounters.ts`
 
@@ -662,7 +804,6 @@ Portal-word algebra of geodesic intervals: reversal, free reduction, comparison,
 | function | `getPortalTraversalFromSource` | The portal traversal that leaves `sourceCellId` through the given portal. |
 | function | `portalWordAfterAnchorCrossing` | Portal word of an interval after one of its anchors crossed a portal. |
 | function | `applyAnchorCrossingTraversals` | Applies {@link portalWordAfterAnchorCrossing} once per traversal, in order, feeding each resulting word into the next. |
-| function | `reduceAdjacentInversePortalTraversals` | Freely reduces a portal word by cancelling adjacent inverse traversals. |
 
 ### `world-objects/geodesic/segments.ts`
 
@@ -736,10 +877,8 @@ Geodesic marmot: an autonomous creature that walks in a straight line (a locally
 | Kind | Name | Summary |
 | --- | --- | --- |
 | interface | `CreateGeodesicMarmotOptions` | Inputs for createGeodesicMarmot. |
-| interface | `GeodesicMarmotRuntime` | Per-marmot runtime handle owned by the renderer. |
 | function | `createGeodesicMarmot` | Creates the authored spec for a geodesic marmot. |
 | function | `isGeodesicMarmotObjectSpec` | Type guard: true when a cell object spec is a geodesic marmot. |
-| function | `createGeodesicMarmotRuntime` | Creates the runtime (three.js group, state machine, registry entry) for a marmot starting in `startCellId`. |
 | function | `createGeodesicMarmotRuntimeObject` | Builds the registry record for a marmot spec in the given cell without creating any three.js objects. |
 
 ### `world-objects/helpHubCopy.ts`
@@ -770,7 +909,6 @@ Measured-length tool: persistent "geodesic length = N m" labels attached to a ge
 
 | Kind | Name | Summary |
 | --- | --- | --- |
-| interface | `MeasuredGeodesicLengthObject` | Registry record for a length label attached to a geodesic. |
 | function | `createMeasuredGeodesicLengthObject` | Creates a length label for a geodesic, anchored on the segment of that geodesic in the player's cell that is closest to the player. |
 | function | `refreshMeasuredGeodesicLengthObject` | Recomputes a length label against the current registry and player position. |
 | function | `formatMeasuredGeodesicLengthLabel` | Formats the label text "<name> length = <value> m". |
@@ -789,13 +927,10 @@ Placed flags (signs): player-placed wooden signs carrying a short text label.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
-| const | `placedFlagTypes` | The available sign models, which also determine the default message prefix ("A" for WoodenSign1, "B" for WoodenSign2). |
-| type | `PlacedFlagType` | Union of the sign model names in `placedFlagTypes`. |
 | const | `placedFlagAssetPaths` | Maps each sign type to its glTF asset path under the assets directory. |
 | const | `defaultPlacedFlagFontColor` | Default sign text color (CSS hex). |
 | const | `placedFlagFontColors` | The allowed sign text colors (CSS hex); the first entry is the default. |
 | const | `placedFlagMaxMessageLength` | Maximum number of characters (code points) in a sign message. |
-| interface | `PlacedFlagObject` | Registry record for a placed sign: its type, sanitized message and font color. |
 | interface | `CreatePlacedFlagOptions` | Inputs for createPlacedFlagObject. |
 | interface | `PlaceFlagFromAimRequest` | Request to place a flag where the player's view ray hits the floor. |
 | interface | `PlaceFlagAtFloorPointRequest` | Request to place a flag at a known floor point. |
@@ -823,10 +958,7 @@ Protractor tool: persistent angle measurements between two geodesic directions a
 | const | `protractorAngleLabelVerticalOffsetMeters` | Height in meters by which the label sits above the centre point. |
 | const | `protractorAngleLabelAimPaddingMeters` | Padding in meters added on each side of the badge to form the (more forgiving) aiming hitbox. |
 | const | `protractorAngleLabelAimDepthMeters` | Thickness in meters of the label's aiming hitbox along its normal. |
-| interface | `ProtractorAngleObject` | Registry record for a persistent angle measurement. |
-| interface | `ProtractorAngleLabelHitbox` | Oriented box around an angle label used for aim picking, in the vertex cell's local frame. |
 | interface | `ProtractorCenterSelection` | The vertex chosen as the centre of an angle: where it is, which cell, and which geodesics pass through it. |
-| interface | `ProtractorDirectedGeodesic` | One side of an angle: a geodesic ray leaving the vertex. |
 | function | `resolveProtractorCenterSelection` | Builds the centre selection for a cannon or intersection object. |
 | function | `resolveProtractorDirectedGeodesicSelection` | Resolves a clicked geodesic segment into a ray leaving the centre, or undefined if the segment is not a valid side. |
 | function | `resolveProtractorEmitterGeodesicSelection` | Resolves an emitter at the centre into a ray along one of its geodesics, or undefined if it is not in the centre's cell or shares no geodesic with it. |
@@ -836,9 +968,9 @@ Protractor tool: persistent angle measurements between two geodesic directions a
 | function | `refreshProtractorAngleObject` | Recomputes an angle from the live registry after geodesics or emitters have moved. |
 | function | `formatProtractorAngleLabel` | Formats the label text "<first> ∠ <second> = <degrees>°". |
 
-### `world-objects/runtimeObjectRegistry.ts`
+### `world-objects/runtimeObjectBase.ts`
 
-Runtime object registry: the per-cell, id-indexed store of every live (non-terrain) object in the world.
+The fields every object in the runtime object registry shares, and the projection of such an object onto the movement/collision state.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
@@ -846,11 +978,18 @@ Runtime object registry: the per-cell, id-indexed store of every live (non-terra
 | interface | `RuntimeObjectTooltip` | Hover/aim tooltip metadata for a runtime object. |
 | interface | `RuntimeWorldObjectBase` | Fields shared by every object stored in the runtime registry. |
 | interface | `RuntimeCreatureObject` | Registry record for an autonomous creature (geodesic marmot, mouse or butterfly). |
+| function | `runtimeObjectToDynamicObjectState` | Projects a runtime object onto the minimal movement/collision state (cell id, cell-local pose, collision cylinder). |
+
+### `world-objects/runtimeObjectRegistry.ts`
+
+Runtime object registry: the per-cell, id-indexed store of every live (non-terrain) object in the world.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
 | interface | `RuntimeStaticAssetObject` | Registry record for a static glTF decoration or landmark placed in a cell. |
 | type | `RuntimeWorldObject` | Discriminated union (on `kind`) of every object type the registry can hold. |
 | interface | `RuntimeObjectRegistry` | Mutable id- and cell-indexed collection of runtime objects. |
 | function | `createRuntimeObjectRegistry` | Creates a registry, optionally pre-populated with `initialObjects`. |
-| function | `runtimeObjectToDynamicObjectState` | Projects a runtime object onto the minimal movement/collision state (cell id, cell-local pose, collision cylinder). |
 | function | `createRuntimeStaticAssetObject` | Builds the registry record for an authored static asset placed in `cellId`. |
 
 ### `world-objects/simpleGeoCreature.ts`
@@ -860,17 +999,9 @@ Simple geodesic creatures: the mouse and the butterfly, autonomous walkers that 
 | Kind | Name | Summary |
 | --- | --- | --- |
 | interface | `SimpleGeoCreatureAuthoringParams` | Author-facing parameters for the mouse and butterfly library entries. |
-| interface | `SimpleGeoCreatureRuntime` | Per-creature runtime handle owned by the renderer. |
-| const | `creatureLeashMeters` | The leader advances only while the creature lags it by less than this many meters, so it waits for a blocked creature. |
 | function | `createSimpleGeoCreature` | Creates the authored spec for a mouse or butterfly. |
 | function | `isSimpleGeoCreatureObjectSpec` | Type guard: true for geo-mouse and geo-butterfly specs. |
-| function | `createSimpleGeoCreatureRuntime` | Creates the runtime (three.js model instance, state, registry entry) for a creature starting in `startCellId`. |
 | function | `createSimpleGeoCreatureRuntimeObject` | Builds the registry record for a creature spec in the given cell without creating any three.js objects. |
-| function | `geodesicSideOfPoint` | Sign of the side on which the point `v` lies relative to the oriented line through `leaderPoint` with direction `leaderForward`: +1 when `v` is to the left, -1 when it is to the right. |
-| function | `applyForbiddenZoneSideRule` | Replaces a desired horizontal displacement that would run into a zone disc by one that goes round the disc with the zone centre on the required side. |
-| function | `forbiddenZoneLateralOscillationScale` | Returns a factor in [0, 1] that fades the sideways wobble out near forbidden zones. |
-| function | `butterflyVerticalOscillationRateHz` | Returns the butterfly's instantaneous vertical bob rate in Hz at `elapsedSeconds`, or 0 for non-butterflies. |
-| function | `butterflyVerticalOscillationHeightMagnitudeMeters` | Returns the butterfly's vertical bob amplitude in meters (10% of its collision height, capped at 0.08 m), or 0 for non-butterflies. |
 
 ### `world-objects/staticAssets.ts`
 
@@ -881,6 +1012,20 @@ Static asset authoring helper: converts author-facing parameters for a glTF deco
 | interface | `StaticObjectAuthoringParams` | Author-facing parameters shared by all static library objects. |
 | function | `createStaticAssetObject` | Builds an AssetObjectSpec from authoring parameters. |
 | function | `degreesToRadians` | Converts degrees to radians. |
+
+### `world-objects/toolObjects.ts`
+
+Registry record types of the results of the player's tools: placed flags (signs), geodesic length labels and protractor angles.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| const | `placedFlagTypes` | The available sign models, which also determine the default message prefix ("A" for WoodenSign1, "B" for WoodenSign2). |
+| type | `PlacedFlagType` | Union of the sign model names in `placedFlagTypes`. |
+| interface | `PlacedFlagObject` | Registry record for a placed sign: its type, sanitized message and font color. |
+| interface | `MeasuredGeodesicLengthObject` | Registry record for a length label attached to a geodesic. |
+| interface | `ProtractorAngleObject` | Registry record for a persistent angle measurement. |
+| interface | `ProtractorAngleLabelHitbox` | Oriented box around an angle label used for aim picking, in the vertex cell's local frame. |
+| interface | `ProtractorDirectedGeodesic` | One side of an angle: a geodesic ray leaving the vertex. |
 
 ### `world-objects/worldObjectOwner.ts`
 
@@ -959,6 +1104,206 @@ World catalog: the list of selectable bundled worlds and the lookup that turns a
 | function | `findWorldCatalogEntry` | Looks up a catalog entry by id or file-like name (normalized with normalizeWorldId); returns undefined with no fallback if absent. |
 | function | `normalizeWorldId` | Reduces a world id, path or file name to a bare id by dropping directories and a ".world.js", ".js" or ".ts" extension; returns undefined for empty input. |
 
+## `glue`
+
+### `glue/appConfig.ts`
+
+Loads and normalizes the app configuration: a per-deployment JavaScript file (<name>.config.js in the public folder, chosen by the ?config= URL parameter) that sets the starting world, which menu sections and tools are enabled, and debug defaults.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| type | `ConfigurableToolId` | Id of a main-menu tool that an app config can switch on or off. |
+| interface | `AppMenuConfig` | Which optional menu sections the app config enables. |
+| interface | `AppToolConfig` | Which tools the app config enables (placeFlags = signs, geodesicEmitters = rays, distances = length tool, angles = protractor). |
+| interface | `AppDebugConfig` | Default debug settings supplied by the app config; URL parameters can override them. |
+| interface | `AppConfig` | Fully normalized app configuration: starting world, menu sections, tools and debug defaults. |
+| type | `RawAppConfig` | Untrusted shape of a loaded config module's default export before normalization. |
+| const | `defaultAppConfigName` | Name of the built-in config used when none (or an invalid one) is requested. |
+| interface | `AppConfigCatalogEntry` | Selectable app config: file-name id and menu label. |
+| const | `appConfigCatalog` | App configs offered in the settings menu; ids correspond to <id>.config.js files in the public folder. |
+| const | `defaultAppConfig` | Built-in configuration used when no config file is available or a field is missing: default world, everything enabled, debug off. |
+| function | `loadAppConfig` | Loads and normalizes the named config (default "default"), following forwardTo redirects; never rejects and returns defaultAppConfig on any failure or forwarding loop. |
+| function | `readAppConfigName` | Reads the config name from the ?config= (or ?configName=) URL parameter, normalized. |
+| function | `normalizeAppConfigName` | Strips a ".js"/".config.js" suffix and returns the name only if it is made of letters, digits, "_" or "-"; otherwise returns the default name (guards the dynamic import path). |
+| function | `buildAppConfigUrl` | Returns the URL of the config file for a name under the public base path. |
+| function | `readAppConfigForwardName` | Returns the validated name in a raw config's forwardTo field, or undefined if absent or invalid. |
+| function | `normalizeAppConfig` | Converts an untrusted raw config object into an AppConfig, taking each recognized field only if it has the right type and valid value and otherwise using the default; accepts optionsMenu or menu for the menu block. |
+| function | `isRuntimeToolEnabled` | Returns whether the config permits a tool; cannon sub-modes follow geodesicEmitters, and non-configurable tools (none, aim) are always enabled. |
+| function | `getEnabledMainTools` | Lists the configurable tools enabled by the config, in main-menu order (sign, emitter, length, protractor). |
+
+### `glue/assetUrls.ts`
+
+Builds URLs for files served from the Vite public folder.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| function | `publicUrl` | Returns the URL of a file relative to the public root, resolved against the page's address (so `?config=` queries and the deployment path do not matter). |
+| function | `publicAssetUrl` | Returns the URL of a file under assets/ in the public folder. |
+| function | `legacyPublicAssetUrl` | Returns the URL of a file under assets/_legacy/ (older assets kept for compatibility). |
+
+### `glue/debugOptions.ts`
+
+Defines the individual debug options (diagnostics logging, portal path/cull inspection, overlays, wireframes, hitbox displays) as a constant table that is the source of truth for the DebugOptionId type.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| const | `debugOptionDefinitions` | Ordered table of debug options with id, label and description. |
+| type | `DebugOptionId` | Id of a debug option, derived from debugOptionDefinitions. |
+| function | `parseDebugOptions` | Parses a comma-separated list of option ids (whitespace tolerated), dropping unknown entries and returning the rest deduplicated in table order; null or empty gives []. |
+| function | `serializeDebugOptions` | Serializes options to a comma-separated string in table order, omitting duplicates. |
+| function | `hasDebugOption` | Returns whether the option is in the list, regardless of debug level. |
+| function | `hasActiveDebugOption` | Returns whether the option is in the list and the debug level is not "off". |
+
+### `glue/debugSettings.ts`
+
+Value types describing a complete debug configuration (level, portal panel mode and enabled options) and a predicate telling whether a change to it can be applied to a running world without a reload.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `DebugSettings` | Debug configuration: console level, portal panel mode and enabled debug options. |
+| interface | `DebugSettingsSupport` | Declares which debug options the running renderer can switch without restarting. |
+| function | `canApplyDebugSettingsAtRuntime` | Returns true when every enabled option is runtime-mutable according to support (default: all known options), i.e. |
+
+### `glue/launchOptionsUrl.ts`
+
+Converts between launch options and URL query parameters: strips them from the visible address after startup (so reloads and shared links are clean) and builds a shareable URL that reproduces the current options.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| function | `removeLaunchOptionsFromUrl` | Returns the URL with all launch-option query parameters (but not config) removed. |
+| function | `replaceVisibleUrlWithoutLaunchOptions` | Rewrites the browser address bar via history.replaceState without launch-option parameters; does nothing when none are present. |
+| function | `buildUrlWithLaunchOptions` | Returns the URL with the given options encoded as query parameters (config only when non-default, debugOptions only when non-empty), replacing any previous launch parameters; reading it back with readLaunchOptions repro… |
+
+### `glue/loadingStatus.ts`
+
+Minimal DOM loading screen shown while a world loads: a log of phase lines with the latest highlighted, plus an error state.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `LoadingStatus` | Handle to a loading screen that reports startup phases and errors. |
+| interface | `LoadingStatusOptions` | Options for createLoadingStatus. |
+| function | `createLoadingStatus` | Creates and mounts a loading screen inside the container and returns its controller. |
+
+### `glue/portalPanelMode.ts`
+
+Defines the portal panel display modes (none, panel, panel-with-text, text-only) as a constant table and the predicates deciding which portal visuals a mode draws.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| const | `portalPanelModeDefinitions` | Ordered table of portal panel modes with id, label and description. |
+| type | `PortalPanelModeId` | Id of a portal panel mode, derived from portalPanelModeDefinitions. |
+| function | `parsePortalPanelMode` | Returns the matching mode for an exact id string, or undefined for null, empty or unknown input. |
+| function | `shouldRenderPortalWall` | Returns true for modes that draw the textured portal wall (panel, panel-with-text). |
+| function | `shouldRenderPortalPlacard` | Returns true for modes that draw the label placard (panel-with-text, text-only). |
+| function | `shouldRenderPortalText` | Returns true for modes that draw portal label text (panel-with-text, text-only). |
+
+### `glue/readLaunchOptions.ts`
+
+Parses the page URL's query string into a LaunchOptions record, with precedence: explicit URL parameter, then the app config's value, then the built-in default.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `LaunchOptions` | Resolved settings for one run of the app: world, UI toggles, debug settings, comfort options and the app config they came from. |
+| function | `readLaunchOptions` | Builds LaunchOptions from a location's query string, the loaded app config and its name, applying URL > config > default precedence for each field. |
+
+### `glue/toolIds.ts`
+
+Identifiers of the player's tools and of the debug-overlay items, with the canonical parse and serialize of the overlay-item list.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| type | `RuntimeDebugOverlayItemId` | Item that can be shown in the on-screen debug overlay. |
+| type | `RuntimeToolId` | Tool the player can have active, including the geodesic-cannon sub-modes. |
+| const | `defaultRuntimeDebugOverlayItems` | Overlay items shown when a launch does not choose any, in canonical order. |
+| function | `parseRuntimeDebugOverlayItems` | Parses a comma-separated list of overlay item ids (null means all defaults), dropping unknown entries and returning canonical order. |
+| function | `serializeRuntimeDebugOverlayItems` | Serializes overlay items to a canonical comma-separated string. |
+| function | `orderRuntimeDebugOverlayItems` | Returns the requested overlay items without duplicates, in canonical order. |
+
+### `glue/uiOptions.ts`
+
+Defines the optional UI widgets that launch options can show (WorldSelector, DebugButton) as a constant table that is the source of truth for the UiOptionId type, with canonical parse and serialize helpers for the comma-separated URL form.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| const | `uiOptionDefinitions` | Ordered table of UI options with id and label. |
+| type | `UiOptionId` | Id of a UI option, derived from uiOptionDefinitions. |
+| function | `parseUiOptions` | Parses a comma-separated list of UI option ids, dropping unknown entries and returning the rest deduplicated in table order; null or empty gives []. |
+| function | `serializeUiOptions` | Serializes UI options to a comma-separated string in table order. |
+| function | `hasUiOption` | Returns whether the option is in the list. |
+
+### `glue/vrComfortOptions.ts`
+
+Pure (Three-free) VR comfort settings: the `VrComfortOptions` record and its defaults.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `VrComfortOptions` | Tunable VR comfort and locomotion parameters (all fields required; pass `Partial` to factories). |
+| const | `defaultVrComfortOptions` | Default comfort settings; treat as immutable. |
+
+## `interaction`
+
+### `interaction/aimTarget.ts`
+
+Aim picking: finds what an aim ray (desktop crosshair or XR controller) hits, across portals.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| type | `AimTargetKind` | Whether an aim target is the floor or a world object. |
+| interface | `AimTarget` | One thing the aim ray hits, expressed both in the hit cell's local frame and in the root (viewer) frame. |
+| interface | `AimRay` | An aim ray in the root cell's frame (world axes, meters); the direction need not be unit length. |
+| interface | `ResolveAimTargetRequest` | Inputs for {@link resolveAimTarget} and {@link resolveAimTargets}. |
+| const | `geodesicSegmentAimRadiusMeters` | Radius of the capsule used to pick geodesic segments, meters. |
+| function | `resolveAimTarget` | Returns the best aim target under the camera crosshair, or `undefined` if nothing is hit. |
+| function | `resolveAimTargetsByRayWalk` | Returns every aim target along the ray, best first, found by walking the ray through the glued cells. |
+| function | `resolveAimTargets` | Returns the best aim target along the ray, or `undefined` if nothing is hit. |
+| function | `getGeodesicEmitterAimCylinderBounds` | Returns the vertical-cylinder proxy used to pick a geodesic cannon, or `undefined` if the cannon has no collision bounds. |
+| function | `getGeodesicEmitterAimSphereCenter` | Returns the centre of the sphere used to pick (and snap the aim to) a geodesic cannon, in the cell-local frame (meters). |
+
+### `interaction/carryPortalTransition.ts`
+
+Derives the portal-crossing record a carried geodesic cannon needs from a player move result.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| function | `resolveGeodesicCarryPortalTransitionFromMove` | Resolves the carry-portal transition implied by a `movePlayer` result. |
+| function | `resolveGeodesicCarryPortalTransitionsFromCrossings` | Maps the ordered crossings of one move (`MoveResult.crossings`) to carry-portal transitions, one per crossing. |
+| function | `resolveGeodesicCarryPortalTransitionFromPortalMove` | Builds the transition describing which portal a move crossed, or `undefined` if no consistent crossing happened. |
+
+### `interaction/inputFrame.ts`
+
+The per-frame input sample handed to the simulation by either the desktop or the XR controller (`DesktopInputFrame` in desktopControls derives from it).
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `RuntimeInputFrame` | One frame of normalized player input from desktop or XR, consumed by movement and tool logic. |
+
+### `interaction/vrLocomotion.ts`
+
+Pure functions turning XR thumbstick and head-tracking input into player-local motion requests.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `StickAxes` | A thumbstick position with each axis in [-1, 1] (x right, y down by gamepad convention). |
+| interface | `VrLocomotionRequest` | Result of stick locomotion. |
+| function | `applyJoystickDeadZone` | Zeroes the stick if its magnitude is within `deadZone`, normalizes it to unit length if it exceeds 1, and otherwise returns it unchanged. |
+| function | `computeJoystickLocomotion` | Converts a stick position into forward/back displacement for this frame: `moveSpeedMetersPerSecond * deltaSeconds` scaled by the clamped y axis, with the sign flipped (stick up moves along +y forward). |
+| function | `computeContinuousTurn` | Returns the yaw change in radians for this frame from the stick x axis (stick right gives negative, i.e. |
+| function | `computePhysicalRoomScaleDisplacement` | Computes the horizontal displacement (meters, z ignored) between two head positions in game-world axes. |
+
+### `interaction/xrSessionState.ts`
+
+Pure model of the immersive-VR session lifecycle shown in the UI and debug state, plus support detection.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| type | `XrSessionStatus` | Lifecycle status of the immersive VR session; see the module header for the usual transitions. |
+| interface | `XrSessionState` | Immutable snapshot of session status plus capability flags. |
+| interface | `XrNavigatorLike` | Structural subset of `navigator` used by `detectXrSessionState`; `xr` is absent in unsupported browsers. |
+| function | `createXrSessionState` | Builds a state for `status`. |
+| function | `statusLabel` | Returns the label text for `status`; for "failed" the optional message is appended. |
+| function | `detectXrSessionState` | Probes WebXR support and returns the initial state: "insecure-context" if not secure, "unsupported" if `navigator.xr` is missing or reports no immersive-vr support, "available" if supported, or "failed" (with a readable… |
+| function | `transitionXrSessionState` | Returns the state for `status`, keeping `secureContext` and `immersiveVrSupported` from `state` (support is cleared only when moving to "unsupported"). |
+
 ## `runtime`
 
 ### `runtime/apiCall.ts`
@@ -983,20 +1328,14 @@ Routes renderer-neutral RuntimeCommand values (from the desktop menu and the VR 
 | function | `createAppCommandDispatcher` | Builds an AppCommandDispatcher whose dispatch forwards each command to dispatchRuntimeCommand with the given callbacks. |
 | function | `dispatchRuntimeCommand` | Invokes exactly one of the option callbacks, selected by command.kind, passing along the command payload (worldId or enabled). |
 
-### `runtime/deformations/torusSkewDeformation.ts`
+### `runtime/appState.ts`
 
-Deformation family for the one-cell torus world: the cell "torus-room" is a prism whose footprint is a parallelogram with edge vectors u = (w, 0) and v = (a, b), and opposite sides glued by translation (side-0 with side-2, side-1 with side-3).
+Defines AppState, the initial immutable bundle of compiled world, player body and player pose that main.ts hands to the renderer, and the factory that builds it.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
-| interface | `TorusSkewDeformationState` | Parameters (meters) of the torus-room parallelogram: horizontal edge w, skew a and depth b. |
-| const | `defaultTorusSkewDeformationState` | Default torus parameters: w = 15 m, b = 15 m, a = 0 (a square). |
-| function | `createTorusSkewDeformationFamily` | Creates the "torus-skew" WorldDeformationFamily; applyToSpec rebuilds the parallelogram footprint and carries startingPosition and cell objects from the inferred base state to the requested one. |
-| function | `buildTorusParallelogramVertices` | Returns the four footprint vertices (counter-clockwise, centered at the origin) of the parallelogram spanned by u = (w, 0) and v = (a, b). |
-| function | `createTorusSkewCellDeformationMaps` | Builds the single-entry map {torus-room} that preserves lattice coordinates between the previous and next parallelogram frames and leaves z unchanged. |
-| function | `nextTorusSkewStep` | Moves (widthMeters, skewXMeters, depthMeters) together from current toward target along a straight segment by at most maxStepMeters in the Euclidean metric, snapping to the target when the remaining distance is within m… |
-| function | `validateTorusSkewBaseSpec` | Returns errors unless the spec has exactly one cell, "torus-room", with 4 base vertices, positive finite height, portals side-0..side-3 on sides 0..3 paired 0<->2 and 1<->3 to itself, and a footprint that is the centred… |
-| function | `inferTorusSkewState` | Reads (w, a, b) from a base spec's torus-room footprint as w = \|v1 - v0\| and (a, b) = v3 - v0; throws if the cell is missing or the values are out of range. |
+| interface | `AppState` | Initial application state for one world run: compiled world, player body, player pose and selected tool. |
+| function | `createInitialAppState` | Creates the AppState for a compiled world, placing the player at world.startingPosition (yaw and pitch default to 0) or at the default pose in cells[0]; throws if the world has no cells. |
 
 ### `runtime/publicApi.ts`
 
@@ -1025,8 +1364,6 @@ Renderer-neutral state machine for the in-game menu, shared by the desktop overl
 | --- | --- | --- |
 | type | `RuntimeMenuPageId` | Identifier of a menu page; "main" is the tool palette and the default. |
 | type | `RuntimeMenuConsoleLogLevelId` | Console log levels selectable in the menu (every debug level except "off", which is the debug toggle). |
-| type | `RuntimeDebugOverlayItemId` | Item that can be shown in the on-screen debug overlay. |
-| type | `RuntimeToolId` | Tool the player can have active, including the geodesic-cannon sub-modes. |
 | interface | `RuntimeMenuState` | Complete immutable menu state: visibility, current page, page payloads and user-adjustable settings. |
 | interface | `CreateRuntimeMenuStateOptions` | Launch-time values used to seed the initial menu state. |
 | function | `createRuntimeMenuState` | Creates a closed menu on the main page seeded from launch settings: debug flags are derived from the given DebugSettings, the overlay defaults to enabled with all items, anti-nausea defaults to true, no tool is selected… |
@@ -1063,8 +1400,17 @@ Renderer-neutral state machine for the in-game menu, shared by the desktop overl
 | function | `selectRuntimeMenuPlaceFlagToolType` | Chooses a flag type and activates the place-flag tool in one step. |
 | function | `setRuntimeMenuEditingFlagId` | Sets or clears the id of the flag being edited. |
 | function | `createDebugSettingsFromRuntimeMenuState` | Converts the menu's debug fields into launch-style DebugSettings: when debug is off it yields level "off", portal panel "none" and no options; otherwise it adds "runtime-diagnostics", the enabled option groups, and "por… |
-| function | `parseRuntimeDebugOverlayItems` | Parses a comma-separated list of overlay item ids (null means all defaults), dropping unknown entries and returning canonical order. |
-| function | `serializeRuntimeDebugOverlayItems` | Serializes overlay items to a canonical comma-separated string. |
+
+### `runtime/serverChannel.ts`
+
+Page side of the channel to the local server (scripts/server/localServer.mjs): a WebSocket over which an admin can call any function of this page's public API (src/runtime/apiCall.ts), list it, evaluate expressions (dev mode only) and read forwarded console output.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `ChannelSocket` | The slice of the WebSocket interface the channel uses (so tests can pass a fake). |
+| interface | `ServerChannelOptions` | Inputs of {@link startServerChannel}; everything but `api` defaults to the browser's own. |
+| interface | `ServerChannel` | Handle returned by {@link startServerChannel}. |
+| function | `startServerChannel` | Connects to the local server when the page was served by it, and answers its requests; returns a handle to stop it. |
 
 ### `runtime/worldGeometryComputedObjects.ts`
 
@@ -1089,31 +1435,6 @@ Registry of WorldDeformationFamily implementations keyed by state kind, plus hel
 | function | `getWorldDeformationFamilyOrThrow` | Returns the family for a kind or throws "Unknown world deformation family". |
 | function | `applyWorldDeformationToSpec` | Returns the base spec deformed by the given state (normalized first); throws if the family is unknown or cannot apply to this spec. |
 | function | `createInitialWorldDeformationState` | Chooses the starting deformation state for a base spec: if the torus family applies, the torus-skew state inferred from the spec's own footprint (width, depth, skew), so the initial state matches the authored geometry; … |
-
-### `runtime/worldGeometryDeformations.ts`
-
-Family-independent vocabulary and helpers for live deformation of a cell complex while preserving its combinatorics (cells, sides, portals and their pairing).
-
-| Kind | Name | Summary |
-| --- | --- | --- |
-| interface | `StaticWorldDeformationState` | Deformation state of a world that is never deformed. |
-| type | `WorldDeformationState` | Union of all deformation parameter records, discriminated by kind; extend it when adding a family. |
-| interface | `DynamicGeometryStepOptions` | Step-size limits for moving a deformation state toward its target one rebuild at a time. |
-| interface | `CellDeformationMap` | Spatial map between a cell's previous and next local frames (cell-local meters), used to carry points and headings across a geometry commit. |
-| interface | `WorldDeformationFamily` | Strategy object defining one family of deformations of a cell-complex spec, parameterized by its state type. |
-| interface | `PrismBaseReplacement` | Replacement footprint (2D vertices in order, meters) for one prism cell identified by id. |
-| interface | `RuntimePoseInCell` | Rigid pose expressed in the local frame of a named cell. |
-| function | `applyPrismBaseReplacements` | Returns a spec whose listed cells have their baseVertices replaced (copied) while all else is shared with the input; throws if any replacement names a missing cell. |
-| function | `transformPoseWithCellMaps` | Maps a cell-local pose through the map for its cell, or returns undefined if that cell has no map. |
-| function | `transformRigidPoseWithMap` | Maps a pose by sending its translation through mapPoint and its forward vector R·e_y (the rotation's second column, projected to the horizontal plane) through mapDirection; the new yaw makes R'·e_y parallel to the mappe… |
-| function | `transformPositionedObjectSpecWithMap` | Returns a copy of a cell-object spec with position and yaw (turnRadians or yawRadians, whichever is defined) mapped; for marmots the velocity direction is mapped by the linear part, its speed kept, and the yaw re-derive… |
-| function | `transformStartingPositionWithMap` | Maps a spec's startingPosition through the map for its cell; returns it unchanged if there is no map and undefined if there is no starting position. |
-| function | `transformCellObjectsWithMaps` | Returns the cell with every visuals.objects entry mapped by the cell's map, or the same cell if it has no map or no objects. |
-| function | `createIdentityCellDeformationMaps` | Creates a copy-through map for every cell of the world, used by families that do not move anything. |
-| function | `validateTopologyPreservingSnapshot` | Lists differences in cell ids, side counts, heights, portal ids, side indices and pairings between two compiled worlds, plus any portal pair in the next world whose two sides differ in length by more than 1e-6 m. |
-| function | `assertTopologyPreservingSnapshot` | Throws an Error listing every difference found by validateTopologyPreservingSnapshot, if any. |
-| function | `deformationStatesEqual` | Compares two states structurally over their own enumerable keys, independent of key order; numbers are compared with === (so NaN differs from NaN and 0 equals -0). |
-| type | `DeformablePositionedObject` | Alias of PositionedCellObjectSpec for objects that deformation maps can move. |
 
 ### `runtime/worldGeometrySession.ts`
 
@@ -1226,152 +1547,6 @@ Renderer-neutral description of what the player can do with the world object the
 | function | `createWorldFocusMessageDefinition` | Builds the focus definition for an object from its kind and the selected tool, or returns undefined when the object has no tooltip or interactable label. |
 | function | `formatWorldFocusMessageTextForLegacyFallback` | Formats a definition as plain multi-line text (title, subtitle, then "<input> - <label>" per available action sorted by priority) for renderers without rich panels; returns undefined for an undefined definition. |
 
-## `glue`
-
-### `glue/appConfig.ts`
-
-Loads and normalizes the app configuration: a per-deployment JavaScript file (<name>.config.js in the public folder, chosen by the ?config= URL parameter) that sets the starting world, which menu sections and tools are enabled, and debug defaults.
-
-| Kind | Name | Summary |
-| --- | --- | --- |
-| type | `ConfigurableToolId` | Id of a main-menu tool that an app config can switch on or off. |
-| interface | `AppMenuConfig` | Which optional menu sections the app config enables. |
-| interface | `AppToolConfig` | Which tools the app config enables (placeFlags = signs, geodesicEmitters = rays, distances = length tool, angles = protractor). |
-| interface | `AppDebugConfig` | Default debug settings supplied by the app config; URL parameters can override them. |
-| interface | `AppConfig` | Fully normalized app configuration: starting world, menu sections, tools and debug defaults. |
-| type | `RawAppConfig` | Untrusted shape of a loaded config module's default export before normalization. |
-| const | `defaultAppConfigName` | Name of the built-in config used when none (or an invalid one) is requested. |
-| interface | `AppConfigCatalogEntry` | Selectable app config: file-name id and menu label. |
-| const | `appConfigCatalog` | App configs offered in the settings menu; ids correspond to <id>.config.js files in the public folder. |
-| const | `defaultAppConfig` | Built-in configuration used when no config file is available or a field is missing: default world, everything enabled, debug off. |
-| function | `loadAppConfig` | Loads and normalizes the named config (default "default"), following forwardTo redirects; never rejects and returns defaultAppConfig on any failure or forwarding loop. |
-| function | `readAppConfigName` | Reads the config name from the ?config= (or ?configName=) URL parameter, normalized. |
-| function | `normalizeAppConfigName` | Strips a ".js"/".config.js" suffix and returns the name only if it is made of letters, digits, "_" or "-"; otherwise returns the default name (guards the dynamic import path). |
-| function | `buildAppConfigUrl` | Returns the URL of the config file for a name under the public base path. |
-| function | `readAppConfigForwardName` | Returns the validated name in a raw config's forwardTo field, or undefined if absent or invalid. |
-| function | `normalizeAppConfig` | Converts an untrusted raw config object into an AppConfig, taking each recognized field only if it has the right type and valid value and otherwise using the default; accepts optionsMenu or menu for the menu block. |
-| function | `isRuntimeToolEnabled` | Returns whether the config permits a tool; cannon sub-modes follow geodesicEmitters, and non-configurable tools (none, aim) are always enabled. |
-| function | `getEnabledMainTools` | Lists the configurable tools enabled by the config, in main-menu order (sign, emitter, length, protractor). |
-
-### `glue/assetUrls.ts`
-
-Builds URLs for files served from the Vite public folder.
-
-| Kind | Name | Summary |
-| --- | --- | --- |
-| function | `publicUrl` | Returns the URL of a file relative to the public root, resolved against the page's address (so `?config=` queries and the deployment path do not matter). |
-| function | `publicAssetUrl` | Returns the URL of a file under assets/ in the public folder. |
-| function | `legacyPublicAssetUrl` | Returns the URL of a file under assets/_legacy/ (older assets kept for compatibility). |
-
-### `glue/debugLevels.ts`
-
-Defines the debug levels (off, basic, verbose) as a single constant table that is the source of truth for the DebugLevelId type, the settings UI and URL parsing.
-
-| Kind | Name | Summary |
-| --- | --- | --- |
-| const | `debugLevelDefinitions` | Ordered table of debug levels with id, menu label and description. |
-| type | `DebugLevelId` | Id of a debug level, derived from debugLevelDefinitions. |
-| function | `parseDebugLevel` | Returns the matching DebugLevelId for an exact id string, or undefined for null, empty or unknown input. |
-| function | `isDebugLevelEnabled` | Returns true for every level except "off". |
-| function | `isVerboseDebugLevel` | Returns true only for "verbose". |
-
-### `glue/debugOptions.ts`
-
-Defines the individual debug options (diagnostics logging, portal path/cull inspection, overlays, wireframes, hitbox displays) as a constant table that is the source of truth for the DebugOptionId type.
-
-| Kind | Name | Summary |
-| --- | --- | --- |
-| const | `debugOptionDefinitions` | Ordered table of debug options with id, label and description. |
-| type | `DebugOptionId` | Id of a debug option, derived from debugOptionDefinitions. |
-| function | `parseDebugOptions` | Parses a comma-separated list of option ids (whitespace tolerated), dropping unknown entries and returning the rest deduplicated in table order; null or empty gives []. |
-| function | `serializeDebugOptions` | Serializes options to a comma-separated string in table order, omitting duplicates. |
-| function | `hasDebugOption` | Returns whether the option is in the list, regardless of debug level. |
-| function | `hasActiveDebugOption` | Returns whether the option is in the list and the debug level is not "off". |
-
-### `glue/debugSettings.ts`
-
-Value types describing a complete debug configuration (level, portal panel mode and enabled options) and a predicate telling whether a change to it can be applied to a running world without a reload.
-
-| Kind | Name | Summary |
-| --- | --- | --- |
-| interface | `DebugSettings` | Debug configuration: console level, portal panel mode and enabled debug options. |
-| interface | `DebugSettingsSupport` | Declares which debug options the running renderer can switch without restarting. |
-| function | `canApplyDebugSettingsAtRuntime` | Returns true when every enabled option is runtime-mutable according to support (default: all known options), i.e. |
-
-### `glue/launchOptionsUrl.ts`
-
-Converts between launch options and URL query parameters: strips them from the visible address after startup (so reloads and shared links are clean) and builds a shareable URL that reproduces the current options.
-
-| Kind | Name | Summary |
-| --- | --- | --- |
-| function | `removeLaunchOptionsFromUrl` | Returns the URL with all launch-option query parameters (but not config) removed. |
-| function | `replaceVisibleUrlWithoutLaunchOptions` | Rewrites the browser address bar via history.replaceState without launch-option parameters; does nothing when none are present. |
-| function | `buildUrlWithLaunchOptions` | Returns the URL with the given options encoded as query parameters (config only when non-default, debugOptions only when non-empty), replacing any previous launch parameters; reading it back with readLaunchOptions repro… |
-
-### `glue/loadingStatus.ts`
-
-Minimal DOM loading screen shown while a world loads: a log of phase lines with the latest highlighted, plus an error state.
-
-| Kind | Name | Summary |
-| --- | --- | --- |
-| interface | `LoadingStatus` | Handle to a loading screen that reports startup phases and errors. |
-| interface | `LoadingStatusOptions` | Options for createLoadingStatus. |
-| function | `createLoadingStatus` | Creates and mounts a loading screen inside the container and returns its controller. |
-
-### `glue/portalPanelMode.ts`
-
-Defines the portal panel display modes (none, panel, panel-with-text, text-only) as a constant table and the predicates deciding which portal visuals a mode draws.
-
-| Kind | Name | Summary |
-| --- | --- | --- |
-| const | `portalPanelModeDefinitions` | Ordered table of portal panel modes with id, label and description. |
-| type | `PortalPanelModeId` | Id of a portal panel mode, derived from portalPanelModeDefinitions. |
-| function | `parsePortalPanelMode` | Returns the matching mode for an exact id string, or undefined for null, empty or unknown input. |
-| function | `shouldRenderPortalWall` | Returns true for modes that draw the textured portal wall (panel, panel-with-text). |
-| function | `shouldRenderPortalPlacard` | Returns true for modes that draw the label placard (panel-with-text, text-only). |
-| function | `shouldRenderPortalText` | Returns true for modes that draw portal label text (panel-with-text, text-only). |
-
-### `glue/readLaunchOptions.ts`
-
-Parses the page URL's query string into a LaunchOptions record, with precedence: explicit URL parameter, then the app config's value, then the built-in default.
-
-| Kind | Name | Summary |
-| --- | --- | --- |
-| interface | `LaunchOptions` | Resolved settings for one run of the app: world, UI toggles, debug settings, comfort options and the app config they came from. |
-| function | `readLaunchOptions` | Builds LaunchOptions from a location's query string, the loaded app config and its name, applying URL > config > default precedence for each field. |
-
-### `glue/serverChannel.ts`
-
-Page side of the channel to the local server (scripts/server/localServer.mjs): a WebSocket over which an admin can call any function of this page's public API (src/runtime/apiCall.ts), list it, evaluate expressions (dev mode only) and read forwarded console output.
-
-| Kind | Name | Summary |
-| --- | --- | --- |
-| interface | `ChannelSocket` | The slice of the WebSocket interface the channel uses (so tests can pass a fake). |
-| interface | `ServerChannelOptions` | Inputs of {@link startServerChannel}; everything but `api` defaults to the browser's own. |
-| interface | `ServerChannel` | Handle returned by {@link startServerChannel}. |
-| function | `startServerChannel` | Connects to the local server when the page was served by it, and answers its requests; returns a handle to stop it. |
-
-### `glue/uiOptions.ts`
-
-Defines the optional UI widgets that launch options can show (WorldSelector, DebugButton) as a constant table that is the source of truth for the UiOptionId type, with canonical parse and serialize helpers for the comma-separated URL form.
-
-| Kind | Name | Summary |
-| --- | --- | --- |
-| const | `uiOptionDefinitions` | Ordered table of UI options with id and label. |
-| type | `UiOptionId` | Id of a UI option, derived from uiOptionDefinitions. |
-| function | `parseUiOptions` | Parses a comma-separated list of UI option ids, dropping unknown entries and returning the rest deduplicated in table order; null or empty gives []. |
-| function | `serializeUiOptions` | Serializes UI options to a comma-separated string in table order. |
-| function | `hasUiOption` | Returns whether the option is in the list. |
-
-### `glue/vrComfortOptions.ts`
-
-Pure (Three-free) VR comfort settings: the `VrComfortOptions` record and its defaults.
-
-| Kind | Name | Summary |
-| --- | --- | --- |
-| interface | `VrComfortOptions` | Tunable VR comfort and locomotion parameters (all fields required; pass `Partial` to factories). |
-| const | `defaultVrComfortOptions` | Default comfort settings; treat as immutable. |
-
 ## `render`
 
 ### `render/dom/desktopFlagEditor.ts`
@@ -1418,25 +1593,18 @@ Aim-ray resolution for both input modes: the desktop camera center ray and the r
 
 | Kind | Name | Summary |
 | --- | --- | --- |
-| interface | `FocusedRuntimeObject` | The interactable object the aim ray currently rests on. |
 | interface | `AimInteractionDeps` | Dependencies for {@link createAimInteraction}; createThreeApp#shell supplies the live camera, renderer and rig objects as values and the changing state as getters. |
 | function | `createAimInteraction` | Creates the aim-interaction helpers bound to the given dependencies. |
 
 ### `render/three/aimTarget.ts`
 
-Aim picking: finds what an aim ray (desktop crosshair or XR controller) hits, across portals.
+Three.js adapter of the renderer-free aim picking (`interaction/aimTarget`): reads the aim ray from a camera's world position and forward (-z) axis, in the root Three.js frame, and hands it over in world axes.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
-| type | `AimTargetKind` | Whether an aim target is the floor or a world object. |
-| interface | `AimTarget` | One thing the aim ray hits, expressed both in the hit cell's local frame and in the root (viewer) frame. |
-| interface | `ResolveAimTargetRequest` | Inputs for {@link resolveAimTarget} and {@link resolveAimTargets}. |
-| const | `geodesicSegmentAimRadiusMeters` | Radius of the capsule used to pick geodesic segments, meters. |
-| function | `resolveAimTarget` | Returns the best aim target under the camera crosshair, or `undefined` if nothing is hit. |
-| function | `resolveAimTargetsByRayWalk` | Returns every aim target along the ray, best first, found by walking the ray through the glued cells. |
-| function | `resolveAimTargets` | Returns the best aim target along the ray, or `undefined` if nothing is hit. |
-| function | `getGeodesicEmitterAimCylinderBounds` | Returns the vertical-cylinder proxy used to pick a geodesic cannon, or `undefined` if the cannon has no collision bounds. |
-| function | `getGeodesicEmitterAimSphereCenter` | Returns the centre of the sphere used to pick (and snap the aim to) a geodesic cannon, in the cell-local frame (meters). |
+| type | `ResolveAimTargetRequest` | Inputs for {@link resolveAimTargets}: the ray request with the ray replaced by the camera that defines it. |
+| function | `aimRayOfCamera` | The aim ray of a camera: its world position and forward axis in world axes. |
+| function | `resolveAimTargets` | Returns every aim target along the camera's crosshair ray, best first; see `interaction/aimTarget`. |
 
 ### `render/three/appDebugHelpers.ts`
 
@@ -1570,6 +1738,24 @@ Application shell: builds the Three.js scene, owns the shared mutable state (pla
 | interface | `ThreeApp` | Handle returned by {@link createThreeApp} for the running application shell. |
 | interface | `ThreeAppOptions` | Inputs for {@link createThreeApp}: the selected world, launch/debug settings and host callbacks. |
 | function | `createThreeApp` | Creates the Three.js application shell inside `container` and starts its animation loop. |
+
+### `render/three/creatures/geodesicMarmotView.ts`
+
+Three.js view of the geodesic marmot: its static proxy mesh, the debug collision cylinder and the attachment to the current cell's scene node.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `GeodesicMarmotRuntime` | Per-marmot runtime handle owned by the renderer. |
+| function | `createGeodesicMarmotRuntime` | Creates the runtime (three.js group, behavior, registry entry) for a marmot starting in `startCellId`. |
+
+### `render/three/creatures/simpleGeoCreatureView.ts`
+
+Three.js view of a simple geodesic creature (the mouse or the butterfly): the glTF instance, the debug collision cylinder and the attachment to the current cell's scene node.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `SimpleGeoCreatureRuntime` | Per-creature runtime handle owned by the renderer. |
+| function | `createSimpleGeoCreatureRuntime` | Creates the runtime (three.js model instance, behavior, registry entry) for a creature starting in `startCellId`. |
 
 ### `render/three/debugCollisionWireframes.ts`
 
@@ -1738,16 +1924,6 @@ Geodesic emitter (cannon) tools: place, rotate, aim, carry, tie-and-detach, and 
 | interface | `GeodesicCannonToolState` | Editing state of the geodesic emitter (cannon) tools. |
 | interface | `GeodesicCannonToolsDeps` | Dependencies of the geodesic cannon tools, supplied by createThreeApp's shell. |
 | function | `createGeodesicCannonTools` | Creates the geodesic cannon tool controller and returns its operations. |
-
-### `render/three/geodesicCarryPortalTransition.ts`
-
-Derives the portal-crossing record a carried geodesic cannon needs from a player move result.
-
-| Kind | Name | Summary |
-| --- | --- | --- |
-| function | `resolveGeodesicCarryPortalTransitionFromMove` | Resolves the carry-portal transition implied by a `movePlayer` result. |
-| function | `resolveGeodesicCarryPortalTransitionsFromCrossings` | Maps the ordered crossings of one move (`MoveResult.crossings`) to carry-portal transitions, one per crossing. |
-| function | `resolveGeodesicCarryPortalTransitionFromPortalMove` | Builds the transition describing which portal a move crossed, or `undefined` if no consistent crossing happened. |
 
 ### `render/three/geodesicCreatureDebug.ts`
 
@@ -1925,27 +2101,6 @@ Utilities for combining the per-eye visibility results of stereo (VR) rendering 
 | function | `rankStereoUnionPaths` | Union of the eyes' paths, ranked round-robin: eye 0's next unseen path, eye 1's next unseen path, and so on. |
 | function | `countStereoPortalPaths` | Path statistics of a two-eye frame for the debug state (undefined unless there are exactly 2 eyes). |
 
-### `render/three/portalFunnel.ts`
-
-The exact per-frame visibility funnel: plan-direction sectors from the eye, clipped portal by portal, and the four half-spaces through the eye that bound a path's visible region.
-
-| Kind | Name | Summary |
-| --- | --- | --- |
-| type | `DirectionSector` | Plan directions from the eye: all directions, or the ccw sector from `right` to `left` (angle in [0, pi]). |
-| const | `sectorSlotSize` | Number of `Float64Array` slots of one packed sector: right.x, right.y, left.x, left.y (NaN in slot 0 = full). |
-| const | `clipPlaneCount` | Number of clip planes of a path. |
-| const | `clipPlaneArrayLength` | Length of the `Float64Array` that holds a path's clip planes (4 planes x 4 numbers). |
-| function | `writeFullSector` | Writes the packed "all directions" sector at `offset`. |
-| function | `clipPackedSector` | Keeps `{d : d . |
-| function | `clipPackedSectorByPortal` | Clips the packed sector at `input[inOffset]` by a portal seen from eye `(ex, ey)`: first by `rotCW(L - e)` then by `rotCCW(R - e)`. |
-| function | `unpackDirectionSector` | Converts a packed sector to the object form. |
-| function | `clipDirectionSector` | Keeps the plan directions `d` of `sector` with `d . |
-| function | `clipSectorByPortal` | Clips `sector` by a portal seen from `eye`: `rotCW(L - e)` first, then `rotCCW(R - e)`. |
-| function | `writeAlwaysInsideClipPlanes` | Writes four "always inside" planes (the root path) at `out[offset .. |
-| function | `writeFunnelClipPlanes` | Writes the four clip planes of a path at `out[offset .. |
-| function | `funnelClipPlanes` | Convenience wrapper over {@link writeFunnelClipPlanes} taking a `Vec3` eye and object sector boundaries. |
-| function | `clipPlanesToNdcPolygon` | Clips the NDC square `[-1,1]^2` by the half-planes of the image of `planes` (4 planes, Three frame, through the eye) and writes the polygon vertices (x, y pairs) to `out`; returns the vertex count (0 when empty, at most… |
-
 ### `render/three/portalInstanceDebug.ts`
 
 Debug renderer that draws a single instance of a cell's archetypes at a chosen `rootFromDestination` matrix.
@@ -1972,16 +2127,23 @@ Asset preloading and instancing for the Three.js renderer.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
-| interface | `PreparedTextureRequest` | Describes a derived texture variant: a preloaded source texture plus colour space, tiling and wrapping. |
-| interface | `PreparedGltfAsset` | A fresh instance of a preloaded glTF: its scene graph and animation clips. |
-| interface | `PreparedWorldAssets` | Synchronous lookup of everything {@link preloadWorldAssets} loaded. |
-| interface | `OwnedPreparedWorldAssets` | The owner's view of {@link PreparedWorldAssets}: whoever called {@link preloadWorldAssets} must call `dispose()` once. |
 | type | `AssetPreloadKind` | Loader category chosen for an asset path from its extension. |
 | interface | `PreparedKtx2Loader` | Minimal KTX2 loader surface (injectable for tests) that must be disposed when done. |
 | interface | `PreloadWorldAssetsOptions` | Options for {@link preloadWorldAssets}. |
 | function | `collectWorldAssetPaths` | Lists the unique asset paths needed by `world`. |
 | function | `classifyAssetPreloadKind` | Maps an asset path to the loader category by file extension (case-insensitive). |
 | function | `preloadWorldAssets` | Downloads all textures and glTF models required by `world` and returns a synchronous lookup for them. |
+
+### `render/three/preparedWorldAssets.ts`
+
+The synchronous lookup of preloaded textures and glTF scenes that the scene builders and object views read, and its owner's view.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `PreparedTextureRequest` | Describes a derived texture variant: a preloaded source texture plus colour space, tiling and wrapping. |
+| interface | `PreparedGltfAsset` | A fresh instance of a preloaded glTF: its scene graph and animation clips. |
+| interface | `PreparedWorldAssets` | Synchronous lookup of everything {@link preloadWorldAssets} loaded. |
+| interface | `OwnedPreparedWorldAssets` | The owner's view of {@link PreparedWorldAssets}: whoever called {@link preloadWorldAssets} must call `dispose()` once. |
 
 ### `render/three/prerenderCells.ts`
 
@@ -2072,7 +2234,6 @@ Plain-data snapshots of runtime and render diagnostics, shared between the Three
 
 | Kind | Name | Summary |
 | --- | --- | --- |
-| interface | `RuntimeInputFrame` | One frame of normalized player input from desktop or XR, consumed by movement and tool logic. |
 | interface | `XrDebugRenderState` | Full per-frame debug readout for the XR/desktop debug overlay (session, player pose, performance, portal statistics). |
 | interface | `RenderState` | Minimal render-loop state: a frame counter plus the latest portal statistics. |
 | interface | `FramePerformanceRenderState` | Per-frame CPU timings in milliseconds, split by pipeline stage. |
@@ -2093,15 +2254,7 @@ Aim-ray value type and pure aim helpers shared by desktop and XR interaction cod
 | function | `getAimForwardVector` | Returns the ray's direction in world axes, or `undefined` if no ray is given. |
 | function | `createAimTargetCycleSignature` | Builds a string identifying an ordered list of aim targets (object id, geodesic emitter id, portal hop count) so callers can detect when the set under the ray changed and reset target cycling. |
 | function | `getRuntimeObjectInteractionRangeMeters` | Returns the maximum interaction distance in meters for an object: tooltip range, else interactable range, else 2.5. |
-
-### `render/three/runtimeDiagnostics.ts`
-
-Optional runtime diagnostics: asset load tracking, portal transition log, slow-frame warnings and a browser long-task watcher.
-
-| Kind | Name | Summary |
-| --- | --- | --- |
-| function | `installRuntimeDiagnostics` | Installs (or, when disabled, clears) the global diagnostics recorder for `world`. |
-| function | `runtimeDiagnostics` | Returns the current diagnostics recorder, which is a no-op object when diagnostics are not enabled. |
+| interface | `FocusedRuntimeObject` | The interactable object the aim ray currently rests on. |
 
 ### `render/three/runtimeObjectGhostRecords.ts`
 
@@ -2295,26 +2448,16 @@ Large plane drawn below the cells so the void reads as ground.
 
 ### `render/three/visiblePortalPaths.ts`
 
-Per-frame portal visibility: decides which entries of a root cell's portal-path table are visible on screen and returns, for each, its placement, the four planes through the eye that bound its visible region, and the convex NDC polygon through which its destination cell may be drawn.
+Three.js adapter of the renderer-free portal visibility pass (`visibility/visiblePortalPaths`): it takes `THREE.Camera`s, refreshes their matrices, and returns the visible paths with `rootFromDestinationMatrix` as a `THREE.Matrix4` in Three.js axes, cached per path transform and shared between calls (never mutate).
 
 | Kind | Name | Summary |
 | --- | --- | --- |
-| interface | `Vec2` | A 2D point; used for normalized device coordinates, where the visible square is [-1,1] x [-1,1] with +y up. |
-| interface | `Rect2` | Axis-aligned rectangle in NDC (min/max inclusive); the bounding box of a clip polygon. |
-| const | `defaultMinPortalScreenAreaPixels` | Paths whose on-screen area is below this many physical pixels are kept but their children are not visited. |
-| interface | `ComputeVisiblePortalPathsInput` | Inputs for {@link computeVisiblePortalPaths}: a path table plus the camera and viewport it is evaluated against. |
-| interface | `ComputeIndependentVisiblePortalPathsInput` | Inputs for {@link computeIndependentVisiblePortalPaths}: like the single variant, but `cameras` is required and each is evaluated separately. |
-| interface | `VisiblePortalPathOptions` | Culling, budget and ordering knobs for portal visibility. |
-| interface | `VisiblePortalPath` | One visible portal path: a destination cell to draw, its placement in the root frame, its clip planes and its screen-space clip polygon. |
-| interface | `VisiblePortalPathDebugSummary` | Counters describing one visibility pass, for the debug overlay. |
-| interface | `ComputeVisiblePortalPathsResult` | Result of a visibility pass: the kept paths in render order plus an id lookup and diagnostics. |
-| interface | `VisiblePortalPathLookupResult` | Debug answer to "is this path visible right now?", with its area and bounds when it is. |
-| function | `computeVisiblePortalPaths` | Computes the visible portal paths for a root cell from one camera. |
-| function | `computeIndependentVisiblePortalPaths` | Computes one visibility result per camera, each evaluated against that camera alone (own eye position, own funnel). |
-| function | `ndcRectForPolygon` | Returns the axis-aligned NDC bounding box of a polygon; yields infinities for an empty polygon. |
-| function | `ndcPolygonAreaPixels` | Converts an NDC polygon's area to pixels of the given viewport. |
-| function | `summarizeVisiblePathCountByDepth` | Builds an ascending-by-depth histogram of how many paths exist at each depth. |
-| function | `describeVisiblePortalPath` | Looks up a path id in the latest visibility result and reports whether it is visible, with its pixel area and NDC bounds if so. |
+| type | `VisiblePortalPath` | One visible portal path with its placement as a Three.js matrix. |
+| type | `ComputeVisiblePortalPathsResult` | Result of a visibility pass with Three.js placement matrices. |
+| type | `ComputeVisiblePortalPathsInput` | Inputs for {@link computeVisiblePortalPaths}: the pure inputs with a Three.js camera. |
+| type | `ComputeIndependentVisiblePortalPathsInput` | Inputs for {@link computeIndependentVisiblePortalPaths}: the pure inputs with Three.js cameras. |
+| function | `computeVisiblePortalPaths` | Computes the visible portal paths for a root cell from one Three.js camera. |
+| function | `computeIndependentVisiblePortalPaths` | Computes one visibility result per Three.js camera, each evaluated against that camera alone. |
 
 ### `render/three/vrComfort.ts`
 
@@ -2328,19 +2471,6 @@ Comfort settings for VR locomotion and the anti-nausea vignette.
 | function | `resolveComfortVignetteAngles` | Computes inner/outer cone half-angles from the full vertical FOV in degrees (clamped to 1..179) and the options. |
 | function | `isArtificialLocomotionActive` | True when the frame's local displacement (meters) or yaw delta (radians) exceeds a small epsilon, i.e. |
 | function | `advanceComfortVignetteOpacity` | Moves `currentOpacity` toward 1 (if `active`) or 0 at a rate of one full range per `antiNauseaFadeSeconds`; negative `deltaSeconds` is treated as 0. |
-
-### `render/three/vrLocomotion.ts`
-
-Pure functions turning XR thumbstick and head-tracking input into player-local motion requests.
-
-| Kind | Name | Summary |
-| --- | --- | --- |
-| interface | `StickAxes` | A thumbstick position with each axis in [-1, 1] (x right, y down by gamepad convention). |
-| interface | `VrLocomotionRequest` | Result of stick locomotion. |
-| function | `applyJoystickDeadZone` | Zeroes the stick if its magnitude is within `deadZone`, normalizes it to unit length if it exceeds 1, and otherwise returns it unchanged. |
-| function | `computeJoystickLocomotion` | Converts a stick position into forward/back displacement for this frame: `moveSpeedMetersPerSecond * deltaSeconds` scaled by the clamped y axis, with the sign flipped (stick up moves along +y forward). |
-| function | `computeContinuousTurn` | Returns the yaw change in radians for this frame from the stick x axis (stick right gives negative, i.e. |
-| function | `computePhysicalRoomScaleDisplacement` | Computes the horizontal displacement (meters, z ignored) between two head positions in game-world axes. |
 
 ### `render/three/vrPaletteHeaderActions.ts`
 
@@ -2535,30 +2665,7 @@ Coordinates "end the immersive session, then run a restart action" so restarts (
 | interface | `XrSessionRestartCoordinator` | Handle returned by `createXrSessionRestartCoordinator`. |
 | function | `createXrSessionRestartCoordinator` | Creates a coordinator with its own pending-restart state (createThreeApp#shell creates one and calls `cancel` on dispose). |
 
-### `render/three/xrSessionState.ts`
-
-Pure model of the immersive-VR session lifecycle shown in the UI and debug state, plus support detection.
-
-| Kind | Name | Summary |
-| --- | --- | --- |
-| type | `XrSessionStatus` | Lifecycle status of the immersive VR session; see the module header for the usual transitions. |
-| interface | `XrSessionState` | Immutable snapshot of session status plus capability flags. |
-| interface | `XrNavigatorLike` | Structural subset of `navigator` used by `detectXrSessionState`; `xr` is absent in unsupported browsers. |
-| function | `createXrSessionState` | Builds a state for `status`. |
-| function | `statusLabel` | Returns the label text for `status`; for "failed" the optional message is appended. |
-| function | `detectXrSessionState` | Probes WebXR support and returns the initial state: "insecure-context" if not secure, "unsupported" if `navigator.xr` is missing or reports no immersive-vr support, "available" if supported, or "failed" (with a readable… |
-| function | `transitionXrSessionState` | Returns the state for `status`, keeping `secureContext` and `immersiveVrSupported` from `state` (support is cleared only when moving to "unsupported"). |
-
 ## `root`
-
-### `appState.ts`
-
-Defines AppState, the initial immutable bundle of compiled world, player body and player pose that main.ts hands to the renderer, and the factory that builds it.
-
-| Kind | Name | Summary |
-| --- | --- | --- |
-| interface | `AppState` | Initial application state for one world run: compiled world, player body, player pose and selected tool. |
-| function | `createInitialAppState` | Creates the AppState for a compiled world, placing the player at world.startingPosition (yaw and pitch default to 0) or at the default pose in cells[0]; throws if the world has no cells. |
 
 ### `main.ts`
 

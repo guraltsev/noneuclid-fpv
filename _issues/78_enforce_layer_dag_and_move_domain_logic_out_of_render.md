@@ -1,11 +1,11 @@
 # 78 - The layer rule is not a DAG: five import cycles and domain logic in render/three
 
-Status: open; re-verified 2026-10-28.
+Status: open; fixed by job 32 on 2026-10-31, pending the maintainer's review of the job's report.
 
 Priority: P2 (architecture / tooling). Complements the frozen-baseline list in issue 41 ("Layering debt") with checker
 gaps and a relocation plan.
 
-Jobs: [32](../.agents/jobs/32_layer_dag.md).
+Jobs: [32](../.agents/jobs/_done/32_layer_dag.md) (done, needs review; see its Report for what differs from the plan).
 
 ## Status update 2026-10-28
 
@@ -68,7 +68,7 @@ shell needs".
 
 ## Fix
 
-Tracked as job [32](../.agents/jobs/32_layer_dag.md). This issue is resolved when that job's acceptance criteria hold.
+Tracked as job [32](../.agents/jobs/_done/32_layer_dag.md). This issue is resolved when that job's acceptance criteria hold.
 
 ## Merged from issue 41 (2026-10-28)
 

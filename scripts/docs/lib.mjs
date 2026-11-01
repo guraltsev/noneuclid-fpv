@@ -14,41 +14,69 @@ export const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)
 export const srcRoot = path.join(repoRoot, "src");
 
 /**
- * Architectural layers, lowest first, with the layers each may import.
+ * Architectural layers in a strict order, lowest first: the key order of this table *is* the layer order.
  *
- * The first key segment of a module path under `src/` (e.g. `cell-complex`) names its layer. Edges outside
- * this table are reported as layering violations; known, accepted exceptions are listed in
- * {@link acceptedLayerExceptions} so that a *new* violation fails the check while history stays visible.
+ * The first key segment of a module path under `src/` (e.g. `cell-complex`) names its layer. A layer may import only layers
+ * listed *before* it (`may` names the ones it actually uses; `"*"` means every layer before it), so the layer graph is a DAG
+ * by construction; `tests/docs/layering.test.ts` asserts it. Edges outside this table are reported as layering violations;
+ * known, accepted exceptions are listed in `layering-baseline.json` so that a *new* violation fails the check while history
+ * stays visible.
  */
 export const layers = {
   math: { description: "Vectors, rigid transforms, planes, polygons, tolerances. Pure; imports nothing.", may: [] },
+  examples: { description: "Authored world scripts (data).", may: [] },
   "cell-complex": {
-    description: "Prism-cell specs, compilation, portal transforms, portal-path tables, static visibility culling.",
+    description: "Prism-cell specs, compilation, portal transforms, portal-path tables, static visibility culling, deformation families.",
     may: ["math"],
   },
+  diagnostics: {
+    description: "Debug levels and the runtime diagnostics recorder that every layer above may report to.",
+    may: ["math", "cell-complex"],
+  },
+  visibility: {
+    description: "Per-frame portal visibility: funnel clipping of portal-path tables against a camera. Pure; no renderer.",
+    may: ["math", "cell-complex"],
+  },
   movement: { description: "Player body, collision, movement and portal crossing in compiled cell complexes.", may: ["math", "cell-complex"] },
-  examples: { description: "Authored world scripts (data).", may: [] },
-  "world-assets": { description: "Floor-texture and asset descriptors.", may: ["cell-complex", "glue"] },
+  "world-assets": { description: "Floor-texture and asset descriptors.", may: ["cell-complex"] },
   "world-objects": {
-    description: "Placeable runtime objects: registry, geodesic emitters, measurement tools, flags, creatures.",
-    may: ["math", "cell-complex", "movement", "world-assets", "glue"],
+    description: "Placeable runtime objects: registry, geodesic emitters, measurement tools, flags, creature behaviors.",
+    may: ["math", "cell-complex", "diagnostics", "movement", "world-assets"],
   },
   authoring: {
     description: "World builder DSL, world-script compiler, validation and world catalog.",
     may: ["math", "cell-complex", "examples", "world-assets", "world-objects"],
   },
+  glue: {
+    description: "Launch options, debug settings, tool ids, asset URLs, app configuration.",
+    may: ["math", "cell-complex", "diagnostics", "authoring"],
+  },
+  interaction: {
+    description: "Renderer-free interaction logic: input frames, aim picking, VR locomotion, XR session state, carried-object portal transitions.",
+    may: ["math", "cell-complex", "movement", "world-objects", "glue"],
+  },
   runtime: {
-    description: "Runtime menu state, command dispatch, geometry session/worker and deformation families.",
-    may: ["math", "cell-complex", "movement", "world-objects", "authoring", "ui", "glue"],
+    description: "Application state, runtime menu state, command dispatch, geometry session/worker, server channel and public API.",
+    may: ["math", "cell-complex", "diagnostics", "movement", "world-objects", "authoring", "glue"],
   },
   ui: {
     description: "Renderer-neutral palette, help, tooltip and input-intent definitions.",
-    may: ["math", "cell-complex", "runtime", "world-objects", "authoring", "glue"],
+    may: ["math", "cell-complex", "world-objects", "authoring", "glue", "runtime"],
   },
-  glue: { description: "Launch options, debug settings, asset URLs, app configuration.", may: ["authoring", "runtime", "ui"] },
   render: { description: "Three.js / DOM / WebXR rendering and input adapters (the application shell).", may: ["*"] },
-  root: { description: "Entry point and application state.", may: ["*"] },
+  root: { description: "Entry point.", may: ["*"] },
 };
+
+/** The layer names, lowest first. */
+export const layerOrder = Object.keys(layers);
+
+/** Whether a module of layer `from` may import a module of layer `to` (`"*"` stands for every layer before `from`). */
+export function layerMayImport(from, to) {
+  const rule = layers[from];
+  if (!rule) return true;
+  if (rule.may.includes(to)) return true;
+  return rule.may.includes("*") && layerOrder.indexOf(to) < layerOrder.indexOf(from);
+}
 
 export function toPosix(p) {
   return p.split(path.sep).join("/");
@@ -171,6 +199,7 @@ export function scanProject() {
     const text = fs.readFileSync(file, "utf8");
     const sourceFile = ts.createSourceFile(file, text, ts.ScriptTarget.ES2022, true);
     const imports = new Set();
+    const packages = new Set();
     const exports = [];
     const declared = new Set();
 
@@ -180,6 +209,7 @@ export function scanProject() {
       if (ts.isImportDeclaration(statement) && ts.isStringLiteral(statement.moduleSpecifier)) {
         const resolved = resolveImport(rel, statement.moduleSpecifier.text, known);
         if (resolved) imports.add(resolved);
+        else if (!statement.moduleSpecifier.text.startsWith(".")) packages.add(statement.moduleSpecifier.text);
       }
       if (ts.isExportDeclaration(statement) && statement.moduleSpecifier && ts.isStringLiteral(statement.moduleSpecifier)) {
         const resolved = resolveImport(rel, statement.moduleSpecifier.text, known);
@@ -207,6 +237,7 @@ export function scanProject() {
       lines: text.split("\n").length,
       header: headerComment(sourceFile),
       imports: [...imports].sort(),
+      packages: [...packages].sort(),
       exports,
       declared,
     });
@@ -248,9 +279,7 @@ export function layerViolations(modules) {
     for (const dep of mod.imports) {
       const to = modules.get(dep).layer;
       if (to === mod.layer) continue;
-      const rule = layers[mod.layer];
-      if (!rule) continue;
-      if (rule.may.includes("*") || rule.may.includes(to)) continue;
+      if (layerMayImport(mod.layer, to)) continue;
       violations.push({ from: mod.path, to: dep, edge: `${mod.layer} -> ${to}` });
     }
   }
@@ -309,6 +338,93 @@ export function moduleImportRuleViolations(modules) {
     }
   }
   return violations;
+}
+
+/**
+ * Rules on npm packages: a package (or any subpath of it) may be imported only from the listed layers.
+ * `packages` entries ending in `/*` are scope prefixes (`@pmndrs/*` matches `@pmndrs/xr`); the others match the package and its subpaths.
+ */
+export const packageImportRules = [
+  {
+    packages: ["three", "@pmndrs/*"],
+    allowedLayers: ["render", "root"],
+    reason: "Three.js and its helper packages are renderer details; only the render layer (and the entry point) may import them",
+  },
+];
+
+function packageMatches(specifier, pattern) {
+  if (pattern.endsWith("/*")) return specifier.startsWith(pattern.slice(0, -1));
+  return specifier === pattern || specifier.startsWith(`${pattern}/`);
+}
+
+/** Violations of {@link packageImportRules}: `{ from, to, reason }` for every import of a restricted package from a layer that may not. */
+export function packageImportViolations(modules) {
+  const violations = [];
+  for (const rule of packageImportRules) {
+    for (const mod of modules.values()) {
+      if (rule.allowedLayers.includes(mod.layer)) continue;
+      for (const specifier of mod.packages) {
+        if (rule.packages.some((pattern) => packageMatches(specifier, pattern))) {
+          violations.push({ from: mod.path, to: specifier, reason: rule.reason });
+        }
+      }
+    }
+  }
+  return violations;
+}
+
+/**
+ * Import cycles among modules: the strongly connected components of the import graph with more than one module
+ * (type-only imports count, since they are real dependencies of the design), each sorted, the list sorted by first member.
+ */
+export function importCycles(modules) {
+  const index = new Map();
+  const low = new Map();
+  const onStack = new Set();
+  const stack = [];
+  const cycles = [];
+  let counter = 0;
+
+  // Iterative Tarjan: the import graph is deep enough that recursion is not worth risking.
+  for (const root of modules.keys()) {
+    if (index.has(root)) continue;
+    const work = [{ node: root, next: 0 }];
+    while (work.length > 0) {
+      const frame = work[work.length - 1];
+      const { node } = frame;
+      if (frame.next === 0) {
+        index.set(node, counter);
+        low.set(node, counter);
+        counter += 1;
+        stack.push(node);
+        onStack.add(node);
+      }
+      const deps = modules.get(node).imports;
+      if (frame.next < deps.length) {
+        const dep = deps[frame.next];
+        frame.next += 1;
+        if (!index.has(dep)) work.push({ node: dep, next: 0 });
+        else if (onStack.has(dep)) low.set(node, Math.min(low.get(node), index.get(dep)));
+        continue;
+      }
+      work.pop();
+      if (work.length > 0) {
+        const parent = work[work.length - 1].node;
+        low.set(parent, Math.min(low.get(parent), low.get(node)));
+      }
+      if (low.get(node) === index.get(node)) {
+        const component = [];
+        let member;
+        do {
+          member = stack.pop();
+          onStack.delete(member);
+          component.push(member);
+        } while (member !== node);
+        if (component.length > 1) cycles.push(component.sort());
+      }
+    }
+  }
+  return cycles.sort((a, b) => (a[0] < b[0] ? -1 : 1));
 }
 
 /** Path of the frozen layering-debt baseline: module-level edges that violate {@link layers} today. */

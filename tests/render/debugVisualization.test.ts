@@ -12,7 +12,8 @@ import type { DebugOptionId } from "../../src/glue/debugOptions";
 import { yawRigidTransform3 } from "../../src/math/rigidTransform3";
 import { simpleCollisionCylinder } from "../../src/movement/dynamicObject";
 import { createDebugVisualization } from "../../src/render/three/debugVisualization";
-import { createRuntimeObjectRegistry, type RuntimeCreatureObject } from "../../src/world-objects/runtimeObjectRegistry";
+import { createRuntimeObjectRegistry } from "../../src/world-objects/runtimeObjectRegistry";
+import { type RuntimeCreatureObject } from "../../src/world-objects/runtimeObjectBase";
 
 const squareRoomBase = [
   { x: -1, y: -1 },

@@ -63,11 +63,11 @@
  */
 import * as THREE from "three";
 import { reversePainterSortStable } from "@pmndrs/uikit";
-import { type AppState } from "../../appState";
+import { type AppState } from "../../runtime/appState";
 import { type CellComplexSpec } from "../../cell-complex/specs";
 import { buildStaticallyCulledPortalPathTables } from "../../cell-complex/staticPortalPathCull";
 import { type AppConfig, defaultAppConfig, isRuntimeToolEnabled } from "../../glue/appConfig";
-import { type DebugLevelId } from "../../glue/debugLevels";
+import { type DebugLevelId } from "../../diagnostics/debugLevels";
 import { type DebugOptionId, hasActiveDebugOption } from "../../glue/debugOptions";
 import { type DebugSettings } from "../../glue/debugSettings";
 import { type PortalPanelModeId } from "../../glue/portalPanelMode";
@@ -82,85 +82,35 @@ import { depenetrateDynamicObject } from "../../movement/depenetrateDynamicObjec
 import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex";
 import { createAppCommandDispatcher } from "../../runtime/appCommandDispatcher";
 import { type RuntimeCommand } from "../../runtime/runtimeCommands";
-import {
-  type RuntimeDebugOverlayItemId,
-  closeRuntimeMenu,
-  createDebugSettingsFromRuntimeMenuState,
-  createRuntimeMenuState,
-  openRuntimeMenu,
-  selectRuntimeMenuPlaceFlagToolType,
-  setRuntimeMenuAimCollisionOutlinesEnabled,
-  setRuntimeMenuAntiNauseaModeEnabled,
-  setRuntimeMenuCollisionGeometryWireframesEnabled,
-  setRuntimeMenuConsoleLogLevel,
-  setRuntimeMenuDebugEnabled,
-  setRuntimeMenuDebugOverlayEnabled,
-  setRuntimeMenuEditingFlagId,
-  setRuntimeMenuEditingSignMessage,
-  setRuntimeMenuGoalPageIndex,
-  setRuntimeMenuPortalInspectionEnabled,
-  setRuntimeMenuPortalPanelMode,
-  setRuntimeMenuReloadConfirmUntilMs,
-  setRuntimeMenuSelectedAppConfigName,
-  setRuntimeMenuSelectedTool,
-  setRuntimeMenuSelectedWorldId,
-  setRuntimeMenuTutorialPageIndex,
-  showRuntimeMenuDebugSettings,
-  showRuntimeMenuEditSign,
-  showRuntimeMenuGeodesicCannonActions,
-  showRuntimeMenuGeometryComputerActions,
-  showRuntimeMenuGoal,
-  showRuntimeMenuMainPage,
-  showRuntimeMenuPlaceFlagOptions,
-  showRuntimeMenuQuestionHelp,
-  showRuntimeMenuQuestionTutorial,
-  showRuntimeMenuSettings,
-  toggleRuntimeMenuDebugOverlayItem,
-} from "../../runtime/runtimeMenuState";
+import { closeRuntimeMenu, createDebugSettingsFromRuntimeMenuState, createRuntimeMenuState, openRuntimeMenu, selectRuntimeMenuPlaceFlagToolType, setRuntimeMenuAimCollisionOutlinesEnabled, setRuntimeMenuAntiNauseaModeEnabled, setRuntimeMenuCollisionGeometryWireframesEnabled, setRuntimeMenuConsoleLogLevel, setRuntimeMenuDebugEnabled, setRuntimeMenuDebugOverlayEnabled, setRuntimeMenuEditingFlagId, setRuntimeMenuEditingSignMessage, setRuntimeMenuGoalPageIndex, setRuntimeMenuPortalInspectionEnabled, setRuntimeMenuPortalPanelMode, setRuntimeMenuReloadConfirmUntilMs, setRuntimeMenuSelectedAppConfigName, setRuntimeMenuSelectedTool, setRuntimeMenuSelectedWorldId, setRuntimeMenuTutorialPageIndex, showRuntimeMenuDebugSettings, showRuntimeMenuEditSign, showRuntimeMenuGeodesicCannonActions, showRuntimeMenuGeometryComputerActions, showRuntimeMenuGoal, showRuntimeMenuMainPage, showRuntimeMenuPlaceFlagOptions, showRuntimeMenuQuestionHelp, showRuntimeMenuQuestionTutorial, showRuntimeMenuSettings, toggleRuntimeMenuDebugOverlayItem } from "../../runtime/runtimeMenuState";
+import { type RuntimeDebugOverlayItemId } from "../../glue/toolIds";
 import { applyGeometryCommitComputedObjectPolicy } from "../../runtime/worldGeometryComputedObjects";
 import {
   createDefaultWorldDeformationFamilyRegistry,
   createInitialWorldDeformationState,
   getWorldDeformationFamilyOrThrow,
 } from "../../runtime/worldGeometryDeformationFamilies";
-import { type CellDeformationMap, transformPoseWithCellMaps } from "../../runtime/worldGeometryDeformations";
+import { type CellDeformationMap, transformPoseWithCellMaps } from "../../cell-complex/worldGeometryDeformations";
 import { type WorldGeometrySnapshot, createWorldGeometrySession } from "../../runtime/worldGeometrySession";
 import { createHelpLensDefinition } from "../../ui/helpLensDefinition";
 import { type PaletteDefinition, createPaletteDefinitionCache } from "../../ui/paletteDefinition";
 import { type GeodesicCarryPortalTransition } from "../../world-objects/geodesic/objects";
 import { advanceCurveShorteningPairs } from "../../world-objects/geodesic/curveShortening";
 import { pruneMissingGeodesicIntersectionObjects } from "../../world-objects/geodesic/intersections";
-import {
-  type GeodesicMarmotRuntime,
-  createGeodesicMarmotRuntime,
-  isGeodesicMarmotObjectSpec,
-} from "../../world-objects/geodesicMarmot";
+import { isGeodesicMarmotObjectSpec } from "../../world-objects/geodesicMarmot";
+import { type GeodesicMarmotRuntime, createGeodesicMarmotRuntime } from "./creatures/geodesicMarmotView";
 import { createMeasuredGeodesicLengthObject } from "../../world-objects/measureLengthTool";
 import {
   placeFlagAtFloorPoint,
   updatePlacedFlagFontColor,
   updatePlacedFlagMessage,
 } from "../../world-objects/placedFlags";
-import {
-  type ProtractorCenterSelection,
-  type ProtractorDirectedGeodesic,
-  createProtractorAngleObject,
-  protractorSelectionsUseDifferentGeodesics,
-  resolveProtractorCenterSelection,
-  resolveProtractorDirectedGeodesicSelection,
-  resolveProtractorEmitterGeodesicSelection,
-} from "../../world-objects/protractorTool";
-import {
-  type RuntimeWorldObject,
-  createRuntimeObjectRegistry,
-  createRuntimeStaticAssetObject,
-  runtimeObjectToDynamicObjectState,
-} from "../../world-objects/runtimeObjectRegistry";
-import {
-  type SimpleGeoCreatureRuntime,
-  createSimpleGeoCreatureRuntime,
-  isSimpleGeoCreatureObjectSpec,
-} from "../../world-objects/simpleGeoCreature";
+import { type ProtractorCenterSelection, createProtractorAngleObject, protractorSelectionsUseDifferentGeodesics, resolveProtractorCenterSelection, resolveProtractorDirectedGeodesicSelection, resolveProtractorEmitterGeodesicSelection } from "../../world-objects/protractorTool";
+import { type ProtractorDirectedGeodesic } from "../../world-objects/toolObjects";
+import { type RuntimeWorldObject, createRuntimeObjectRegistry, createRuntimeStaticAssetObject } from "../../world-objects/runtimeObjectRegistry";
+import { runtimeObjectToDynamicObjectState } from "../../world-objects/runtimeObjectBase";
+import { isSimpleGeoCreatureObjectSpec } from "../../world-objects/simpleGeoCreature";
+import { type SimpleGeoCreatureRuntime, createSimpleGeoCreatureRuntime } from "./creatures/simpleGeoCreatureView";
 import { createObjectHost, createPlainWorldObject, type PlainWorldObject } from "../../world-objects/worldObjectOwner";
 import { setApiNamespace } from "../../runtime/publicApi";
 import { createDesktopFlagEditor } from "../dom/desktopFlagEditor";
@@ -201,7 +151,7 @@ import {
 import { type FrameRenderSnapshot, createEmptyFrameRenderSnapshot, createFrameRenderSnapshot } from "./frameRenderSnapshot";
 import { createGeodesicRuntimeRenderSources } from "./geodesicCannonRenderer";
 import { GeodesicCannonToolState, createGeodesicCannonTools } from "./geodesicCannonTools";
-import { resolveGeodesicCarryPortalTransitionsFromCrossings } from "./geodesicCarryPortalTransition";
+import { resolveGeodesicCarryPortalTransitionsFromCrossings } from "../../interaction/carryPortalTransition";
 import { createGeodesicDebugDumps } from "./geodesicDebugDumps";
 import { createGeodesicEmitterLabelController } from "./geodesicEmitterLabelController";
 import { createGeometryComputerMenu } from "./geometryComputerMenu";
@@ -227,7 +177,7 @@ import {
   PortalInstanceDebugRenderer,
   createPortalInstanceDebugRenderer,
 } from "./portalInstanceDebug";
-import { PreparedWorldAssets } from "./preloadWorldAssets";
+import { PreparedWorldAssets } from "./preparedWorldAssets";
 import { prerenderCells } from "./prerenderCells";
 import { ProtractorAngleRuntime } from "./protractorAngleRenderer";
 import { createProtractorToolFeedback, protractorToolFeedbackSignature } from "./protractorToolFeedback";
@@ -250,14 +200,14 @@ import {
 import {
   FramePerformanceRenderState,
   PortalEyeRenderDebugState,
-  RuntimeInputFrame,
   StereoPortalPathRenderState,
   WebGlRenderInfoState,
   XrDebugRenderState,
 } from "./renderState";
+import { RuntimeInputFrame } from "../../interaction/inputFrame";
 import { RootAimRay } from "./rootAimRay";
 import { createFrameErrorGuard } from "./frameErrorGuard";
-import { installRuntimeDiagnostics, runtimeDiagnostics } from "./runtimeDiagnostics";
+import { installRuntimeDiagnostics, runtimeDiagnostics } from "../../diagnostics/runtimeDiagnostics";
 import { createRuntimeObjectInstanceSync } from "./runtimeObjectInstanceSync";
 import {
   RuntimeObjectRenderArchetype,
@@ -286,13 +236,8 @@ import {
 import { createScenePaletteController } from "./scenePaletteController";
 import { createToolObjectRuntimes } from "./toolObjectRuntimes";
 import { createUnderCellInfinityFloor } from "./underCellFloor";
-import {
-  ComputeVisiblePortalPathsResult,
-  VisiblePortalPath,
-  VisiblePortalPathOptions,
-  computeVisiblePortalPaths,
-  defaultMinPortalScreenAreaPixels,
-} from "./visiblePortalPaths";
+import { VisiblePortalPathOptions, defaultMinPortalScreenAreaPixels } from "../../visibility/visiblePortalPaths";
+import { ComputeVisiblePortalPathsResult, VisiblePortalPath, computeVisiblePortalPaths } from "./visiblePortalPaths";
 import {
   VrComfortOptions,
   createVrComfortVignette,
@@ -325,7 +270,7 @@ import {
   createXrSessionState,
   detectXrSessionState,
   transitionXrSessionState,
-} from "./xrSessionState";
+} from "../../interaction/xrSessionState";
 
 /**
  * Handle returned by {@link createThreeApp} for the running application shell.

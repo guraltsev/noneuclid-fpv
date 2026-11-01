@@ -21,8 +21,8 @@ import { moveDynamicObject } from "../../src/movement/moveDynamicObject";
 import {
   createTorusSkewCellDeformationMaps,
   createTorusSkewDeformationFamily,
-} from "../../src/runtime/deformations/torusSkewDeformation";
-import { transformPoseWithCellMaps } from "../../src/runtime/worldGeometryDeformations";
+} from "../../src/cell-complex/deformations/torusSkewDeformation";
+import { transformPoseWithCellMaps } from "../../src/cell-complex/worldGeometryDeformations";
 
 const rest = { kind: "torus-skew", cellId: "torus-room", widthMeters: 15, depthMeters: 15, skewXMeters: 0 } as const;
 const trap = { ...rest, depthMeters: 7.5, skewXMeters: 30 } as const;

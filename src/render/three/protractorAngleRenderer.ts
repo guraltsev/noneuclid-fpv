@@ -9,13 +9,8 @@
  * `root` to the owning cell's scene node.
  */
 import * as THREE from "three";
-import {
-  formatProtractorAngleLabel,
-  protractorAngleLabelBadgeHeightMeters,
-  protractorAngleLabelBadgeWidthMeters,
-  protractorAngleLabelVerticalOffsetMeters,
-  type ProtractorAngleObject,
-} from "../../world-objects/protractorTool";
+import { formatProtractorAngleLabel, protractorAngleLabelBadgeHeightMeters, protractorAngleLabelBadgeWidthMeters, protractorAngleLabelVerticalOffsetMeters } from "../../world-objects/protractorTool";
+import { type ProtractorAngleObject } from "../../world-objects/toolObjects";
 import { applyWorldRigidTransform } from "./worldAxes";
 import { createWorldResultBadge } from "./worldResultBadge";
 import { disposeObject3DWithTextures } from "./runtimeSceneUtils";

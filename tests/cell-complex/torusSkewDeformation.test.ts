@@ -16,15 +16,8 @@ import { checkPortalPathString } from "../../src/cell-complex/portalPathDebug";
 import { buildStaticallyCulledPortalPathTables } from "../../src/cell-complex/staticPortalPathCull";
 import { yawRigidTransform3 } from "../../src/math/rigidTransform3";
 import { vec3 } from "../../src/math/vec3";
-import {
-  buildTorusParallelogramVertices,
-  createTorusSkewCellDeformationMaps,
-  createTorusSkewDeformationFamily,
-  defaultTorusSkewDeformationState,
-  nextTorusSkewStep,
-  validateTorusSkewBaseSpec,
-  type TorusSkewDeformationState,
-} from "../../src/runtime/deformations/torusSkewDeformation";
+import { buildTorusParallelogramVertices, createTorusSkewCellDeformationMaps, createTorusSkewDeformationFamily, defaultTorusSkewDeformationState, nextTorusSkewStep, validateTorusSkewBaseSpec } from "../../src/cell-complex/deformations/torusSkewDeformation";
+import { type TorusSkewDeformationState } from "../../src/cell-complex/worldGeometryDeformations";
 import { createInitialWorldDeformationState } from "../../src/runtime/worldGeometryDeformationFamilies";
 import { torusModuli } from "../../src/authoring/exampleWorlds";
 import {
@@ -32,7 +25,7 @@ import {
   transformPoseWithCellMaps,
   transformPositionedObjectSpecWithMap,
   transformRigidPoseWithMap,
-} from "../../src/runtime/worldGeometryDeformations";
+} from "../../src/cell-complex/worldGeometryDeformations";
 import { transformYawWithMap } from "../../src/render/three/runtimeSceneUtils";
 import { createGeodesicMarmot, createGeodesicMarmotRuntimeObject } from "../../src/world-objects/geodesicMarmot";
 import type { CellObjectSpec } from "../../src/cell-complex/specs";

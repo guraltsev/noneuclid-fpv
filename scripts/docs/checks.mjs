@@ -6,7 +6,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import { moduleImportRuleViolations, newLayerViolations, repoRoot, scanProject, toPosix } from "./lib.mjs";
+import { importCycles, moduleImportRuleViolations, newLayerViolations, packageImportViolations, repoRoot, scanProject, toPosix } from "./lib.mjs";
 import { renderApiReference, renderArchitectureReference } from "./render.mjs";
 
 export const generatedFiles = {
@@ -58,6 +58,16 @@ export function checkModuleImportRules(modules) {
   return moduleImportRuleViolations(modules).map((v) => `src/${v.from} imports src/${v.to}; ${v.reason}`);
 }
 
+export function checkPackageImports(modules) {
+  return packageImportViolations(modules).map((v) => `src/${v.from} imports "${v.to}"; ${v.reason}.`);
+}
+
+export function checkImportCycles(modules) {
+  return importCycles(modules).map(
+    (cycle) => `import cycle (type-only imports included) through ${cycle.length} modules: ${cycle.map((m) => `src/${m}`).join(", ")}.`,
+  );
+}
+
 export function checkGeneratedFresh(modules) {
   const problems = [];
   for (const [rel, render] of Object.entries(generatedFiles)) {
@@ -106,6 +116,8 @@ export function runAllChecks() {
       "exported JSDoc": checkExportDocs(modules),
       "layering": checkLayering(modules),
       "module import rules": checkModuleImportRules(modules),
+      "npm imports": checkPackageImports(modules),
+      "import cycles": checkImportCycles(modules),
       "generated documents": checkGeneratedFresh(modules),
       "document references": checkDocReferences(modules),
     },

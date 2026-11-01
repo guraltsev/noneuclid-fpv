@@ -5,9 +5,9 @@
  * Stepping moves (w, a, b) together along a straight segment in (w, a, b) space by at most maxStepMeters per rebuild (the allowed set is convex, so every point of the segment is allowed). Snapshot validation requires unchanged topology and equal lengths of opposite sides.
  * The floor UV frame is the lattice frame of the current state with tile counts fixed from the base state, so the floor texture follows lattice coordinates like the objects do.
  */
-import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex";
-import { floorTilesAlong } from "../../cell-complex/floorUv";
-import type { CellComplexSpec, PrismCellSpec } from "../../cell-complex/specs";
+import type { CompiledCellComplex } from "../compileCellComplex";
+import { floorTilesAlong } from "../floorUv";
+import type { CellComplexSpec, PrismCellSpec } from "../specs";
 import { vec3, type Vec3 } from "../../math/vec3";
 import {
   applyPrismBaseReplacements,
@@ -16,21 +16,9 @@ import {
   validateTopologyPreservingSnapshot,
   type CellDeformationMap,
   type DynamicGeometryStepOptions,
+  type TorusSkewDeformationState,
   type WorldDeformationFamily,
 } from "../worldGeometryDeformations";
-
-/** Parameters (meters) of the torus-room parallelogram: horizontal edge w, skew a and depth b. */
-export interface TorusSkewDeformationState {
-  readonly kind: "torus-skew";
-  /** Always "torus-room"; the family only deforms that single cell. */
-  readonly cellId: "torus-room";
-  /** Length w of the horizontal lattice vector u = (w, 0); positive and finite. */
-  readonly widthMeters: number;
-  /** Height b of the second lattice vector v = (a, b); must lie in [w/2, 2w]. */
-  readonly depthMeters: number;
-  /** Horizontal component a of v (the shear); must lie in [0, 2w]. */
-  readonly skewXMeters: number;
-}
 
 interface TorusLatticeFrame {
   readonly origin: { readonly x: number; readonly y: number };

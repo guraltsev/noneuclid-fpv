@@ -16,7 +16,8 @@ import {
 } from "../../src/render/three/debugCollisionWireframes";
 import { buildStaticObjectCollisionWireframeGroup } from "../../src/render/three/staticObjectCollisionWireframes";
 import { applyWorldRigidTransform, worldPointToThree } from "../../src/render/three/worldAxes";
-import { createRuntimeStaticAssetObject, runtimeObjectToDynamicObjectState } from "../../src/world-objects/runtimeObjectRegistry";
+import { createRuntimeStaticAssetObject } from "../../src/world-objects/runtimeObjectRegistry";
+import { runtimeObjectToDynamicObjectState } from "../../src/world-objects/runtimeObjectBase";
 import { cube } from "../../src/authoring/exampleWorlds";
 
 describe("debug collision wireframes", () => {

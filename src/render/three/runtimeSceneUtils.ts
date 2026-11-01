@@ -4,11 +4,11 @@
  * `disposeObject3D`/`disposeMaterial` free GPU geometry and materials only; the `...WithTextures` variants also dispose material `map` textures and must only be used on textures the caller created; `disposeCanvasTextures` frees only canvas-texture maps, which are never shared with preloaded assets. None of them remove objects from their parent.
  */
 import * as THREE from "three";
-import { type AppState } from "../../appState";
+import { type AppState } from "../../runtime/appState";
 import { type CompiledPrismCell } from "../../cell-complex/prismCells";
 import { vec3, type Vec3 } from "../../math/vec3";
 import { DEFAULT_PLAYER_EYE_HEIGHT_METERS } from "../../movement/playerBody";
-import { type CellDeformationMap } from "../../runtime/worldGeometryDeformations";
+import { type CellDeformationMap } from "../../cell-complex/worldGeometryDeformations";
 import { type RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
 import { buildForbiddenZoneWireframe } from "./debugCollisionWireframes";
 

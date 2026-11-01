@@ -6,7 +6,7 @@
  */
 import { compileCellComplex } from "./cell-complex/compileCellComplex";
 import { describeGeometrySpec } from "./cell-complex/describeGeometry";
-import { createInitialAppState } from "./appState";
+import { createInitialAppState } from "./runtime/appState";
 import { loadWorldSpec } from "./authoring/worldCatalog";
 import type { DebugSettings } from "./glue/debugSettings";
 import { hasActiveDebugOption } from "./glue/debugOptions";
@@ -18,10 +18,11 @@ import { loadAppConfig, readAppConfigName } from "./glue/appConfig";
 import { createLoadingStatus } from "./glue/loadingStatus";
 import { readLaunchOptions, type LaunchOptions } from "./glue/readLaunchOptions";
 import { createThreeApp, type ThreeApp } from "./render/three/createThreeApp";
-import { type OwnedPreparedWorldAssets, preloadWorldAssets } from "./render/three/preloadWorldAssets";
+import { preloadWorldAssets } from "./render/three/preloadWorldAssets";
+import { type OwnedPreparedWorldAssets } from "./render/three/preparedWorldAssets";
 import { getPublicApi, setApiNamespace } from "./runtime/publicApi";
-import { startServerChannel } from "./glue/serverChannel";
-import { installRuntimeDiagnostics } from "./render/three/runtimeDiagnostics";
+import { startServerChannel } from "./runtime/serverChannel";
+import { installRuntimeDiagnostics } from "./diagnostics/runtimeDiagnostics";
 import "./style.css";
 
 const appElement = document.querySelector<HTMLDivElement>("#app");

@@ -7,7 +7,7 @@
  */
 
 import * as THREE from "three";
-import type { PreparedWorldAssets } from "./preloadWorldAssets";
+import type { PreparedWorldAssets } from "./preparedWorldAssets";
 
 /** Asset-lookup key of the generated portal wall texture; no file is downloaded for it. */
 export const PORTAL_WALL_TEXTURE_KEY = "generated/portal-wall-checker";

@@ -9,10 +9,10 @@
  * counter-clockwise from +x; Three.js-space values only appear for the carried-emitter glow and aim rays.
  * Ids of new cannons and geodesics embed `Date.now()` plus a per-factory counter.
  */
-import type { FocusedRuntimeObject } from "./aimInteraction";
+import type { FocusedRuntimeObject } from "./rootAimRay";
 import * as THREE from "three";
 import { type CompiledCellComplex } from "../../cell-complex/compileCellComplex";
-import { type DebugLevelId } from "../../glue/debugLevels";
+import { type DebugLevelId } from "../../diagnostics/debugLevels";
 import { yawRigidTransform3 } from "../../math/rigidTransform3";
 import { type Vec3, normalizeVec3 } from "../../math/vec3";
 import { testCellCollision } from "../../movement/collision";
@@ -55,12 +55,9 @@ import {
   rebuildGeodesicToLength,
   shootGeodesic,
 } from "../../world-objects/geodesic/cannon";
-import {
-  type RuntimeObjectRegistry,
-  type RuntimeWorldObject,
-  runtimeObjectToDynamicObjectState,
-} from "../../world-objects/runtimeObjectRegistry";
-import { AimTarget } from "./aimTarget";
+import { type RuntimeObjectRegistry, type RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
+import { runtimeObjectToDynamicObjectState } from "../../world-objects/runtimeObjectBase";
+import { AimTarget } from "../../interaction/aimTarget";
 import { formatGeodesicPortalWord } from "./appDebugHelpers";
 import {
   carriedGeodesicEmitterPoseToleranceMeters,
@@ -75,7 +72,7 @@ import { createDesktopControls } from "./desktopControls";
 import { resolveGeodesicCannonAimYawFromAbsolutePoints } from "./geodesicCannonAimTarget";
 import { locateDevelopedPoint } from "../../cell-complex/segmentWalk";
 import { composeRigidTransform3 } from "../../math/rigidTransform3";
-import { resolveGeodesicCarryPortalTransitionsFromCrossings } from "./geodesicCarryPortalTransition";
+import { resolveGeodesicCarryPortalTransitionsFromCrossings } from "../../interaction/carryPortalTransition";
 import {
   RootAimRay,
   getAimForwardVector,

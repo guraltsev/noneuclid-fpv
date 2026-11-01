@@ -14,7 +14,7 @@ import {
   funnelClipPlanes,
   writeAlwaysInsideClipPlanes,
   type DirectionSector,
-} from "../../src/render/three/portalFunnel";
+} from "../../src/visibility/portalFunnel";
 import { worldPointToThree } from "../../src/render/three/worldAxes";
 import { mulberry32 } from "../support/portalWordWitness";
 

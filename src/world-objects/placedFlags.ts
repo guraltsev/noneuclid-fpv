@@ -8,17 +8,10 @@ import { testCellCollision, getDynamicObjectCollisionBounds, simpleCylinderInter
 import type { DynamicObjectState, SimpleCollisionCylinder } from "../movement/dynamicObject";
 import { yawRigidTransform3, type RigidTransform3 } from "../math/rigidTransform3";
 import type { Vec3 } from "../math/vec3";
-import type { RuntimeObjectInteraction, RuntimeWorldObjectBase, RuntimeObjectRegistry } from "./runtimeObjectRegistry";
-import { runtimeObjectToDynamicObjectState } from "./runtimeObjectRegistry";
-
-/**
- * The available sign models, which also determine the default message prefix ("A" for WoodenSign1, "B" for WoodenSign2).
- */
-export const placedFlagTypes = ["WoodenSign1", "WoodenSign2"] as const;
-/**
- * Union of the sign model names in `placedFlagTypes`.
- */
-export type PlacedFlagType = typeof placedFlagTypes[number];
+import type { RuntimeObjectInteraction } from "./runtimeObjectBase";
+import { runtimeObjectToDynamicObjectState } from "./runtimeObjectBase";
+import type { RuntimeObjectRegistry } from "./runtimeObjectRegistry";
+import { placedFlagTypes, type PlacedFlagObject, type PlacedFlagType } from "./toolObjects";
 
 /**
  * Maps each sign type to its glTF asset path under the assets directory.
@@ -40,16 +33,6 @@ export const placedFlagFontColors = [defaultPlacedFlagFontColor, "#111827", "#ef
  * Maximum number of characters (code points) in a sign message.
  */
 export const placedFlagMaxMessageLength = 20;
-
-/**
- * Registry record for a placed sign: its type, sanitized message and font color.
- */
-export interface PlacedFlagObject extends RuntimeWorldObjectBase {
-  readonly kind: "placed-flag";
-  readonly flagType: PlacedFlagType;
-  readonly message: string;
-  readonly fontColor: string;
-}
 
 /**
  * Inputs for createPlacedFlagObject.

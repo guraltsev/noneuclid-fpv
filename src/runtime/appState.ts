@@ -3,9 +3,9 @@
  * The player starts at the world's declared startingPosition (cell, local position, yaw, pitch) or, if absent, at a default pose in the first compiled cell.
  * The renderer treats this as seed data and keeps its own mutable per-frame state afterwards.
  */
-import type { CompiledCellComplex } from "./cell-complex/compileCellComplex";
-import { createDefaultPlayerBody, type PlayerBody } from "./movement/playerBody";
-import { createDefaultPlayerPose, type PlayerPose } from "./movement/playerPose";
+import type { CompiledCellComplex } from "../cell-complex/compileCellComplex";
+import { createDefaultPlayerBody, type PlayerBody } from "../movement/playerBody";
+import { createDefaultPlayerPose, type PlayerPose } from "../movement/playerPose";
 
 /**
  * Initial application state for one world run: compiled world, player body, player pose and selected tool.

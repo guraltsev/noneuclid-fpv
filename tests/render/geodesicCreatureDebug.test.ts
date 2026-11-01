@@ -10,7 +10,8 @@ import { describe, expect, it } from "vitest";
 import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
 import type { CellComplexSpec } from "../../src/cell-complex/specs";
 import { createRuntimeObjectRegistry } from "../../src/world-objects/runtimeObjectRegistry";
-import { createSimpleGeoCreature, createSimpleGeoCreatureRuntime } from "../../src/world-objects/simpleGeoCreature";
+import { createSimpleGeoCreature } from "../../src/world-objects/simpleGeoCreature";
+import { createSimpleGeoCreatureRuntime } from "../../src/render/three/creatures/simpleGeoCreatureView";
 import { collectGeodesicCreatureDebugDump } from "../../src/render/three/geodesicCreatureDebug";
 import { createFakePreparedAssets } from "../support/preparedAssets";
 

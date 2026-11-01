@@ -6,7 +6,7 @@
 import * as THREE from "three";
 import { type Vec3 } from "../../math/vec3";
 import { type RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
-import { AimTarget } from "./aimTarget";
+import { AimTarget } from "../../interaction/aimTarget";
 import { threeDirectionToWorld, threePointToWorld } from "./worldAxes";
 
 /**
@@ -69,4 +69,11 @@ export function createAimTargetCycleSignature(targets: readonly AimTarget[]): st
  */
 export function getRuntimeObjectInteractionRangeMeters(object: RuntimeWorldObject): number {
   return object.tooltip?.rangeMeters ?? object.interactable?.rangeMeters ?? 2.5;
+}
+
+/** The interactable object the aim ray currently rests on. */
+export interface FocusedRuntimeObject {
+  readonly object: RuntimeWorldObject;
+  readonly distance: number;
+  readonly tooltipAnchor: { readonly x: number; readonly y: number; readonly z: number };
 }

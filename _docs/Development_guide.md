@@ -86,7 +86,7 @@ relative paths, so there is no base path to give. See the
 ## Repository Map
 
 - `src/main.ts` is the small browser entrypoint.
-- `src/appState.ts` holds app-level state contracts.
+- `src/runtime/appState.ts` holds app-level state contracts.
 - `src/math` holds low-level geometry primitives and tolerances.
 - `src/cell-complex` holds cell, portal, compiler, transform, portal-path, and
   forbidden-zone rules.

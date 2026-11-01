@@ -4,12 +4,24 @@
  * For each pair (previous state, next state) a family also yields one CellDeformationMap per cell: the map between the previous and next local frame of that cell. Maps carry points, headings, poses, starting positions and positioned objects across a geometry commit, so the player and creatures keep the same place in the deforming cell.
  * Everything here is pure and immutable: functions return new specs and objects, and validation is by exact side/portal bookkeeping with a 1e-6 m tolerance.
  */
-import type { CompiledCellComplex } from "../cell-complex/compileCellComplex";
-import type { FloorLatticeUvFrame } from "../cell-complex/floorUv";
-import type { CellComplexSpec, CellObjectSpec, PositionedCellObjectSpec, PrismCellSpec } from "../cell-complex/specs";
+import type { CompiledCellComplex } from "./compileCellComplex";
+import type { FloorLatticeUvFrame } from "./floorUv";
+import type { CellComplexSpec, CellObjectSpec, PositionedCellObjectSpec, PrismCellSpec } from "./specs";
 import { yawRigidTransform3, type RigidTransform3 } from "../math/rigidTransform3";
 import { normalizeVec3, vec3, type Vec3 } from "../math/vec3";
-import type { TorusSkewDeformationState } from "./deformations/torusSkewDeformation";
+
+/** Parameters (meters) of the torus-room parallelogram: horizontal edge w, skew a and depth b. */
+export interface TorusSkewDeformationState {
+  readonly kind: "torus-skew";
+  /** Always "torus-room"; the family only deforms that single cell. */
+  readonly cellId: "torus-room";
+  /** Length w of the horizontal lattice vector u = (w, 0); positive and finite. */
+  readonly widthMeters: number;
+  /** Height b of the second lattice vector v = (a, b); must lie in [w/2, 2w]. */
+  readonly depthMeters: number;
+  /** Horizontal component a of v (the shear); must lie in [0, 2w]. */
+  readonly skewXMeters: number;
+}
 
 /** Deformation state of a world that is never deformed. */
 export interface StaticWorldDeformationState {

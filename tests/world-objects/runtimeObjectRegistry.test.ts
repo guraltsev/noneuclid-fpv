@@ -12,11 +12,8 @@
 import { describe, expect, it } from "vitest";
 import { identityRigidTransform3 } from "../../src/math/rigidTransform3";
 import { simpleCollisionCylinder } from "../../src/movement/dynamicObject";
-import {
-  createRuntimeObjectRegistry,
-  createRuntimeStaticAssetObject,
-  type RuntimeCreatureObject,
-} from "../../src/world-objects/runtimeObjectRegistry";
+import { createRuntimeObjectRegistry, createRuntimeStaticAssetObject } from "../../src/world-objects/runtimeObjectRegistry";
+import { type RuntimeCreatureObject } from "../../src/world-objects/runtimeObjectBase";
 import type { GeodesicCannonObject } from "../../src/world-objects/geodesic/objects";
 import { createSegment } from "../fixtures/world-objects/geodesic";
 import { userObjectClass } from "../../src/world-objects/library";

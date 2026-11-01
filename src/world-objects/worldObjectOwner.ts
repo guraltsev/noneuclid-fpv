@@ -7,12 +7,9 @@
 import type { CompiledCellComplex } from "../cell-complex/compileCellComplex";
 import { depenetrateDynamicObject } from "../movement/depenetrateDynamicObject";
 import type { RigidTransform3 } from "../math/rigidTransform3";
-import { transformPoseWithCellMaps, type CellDeformationMap } from "../runtime/worldGeometryDeformations";
-import {
-  runtimeObjectToDynamicObjectState,
-  type RuntimeObjectRegistry,
-  type RuntimeWorldObject,
-} from "./runtimeObjectRegistry";
+import { transformPoseWithCellMaps, type CellDeformationMap } from "../cell-complex/worldGeometryDeformations";
+import { type RuntimeObjectRegistry, type RuntimeWorldObject } from "./runtimeObjectRegistry";
+import { runtimeObjectToDynamicObjectState } from "./runtimeObjectBase";
 
 /**
  * The only authority on the pose of one object. Implemented by creatures, the marmot and `PlainWorldObject`.

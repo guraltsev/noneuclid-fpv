@@ -4,7 +4,7 @@
  */
 import { type PortalPathTablesByRootCell } from "../../cell-complex/portalPaths";
 import { type StaticPortalPathCullResult } from "../../cell-complex/staticPortalPathCull";
-import { type DebugLevelId } from "../../glue/debugLevels";
+import { type DebugLevelId } from "../../diagnostics/debugLevels";
 import { type DebugOptionId } from "../../glue/debugOptions";
 
 /** Prints which portal-overlay console commands are usable; portalPathDebugActive indicates whether the overlay helpers were installed. */

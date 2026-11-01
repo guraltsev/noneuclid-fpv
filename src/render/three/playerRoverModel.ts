@@ -10,7 +10,7 @@
 import * as THREE from "three";
 import { yawRigidTransform3 } from "../../math/rigidTransform3";
 import type { PlayerPose } from "../../movement/playerPose";
-import type { PreparedWorldAssets } from "./preloadWorldAssets";
+import type { PreparedWorldAssets } from "./preparedWorldAssets";
 import {
   collectRuntimeObjectRenderSourceMeshes,
   type RuntimeObjectRenderRecord,

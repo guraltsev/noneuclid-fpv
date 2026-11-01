@@ -3,7 +3,7 @@
  * DebugSettingsSupport lists the options the renderer can toggle live; by default all current options are runtime-mutable.
  */
 import type { DebugOptionId } from "./debugOptions";
-import type { DebugLevelId } from "./debugLevels";
+import type { DebugLevelId } from "../diagnostics/debugLevels";
 import type { PortalPanelModeId } from "./portalPanelMode";
 
 /** Debug configuration: console level, portal panel mode and enabled debug options. */

@@ -11,13 +11,10 @@ import { Component, Container, Image, Text } from "@pmndrs/uikit";
 import { ArrowLeft, ChevronLeft, ChevronRight, House, RotateCw, Settings, Trash2, X } from "@pmndrs/uikit-lucide";
 import { publicAssetUrl } from "../../glue/assetUrls";
 import type { PortalPanelModeId } from "../../glue/portalPanelMode";
-import type {
-  RuntimeDebugOverlayItemId,
-  RuntimeMenuConsoleLogLevelId,
-  RuntimeToolId,
-} from "../../runtime/runtimeMenuState";
+import type { RuntimeMenuConsoleLogLevelId } from "../../runtime/runtimeMenuState";
+import type { RuntimeDebugOverlayItemId, RuntimeToolId } from "../../glue/toolIds";
 import type { PaletteDefinition, PaletteHeaderAction } from "../../ui/paletteDefinition";
-import type { PlacedFlagType } from "../../world-objects/placedFlags";
+import type { PlacedFlagType } from "../../world-objects/toolObjects";
 import { resolveVrPaletteHeaderActions } from "./vrPaletteHeaderActions";
 import {
   scenePalettePanelHeightPixels,

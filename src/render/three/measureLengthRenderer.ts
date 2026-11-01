@@ -7,10 +7,8 @@
  * and dispose the old GPU resources (geometries, materials, textures); the caller attaches `root` to the cell's scene node.
  */
 import * as THREE from "three";
-import {
-  formatMeasuredGeodesicLengthLabel,
-  type MeasuredGeodesicLengthObject,
-} from "../../world-objects/measureLengthTool";
+import { formatMeasuredGeodesicLengthLabel } from "../../world-objects/measureLengthTool";
+import { type MeasuredGeodesicLengthObject } from "../../world-objects/toolObjects";
 import { applyWorldRigidTransform } from "./worldAxes";
 import { createWorldResultBadge } from "./worldResultBadge";
 import { disposeObject3DWithTextures } from "./runtimeSceneUtils";

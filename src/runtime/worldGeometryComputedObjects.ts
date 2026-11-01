@@ -8,14 +8,10 @@ import type { Vec3 } from "../math/vec3";
 import { pruneMissingGeodesicIntersectionObjects } from "../world-objects/geodesic/intersections";
 import { isGeodesicLocked, removeGeodesic } from "../world-objects/geodesic/lifecycle";
 import { rebuildConnectedGeodesicBetweenEmitters } from "../world-objects/geodesic/cannon";
-import {
-  refreshMeasuredGeodesicLengthObject,
-  type MeasuredGeodesicLengthObject,
-} from "../world-objects/measureLengthTool";
-import {
-  refreshProtractorAngleObject,
-  type ProtractorAngleObject,
-} from "../world-objects/protractorTool";
+import { refreshMeasuredGeodesicLengthObject } from "../world-objects/measureLengthTool";
+import { type MeasuredGeodesicLengthObject } from "../world-objects/toolObjects";
+import { refreshProtractorAngleObject } from "../world-objects/protractorTool";
+import { type ProtractorAngleObject } from "../world-objects/toolObjects";
 import type { RuntimeObjectRegistry, RuntimeWorldObject } from "../world-objects/runtimeObjectRegistry";
 
 /**

@@ -5,8 +5,8 @@
  * Lifecycle: the creator must call dispose() to remove the element.
  */
 import { publicAssetUrl } from "../../glue/assetUrls";
-import type { RuntimeToolId } from "../../runtime/runtimeMenuState";
-import type { PlacedFlagType } from "../../world-objects/placedFlags";
+import type { RuntimeToolId } from "../../glue/toolIds";
+import type { PlacedFlagType } from "../../world-objects/toolObjects";
 
 // Sign icon image per flag type.
 const signIconSources: Record<PlacedFlagType, string> = {

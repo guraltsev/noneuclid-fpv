@@ -18,7 +18,7 @@ import {
 } from "../../world-objects/geodesic/objects";
 import { yawRigidTransform3 } from "../../math/rigidTransform3";
 import { collectRuntimeObjectRenderSourceMeshes, type RuntimeObjectRenderRecord, type RuntimeObjectRenderSourceMesh } from "./runtimeObjectRenderRecords";
-import type { PreparedWorldAssets } from "./preloadWorldAssets";
+import type { PreparedWorldAssets } from "./preparedWorldAssets";
 import { rigidTransformToThreeMatrix } from "./worldAxes";
 
 /** Archetype of an ordinary (unconnected) geodesic segment ribbon. */

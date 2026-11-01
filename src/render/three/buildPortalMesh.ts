@@ -10,7 +10,7 @@
 
 import * as THREE from "three";
 import { createPortalWallMaterial } from "./portalWallTexture";
-import type { PreparedWorldAssets } from "./preloadWorldAssets";
+import type { PreparedWorldAssets } from "./preparedWorldAssets";
 
 /** Geometry and options for one portal wall: side endpoints (cell-local xy, meters), height and assets. */
 export interface PortalWallMeshSpec {

@@ -2,10 +2,10 @@
  * Pure functions turning XR thumbstick and head-tracking input into player-local motion requests.
  * Output frames are player-local (x right, y forward, z up); distances in meters, angles in radians, rates scaled by frame `deltaSeconds`.
  * Stick conventions follow WebXR gamepads: pushing up gives negative y, so forward motion negates it; pushing right yields a clockwise (negative yaw) turn.
- * Tunables come from `VrComfortOptions` (see vrComfort); callers combine these results into a `RuntimeInputFrame` (xrControls, xrPlayerRig).
+ * Tunables come from `VrComfortOptions` (see glue/vrComfortOptions); callers combine these results into a `RuntimeInputFrame` (xrControls, xrPlayerRig).
  */
-import { vec3, type Vec3 } from "../../math/vec3";
-import { defaultVrComfortOptions, type VrComfortOptions } from "./vrComfort";
+import { vec3, type Vec3 } from "../math/vec3";
+import { defaultVrComfortOptions, type VrComfortOptions } from "../glue/vrComfortOptions";
 
 /**
  * A thumbstick position with each axis in [-1, 1] (x right, y down by gamepad convention).

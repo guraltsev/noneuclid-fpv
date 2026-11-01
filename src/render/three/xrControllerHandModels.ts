@@ -9,8 +9,8 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { clone as cloneSkeleton } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { publicAssetUrl } from "../../glue/assetUrls";
-import type { RuntimeToolId } from "../../runtime/runtimeMenuState";
-import type { PlacedFlagType } from "../../world-objects/placedFlags";
+import type { RuntimeToolId } from "../../glue/toolIds";
+import type { PlacedFlagType } from "../../world-objects/toolObjects";
 import { xrRigidTransformLocalMatrix } from "./xrPlayerRig";
 
 /**

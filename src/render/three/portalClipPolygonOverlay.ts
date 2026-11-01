@@ -6,7 +6,7 @@
  * allows for that path. The overlay is DOM-only and touched only when the debug option is on.
  */
 
-import type { Vec2 } from "./visiblePortalPaths";
+import type { Vec2 } from "../../visibility/visiblePortalPaths";
 
 /** One polygon to draw: its label, CSS color and NDC vertices. */
 export interface PortalClipPolygonOverlayEntry {

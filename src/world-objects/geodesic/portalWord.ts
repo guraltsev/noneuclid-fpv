@@ -9,6 +9,7 @@ import type {
   GeodesicPortalTraversal,
   TraceGeodesicSegmentResult,
 } from "./objects";
+import { reduceAdjacentInversePortalTraversals } from "./objects";
 
 /**
  * Returns the inverse portal word: reversed order, with each traversal's source and target swapped.
@@ -154,30 +155,4 @@ export function applyAnchorCrossingTraversals(input: {
     interval = { ...interval, portalWord: word };
   }
   return word;
-}
-
-/** Freely reduces a portal word by cancelling adjacent inverse traversals. */
-export function reduceAdjacentInversePortalTraversals(
-  word: readonly GeodesicPortalTraversal[],
-): readonly GeodesicPortalTraversal[] {
-  const reduced: GeodesicPortalTraversal[] = [];
-  for (const traversal of word) {
-    const previous = reduced.at(-1);
-    if (previous && portalTraversalsAreInverse(previous, traversal)) {
-      reduced.pop();
-      continue;
-    }
-    reduced.push(traversal);
-  }
-  return reduced;
-}
-
-function portalTraversalsAreInverse(
-  left: GeodesicPortalTraversal,
-  right: GeodesicPortalTraversal,
-): boolean {
-  return left.sourceCellId === right.targetCellId &&
-    left.sourcePortalId === right.targetPortalId &&
-    left.targetCellId === right.sourceCellId &&
-    left.targetPortalId === right.sourcePortalId;
 }

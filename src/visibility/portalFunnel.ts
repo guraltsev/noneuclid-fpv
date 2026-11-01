@@ -14,9 +14,9 @@
  * and view matrices. The traversal-facing functions work on caller-owned `Float64Array`s and allocate nothing.
  */
 
-import type { Vec2xy } from "../../math/polygons";
-import type { Vec3 } from "../../math/vec3";
-import type { OrientedPortalSegment } from "../../cell-complex/orientedPortal";
+import type { Vec2xy } from "../math/polygons";
+import type { Vec3 } from "../math/vec3";
+import type { OrientedPortalSegment } from "../cell-complex/orientedPortal";
 
 /** Plan directions from the eye: all directions, or the ccw sector from `right` to `left` (angle in [0, pi]). Unit vectors. */
 export type DirectionSector =

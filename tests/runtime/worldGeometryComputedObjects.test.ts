@@ -20,14 +20,8 @@ import { getGeodesicSegments, getGeodesicTail } from "../../src/world-objects/ge
 import { isGeodesicLocked } from "../../src/world-objects/geodesic/lifecycle";
 import { shootGeodesic } from "../../src/world-objects/geodesic/cannon";
 import { createMeasuredGeodesicLengthObject } from "../../src/world-objects/measureLengthTool";
-import {
-  createProtractorAngleObject,
-  protractorAngleRadiusMeters,
-  resolveProtractorCenterSelection,
-  resolveProtractorDirectedGeodesicSelection,
-  resolveProtractorEmitterGeodesicSelection,
-  type ProtractorAngleObject,
-} from "../../src/world-objects/protractorTool";
+import { createProtractorAngleObject, protractorAngleRadiusMeters, resolveProtractorCenterSelection, resolveProtractorDirectedGeodesicSelection, resolveProtractorEmitterGeodesicSelection } from "../../src/world-objects/protractorTool";
+import { type ProtractorAngleObject } from "../../src/world-objects/toolObjects";
 import {
   createRuntimeObjectRegistry,
   type RuntimeWorldObject,

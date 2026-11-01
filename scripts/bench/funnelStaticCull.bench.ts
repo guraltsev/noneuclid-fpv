@@ -12,7 +12,8 @@ import { cube, dodecahedron, genus2Torus, icosahedron, torusModuli } from "../..
 import { compileCellComplex, type CompiledCellComplex } from "../../src/cell-complex/compileCellComplex";
 import { buildPortalPathTables, type PortalPathTable } from "../../src/cell-complex/portalPaths";
 import { buildStaticallyCulledPortalPathTables } from "../../src/cell-complex/staticPortalPathCull";
-import { computeVisiblePortalPaths, defaultMinPortalScreenAreaPixels } from "../../src/render/three/visiblePortalPaths";
+import { defaultMinPortalScreenAreaPixels } from "../../src/visibility/visiblePortalPaths";
+import { computeVisiblePortalPaths } from "../../src/render/three/visiblePortalPaths";
 import { worldPointToThree } from "../../src/render/three/worldAxes";
 import { mulberry32 } from "../../tests/support/portalWordWitness";
 

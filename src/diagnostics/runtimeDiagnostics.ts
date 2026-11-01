@@ -7,8 +7,8 @@
  * console (info only at verbose debug levels, warnings always). Times are `performance.now()` milliseconds; recorded
  * frame timings are in milliseconds. Callers always go through {@link runtimeDiagnostics}, so they need no enabled checks.
  */
-import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex";
-import { isVerboseDebugLevel, type DebugLevelId } from "../../glue/debugLevels";
+import type { CompiledCellComplex } from "../cell-complex/compileCellComplex";
+import { isVerboseDebugLevel, type DebugLevelId } from "./debugLevels";
 
 // 'preload' = global asset fetch before the world starts; 'instance-load' = per-object clone/placement in a cell.
 type AssetPhase = "preload" | "instance-load";

@@ -13,8 +13,9 @@ import { describe, expect, it } from "vitest";
 import { torus } from "../../src/authoring/exampleWorlds";
 import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
 import { transformDirection3 } from "../../src/math/rigidTransform3";
-import { createGeodesicMarmot, createGeodesicMarmotRuntime, createGeodesicMarmotRuntimeObject } from "../../src/world-objects/geodesicMarmot";
-import type { PreparedWorldAssets } from "../../src/render/three/preloadWorldAssets";
+import { createGeodesicMarmot, createGeodesicMarmotRuntimeObject } from "../../src/world-objects/geodesicMarmot";
+import { createGeodesicMarmotRuntime } from "../../src/render/three/creatures/geodesicMarmotView";
+import type { PreparedWorldAssets } from "../../src/render/three/preparedWorldAssets";
 
 describe("createGeodesicMarmotRuntime", () => {
   it("uses anchor crossing semantics and reparents on the same crossing frame", () => {

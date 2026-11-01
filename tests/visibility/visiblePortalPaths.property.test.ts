@@ -1,5 +1,5 @@
 /**
- * Visible portal paths (src/render/three/visiblePortalPaths.ts), property: `computeVisiblePortalPaths` never gives
+ * Visible portal paths (src/visibility/visiblePortalPaths.ts), property: `computeVisiblePortalPaths` never gives
  * a false negative. For random cameras and random screen points in several example worlds, the ray a screen point
  * casts is walked through the glued cells directly (bypassing the renderer); every prefix of the word it crosses
  * must be a path `computeVisiblePortalPaths` returned, and the ray must lie inside that path's four clip planes
@@ -12,7 +12,7 @@ import { compileCellComplex, type CompiledCellComplex } from "../../src/cell-com
 import type { PortalPathTable } from "../../src/cell-complex/portalPaths";
 import { walkDevelopedSegment } from "../../src/cell-complex/segmentWalk";
 import { buildStaticallyCulledPortalPathTables } from "../../src/cell-complex/staticPortalPathCull";
-import { computeVisiblePortalPaths } from "../../src/render/three/visiblePortalPaths";
+import { computeVisiblePortalPaths } from "../support/visibilityHarness";
 import { threePointToWorld } from "../../src/render/three/worldAxes";
 import { mulberry32, wordSignature } from "../support/portalWordWitness";
 import { createRandomCamera } from "../support/cameras";

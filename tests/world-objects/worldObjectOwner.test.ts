@@ -11,15 +11,13 @@
  */
 import { describe, expect, it } from "vitest";
 import { identityRigidTransform3, yawRigidTransform3 } from "../../src/math/rigidTransform3";
-import type { CellDeformationMap } from "../../src/runtime/worldGeometryDeformations";
+import type { CellDeformationMap } from "../../src/cell-complex/worldGeometryDeformations";
 import {
   createObjectHost,
   createPlainWorldObject,
 } from "../../src/world-objects/worldObjectOwner";
-import {
-  createRuntimeObjectRegistry,
-  type RuntimeCreatureObject,
-} from "../../src/world-objects/runtimeObjectRegistry";
+import { createRuntimeObjectRegistry } from "../../src/world-objects/runtimeObjectRegistry";
+import { type RuntimeCreatureObject } from "../../src/world-objects/runtimeObjectBase";
 
 function house(id: string, cellId: string): RuntimeCreatureObject {
   return { id, kind: "geo-mouse", cellId, localPose: identityRigidTransform3, portalRenderable: false };

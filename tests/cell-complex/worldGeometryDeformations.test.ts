@@ -12,12 +12,12 @@ import { describe, expect, it } from "vitest";
 import { torus } from "../../src/authoring/exampleWorlds";
 import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
 import { torusModuli } from "../../src/authoring/exampleWorlds";
-import { inferTorusSkewState } from "../../src/runtime/deformations/torusSkewDeformation";
+import { inferTorusSkewState } from "../../src/cell-complex/deformations/torusSkewDeformation";
 import {
   applyPrismBaseReplacements,
   deformationStatesEqual,
   validateTopologyPreservingSnapshot,
-} from "../../src/runtime/worldGeometryDeformations";
+} from "../../src/cell-complex/worldGeometryDeformations";
 import {
   applyWorldDeformationToSpec,
   createDefaultWorldDeformationFamilyRegistry,

@@ -12,13 +12,14 @@ import { torus } from "../../src/authoring/exampleWorlds";
 import type { CellComplexSpec } from "../../src/cell-complex/specs";
 import { yawRigidTransform3 } from "../../src/math/rigidTransform3";
 import { vec3 } from "../../src/math/vec3";
-import type { PreparedWorldAssets } from "../../src/render/three/preloadWorldAssets";
-import { createTorusSkewCellDeformationMaps, createTorusSkewDeformationFamily } from "../../src/runtime/deformations/torusSkewDeformation";
-import { transformPoseWithCellMaps } from "../../src/runtime/worldGeometryDeformations";
+import type { PreparedWorldAssets } from "../../src/render/three/preparedWorldAssets";
+import { createTorusSkewCellDeformationMaps, createTorusSkewDeformationFamily } from "../../src/cell-complex/deformations/torusSkewDeformation";
+import { transformPoseWithCellMaps } from "../../src/cell-complex/worldGeometryDeformations";
 import { createPlacedFlagObject } from "../../src/world-objects/placedFlags";
 import { createRuntimeObjectRegistry, createRuntimeStaticAssetObject } from "../../src/world-objects/runtimeObjectRegistry";
 import { createObjectHost, createPlainWorldObject } from "../../src/world-objects/worldObjectOwner";
-import { createSimpleGeoCreature, createSimpleGeoCreatureRuntime } from "../../src/world-objects/simpleGeoCreature";
+import { createSimpleGeoCreature } from "../../src/world-objects/simpleGeoCreature";
+import { createSimpleGeoCreatureRuntime } from "../../src/render/three/creatures/simpleGeoCreatureView";
 
 describe("world geometry runtime transforms", () => {
   it("recomputes authored starting position from the deformed spec", () => {

@@ -7,7 +7,7 @@
  * Lifecycle: listeners are installed on window/document/canvas at creation; the owner must call dispose() to remove them.
  */
 import { vec3 } from "../../math/vec3";
-import type { RuntimeInputFrame } from "./renderState";
+import type { RuntimeInputFrame } from "../../interaction/inputFrame";
 
 /**
  * Input accumulated since the previous consumeFrame call, ready to be applied for one frame.

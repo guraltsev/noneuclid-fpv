@@ -7,13 +7,10 @@
  */
 import * as THREE from "three";
 import type { PortalPanelModeId } from "../../glue/portalPanelMode";
-import type {
-  RuntimeDebugOverlayItemId,
-  RuntimeMenuConsoleLogLevelId,
-  RuntimeToolId,
-} from "../../runtime/runtimeMenuState";
+import type { RuntimeMenuConsoleLogLevelId } from "../../runtime/runtimeMenuState";
+import type { RuntimeDebugOverlayItemId, RuntimeToolId } from "../../glue/toolIds";
 import type { PaletteDefinition } from "../../ui/paletteDefinition";
-import type { PlacedFlagType } from "../../world-objects/placedFlags";
+import type { PlacedFlagType } from "../../world-objects/toolObjects";
 import { resolvePaletteTooltipLabel } from "../../ui/paletteTooltips";
 import { roundRect } from "./canvasDrawing";
 import { disposeObject3DWithTextures } from "./runtimeSceneUtils";

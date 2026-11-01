@@ -4,7 +4,8 @@
  * While open it listens for Escape in the capture phase on document, swallows the event and closes. The root element is styled by the desktop-flag-editor CSS classes.
  * Lifecycle: the creator must call dispose() to remove the element and any listener left behind.
  */
-import { placedFlagFontColors, placedFlagMaxMessageLength, type PlacedFlagObject } from "../../world-objects/placedFlags";
+import { placedFlagFontColors, placedFlagMaxMessageLength } from "../../world-objects/placedFlags";
+import { type PlacedFlagObject } from "../../world-objects/toolObjects";
 
 /** Handle to the flag editor created by {@link createDesktopFlagEditor}. */
 export interface DesktopFlagEditor {

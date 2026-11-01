@@ -70,8 +70,7 @@
 import type { SimpleCollisionCylinder } from "../../movement/dynamicObject";
 import { identityRigidTransform3, yawRigidTransform3, type RigidTransform3 } from "../../math/rigidTransform3";
 import { addVec3, normalizeVec3, scaleVec3, type Vec3 } from "../../math/vec3";
-import type { RuntimeWorldObject, RuntimeWorldObjectBase } from "../runtimeObjectRegistry";
-import { reduceAdjacentInversePortalTraversals } from "./portalWord";
+import type { RuntimeWorldObjectBase } from "../runtimeObjectBase";
 
 // ---- Runtime object shapes ----
 
@@ -458,11 +457,6 @@ export function isFreeGeodesicEndObject(object: { readonly kind: string }): obje
   return object.kind === "free-geodesic-end";
 }
 
-/** Type guard: true when the object is a `GeodesicCornerObject`. */
-export function isGeodesicCornerObject(object: RuntimeWorldObject | undefined): object is GeodesicCornerObject {
-  return object?.kind === "geodesic-corner";
-}
-
 /**
  * Builds a corner anchor at `point` (cell-local meters, z = beam height) in cell `cellId`, wrapping the disk `junctionId` on `side`.
  *
@@ -616,19 +610,6 @@ export function getGeodesicCannonEmitterPoint(cannon: GeodesicCannonObject): Vec
   };
 }
 
-/** True when the object may be the anchor of a geodesic interval endpoint. */
-export function canObjectAttachGeodesics(object: RuntimeWorldObject | undefined): object is RuntimeWorldObject {
-  return object !== undefined &&
-    (object.kind === "geodesic-cannon" || ("canAttachGeodesics" in object && object.canAttachGeodesics === true));
-}
-
-/** Beam-height point of an anchor object in its cell frame. */
-export function getAnchorBeamPoint(anchor: RuntimeWorldObject): Vec3 {
-  return anchor.kind === "geodesic-cannon"
-    ? getGeodesicCannonEmitterPoint(anchor)
-    : anchor.localPose.translation;
-}
-
 /** The other endpoint role: `start` for `end` and `end` for `start`. */
 export function getOppositeEndRole(role: GeodesicEndRole): GeodesicEndRole {
   return role === "start" ? "end" : "start";
@@ -658,4 +639,30 @@ export function sanitizeYaw(yawRadians: number): number {
   }
 
   return Math.atan2(Math.sin(yawRadians), Math.cos(yawRadians));
+}
+
+/** Freely reduces a portal word by cancelling adjacent inverse traversals. */
+export function reduceAdjacentInversePortalTraversals(
+  word: readonly GeodesicPortalTraversal[],
+): readonly GeodesicPortalTraversal[] {
+  const reduced: GeodesicPortalTraversal[] = [];
+  for (const traversal of word) {
+    const previous = reduced.at(-1);
+    if (previous && portalTraversalsAreInverse(previous, traversal)) {
+      reduced.pop();
+      continue;
+    }
+    reduced.push(traversal);
+  }
+  return reduced;
+}
+
+function portalTraversalsAreInverse(
+  left: GeodesicPortalTraversal,
+  right: GeodesicPortalTraversal,
+): boolean {
+  return left.sourceCellId === right.targetCellId &&
+    left.sourcePortalId === right.targetPortalId &&
+    left.targetCellId === right.sourceCellId &&
+    left.targetPortalId === right.sourcePortalId;
 }

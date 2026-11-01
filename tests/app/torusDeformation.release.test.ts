@@ -12,7 +12,7 @@
  */
 import { afterEach, describe, expect, it } from "vitest";
 import type { LiveGeometryDebugState } from "../../src/runtime/worldGeometrySession";
-import type { WorldDeformationState } from "../../src/runtime/worldGeometryDeformations";
+import type { WorldDeformationState } from "../../src/cell-complex/worldGeometryDeformations";
 import { openApp, type ScenarioApi, type ScenarioApp } from "../support/scenario/openApp";
 
 function skewXMetersOf(state: WorldDeformationState): number {

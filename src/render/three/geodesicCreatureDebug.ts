@@ -10,9 +10,10 @@
 import * as THREE from "three";
 import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex";
 import { getDynamicObjectCollisionBounds, signedDistanceToSide, testCellCollision } from "../../movement/collision";
-import { runtimeObjectToDynamicObjectState, type RuntimeObjectRegistry } from "../../world-objects/runtimeObjectRegistry";
-import type { GeodesicMarmotRuntime } from "../../world-objects/geodesicMarmot";
-import type { SimpleGeoCreatureRuntime } from "../../world-objects/simpleGeoCreature";
+import { type RuntimeObjectRegistry } from "../../world-objects/runtimeObjectRegistry";
+import { runtimeObjectToDynamicObjectState } from "../../world-objects/runtimeObjectBase";
+import type { GeodesicMarmotRuntime } from "./creatures/geodesicMarmotView";
+import type { SimpleGeoCreatureRuntime } from "./creatures/simpleGeoCreatureView";
 import { worldPointToThree } from "./worldAxes";
 
 /** Any creature runtime that exposes a Three.js `root` plus `objectId` and `cellId`. */
