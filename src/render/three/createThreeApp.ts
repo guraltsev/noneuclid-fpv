@@ -79,7 +79,7 @@ import { DEFAULT_PLAYER_EYE_HEIGHT_METERS } from "../../movement/playerBody";
 import { type PlayerPose, playerPoseToDynamicObject } from "../../movement/playerPose";
 import { createAppSession, initialObjectIdSerials } from "../../runtime/appSession";
 import { applyRuntimeCommand } from "../../runtime/applyRuntimeCommand";
-import { type RuntimeCommand, type RuntimeEffect } from "../../runtime/runtimeCommands";
+import { type RuntimeCommand } from "../../runtime/runtimeCommands";
 import { createDebugSettingsFromRuntimeMenuState, createRuntimeMenuState } from "../../runtime/runtimeMenuState";
 import { type RuntimeDebugOverlayItemId } from "../../glue/toolIds";
 import {
@@ -103,8 +103,6 @@ import { createAimCrossMarker } from "./aimCrossMarker";
 import { createAimFeedback } from "./aimFeedback";
 import { createAimInteraction } from "./aimInteraction";
 import {
-  GeometryDebugHelpers,
-  WindowWithGeometryDebugHelpers,
   installGeneralDebugHelpers,
   uninstallGeneralDebugHelpers,
   uninstallGeometryDebugHelpers,
@@ -116,6 +114,8 @@ import { createGeometryCommit } from "./geometryCommit";
 import { createDebugOverlay } from "./debugOverlay";
 import { createDebugVisualization } from "./debugVisualization";
 import { createDesktopControls } from "./desktopControls";
+import { createGeometryDebugHelpers } from "./geometryDebugHelpers";
+import { createRuntimeEffects } from "./runtimeEffects";
 import { createDesktopInputHandlers } from "./desktopInputHandlers";
 import { createDesktopScenePaletteInput } from "./desktopScenePaletteInput";
 import {
@@ -179,6 +179,7 @@ import {
   updateStylizedSceneLighting,
 } from "./sceneLighting";
 import { createScenePaletteController } from "./scenePaletteController";
+import { createScenePaletteCommands } from "./scenePaletteCommands";
 import { createToolObjectRuntimes } from "./toolObjectRuntimes";
 import { createUnderCellInfinityFloor } from "./underCellFloor";
 import { VisiblePortalPathOptions, defaultMinPortalScreenAreaPixels } from "../../visibility/visiblePortalPaths";
@@ -354,7 +355,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     protractorToolState: {},
     objectIdSerials: initialObjectIdSerials,
   });
-  let reloadConfirmationTimeout: number | undefined;
   // Disposal bookkeeping: `disposed` makes dispose() idempotent.
   let disposed = false;
   // Frame error containment (see the module header). `frameDrawn` tells recovery whether the failed frame
@@ -409,123 +409,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     scene,
     getCamera: () => camera,
     session,
-    onOpenRequested() {
-      dispatchRuntimeCommand({ kind: "open-menu" });
-    },
-    onCloseRequested() {
-      dispatchRuntimeCommand({ kind: "cancel-menu-and-tool" });
-    },
-    onShowSettingsRequested() {
-      dispatchRuntimeCommand({ kind: "show-settings" });
-    },
-    onShowMainRequested() {
-      dispatchRuntimeCommand({ kind: "show-main-page" });
-    },
-    onWorldSelected(worldId) {
-      dispatchRuntimeCommand({ kind: "select-world", worldId });
-    },
-    onConfigSelected(configName) {
-      dispatchRuntimeCommand({ kind: "select-config", configName });
-    },
-    onReloadRequested() {
-      dispatchRuntimeCommand({ kind: "press-reload", nowMs: Date.now(), windowMs: reloadConfirmationWindowMs });
-    },
-    onHomeRequested() {
-      dispatchRuntimeCommand({ kind: "go-home" });
-    },
-    onDebugEnabledChanged(enabled) {
-      dispatchRuntimeCommand({ kind: "set-debug-enabled", enabled });
-    },
-    onDebugSettingsRequested() {
-      dispatchRuntimeCommand({ kind: "show-debug-settings" });
-    },
-    onConsoleLogLevelSelected(level) {
-      dispatchRuntimeCommand({ kind: "set-console-log-level", level });
-    },
-    onDebugOverlayToggled(enabled) {
-      dispatchRuntimeCommand({ kind: "set-debug-overlay", enabled });
-    },
-    onDebugOverlayItemToggled(itemId, enabled) {
-      dispatchRuntimeCommand({ kind: "toggle-debug-overlay-item", itemId, enabled });
-    },
-    onAntiNauseaModeToggled(enabled) {
-      dispatchRuntimeCommand({ kind: "set-anti-nausea-mode", enabled });
-    },
-    onPortalPanelModeSelected(mode) {
-      dispatchRuntimeCommand({ kind: "set-portal-panel-mode", mode });
-    },
-    onPortalInspectionToggled(enabled) {
-      dispatchRuntimeCommand({ kind: "set-portal-inspection", enabled });
-    },
-    onCollisionGeometryWireframesToggled(enabled) {
-      dispatchRuntimeCommand({ kind: "set-collision-geometry-wireframes", enabled });
-    },
-    onAimCollisionOutlinesToggled(enabled) {
-      dispatchRuntimeCommand({ kind: "set-aim-collision-outlines", enabled });
-    },
-    onCopyUrlWithOptionsRequested() {
-      dispatchRuntimeCommand({ kind: "copy-url-with-options" });
-    },
-    onToolSelected(toolId) {
-      dispatchRuntimeCommand({ kind: "select-tool", toolId });
-    },
-    onPlaceFlagOptionsRequested() {
-      dispatchRuntimeCommand({ kind: "show-place-flag-options" });
-    },
-    onPlaceFlagTypeSelected(flagType) {
-      dispatchRuntimeCommand({ kind: "choose-place-flag-type", flagType });
-    },
-    onGeodesicCannonAddRequested(cannonId) {
-      dispatchRuntimeCommand({ kind: "add-geodesic-to-cannon", cannonId });
-    },
-    onGeodesicCannonCarryRequested(cannonId) {
-      dispatchRuntimeCommand({ kind: "start-cannon-carry", cannonId });
-    },
-    onGeodesicCannonTieAndDetachRequested(cannonId) {
-      dispatchRuntimeCommand({ kind: "start-cannon-tie-and-detach", cannonId });
-    },
-    onGeodesicCannonRotateRequested(cannonId, geodesicId) {
-      dispatchRuntimeCommand({ kind: "start-cannon-rotation", cannonId, geodesicId });
-    },
-    onGeodesicCannonAimRequested(cannonId, geodesicId) {
-      dispatchRuntimeCommand({ kind: "start-cannon-aim", cannonId, geodesicId });
-    },
-    onGeodesicCannonDeleteRequested(cannonId, geodesicId) {
-      dispatchRuntimeCommand({ kind: "delete-geodesic-from-cannon", cannonId, geodesicId });
-    },
-    onGeometryComputerStepTargetRequested(computerId, axis, deltaMeters) {
-      dispatchRuntimeCommand({ kind: "step-geometry-computer-target", computerId, axis, deltaMeters });
-    },
-    onGeometryComputerGoRequested(computerId) {
-      dispatchRuntimeCommand({ kind: "start-geometry-computer-deformation", computerId });
-    },
-    onQuestionHelpTutorialRequested() {
-      dispatchRuntimeCommand({ kind: "show-question-tutorial" });
-    },
-    onQuestionHelpGoalRequested() {
-      dispatchRuntimeCommand({ kind: "show-goal" });
-    },
-    onTutorialPreviousRequested() {
-      dispatchRuntimeCommand({ kind: "step-tutorial-page", delta: -1 });
-    },
-    onTutorialNextRequested() {
-      dispatchRuntimeCommand({ kind: "step-tutorial-page", delta: 1 });
-    },
-    onGoalPreviousRequested() {
-      dispatchRuntimeCommand({ kind: "step-goal-page", delta: -1 });
-    },
-    onGoalNextRequested() {
-      dispatchRuntimeCommand({ kind: "step-goal-page", delta: 1 });
-    },
-    onSignKeyboardCharacter(character) {
-      dispatchRuntimeCommand({ kind: "type-sign-character", character });
-    },
-    onSignKeyboardBackspace() {
-      dispatchRuntimeCommand({ kind: "backspace-sign" });
-    },
-    onSignDeleteRequested() {
-      dispatchRuntimeCommand({ kind: "delete-sign" });
-    },
+    ...createScenePaletteCommands({ dispatch: dispatchRuntimeCommand, reloadConfirmationWindowMs }),
   });
 
   // One Three.js group per cell id (cell-local frame), rebuilt by rebuildCellMeshes. Only the group of the
@@ -957,6 +841,33 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     dismissHelpLensFocus: aimFeedback.dismissHelpLensFocus,
   });
 
+  const geometryDebugHelpers = createGeometryDebugHelpers({ session, geometrySession });
+
+  const runtimeEffects = createRuntimeEffects({
+    session,
+    dispatch: dispatchRuntimeCommand,
+    host: options,
+    syncDesktopPalette,
+    syncTieAndDetachSelectionHighlights,
+    clearProtractorToolFeedback,
+    requestRuntimeObjectInstanceSync,
+    applyMenuDebugState,
+    applyMenuComfortState,
+    requestAppRestart: xrSession.requestAppRestart,
+    teleportPlayerHome,
+    addGeodesicToCannon,
+    startGeodesicCannonCarry,
+    startGeodesicCannonTieAndDetach,
+    startGeodesicCannonRotation,
+    startGeodesicCannonAim,
+    deleteGeodesicFromCannon,
+    stepGeometryComputerPendingTarget,
+    startGeometryComputerDeformation,
+    appendEditingSignCharacter,
+    backspaceEditingSignMessage,
+    deleteEditingSign,
+  });
+
   // Initial build: cell groups and archetypes, camera pose, first visibility pass (before any frame runs).
   rebuildCellMeshes();
   applyDesktopCameraPose();
@@ -1006,7 +917,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     setPlayerPose: debugSetPlayerPose,
   });
   installRenderInspectionApi(runtimeObjectInstanceSync.inspection);
-  installGeometryDebugHelpersIfAvailable();
+  geometryDebugHelpers.installIfAvailable();
   setApiNamespace("view", {
     screenshot() {
       if (renderer.xr.isPresenting) {
@@ -1503,57 +1414,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     syncDesktopPalette();
   }
 
-  function installGeometryDebugHelpersIfAvailable(): void {
-    if (geometrySession.state.current.kind !== "torus-skew" && session.get().debugSettings.debugLevel === "off") {
-      uninstallGeometryDebugHelpers();
-      return;
-    }
-
-    const helpers: GeometryDebugHelpers = {
-      SetTorusSkew(skewXMeters) {
-        const current = geometrySession.state.current;
-        if (current.kind !== "torus-skew") {
-          throw new Error("World deformation is not available for the active world.");
-        }
-
-        geometrySession.setTarget({
-          ...current,
-          skewXMeters,
-        });
-      },
-      StepTorusSkew(deltaXMeters) {
-        const state = geometrySession.state;
-        const base = state.target.kind === "torus-skew"
-          ? state.target
-          : state.current.kind === "torus-skew"
-            ? state.current
-            : undefined;
-        if (!base) {
-          throw new Error("World deformation is not available for the active world.");
-        }
-
-        geometrySession.setTarget({
-          ...base,
-          skewXMeters: base.skewXMeters + deltaXMeters,
-        });
-      },
-      Cancel() {
-        geometrySession.cancel();
-      },
-      get state() {
-        return geometrySession.state;
-      },
-    };
-
-    (window as WindowWithGeometryDebugHelpers).noneuclidGeometry = helpers;
-    setApiNamespace("geometry", {
-      setTorusSkew: (m: number) => helpers.SetTorusSkew(m),
-      stepTorusSkew: (dm: number) => helpers.StepTorusSkew(dm),
-      cancel: () => helpers.Cancel(),
-      state: () => helpers.state,
-    });
-  }
-
   // Effect "apply-debug-state": the menu's debug fields changed.
   function applyMenuDebugState(): void {
     syncLaunchOptionsState();
@@ -1591,7 +1451,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       playerPose: debugPlayerPose,
       setPlayerPose: debugSetPlayerPose,
     });
-    installGeometryDebugHelpersIfAvailable();
+    geometryDebugHelpers.installIfAvailable();
     for (const runtime of dynamicObjectRuntimes) {
       runtime.syncParent(cellMeshes);
     }
@@ -1646,10 +1506,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       disposed = true;
       // Disposal order: timers and loop first (no more frames), then listeners, UI/controllers, scene content
       // and GPU resources, debug runtime and helpers, geometry session, and last the renderer and its canvas.
-      if (reloadConfirmationTimeout !== undefined) {
-        window.clearTimeout(reloadConfirmationTimeout);
-        reloadConfirmationTimeout = undefined;
-      }
+      runtimeEffects.dispose();
       renderer.setAnimationLoop(null);
       xrSession.endActiveXrSessionOnDispose();
       window.removeEventListener("resize", onResize);
@@ -1872,101 +1729,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   // The one command path: the reducer changes the session, then the effects run in the order it listed them.
   function dispatchRuntimeCommand(command: RuntimeCommand): void {
     for (const effect of applyRuntimeCommand(session, command)) {
-      runRuntimeEffect(effect);
-    }
-  }
-
-  function runRuntimeEffect(effect: RuntimeEffect): void {
-    switch (effect.kind) {
-      case "sync-palette":
-        syncDesktopPalette();
-        return;
-      case "end-tool-session":
-        dispatchRuntimeCommand({ kind: "set-protractor-tool-state", state: {} });
-        dispatchRuntimeCommand({ kind: "set-cannon-tool-state", state: {} });
-        syncTieAndDetachSelectionHighlights([]);
-        clearProtractorToolFeedback();
-        return;
-      case "switch-tool-session":
-        if (effect.toolId !== "protractor") {
-          dispatchRuntimeCommand({ kind: "set-protractor-tool-state", state: {} });
-          clearProtractorToolFeedback();
-        }
-        if (effect.toolId !== "geodesic-cannon-tie-detach") {
-          syncTieAndDetachSelectionHighlights([]);
-          requestRuntimeObjectInstanceSync();
-          dispatchRuntimeCommand({ kind: "set-cannon-tool-state", state: {
-            ...session.get().cannonToolState,
-            tieAndDetachEndpointSelections: undefined,
-          } });
-        }
-        return;
-      case "sync-object-instances":
-        requestRuntimeObjectInstanceSync();
-        return;
-      case "apply-debug-state":
-        applyMenuDebugState();
-        return;
-      case "apply-comfort-state":
-        applyMenuComfortState();
-        return;
-      case "reload-world":
-        xrSession.requestAppRestart(() => options.onReloadRequested?.());
-        return;
-      case "go-home":
-        teleportPlayerHome();
-        return;
-      case "change-world":
-        xrSession.requestAppRestart(() => options.onWorldChangeRequested?.(effect.worldId));
-        return;
-      case "change-app-config":
-        xrSession.requestAppRestart(() => options.onAppConfigChangeRequested?.(effect.configName));
-        return;
-      case "copy-url-with-options":
-        options.onCopyUrlWithOptionsRequested?.();
-        return;
-      case "arm-reload-confirmation-timer":
-        if (reloadConfirmationTimeout !== undefined) {
-          window.clearTimeout(reloadConfirmationTimeout);
-        }
-        reloadConfirmationTimeout = window.setTimeout(() => {
-          dispatchRuntimeCommand({ kind: "expire-reload-confirmation", nowMs: Date.now() });
-          reloadConfirmationTimeout = undefined;
-        }, effect.windowMs);
-        return;
-      case "add-geodesic-to-cannon":
-        addGeodesicToCannon(effect.cannonId);
-        return;
-      case "start-cannon-carry":
-        startGeodesicCannonCarry(effect.cannonId);
-        return;
-      case "start-cannon-tie-and-detach":
-        startGeodesicCannonTieAndDetach(effect.cannonId);
-        return;
-      case "start-cannon-rotation":
-        startGeodesicCannonRotation(effect.cannonId, effect.geodesicId);
-        return;
-      case "start-cannon-aim":
-        startGeodesicCannonAim(effect.cannonId, effect.geodesicId);
-        return;
-      case "delete-geodesic-from-cannon":
-        deleteGeodesicFromCannon(effect.cannonId, effect.geodesicId);
-        return;
-      case "step-geometry-computer-target":
-        stepGeometryComputerPendingTarget(effect.computerId, effect.axis, effect.deltaMeters);
-        return;
-      case "start-geometry-computer-deformation":
-        startGeometryComputerDeformation(effect.computerId);
-        return;
-      case "type-sign-character":
-        appendEditingSignCharacter(effect.character);
-        return;
-      case "backspace-sign":
-        backspaceEditingSignMessage();
-        return;
-      case "delete-sign":
-        deleteEditingSign();
-        return;
+      runtimeEffects.run(effect);
     }
   }
 

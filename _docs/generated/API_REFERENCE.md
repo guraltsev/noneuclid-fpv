@@ -2115,6 +2115,16 @@ Menu logic for the in-world geometry computer, which edits the torus-skew parame
 | interface | `GeometryComputerMenuDeps` | Dependencies for {@link createGeometryComputerMenu}; createThreeApp#shell supplies the geometry session, the app session and the command path. |
 | function | `createGeometryComputerMenu` | Creates the geometry computer menu actions. |
 
+### `render/three/geometryDebugHelpers.ts`
+
+The `window.noneuclidGeometry` helpers and the `geometry` API namespace that drive the torus-skew deformation by hand.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `GeometryDebugHelpersDeps` | Dependencies of {@link createGeometryDebugHelpers}. |
+| interface | `GeometryDebugHelpersHandle` | Handle to the geometry helpers created by {@link createGeometryDebugHelpers}. |
+| function | `createGeometryDebugHelpers` | Creates the installer of the geometry debug helpers. |
+
 ### `render/three/helpLensRenderer.ts`
 
 Help panel ("help lens") renderer: shows the current contextual help definition either as a DOM panel (desktop) or as a floating textured plane in front of the camera (XR).
@@ -2576,6 +2586,17 @@ Aim-ray value type and pure aim helpers shared by desktop and XR interaction cod
 | function | `getRuntimeObjectInteractionRangeMeters` | Returns the maximum interaction distance in meters for an object: tooltip range, else interactable range, else 2.5. |
 | interface | `FocusedRuntimeObject` | The interactable object the aim ray currently rests on. |
 
+### `render/three/runtimeEffects.ts`
+
+Runs the effects the session reducer lists after a command (`applyRuntimeCommand`), in the order it listed them.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `RuntimeEffectHostCallbacks` | Callbacks the host passed to the app for restarts and URL copying. |
+| interface | `RuntimeEffectsDeps` | Dependencies of {@link createRuntimeEffects}. |
+| interface | `RuntimeEffects` | Handle to the effect runner created by {@link createRuntimeEffects}. |
+| function | `createRuntimeEffects` | Creates the runner of reducer effects. |
+
 ### `render/three/runtimeObjectActions.ts`
 
 Actions the player performs on runtime objects through the aim: placing and editing signs, measuring a geodesic, the protractor, the primary interaction and context menu of the focused object, going home, resetting the world, and the debug pose helpers.
@@ -2688,6 +2709,16 @@ Lighting rig for the stylized (non-physical) look of the scene.
 | function | `createStylizedSceneLighting` | Creates the hemisphere + ambient lights and adds them to `scene`. |
 | function | `updateStylizedSceneLighting` | Per-frame lighting hook; currently a deliberate no-op because the rig does not depend on the camera. |
 | function | `disposeStylizedSceneLighting` | Detaches the lights from `scene` (or from whatever parent they currently have when `scene` is omitted). |
+
+### `render/three/scenePaletteCommands.ts`
+
+What the scene palette's buttons do: one callback per palette action, each dispatching the command that action stands for.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `ScenePaletteCommandsDeps` | Dependencies of {@link createScenePaletteCommands}. |
+| type | `ScenePaletteCommands` | The palette controller's action callbacks. |
+| function | `createScenePaletteCommands` | Creates the palette's action callbacks over `dispatch`. |
 
 ### `render/three/scenePaletteController.ts`
 
