@@ -118,12 +118,27 @@ export function collectPlacedFlagRenderSourceMeshes(
 }
 
 /**
- * Horizontal render footprint radius of an object: the largest horizontal distance (Three x and z) from the object
- * root to any corner of any source mesh's bounding box, expressed in the root's frame. Zero when there are no sources.
- * Calls `updateMatrixWorld(true)` on each source root.
+ * What is drawn of an object (or of one part of it) reaches this far horizontally: a disk in the object's own frame (world axes, z up).
+ * The portal ghosts of the object are decided by this disk and by nothing else, so every drawn part must have one.
  */
-export function computeRenderSourceFootprintRadius(sources: readonly RuntimeObjectRenderSourceMesh[]): number {
-  let radius = 0;
+export interface RenderFootprint {
+  /** Centre of the disk, in the object's own frame: x and y in meters. Not necessarily the object's origin or its collision centre. */
+  readonly center: { readonly x: number; readonly y: number };
+  /** Radius in meters; positive. */
+  readonly radiusMeters: number;
+}
+
+/**
+ * The render footprint of the drawn source meshes: the horizontal bounding box of every corner of every source mesh's bounding box, expressed
+ * in the object root's frame, as a disk around the box centre that holds all of its corners. Returns undefined when there are no sources or
+ * every box is empty (nothing measurable is drawn): the caller must treat that as a failure, never as "no footprint needed".
+ * Converts from Three axes (x, z horizontal) to the object's world axes (x, y = -z). Calls `updateMatrixWorld(true)` on each source root.
+ */
+export function computeRenderSourceFootprint(sources: readonly RuntimeObjectRenderSourceMesh[]): RenderFootprint | undefined {
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minZ = Infinity;
+  let maxZ = -Infinity;
   const corner = new THREE.Vector3();
   const rootInverse = new THREE.Matrix4();
   const rootFromMesh = new THREE.Matrix4();
@@ -149,11 +164,22 @@ export function computeRenderSourceFootprintRadius(sources: readonly RuntimeObje
       for (const y of [box.min.y, box.max.y]) {
         for (const z of [box.min.z, box.max.z]) {
           corner.set(x, y, z).applyMatrix4(rootFromMesh);
-          radius = Math.max(radius, Math.hypot(corner.x, corner.z));
+          minX = Math.min(minX, corner.x);
+          maxX = Math.max(maxX, corner.x);
+          minZ = Math.min(minZ, corner.z);
+          maxZ = Math.max(maxZ, corner.z);
         }
       }
     }
   }
 
-  return radius;
+  if (!(maxX >= minX) || !(maxZ >= minZ)) {
+    return undefined;
+  }
+
+  const radiusMeters = Math.hypot(maxX - minX, maxZ - minZ) / 2;
+
+  return radiusMeters > 0
+    ? { center: { x: (minX + maxX) / 2, y: -((minZ + maxZ) / 2) }, radiusMeters }
+    : undefined;
 }

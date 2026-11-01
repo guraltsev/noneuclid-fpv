@@ -31,11 +31,12 @@ import {
   groupRuntimeObjectRenderRecordsByArchetype,
 } from "./runtimeObjectRenderArchetypes";
 import {
+  type RenderFootprint,
   type RuntimeObjectRenderRecord,
   type RuntimeObjectRenderSourceMesh,
   collectPlacedFlagRenderSourceMeshes,
   collectRuntimeObjectRenderSourceMeshes,
-  computeRenderSourceFootprintRadius,
+  computeRenderSourceFootprint,
   placedFlagModelArchetypeKeyPrefix,
 } from "./runtimeObjectRenderRecords";
 import { isGeodesicRuntimeRenderObject, runtimeObjectArchetypeKeyPrefix } from "./runtimeSceneUtils";
@@ -110,7 +111,7 @@ export function createRuntimeObjectInstanceSync(deps: RuntimeObjectInstanceSyncD
   const footprintCache = new Map<string, {
     readonly first: RuntimeObjectRenderSourceMesh | undefined;
     readonly count: number;
-    readonly radius: number;
+    readonly footprint: RenderFootprint;
   }>();
   const recordCacheByObjectId = new Map<string, CachedObjectRecords>();
   // Source keys last collected per object (key `object:<id>`) and for the rover (`rover`), with the root they came from.
@@ -120,19 +121,28 @@ export function createRuntimeObjectInstanceSync(deps: RuntimeObjectInstanceSyncD
   let archetypeKeysByPrefix = new Map<string, string[]>();
   const stats = { syncs: 0, recordCollections: 0, ghostComputations: 0 };
 
-  function footprintRadius(prefix: string, archetypeKeys: readonly string[]): number {
+  // The render footprint of the parts drawn by `archetypeKeys`, measured from their source meshes (what is drawn, not what collides). An
+  // object part with archetypes but no measurable mesh is an error: a part without a footprint would silently get no portal ghosts.
+  function renderFootprintOf(prefix: string, archetypeKeys: readonly string[]): RenderFootprint {
     const sources = archetypeKeys
       .map((key) => renderSourcesByKey.get(key))
       .filter((source): source is RuntimeObjectRenderSourceMesh => source !== undefined);
     const cached = footprintCache.get(prefix);
 
     if (cached && cached.first === sources[0] && cached.count === sources.length) {
-      return cached.radius;
+      return cached.footprint;
     }
 
-    const radius = computeRenderSourceFootprintRadius(sources);
-    footprintCache.set(prefix, { first: sources[0], count: sources.length, radius });
-    return radius;
+    const footprint = computeRenderSourceFootprint(sources);
+
+    if (!footprint) {
+      throw new Error(
+        `Render footprint missing for "${prefix}": none of its ${archetypeKeys.length} drawn archetypes has a measurable mesh, so its portal ghosts cannot be decided.`,
+      );
+    }
+
+    footprintCache.set(prefix, { first: sources[0], count: sources.length, footprint });
+    return footprint;
   }
 
   function rebuildPrefixIndex(): void {
@@ -293,17 +303,20 @@ export function createRuntimeObjectInstanceSync(deps: RuntimeObjectInstanceSyncD
             world,
             object: { ...runtimeObjectToDynamicObjectState(object), id: placement.objectId, localPose: placement.localPose },
             archetypeKeys: placement.archetypeKeys,
-            footprintRadiusMeters: footprintRadius(archetypeKeyPrefix(placement.archetypeKeys[0]), placement.archetypeKeys),
+            renderFootprint: renderFootprintOf(archetypeKeyPrefix(placement.archetypeKeys[0]), placement.archetypeKeys),
           })
         );
       } else {
         stats.ghostComputations += 1;
-        objectRecords = collectRuntimeObjectRenderRecordsWithPortalGhosts({
-          world,
-          object,
-          archetypeKeys,
-          footprintRadiusMeters: footprintRadius(prefix, archetypeKeys),
-        });
+        // An object whose archetypes are not collected yet draws nothing, so there is nothing to ghost.
+        objectRecords = archetypeKeys.length === 0
+          ? []
+          : collectRuntimeObjectRenderRecordsWithPortalGhosts({
+            world,
+            object,
+            archetypeKeys,
+            renderFootprint: renderFootprintOf(prefix, archetypeKeys),
+          });
       }
 
       recordCacheByObjectId.set(object.id, { object, world, archetypeKeys: [...archetypeKeys], records: objectRecords });

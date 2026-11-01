@@ -13,6 +13,7 @@ import { describe, expect, it } from "vitest";
 import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
 import type { CellComplexSpec } from "../../src/cell-complex/specs";
 import { yawRigidTransform3 } from "../../src/math/rigidTransform3";
+import { simpleCollisionCylinder } from "../../src/movement/dynamicObject";
 import { createGeodesicRuntimeRenderSources } from "../../src/render/three/geodesicCannonRenderer";
 import { createFrameRenderSnapshot } from "../../src/render/three/frameRenderSnapshot";
 import { createRootVisiblePortalPath } from "../../src/render/three/renderPortalInstances";
@@ -145,13 +146,16 @@ function frame() {
   });
 }
 
-function rootFor(object: RuntimeWorldObject): THREE.Object3D {
+/** The drawn model of one object: a small box, `drawnOffsetX` m from the object's origin along its own x axis, or a box with nothing measurable. */
+function rootFor(object: RuntimeWorldObject, drawn: { readonly offsetX?: number; readonly measurable?: boolean } = {}): THREE.Object3D {
   const root = new THREE.Group();
-  root.add(new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.2)));
+  const model = new THREE.Mesh(drawn.measurable === false ? new THREE.BoxGeometry(0, 0.2, 0) : new THREE.BoxGeometry(0.2, 0.2, 0.2));
+  model.position.x = drawn.offsetX ?? 0;
+  root.add(model);
   if (object.kind === "placed-flag") {
     root.children[0].name = "fake-sign-board";
     for (const side of ["front", "back"]) {
-      const plane = new THREE.Mesh(new THREE.PlaneGeometry(0.1, 0.1));
+      const plane = new THREE.Mesh(new THREE.PlaneGeometry(drawn.measurable === false ? 0 : 0.1, drawn.measurable === false ? 0 : 0.1));
       plane.name = `placed-flag-text-plane:${object.id}:${side}`;
       root.add(plane);
     }
@@ -159,14 +163,14 @@ function rootFor(object: RuntimeWorldObject): THREE.Object3D {
   return root;
 }
 
-function setup(objects: RuntimeWorldObject[]) {
+function setup(objects: RuntimeWorldObject[], drawn: Parameters<typeof rootFor>[1] = {}) {
   const world = compileCellComplex(twoRooms());
   const registry = createRuntimeObjectRegistry(objects);
   const geodesicRenderSources = createGeodesicRuntimeRenderSources();
   const renderArchetypesByKey = new Map<string, ReturnType<typeof buildRuntimeObjectRenderArchetype>>();
   const sync = createRuntimeObjectInstanceSync({
     registry,
-    runtimeObjectRootsById: new Map(objects.map((object) => [object.id, rootFor(object)])),
+    runtimeObjectRootsById: new Map(objects.map((object) => [object.id, rootFor(object, drawn)])),
     renderSourcesByKey: new Map<string, RuntimeObjectRenderSourceMesh>(),
     renderArchetypesByKey,
     renderRoot: new THREE.Group(),
@@ -229,6 +233,47 @@ describe("portal ghosts of every kind of runtime object", () => {
       for (const [key, archetype] of bodyArchetypes(renderArchetypesByKey)) {
         expect(archetype.mesh.count, key).toBe(1);
       }
+    });
+  }
+});
+
+/** The kinds whose drawn part is the model of their own root (not a fixed geodesic part), with a collision cylinder the test can size. */
+const modelKinds = ["geodesci-marmot", "geo-mouse", "geo-butterfly", "asset", "placed-flag"] as const;
+
+describe("portal ghosts follow what is drawn, not the collision shape", () => {
+  for (const kind of modelKinds) {
+    const kindCase = kinds[kind] as Extract<KindCase, { object: unknown }>;
+    // Not turned, so that the drawn model's offset along the object's own x axis is an offset along the world x axis, toward the west wall at -1.
+    const at = (x: number) => ({
+      ...kindCase.object("room-b", x, 0),
+      localPose: yawRigidTransform3(0, { x, y: 0, z: 0 }),
+      collision: simpleCollisionCylinder(0.3, 0.2),
+    }) as RuntimeWorldObject;
+
+    it(`ghosts a ${kind} whose drawn model reaches the portal, with the origin 0.3 m clear of it`, () => {
+      const { sync, renderArchetypesByKey } = setup([at(-0.7)], { offsetX: -0.3 });
+
+      sync.sync(frame());
+
+      for (const [key, archetype] of bodyArchetypes(renderArchetypesByKey)) {
+        expect(archetype.mesh.count, key).toBe(2);
+      }
+    });
+
+    it(`draws no ghost of a ${kind} whose collision, not its model, reaches the portal`, () => {
+      const { sync, renderArchetypesByKey } = setup([at(-0.85)], { offsetX: 0.3 });
+
+      sync.sync(frame());
+
+      for (const [key, archetype] of bodyArchetypes(renderArchetypesByKey)) {
+        expect(archetype.mesh.count, key).toBe(1);
+      }
+    });
+
+    it(`fails loudly when the drawn model of a ${kind} has nothing measurable`, () => {
+      const { sync } = setup([at(-0.7)], { measurable: false });
+
+      expect(() => sync.sync(frame())).toThrow(/Render footprint missing/);
     });
   }
 });

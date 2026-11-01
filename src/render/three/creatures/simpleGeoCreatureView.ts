@@ -39,6 +39,21 @@ export interface SimpleGeoCreatureRuntime extends WorldObjectOwner {
 }
 
 /**
+ * Puts a creature's glTF scene in the creature's own frame: the spec's scale, tilts, the half turn that makes the model face forward and the model offset
+ * (world axes to Three.js axes). The one place that decides where the drawn model sits relative to the creature's origin, so what is drawn (and its
+ * render footprint, see `computeRenderSourceFootprint`) can be reproduced without a renderer.
+ */
+export function placeSimpleGeoCreatureModel(scene: THREE.Object3D, objectSpec: SimpleGeoCreatureObjectSpec): void {
+  scene.scale.setScalar(objectSpec.scale ?? 1);
+  scene.rotation.x = objectSpec.forwardTiltRadians ?? 0;
+  scene.rotation.y = Math.PI;
+  scene.rotation.z = objectSpec.sideTiltRadians ?? 0;
+  if (objectSpec.modelOffset) {
+    scene.position.copy(new THREE.Vector3(objectSpec.modelOffset.x, objectSpec.modelOffset.z, -objectSpec.modelOffset.y));
+  }
+}
+
+/**
  * Creates the runtime (three.js model instance, behavior, registry entry) for a creature starting in `startCellId`.
  * Throws if the model was not preloaded in `assets`. Registers the object in `registry` when given and claims ownership of its registry record (see `createSimpleGeoCreatureBehavior`).
  */
@@ -57,13 +72,7 @@ export function createSimpleGeoCreatureRuntime(
   }
 
   prepared.scene.name = `asset:${objectSpec.id}`;
-  prepared.scene.scale.setScalar(objectSpec.scale ?? 1);
-  prepared.scene.rotation.x = objectSpec.forwardTiltRadians ?? 0;
-  prepared.scene.rotation.y = Math.PI;
-  prepared.scene.rotation.z = objectSpec.sideTiltRadians ?? 0;
-  if (objectSpec.modelOffset) {
-    prepared.scene.position.copy(new THREE.Vector3(objectSpec.modelOffset.x, objectSpec.modelOffset.z, -objectSpec.modelOffset.y));
-  }
+  placeSimpleGeoCreatureModel(prepared.scene, objectSpec);
   root.add(prepared.scene);
   const behavior = createSimpleGeoCreatureBehavior(objectSpec, startCellId, registry);
   const collisionWireframe = buildObjectCollisionWireframe(objectSpec.id, behavior.state);

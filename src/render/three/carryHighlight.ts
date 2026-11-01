@@ -10,7 +10,6 @@
  */
 import * as THREE from "three";
 import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex";
-import { transformPoint3 } from "../../math/rigidTransform3";
 import type { DynamicObjectState } from "../../movement/dynamicObject";
 import { carryHighlightShapeOf, type CarryHighlightShape } from "../../world-objects/carryHighlightShape";
 import { collectRuntimeObjectRenderRecordsWithPortalGhosts } from "./runtimeObjectGhostRecords";
@@ -73,15 +72,14 @@ export function collectCarryHighlightRecords(
     .makeTranslation(centre.x, centre.y, centre.z)
     .multiply(new THREE.Matrix4().makeScale(Math.abs(shape.radii.x), Math.abs(shape.radii.z), Math.abs(shape.radii.y)));
   const highlightId = `${object.id}:carry-highlight`;
-  // The shape's horizontal reach from its centre (the longest horizontal semi-axis), around the centre's cell-local place.
+  // The shape's horizontal reach from its centre (the longest horizontal semi-axis), around the centre in the object's own frame.
   const reach = Math.max(Math.abs(shape.radii.x), Math.abs(shape.radii.y));
-  const centreInCell = transformPoint3(object.localPose, { x: shape.centre.x, y: shape.centre.y, z: 0 });
-  // The same general mechanism as every other part of every object: the record in the object's own cell and its portal ghosts, the ghost disk
-  // taken around the shape's centre with the shape's own reach (the object's collision footprint would be too small for a wide shape).
+  // The same general mechanism as every other part of every object: the record in the object's own cell and its portal ghosts. The shape
+  // declares its own render footprint, the disk around its centre with its own reach.
   return collectRuntimeObjectRenderRecordsWithPortalGhosts({
     world,
     object: { ...object, id: highlightId },
     archetypeKeys: [carryHighlightArchetypeKey],
-    footprintOverride: { radiusMeters: reach, center: { x: centreInCell.x, y: centreInCell.y } },
+    renderFootprint: { center: { x: shape.centre.x, y: shape.centre.y }, radiusMeters: reach },
   }).map((record) => ({ ...record, localMatrix: record.localMatrix.clone().multiply(fromCentre) }));
 }

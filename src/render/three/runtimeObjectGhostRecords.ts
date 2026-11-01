@@ -3,10 +3,13 @@
  *
  * Only the object's true cell contains its pose; an object near a portal side or a vertex would otherwise vanish when
  * the neighbouring cells are seen through the portals. The ghosts come from the developed disk (job 12) of radius
- * `footprint radius + activation clearance` around the object's horizontal centre: every cell copy the disk reaches,
+ * `render footprint radius + activation clearance` around the footprint's centre: every cell copy the disk reaches,
  * however many portals away, gets one record with pose `node.cellFromStart * object.localPose`, converted to a Three.js
- * matrix. The footprint radius is the collision radius, or `footprintRadiusMeters` (the render footprint) when the
- * object has no collision bounds; with neither, nothing is emitted.
+ * matrix.
+ *
+ * The footprint is what is DRAWN (`RenderFootprint`: centre and radius in the object's own frame), never the collision shape: a ghost exists
+ * to show the drawn part on the other side of a portal, and the drawn part need not be centred on, or as wide as, the body that collides.
+ * It is a required input. An object has no fallback footprint; a drawn part without a measured one is an error, reported by the caller.
  *
  * Around a cone vertex the same cell can appear in two copies. Copies in the same cell whose centres are closer than
  * twice the footprint radius overlap, so only the first one (breadth-first order, the real object first) is kept.
@@ -17,10 +20,9 @@ import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex"
 import { collectDevelopedDisk } from "../../cell-complex/developedDisk";
 import { composeRigidTransform3, transformPoint3 } from "../../math/rigidTransform3";
 import { vec3 } from "../../math/vec3";
-import { getDynamicObjectCollisionBounds } from "../../movement/collision";
 import type { DynamicObjectState } from "../../movement/dynamicObject";
 import { rigidTransformToThreeMatrix } from "./worldAxes";
-import type { RuntimeObjectRenderRecord } from "./runtimeObjectRenderRecords";
+import type { RenderFootprint, RuntimeObjectRenderRecord } from "./runtimeObjectRenderRecords";
 
 /** Default distance in meters (0.02) beyond which an object is considered too far from a portal wall to need a ghost. */
 export const defaultPortalGhostActivationClearanceMeters = 0.02;
@@ -40,13 +42,11 @@ export interface PortalGhostRuntimeObjectRenderRecordRequest {
   readonly archetypeKeys: Iterable<string>;
   /** Overrides `defaultPortalGhostActivationClearanceMeters`. */
   readonly activationClearanceMeters?: number;
-  /** Horizontal render footprint radius used when the object has no collision bounds. */
-  readonly footprintRadiusMeters?: number;
   /**
-   * The horizontal reach of what is drawn, when it is not the object's collision footprint (for example a carry highlight wider than the body):
-   * the disk is taken around `center` (cell-local x and y) with this radius, whatever the object's collision bounds are.
+   * What is drawn of the object (or of this part of it): a disk in the object's own frame. Required: there is no collision or default fallback.
+   * Not read when `archetypeKeys` is empty (nothing is drawn, so nothing is ghosted).
    */
-  readonly footprintOverride?: { readonly radiusMeters: number; readonly center: { readonly x: number; readonly y: number } };
+  readonly renderFootprint: RenderFootprint;
 }
 
 /**
@@ -71,34 +71,28 @@ export function collectRuntimeObjectRenderRecordsWithPortalGhosts(
   ];
 }
 
-/** Returns ghost render records, in every cell copy the object's footprint reaches (empty if none, or if the cell, footprint or key list is missing). */
+/**
+ * Returns ghost render records, in every cell copy the object's render footprint reaches (empty if none, or if the cell or key list is missing).
+ * Throws if the footprint radius is not positive: an unmeasured drawn part must fail loudly, not be left without ghosts.
+ */
 export function collectPortalGhostRuntimeObjectRenderRecords(
   request: PortalGhostRuntimeObjectRenderRecordRequest,
 ): readonly RuntimeObjectRenderRecord[] {
   const { object, world } = request;
-
-  if (!world.cellsById.has(object.cellId)) {
-    return [];
-  }
-
-  const bounds = getDynamicObjectCollisionBounds(object);
-  const radius = request.footprintOverride?.radiusMeters ?? bounds?.radius ?? request.footprintRadiusMeters;
-
-  if (radius === undefined || !(radius > 0)) {
-    return [];
-  }
-
   const archetypeKeys = [...request.archetypeKeys];
 
-  if (archetypeKeys.length === 0) {
+  if (archetypeKeys.length === 0 || !world.cellsById.has(object.cellId)) {
     return [];
   }
 
-  const center = request.footprintOverride
-    ? request.footprintOverride.center
-    : bounds
-      ? { x: bounds.center.x, y: bounds.center.y }
-      : { x: object.localPose.translation.x, y: object.localPose.translation.y };
+  const radius = request.renderFootprint.radiusMeters;
+
+  if (!(radius > 0)) {
+    throw new Error(`Object "${object.id}" has no render footprint (radius ${radius}); its portal ghosts cannot be decided.`);
+  }
+
+  // The footprint centre is in the object's own frame; the disk is taken in the cell's frame.
+  const center = transformPoint3(object.localPose, vec3(request.renderFootprint.center.x, request.renderFootprint.center.y, 0));
   const clearance = request.activationClearanceMeters ?? defaultPortalGhostActivationClearanceMeters;
   const disk = collectDevelopedDisk({ world, cellId: object.cellId, center, radiusMeters: radius + clearance });
   const kept: { readonly cellId: string; readonly x: number; readonly y: number }[] = [];

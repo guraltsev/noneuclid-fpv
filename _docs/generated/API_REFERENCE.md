@@ -1865,6 +1865,7 @@ Three.js view of a simple geodesic creature (the mouse or the butterfly): the gl
 | Kind | Name | Summary |
 | --- | --- | --- |
 | interface | `SimpleGeoCreatureRuntime` | Per-creature runtime handle owned by the renderer. |
+| function | `placeSimpleGeoCreatureModel` | Puts a creature's glTF scene in the creature's own frame: the spec's scale, tilts, the half turn that makes the model face forward and the model offset (world axes to Three.js axes). |
 | function | `createSimpleGeoCreatureRuntime` | Creates the runtime (three.js model instance, behavior, registry entry) for a creature starting in `startCellId`. |
 
 ### `render/three/debugCollisionWireframes.ts`
@@ -2520,7 +2521,7 @@ Creates "ghost" render records so a dynamic object that overlaps a portal is dra
 | type | `PortalGhostRenderableObject` | A dynamic object with an id, i.e. |
 | interface | `PortalGhostRuntimeObjectRenderRecordRequest` | Input for ghost-record collection. |
 | function | `collectRuntimeObjectRenderRecordsWithPortalGhosts` | The one way a part of an object gets its render records: one record per archetype key in the object's own cell, then its portal ghosts (see {@link collectPortalGhostRuntimeObjectRenderRecords}). |
-| function | `collectPortalGhostRuntimeObjectRenderRecords` | Returns ghost render records, in every cell copy the object's footprint reaches (empty if none, or if the cell, footprint or key list is missing). |
+| function | `collectPortalGhostRuntimeObjectRenderRecords` | Returns ghost render records, in every cell copy the object's render footprint reaches (empty if none, or if the cell or key list is missing). |
 
 ### `render/three/runtimeObjectInstanceSync.ts`
 
@@ -2557,7 +2558,8 @@ Data records describing where runtime (non-static) objects should be drawn, and 
 | function | `collectRuntimeObjectRenderSourceMeshes` | Collects every `Mesh` under `root` as an instancing source and hides the originals. |
 | function | `placedFlagModelArchetypeKeyPrefix` | Archetype-key prefix shared by the glTF model meshes of all placed flags of one `flagType`. |
 | function | `collectPlacedFlagRenderSourceMeshes` | Like {@link collectRuntimeObjectRenderSourceMeshes}, but meshes named `placed-flag-text-plane:*` get keys under `ownPrefix` and every other mesh under the shared model prefix of `flagType`; both are numbered separately … |
-| function | `computeRenderSourceFootprintRadius` | Horizontal render footprint radius of an object: the largest horizontal distance (Three x and z) from the object root to any corner of any source mesh's bounding box, expressed in the root's frame. |
+| interface | `RenderFootprint` | What is drawn of an object (or of one part of it) reaches this far horizontally: a disk in the object's own frame (world axes, z up). |
+| function | `computeRenderSourceFootprint` | The render footprint of the drawn source meshes: the horizontal bounding box of every corner of every source mesh's bounding box, expressed in the object root's frame, as a disk around the box centre that holds all of i… |
 
 ### `render/three/runtimeSceneUtils.ts`
 
