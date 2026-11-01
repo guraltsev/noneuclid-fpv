@@ -165,3 +165,9 @@ Removed, transitively with their tests: `desktopFlagEditor`, `placedFlagFontColo
 
 ### Checks
 Baseline at `324a715`: typecheck green, `npm test` 144 files / 1237 tests. Final (`43abdc7`): `npm run typecheck`, `npm run docs:check` green; `npm test` 153 files / 1281 tests; `npm run test:release` 6 files / 13 tests, the known `appCommands` CDP timeout did not occur in these runs. Both done-greps print nothing.
+
+### Addendum (after the maintainer's first live test, 2026-11-01)
+Three things found by driving the real app over CDP, all on this branch after the report above:
+- **Stray emitter heads and action at a distance.** An untied emitter kept listing a geodesic it no longer anchored (the emitter-side caches `geodesicIds`, `activeGeodesicId`, `geodesicEmitterYawRadiansById`), so it drew a head for it and deleting it from its menu deleted the other emitters' geodesic. The caches are deleted (commit `7245b3d`): an emitter's geodesics are derived from the interval attachments (`getEmitterGeodesicIds`), the active geodesic is session state, the launch yaw is the tangent at the emitter. `syncEmitterGeodesicMenuCaches` and the association-removal helpers named earlier in this report no longer exist.
+- **Curve shortening is a flow, not a one-tick collapse** (commit `fe5ec0a`; maintainer decision, reversing job 26 Decision 1): the curve is a chain of moving intervals whose free vertices relax each tick, the vertex count never grows, and the exact solver `resolveCurveShorteningPair`, `sleeve.ts` and `GeodesicCornerObject` were deleted. Curves that need a new wrap vertex at a forbidden-zone disk now end `unresolved`.
+- **Gap that let both through:** no test covered the tool/shell part of tie-and-detach; the new tests cover the flow, the derived queries and the renderer's heads. A tool-level contract test for the pick sequence is still missing.
