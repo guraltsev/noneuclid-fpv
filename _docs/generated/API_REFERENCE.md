@@ -605,7 +605,7 @@ The carry contract: what it means for an object to be carried, stated once, as p
 | const | `carryZoneMarginMeters` | Distance a carried object keeps from an exclusion zone it was stopped by, in meters: the skin the movement layer keeps from every obstacle. |
 | const | `carryArrivalToleranceMeters` | Distance to the target under which the object counts as having arrived, in meters. |
 | const | `carryMaxStepsPerCall` | Most steps one call of `carryTowardTarget` applies; the rest of the way is left to the next frame. |
-| interface | `CarriableMarker` | Marker on an object type: it can be carried. |
+| interface | `CarriableMarker` | Marker on an object type: it can be carried, and (optionally) the shape of its carry highlight. |
 | function | `canBeCarried` | Whether an object declares that it can be carried. |
 | interface | `CarriedPlace` | Where a carried object is: its cell, its point in that cell's frame (z is the object's own height and is never changed by a step) and its yaw. |
 | interface | `CarryStep` | A displacement step: a vector in the frame of the cell the object is in, at most `carryStepCapMeters` long. |
@@ -621,6 +621,16 @@ The carry contract: what it means for an object to be carried, stated once, as p
 | interface | `CarryAdvance` | What `carryTowardTarget` did: where the object is now, how many steps were applied and how far from the target it ended. |
 | function | `remainingToTarget` | The distance from the object to the target along the valid straight development, or "unreachable". |
 | function | `carryTowardTarget` | Moves a carried object toward a target as a stream of steps: each is the displacement to the target from the object's current place (in the nearest valid straight development), cut to at most the step cap and to what is… |
+
+### `world-objects/carryHighlightShape.ts`
+
+The shape of the highlight drawn around a carried object.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| const | `carryHighlightMarginMeters` | Margin in meters added to the collision radius to get the radius of the fallback highlight sphere. |
+| type | `CarryHighlightShape` | A carry highlight shape. |
+| function | `carryHighlightShapeOf` | The highlight shape of a carried object: the one it declares, otherwise a sphere centred on its collision shape with the collision radius plus `carryHighlightMarginMeters`; undefined when it declares none and has no col… |
 
 ### `world-objects/creatures/geodesicMarmotBehavior.ts`
 
@@ -817,6 +827,7 @@ Geodesic emitters ("cannons"), geodesic intervals and curve shortening on a glue
 | interface | `CreateGeodesicCannonOptions` | Construction options for `createGeodesicCannonObject`; omitted optional fields get the defaults documented there. |
 | interface | `TraceGeodesicSegmentResult` | One traced piece: the cell, the (normalized) ray used, the length actually travelled, and why it stopped. |
 | interface | `PlaceGeodesicCannonResult` | Result of the cannon placement functions: the placed (registry) cannon, or `placed: false` with a coarse `reason`. |
+| const | `cannonCarryHighlight` | Carry highlight of an emitter: an ellipsoid around the whole post, loosely. |
 | const | `geodesicRayBeamHeightMeters` | Height of the geodesic beam above an emitter's floor point, in meters. |
 | const | `geodesicRayBeamStartOffsetMeters` | Horizontal distance (meters) by which a beam starts away from its emitter center along the launch direction; currently 0. |
 | const | `GEODESIC_MIN_LENGTH_METERS` | Smallest lifted chord length (meters) of a valid interval; shorter intervals are degenerate and are deleted or rejected. |
@@ -1800,16 +1811,15 @@ Pure placement and naming helpers for carrying and aiming geodesic emitters.
 
 ### `render/three/carryHighlight.ts`
 
-The translucent ball drawn around an object that is being carried.
+The translucent shape drawn around an object that is being carried.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
-| const | `carryHighlightArchetypePrefix` | Archetype-key prefix of the highlight ball (the key is `<prefix>:mesh:0`). |
-| const | `carryHighlightArchetypeKey` | Archetype key of the highlight ball. |
-| const | `carryHighlightMarginMeters` | Margin in meters added to the collision radius to get the radius of the ball. |
-| type | `CarryHighlightObject` | What the highlight needs of a carried object: an id and a pose with a collision shape. |
-| function | `createCarryHighlightSource` | Builds the render source of the ball: a unit sphere, scaled per record to the object it surrounds. |
-| function | `collectCarryHighlightRecords` | The records of the highlight ball for `object`, one for each place in `objectRecords` where the object itself is drawn. |
+| const | `carryHighlightArchetypePrefix` | Archetype-key prefix of the highlight shape (the key is `<prefix>:mesh:0`). |
+| const | `carryHighlightArchetypeKey` | Archetype key of the highlight shape. |
+| type | `CarryHighlightObject` | What the highlight needs of a carried object: an id, a pose, and a declared highlight shape or a collision shape to derive one from. |
+| function | `createCarryHighlightSource` | Builds the render source of the highlight: a unit sphere, scaled per record (non-uniformly for an ellipsoid) to the object it surrounds. |
+| function | `collectCarryHighlightRecords` | The records of the highlight shape for `object`, one for each place in `objectRecords` where the object itself is drawn. |
 
 ### `render/three/cellRenderArchetypes.ts`
 

@@ -68,6 +68,7 @@
  * constants, constructors and small geometry helpers they share.
  */
 import type { SimpleCollisionCylinder } from "../../movement/dynamicObject";
+import type { CarryHighlightShape } from "../carryHighlightShape";
 import { identityRigidTransform3, yawRigidTransform3, type RigidTransform3 } from "../../math/rigidTransform3";
 import { addVec3, normalizeVec3, scaleVec3, type Vec3 } from "../../math/vec3";
 import type { RuntimeWorldObjectBase } from "../runtimeObjectBase";
@@ -89,6 +90,8 @@ export interface GeodesicCannonObject extends RuntimeWorldObjectBase {
   readonly canAttachGeodesics?: true;
   /** Marker consumed by `canBeCarried` (src/world-objects/carry.ts): this object may be carried and reacts to displacement steps. */
   readonly canBeCarried?: true;
+  /** The shape of the highlight drawn around the emitter while it is carried (`cannonCarryHighlight`). */
+  readonly carryHighlight?: CarryHighlightShape;
   /** Geodesic currently selected in the emitter menu (cache; may name a geodesic that no longer exists). */
   readonly activeGeodesicId?: string;
   /** Ids of geodesics listed under this cannon (cache of the interval attachments). */
@@ -377,6 +380,21 @@ const defaultCannonCollision: SimpleCollisionCylinder = {
   offset: { x: 0, y: 0, z: 0.375 },
 };
 
+/**
+ * Carry highlight of an emitter: an ellipsoid around the whole post, loosely.
+ *
+ * The visible post is about 1.7 m tall (the loaded model at its scale; the procedural stand-in is 1.55 m) standing on the floor, so the
+ * vertical semi-axis is half that height plus a 0.1 m margin (0.95 m) and the centre is at half the height (0.85 m). The horizontal
+ * semi-axes are the collision radius 0.3 m plus the same 0.1 m margin (0.4 m): wider than the post and its 0.26 m base, which leaves room
+ * for the lightsaber head. The collision cylinder is only 0.75 m tall, so the ellipsoid follows the visible post, not the collision shape: it
+ * contains the cylinder's axis and its mid-height rim, and the cylinder's bottom rim edge, which no one sees, lies just outside.
+ */
+export const cannonCarryHighlight: CarryHighlightShape = {
+  kind: "ellipsoid",
+  centre: { x: 0, y: 0, z: 0.85 },
+  radii: { x: 0.4, y: 0.4, z: 0.95 },
+};
+
 /** Height of the geodesic beam above an emitter's floor point, in meters. */
 export const geodesicRayBeamHeightMeters = 1.08;
 
@@ -415,6 +433,7 @@ export function createGeodesicCannonObject(options: CreateGeodesicCannonOptions)
     kind: "geodesic-cannon",
     canAttachGeodesics: true,
     canBeCarried: true,
+    carryHighlight: cannonCarryHighlight,
     cellId: options.cellId,
     localPose: {
       ...options.localPose,

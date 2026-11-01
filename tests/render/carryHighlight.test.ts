@@ -1,11 +1,11 @@
 /**
  * `tests/render/carryHighlight.test.ts` — unit tier.
  *
- * The translucent ball around a carried object (`src/render/three/carryHighlight.ts`) and its use by the runtime-object instance sync.
+ * The translucent highlight shape around a carried object (`src/render/three/carryHighlight.ts`) and its use by the runtime-object instance sync.
  *
- * It marks the object itself, not the hand: an object that is stuck (stopped short of a wall or a zone) is drawn with its ball where it is,
- * and the gap to the hand shows. The ball is made from the object's own render records, so it appears wherever the object is drawn, on any
- * portal path and on another face; it is sized from the collision radius plus a margin and centred on the collision shape; and it knows
+ * It marks the object itself, not the hand: an object that is stuck (stopped short of a wall or a zone) is drawn with its highlight where it is,
+ * and the gap to the hand shows. The shape is made from the object's own render records, so it appears wherever the object is drawn, on any
+ * portal path and on another face; it is the object's own declared shape (an ellipsoid for an emitter), or a sphere from the collision shape when it declares none; and it knows
  * nothing about the kind of object, so any carryable object gets it.
  */
 import * as THREE from "three";
@@ -14,11 +14,9 @@ import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
 import type { CellComplexSpec } from "../../src/cell-complex/specs";
 import { yawRigidTransform3 } from "../../src/math/rigidTransform3";
 import type { PlayerPose } from "../../src/movement/playerPose";
-import {
-  carryHighlightArchetypeKey,
-  carryHighlightMarginMeters,
-  collectCarryHighlightRecords,
-} from "../../src/render/three/carryHighlight";
+import { carryHighlightArchetypeKey, collectCarryHighlightRecords } from "../../src/render/three/carryHighlight";
+import { carryHighlightMarginMeters } from "../../src/world-objects/carryHighlightShape";
+import { cannonCarryHighlight } from "../../src/world-objects/geodesic/objects";
 import { createEmptyFrameRenderSnapshot, createFrameRenderSnapshot } from "../../src/render/three/frameRenderSnapshot";
 import { createRootVisiblePortalPath } from "../../src/render/three/renderPortalInstances";
 import {
@@ -57,7 +55,7 @@ function scaleOf(matrix: THREE.Matrix4): THREE.Vector3 {
 }
 
 describe("collectCarryHighlightRecords", () => {
-  it("makes one ball per place, centred on the collision shape, sized by radius plus margin", () => {
+  it("draws a sphere per place for an object with no declared shape, sized by radius plus margin", () => {
     const object = carried("m");
     const pose = rigidTransformToThreeMatrix(object.localPose);
     const ghost = new THREE.Matrix4().makeTranslation(5, 0, 0).multiply(pose);
@@ -80,7 +78,41 @@ describe("collectCarryHighlightRecords", () => {
     expect(centre.z).toBeCloseTo(expected.z, 6);
   });
 
-  it("ignores the object's parts under other ids and objects without a collision shape", () => {
+  it("draws a declared ellipsoid scaled unevenly and turned with the object's yaw", () => {
+    const object = { ...carried("m"), carryHighlight: cannonCarryHighlight };
+    const pose = rigidTransformToThreeMatrix(object.localPose);
+
+    const [shape] = collectCarryHighlightRecords(object, [record("m", "room-b", pose)]);
+
+    // Semi-axes along the object's x, y, z become Three.js x, z, y.
+    const scale = scaleOf(shape.localMatrix);
+    expect(scale.x).toBeCloseTo(cannonCarryHighlight.radii.x, 6);
+    expect(scale.y).toBeCloseTo(cannonCarryHighlight.radii.z, 6);
+    expect(scale.z).toBeCloseTo(cannonCarryHighlight.radii.y, 6);
+    expect(scale.y).toBeGreaterThan(scale.x);
+    // Centred at the declared centre, and the ellipsoid's first axis points where the object's own x axis points (yaw 0.4), not along the world x axis.
+    const centre = new THREE.Vector3().setFromMatrixPosition(shape.localMatrix);
+    const expectedCentre = worldPointToThree(cannonCarryHighlight.centre).applyMatrix4(pose);
+    expect(centre.distanceTo(expectedCentre)).toBeLessThan(1e-6);
+    const shapeAxis = new THREE.Vector3().setFromMatrixColumn(shape.localMatrix, 0).normalize();
+    const objectAxis = new THREE.Vector3().setFromMatrixColumn(pose, 0).normalize();
+    expect(shapeAxis.distanceTo(objectAxis)).toBeLessThan(1e-6);
+    expect(Math.abs(shapeAxis.z)).toBeGreaterThan(0.1);
+  });
+
+  it("turns the ellipsoid with the object when the object turns", () => {
+    const object = { ...carried("m"), carryHighlight: cannonCarryHighlight };
+    const turned = { ...object, localPose: yawRigidTransform3(1.2, { x: 0.2, y: 0.1, z: 0 }) };
+
+    const [before] = collectCarryHighlightRecords(object, [record("m", "room-b", rigidTransformToThreeMatrix(object.localPose))]);
+    const [after] = collectCarryHighlightRecords(turned, [record("m", "room-b", rigidTransformToThreeMatrix(turned.localPose))]);
+
+    const axisBefore = new THREE.Vector3().setFromMatrixColumn(before.localMatrix, 0).normalize();
+    const axisAfter = new THREE.Vector3().setFromMatrixColumn(after.localMatrix, 0).normalize();
+    expect(axisBefore.angleTo(axisAfter)).toBeCloseTo(1.2 - 0.4, 6);
+  });
+
+  it("ignores parts under other ids and objects with no shape and no collision shape", () => {
     const object = carried("m");
     const pose = rigidTransformToThreeMatrix(object.localPose);
 
@@ -148,7 +180,7 @@ function snapshotOf(paths: Record<string, VisiblePortalPath[]>) {
 }
 
 describe("the instance sync's highlight of the carried object", () => {
-  it("draws a ball on the carried object at every path that shows it", () => {
+  it("draws the highlight on the carried object at every path that shows it", () => {
     const { sync, renderArchetypesByKey, object } = setupSync("m");
     const shift = new THREE.Matrix4().makeTranslation(3, 0, 0);
 
@@ -170,7 +202,7 @@ describe("the instance sync's highlight of the carried object", () => {
     expect(atSecond.distanceTo(expectedAt(shift))).toBeLessThan(1e-6);
   });
 
-  it("draws no ball when nothing is carried, or the carried object is gone", () => {
+  it("draws no highlight when nothing is carried, or the carried object is gone", () => {
     for (const carriedId of [undefined, "missing"]) {
       const { sync, renderArchetypesByKey } = setupSync(carriedId);
       sync.sync(snapshotOf({ "room-b": [path("room-b", 0, 0)] }));
@@ -220,6 +252,10 @@ describe("the highlight of a carried geodesic emitter", () => {
     // Over the emitter's own place (its horizontal position), at the height of its collision shape.
     expect(centre.x).toBeCloseTo(atEmitter.x, 6);
     expect(centre.z).toBeCloseTo(atEmitter.z, 6);
-    expect(centre.y).toBeGreaterThan(0);
+    // The emitter declares an ellipsoid around its whole post: centred at half the post height, with the declared semi-axes.
+    expect(centre.y).toBeCloseTo(cannonCarryHighlight.centre.z, 6);
+    const scale = scaleOf(first);
+    expect(scale.x).toBeCloseTo(cannonCarryHighlight.radii.x, 6);
+    expect(scale.y).toBeCloseTo(cannonCarryHighlight.radii.z, 6);
   });
 });

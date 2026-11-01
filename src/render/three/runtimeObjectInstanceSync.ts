@@ -8,7 +8,7 @@
  * portal) and the per-eye camera positions. Per sync it (a) updates the render sources and the archetype-key prefix
  * index, (b) collects the render records once, (c) creates or grows archetypes, and (d) writes every archetype's
  * instances. Records of unchanged objects (same registry value, same world, same archetype keys) are reused,
- * ghosts included. While the session names a carried object, a translucent ball around it is drawn from that object's own records
+ * ghosts included. While the session names a carried object, a translucent highlight shape (declared by the object, an ellipsoid for an emitter) around it is drawn from that object's own records
  * (`carryHighlight.ts`), so it appears wherever the object does. It never touches the selectable-hitbox debug meshes.
  */
 import type { AppSession } from "../../runtime/appSession";
@@ -16,7 +16,7 @@ import type * as THREE from "three";
 import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex";
 import type { RuntimeObjectRegistry, RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
 import { runtimeObjectToDynamicObjectState } from "../../world-objects/runtimeObjectBase";
-import { collectCarryHighlightRecords, createCarryHighlightSource } from "./carryHighlight";
+import { collectCarryHighlightRecords, createCarryHighlightSource, type CarryHighlightObject } from "./carryHighlight";
 import type { FrameRenderSnapshot } from "./frameRenderSnapshot";
 import { collectGeodesicRuntimeRenderRecords } from "./geodesicCannonRenderer";
 import type { PlayerRoverRenderModel } from "./playerRoverModel";
@@ -87,6 +87,14 @@ interface CachedObjectRecords {
 const meshKeySeparator = ":mesh:";
 const noKeys: readonly string[] = [];
 
+// The carried object as the highlight sees it: its pose and collision shape, and the highlight shape it declares (if any).
+function carryHighlightObject(object: RuntimeWorldObject): CarryHighlightObject {
+  return {
+    ...runtimeObjectToDynamicObjectState(object),
+    id: object.id,
+    carryHighlight: "carryHighlight" in object ? object.carryHighlight : undefined,
+  };
+}
 function sameStrings(left: readonly string[], right: readonly string[]): boolean {
   return left.length === right.length && left.every((value, index) => value === right[index]);
 }
@@ -163,7 +171,7 @@ export function createRuntimeObjectInstanceSync(deps: RuntimeObjectInstanceSyncD
       }
     };
 
-    // The highlight ball exists as an archetype only while something is carried.
+    // The highlight shape exists as an archetype only while something is carried.
     const carriedId = deps.session.get().carry?.objectId;
     if (carriedId !== undefined && objects.some((object) => object.id === carriedId)) {
       addSource(carryHighlightSource);
@@ -262,7 +270,7 @@ export function createRuntimeObjectInstanceSync(deps: RuntimeObjectInstanceSyncD
       if (cached && cached.object === object && cached.world === world && sameStrings(cached.archetypeKeys, archetypeKeys)) {
         records.push(...cached.records);
         if (object.id === carriedId) {
-          records.push(...collectCarryHighlightRecords({ ...runtimeObjectToDynamicObjectState(object), id: object.id }, cached.records));
+          records.push(...collectCarryHighlightRecords(carryHighlightObject(object), cached.records));
         }
         continue;
       }
@@ -292,7 +300,7 @@ export function createRuntimeObjectInstanceSync(deps: RuntimeObjectInstanceSyncD
       recordCacheByObjectId.set(object.id, { object, world, archetypeKeys: [...archetypeKeys], records: objectRecords });
       records.push(...objectRecords);
       if (object.id === carriedId) {
-        records.push(...collectCarryHighlightRecords({ ...runtimeObjectToDynamicObjectState(object), id: object.id }, objectRecords));
+        records.push(...collectCarryHighlightRecords(carryHighlightObject(object), objectRecords));
       }
     }
 

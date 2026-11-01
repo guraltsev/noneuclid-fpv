@@ -49,6 +49,7 @@ import { collisionSkinMeters, degenerateLengthMeters } from "../math/tolerances"
 import { vec3, type Vec3 } from "../math/vec3";
 import { collectDevelopedObstacles } from "../movement/developedObstacles";
 import { sweepDiscAgainstObstacle } from "../movement/sweptCollision";
+import type { CarryHighlightShape } from "./carryHighlightShape";
 import { sanitizeYaw } from "./geodesic/objects";
 
 /** Longest displacement step the reaction is defined for, in meters. */
@@ -69,9 +70,11 @@ const carryNearSearchHops = 2;
 const carryNearSearchMeters = 1;
 const carryFarSearchHops = 6;
 
-/** Marker on an object type: it can be carried. Checked by `canBeCarried`. */
+/** Marker on an object type: it can be carried, and (optionally) the shape of its carry highlight. Checked by `canBeCarried`. */
 export interface CarriableMarker {
   readonly canBeCarried?: true;
+  /** The object's own highlight shape; objects without one get the sphere of `carryHighlightShapeOf`. */
+  readonly carryHighlight?: CarryHighlightShape;
 }
 
 /** Whether an object declares that it can be carried. */
