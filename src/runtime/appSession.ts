@@ -16,6 +16,14 @@ import type { RuntimeMenuState } from "./runtimeMenuState";
 export type ObjectIdFamily = "placed-flag" | "measured-geodesic-length" | "protractor-angle" | "geodesic-cannon" | "geodesic";
 
 /**
+ * Who is being carried. Only the object's id is state: where the hand holds it is derived each frame from the carrier's aim.
+ * One record means one carrier; the carry contract (world-objects/carry.ts) itself keeps no such table.
+ */
+export interface CarryRecord {
+  readonly objectId: string;
+}
+
+/**
  * Mutable state of one running world, as one plain record. Replace it, never edit it in place.
  */
 export interface AppSessionState {
@@ -33,6 +41,8 @@ export interface AppSessionState {
   readonly playerPose: PlayerPose;
   /** Real state: which cannon and geodesic the emitter tools work on and the tie-and-detach picks; empty when idle. */
   readonly cannonToolState: GeodesicCannonToolState;
+  /** Real state: the object the carry tool holds, or undefined; it exists only while the carry tool is the selected tool. */
+  readonly carry: CarryRecord | undefined;
   /** Real state: the protractor tool's picks; empty when idle. */
   readonly protractorToolState: ProtractorToolState;
   /** Real state: next serial number per object id family; only ever increases. */

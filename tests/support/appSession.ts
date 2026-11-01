@@ -17,6 +17,7 @@ export function createTestAppSession(overrides: Partial<AppSessionState> = {}): 
     vrComfortOptions: defaultVrComfortOptions,
     playerPose: createDefaultPlayerPose("room-a"),
     cannonToolState: {},
+    carry: undefined,
     protractorToolState: {},
     objectIdSerials: initialObjectIdSerials,
     ...overrides,

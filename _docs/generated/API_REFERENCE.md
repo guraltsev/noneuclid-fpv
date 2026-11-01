@@ -1375,6 +1375,7 @@ The shell-side session: the one record that holds the mutable state of a running
 | Kind | Name | Summary |
 | --- | --- | --- |
 | type | `ObjectIdFamily` | Families of runtime objects whose ids carry a serial number from the session. |
+| interface | `CarryRecord` | Who is being carried. |
 | interface | `AppSessionState` | Mutable state of one running world, as one plain record. |
 | interface | `AppSession` | Owner of the current AppSessionState. |
 | function | `createAppSession` | Creates a session holding `initial`. |

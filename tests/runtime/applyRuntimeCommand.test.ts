@@ -44,6 +44,7 @@ function stateWith(menu?: Partial<RuntimeMenuState>, appConfig: AppConfig = defa
     vrComfortOptions: defaultVrComfortOptions,
     playerPose: createDefaultPlayerPose("room-a"),
     cannonToolState: {},
+    carry: undefined,
     protractorToolState: {},
     objectIdSerials: initialObjectIdSerials,
   };
@@ -483,5 +484,48 @@ describe("applyRuntimeCommand: tool and player state", () => {
     expect(takeObjectIdSerial(session, "placed-flag")).toBe(1);
     expect(takeObjectIdSerial(session, "geodesic")).toBe(0);
     expect(session.get().objectIdSerials).toMatchObject({ "placed-flag": 2, geodesic: 1, "protractor-angle": 0 });
+  });
+});
+
+describe("applyRuntimeCommand: carrying", () => {
+  const carrying = (objectId = "cannon-a"): AppSessionState =>
+    reduce({ kind: "begin-carry", objectId }, reduce({ kind: "enter-tool-mode", toolId: "geodesic-cannon-carry" }).state).state;
+
+  it("records the carried object on pickup while the carry tool is selected", () => {
+    expect(carrying().carry).toEqual({ objectId: "cannon-a" });
+  });
+
+  it("ignores a second pickup of the object already carried, keeping the state object", () => {
+    const state = carrying();
+
+    expect(reduce({ kind: "begin-carry", objectId: "cannon-a" }, state).state).toBe(state);
+  });
+
+  it("lets a pickup of another object replace the record (the record has one slot)", () => {
+    expect(reduce({ kind: "begin-carry", objectId: "cannon-b" }, carrying()).state.carry).toEqual({ objectId: "cannon-b" });
+  });
+
+  it("does not record a pickup outside the carry tool", () => {
+    expect(reduce({ kind: "begin-carry", objectId: "cannon-a" }).state.carry).toBeUndefined();
+  });
+
+  it("clears the record on release and leaves the tool selection alone", () => {
+    const result = reduce({ kind: "end-carry" }, carrying());
+
+    expect(result.state.carry).toBeUndefined();
+    expect(result.state.menuState.selectedTool).toBe("geodesic-cannon-carry");
+    expect(result.effects).toEqual([]);
+  });
+
+  it("keeps the state object when released with nothing carried", () => {
+    const state = stateWith();
+
+    expect(reduce({ kind: "end-carry" }, state).state).toBe(state);
+  });
+
+  it("drops the record when the carry tool is cleared, replaced or cancelled", () => {
+    expect(reduce({ kind: "clear-selected-tool" }, carrying()).state.carry).toBeUndefined();
+    expect(reduce({ kind: "select-tool", toolId: "protractor" }, carrying()).state.carry).toBeUndefined();
+    expect(reduce({ kind: "cancel-menu-and-tool" }, carrying()).state.carry).toBeUndefined();
   });
 });

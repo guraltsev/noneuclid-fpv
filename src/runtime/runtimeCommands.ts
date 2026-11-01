@@ -74,6 +74,11 @@ export type RuntimeCommand =
   | { readonly kind: "set-cannon-tool-state"; readonly state: GeodesicCannonToolState }
   | { readonly kind: "set-protractor-tool-state"; readonly state: ProtractorToolState }
   | { readonly kind: "set-player-pose"; readonly pose: PlayerPose }
+  // Carrying. The record lives only while the carry tool is selected; leaving that tool by any command drops it.
+  /** Pickup: the carry tool holds `objectId`. Ignored when the session already carries that object. */
+  | { readonly kind: "begin-carry"; readonly objectId: string }
+  /** Release: the carry tool no longer holds anything (the tool selection is left alone). */
+  | { readonly kind: "end-carry" }
   // World, config, reload.
   | { readonly kind: "select-world"; readonly worldId: string }
   | { readonly kind: "select-config"; readonly configName: string }

@@ -443,6 +443,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     ),
     playerPose: appState.playerPose,
     cannonToolState: {},
+    carry: undefined,
     protractorToolState: {},
     objectIdSerials: initialObjectIdSerials,
   });

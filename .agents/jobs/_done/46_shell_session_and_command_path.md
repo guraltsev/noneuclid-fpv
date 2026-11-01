@@ -118,9 +118,8 @@ Four commits on branch `job-46` (from `job-47`): `3b4e2d0` (step 1), `d9262bf` (
   `activeXrSession`), `aimFrameSerial`, `visibleCellId`, the portal pass results (`latestVisibleResult`, `portalEyeRenderStates`, `portalInstanceRenderState`, ...),
   `activeWorldBundle`, `protractorToolFeedback`, `helpLensFocusedObjectId`, `previousDesktopPalettePlacement`, `reloadConfirmationTimeout` (a timer handle) and the
   frame diagnostics. Their getters (`getFrameSerial`, `getVisibleCellId`, `getEyeCount`, `getWorld`) stay in the factories' deps; none is a get/set pair.
-- **One carrier per object** (job 47 left it to the session): not enforced. The carry state is still the cannon tool state's `selectedCannonId` / `activeGeodesicId`;
-  there is no `{ objectId, offset }` carry record in the session yet, because the carry tool's offset still lives in the tool.
-- The detach path of the carry tool calls `finishGeodesicCannonCarry()` itself; it was not turned into a command.
+- **Carry record** (added afterwards, branch `carry-record`): the session holds `carry: { objectId } | undefined`, set by the `begin-carry` command at pickup, cleared by `end-carry` at release, and dropped by the reducer whenever the carry tool stops being the selected tool. There is no `offset` field: the hand offset is not state, it is derived each frame from the carrier's aim. A second pickup of the object already carried is ignored. The carry contract stays stateless; one carrier per object is a courtesy of the carriers, not a mechanic.
+- The detach path of the carry tool still calls `finishGeodesicCannonCarry()` itself, which now dispatches `end-carry`. It is not a command/effect pair because the carry test harness dispatches commands and drops their effects, and `geodesicCannonCarry.test.ts` must stay unchanged.
 
 ### Checks
 - Baseline (job 47 branch head `68e41c2`): typecheck, `docs:check` and `npm test` (1060) green; `test:release` 10 of 11, only `appCommands.release.test.ts` timing out.

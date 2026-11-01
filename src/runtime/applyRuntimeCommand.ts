@@ -65,8 +65,17 @@ export function applyRuntimeCommand(session: AppSession, command: RuntimeCommand
 
 /**
  * Pure reducer: the next session state and the ordered effects for one command. Returns the same state object when the command changes nothing.
+ * The carry record exists only while the carry tool is the selected tool: any command that leaves that tool drops the record.
  */
 export function reduceRuntimeCommand(state: AppSessionState, command: RuntimeCommand): RuntimeCommandResult {
+  const result = reduceCommand(state, command);
+  if (result.state.carry && result.state.menuState.selectedTool !== "geodesic-cannon-carry") {
+    return { state: { ...result.state, carry: undefined }, effects: result.effects };
+  }
+  return result;
+}
+
+function reduceCommand(state: AppSessionState, command: RuntimeCommand): RuntimeCommandResult {
   const menu = state.menuState;
   const config = state.appConfig;
   const toolEnabled = (toolId: RuntimeToolId): boolean => isRuntimeToolEnabled(config, toolId);
@@ -235,6 +244,13 @@ export function reduceRuntimeCommand(state: AppSessionState, command: RuntimeCom
       return { state: { ...state, protractorToolState: command.state }, effects: [] };
     case "set-player-pose":
       return { state: { ...state, playerPose: command.pose }, effects: [] };
+    case "begin-carry":
+      // A second pickup of the object already carried changes nothing. (Outside the carry tool the wrapper drops the record again.)
+      return state.carry?.objectId === command.objectId
+        ? nothing
+        : { state: { ...state, carry: { objectId: command.objectId } }, effects: [] };
+    case "end-carry":
+      return state.carry ? { state: { ...state, carry: undefined }, effects: [] } : nothing;
     case "adopt-debug-settings": {
       const seeded = createRuntimeMenuState({
         selectedWorldId: menu.selectedWorldId,

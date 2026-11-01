@@ -492,6 +492,7 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
       ? getGeodesicTotalLengthMeters(geodesicId)
       : undefined;
     deps.dispatch({ kind: "enter-tool-mode", toolId: "geodesic-cannon-carry" });
+    deps.dispatch({ kind: "begin-carry", objectId: selectedCannon.id });
     syncDesktopPalette();
     if (!renderer.xr.isPresenting) {
       void controls.requestPointerLock();
@@ -517,7 +518,7 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
       return false;
     }
 
-    const cannonId = deps.session.get().cannonToolState.selectedCannonId;
+    const cannonId = deps.session.get().carry?.objectId;
     const cannon = cannonId ? runtimeObjectRegistry.get(cannonId) : undefined;
     if (cannon?.kind === "geodesic-cannon") {
       rebuildCarriedGeodesicFromCannon(cannon);
@@ -527,6 +528,7 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
     }
     deps.dispatch({ kind: "set-cannon-tool-state", state: {} });
     geodesicCannonRotationTargetLengthMeters = undefined;
+    deps.dispatch({ kind: "end-carry" });
     deps.dispatch({ kind: "clear-selected-tool" });
     clearCarriedGeodesicCannonGlow();
     syncDesktopPalette();
@@ -713,7 +715,7 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
       return;
     }
 
-    const cannonId = deps.session.get().cannonToolState.selectedCannonId;
+    const cannonId = deps.session.get().carry?.objectId;
     const cannon = cannonId ? runtimeObjectRegistry.get(cannonId) : undefined;
     if (cannon?.kind !== "geodesic-cannon") {
       return;

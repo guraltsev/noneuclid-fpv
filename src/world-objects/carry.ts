@@ -19,7 +19,8 @@
  *   - An object that ends a step inside an exclusion zone is reported as placed there; what happens to it is the caller's rule
  *     (the cannon tool destroys it, as before).
  * - Release is a detach and nothing else.
- * - One carrier per object (first come, first served) is part of the contract; the session enforces it.
+ * - Carriers should not carry an object another carrier holds; if they do, the steps interleave, which is safe (every step is checked
+ *   on its own) but erratic. The contract stays stateless and keeps no table of carriers.
  *
  * The sender's side, also pure and here so that every carrier does it the same way: `locateCarrierTarget` finds where the carrier's hand is,
  * and `carryTowardTarget` turns "the object should be at the hand" into steps: target minus the object's current place, in the nearest valid
