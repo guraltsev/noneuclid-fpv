@@ -1667,6 +1667,16 @@ Red cross decal drawn on the surface point that the aim ray currently hits.
 | function | `createAimCrossMarker` | Creates the aim cross marker, adds it (hidden) to the given scene, and returns its handle. |
 | function | `resolveAimCrossMarkerQuaternion` | Builds the orientation (Three.js frame) that lays the cross flat on a surface with the given normal. |
 
+### `render/three/aimFeedback.ts`
+
+Per-frame feedback on what the player aims at: the floating object tooltip, the help lens, the aim cross marker with the XR controller ray, and the protractor tool's preview drawing.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `AimFeedbackDeps` | Dependencies of the aim feedback, supplied by createThreeApp's shell. |
+| interface | `AimFeedback` | Handle to the aim feedback created by {@link createAimFeedback}. |
+| function | `createAimFeedback` | Creates the aim feedback and adds its controller ray (hidden) to the scene. |
+
 ### `render/three/aimInteraction.ts`
 
 Aim-ray resolution for both input modes: the desktop camera center ray and the right (or first) XR controller ray.

@@ -93,14 +93,11 @@ import {
 } from "../../runtime/worldGeometryDeformationFamilies";
 import { type CellDeformationMap, transformPoseWithCellMaps } from "../../cell-complex/worldGeometryDeformations";
 import { type WorldGeometrySnapshot, createWorldGeometrySession } from "../../runtime/worldGeometrySession";
-import { createHelpLensDefinition } from "../../ui/helpLensDefinition";
 import { type PaletteDefinition, createPaletteDefinitionCache } from "../../ui/paletteDefinition";
 import { advanceCurveShorteningPairs } from "../../world-objects/geodesic/curveShortening";
 import { pruneMissingGeodesicIntersectionObjects } from "../../world-objects/geodesic/intersections";
 import { isGeodesicMarmotObjectSpec } from "../../world-objects/geodesicMarmot";
 import { type GeodesicMarmotRuntime, createGeodesicMarmotRuntime } from "./creatures/geodesicMarmotView";
-import { type ProtractorCenterSelection, protractorSelectionsUseDifferentGeodesics, resolveProtractorCenterSelection, resolveProtractorDirectedGeodesicSelection, resolveProtractorEmitterGeodesicSelection } from "../../world-objects/protractorTool";
-import { type ProtractorDirectedGeodesic } from "../../world-objects/toolObjects";
 import { type RuntimeWorldObject, createRuntimeObjectRegistry, createRuntimeStaticAssetObject } from "../../world-objects/runtimeObjectRegistry";
 import { runtimeObjectToDynamicObjectState } from "../../world-objects/runtimeObjectBase";
 import { isSimpleGeoCreatureObjectSpec } from "../../world-objects/simpleGeoCreature";
@@ -110,6 +107,7 @@ import { setApiNamespace } from "../../runtime/publicApi";
 import { createDesktopToolIndicator } from "../dom/desktopToolIndicator";
 import { createFloatingObjectTooltip } from "../dom/floatingObjectTooltip";
 import { createAimCrossMarker } from "./aimCrossMarker";
+import { createAimFeedback } from "./aimFeedback";
 import { createAimInteraction } from "./aimInteraction";
 import {
   GeometryDebugHelpers,
@@ -174,7 +172,6 @@ import {
 import { PreparedWorldAssets } from "./preparedWorldAssets";
 import { prerenderCells } from "./prerenderCells";
 import { ProtractorAngleRuntime } from "./protractorAngleRenderer";
-import { createProtractorToolFeedback, protractorToolFeedbackSignature } from "./protractorToolFeedback";
 import { renderCameraFarMeters, renderCameraNearMeters } from "./renderCameraClip";
 import {
   PortalInstanceRenderDebugState,
@@ -199,7 +196,6 @@ import {
   XrDebugRenderState,
 } from "./renderState";
 import { RuntimeInputFrame } from "../../interaction/inputFrame";
-import { RootAimRay } from "./rootAimRay";
 import { createFrameErrorGuard } from "./frameErrorGuard";
 import { installRuntimeDiagnostics, runtimeDiagnostics } from "../../diagnostics/runtimeDiagnostics";
 import { createRuntimeObjectInstanceSync } from "./runtimeObjectInstanceSync";
@@ -465,22 +461,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   const runtimeObjectRegistry = createRuntimeObjectRegistry();
   const objectHost = createObjectHost();
   const aimCrossMarker = createAimCrossMarker(scene);
-  const aimControllerRayPositions = new Float32Array(6);
-  const aimControllerRayGeometry = new THREE.BufferGeometry();
-  aimControllerRayGeometry.setAttribute("position", new THREE.BufferAttribute(aimControllerRayPositions, 3));
-  const aimControllerRayMaterial = new THREE.LineBasicMaterial({
-    color: 0xef1b1b,
-    transparent: true,
-    opacity: 0.74,
-    depthTest: false,
-    depthWrite: false,
-  });
-  const aimControllerRay = new THREE.Line(aimControllerRayGeometry, aimControllerRayMaterial);
-  aimControllerRay.name = "aim-controller-ray";
-  aimControllerRay.renderOrder = 49;
-  aimControllerRay.frustumCulled = false;
-  aimControllerRay.visible = false;
-  scene.add(aimControllerRay);
   const floatingObjectTooltip = createFloatingObjectTooltip(document.body);
   const helpLensRenderer = createHelpLensRenderer(document.body, scene);
   const xrEntryUi = createXrEntryUi(container, enterVr);
@@ -679,12 +659,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   const placedFlagRuntimes = new Map<string, PlacedFlagRuntime>();
   const measuredGeodesicLengthRuntimes = new Map<string, MeasuredGeodesicLengthRuntime>();
   const protractorAngleRuntimes = new Map<string, ProtractorAngleRuntime>();
-  let protractorToolFeedback: {
-    readonly signature: string;
-    readonly cellId: string;
-    readonly root: THREE.Group;
-  } | undefined;
-  let helpLensFocusedObjectId: string | undefined;
   const runtimeObjectRenderRoot = new THREE.Group();
   runtimeObjectRenderRoot.name = "runtime-object-archetype-renders";
   scene.add(runtimeObjectRenderRoot);
@@ -857,42 +831,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       session,
     });
 
-  const {
-    syncPlacedFlagRuntime,
-    removePlacedFlagRuntime,
-    syncMeasuredGeodesicLengthRuntime,
-    removeMeasuredGeodesicLengthRuntime,
-    syncProtractorAngleRuntime,
-    removeProtractorAngleRuntime,
-    removePlacedFlags,
-    removeMeasuredGeodesicLengths,
-    removeMeasuredGeodesicLengthsForGeodesic,
-    refreshMeasuredGeodesicLengths,
-    refreshMeasuredGeodesicLengthsForGeodesic,
-    removeProtractorAngles,
-    removeProtractorAnglesForGeodesic,
-    removeProtractorAnglesForMissingVertices,
-    refreshProtractorAnglesForGeodesic,
-    refreshProtractorAnglesForGeodesics,
-  } = createToolObjectRuntimes({
-    assets: options.assets,
-    runtimeObjectRegistry,
-    cellMeshes,
-    placedFlagRuntimes,
-    measuredGeodesicLengthRuntimes,
-    protractorAngleRuntimes,
-    runtimeObjectRootsById,
-    runtimeObjectRenderSourcesByKey,
-    runtimeObjectRenderArchetypesByKey,
-    runtimeObjectRenderRoot,
-    getWorld: activeWorld,
-    session,
-    dispatch: dispatchRuntimeCommand,
-    clearProtractorToolFeedback,
-    syncRuntimeObjectPortalInstances: requestRuntimeObjectInstanceSync,
-    syncSelectableHitboxDebug: requestSelectableHitboxDebugSync,
-  });
-
   const { updateGeodesicEmitterLabels, getGeodesicDisplayName, getGeodesicLabelsById } =
     createGeodesicEmitterLabelController({
       scene,
@@ -929,6 +867,63 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     getWorld: activeWorld,
     session,
     getFrameSerial: () => aimFrameSerial,
+  });
+
+
+  const aimFeedback = createAimFeedback({
+    scene,
+    camera,
+    session,
+    runtimeObjectRegistry,
+    cellMeshes,
+    floatingObjectTooltip,
+    aimCrossMarker,
+    helpLensRenderer,
+    updateXrObjectTooltip,
+    resolveCurrentAimTarget,
+    targetIsWithinInteractionRange,
+    findFocusedRuntimeObject,
+    resolveDesktopTooltipScreenPosition,
+    getRuntimeObjectTooltipText,
+    getWorldFocusMessageDefinition,
+    getGeodesicDisplayName,
+  });
+  const { clearProtractorToolFeedback, resolveProtractorDirectedSelectionFromAimTarget } = aimFeedback;
+
+  const {
+    syncPlacedFlagRuntime,
+    removePlacedFlagRuntime,
+    syncMeasuredGeodesicLengthRuntime,
+    removeMeasuredGeodesicLengthRuntime,
+    syncProtractorAngleRuntime,
+    removeProtractorAngleRuntime,
+    removePlacedFlags,
+    removeMeasuredGeodesicLengths,
+    removeMeasuredGeodesicLengthsForGeodesic,
+    refreshMeasuredGeodesicLengths,
+    refreshMeasuredGeodesicLengthsForGeodesic,
+    removeProtractorAngles,
+    removeProtractorAnglesForGeodesic,
+    removeProtractorAnglesForMissingVertices,
+    refreshProtractorAnglesForGeodesic,
+    refreshProtractorAnglesForGeodesics,
+  } = createToolObjectRuntimes({
+    assets: options.assets,
+    runtimeObjectRegistry,
+    cellMeshes,
+    placedFlagRuntimes,
+    measuredGeodesicLengthRuntimes,
+    protractorAngleRuntimes,
+    runtimeObjectRootsById,
+    runtimeObjectRenderSourcesByKey,
+    runtimeObjectRenderArchetypesByKey,
+    runtimeObjectRenderRoot,
+    getWorld: activeWorld,
+    session,
+    dispatch: dispatchRuntimeCommand,
+    clearProtractorToolFeedback,
+    syncRuntimeObjectPortalInstances: requestRuntimeObjectInstanceSync,
+    syncSelectableHitboxDebug: requestSelectableHitboxDebugSync,
   });
 
   const {
@@ -1342,7 +1337,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     const activeAimRay = resolveActiveRootAimRay(xrActive, xrFrame, xrReferenceSpace);
     updateCarriedGeodesicCannonPose(xrActive, activeAimRay, deltaSeconds);
     if (frame.helpRequested) {
-      requestHelpLensForFocusedObject(activeAimRay);
+      aimFeedback.requestHelpLensForFocusedObject(activeAimRay);
     }
     const worldPrimaryActionRequested = frame.primaryActionRequested && !currentMenuState().isOpen;
     // Tool dispatch: modal cannon tools consume the primary action themselves; world tools act only when
@@ -1468,8 +1463,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       applyDesktopCameraPose();
     }
     frameErrorGuard.runPhase("tooltips", () => {
-      updateFloatingObjectTooltip(xrActive, activeAimRay, xrHeadWorldPose);
-      updateHelpLens(xrActive, activeAimRay);
+      aimFeedback.updateTooltips(xrActive, activeAimRay, xrHeadWorldPose);
     });
     const frameAfterCameraMs = performance.now();
     const frameBeforePortalMs = frameAfterCameraMs;
@@ -1504,8 +1498,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
 
     // UI/debug refresh; none of this changes simulation state, so it runs as one contained phase.
     frameErrorGuard.runPhase("ui", () => {
-      updateAimCrossMarker(xrActive, activeAimRay);
-      updateProtractorToolFeedback(activeAimRay);
+      aimFeedback.updateAim(xrActive, activeAimRay);
       updateGeodesicEmitterLabels();
       syncXrDebugState(frame.source, moveResult);
       updateScenePalette(xrActive, xrFrame, xrReferenceSpace, xrHeadWorldPose, deltaSeconds, frame);
@@ -1900,15 +1893,12 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       desktopScenePaletteInput.dispose();
       desktopToolIndicator.dispose();
       aimCrossMarker.dispose();
-      aimControllerRay.removeFromParent();
-      aimControllerRayGeometry.dispose();
-      aimControllerRayMaterial.dispose();
+      aimFeedback.dispose();
       floatingObjectTooltip.dispose();
       helpLensRenderer.dispose();
       vrComfortVignette.dispose();
       clearXrObjectTooltip();
       controls.dispose();
-      clearProtractorToolFeedback();
       for (const runtime of placedFlagRuntimes.values()) {
         runtime.dispose();
       }
@@ -2202,9 +2192,8 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       if (action !== "none") {
         event.preventDefault();
         applyDesktopScenePaletteToggle(action);
-      } else if (helpLensFocusedObjectId) {
+      } else if (aimFeedback.dismissHelpLensFocus()) {
         event.preventDefault();
-        helpLensFocusedObjectId = undefined;
       }
       return;
     }
@@ -2657,259 +2646,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
         z: appState.playerBody.heightMeters / 2,
       }),
     );
-  }
-
-  function updateFloatingObjectTooltip(
-    xrActive: boolean,
-    activeAimRay: RootAimRay | undefined,
-    xrHeadWorldPose: XrHeadWorldPose | undefined,
-  ): void {
-    if (currentMenuState().isOpen) {
-      floatingObjectTooltip.update({ visible: false });
-      updateXrObjectTooltip(undefined);
-      return;
-    }
-
-    const focused = findFocusedRuntimeObject(activeAimRay);
-    const text = focused ? getRuntimeObjectTooltipText(focused.object, xrActive ? "xr" : "desktop") : undefined;
-    if (xrActive) {
-      floatingObjectTooltip.update({ visible: false });
-      updateXrObjectTooltip(text && focused ? {
-        text,
-        anchor: focused.tooltipAnchor,
-        headWorldPosition: xrHeadWorldPose?.position,
-      } : undefined);
-      return;
-    }
-
-    updateXrObjectTooltip(undefined);
-    const screenPosition = focused ? resolveDesktopTooltipScreenPosition() : undefined;
-
-    floatingObjectTooltip.update({
-      visible: Boolean(text && screenPosition),
-      text,
-      xPixels: screenPosition?.x,
-      yPixels: screenPosition?.y,
-    });
-  }
-
-  function updateAimCrossMarker(xrActive: boolean, activeAimRay: RootAimRay | undefined): void {
-    if (
-      (
-        currentMenuState().selectedTool !== "none" &&
-        currentMenuState().selectedTool !== "aim" &&
-        currentMenuState().selectedTool !== "place-flag" &&
-        currentMenuState().selectedTool !== "geodesic-cannon" &&
-        currentMenuState().selectedTool !== "geodesic-cannon-aim" &&
-        currentMenuState().selectedTool !== "geodesic-cannon-tie-detach" &&
-        currentMenuState().selectedTool !== "measure-length" &&
-        currentMenuState().selectedTool !== "protractor"
-      ) ||
-      currentMenuState().isOpen
-    ) {
-      aimCrossMarker.update(undefined);
-      updateAimControllerRay(false);
-      return;
-    }
-
-    const target = activeAimRay ? resolveCurrentAimTarget(activeAimRay) : undefined;
-    aimCrossMarker.update(target, activeAimRay);
-    updateAimControllerRay(xrActive && Boolean(target), activeAimRay, aimCrossMarker.root.position);
-  }
-
-  function updateAimControllerRay(
-    visible: boolean,
-    activeAimRay?: RootAimRay,
-    targetPosition?: THREE.Vector3,
-  ): void {
-    if (!visible || !activeAimRay || !targetPosition) {
-      aimControllerRay.visible = false;
-      return;
-    }
-
-    aimControllerRayPositions[0] = activeAimRay.origin.x;
-    aimControllerRayPositions[1] = activeAimRay.origin.y;
-    aimControllerRayPositions[2] = activeAimRay.origin.z;
-    aimControllerRayPositions[3] = targetPosition.x;
-    aimControllerRayPositions[4] = targetPosition.y;
-    aimControllerRayPositions[5] = targetPosition.z;
-    aimControllerRayGeometry.attributes.position.needsUpdate = true;
-    aimControllerRay.visible = true;
-  }
-
-  function updateProtractorToolFeedback(activeAimRay: RootAimRay | undefined): void {
-    const protractor = session.get().protractorToolState;
-    if (currentMenuState().selectedTool !== "protractor" || currentMenuState().isOpen) {
-      clearProtractorToolFeedback();
-      return;
-    }
-
-    const target = activeAimRay ? resolveCurrentAimTarget(activeAimRay) : undefined;
-    const usableTarget = targetIsWithinInteractionRange(target) ? target : undefined;
-    const center = protractor.center ??
-      (usableTarget?.object?.kind === "geodesic-cannon" || usableTarget?.object?.kind === "geodesic-intersection"
-        ? resolveProtractorCenterSelection(usableTarget.object)
-        : undefined);
-    if (!center) {
-      clearProtractorToolFeedback();
-      return;
-    }
-
-    const hoverSelection = protractor.center
-      ? resolveProtractorDirectedSelectionFromAimTarget(usableTarget, protractor.center)
-      : undefined;
-    const validHoverSelection = hoverSelection && protractor.first &&
-        !protractorSelectionsUseDifferentGeodesics(protractor.first, hoverSelection)
-      ? undefined
-      : hoverSelection;
-    const feedbackOptions = {
-      center,
-      centerLocked: Boolean(protractor.center),
-      first: protractor.first,
-      hover: validHoverSelection,
-    };
-    if (protractorToolFeedback?.signature === protractorToolFeedbackSignature(feedbackOptions)) {
-      return;
-    }
-    const feedback = createProtractorToolFeedback(feedbackOptions);
-    if (!feedback) {
-      clearProtractorToolFeedback();
-      return;
-    }
-
-    syncProtractorToolFeedback(feedback);
-  }
-
-  function resolveProtractorDirectedSelectionFromAimTarget(
-    target: ReturnType<typeof resolveCurrentAimTarget>,
-    center: ProtractorCenterSelection,
-  ): ProtractorDirectedGeodesic | undefined {
-    if (target?.object?.kind === "geodesic-segment") {
-      const selected = resolveProtractorDirectedGeodesicSelection({
-        center,
-        segment: target.object,
-        hitPoint: target.localPoint,
-      });
-      return selected ? withProtractorGeodesicLabel(selected) : undefined;
-    }
-
-    if (target?.object?.kind === "geodesic-cannon") {
-      const selected = resolveProtractorEmitterGeodesicSelection({
-        center,
-        emitter: target.object,
-        registry: runtimeObjectRegistry,
-        geodesicId: target.geodesicEmitterGeodesicId,
-      });
-      return selected ? withProtractorGeodesicLabel(selected) : undefined;
-    }
-
-    return undefined;
-  }
-
-  function withProtractorGeodesicLabel(selection: ProtractorDirectedGeodesic): ProtractorDirectedGeodesic {
-    return {
-      ...selection,
-      label: getGeodesicDisplayName(selection.geodesicId),
-    };
-  }
-
-  function syncProtractorToolFeedback(feedback: {
-    readonly signature: string;
-    readonly cellId: string;
-    readonly root: THREE.Group;
-  }): void {
-    clearProtractorToolFeedback();
-    const cellRoot = cellMeshes.get(feedback.cellId);
-    if (!cellRoot) {
-      disposeObject3D(feedback.root);
-      return;
-    }
-
-    cellRoot.add(feedback.root);
-    protractorToolFeedback = feedback;
-  }
-
-  function clearProtractorToolFeedback(): void {
-    if (!protractorToolFeedback) {
-      return;
-    }
-
-    protractorToolFeedback.root.removeFromParent();
-    disposeObject3D(protractorToolFeedback.root);
-    protractorToolFeedback = undefined;
-  }
-
-  function updateHelpLens(xrActive: boolean, activeAimRay: RootAimRay | undefined): void {
-    if (currentMenuState().isOpen) {
-      helpLensRenderer.update({ visible: false, xrActive, camera });
-      return;
-    }
-
-    const focused = findFocusedRuntimeObject(activeAimRay);
-    if (helpLensFocusedObjectId) {
-      if (focused?.object.id !== helpLensFocusedObjectId) {
-        helpLensFocusedObjectId = undefined;
-      } else {
-        const definition = createHelpDefinitionForObject(focused.object, xrActive);
-        helpLensRenderer.update({ visible: definition !== undefined, xrActive, camera, definition });
-        return;
-      }
-    }
-
-    const automaticObject = findAutomaticHelpObject();
-    const definition = automaticObject ? createHelpDefinitionForObject(automaticObject, xrActive) : undefined;
-    helpLensRenderer.update({
-      visible: definition !== undefined,
-      xrActive,
-      camera,
-      definition,
-    });
-  }
-
-  function requestHelpLensForFocusedObject(activeAimRay: RootAimRay | undefined): void {
-    const focused = findFocusedRuntimeObject(activeAimRay);
-    const focusedObjectId = focused?.object.id;
-    helpLensFocusedObjectId = focusedObjectId === helpLensFocusedObjectId ? undefined : focusedObjectId;
-  }
-
-  function createHelpDefinitionForObject(
-    object: RuntimeWorldObject,
-    xrActive: boolean,
-  ): ReturnType<typeof createHelpLensDefinition> | undefined {
-    const focus = getWorldFocusMessageDefinition(object);
-    if (!focus) {
-      return undefined;
-    }
-
-    return createHelpLensDefinition({
-      focus,
-      selectedTool: currentMenuState().selectedTool,
-      inputMode: xrActive ? "xr" : "desktop",
-    });
-  }
-
-  function findAutomaticHelpObject(): RuntimeWorldObject | undefined {
-    let best: { readonly object: RuntimeWorldObject; readonly distanceSquared: number } | undefined;
-    for (const object of runtimeObjectRegistry.getObjectsInCell(session.get().playerPose.cellId)) {
-      const rangeMeters = object.autoDisplayHelpRangeMeters;
-      if (!object.displayHelpMessage || rangeMeters === undefined) {
-        continue;
-      }
-
-      const dx = object.localPose.translation.x - session.get().playerPose.position.x;
-      const dy = object.localPose.translation.y - session.get().playerPose.position.y;
-      const dz = object.localPose.translation.z - session.get().playerPose.position.z;
-      const distanceSquared = dx * dx + dy * dy + dz * dz;
-      if (distanceSquared > rangeMeters * rangeMeters) {
-        continue;
-      }
-
-      if (!best || distanceSquared < best.distanceSquared) {
-        best = { object, distanceSquared };
-      }
-    }
-
-    return best?.object;
   }
 
   function removeGeodesicRuntimeObjects(): void {
