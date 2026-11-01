@@ -130,7 +130,7 @@ function setupSync(carriedId: string | undefined) {
     getWorld: () => world,
     session: createTestAppSession({
       playerPose: { cellId: "room-b", position: { x: 0, y: 0, z: 0 }, yawRadians: 0 } as unknown as PlayerPose,
-      carry: carriedId === undefined ? undefined : { objectId: carriedId },
+      carry: carriedId === undefined ? undefined : { objectId: carriedId, arrived: true },
     }),
     buildArchetype: (source, capacity) => buildRuntimeObjectRenderArchetype(source, capacity, undefined),
   });
@@ -204,7 +204,7 @@ describe("the highlight of a carried geodesic emitter", () => {
       maxVisiblePaths: 4,
       diagnostics: createRuntimeObjectRenderArchetypeDiagnostics(),
       getWorld: () => world,
-      session: createTestAppSession({ carry: { objectId: "cannon-b" } }),
+      session: createTestAppSession({ carry: { objectId: "cannon-b", arrived: true } }),
       buildArchetype: (source, capacity) => buildRuntimeObjectRenderArchetype(source, capacity, undefined),
     });
     const shift = new THREE.Matrix4().makeTranslation(-2, 0, 0);

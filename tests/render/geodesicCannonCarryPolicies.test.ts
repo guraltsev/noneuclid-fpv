@@ -163,6 +163,35 @@ describe("the carry tool applies the agreed policies", () => {
       expect(far.selectedTool()).toBe("none");
     });
 
+    it("holds a fresh pickup at the limit of the pickup range", () => {
+      const { tools, selectedTool } = setupRooms(3.5, 2.5);
+
+      tools.startGeodesicCannonCarry("cannon-b");
+      // 2.55 m from the emitter: just beyond the 2.5 m pickup range, within the loose leash; the emitter has not moved (no time passes).
+      tools.updateCarriedGeodesicCannonPose(true, handAt(3.5, 3), 0);
+
+      expect(selectedTool()).toBe("geodesic-cannon-carry");
+    });
+
+    it("holds at 1.5 m while gliding, but lets go at 1.5 m once the emitter has arrived", () => {
+      const gliding = setupRooms(3.5, 2.5);
+      gliding.tools.startGeodesicCannonCarry("cannon-b");
+      // The emitter (x = 6 in the frame of a) is 1.5 m from the hand and has not reached it: the loose leash applies.
+      gliding.tools.updateCarriedGeodesicCannonPose(true, handAt(4.5, 2.5), 0);
+      expect(gliding.selectedTool()).toBe("geodesic-cannon-carry");
+
+      const held = setupRooms(3.5, 2.5);
+      held.tools.startGeodesicCannonCarry("cannon-b");
+      // Without a time limit the emitter follows the hand all the way: it has arrived, the tight leash applies from now on.
+      held.tools.updateCarriedGeodesicCannonPose(true, handAt(4.5, 2.5));
+      expect(held.selectedTool()).toBe("geodesic-cannon-carry");
+      // Within 1 m of the arrived emitter the carry goes on; at 1.5 m (the emitter stuck, the hand gone) it is let go.
+      held.tools.updateCarriedGeodesicCannonPose(true, handAt(4.5, 1.6), 0);
+      expect(held.selectedTool()).toBe("geodesic-cannon-carry");
+      held.tools.updateCarriedGeodesicCannonPose(true, handAt(4.5, 1), 0);
+      expect(held.selectedTool()).toBe("none");
+    });
+
     it("keeps the geodesic chained when a hand that moved far away lets go", () => {
       const { registry, tools, selectedTool } = setupRooms(3.5, 2.5);
       const frameSeconds = 1 / 60;

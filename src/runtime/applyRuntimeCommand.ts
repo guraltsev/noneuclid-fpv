@@ -248,7 +248,9 @@ function reduceCommand(state: AppSessionState, command: RuntimeCommand): Runtime
       // A second pickup of the object already carried changes nothing. (Outside the carry tool the wrapper drops the record again.)
       return state.carry?.objectId === command.objectId
         ? nothing
-        : { state: { ...state, carry: { objectId: command.objectId } }, effects: [] };
+        : { state: { ...state, carry: { objectId: command.objectId, arrived: false } }, effects: [] };
+    case "carry-arrived":
+      return state.carry && !state.carry.arrived ? { state: { ...state, carry: { ...state.carry, arrived: true } }, effects: [] } : nothing;
     case "end-carry":
       return state.carry ? { state: { ...state, carry: undefined }, effects: [] } : nothing;
     case "adopt-debug-settings": {

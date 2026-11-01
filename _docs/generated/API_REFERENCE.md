@@ -1331,10 +1331,14 @@ The player's hand as a carrier: when does it let go of what it carries?
 | Kind | Name | Summary |
 | --- | --- | --- |
 | type | `HandCarryDecision` | What the hand does after a frame of carrying: keep holding, or let go (the carry ends where the object is). |
+| type | `HandCarryPhase` | Where a carry is: still gliding to the hand after the pickup (loose leash), or held, having been at the hand (tight leash). |
+| const | `heldCarryLeashMeters` | Leash in meters once the object has been at the hand (1.0; tunable): beyond this distance the hand lets go. |
+| const | `handCarryArrivalMeters` | Distance in meters (0.1; tunable) within which the object counts as having reached the hand. |
 | const | `handCarrySlowestFrameSeconds` | The slowest frame the leash allows for, in seconds: the object may lag the hand by what it travels at the speed cap in one such frame. |
 | const | `handCarryLeashSlackMeters` | Lag the leash allows on top of the pickup distance, in meters (about 0.67): the speed cap times the slowest frame. |
 | function | `handCarryLeashMeters` | The leash of the hand, in meters: how far the carried object may be from the hand before it is let go. |
-| function | `decideHandCarry` | Holds while the object is within the leash of the hand; releases when it is farther or cannot be reached. |
+| function | `handCarryArrived` | True when the object is at the hand: within `handCarryArrivalMeters` of it. |
+| function | `decideHandCarry` | Holds while the object is within the leash of the phase (`glidingLeashMeters` while gliding, `heldCarryLeashMeters` once held, never longer than the loose one); releases when it is farther or cannot be reached. |
 
 ### `interaction/inputFrame.ts`
 
@@ -1401,7 +1405,7 @@ The shell-side session: the one record that holds the mutable state of a running
 | Kind | Name | Summary |
 | --- | --- | --- |
 | type | `ObjectIdFamily` | Families of runtime objects whose ids carry a serial number from the session. |
-| interface | `CarryRecord` | Who is being carried. |
+| interface | `CarryRecord` | Who is being carried, and whether the object has reached the hand yet. |
 | interface | `AppSessionState` | Mutable state of one running world, as one plain record. |
 | interface | `AppSession` | Owner of the current AppSessionState. |
 | function | `createAppSession` | Creates a session holding `initial`. |

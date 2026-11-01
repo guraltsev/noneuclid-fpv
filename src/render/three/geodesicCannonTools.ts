@@ -44,7 +44,7 @@ import {
 import { type RuntimeObjectRegistry, type RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
 import { runtimeObjectToDynamicObjectState } from "../../world-objects/runtimeObjectBase";
 import { AimTarget } from "../../interaction/aimTarget";
-import { decideHandCarry, handCarryLeashMeters } from "../../interaction/handCarry";
+import { decideHandCarry, handCarryArrived, handCarryLeashMeters } from "../../interaction/handCarry";
 import {
   carriedGeodesicEmitterDesktopDistanceMeters,
   getDistanceAlongGeodesicSegment,
@@ -775,11 +775,16 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
       syncSelectableHitboxDebug();
     }
     // Whether the hand goes on holding the emitter is the hand's policy (a wall or a zone never ends a carry): it lets go of what is too far.
-    const leashMeters = handCarryLeashMeters({
+    // The leash is loose while the emitter still glides to the hand and tight once it has been at the hand (the first frame it is, the session is told).
+    const arrived = deps.session.get().carry?.arrived === true || handCarryArrived(advance.remaining);
+    if (arrived && deps.session.get().carry?.arrived === false) {
+      deps.dispatch({ kind: "carry-arrived" });
+    }
+    const glidingLeashMeters = handCarryLeashMeters({
       pickupRangeMeters: getRuntimeObjectInteractionRangeMeters(cannon),
       handReachMeters: xrActive ? 0 : carriedGeodesicEmitterDesktopDistanceMeters,
     });
-    if (decideHandCarry(advance.remaining, leashMeters) === "release") {
+    if (decideHandCarry(advance.remaining, arrived ? "held" : "gliding", glidingLeashMeters) === "release") {
       finishGeodesicCannonCarry();
     }
   }

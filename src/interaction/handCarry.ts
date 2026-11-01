@@ -10,12 +10,23 @@
  * carrier with another policy takes the same input. A force field would replace the boolean decision here by a pull toward the carrier that grows
  * with the distance and decide the release from it; nothing outside this module would change.
  *
- * The leash is longer than the farthest an object can be from the hand the moment it is picked up, so a fresh pickup never lets go.
+ * The leash has two phases. Right after a pickup the object glides to the hand and may be as far from it as the pickup range allows, so the leash
+ * is loose (longer than the farthest an object can be from the hand at pickup, so a fresh pickup never lets go). Once the object has been at the hand
+ * the leash is tight (`heldCarryLeashMeters`): an object held in the hand that falls this far behind it, because it is stuck at a wall or a zone and
+ * the hand keeps going, is let go. An object that never reaches the hand is let go at the loose leash.
  */
 import { carryMaxSpeedMetersPerSecond, type CarryRemaining } from "../world-objects/carry";
 
 /** What the hand does after a frame of carrying: keep holding, or let go (the carry ends where the object is). */
 export type HandCarryDecision = "hold" | "release";
+
+/** Where a carry is: still gliding to the hand after the pickup (loose leash), or held, having been at the hand (tight leash). */
+export type HandCarryPhase = "gliding" | "held";
+
+/** Leash in meters once the object has been at the hand (1.0; tunable): beyond this distance the hand lets go. */
+export const heldCarryLeashMeters = 1;
+/** Distance in meters (0.1; tunable) within which the object counts as having reached the hand. */
+export const handCarryArrivalMeters = 0.1;
 
 /** The slowest frame the leash allows for, in seconds: the object may lag the hand by what it travels at the speed cap in one such frame. */
 export const handCarrySlowestFrameSeconds = 1 / 30;
@@ -31,7 +42,16 @@ export function handCarryLeashMeters(input: { readonly pickupRangeMeters: number
   return input.pickupRangeMeters + input.handReachMeters + handCarryLeashSlackMeters;
 }
 
-/** Holds while the object is within the leash of the hand; releases when it is farther or cannot be reached. */
-export function decideHandCarry(remaining: CarryRemaining, leashMeters: number): HandCarryDecision {
+/** True when the object is at the hand: within `handCarryArrivalMeters` of it. An unreachable object is not. */
+export function handCarryArrived(remaining: CarryRemaining): boolean {
+  return remaining !== "unreachable" && remaining <= handCarryArrivalMeters;
+}
+
+/**
+ * Holds while the object is within the leash of the phase (`glidingLeashMeters` while gliding, `heldCarryLeashMeters` once held, never longer than the
+ * loose one); releases when it is farther or cannot be reached.
+ */
+export function decideHandCarry(remaining: CarryRemaining, phase: HandCarryPhase, glidingLeashMeters: number): HandCarryDecision {
+  const leashMeters = phase === "held" ? Math.min(heldCarryLeashMeters, glidingLeashMeters) : glidingLeashMeters;
   return remaining !== "unreachable" && remaining <= leashMeters ? "hold" : "release";
 }

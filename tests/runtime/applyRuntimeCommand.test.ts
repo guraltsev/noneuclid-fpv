@@ -492,7 +492,7 @@ describe("applyRuntimeCommand: carrying", () => {
     reduce({ kind: "begin-carry", objectId }, reduce({ kind: "enter-tool-mode", toolId: "geodesic-cannon-carry" }).state).state;
 
   it("records the carried object on pickup while the carry tool is selected", () => {
-    expect(carrying().carry).toEqual({ objectId: "cannon-a" });
+    expect(carrying().carry).toEqual({ objectId: "cannon-a", arrived: false });
   });
 
   it("ignores a second pickup of the object already carried, keeping the state object", () => {
@@ -502,11 +502,31 @@ describe("applyRuntimeCommand: carrying", () => {
   });
 
   it("lets a pickup of another object replace the record (the record has one slot)", () => {
-    expect(reduce({ kind: "begin-carry", objectId: "cannon-b" }, carrying()).state.carry).toEqual({ objectId: "cannon-b" });
+    expect(reduce({ kind: "begin-carry", objectId: "cannon-b" }, carrying()).state.carry).toEqual({ objectId: "cannon-b", arrived: false });
   });
 
   it("does not record a pickup outside the carry tool", () => {
     expect(reduce({ kind: "begin-carry", objectId: "cannon-a" }).state.carry).toBeUndefined();
+  });
+
+  it("marks the carry as arrived the first time, and only then changes the state", () => {
+    const arrived = reduce({ kind: "carry-arrived" }, carrying());
+
+    expect(arrived.state.carry).toEqual({ objectId: "cannon-a", arrived: true });
+    expect(arrived.effects).toEqual([]);
+    expect(reduce({ kind: "carry-arrived" }, arrived.state).state).toBe(arrived.state);
+  });
+
+  it("ignores an arrival when nothing is carried", () => {
+    const state = stateWith();
+
+    expect(reduce({ kind: "carry-arrived" }, state).state).toBe(state);
+  });
+
+  it("starts a pickup of another object as not arrived", () => {
+    const arrived = reduce({ kind: "carry-arrived" }, carrying()).state;
+
+    expect(reduce({ kind: "begin-carry", objectId: "cannon-b" }, arrived).state.carry).toEqual({ objectId: "cannon-b", arrived: false });
   });
 
   it("clears the record on release and leaves the tool selection alone", () => {
@@ -527,5 +547,6 @@ describe("applyRuntimeCommand: carrying", () => {
     expect(reduce({ kind: "clear-selected-tool" }, carrying()).state.carry).toBeUndefined();
     expect(reduce({ kind: "select-tool", toolId: "protractor" }, carrying()).state.carry).toBeUndefined();
     expect(reduce({ kind: "cancel-menu-and-tool" }, carrying()).state.carry).toBeUndefined();
+    expect(reduce({ kind: "clear-selected-tool" }, reduce({ kind: "carry-arrived" }, carrying()).state).state.carry).toBeUndefined();
   });
 });

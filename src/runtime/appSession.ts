@@ -16,11 +16,13 @@ import type { RuntimeMenuState } from "./runtimeMenuState";
 export type ObjectIdFamily = "placed-flag" | "measured-geodesic-length" | "protractor-angle" | "geodesic-cannon" | "geodesic";
 
 /**
- * Who is being carried. Only the object's id is state: where the hand holds it is derived each frame from the carrier's aim.
- * One record means one carrier; the carry contract (world-objects/carry.ts) itself keeps no such table.
+ * Who is being carried, and whether the object has reached the hand yet. Where the hand holds the object is derived each frame from the
+ * carrier's aim. One record means one carrier; the carry contract (world-objects/carry.ts) itself keeps no such table.
  */
 export interface CarryRecord {
   readonly objectId: string;
+  /** False while the object still glides to the hand after the pickup (the hand's loose leash applies); true from the first frame it is at the hand (the tight leash applies). */
+  readonly arrived: boolean;
 }
 
 /**
