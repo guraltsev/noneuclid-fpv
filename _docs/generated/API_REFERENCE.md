@@ -2524,6 +2524,16 @@ Aim-ray value type and pure aim helpers shared by desktop and XR interaction cod
 | function | `getRuntimeObjectInteractionRangeMeters` | Returns the maximum interaction distance in meters for an object: tooltip range, else interactable range, else 2.5. |
 | interface | `FocusedRuntimeObject` | The interactable object the aim ray currently rests on. |
 
+### `render/three/runtimeObjectActions.ts`
+
+Actions the player performs on runtime objects through the aim: placing and editing signs, measuring a geodesic, the protractor, the primary interaction and context menu of the focused object, going home, resetting the world, and the debug pose helpers.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `RuntimeObjectActionsDeps` | Dependencies of the runtime-object actions, supplied by createThreeApp's shell. |
+| interface | `RuntimeObjectActions` | What the shell calls: the aim actions, the sign editing keys, going home and resetting, and the debug helpers. |
+| function | `createRuntimeObjectActions` | Creates the runtime-object actions over the shell's session, registry and tool-object runtimes. |
+
 ### `render/three/runtimeObjectGhostRecords.ts`
 
 Creates "ghost" render records so a dynamic object that overlaps a portal is drawn on every side of it.

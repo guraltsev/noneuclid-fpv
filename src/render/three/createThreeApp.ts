@@ -66,7 +66,7 @@ import { reversePainterSortStable } from "@pmndrs/uikit";
 import { type AppState } from "../../runtime/appState";
 import { type CellComplexSpec } from "../../cell-complex/specs";
 import { buildStaticallyCulledPortalPathTables } from "../../cell-complex/staticPortalPathCull";
-import { type AppConfig, defaultAppConfig, isRuntimeToolEnabled } from "../../glue/appConfig";
+import { type AppConfig, defaultAppConfig } from "../../glue/appConfig";
 import { type DebugLevelId } from "../../diagnostics/debugLevels";
 import { type DebugOptionId, hasActiveDebugOption } from "../../glue/debugOptions";
 import { type DebugSettings } from "../../glue/debugSettings";
@@ -80,7 +80,7 @@ import { DEFAULT_PLAYER_EYE_HEIGHT_METERS } from "../../movement/playerBody";
 import { type PlayerPose, playerPoseFromDynamicObject, playerPoseToDynamicObject } from "../../movement/playerPose";
 import { depenetrateDynamicObject } from "../../movement/depenetrateDynamicObject";
 import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex";
-import { createAppSession, initialObjectIdSerials, takeObjectIdSerial } from "../../runtime/appSession";
+import { createAppSession, initialObjectIdSerials } from "../../runtime/appSession";
 import { applyRuntimeCommand } from "../../runtime/applyRuntimeCommand";
 import { type RuntimeCommand, type RuntimeEffect } from "../../runtime/runtimeCommands";
 import { createDebugSettingsFromRuntimeMenuState, createRuntimeMenuState } from "../../runtime/runtimeMenuState";
@@ -99,12 +99,7 @@ import { advanceCurveShorteningPairs } from "../../world-objects/geodesic/curveS
 import { pruneMissingGeodesicIntersectionObjects } from "../../world-objects/geodesic/intersections";
 import { isGeodesicMarmotObjectSpec } from "../../world-objects/geodesicMarmot";
 import { type GeodesicMarmotRuntime, createGeodesicMarmotRuntime } from "./creatures/geodesicMarmotView";
-import { createMeasuredGeodesicLengthObject } from "../../world-objects/measureLengthTool";
-import {
-  placeFlagAtFloorPoint,
-  updatePlacedFlagMessage,
-} from "../../world-objects/placedFlags";
-import { type ProtractorCenterSelection, createProtractorAngleObject, protractorSelectionsUseDifferentGeodesics, resolveProtractorCenterSelection, resolveProtractorDirectedGeodesicSelection, resolveProtractorEmitterGeodesicSelection } from "../../world-objects/protractorTool";
+import { type ProtractorCenterSelection, protractorSelectionsUseDifferentGeodesics, resolveProtractorCenterSelection, resolveProtractorDirectedGeodesicSelection, resolveProtractorEmitterGeodesicSelection } from "../../world-objects/protractorTool";
 import { type ProtractorDirectedGeodesic } from "../../world-objects/toolObjects";
 import { type RuntimeWorldObject, createRuntimeObjectRegistry, createRuntimeStaticAssetObject } from "../../world-objects/runtimeObjectRegistry";
 import { runtimeObjectToDynamicObjectState } from "../../world-objects/runtimeObjectBase";
@@ -118,7 +113,6 @@ import { createAimCrossMarker } from "./aimCrossMarker";
 import { createAimInteraction } from "./aimInteraction";
 import {
   GeometryDebugHelpers,
-  PlayerPoseDebugDump,
   WindowWithGeometryDebugHelpers,
   installGeneralDebugHelpers,
   mergeStaticPathCounts,
@@ -154,6 +148,7 @@ import { createGeodesicCannonTools } from "./geodesicCannonTools";
 import { createGeodesicDebugDumps } from "./geodesicDebugDumps";
 import { createGeodesicEmitterLabelController } from "./geodesicEmitterLabelController";
 import { createGeometryComputerMenu } from "./geometryComputerMenu";
+import { createRuntimeObjectActions } from "./runtimeObjectActions";
 import { createHelpLensRenderer } from "./helpLensRenderer";
 import { MeasuredGeodesicLengthRuntime } from "./measureLengthRenderer";
 import { PlacedFlagRuntime } from "./placedFlagRenderer";
@@ -978,6 +973,61 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     removeProtractorAnglesForMissingVertices,
     refreshProtractorAnglesForGeodesic,
     refreshProtractorAnglesForGeodesics,
+  });
+
+  const {
+    appendEditingSignCharacter,
+    backspaceEditingSignMessage,
+    deleteEditingSign,
+    tryPlaceFlagFromAim,
+    tryUseMeasureLengthToolFromAim,
+    tryUseProtractorToolFromAim,
+    tryUseFocusedObjectPrimaryInteraction,
+    openContextMenuFromAim,
+    resetPlayerToHome,
+    teleportPlayerHome,
+    resetRuntimeWorld,
+    debugPlayerPose,
+    debugSetPlayerPose,
+    debugPlaceObjectAt,
+  } = createRuntimeObjectActions({
+    session,
+    dispatch: dispatchRuntimeCommand,
+    runtimeObjectRegistry,
+    getWorld: activeWorld,
+    appConfig,
+    initialPlayerPose: appState.playerPose,
+    xrRig,
+    objectHost,
+    dynamicObjectRuntimes,
+    cellMeshes,
+    staticAssetOwners,
+    resolveCurrentAimTarget,
+    targetIsWithinInteractionRange,
+    logVerboseAimClick,
+    findFocusedRuntimeObject,
+    tryExtendFocusedGeodesicFromAim,
+    getGeodesicDisplayName,
+    getGeodesicLabelsById,
+    getLockedGeodesicIds,
+    canTieAndDetachGeodesicsFromCannon,
+    createGeometryComputerMenuOptions,
+    syncPlacedFlagRuntime,
+    removePlacedFlagRuntime,
+    syncMeasuredGeodesicLengthRuntime,
+    removeMeasuredGeodesicLengthRuntime,
+    syncProtractorAngleRuntime,
+    removeProtractorAngleRuntime,
+    removePlacedFlags,
+    removeMeasuredGeodesicLengths,
+    removeProtractorAngles,
+    removeGeodesicRuntimeObjects,
+    syncRuntimeObjectPortalInstances: requestRuntimeObjectInstanceSync,
+    syncSelectableHitboxDebug: requestSelectableHitboxDebugSync,
+    syncDesktopPalette,
+    clearProtractorToolFeedback,
+    resolveProtractorDirectedSelectionFromAimTarget,
+    applyDesktopScenePaletteToggle,
   });
 
   // Initial build: cell groups and archetypes, camera pose, first visibility pass (before any frame runs).
@@ -2592,381 +2642,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   function getTieAndDetachToolPrompt(): string {
     const selectedCount = session.get().cannonToolState.tieAndDetachEndpointSelections?.length ?? 0;
     return selectedCount === 0 ? "select: geodesic 1" : "select: geodesic 2";
-  }
-
-  function appendEditingSignCharacter(character: string): void {
-    if (!/^[A-Z0-9]$/.test(character) && character !== "\n" && character !== " ") {
-      return;
-    }
-
-    const editState = currentMenuState().editSignOptions;
-    if (!editState) {
-      return;
-    }
-
-    setEditingSignMessage(editState.flagId, `${editState.message}${character}`);
-  }
-
-  function backspaceEditingSignMessage(): void {
-    const editState = currentMenuState().editSignOptions;
-    if (!editState) {
-      return;
-    }
-
-    setEditingSignMessage(editState.flagId, [...editState.message].slice(0, -1).join(""));
-  }
-
-  function deleteEditingSign(): void {
-    const editState = currentMenuState().editSignOptions;
-    if (!editState) {
-      return;
-    }
-
-    const flag = runtimeObjectRegistry.get(editState.flagId);
-    if (flag?.kind === "placed-flag") {
-      runtimeObjectRegistry.remove(editState.flagId);
-      removePlacedFlagRuntime(editState.flagId);
-      requestRuntimeObjectInstanceSync();
-    }
-    dispatchRuntimeCommand({ kind: "close-menu" });
-  }
-
-  function setEditingSignMessage(flagId: string, message: string): void {
-    const flag = runtimeObjectRegistry.get(flagId);
-    if (flag?.kind !== "placed-flag") {
-      dispatchRuntimeCommand({ kind: "close-menu" });
-      return;
-    }
-
-    const nextFlag = updatePlacedFlagMessage(flag, message);
-    runtimeObjectRegistry.update(nextFlag);
-    syncPlacedFlagRuntime(nextFlag);
-    dispatchRuntimeCommand({ kind: "set-editing-sign-message", message: nextFlag.message });
-  }
-
-  function tryPlaceFlagFromAim(ray?: RootAimRay): void {
-    if (!ray) {
-      return;
-    }
-
-    const target = resolveCurrentAimTarget(ray);
-    if (target?.kind !== "floor") {
-      return;
-    }
-
-    const result = placeFlagAtFloorPoint({
-      world: activeWorld(),
-      registry: runtimeObjectRegistry,
-      cellId: target.cellId,
-      eyePosition: target.localEyePosition,
-      floorPoint: target.localPoint,
-      flagType: currentMenuState().placeFlagOptions.flagType,
-      id: `placed-flag:${Date.now()}:${takeObjectIdSerial(session, "placed-flag")}`,
-    });
-
-    if (result.placed && result.object) {
-      syncPlacedFlagRuntime(result.object);
-      dispatchRuntimeCommand({ kind: "clear-selected-tool" });
-      requestSelectableHitboxDebugSync();
-    }
-  }
-
-  function tryUseMeasureLengthToolFromAim(ray?: RootAimRay): void {
-    if (!ray) {
-      return;
-    }
-
-    const target = resolveCurrentAimTarget(ray);
-    logVerboseAimClick(target);
-    if (!targetIsWithinInteractionRange(target) || target?.object?.kind !== "geodesic-segment") {
-      return;
-    }
-
-    const geodesicId = target.object.geodesicId;
-    const existing = runtimeObjectRegistry.getAll().find((object) =>
-      object.kind === "measured-geodesic-length" && object.geodesicId === geodesicId
-    );
-    const measurement = createMeasuredGeodesicLengthObject({
-      id: existing?.id ?? `measured-geodesic-length:${Date.now()}:${takeObjectIdSerial(session, "measured-geodesic-length")}`,
-      registry: runtimeObjectRegistry,
-      world: activeWorld(),
-      geodesicId,
-      playerCellId: session.get().playerPose.cellId,
-      playerPoint: session.get().playerPose.position,
-      label: getGeodesicDisplayName(geodesicId),
-      fallbackSegment: target.object,
-    });
-    if (!measurement) {
-      return;
-    }
-
-    if (existing) {
-      runtimeObjectRegistry.update(measurement);
-    } else {
-      runtimeObjectRegistry.add(measurement);
-    }
-    syncMeasuredGeodesicLengthRuntime(measurement);
-    dispatchRuntimeCommand({ kind: "clear-selected-tool" });
-    requestSelectableHitboxDebugSync();
-  }
-
-  function resetPlayerToHome(): void {
-    const startingPosition = activeWorld().startingPosition;
-    const fallbackCell = activeWorld().cells[0];
-    const homePose: PlayerPose = startingPosition
-      ? {
-          cellId: startingPosition.cellId,
-          position: startingPosition.position,
-          yawRadians: startingPosition.yawRadians ?? 0,
-          pitchRadians: startingPosition.pitchRadians ?? 0,
-        }
-      : {
-          ...appState.playerPose,
-          cellId: fallbackCell?.id ?? appState.playerPose.cellId,
-        };
-    dispatchRuntimeCommand({ kind: "set-player-pose", pose: homePose });
-    xrRig.reset();
-  }
-
-  function teleportPlayerHome(): void {
-    closeMenusForHomeTeleport();
-    resetPlayerToHome();
-  }
-
-  function closeMenusForHomeTeleport(): void {
-    if (currentMenuState().isOpen || currentMenuState().selectedTool !== "none") {
-      dispatchRuntimeCommand({ kind: "cancel-menu-and-tool" });
-    }
-  }
-
-  function debugPlayerPose(): PlayerPoseDebugDump {
-    const pose = session.get().playerPose;
-    const round = (value: number): number => Math.round(value * 1e6) / 1e6;
-    return {
-      cellId: pose.cellId,
-      position: { x: round(pose.position.x), y: round(pose.position.y), z: round(pose.position.z) },
-      yawDegrees: round((pose.yawRadians * 180) / Math.PI),
-      pitchDegrees: round((pose.pitchRadians * 180) / Math.PI),
-    };
-  }
-
-  function debugSetPlayerPose(cellId: string, x: number, y: number, yawDegrees: number, pitchDegrees?: number): PlayerPoseDebugDump {
-    if (!activeWorld().cellsById.has(cellId)) {
-      throw new Error(`no cell "${cellId}" in the active world`);
-    }
-    if (![x, y, yawDegrees, pitchDegrees ?? 0].every(Number.isFinite)) {
-      throw new Error("setPlayerPose needs finite numbers");
-    }
-    const current = session.get().playerPose;
-    dispatchRuntimeCommand({
-      kind: "set-player-pose",
-      pose: {
-        cellId,
-        position: { x, y, z: 0 },
-        yawRadians: (yawDegrees * Math.PI) / 180,
-        pitchRadians: pitchDegrees === undefined ? current.pitchRadians : (pitchDegrees * Math.PI) / 180,
-      },
-    });
-    return debugPlayerPose();
-  }
-
-  function debugPlaceObjectAt(id: string, cellId: string, x: number, y: number, yawDegrees: number): boolean {
-    const placed = objectHost.placeAt(id, cellId, yawRigidTransform3((yawDegrees * Math.PI) / 180, { x, y, z: 0 }));
-    console.log(`placeObjectAt(${id}): ${placed}`);
-    return placed;
-  }
-
-  function resetRuntimeWorld(): void {
-    for (const runtime of dynamicObjectRuntimes) {
-      runtime.reset(cellMeshes);
-    }
-    for (const owner of staticAssetOwners) {
-      owner.reset();
-    }
-    removePlacedFlags();
-    removeGeodesicRuntimeObjects();
-    removeMeasuredGeodesicLengths();
-    removeProtractorAngles();
-  }
-
-  function tryUseProtractorToolFromAim(ray?: RootAimRay): void {
-    const protractor = session.get().protractorToolState;
-    if (!ray) {
-      return;
-    }
-
-    const target = resolveCurrentAimTarget(ray);
-    logVerboseAimClick(target);
-    if (!targetIsWithinInteractionRange(target)) {
-      return;
-    }
-
-    if (!protractor.center) {
-      if (target?.object?.kind !== "geodesic-cannon" && target?.object?.kind !== "geodesic-intersection") {
-        return;
-      }
-
-      dispatchRuntimeCommand({ kind: "set-protractor-tool-state", state: {
-        center: resolveProtractorCenterSelection(target.object),
-      } });
-      syncDesktopPalette();
-      return;
-    }
-
-    const selected = resolveProtractorDirectedSelectionFromAimTarget(target, protractor.center);
-    if (!selected) {
-      return;
-    }
-
-    if (!protractor.first) {
-      dispatchRuntimeCommand({ kind: "set-protractor-tool-state", state: {
-        center: protractor.center,
-        first: selected,
-      } });
-      syncDesktopPalette();
-      return;
-    }
-
-    if (!protractorSelectionsUseDifferentGeodesics(protractor.first, selected)) {
-      return;
-    }
-
-    const angle = createProtractorAngleObject({
-      id: `protractor-angle:${Date.now()}:${takeObjectIdSerial(session, "protractor-angle")}`,
-      center: protractor.center,
-      first: protractor.first,
-      second: selected,
-    });
-    runtimeObjectRegistry.add(angle);
-    syncProtractorAngleRuntime(angle);
-    dispatchRuntimeCommand({ kind: "set-protractor-tool-state", state: {} });
-    clearProtractorToolFeedback();
-    dispatchRuntimeCommand({ kind: "clear-selected-tool" });
-    requestSelectableHitboxDebugSync();
-  }
-
-  function tryRemoveFocusedProtractorAngle(ray?: RootAimRay): boolean {
-    const focused = findFocusedRuntimeObject(ray);
-    if (focused?.object.kind !== "protractor-angle") {
-      return false;
-    }
-
-    runtimeObjectRegistry.remove(focused.object.id);
-    removeProtractorAngleRuntime(focused.object.id);
-    requestRuntimeObjectInstanceSync();
-    requestSelectableHitboxDebugSync();
-    return true;
-  }
-
-  function tryRemoveFocusedMeasuredGeodesicLength(ray?: RootAimRay): boolean {
-    const focused = findFocusedRuntimeObject(ray);
-    if (focused?.object.kind !== "measured-geodesic-length") {
-      return false;
-    }
-
-    runtimeObjectRegistry.remove(focused.object.id);
-    removeMeasuredGeodesicLengthRuntime(focused.object.id);
-    requestRuntimeObjectInstanceSync();
-    requestSelectableHitboxDebugSync();
-    return true;
-  }
-
-  function tryUseFocusedObjectPrimaryInteraction(ray?: RootAimRay): boolean {
-    if (!ray) {
-      return false;
-    }
-
-    const target = resolveCurrentAimTarget(ray);
-    if (!targetIsWithinInteractionRange(target)) {
-      return false;
-    }
-
-    switch (target?.object?.kind) {
-      case "asset":
-        return tryOpenFocusedQuestionHelp(target.object);
-      case "geodesic-segment":
-        return tryExtendFocusedGeodesicFromAim(ray);
-      case "measured-geodesic-length":
-        return tryRemoveFocusedMeasuredGeodesicLength(ray);
-      case "protractor-angle":
-        return tryRemoveFocusedProtractorAngle(ray);
-      default:
-        return false;
-    }
-  }
-
-  function openContextMenuFromAim(ray?: RootAimRay): void {
-    if (currentMenuState().isOpen) {
-      applyDesktopScenePaletteToggle(reduceDesktopScenePaletteToggle(true, "secondary-click"));
-      return;
-    }
-
-    if (tryOpenFocusedObjectMenu(ray)) {
-      return;
-    }
-
-    dispatchRuntimeCommand({ kind: "open-menu" });
-  }
-
-  function tryOpenFocusedObjectMenu(ray?: RootAimRay): boolean {
-    const focused = findFocusedRuntimeObject(ray);
-    if (!focused) {
-      return false;
-    }
-
-    if (
-      focused.object.kind === "placed-flag" &&
-      focused.object.interactable?.action === "edit-flag" &&
-      isRuntimeToolEnabled(appConfig, "place-flag")
-    ) {
-      dispatchRuntimeCommand({ kind: "show-edit-sign", flagId: focused.object.id, message: focused.object.message });
-      return true;
-    }
-
-    if (focused.object.kind === "geodesic-cannon" && isRuntimeToolEnabled(appConfig, "geodesic-cannon")) {
-      dispatchRuntimeCommand({ kind: "set-cannon-tool-state", state: {
-        selectedCannonId: focused.object.id,
-        activeGeodesicId: focused.object.activeGeodesicId,
-      } });
-      dispatchRuntimeCommand({
-        kind: "show-geodesic-cannon-actions",
-        cannonId: focused.object.id,
-        geodesicIds: focused.object.geodesicIds,
-        geodesicLabelsById: getGeodesicLabelsById(focused.object.geodesicIds),
-        lockedGeodesicIds: getLockedGeodesicIds(focused.object.geodesicIds),
-        canTieAndDetach: canTieAndDetachGeodesicsFromCannon(focused.object.id),
-      });
-      return true;
-    }
-
-    if (focused.object.kind === "asset" && focused.object.interactable?.action === "open-geometry-computer") {
-      dispatchRuntimeCommand({
-        kind: "show-geometry-computer-actions",
-        ...createGeometryComputerMenuOptions(focused.object.id),
-      });
-      return true;
-    }
-
-    if (focused.object.kind === "asset" && tryOpenFocusedQuestionHelp(focused.object)) {
-      return true;
-    }
-
-    return false;
-  }
-
-  function tryOpenFocusedQuestionHelp(object: RuntimeWorldObject): boolean {
-    if (object.kind !== "asset" || object.interactable?.action !== "open-tutorial") {
-      return false;
-    }
-
-    const tutorialPages = object.tutorialPages ?? [];
-    const goalPages = object.goalPages ?? [];
-    if (tutorialPages.length === 0 && goalPages.length === 0) {
-      return false;
-    }
-
-    dispatchRuntimeCommand({ kind: "show-question-help", objectId: object.id, tutorialPages, goalPages });
-    return true;
   }
 
   function playerBlockingBodiesInCell(cellId: string) {
