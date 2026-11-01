@@ -102,7 +102,6 @@ function createHarness(target: AimTarget | undefined, sessionOverrides: Partial<
     syncDesktopPalette: none,
     clearProtractorToolFeedback: none,
     resolveProtractorDirectedSelectionFromAimTarget: () => undefined,
-    applyDesktopScenePaletteToggle: none,
   });
   return { actions, registry, commands, syncedFlagIds, rigResets };
 }

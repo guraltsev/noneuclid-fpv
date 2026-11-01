@@ -1939,6 +1939,16 @@ Desktop keyboard and pointer-lock mouse input, collected into one DesktopInputFr
 | interface | `DesktopControlsOptions` | Tuning parameters for {@link createDesktopControls}; every field is optional. |
 | function | `createDesktopControls` | Creates the desktop input collector for the given canvas and installs its listeners. |
 
+### `render/three/desktopInputHandlers.ts`
+
+Desktop and XR input of the shell: the desktop event handlers (context menu, right click, Escape and Tab keys, wheel), the per-frame input frames, and the per-frame feed of the scene palette from XR controllers or the desktop pointer.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `DesktopInputHandlersDeps` | Dependencies of {@link createDesktopInputHandlers}. |
+| interface | `DesktopInputHandlers` | Handle to the input handlers created by {@link createDesktopInputHandlers}. |
+| function | `createDesktopInputHandlers` | Creates the desktop event handlers, the input-frame readers and the palette feed. |
+
 ### `render/three/desktopScenePaletteInput.ts`
 
 Desktop input path for the in-scene palette: turns mouse motion and button state into a single virtual pointer aimed at the palette.

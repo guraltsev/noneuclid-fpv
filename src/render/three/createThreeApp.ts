@@ -87,7 +87,6 @@ import {
   createInitialWorldDeformationState,
 } from "../../runtime/worldGeometryDeformationFamilies";
 import { type WorldGeometrySnapshot, createWorldGeometrySession } from "../../runtime/worldGeometrySession";
-import { type PaletteDefinition, createPaletteDefinitionCache } from "../../ui/paletteDefinition";
 import { advanceCurveShorteningPairs } from "../../world-objects/geodesic/curveShortening";
 import { pruneMissingGeodesicIntersectionObjects } from "../../world-objects/geodesic/intersections";
 import { isGeodesicMarmotObjectSpec } from "../../world-objects/geodesicMarmot";
@@ -113,16 +112,12 @@ import {
 } from "./appDebugHelpers";
 import { logDebugStartupGuide } from "./appDebugLogging";
 import { installRenderInspectionApi, uninstallRenderInspectionApi } from "./renderInspection";
-import { XrHeadWorldPose } from "./carriedGeodesicCannon";
 import { createGeometryCommit } from "./geometryCommit";
 import { createDebugOverlay } from "./debugOverlay";
 import { createDebugVisualization } from "./debugVisualization";
 import { createDesktopControls } from "./desktopControls";
-import {
-  createDesktopScenePaletteInput,
-  reduceDesktopScenePaletteToggle,
-} from "./desktopScenePaletteInput";
-import { resolveDesktopScenePalettePlacement } from "./desktopScenePalettePlacement";
+import { createDesktopInputHandlers } from "./desktopInputHandlers";
+import { createDesktopScenePaletteInput } from "./desktopScenePaletteInput";
 import {
   captureWebGlRenderInfo,
   smoothFramePerformance,
@@ -159,7 +154,6 @@ import {
   FramePerformanceRenderState,
   WebGlRenderInfoState,
 } from "./renderState";
-import { RuntimeInputFrame } from "../../interaction/inputFrame";
 import { createFrameErrorGuard } from "./frameErrorGuard";
 import { installRuntimeDiagnostics, runtimeDiagnostics } from "../../diagnostics/runtimeDiagnostics";
 import { createRuntimeObjectInstanceSync } from "./runtimeObjectInstanceSync";
@@ -193,7 +187,6 @@ import {
   createVrComfortVignette,
   isArtificialLocomotionActive,
 } from "./vrComfort";
-import { resolveVrPalettePlacement } from "./vrPalettePlacement";
 import { createXrControllerHandModels } from "./xrControllerHandModels";
 import { createXrControls } from "./xrControls";
 import { createXrEntryUi } from "./xrEntryUi";
@@ -271,9 +264,6 @@ export interface ThreeAppOptions {
 const reloadConfirmationWindowMs = 2000;
 // Consecutive failed frames (about half a second at 60-90 Hz) before an immersive session is ended.
 const MAX_CONSECUTIVE_FAILED_FRAMES = 30;
-// Desktop fallbacks of updateScenePalette's head pose; overwritten before each use.
-const paletteHeadPositionScratch = new THREE.Vector3();
-const paletteHeadQuaternionScratch = new THREE.Quaternion();
 
 /**
  * Creates the Three.js application shell inside `container` and starts its animation loop.
@@ -364,7 +354,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     protractorToolState: {},
     objectIdSerials: initialObjectIdSerials,
   });
-  let previousDesktopPalettePlacement: ReturnType<typeof resolveDesktopScenePalettePlacement> | undefined;
   let reloadConfirmationTimeout: number | undefined;
   // Disposal bookkeeping: `disposed` makes dispose() idempotent.
   let disposed = false;
@@ -698,8 +687,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   });
   // Inputs of the last per-frame refreshMeasuredGeodesicLengths run (version -1: never run).
   const measuredLengthsRefreshed = { version: -1, cellId: "", x: Number.NaN, y: Number.NaN, z: Number.NaN };
-  // The palette definition is rebuilt only when the menu state, input mode or reload-confirmation flag changes.
-  const paletteDefinitionCache = createPaletteDefinitionCache(appConfig);
   // Id of the cell whose group in cellMeshes is currently visible; updated by updateVisibleCell.
   let visibleCellId: string | undefined = session.get().playerPose.cellId;
 
@@ -897,6 +884,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     tryUseProtractorToolFromAim,
     tryUseFocusedObjectPrimaryInteraction,
     openContextMenuFromAim,
+    applyDesktopScenePaletteToggle,
     resetPlayerToHome,
     teleportPlayerHome,
     resetRuntimeWorld,
@@ -940,7 +928,33 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     syncDesktopPalette,
     clearProtractorToolFeedback,
     resolveProtractorDirectedSelectionFromAimTarget,
+  });
+
+  const {
+    onDesktopContextMenu,
+    onDesktopMouseDown,
+    onDesktopPaletteKeyDown,
+    onDesktopWheel,
+    getDesktopInputFrame,
+    getXrInputFrame,
+    updateScenePalette,
+  } = createDesktopInputHandlers({
+    session,
+    appConfig,
+    camera,
+    renderer,
+    xrRig,
+    controls,
+    xrControls,
+    scenePaletteController,
+    desktopScenePaletteInput,
+    xrScenePaletteInput,
+    xrControllerHandModels,
+    resolveActiveRootAimRay,
+    cycleFocusedAimTarget,
+    openContextMenuFromAim,
     applyDesktopScenePaletteToggle,
+    dismissHelpLensFocus: aimFeedback.dismissHelpLensFocus,
   });
 
   // Initial build: cell groups and archetypes, camera pose, first visibility pass (before any frame runs).
@@ -1732,178 +1746,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       renderer.domElement.remove();
     },
   };
-
-  // Feeds the scene palette (menu) from XR controllers or desktop pointer input and positions it; in XR also
-  // updates the controller hand models. Called once per frame in the UI phase.
-  function paletteDefinitionFrame(inputMode: "xr" | "desktop"): {
-    readonly definition: PaletteDefinition;
-    readonly definitionVersion: number;
-  } {
-    const cached = paletteDefinitionCache.get(currentMenuState(), inputMode);
-    return { definition: cached.definition, definitionVersion: cached.version };
-  }
-
-  function updateScenePalette(
-    xrActive: boolean,
-    xrFrame: XRFrame | undefined,
-    xrReferenceSpace: XRReferenceSpace | null,
-    xrHeadWorldPose: XrHeadWorldPose | undefined,
-    deltaSeconds: number,
-    frame: RuntimeInputFrame,
-  ): void {
-    if (xrActive && xrFrame && xrReferenceSpace) {
-      const inputSources = [...(renderer.xr.getSession()?.inputSources ?? [])];
-      const headPosition = xrHeadWorldPose?.position ?? camera.getWorldPosition(paletteHeadPositionScratch);
-      const headQuaternion = xrHeadWorldPose?.quaternion ?? camera.getWorldQuaternion(paletteHeadQuaternionScratch);
-
-      const placement = resolveVrPalettePlacement({
-        head: {
-          position: headPosition,
-          quaternion: headQuaternion,
-        },
-      });
-      scenePaletteController.update({
-        input: xrScenePaletteInput.update({
-          deltaSeconds,
-          xrFrame,
-          referenceSpace: xrReferenceSpace,
-          referenceSpaceToWorldMatrix: xrRig.root.matrixWorld,
-          inputSources,
-        }),
-        ...paletteDefinitionFrame("xr"),
-        placement,
-      });
-      xrControllerHandModels.update({
-        inputSources,
-        xrFrame,
-        referenceSpace: xrReferenceSpace,
-        referenceSpaceToWorldMatrix: xrRig.root.matrixWorld,
-        selectedTool: currentMenuState().selectedTool,
-        placeFlagType: currentMenuState().placeFlagOptions.flagType,
-      });
-      return;
-    }
-
-    const placement = resolveDesktopScenePalettePlacement({
-      camera,
-      previousPlacement: previousDesktopPalettePlacement,
-    });
-    previousDesktopPalettePlacement = placement;
-    scenePaletteController.update({
-      input: desktopScenePaletteInput.update({
-        desktopFrame: {
-          ...frame,
-          palettePointerDeltaPixels: frame.palettePointerDeltaPixels ?? { x: 0, y: 0 },
-          paletteSelectPressed: frame.paletteSelectPressed ?? false,
-          paletteSelectRequested: frame.paletteSelectRequested ?? false,
-        },
-        deltaSeconds,
-        camera,
-        isOpen: currentMenuState().isOpen,
-        placement,
-      }),
-      ...paletteDefinitionFrame("desktop"),
-      placement,
-    });
-  }
-
-  function onDesktopContextMenu(event: MouseEvent): void {
-    event.preventDefault();
-  }
-
-  function onDesktopMouseDown(event: MouseEvent): void {
-    if (event.button !== 2 || renderer.xr.isPresenting) {
-      return;
-    }
-
-    if (event.target !== renderer.domElement && !controls.isPointerLocked()) {
-      return;
-    }
-
-    event.preventDefault();
-    openContextMenuFromAim(resolveActiveRootAimRay(false));
-  }
-
-  function onDesktopPaletteKeyDown(event: KeyboardEvent): void {
-    if (renderer.xr.isPresenting) {
-      return;
-    }
-
-    if (event.code === "Escape") {
-      const action = reduceDesktopScenePaletteToggle(currentMenuState().isOpen, "escape-key");
-      if (action !== "none") {
-        event.preventDefault();
-        applyDesktopScenePaletteToggle(action);
-      } else if (aimFeedback.dismissHelpLensFocus()) {
-        event.preventDefault();
-      }
-      return;
-    }
-
-    if (event.code === "Tab" && !currentMenuState().isOpen) {
-      if (cycleFocusedAimTarget(resolveActiveRootAimRay(false))) {
-        event.preventDefault();
-      }
-    }
-  }
-
-  function onDesktopWheel(event: WheelEvent): void {
-    if (renderer.xr.isPresenting || currentMenuState().isOpen) {
-      return;
-    }
-
-    if (event.target !== renderer.domElement && !controls.isPointerLocked()) {
-      return;
-    }
-
-    if (cycleFocusedAimTarget(resolveActiveRootAimRay(false))) {
-      event.preventDefault();
-    }
-  }
-
-  function applyDesktopScenePaletteToggle(action: "open" | "right-action" | "close" | "none"): void {
-    if (action === "open" && !currentMenuState().isOpen) {
-      dispatchRuntimeCommand({ kind: "open-menu" });
-    } else if (action === "right-action" && currentMenuState().isOpen) {
-      dispatchRuntimeCommand({ kind: "menu-right-action" });
-    } else if (action === "close" && currentMenuState().isOpen) {
-      dispatchRuntimeCommand({ kind: "cancel-menu-and-tool" });
-    }
-  }
-
-  // Consumes accumulated keyboard/mouse input; the palette look mode is used while the menu is open.
-  function getDesktopInputFrame(deltaSeconds: number): RuntimeInputFrame {
-    controls.setLookMode(currentMenuState().isOpen ? "palette" : "camera");
-    const frame = controls.consumeFrame(deltaSeconds);
-
-    return {
-      ...frame,
-      source: "desktop",
-    };
-  }
-
-  // Consumes controller input from the active session's input sources; an all-zero frame if no session.
-  function getXrInputFrame(deltaSeconds: number): RuntimeInputFrame {
-    const session = renderer.xr.getSession();
-
-    if (!session) {
-      return {
-        localDisplacement: { x: 0, y: 0, z: 0 },
-        yawDeltaRadians: 0,
-        pitchDeltaRadians: 0,
-        resetRequested: false,
-        primaryActionRequested: false,
-        interactRequested: false,
-        carryActionRequested: false,
-        helpRequested: false,
-        source: "xr",
-      };
-    }
-
-    return {
-      ...xrControls.consumeFrame(session.inputSources, deltaSeconds),
-    };
-  }
 
   function recordCellTransition(previousCellId: string, moveResult: ReturnType<typeof movePlayer>): void {
     if (session.get().playerPose.cellId !== previousCellId) {

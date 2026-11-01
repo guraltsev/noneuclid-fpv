@@ -114,8 +114,6 @@ export interface RuntimeObjectActionsDeps {
     target: AimTarget | undefined,
     center: ProtractorCenterSelection,
   ): ProtractorDirectedGeodesic | undefined;
-  /** Applies a desktop palette toggle (open, close, right action) the way the shell does. */
-  applyDesktopScenePaletteToggle(action: "open" | "right-action" | "close" | "none"): void;
 }
 
 /** What the shell calls: the aim actions, the sign editing keys, going home and resetting, and the debug helpers. */
@@ -136,6 +134,8 @@ export interface RuntimeObjectActions {
   tryUseFocusedObjectPrimaryInteraction(ray?: RootAimRay): boolean;
   /** Secondary action: closes an open menu, else opens the focused object's menu, else the main menu. */
   openContextMenuFromAim(ray?: RootAimRay): void;
+  /** Applies a desktop palette toggle (open, close, right action) to the menu. */
+  applyDesktopScenePaletteToggle(action: "open" | "right-action" | "close" | "none"): void;
   /** Puts the player at the world's starting position and clears the rig. */
   resetPlayerToHome(): void;
   /** Cancels any open menu or tool, then goes home. */
@@ -185,7 +185,6 @@ export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): Runt
     syncDesktopPalette,
     clearProtractorToolFeedback,
     resolveProtractorDirectedSelectionFromAimTarget,
-    applyDesktopScenePaletteToggle,
   } = deps;
   const dispatchRuntimeCommand = deps.dispatch;
   const requestRuntimeObjectInstanceSync = deps.syncRuntimeObjectPortalInstances;
@@ -493,6 +492,16 @@ export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): Runt
     }
   }
 
+  function applyDesktopScenePaletteToggle(action: "open" | "right-action" | "close" | "none"): void {
+    if (action === "open" && !currentMenuState().isOpen) {
+      dispatchRuntimeCommand({ kind: "open-menu" });
+    } else if (action === "right-action" && currentMenuState().isOpen) {
+      dispatchRuntimeCommand({ kind: "menu-right-action" });
+    } else if (action === "close" && currentMenuState().isOpen) {
+      dispatchRuntimeCommand({ kind: "cancel-menu-and-tool" });
+    }
+  }
+
   function openContextMenuFromAim(ray?: RootAimRay): void {
     if (currentMenuState().isOpen) {
       applyDesktopScenePaletteToggle(reduceDesktopScenePaletteToggle(true, "secondary-click"));
@@ -576,6 +585,7 @@ export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): Runt
     tryUseProtractorToolFromAim,
     tryUseFocusedObjectPrimaryInteraction,
     openContextMenuFromAim,
+    applyDesktopScenePaletteToggle,
     resetPlayerToHome,
     teleportPlayerHome,
     resetRuntimeWorld,
