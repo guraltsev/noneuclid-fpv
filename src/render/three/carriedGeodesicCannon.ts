@@ -14,8 +14,6 @@ import { threePointToWorld } from "./worldAxes";
 
 /** Distance in meters ahead of the desktop aim-ray origin at which a carried emitter is held. */
 export const carriedGeodesicEmitterDesktopDistanceMeters = 0.75;
-/** Positional tolerance in meters under which a carried emitter's pose is treated as unchanged. */
-export const carriedGeodesicEmitterPoseToleranceMeters = 1e-4;
 
 /** Head pose in Three.js world space: position in meters and orientation quaternion. */
 export interface XrHeadWorldPose {

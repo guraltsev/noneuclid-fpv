@@ -1,6 +1,6 @@
 # Job 47 - The carry contract: an object that can be carried, and what carrying means
 
-Status: queued.
+Status: done, needs review on 2026-11-01.
 Resolves: nothing fully. It implements the agreed carry policies of design 012, P4 that the current code does not meet yet
 (wall in the way; a junction swept by the carry segment), and moves the carry rules out of the tool.
 
@@ -101,3 +101,53 @@ weakened; the existing carry tests must keep passing as written.
 - `geodesicCannonTools.ts` contains no placement or route logic for carrying, only calls and applying the result.
 - The two agreed policies (stop just short of a wall; drop at the last valid position on a swept junction) hold and are tested.
 - All checks pass (apart from the known timeout) and a `## Report` is appended.
+
+## Report
+
+### Done
+- `src/world-objects/carry.ts` states the contract in its header and implements it, with no Three.js and no registry access:
+  `canBeCarried` (the marker; `GeodesicCannonObject.canBeCarried?: true`, set by `createGeodesicCannonObject`), `reactToDisplacement`
+  (one step in the object's current cell frame, at most `carryStepCapMeters` = 1 m; returns `{ placement, route, stoppedByWall? }`,
+  `{ stay: reason }` or `{ detach: { impulse? } }`), `locateCarrierTarget` (where the hand is; a wall stops it just short),
+  `displacementToTarget` (the nearest valid straight development: today's `findNearestImageRoute`, 2 portals first, 6 for a pickup) and
+  `carryTowardTarget` (the stream: step = target minus current place, cut to the cap and to `carryMaxSpeedMetersPerSecond` = 20 m/s times the
+  time passed, each step through the reaction and a caller-supplied `commit`). The portals crossed are read off `walkDevelopedSegment`, and the
+  yaw turns with the composed crossings.
+- `geodesicCannonTools.ts` no longer holds placement, route or yaw logic for carrying (`resolveCarriedEmitterPlacement`, `carriedEmitterRoute`
+  and their constants are gone); `updateCarriedGeodesicCannonPose` asks `locateCarrierTarget`, runs `carryTowardTarget` with a `commit` that
+  applies the forbidden-zone rule and `moveEmitterAlongRoute`, rebuilds the geodesic once per frame and draws the glow at the hand. It takes
+  an optional `deltaSeconds` (createThreeApp passes the frame time). A `detach` outcome finishes the carry.
+- Tests: `tests/world-objects/carry.test.ts` (22: one cell; one portal; two faces; the cap; wall stop; swept junction, a legal portal crossing
+  inside the zone, body radius, an end inside a zone; yaw turn on the cube; several steps in order; a lost frame; steps are not merged; refused
+  commit; pick up and release at once; hand locating; a locked geodesic whose portal word is checked to chain after every committed move, over a
+  glide from another face at the speed cap and over a two-face carry) and `tests/render/geodesicCannonCarryPolicies.test.ts` (3: the tool stops
+  short of a wall, drops the emitter at its last valid position on a swept junction, glides at no more than the speed cap).
+  `tests/render/geodesicCannonCarry.test.ts` is unchanged and green.
+
+### Deviations
+- The reaction takes no registry: it does not need one. The only veto a registry can give, a locked geodesic's word refusing a move, is
+  `commit` returning false (`moveEmitterAlongRoute` is still the one mutation point and stays all or nothing).
+- Without `deltaSeconds` (the tests of the existing carry guard call the tool without time) the glide is not rate limited, though every
+  step is still at most the cap; the app always passes the frame time, so the 20 m/s limit holds there. The per-call limit is 64 steps.
+- The hand behind a wall is not "the emitter stays" any more: the hand is clamped just short of the wall and the emitter glides there
+  (the agreed wall policy applied to the hand as well as to the object's step).
+- Removed the now unused `carriedGeodesicEmitterPoseToleranceMeters` from `carriedGeodesicCannon.ts`.
+
+### Uncertain
+- An end inside an exclusion zone is reported as a placement and the tool still destroys the emitter, as the job says. This is inconsistent with
+  the sweep rule at one edge: a step that stops at a wall inside a zone (wall near a corner) destroys the emitter, while a step that merely
+  passes through the zone drops it. The planned change (a kick away from the junction) removes the case.
+- The nearest valid development can pick the way round the other side of a cube corner for a pickup, so a hand straight "below" an emitter may be
+  reached through a neighbouring face. That is the existing convention (the job names it), not new behaviour.
+- The exclusion test widens the zone by the emitter's body radius (0.3 m for the cannon) so that a swept step and a step's end use the same
+  zone; the old code only tested the end. A step passing between 0.15 and 0.45 m from a corner now drops the emitter.
+- The speed cap and the glide were exercised by tests with the real tool; no hands-on VR or desktop run was done.
+
+### Not done
+- One carrier per object is stated in the contract; enforcing it is the session's job (job 46).
+- The planned kick (`detach.impulse`) is not implemented, only the outcome slot.
+
+### Checks
+- Baseline (branch `job-31` at `8708a16`): as recorded in job 31.
+- After: `npm run typecheck`, `npm test` (1060 tests), `npm run docs:check` green; `npm run test:release` 10 of 11, only `appCommands.release.test.ts`
+  ("changeWorld switches to the requested world") failed with the known `Runtime.evaluate` CDP timeout.

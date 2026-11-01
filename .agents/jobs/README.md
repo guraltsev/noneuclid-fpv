@@ -1,4 +1,4 @@
-﻿# Jobs
+# Jobs
 
 A **job** is a work order: carry out this change, in this scope, and verify it like this. An **issue**
 (`_issues/`) describes something that is wrong: the defect, the evidence and the impact. Small fixes and mitigation
@@ -132,5 +132,5 @@ queued job, despite their numbers (they were numbered after the existing queue t
 | [43](_done/43_clean_render_tests_and_shared_fakes.md) | Clean the render tests and share the boundary fakes | done, needs review | - |  |
 | [44](_done/44_api_scenario_runner_and_manual_checklist.md) | API scenario runner, first scenarios, and the manual checklist | done, needs review | - |  |
 | [45](45_api_functions_for_scenarios.md) | API functions that scenarios need, and the checks they convert | blocked on the maintainer (012) | - |  |
-| [46](46_shell_session_and_command_path.md) | One shell-side state holder and one command path | queued (after 31 and 47) | - | 77 |
-| [47](47_carry_contract.md) | The carry contract: an emitter that can be carried reacts to a stream of displacement steps | queued | - |  |
+| [46](46_shell_session_and_command_path.md) | One shell-side state holder and one command path | queued (31 and 47 done) | - | 77 |
+| [47](_done/47_carry_contract.md) | The carry contract: an emitter that can be carried reacts to a stream of displacement steps | done, needs review | - |  |

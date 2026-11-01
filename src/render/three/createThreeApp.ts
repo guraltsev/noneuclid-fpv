@@ -1423,7 +1423,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     }
     const xrHeadWorldPose = xrActive ? resolveXrHeadWorldPose(xrViewerPose) : undefined;
     const activeAimRay = resolveActiveRootAimRay(xrActive, xrFrame, xrReferenceSpace);
-    updateCarriedGeodesicCannonPose(xrActive, activeAimRay);
+    updateCarriedGeodesicCannonPose(xrActive, activeAimRay, deltaSeconds);
     if (frame.helpRequested && !desktopFlagEditor.isOpen()) {
       requestHelpLensForFocusedObject(activeAimRay);
     }

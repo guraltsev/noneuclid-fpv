@@ -15,7 +15,7 @@ import { type CompiledCellComplex } from "../../cell-complex/compileCellComplex"
 import { type DebugLevelId } from "../../diagnostics/debugLevels";
 import { yawRigidTransform3 } from "../../math/rigidTransform3";
 import { type Vec3, normalizeVec3 } from "../../math/vec3";
-import { testCellCollision } from "../../movement/collision";
+import { getDynamicObjectCollisionBounds, testCellCollision } from "../../movement/collision";
 import { type PlayerPose } from "../../movement/playerPose";
 import {
   type RuntimeMenuState,
@@ -23,7 +23,7 @@ import {
   setRuntimeMenuSelectedTool,
   showRuntimeMenuGeodesicCannonActions,
 } from "../../runtime/runtimeMenuState";
-import { type GeodesicEndpointSelection, sanitizeYaw } from "../../world-objects/geodesic/objects";
+import { type GeodesicEndpointSelection } from "../../world-objects/geodesic/objects";
 import {
   pruneMissingGeodesicIntersectionObjects,
   withDeferredGeodesicIntersections,
@@ -55,7 +55,6 @@ import { type RuntimeObjectRegistry, type RuntimeWorldObject } from "../../world
 import { runtimeObjectToDynamicObjectState } from "../../world-objects/runtimeObjectBase";
 import { AimTarget } from "../../interaction/aimTarget";
 import {
-  carriedGeodesicEmitterPoseToleranceMeters,
   createCarriedGeodesicCannonGlow,
   getDistanceAlongGeodesicSegment,
   resolveCannonGeodesicId,
@@ -65,23 +64,14 @@ import {
 } from "./carriedGeodesicCannon";
 import { createDesktopControls } from "./desktopControls";
 import { resolveGeodesicCannonAimYawFromAbsolutePoints } from "./geodesicCannonAimTarget";
-import { locateDevelopedPoint } from "../../cell-complex/segmentWalk";
-import { composeRigidTransform3, identityRigidTransform3, transformPoint3 } from "../../math/rigidTransform3";
-import { findNearestImageRoute, type PortalRouteHop } from "../../cell-complex/portalRoute";
+import { carryMaxSpeedMetersPerSecond, carryTowardTarget, locateCarrierTarget } from "../../world-objects/carry";
 import {
   RootAimRay,
   getAimForwardVector,
   getRuntimeObjectInteractionRangeMeters,
   intersectRootRayWithFloor,
 } from "./rootAimRay";
-import { distanceSquared } from "./runtimeSceneUtils";
 import { worldPointToThree } from "./worldAxes";
-
-// A carried emitter's step in one frame is at most this far (meters); a larger move is a jump (a pickup from another face).
-const carriedEmitterStepMaxMeters = 1;
-// Longest chain of portals searched for a step, and for a jump.
-const carriedEmitterStepMaxHops = 2;
-const carriedEmitterJumpMaxHops = 6;
 
 /** Editing state of the geodesic emitter (cannon) tools. */
 export interface GeodesicCannonToolState {
@@ -732,7 +722,7 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
     return cannon?.kind === "geodesic-cannon" ? cannon : undefined;
   }
 
-  function updateCarriedGeodesicCannonPose(xrActive: boolean, activeAimRay: RootAimRay | undefined): void {
+  function updateCarriedGeodesicCannonPose(xrActive: boolean, activeAimRay: RootAimRay | undefined, deltaSeconds?: number): void {
     if (deps.getMenuState().selectedTool !== "geodesic-cannon-carry") {
       clearCarriedGeodesicCannonGlow();
       return;
@@ -751,102 +741,71 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
       return;
     }
 
-    // The emitter is held at the hand, which may be on another face than the player; store it in the cell it is really in.
-    const placement = resolveCarriedEmitterPlacement(anchor);
-    if (!placement) {
-      // The hand is behind a wall: the emitter stays where it was.
-      syncCarriedGeodesicCannonGlow(anchor);
-      return;
-    }
-    // Which portals the emitter crossed follows from where it was and where it is, not from what the player did. Crossing a
-    // portal turns the frame (on the cube by a quarter turn), and the emitter keeps its physical direction, so it turns with it.
-    const hops = carriedEmitterRoute(cannon, placement);
-    const turnRadians = Math.atan2(
-      hops.reduce((frame, hop) => composeRigidTransform3(hop.transformToTarget, frame), identityRigidTransform3).rotation.m10,
-      hops.reduce((frame, hop) => composeRigidTransform3(hop.transformToTarget, frame), identityRigidTransform3).rotation.m00,
-    );
-    const placed = {
-      ...cannon,
-      cellId: placement.cellId,
-      localPose: yawRigidTransform3(sanitizeYaw(cannon.aimYawRadians + turnRadians), placement.point),
-    };
-    // Dragging the emitter into a forbidden zone destroys it (and its geodesics) rather than leaving it there.
-    if (carriedGeodesicCannonTouchesForbiddenZone(placed)) {
-      deleteCarriedGeodesicCannon(cannon.id);
-      return;
-    }
-
-    if (
-      placed.cellId === cannon.cellId &&
-      distanceSquared(placed.localPose.translation, cannon.localPose.translation) <=
-        carriedGeodesicEmitterPoseToleranceMeters * carriedGeodesicEmitterPoseToleranceMeters
-    ) {
-      syncCarriedGeodesicCannonGlow(anchor);
-      return;
-    }
-
-    const moved = moveEmitterAlongRoute({
-      registry: runtimeObjectRegistry,
-      emitterId: cannon.id,
-      cellId: placed.cellId,
-      localPose: placed.localPose,
-      route: hops.map(({ sourceCellId, sourcePortalId, targetCellId, targetPortalId }) => ({
-        sourceCellId,
-        sourcePortalId,
-        targetCellId,
-        targetPortalId,
-      })),
-    });
-    if (!moved.moved) {
-      // The move cannot be reconciled with the portal words of the emitter's geodesics, so the emitter stays where it was.
-      console.warn(`Carried emitter "${cannon.id}" stays in "${cannon.cellId}": no route to "${placed.cellId}" fits the portal word of ${moved.brokenGeodesicIds.join(", ")}.`);
-      syncCarriedGeodesicCannonGlow(anchor);
-      return;
-    }
-    const nextCannon = runtimeObjectRegistry.get(cannon.id);
-    if (nextCannon?.kind !== "geodesic-cannon") {
-      return;
-    }
-    rebuildCarriedGeodesicFromCannon(nextCannon, { preserveGeodesicOnRebuildFailure: true });
-    syncCarriedGeodesicCannonGlow(anchor);
-    syncRuntimeObjectPortalInstances();
-    syncSelectableHitboxDebug();
-  }
-
-  // Where the carried emitter is: the cell the hand is in, found by walking from the player to the hand through the portals
-  // between them, and its point in that cell's frame. Undefined when a wall stands between the player and the hand.
-  function resolveCarriedEmitterPlacement(
-    anchor: { readonly x: number; readonly y: number; readonly z: number },
-  ): { readonly cellId: string; readonly point: { readonly x: number; readonly y: number; readonly z: number } } | undefined {
+    // The emitter is held at the hand, which may be on another face than the player or behind a wall. Where the hand is comes
+    // from the carry contract; the emitter then glides toward it in displacement steps, and the contract decides how it reacts.
     const playerPose = deps.getPlayerPose();
-    const located = locateDevelopedPoint(
-      deps.getWorld(),
-      playerPose.cellId,
-      { x: playerPose.position.x, y: playerPose.position.y },
-      { x: anchor.x, y: anchor.y },
-    );
-    if (located.status !== "end") {
-      return undefined;
+    const hand = locateCarrierTarget(deps.getWorld(), playerPose, anchor);
+    if (!hand) {
+      syncCarriedGeodesicCannonGlow(anchor);
+      return;
     }
+    const emitterBody = getDynamicObjectCollisionBounds(runtimeObjectToDynamicObjectState(cannon));
+    let destroyed = false;
+    const advance = carryTowardTarget({
+      world: deps.getWorld(),
+      object: {
+        cellId: cannon.cellId,
+        position: cannon.localPose.translation,
+        yawRadians: cannon.aimYawRadians,
+        radiusMeters: emitterBody?.radius,
+      },
+      target: { cellId: hand.cellId, point: { x: hand.point.x, y: hand.point.y, z: 0 } },
+      maxTravelMeters: deltaSeconds === undefined ? undefined : carryMaxSpeedMetersPerSecond * deltaSeconds,
+      commit: (move) => {
+        const placed = {
+          ...cannon,
+          cellId: move.placement.cellId,
+          localPose: yawRigidTransform3(move.placement.yawRadians, move.placement.position),
+        };
+        // Dragging the emitter into a forbidden zone destroys it (and its geodesics) rather than leaving it there.
+        if (carriedGeodesicCannonTouchesForbiddenZone(placed)) {
+          deleteCarriedGeodesicCannon(cannon.id);
+          destroyed = true;
+          return false;
+        }
 
-    return { cellId: located.cellId, point: transformPoint3(located.cellFromStart, anchor) };
+        const moved = moveEmitterAlongRoute({
+          registry: runtimeObjectRegistry,
+          emitterId: cannon.id,
+          cellId: placed.cellId,
+          localPose: placed.localPose,
+          route: move.route,
+        });
+        if (!moved.moved) {
+          // The move cannot be reconciled with the portal words of the emitter's geodesics, so the emitter stays where it was.
+          console.warn(`Carried emitter "${cannon.id}" stays: no route to "${placed.cellId}" fits the portal word of ${moved.brokenGeodesicIds.join(", ")}.`);
+        }
+        return moved.moved;
+      },
+    });
+    if (destroyed) {
+      return;
+    }
+    if (advance.steps > 0) {
+      const nextCannon = runtimeObjectRegistry.get(cannon.id);
+      if (nextCannon?.kind === "geodesic-cannon") {
+        rebuildCarriedGeodesicFromCannon(nextCannon, { preserveGeodesicOnRebuildFailure: true });
+      }
+      syncRuntimeObjectPortalInstances();
+      syncSelectableHitboxDebug();
+    }
+    if (advance.end === "detached") {
+      // The step would have swept across a junction: the emitter is dropped where it is.
+      finishGeodesicCannonCarry();
+      return;
+    }
+    syncCarriedGeodesicCannonGlow(anchor);
   }
-
-  // The portals a carried emitter crossed between two frames: the chain whose image of the old position is nearest the new
-  // one. A frame's step crosses at most a portal or two; a pickup from another face is a jump, searched over longer chains.
-  function carriedEmitterRoute(
-    before: Extract<RuntimeWorldObject, { readonly kind: "geodesic-cannon" }>,
-    after: { readonly cellId: string; readonly point: { readonly x: number; readonly y: number; readonly z: number } },
-  ): readonly PortalRouteHop[] {
-    const from = { cellId: before.cellId, point: before.localPose.translation };
-    const step = findNearestImageRoute(deps.getWorld(), from, after, carriedEmitterStepMaxHops);
-    const route = step && step.distanceMeters <= carriedEmitterStepMaxMeters
-      ? step
-      : findNearestImageRoute(deps.getWorld(), from, after, carriedEmitterJumpMaxHops) ?? step;
-
-    return route?.hops ?? [];
-  }
-
   function rebuildCarriedGeodesicFromCannon(
     cannon: Extract<RuntimeWorldObject, { readonly kind: "geodesic-cannon" }>,
     options: { readonly preserveGeodesicOnRebuildFailure?: boolean } = {},

@@ -87,6 +87,8 @@ export interface GeodesicCannonObject extends RuntimeWorldObjectBase {
   readonly kind: "geodesic-cannon";
   /** Marker consumed by `canObjectAttachGeodesics`: this object may be the anchor of an interval endpoint. */
   readonly canAttachGeodesics?: true;
+  /** Marker consumed by `canBeCarried` (src/world-objects/carry.ts): this object may be carried and reacts to displacement steps. */
+  readonly canBeCarried?: true;
   /** Geodesic currently selected in the emitter menu (cache; may name a geodesic that no longer exists). */
   readonly activeGeodesicId?: string;
   /** Ids of geodesics listed under this cannon (cache of the interval attachments). */
@@ -412,6 +414,7 @@ export function createGeodesicCannonObject(options: CreateGeodesicCannonOptions)
     id: options.id,
     kind: "geodesic-cannon",
     canAttachGeodesics: true,
+    canBeCarried: true,
     cellId: options.cellId,
     localPose: {
       ...options.localPose,

@@ -593,6 +593,32 @@ Floor texture library: the named floor appearances world scripts can use, via th
 
 ## `world-objects`
 
+### `world-objects/carry.ts`
+
+The carry contract: what it means for an object to be carried, stated once, as pure functions of the world and the object.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| const | `carryStepCapMeters` | Longest displacement step the reaction is defined for, in meters. |
+| const | `carryMaxSpeedMetersPerSecond` | Fastest travel of a carried object toward its carrier's hand, in meters per second (about 20 m/s). |
+| const | `carryWallMarginMeters` | Distance a carried object keeps from a wall it was stopped by, in meters. |
+| const | `carryArrivalToleranceMeters` | Distance to the target under which the object counts as having arrived, in meters. |
+| const | `carryMaxStepsPerCall` | Most steps one call of `carryTowardTarget` applies; the rest of the way is left to the next frame. |
+| interface | `CarriableMarker` | Marker on an object type: it can be carried. |
+| function | `canBeCarried` | Whether an object declares that it can be carried. |
+| interface | `CarriedPlace` | Where a carried object is: its cell, its point in that cell's frame (z is the object's own height and is never changed by a step) and its yaw. |
+| interface | `CarryStep` | A displacement step: a vector in the frame of the cell the object is in, at most `carryStepCapMeters` long. |
+| interface | `CarryPlacement` | Where a step leaves the object: a place valid in its cell. |
+| interface | `CarryMove` | The step moved the object: its new place, the portals crossed (in order) and whether a wall cut the step short. |
+| type | `CarryStayReason` | Why a step did not move the object. |
+| type | `CarryReaction` | What an object does with one displacement step. |
+| function | `reactToDisplacement` | The reaction of a carried object to one displacement step; see the module header for the rules. |
+| function | `locateCarrierTarget` | Where the carrier's hand is, as a place on the surface: the cell it is in and its point in that cell's frame, found by walking from the carrier to the hand through the portals between them. |
+| function | `displacementToTarget` | The displacement from the object to the target in the nearest valid straight development, in the object's cell frame: the way round is the chain of portals whose image of the object lies nearest the target and that the … |
+| type | `CarryAdvanceEnd` | How `carryTowardTarget` ended. |
+| interface | `CarryAdvance` | What `carryTowardTarget` did: where the object is now and how many steps were applied. |
+| function | `carryTowardTarget` | Moves a carried object toward a target as a stream of steps: each is the displacement to the target from the object's current place (in the nearest valid straight development), cut to at most the step cap and to what is… |
+
 ### `world-objects/creatures/geodesicMarmotBehavior.ts`
 
 Motion of the geodesic marmot, with no renderer: the state it owns, how it advances each frame along its heading (a locally straight geodesic that stays straight as portals re-express the frame), and how it follows geometry changes.
@@ -1709,7 +1735,6 @@ Pure placement, glow, and naming helpers for carrying and aiming geodesic emitte
 | Kind | Name | Summary |
 | --- | --- | --- |
 | const | `carriedGeodesicEmitterDesktopDistanceMeters` | Distance in meters ahead of the desktop aim-ray origin at which a carried emitter is held. |
-| const | `carriedGeodesicEmitterPoseToleranceMeters` | Positional tolerance in meters under which a carried emitter's pose is treated as unchanged. |
 | interface | `XrHeadWorldPose` | Head pose in Three.js world space: position in meters and orientation quaternion. |
 | function | `resolveDesktopCarriedGeodesicCannonAnchor` | Computes where a carried cannon sits on desktop: the point 0.75 m along the aim ray, in cell-local coordinates. |
 | function | `resolveVrCarriedGeodesicCannonAnchor` | Computes where a carried cannon sits in VR: directly under the aim-ray origin (the hand), in cell-local coordinates. |
