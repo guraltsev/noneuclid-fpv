@@ -10,10 +10,8 @@ branch holds one built folder per published branch; the stable version is at
 **https://guraltsev.github.io/noneuclid-fpv/main/** and the root redirects there. Setup, the `npm run publish:branch`
 command, the optional push hook and the optional workflow are described in [PUBLISHING.md](PUBLISHING.md).
 
-A local pre-push hook (`.githooks/pre-push`, enabled by `npm install` or `npm run setup:hooks`) runs
-`npm run typecheck`, `npm test`, `npm run build` and a headless smoke test of two worlds (skipped with a warning when no
-Chromium-based browser is found) and refuses the push if any fails. Publishing itself does not test anything.
-`git push --no-verify` skips the hook.
+The local pre-push hook (`.githooks/pre-push`, enabled by `npm install` or `npm run setup:hooks`) runs no checks;
+run `npm run typecheck`, `npm test` and `npm run build` yourself before publishing. Publishing itself does not test anything.
 
 Before publishing you can run the browser smoke check (optional, needs a Chromium-based browser):
 

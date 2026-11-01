@@ -411,8 +411,7 @@ browser `tests/support/scenario/globalSetup.ts` launches, and running them in pa
 browser smoke still runs separately as `npm run smoke` (flags in [DEVELOPMENT.md](DEVELOPMENT.md)), now checking
 `window.noneuclid.api` instead of the retired debug globals; it is not folded into the `release` project.
 
-`git push` runs typecheck, `npm test`, the build, `npx vitest run --project release` and the browser smoke through the
-pre-push hook (`.githooks/`). Before
+`git push` runs no checks (the pre-push hook in `.githooks/` only carries the opt-in Pages publish step). Before
 closing a piece of work, run:
 
 ```sh

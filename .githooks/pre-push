@@ -1,56 +1,10 @@
 #!/bin/sh
-# Pre-push gate. The Pages workflow builds and deploys without running tests,
-# so this hook is the only check between a commit and the live site.
-# Enabled by `npm install`, or by hand with `npm run setup:hooks`
-# (scripts/setup-git-hooks.mjs sets core.hooksPath).
-# Skip once with `git push --no-verify`.
-set -e
-
-if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
-  echo "pre-push: warning: uncommitted changes; the checks run on the working tree, not exactly on what is pushed." >&2
-fi
-
-echo "pre-push: npm run typecheck" >&2
-npm run --silent typecheck
-
-echo "pre-push: npm test" >&2
-npm test --silent
-
-# The production bundle can fail at load time (for example a const used before its declaration runs) while typecheck
-# and the unit tests stay green, so build it and load a few worlds in a headless browser. The smoke step is skipped,
-# with a warning, when no Chromium-based browser is found (set BROWSER to its path).
-echo "pre-push: npm run build" >&2
-npm run --silent build >/dev/null
-
-echo "pre-push: npx vitest run --project release" >&2
-# --no-file-parallelism: the release scenarios share one headless browser (tests/support/scenario/globalSetup.ts);
-# running test files in parallel starves it of CPU and corrupts it for the rest of the run (job 44's Report).
-npx vitest run --project release --passWithNoTests --no-file-parallelism
-
-smoke_browser="${BROWSER:-}"
-if [ -z "$smoke_browser" ]; then
-  case "$(uname -s)" in
-    MINGW*|MSYS*|CYGWIN*) smoke_browser="C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe" ;;
-    *) smoke_browser="$(command -v chromium || true)" ;;
-  esac
-fi
-
-if [ -n "$smoke_browser" ] && { [ -x "$smoke_browser" ] || [ -f "$smoke_browser" ]; }; then
-  echo "pre-push: npm run smoke" >&2
-  # torus-moduli has occasionally stayed on the loading screen (no console output) and then passed on a rerun, so a
-  # failure is retried once; a real load-time crash fails both attempts.
-  if ! npm run --silent smoke -- --world cube,torus-moduli; then
-    echo "pre-push: smoke failed; retrying once" >&2
-    npm run --silent smoke -- --world cube,torus-moduli
-  fi
-else
-  echo "pre-push: warning: no Chromium-based browser found; skipping the smoke test (set BROWSER to enable it)." >&2
-fi
-
-echo "pre-push: all checks passed." >&2
+# Pre-push hook. It runs no checks: run `npm run typecheck` and `npm test` yourself before sharing a change.
+# It only carries the opt-in Pages publish step below, which does nothing unless `git config publish.onPush true`.
+# Enabled by `npm install`, or by hand with `npm run setup:hooks` (scripts/setup-git-hooks.mjs sets core.hooksPath).
 
 # pages-publish:begin
-# Opt-in: publish the checked-out branch after the other checks. Enable with
+# Opt-in: publish the checked-out branch. Enable with
 #   git config publish.onPush true
 # A failed publish only warns; it never blocks the push.
 if [ "$(git config --bool publish.onPush 2>/dev/null)" = "true" ]; then

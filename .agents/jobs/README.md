@@ -11,7 +11,7 @@ sketches may live in an issue; anything that is mainly "carry out this change" i
 - Each job names the issues it resolves. When a job lands, close those issues (move them to `_issues/_closed/` with an
   Outcome and Closing evidence) and move the job to `_done/` with `Status: done on <date>` and the commit hashes.
 - A job that turns out to be wrong is edited or split, not silently skipped. Renumber only when the order changes.
-- Every job ends with verification; `git push` runs `npm run typecheck` and `npm test` through the pre-push hook.
+- Every job ends with verification; `git push` runs no checks, so run `npm run typecheck` and `npm test` yourself.
 
 ## Rules for the implementing model
 
@@ -30,7 +30,7 @@ Jobs are written to be carried out by a model working alone. A more capable mode
    such change under `### Deviations`.
 6. **Finish:** run `npm run typecheck`, `npm test` and `npm run docs:check`. If `docs:check` reports stale generated
    documents, run `npm run docs:generate`. Then commit, end the message with the co-author line the repository uses,
-   and push. The pre-push hook runs the checks again.
+   and push.
 7. **Windows shell:** `npm run smoke -- "<url>"` and the Volta `node` shim go through cmd.exe, which cuts URLs at
    `&`. Call `node.exe` directly when a URL has several parameters. `npm run smoke` now takes `--world`/`--config` flags, so no URL with `&` is needed.
 

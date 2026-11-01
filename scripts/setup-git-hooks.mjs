@@ -1,4 +1,4 @@
-// Points Git at the tracked hooks in `.githooks/` (currently the pre-push check).
+// Points Git at the tracked hooks in `.githooks/` (currently the opt-in Pages publish step on push).
 // Runs automatically from `npm install` (`prepare`); run it by hand with
 // `npm run setup:hooks` or `node scripts/setup-git-hooks.mjs`.
 // Outside a Git checkout (for example an extracted tarball) it only warns.
@@ -30,4 +30,4 @@ if (result.status !== 0) {
   process.exit(1);
 }
 
-console.log(`setup-git-hooks: core.hooksPath = ${hooksDir} (pre-push runs typecheck, tests, build and a headless smoke test).`);
+console.log(`setup-git-hooks: core.hooksPath = ${hooksDir} (pre-push runs no checks; it only publishes when publish.onPush is true).`);
