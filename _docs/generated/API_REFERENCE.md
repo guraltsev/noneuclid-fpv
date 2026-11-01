@@ -2937,6 +2937,19 @@ XR input path for the in-scene palette: converts XR controller target-ray poses 
 | function | `createXrScenePaletteInput` | Creates the XR palette input adapter; it holds no resources beyond its own controller cache, which reset() clears. |
 | function | `isSelectPressed` | Returns whether the controller's primary action button is pressed (select); false for a missing gamepad. |
 
+### `render/three/xrSessionController.ts`
+
+Orchestrates the immersive-VR session of the shell: capability probe, entering, the session's `end` event, restarts that must wait for the session to end, teardown, and the XR head pose and debug readout.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `XrRendererLike` | The renderer's XR manager, reduced to what the controller reads and writes. |
+| interface | `XrDebugMoveResult` | The movement result fields the debug readout remembers. |
+| type | `XrRenderDebugFields` | The debug fields that come from the frame loop's render state rather than from the XR session. |
+| interface | `XrSessionControllerDeps` | What `createXrSessionController` needs from the shell. |
+| interface | `XrSessionController` | Handle returned by `createXrSessionController`. |
+| function | `createXrSessionController` | Creates the controller; it starts with state "unknown" until `detectAvailability` resolves. |
+
 ### `render/three/xrSessionRestart.ts`
 
 Coordinates "end the immersive session, then run a restart action" so restarts (world change, app restart) never run while a session is still presenting.

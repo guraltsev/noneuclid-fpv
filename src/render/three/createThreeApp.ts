@@ -52,10 +52,10 @@
  * registry are owned here and disposed by `dispose()`.
  *
  * ## XR session lifecycle
- * `enterVr` (button in `xrEntryUi`) moves `xrSessionState` available/ended/failed -> entering ->
+ * `xrSession.enterVr` (button in its entry overlay) moves the session state available/ended/failed -> entering ->
  * active, or -> failed on error. The session's `end` event moves it to `ended` and resets the rig, palette
  * input and controller models. `requestAppRestart` ends a presenting session first via
- * `xrSessionRestartCoordinator` before invoking the host restart callback.
+ * `xrSession` before invoking the host restart callback.
  *
  * ## Units and frames
  * Distances are meters and angles radians. Cell-local coordinates are x right, y forward, z up; the Three.js
@@ -137,7 +137,6 @@ import {
 import { resolveDesktopScenePalettePlacement } from "./desktopScenePalettePlacement";
 import {
   captureWebGlRenderInfo,
-  createInitialXrDebugState,
   smoothFramePerformance,
 } from "./frameDiagnostics";
 import { type FrameRenderSnapshot, createEmptyFrameRenderSnapshot, createFrameRenderSnapshot } from "./frameRenderSnapshot";
@@ -193,7 +192,6 @@ import {
   PortalEyeRenderDebugState,
   StereoPortalPathRenderState,
   WebGlRenderInfoState,
-  XrDebugRenderState,
 } from "./renderState";
 import { RuntimeInputFrame } from "../../interaction/inputFrame";
 import { createFrameErrorGuard } from "./frameErrorGuard";
@@ -237,13 +235,13 @@ import { resolveVrPalettePlacement } from "./vrPalettePlacement";
 import { createXrControllerHandModels } from "./xrControllerHandModels";
 import { createXrControls } from "./xrControls";
 import { createXrEntryUi } from "./xrEntryUi";
+import { createXrSessionController } from "./xrSessionController";
 import { createXrObjectTooltipController } from "./xrObjectTooltipController";
-import { createXrDebugPanel, describeXrInputMode, isXrDebugPanelVisible } from "./xrDebugPanel";
+import { createXrDebugPanel, isXrDebugPanelVisible } from "./xrDebugPanel";
 import {
   createXrPlayerRig,
   headLocalMetersFromViewerPose,
   headYawRadiansFromViewerPose,
-  xrRigidTransformLocalMatrix,
 } from "./xrPlayerRig";
 import {
   XrPortalEyeRenderRoot,
@@ -254,13 +252,6 @@ import {
 import { createMonoPortalRenderRoots } from "./portalFrameRender";
 import { createPortalEyeActivator } from "./portalEyeActivation";
 import { createXrScenePaletteInput } from "./xrScenePaletteInput";
-import { createXrSessionRestartCoordinator } from "./xrSessionRestart";
-import {
-  XrSessionState,
-  createXrSessionState,
-  detectXrSessionState,
-  transitionXrSessionState,
-} from "../../interaction/xrSessionState";
 
 /**
  * Handle returned by {@link createThreeApp} for the running application shell.
@@ -333,12 +324,6 @@ interface ActiveWorldBundle {
 const reloadConfirmationWindowMs = 2000;
 // Consecutive failed frames (about half a second at 60-90 Hz) before an immersive session is ended.
 const MAX_CONSECUTIVE_FAILED_FRAMES = 30;
-// Module-level scratch objects for resolveXrHeadWorldPose; the returned pose aliases them, so it is valid
-// only until the next call and must not be stored.
-const xrHeadWorldMatrix = new THREE.Matrix4();
-const xrHeadWorldPosition = new THREE.Vector3();
-const xrHeadWorldQuaternion = new THREE.Quaternion();
-const xrHeadWorldScale = new THREE.Vector3();
 // Desktop fallbacks of updateScenePalette's head pose; overwritten before each use.
 const paletteHeadPositionScratch = new THREE.Vector3();
 const paletteHeadQuaternionScratch = new THREE.Quaternion();
@@ -395,12 +380,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   // through the set-player-pose command; factories read it from the session.
   // Incremented once per rendered frame; keys the per-frame aim-ray cache.
   let aimFrameSerial = 0;
-  // XR availability/session status. Written by the async detect call, enterVr, the session "end" listener
-  // and requestAppRestart failure handling; read by renderFrame to choose the XR or desktop path.
-  let xrSessionState: XrSessionState = createXrSessionState("unknown", {
-    secureContext: window.isSecureContext,
-  });
-  let xrDebugState: XrDebugRenderState = createInitialXrDebugState(xrSessionState, appState.playerPose);
   // Debug settings mirror: seeded from options, replaced by applyDebugSettings (menu or updateDebugSettings).
   let smoothedFrameRateFps: number | undefined;
   let smoothedFramePerformance: FramePerformanceRenderState | undefined;
@@ -440,7 +419,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   });
   let previousDesktopPalettePlacement: ReturnType<typeof resolveDesktopScenePalettePlacement> | undefined;
   let reloadConfirmationTimeout: number | undefined;
-  // Disposal bookkeeping: `disposed` neutralises late XR 'end' events; the session/cleanup pair is set by enterVr.
+  // Disposal bookkeeping: `disposed` makes dispose() idempotent.
   let disposed = false;
   // Frame error containment (see the module header). `frameDrawn` tells recovery whether the failed frame
   // already reached `renderer.render`.
@@ -450,9 +429,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     onPersistentFailure: endXrSessionAfterPersistentFrameFailure,
   });
   let frameDrawn = false;
-  let activeXrSession: XRSession | undefined;
-  let xrSessionEndHandlerCleanup: (() => void) | undefined;
-  const xrSessionRestartCoordinator = createXrSessionRestartCoordinator();
   const debugOverlay = createDebugOverlay(container);
   const desktopToolIndicator = createDesktopToolIndicator(document.body);
   const desktopScenePaletteInput = createDesktopScenePaletteInput();
@@ -463,7 +439,32 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   const aimCrossMarker = createAimCrossMarker(scene);
   const floatingObjectTooltip = createFloatingObjectTooltip(document.body);
   const helpLensRenderer = createHelpLensRenderer(document.body, scene);
-  const xrEntryUi = createXrEntryUi(container, enterVr);
+  const xrEntryUi = createXrEntryUi(container, () => void xrSession.enterVr());
+  const xrSession = createXrSessionController({
+    entryUi: xrEntryUi,
+    navigator,
+    secureContext: window.isSecureContext,
+    session,
+    initialPlayerPose: appState.playerPose,
+    xr: renderer.xr,
+    xrRig,
+    resetAfterSessionEnd() {
+      xrRig.reset();
+      xrScenePaletteInput.reset();
+      xrControllerHandModels.reset();
+      scenePaletteController.setVisible(false);
+    },
+    disposeOnTeardown: [xrRig, xrControls],
+    readRenderDebugFields: () => ({
+      framePerformance: smoothedFramePerformance,
+      webGlRenderInfo: latestWebGlRenderInfo,
+      visiblePortalPathCount: latestVisibleResult?.paths.length,
+      visiblePortalPaths: latestVisibleResult ? visibleSummaryToRenderState(latestVisibleResult.summary) : undefined,
+      portalInstances: portalInstanceRenderState,
+      portalEyes: createPortalEyeDebugStates(),
+      stereoPortalPaths: stereoPortalPathState,
+    }),
+  });
   const clipPolygonOverlay = createPortalClipPolygonOverlay(container);
   const sceneLighting = createStylizedSceneLighting(scene);
   const scenePaletteController = createScenePaletteController({
@@ -1056,7 +1057,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       smoothedFrameRateFps,
       smoothedFramePerformance,
       latestWebGlRenderInfo,
-      xrDebugState,
+      xrDebugState: xrSession.debugState(),
     }),
     dispatch: dispatchRuntimeCommand,
   };
@@ -1144,12 +1145,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   }
 
   // Asynchronous WebXR capability probe; it may resolve after the first frames, updating the entry button.
-  void detectXrSessionState(navigator, window.isSecureContext).then((state) => {
-    xrSessionState = state;
-    xrEntryUi.update(xrSessionState);
-    syncXrDebugState("desktop");
-  });
-  xrEntryUi.update(xrSessionState);
+  xrSession.detectAvailability();
 
   // Startup shader/cell warmup render so the first visible frames do not stall on compilation.
   const warmupStartMs = performance.now();
@@ -1246,7 +1242,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     // Swap in a finished background geometry deformation before anything reads the world this frame.
     commitReadyWorldGeometrySnapshot();
     // Phase 1: input. Head pose is in the XR local-floor reference space (meters / radians), not cell frame.
-    const xrActive = renderer.xr.isPresenting && xrSessionState.status === "active";
+    const xrActive = renderer.xr.isPresenting && xrSession.sessionState().status === "active";
     const xrReferenceSpace = xrActive ? renderer.xr.getReferenceSpace() : null;
     const xrViewerPose = xrActive && xrFrame && xrReferenceSpace
       ? xrFrame.getViewerPose(xrReferenceSpace)
@@ -1333,7 +1329,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     } else {
       applyDesktopCameraPose();
     }
-    const xrHeadWorldPose = xrActive ? resolveXrHeadWorldPose(xrViewerPose) : undefined;
+    const xrHeadWorldPose = xrActive ? xrSession.resolveXrHeadWorldPose(xrViewerPose) : undefined;
     const activeAimRay = resolveActiveRootAimRay(xrActive, xrFrame, xrReferenceSpace);
     updateCarriedGeodesicCannonPose(xrActive, activeAimRay, deltaSeconds);
     if (frame.helpRequested) {
@@ -1500,7 +1496,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     frameErrorGuard.runPhase("ui", () => {
       aimFeedback.updateAim(xrActive, activeAimRay);
       updateGeodesicEmitterLabels();
-      syncXrDebugState(frame.source, moveResult);
+      xrSession.syncDebugState(frame.source, moveResult);
       updateScenePalette(xrActive, xrFrame, xrReferenceSpace, xrHeadWorldPose, deltaSeconds, frame);
       const overlayState = portalDebugRuntime.updateVisiblePortalPaths();
       // Resolve the head pose again: the rig was synced a second time after the first pose was computed, and a stale
@@ -1512,7 +1508,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
           debugOverlayEnabled: currentMenuState().debugOverlayEnabled,
         }),
         state: overlayState,
-        head: xrActive ? resolveXrHeadWorldPose(xrViewerPose) : undefined,
+        head: xrActive ? xrSession.resolveXrHeadWorldPose(xrViewerPose) : undefined,
         nowMs: performance.now(),
       });
     });
@@ -1880,14 +1876,14 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
         window.clearTimeout(reloadConfirmationTimeout);
         reloadConfirmationTimeout = undefined;
       }
-      xrSessionRestartCoordinator.cancel();
       renderer.setAnimationLoop(null);
-      endActiveXrSessionOnDispose();
+      xrSession.endActiveXrSessionOnDispose();
       window.removeEventListener("resize", onResize);
       renderer.domElement.removeEventListener("contextmenu", onDesktopContextMenu);
       window.removeEventListener("mousedown", onDesktopMouseDown);
       window.removeEventListener("wheel", onDesktopWheel);
       window.removeEventListener("keydown", onDesktopPaletteKeyDown);
+      xrEntryUi.dispose();
       scenePaletteController.dispose();
       xrControllerHandModels.dispose();
       desktopScenePaletteInput.dispose();
@@ -1975,106 +1971,12 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       debugOverlay.dispose();
       scene.remove(xrDebugPanel.object);
       xrDebugPanel.dispose();
-      xrEntryUi.dispose();
       clipPolygonOverlay.dispose();
       disposeStylizedSceneLighting(sceneLighting, scene);
       renderer.dispose();
       renderer.domElement.remove();
     },
   };
-
-  // Runs `restart` (reload / world change / config change) after leaving immersive VR. When a session is
-  // presenting, the coordinator ends it first and calls `restart` afterwards; if ending fails, the error is
-  // logged, xrSessionState becomes "failed" and `restart` is not invoked by this path.
-  function requestAppRestart(restart: () => void): void {
-    const session = renderer.xr.isPresenting ? renderer.xr.getSession() : undefined;
-
-    xrSessionRestartCoordinator.requestRestart(session, restart, (error) => {
-      const message = error instanceof Error ? error.message : "Unable to leave immersive VR before restarting.";
-      console.warn("[noneuclid] unable to end XR session before restart", error);
-      xrSessionState = transitionXrSessionState(xrSessionState, "failed", message);
-      xrEntryUi.update(xrSessionState);
-      syncXrDebugState("desktop");
-    });
-  }
-
-  /**
-   * Requests an immersive-vr session and makes it the renderer's XR session.
-   *
-   * Does nothing unless WebXR is available, immersive VR is supported and the state is available, ended or
-   * failed. Optional features: local-floor, bounded-floor, hand-tracking. Never rejects: errors set
-   * `xrSessionState` to "failed" with the message. The session's `end` listener (added once per session)
-   * marks the state ended and resets rig, palette input and controller models so the next entry starts clean.
-   */
-  // Best-effort teardown of an active immersive session: detaches the 'end' listener first (so the handler
-  // cannot touch disposed state), then asks the browser to end the session. Called only from dispose().
-  function endActiveXrSessionOnDispose(): void {
-    xrSessionEndHandlerCleanup?.();
-    xrSessionEndHandlerCleanup = undefined;
-    const session = activeXrSession ?? renderer.xr.getSession?.() ?? undefined;
-    activeXrSession = undefined;
-    if (session) {
-      try {
-        void Promise.resolve(session.end()).catch(() => undefined);
-      } catch {
-        // Session already ended or ending; nothing more to do.
-      }
-    }
-    for (const owned of [xrRig, xrControls] as Array<{ dispose?: () => void }>) {
-      try {
-        owned.dispose?.();
-      } catch {
-        // Optional dispose must not block the rest of teardown.
-      }
-    }
-  }
-
-  async function enterVr(): Promise<void> {
-    const xr = navigator.xr;
-
-    if (
-      !xr?.requestSession ||
-      !xrSessionState.immersiveVrSupported ||
-      (xrSessionState.status !== "available" && xrSessionState.status !== "ended" && xrSessionState.status !== "failed")
-    ) {
-      return;
-    }
-
-    xrSessionState = transitionXrSessionState(xrSessionState, "entering");
-    xrEntryUi.update(xrSessionState);
-    syncXrDebugState("desktop");
-
-    try {
-      const session = await xr.requestSession("immersive-vr", {
-        optionalFeatures: ["local-floor", "bounded-floor", "hand-tracking"],
-      });
-      activeXrSession = session;
-      session.addEventListener("end", onXrSessionEnd);
-      xrSessionEndHandlerCleanup = () => session.removeEventListener("end", onXrSessionEnd);
-      function onXrSessionEnd(): void {
-        if (disposed) {
-          return;
-        }
-        activeXrSession = undefined;
-        xrSessionState = transitionXrSessionState(xrSessionState, "ended");
-        xrRig.reset();
-        xrScenePaletteInput.reset();
-        xrControllerHandModels.reset();
-        scenePaletteController.setVisible(false);
-        xrEntryUi.update(xrSessionState);
-        syncXrDebugState("desktop");
-      }
-      await renderer.xr.setSession(session);
-      xrSessionState = transitionXrSessionState(xrSessionState, "active");
-      xrEntryUi.update(xrSessionState);
-      syncXrDebugState("xr");
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to start immersive VR.";
-      xrSessionState = transitionXrSessionState(xrSessionState, "failed", message);
-      xrEntryUi.update(xrSessionState);
-      syncXrDebugState("desktop");
-    }
-  }
 
   // Feeds the scene palette (menu) from XR controllers or desktop pointer input and positions it; in XR also
   // updates the controller hand models. Called once per frame in the UI phase.
@@ -2148,21 +2050,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       ...paletteDefinitionFrame("desktop"),
       placement,
     });
-  }
-
-  // Head pose in Three.js world space (rig root matrix times the viewer pose). The result aliases the
-  // module-level scratch vectors and is overwritten on the next call.
-  function resolveXrHeadWorldPose(xrViewerPose: XRViewerPose | undefined): XrHeadWorldPose | undefined {
-    if (!xrViewerPose) {
-      return undefined;
-    }
-
-    xrHeadWorldMatrix.copy(xrRig.root.matrixWorld).multiply(xrRigidTransformLocalMatrix(xrViewerPose.transform));
-    xrHeadWorldMatrix.decompose(xrHeadWorldPosition, xrHeadWorldQuaternion, xrHeadWorldScale);
-    return {
-      position: xrHeadWorldPosition,
-      quaternion: xrHeadWorldQuaternion,
-    };
   }
 
   function onDesktopContextMenu(event: MouseEvent): void {
@@ -2272,32 +2159,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
         );
       portalDebugRuntime.syncRootCell();
     }
-  }
-
-  function syncXrDebugState(
-    source: RuntimeInputFrame["source"],
-    moveResult?: ReturnType<typeof movePlayer>,
-  ): void {
-    xrDebugState = {
-      secureContext: xrSessionState.secureContext,
-      sessionStatus: xrSessionState.status,
-      activeInputSource: source,
-      framePerformance: smoothedFramePerformance,
-      webGlRenderInfo: latestWebGlRenderInfo,
-      currentCellId: session.get().playerPose.cellId,
-      playerPosition: session.get().playerPose.position,
-      yawRadians: session.get().playerPose.yawRadians,
-      lastMovementBlocked: moveResult?.blocked ?? xrDebugState.lastMovementBlocked,
-      lastBlockingReason: moveResult?.blockingReason ?? xrDebugState.lastBlockingReason,
-      lastCrossedPortalId: moveResult?.crossedPortalId ?? xrDebugState.lastCrossedPortalId,
-      inputMode: renderer.xr.isPresenting ? describeXrInputMode([...(renderer.xr.getSession()?.inputSources ?? [])]) : undefined,
-      sharedRenderRootCellId: renderer.xr.isPresenting ? xrRig.getSharedRenderRootCellId(session.get().playerPose) : undefined,
-      visiblePortalPathCount: latestVisibleResult?.paths.length,
-      visiblePortalPaths: latestVisibleResult ? visibleSummaryToRenderState(latestVisibleResult.summary) : undefined,
-      portalInstances: portalInstanceRenderState,
-      portalEyes: createPortalEyeDebugStates(),
-      stereoPortalPaths: stereoPortalPathState,
-    };
   }
 
   function createPortalEyeDebugStates(): readonly PortalEyeRenderDebugState[] | undefined {
@@ -2701,16 +2562,16 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
         applyMenuComfortState();
         return;
       case "reload-world":
-        requestAppRestart(() => options.onReloadRequested?.());
+        xrSession.requestAppRestart(() => options.onReloadRequested?.());
         return;
       case "go-home":
         teleportPlayerHome();
         return;
       case "change-world":
-        requestAppRestart(() => options.onWorldChangeRequested?.(effect.worldId));
+        xrSession.requestAppRestart(() => options.onWorldChangeRequested?.(effect.worldId));
         return;
       case "change-app-config":
-        requestAppRestart(() => options.onAppConfigChangeRequested?.(effect.configName));
+        xrSession.requestAppRestart(() => options.onAppConfigChangeRequested?.(effect.configName));
         return;
       case "copy-url-with-options":
         options.onCopyUrlWithOptionsRequested?.();

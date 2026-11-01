@@ -57,9 +57,12 @@ type QuaternionLike = { readonly x: number; readonly y: number; readonly z: numb
 
 /**
  * A `RestartableXrSession` fake: `end()` resolves (override with `vi.mocked(session.end).mockRejectedValueOnce`),
- * and `dispatchEnd()` runs every `"end"` listener the code under test registered.
+ * `removeEventListener` drops one, and `dispatchEnd()` runs every `"end"` listener still registered.
  */
-export function createFakeXrSession(): RestartableXrSession & { dispatchEnd(): void } {
+export function createFakeXrSession(): RestartableXrSession & {
+  dispatchEnd(): void;
+  removeEventListener(type: "end", listener: () => void): void;
+} {
   const listeners: Array<() => void> = [];
 
   return {
@@ -67,6 +70,12 @@ export function createFakeXrSession(): RestartableXrSession & { dispatchEnd(): v
     addEventListener(type, listener) {
       if (type === "end") {
         listeners.push(listener);
+      }
+    },
+    removeEventListener(type, listener) {
+      const index = listeners.indexOf(listener);
+      if (type === "end" && index >= 0) {
+        listeners.splice(index, 1);
       }
     },
     dispatchEnd() {
