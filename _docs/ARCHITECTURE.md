@@ -53,8 +53,8 @@ imports only modules before it): `src/math/vec2.ts` (2-D helpers), `objects.ts` 
 `portalWord.ts` (pure portal-word algebra), `development.ts` (cached inverse portal transforms), `trace.ts` (single-cell
 and multi-cell ray tracing), `intersections.ts` (crossing markers), `endpoints.ts` (endpoint attachments and lifting),
 `segments.ts` (derived segments), `lifecycle.ts` (locked queries and removal), `intervals.ts` (interval rebuilds and
-previews), `sleeve.ts` (pure sleeve development, point funnel and taut string), `curveShortening.ts` (tie-and-detach and the
-exact one-tick resolution of curve-shortening pairs) and `cannon.ts` (shooting, extending, connecting and placing
+previews), `curveShortening.ts` (tie-and-detach and the
+curve shortening flow of curve-shortening pairs) and `cannon.ts` (shooting, extending, connecting and placing
 cannons).
 
 ## Layers and the dependency rule

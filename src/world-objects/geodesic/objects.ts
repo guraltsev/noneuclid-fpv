@@ -11,7 +11,6 @@
  * ## Objects (all live in a `RuntimeObjectRegistry`)
  * - `GeodesicCannonObject` (emitter): a placed object that geodesic endpoints can attach to.
  * - `FreeGeodesicEndObject`: an invisible anchor for an endpoint that is not on an emitter.
- * - `GeodesicCornerObject`: an invisible pinned anchor at a corner of a taut geodesic polygon, next to the forbidden disk it wraps.
  * - `GeodesicIntervalObject`: THE authoritative geodesic. It has two endpoint attachments (`start`, `end`; each names an anchor object, an
  *   emitter or a free end) and a PORTAL WORD: the ordered list of portal traversals from `start` to `end`. Nothing else is stored.
  * - `GeodesicSegmentObject`: derived, per-cell straight pieces of an interval, regenerated from the interval whenever it changes.
@@ -41,13 +40,12 @@
  *
  * ## Curve shortening (issue 31/32)
  * `tieAndDetachGeodesicEndpoints` detaches two endpoint roles (possibly the two roles of one loop) from an emitter and ties them to one
- * shared free end F, creating a `CurveShorteningPairObject`. The next `advanceCurveShorteningPairs` call resolves the pair in one tick
- * (`resolveCurveShorteningPair`): the role-aware concatenation of the two arcs' words, freely reduced (`getPortalWordBetweenEndpointRoles`,
- * `reduceAdjacentInversePortalTraversals`), is developed into a sleeve of apertures (`sleeve.ts`), and the shortest path of that homotopy
- * class is the straight chord, or a taut string that wraps the forbidden-zone disks at portal junctions. Wraps are drawn as corners,
- * pinned `GeodesicCornerObject` anchors, so the result is a chain of stable locked intervals. A single interval whose two roles share F is a
- * free loop: with a translation as holonomy it stays as a stable loop, with a rotation (it encircles a cone point) it is deleted with a
- * notice. A pair that cannot be resolved is left as it was and marked `"unresolved"`. There is no gradient descent.
+ * shared free end F, creating a `CurveShorteningPairObject`, and the curve then relaxes under the curve shortening flow (`advanceCurveShorteningPairs`):
+ * every free vertex moves each tick along the descent direction of the total length by an exact line search, its two arcs are re-realized as
+ * geodesic chords of their portal words (the words change by the portals the vertex crosses), and a vertex whose turning angle is below the tolerance is
+ * removed, merging its two arcs. The vertex count never grows and the length never grows. A single interval whose two roles share F is a free loop:
+ * with a translation as holonomy it is already taut and becomes a stable loop, with a rotation (it encircles a cone point) it shrinks until it is
+ * deleted with a notice. A curve that would need a wrap vertex at a forbidden-zone disk is left `"unresolved"`.
  *
  * ## Intersections and bookkeeping
  * `updateGeodesicIntersectionObjects` recomputes the crossing markers of all segments (same cell, different geodesics) and keeps marker ids
@@ -57,8 +55,7 @@
  * ## Constants
  * Meters unless stated. `GEODESIC_MIN_LENGTH_METERS` (0.15) minimum chord of a geodesic; `minGeodesicSegmentLengthMeters` (0.05) minimum
  * piece when splitting; `intersectionTolerance` (1e-7) numerical zero; `forbiddenZoneCircleToleranceMeters` (1e-9) band of the open-disk rule;
- * `emitterConnectionToleranceMeters` (0.3) capture radius around an emitter; `geodesicCornerClearanceMeters` (1e-6, in `sleeve.ts`) extra
- * radius of the forbidden disk wrapped by the taut string.
+ * `emitterConnectionToleranceMeters` (0.3) capture radius around an emitter.
  *
  * The geodesic code is split over the modules of `src/world-objects/geodesic/`; this module holds the object types,
  * constants, constructors and small geometry helpers they share.
@@ -161,22 +158,6 @@ export interface FreeGeodesicEndObject extends RuntimeWorldObjectBase {
 }
 
 /**
- * A pinned, invisible anchor at a corner of a taut geodesic polygon, next to the forbidden disk it wraps.
- *
- * Created by the exact curve-shortening resolution (`resolveCurveShorteningPair`); its `localPose.translation` is the corner in cell
- * `cellId` (cell-local meters, z = beam height). Unlike a free end it is never aimed or moved by the user and counts as a lock for
- * `isGeodesicLocked`. It is deleted automatically once no interval refers to it (`removeUnusedFreeGeodesicEnds`).
- */
-export interface GeodesicCornerObject extends RuntimeWorldObjectBase {
-  readonly kind: "geodesic-corner";
-  readonly canAttachGeodesics: true;
-  /** Junction id (`"<cellId>:vertex-<i>"`) of the disk this corner wraps, in the corner's own cell. */
-  readonly junctionId: string;
-  /** Side of the wrapped disk relative to the travel direction from the chain's start anchor to its end anchor. */
-  readonly side: "left" | "right";
-}
-
-/**
  * The authoritative description of one geodesic: two endpoint attachments plus the portal word joining them.
  *
  * Invariants: `start.geodesicId === end.geodesicId === id`; `startCellId` (= `cellId`) is the cell of the `start`
@@ -198,23 +179,18 @@ export interface GeodesicIntervalObject extends RuntimeWorldObjectBase {
 }
 
 /**
- * Bookkeeping object owning one curve-shortening process: two endpoint roles glued at a shared free end, resolved in one tick.
+ * Bookkeeping object owning one curve-shortening process: a piecewise-geodesic curve whose free vertices relax under the curve shortening flow.
  *
- * Invariants (see issue 32): `first` and `second` are different endpoint roles attached to `freeEndAnchorId`
- * (they may belong to the same interval, which is then a free loop); every referenced interval is `"moving"`.
- * The object is invisible; `cellId`/`localPose` merely mirror `lastGoodFreeEndCellId`/`lastGoodFreeEndPoint`. A pair whose resolution failed has `state: "unresolved"`.
+ * `vertexIds` lists the ids of the `FreeGeodesicEndObject`s that are still vertices of the curve, in the order the flow visits them. The arcs are not stored:
+ * they are the `"moving"` intervals that have a vertex of the list as an endpoint (each vertex has exactly two such endpoint roles; both belong to
+ * one interval for a free loop). A vertex is removed from the list when the curve is taut there; the list never grows. The object is invisible; `cellId`
+ * only mirrors the cell of the first vertex. A pair that could not go on has `state: "unresolved"`.
  */
 export interface CurveShorteningPairObject extends RuntimeWorldObjectBase {
   readonly kind: "curve-shortening-pair";
-  readonly first: GeodesicEndpointAttachment;
-  readonly second: GeodesicEndpointAttachment;
-  /** Id of the shared `FreeGeodesicEndObject` that both roles attach to. */
-  readonly freeEndAnchorId: string;
-  /** Cell of the shared free end when the pair was created (informational; the pose mirrors it). */
-  readonly lastGoodFreeEndCellId: string;
-  /** Cell-local position (meters) of the shared free end when the pair was created (informational). */
-  readonly lastGoodFreeEndPoint: Vec3;
-  /** `"moving"` until the next `advanceCurveShorteningPairs` call resolves the pair; `"unresolved"` after a failed resolution (later calls skip it). */
+  /** Ids of the free vertices of the curve, in the order the flow visits them; shrinks, never grows. */
+  readonly vertexIds: readonly string[];
+  /** `"moving"` while the curve flows; `"unresolved"` after it was blocked (later ticks skip it). */
   readonly state: "moving" | "unresolved";
 }
 
@@ -467,30 +443,6 @@ export function isFreeGeodesicEndObject(object: { readonly kind: string }): obje
 }
 
 /**
- * Builds a corner anchor at `point` (cell-local meters, z = beam height) in cell `cellId`, wrapping the disk `junctionId` on `side`.
- *
- * Pure; the caller adds it to the registry. The object is invisible, non-colliding and without a tooltip.
- */
-export function createGeodesicCornerObject(input: {
-  readonly id: string;
-  readonly cellId: string;
-  readonly point: Vec3;
-  readonly junctionId: string;
-  readonly side: "left" | "right";
-}): GeodesicCornerObject {
-  return {
-    id: input.id,
-    kind: "geodesic-corner",
-    canAttachGeodesics: true,
-    cellId: input.cellId,
-    localPose: yawRigidTransform3(0, input.point),
-    portalRenderable: false,
-    junctionId: input.junctionId,
-    side: input.side,
-  };
-}
-
-/**
  * Builds a free-end anchor at `point` (cell-local meters, including its beam height in z) in cell `cellId`.
  *
  * Pure; the caller adds it to the registry. The object is non-renderable through portals and can attach geodesics.
@@ -547,30 +499,23 @@ export function createGeodesicIntervalObject(input: {
 }
 
 /**
- * Builds a curve-shortening pair object (see `CurveShorteningPairObject`); `state` defaults to `"moving"`.
+ * Builds a curve-shortening pair object (see `CurveShorteningPairObject`); `state` defaults to `"moving"`. `cellId` is the cell of the first vertex.
  *
- * Pure; the caller adds it to the registry. The pose mirrors the last-good free-end location.
+ * Pure; the caller adds it to the registry.
  */
 export function createCurveShorteningPairObject(input: {
   readonly id: string;
-  readonly first: GeodesicEndpointAttachment;
-  readonly second: GeodesicEndpointAttachment;
-  readonly freeEndAnchorId: string;
-  readonly lastGoodFreeEndCellId: string;
-  readonly lastGoodFreeEndPoint: Vec3;
+  readonly vertexIds: readonly string[];
+  readonly cellId: string;
   readonly state?: "moving" | "unresolved";
 }): CurveShorteningPairObject {
   return {
     id: input.id,
     kind: "curve-shortening-pair",
-    cellId: input.lastGoodFreeEndCellId,
-    localPose: yawRigidTransform3(0, input.lastGoodFreeEndPoint),
+    cellId: input.cellId,
+    localPose: identityRigidTransform3,
     portalRenderable: false,
-    first: input.first,
-    second: input.second,
-    freeEndAnchorId: input.freeEndAnchorId,
-    lastGoodFreeEndCellId: input.lastGoodFreeEndCellId,
-    lastGoodFreeEndPoint: input.lastGoodFreeEndPoint,
+    vertexIds: input.vertexIds,
     state: input.state ?? "moving",
   };
 }

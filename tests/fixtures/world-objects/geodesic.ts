@@ -330,7 +330,7 @@ export function compileRotatedFreeLoopWorld() {
   });
 }
 
-// Advances until the pair is gone or `maxTicks` is reached. Fails if the pair's total length ever grows by more than 1e-9 m.
+// Advances until the pair is gone or `maxTicks` is reached. Fails if the pair's total length ever grows by more than 1e-9 m, or if a tick adds a free vertex.
 export function runCurveShorteningUntilPairGone(
   world: ReturnType<typeof compileCellComplex>,
   registry: ReturnType<typeof createRuntimeObjectRegistry>,
@@ -340,8 +340,10 @@ export function runCurveShorteningUntilPairGone(
   let previous = total();
   let ticks = 0;
   while (ticks < options.maxTicks && registry.get(options.pairId)) {
+    const verticesBefore = registry.getObjectsOfKind("free-geodesic-end").length;
     advanceCurveShorteningPairs({ world, registry, deltaSeconds: options.deltaSeconds });
     ticks += 1;
+    expect(registry.getObjectsOfKind("free-geodesic-end").length).toBeLessThanOrEqual(verticesBefore);
     if (registry.get(options.pairId)) {
       const next = total();
       expect(next).toBeLessThanOrEqual(previous + 1e-9);
@@ -391,14 +393,7 @@ export function createSymmetricPairScenario(halfWidth: number, height: number) {
   registry.add(createGeodesicIntervalObject({ id: "g2", startAnchorObjectId: "free", endAnchorObjectId: "e2", startCellId: "a", motionState: "moving" }));
   rebuildDerivedGeodesicSegments({ world, registry, geodesicId: "g1" });
   rebuildDerivedGeodesicSegments({ world, registry, geodesicId: "g2" });
-  registry.add(createCurveShorteningPairObject({
-    id: "pair",
-    first: { geodesicId: "g1", role: "end", anchorObjectId: "free" },
-    second: { geodesicId: "g2", role: "start", anchorObjectId: "free" },
-    freeEndAnchorId: "free",
-    lastGoodFreeEndCellId: "a",
-    lastGoodFreeEndPoint: { x: 0, y: height, z: geodesicRayBeamHeightMeters },
-  }));
+  registry.add(createCurveShorteningPairObject({ id: "pair", vertexIds: ["free"], cellId: "a" }));
   return { world, registry };
 }
 

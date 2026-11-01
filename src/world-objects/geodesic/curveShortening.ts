@@ -1,31 +1,24 @@
 /**
- * Curve shortening: tie-and-detach of two endpoint roles into a curve-shortening pair, and its exact resolution in one tick.
- * Tying detaches two roles of an emitter onto a shared free end F without changing the geometry. The next `advanceCurveShorteningPairs` call replaces the pair (two arcs tied at F, or one free loop on F) by the shortest path of its homotopy class: the fused portal word is developed into a sleeve (`sleeve.ts`) and the taut string through it is the straight chord, or a polygon whose corners wrap the forbidden-zone disks at portal junctions. Corners become pinned `GeodesicCornerObject` anchors, the result a chain of stable locked intervals. A free loop whose holonomy rotates (it encircles a cone point) is deleted with a notice. Failures change nothing except marking the pair `"unresolved"`.
+ * Curve shortening: tie-and-detach of two endpoint roles into a curve-shortening pair, and the curve shortening flow that then runs over many frames.
+ * Tying detaches two endpoint roles of an emitter onto a shared free end F without changing the geometry. The curve is then a piecewise-geodesic chain of
+ * moving intervals; each `advanceCurveShorteningPairs` tick moves every free vertex along the descent direction of the total length (the sum of its two
+ * arcs' unit tangents) with an exact line search, re-realizes the neighbouring arcs as geodesic chords of their portal words, and removes a vertex when
+ * its turning angle is below a tolerance. The vertex count never grows (no vertex is inserted), the total length never grows, and the registry is the
+ * current curve at every tick. When no free vertex is left the curve is stable. Failures change nothing except marking the pair `"unresolved"`.
  */
 import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex";
-import { forbiddenPortalJunctionRadiusMeters } from "../../cell-complex/forbiddenZones";
 import { walkDevelopedSegment } from "../../cell-complex/segmentWalk";
-import {
-  composeRigidTransform3,
-  identityRigidTransform3,
-  invertRigidTransform3,
-  orthonormalizeYawRigidTransform3,
-  transformDirection3,
-  transformPoint3,
-  type RigidTransform3,
-} from "../../math/rigidTransform3";
-import { lengthVec2, subVec2 } from "../../math/vec2";
+import { transformPoint3 } from "../../math/rigidTransform3";
 import { vec3 } from "../../math/vec3";
 import type { RuntimeObjectRegistry, RuntimeWorldObject } from "../runtimeObjectRegistry";
-import { developSleeve, geodesicCornerClearanceMeters, solveTautPath } from "./sleeve";
-import { createCurveShorteningPairObject, createFreeGeodesicEndObject, createGeodesicCornerObject, createGeodesicIntervalObject, type CurveShorteningPairObject, GEODESIC_MIN_LENGTH_METERS, type GeodesicCornerObject, type GeodesicEndpointSelection, type GeodesicIntervalObject, type GeodesicPortalTraversal, type GeodesicSegmentObject, getGeodesicCannonEmitterPoint, getOppositeEndRole, type TraceGeodesicSegmentResult } from "./objects";
-import { canObjectAttachGeodesics, getAnchorBeamPoint } from "./anchors";
+import { createCurveShorteningPairObject, createFreeGeodesicEndObject, createGeodesicIntervalObject, type CurveShorteningPairObject, GEODESIC_MIN_LENGTH_METERS, type GeodesicEndpointSelection, type GeodesicEndRole, type GeodesicIntervalObject, type GeodesicPortalTraversal, type GeodesicSegmentObject, getGeodesicCannonEmitterPoint, getOppositeEndRole, reduceAdjacentInversePortalTraversals, type TraceGeodesicSegmentResult } from "./objects";
+import { canObjectAttachGeodesics } from "./anchors";
 import { getPortalWordBetweenEndpointRoles, reverseGeodesicPortalWord, samePortalWord } from "./portalWord";
-import { reduceAdjacentInversePortalTraversals } from "./objects";
 import { requestGeodesicIntersectionUpdate, withDeferredGeodesicIntersections } from "./intersections";
-import { removeUnusedFreeGeodesicEnds } from "./endpoints";
+import { liftGeodesicEndpointWithAnchors, removeUnusedFreeGeodesicEnds } from "./endpoints";
 import {
   getGeodesicSegments,
+  getGeodesicTotalLengthMeters,
   removeGeodesicIntervalAndDerivedObjects,
   removeGeodesicSegments,
   replaceDerivedSegmentsFromTraces,
@@ -45,12 +38,13 @@ export interface TieAndDetachGeodesicEndpointsRequest {
   readonly createFreeEndId: () => string;
 }
 
-/** Request for `advanceCurveShorteningPairs`: resolve every moving pair (the time step only gates the call; a pair is resolved in one tick). */
+/** Request for `advanceCurveShorteningPairs`: one tick of the curve shortening flow of every moving pair. */
 export interface AdvanceCurveShorteningPairsRequest {
   readonly world: CompiledCellComplex;
   readonly registry: RuntimeObjectRegistry;
+  /** Frame time in seconds; the flow moves each free vertex by at most `curveShorteningSpeedMetersPerSecond` times this (clamped to 0.1 s). */
   readonly deltaSeconds: number;
-  /** Receives the notices of the resolution (collapsed loops and geodesics, unresolved pairs). */
+  /** Receives the notices of the flow (collapsed loops and geodesics, unresolved pairs). */
   readonly onNotice?: (notice: CurveShorteningNotice) => void;
 }
 
@@ -62,7 +56,7 @@ export interface AdvanceCurveShorteningPairsRequest {
  * (pinned at both ends); the first anchor of the detached roles is the emitter. Effects on success: a `FreeGeodesicEndObject` is created at the emitter's beam point (so the geometry does
  * not change at detach time), the selected roles are re-attached to it, the affected intervals become `"moving"`, their segments are
  * rebuilt from the stored portal word (the homotopy class is preserved), and a `CurveShorteningPairObject` is added. Returns that pair;
- * the next `advanceCurveShorteningPairs` call resolves it.
+ * the next `advanceCurveShorteningPairs` ticks shorten it.
  *
  * Returns `undefined` on failed preconditions (nothing changed) or when a rebuild fails. Any rebuild failure rolls back all intervals
  * and segments and removes the free end: the geometry does not change at tie time, so a failure is numerical and never a reason to
@@ -145,33 +139,61 @@ function tieAndDetachGeodesicEndpointsNow(
     syncEmitterGeodesicMenuCaches(request.registry, interval.id);
   }
 
-  // The pair remembers where the free end was born (the emitter's beam point).
   const pair = createCurveShorteningPairObject({
     id: request.createPairId(),
-    first: { geodesicId: request.first.geodesicId, role: request.first.role, anchorObjectId: freeEnd.id },
-    second: { geodesicId: request.second.geodesicId, role: request.second.role, anchorObjectId: freeEnd.id },
-    freeEndAnchorId: freeEnd.id,
-    lastGoodFreeEndCellId: freeEnd.cellId,
-    lastGoodFreeEndPoint: getAnchorBeamPoint(freeEnd),
+    vertexIds: [freeEnd.id],
+    cellId: freeEnd.cellId,
   });
   request.registry.add(pair);
   requestGeodesicIntersectionUpdate(request.registry);
   return pair;
 }
 
-// ---- Curve shortening ----
+// ---- Curve shortening flow ----
+
+/** Speed (meters per second) at which a free vertex moves along its descent direction; the exact line search never overshoots the minimum. */
+export const curveShorteningSpeedMetersPerSecond = 1.5;
+
+/** Longest frame time (seconds) one tick of the flow integrates; a stalled tab does not teleport a vertex. */
+const maxCurveShorteningDeltaSeconds = 0.1;
+
+/** Turning angle (radians) below which a vertex counts as taut: its two arcs are one geodesic and the vertex is removed. */
+export const curveShorteningTautTurnRadians = 5e-3;
+
+/** Smallest step (meters) worth taking; a vertex that cannot move this far, and is not taut, is merged away or the curve is left unresolved. */
+const minCurveShorteningStepMeters = 1e-5;
+
+/** A blocked loop shorter than this has no room left to shrink: it is on its way to the cone point it encircles and is deleted. */
+const loopCollapseLengthMeters = GEODESIC_MIN_LENGTH_METERS * 4;
+
+/** How many times a rejected step is halved before the vertex counts as blocked. */
+const maxStepHalvings = 8;
+
+/** Bisection iterations of the line search along the descent ray. */
+const lineSearchIterations = 40;
+
+/** Length tolerance (meters): a step must not lengthen the arcs it moves by more than this. */
+const lengthIncreaseToleranceMeters = 1e-9;
+
+/** An arc end: one endpoint role of an interval attached to a vertex. */
+interface ArcEnd {
+  readonly intervalId: string;
+  readonly role: GeodesicEndRole;
+}
 
 /**
- * Resolves every `"moving"` curve-shortening pair completely, in this one call, and returns the ids that changed.
+ * Advances every moving curve-shortening curve by one tick of the curve shortening flow and returns the ids that changed.
  *
- * Each pair is handed to `resolveCurveShorteningPair`: it is replaced by the length-minimizing path of its homotopy class (the straight
- * chord, or a taut string around the forbidden-zone disks made of stable intervals joined at pinned corner anchors), or deleted when
- * the result is a point, or set `"unresolved"` (and skipped by later calls) when it cannot be resolved. There is no animation and no
- * gradient descent. `"unresolved"` pairs are skipped.
+ * The curve is the piecewise-geodesic chain of the pair's `"moving"` intervals; its free vertices are the pair's `vertexIds`. Every
+ * tick each free vertex moves along the descent direction of the total length, the sum of the unit tangents of its two arcs pointing away
+ * from it, by `min(speed * dt, distance to the minimum along that ray)` (an exact one-dimensional line search, so it never overshoots and never
+ * stalls). Both arcs are re-realized as geodesic chords of their word, and the word changes by the portals the vertex crossed. The curve in
+ * the registry is the current curve at every tick, and its total length never grows. A vertex whose turning angle is below
+ * `curveShorteningTautTurnRadians` is removed: its two arcs merge into one (a loop on one vertex becomes a stable loop). The vertex count
+ * never grows: no vertex is inserted, so a curve that would need a wrap around a forbidden-zone disk is left `"unresolved"`. When no free
+ * vertex remains the pair is gone and the curve is stable. `deltaSeconds` is clamped to 0.1 s; a non-positive value does nothing.
  *
- * Returns the unique ids that changed: the new intervals, then the deleted arcs, then the pair id when the pair was deleted or set
- * unresolved, so that the caller can refresh or drop measurements and angles that refer to them. Returns `[]` when `deltaSeconds` is
- * not positive. Notices go to `onNotice`.
+ * Returns the unique ids of the intervals that moved or merged, then removed ones, and the pair id when the pair ended. Notices go to `onNotice`.
  */
 export function advanceCurveShorteningPairs(
   request: AdvanceCurveShorteningPairsRequest,
@@ -183,30 +205,437 @@ function advanceCurveShorteningPairsNow(request: AdvanceCurveShorteningPairsRequ
   if (!(request.deltaSeconds > 0)) {
     return [];
   }
+  const stepBudgetMeters = curveShorteningSpeedMetersPerSecond * Math.min(request.deltaSeconds, maxCurveShorteningDeltaSeconds);
   const changed: string[] = [];
   for (const pair of request.registry.getObjectsOfKind("curve-shortening-pair")) {
     if (pair.state !== "moving" || request.registry.get(pair.id)?.kind !== "curve-shortening-pair") {
       continue;
     }
-    const result = resolveCurveShorteningPair({
-      world: request.world,
-      registry: request.registry,
-      pairId: pair.id,
-      onNotice: request.onNotice,
-    });
-    if (result.status === "resolved") {
-      changed.push(...result.geodesicIds, ...result.removedIds);
-    } else if (result.status === "deleted") {
-      changed.push(...result.removedIds, pair.id);
-    } else {
-      changed.push(pair.id);
-    }
+    changed.push(...flowPair(request, pair.id, stepBudgetMeters));
   }
   if (changed.length > 0) {
     requestGeodesicIntersectionUpdate(request.registry);
   }
   return [...new Set(changed)];
 }
+
+// One tick of one pair: every free vertex in order (Gauss-Seidel, so a vertex sees the position its neighbour just took).
+function flowPair(request: AdvanceCurveShorteningPairsRequest, pairId: string, stepBudgetMeters: number): readonly string[] {
+  const { registry } = request;
+  const changed: string[] = [];
+  const pair = registry.get(pairId);
+  if (pair?.kind !== "curve-shortening-pair") {
+    return changed;
+  }
+  for (const vertexId of pair.vertexIds) {
+    const current = registry.get(pairId);
+    if (current?.kind !== "curve-shortening-pair" || current.state !== "moving") {
+      break;
+    }
+    if (registry.get(vertexId)?.kind !== "free-geodesic-end") {
+      // The vertex is gone (an arc was deleted by someone else): nothing sensible is left of this curve.
+      changed.push(...finishPairWithoutVertex(registry, current, vertexId));
+      continue;
+    }
+    const outcome = flowVertex(request, current, vertexId, stepBudgetMeters);
+    changed.push(...outcome.changedIds);
+  }
+  const after = registry.get(pairId);
+  if (after?.kind === "curve-shortening-pair" && after.vertexIds.length === 0) {
+    registry.remove(after.id);
+    changed.push(after.id);
+  }
+  return changed;
+}
+
+function finishPairWithoutVertex(
+  registry: RuntimeObjectRegistry,
+  pair: CurveShorteningPairObject,
+  missingVertexId: string,
+): readonly string[] {
+  registry.update({ ...pair, vertexIds: pair.vertexIds.filter((id) => id !== missingVertexId) });
+  return [pair.id];
+}
+
+interface VertexFlowOutcome {
+  readonly changedIds: readonly string[];
+}
+
+// Moves, merges away or blocks one free vertex of a pair.
+function flowVertex(
+  request: AdvanceCurveShorteningPairsRequest,
+  pair: CurveShorteningPairObject,
+  vertexId: string,
+  stepBudgetMeters: number,
+): VertexFlowOutcome {
+  const { world, registry } = request;
+  const vertex = registry.get(vertexId);
+  if (vertex?.kind !== "free-geodesic-end") {
+    return { changedIds: [] };
+  }
+  const ends = incidentArcEnds(registry, vertexId);
+  if (ends.length !== 2) {
+    return { changedIds: markUnresolved(request, pair, `vertex-valence-${ends.length}`) };
+  }
+  const tangents = ends.map((end) => tangentAwayFromVertex(world, registry, end, undefined));
+  if (tangents.some((tangent) => tangent === undefined)) {
+    return { changedIds: markUnresolved(request, pair, "lift") };
+  }
+  const [first, second] = tangents as [ArcTangent, ArcTangent];
+  const descent = { x: first.x + second.x, y: first.y + second.y };
+  const descentNorm = Math.hypot(descent.x, descent.y);
+  if (descentNorm < curveShorteningTautTurnRadians) {
+    return mergeVertexOrFail(request, pair, vertexId, ends);
+  }
+  const direction = { x: descent.x / descentNorm, y: descent.y / descentNorm };
+  const step = lineSearchStepMeters(world, registry, vertex, ends, direction, stepBudgetMeters);
+  if (step < minCurveShorteningStepMeters) {
+    return mergeVertexOrFail(request, pair, vertexId, ends);
+  }
+  const before = totalLengthOfArcs(registry, ends);
+  let attempt = step;
+  for (let halving = 0; halving <= maxStepHalvings && attempt >= minCurveShorteningStepMeters; halving += 1) {
+    const moved = tryMoveVertex(world, registry, vertex, ends, direction, attempt, before);
+    if (moved) {
+      commitVertexMove(registry, pair, moved);
+      return { changedIds: moved.intervals.map(({ interval }) => interval.id) };
+    }
+    attempt /= 2;
+  }
+  // Blocked: a wall, a forbidden zone, or an arc about to become degenerate. Cutting the corner is the only move left that adds no vertex.
+  return mergeVertexOrFail(request, pair, vertexId, ends);
+}
+
+interface ArcTangent {
+  readonly x: number;
+  readonly y: number;
+  readonly lengthMeters: number;
+}
+
+// Unit tangent of an arc at a vertex, pointing away from it, in the vertex's own cell frame; `candidates` shadow the registry's anchors.
+function tangentAwayFromVertex(
+  world: CompiledCellComplex,
+  registry: RuntimeObjectRegistry,
+  end: ArcEnd,
+  candidates: ReadonlyMap<string, RuntimeWorldObject> | undefined,
+  intervalOverrides?: ReadonlyMap<string, GeodesicIntervalObject>,
+): ArcTangent | undefined {
+  const interval = intervalOverrides?.get(end.intervalId) ?? registry.get(end.intervalId);
+  if (interval?.kind !== "geodesic-interval") {
+    return undefined;
+  }
+  const lifted = liftGeodesicEndpointWithAnchors({
+    world,
+    registry,
+    interval,
+    sourceRole: end.role,
+    candidateAnchorsById: candidates,
+  });
+  if (!lifted) {
+    return undefined;
+  }
+  const dx = lifted.targetPointInSourceCell.x - lifted.sourcePoint.x;
+  const dy = lifted.targetPointInSourceCell.y - lifted.sourcePoint.y;
+  const length = Math.hypot(dx, dy);
+  return length > 0 ? { x: dx / length, y: dy / length, lengthMeters: length } : undefined;
+}
+
+// Both endpoint roles of every moving interval attached to the vertex (a loop on the vertex has two).
+function incidentArcEnds(registry: RuntimeObjectRegistry, vertexId: string): readonly ArcEnd[] {
+  const ends: ArcEnd[] = [];
+  for (const interval of registry.getObjectsOfKind("geodesic-interval")) {
+    for (const role of ["start", "end"] as const) {
+      if (interval[role].anchorObjectId === vertexId) {
+        ends.push({ intervalId: interval.id, role });
+      }
+    }
+  }
+  return ends;
+}
+
+function totalLengthOfArcs(registry: RuntimeObjectRegistry, ends: readonly ArcEnd[]): number {
+  return [...new Set(ends.map(({ intervalId }) => intervalId))]
+    .reduce((total, id) => total + getGeodesicTotalLengthMeters(registry, id), 0);
+}
+
+function movedVertex(vertex: Extract<RuntimeWorldObject, { readonly kind: "free-geodesic-end" }>, cellId: string, x: number, y: number) {
+  return {
+    ...vertex,
+    cellId,
+    localPose: { ...vertex.localPose, translation: { x, y, z: vertex.localPose.translation.z } },
+  };
+}
+
+// Exact line search of the total length along the ray: the length is convex along it and its derivative is
+// `-(direction . u1 + direction . u2)` with the tangents re-lifted at the candidate position, so a bisection on the sign finds the minimum.
+// Returns `min(budget, distance to the minimum)`.
+function lineSearchStepMeters(
+  world: CompiledCellComplex,
+  registry: RuntimeObjectRegistry,
+  vertex: Extract<RuntimeWorldObject, { readonly kind: "free-geodesic-end" }>,
+  ends: readonly ArcEnd[],
+  direction: { readonly x: number; readonly y: number },
+  budgetMeters: number,
+): number {
+  const origin = vertex.localPose.translation;
+  const slope = (t: number): number | undefined => {
+    const candidate = movedVertex(vertex, vertex.cellId, origin.x + direction.x * t, origin.y + direction.y * t);
+    const candidates = new Map<string, RuntimeWorldObject>([[vertex.id, candidate]]);
+    let total = 0;
+    for (const end of ends) {
+      const tangent = tangentAwayFromVertex(world, registry, end, candidates);
+      if (!tangent) {
+        return undefined;
+      }
+      total -= direction.x * tangent.x + direction.y * tangent.y;
+    }
+    return total;
+  };
+  const atBudget = slope(budgetMeters);
+  if (atBudget === undefined) {
+    return budgetMeters;
+  }
+  if (atBudget <= 0) {
+    return budgetMeters;
+  }
+  let low = 0;
+  let high = budgetMeters;
+  for (let iteration = 0; iteration < lineSearchIterations; iteration += 1) {
+    const middle = (low + high) / 2;
+    const value = slope(middle);
+    if (value === undefined || value > 0) {
+      high = middle;
+    } else {
+      low = middle;
+    }
+  }
+  return (low + high) / 2;
+}
+
+interface MovedVertex {
+  readonly vertex: Extract<RuntimeWorldObject, { readonly kind: "free-geodesic-end" }>;
+  readonly intervals: readonly { readonly interval: GeodesicIntervalObject; readonly traces: readonly TraceGeodesicSegmentResult[] }[];
+}
+
+// Tries one step: walks the vertex through the world, updates the words of the arcs by the portals it crossed, previews both arcs and
+// accepts only a step that does not lengthen them. Nothing is written.
+function tryMoveVertex(
+  world: CompiledCellComplex,
+  registry: RuntimeObjectRegistry,
+  vertex: Extract<RuntimeWorldObject, { readonly kind: "free-geodesic-end" }>,
+  ends: readonly ArcEnd[],
+  direction: { readonly x: number; readonly y: number },
+  stepMeters: number,
+  lengthBefore: number,
+): MovedVertex | undefined {
+  const origin = vertex.localPose.translation;
+  const walk = walkDevelopedSegment({
+    world,
+    cellId: vertex.cellId,
+    start: { x: origin.x, y: origin.y },
+    direction,
+    lengthMeters: stepMeters,
+  });
+  const lastPiece = walk.pieces.at(-1);
+  if (walk.status !== "end" || !lastPiece) {
+    return undefined;
+  }
+  const local = transformPoint3(lastPiece.cellFromStart, vec3(origin.x + direction.x * stepMeters, origin.y + direction.y * stepMeters, 0));
+  const crossings: GeodesicPortalTraversal[] = walk.crossings.map((crossing) => ({
+    sourceCellId: crossing.sourceCellId,
+    sourcePortalId: crossing.portalId,
+    targetCellId: crossing.targetCellId,
+    targetPortalId: crossing.targetPortalId,
+  }));
+  const next = movedVertex(vertex, lastPiece.cellId, local.x, local.y);
+
+  const updated = new Map<string, GeodesicIntervalObject>();
+  for (const end of ends) {
+    const interval = updated.get(end.intervalId) ?? registry.get(end.intervalId);
+    if (interval?.kind !== "geodesic-interval") {
+      return undefined;
+    }
+    updated.set(end.intervalId, withVertexCrossings(interval, end.role, crossings, lastPiece.cellId));
+  }
+  const candidates = new Map<string, RuntimeWorldObject>([[vertex.id, next]]);
+  const intervals: { interval: GeodesicIntervalObject; traces: readonly TraceGeodesicSegmentResult[] }[] = [];
+  let lengthAfter = 0;
+  for (const interval of updated.values()) {
+    const preview = previewRebuildGeodesicInterval({ world, registry, interval, candidateAnchorsById: candidates });
+    if (!preview) {
+      return undefined;
+    }
+    intervals.push({ interval, traces: preview.traces });
+    lengthAfter += preview.traces.reduce((total, trace) => total + trace.lengthMeters, 0);
+  }
+  if (lengthAfter > lengthBefore + lengthIncreaseToleranceMeters) {
+    return undefined;
+  }
+  return { vertex: next, intervals };
+}
+
+// The interval after its `role` end moved over the portals `crossings` into `newCellId`: the word is extended at the end or prefixed
+// (inverted) at the start, then freely reduced; a moved start also moves the interval's start cell.
+function withVertexCrossings(
+  interval: GeodesicIntervalObject,
+  role: GeodesicEndRole,
+  crossings: readonly GeodesicPortalTraversal[],
+  newCellId: string,
+): GeodesicIntervalObject {
+  if (crossings.length === 0) {
+    return role === "start" ? { ...interval, cellId: newCellId, startCellId: newCellId } : interval;
+  }
+  if (role === "end") {
+    return { ...interval, portalWord: reduceAdjacentInversePortalTraversals([...interval.portalWord, ...crossings]) };
+  }
+  return {
+    ...interval,
+    cellId: newCellId,
+    startCellId: newCellId,
+    portalWord: reduceAdjacentInversePortalTraversals([...reverseGeodesicPortalWord(crossings), ...interval.portalWord]),
+  };
+}
+
+function commitVertexMove(registry: RuntimeObjectRegistry, pair: CurveShorteningPairObject, moved: MovedVertex): void {
+  registry.update(moved.vertex);
+  for (const { interval, traces } of moved.intervals) {
+    registry.update(interval);
+    replaceDerivedSegmentsFromTraces({ registry, geodesicId: interval.id, traces });
+  }
+  // The pair object mirrors the cell of its first vertex (informational).
+  if (pair.vertexIds[0] === moved.vertex.id && pair.cellId !== moved.vertex.cellId) {
+    registry.update({ ...pair, cellId: moved.vertex.cellId });
+  }
+}
+
+function markUnresolved(request: AdvanceCurveShorteningPairsRequest, pair: CurveShorteningPairObject, reason: string): readonly string[] {
+  request.registry.update({ ...pair, state: "unresolved" });
+  request.onNotice?.({
+    kind: "unresolved",
+    pairId: pair.id,
+    reason,
+    message: `The tied geodesic could not be straightened (${reason}).`,
+  });
+  return [pair.id];
+}
+
+function oppositeRole(role: GeodesicEndRole): GeodesicEndRole {
+  return getOppositeEndRole(role);
+}
+
+// Removes a vertex whose two arcs form one geodesic (taut), or that cannot move any more: the two arcs merge into one interval from the
+// far anchor of the first to the far anchor of the second. A loop on the vertex has nothing to merge with: it becomes a stable loop when taut
+// and is deleted when it has shrunk below the minimum length. A merge whose chord cannot be realized (a wall or a forbidden zone is in
+// the way, which would need an inserted wrap vertex) leaves the curve unresolved.
+function mergeVertexOrFail(
+  request: AdvanceCurveShorteningPairsRequest,
+  pair: CurveShorteningPairObject,
+  vertexId: string,
+  ends: readonly ArcEnd[],
+): VertexFlowOutcome {
+  const { world, registry } = request;
+  const [firstEnd, secondEnd] = ends;
+  const firstInterval = registry.get(firstEnd.intervalId);
+  const secondInterval = registry.get(secondEnd.intervalId);
+  if (firstInterval?.kind !== "geodesic-interval" || secondInterval?.kind !== "geodesic-interval") {
+    return { changedIds: markUnresolved(request, pair, "missing-interval") };
+  }
+  const remainingVertexIds = pair.vertexIds.filter((id) => id !== vertexId);
+
+  if (firstInterval.id === secondInterval.id) {
+    const length = getGeodesicTotalLengthMeters(registry, firstInterval.id);
+    const tangents = ends.map((end) => tangentAwayFromVertex(world, registry, end, undefined));
+    const straight = tangents.every((tangent) => tangent !== undefined) &&
+      Math.hypot(tangents[0]!.x + tangents[1]!.x, tangents[0]!.y + tangents[1]!.y) < curveShorteningTautTurnRadians;
+    if (straight) {
+      registry.update({ ...firstInterval, motionState: "stable" });
+      registry.update({ ...pair, vertexIds: remainingVertexIds });
+      return { changedIds: [firstInterval.id, pair.id] };
+    }
+    if (length < loopCollapseLengthMeters) {
+      registry.update({ ...pair, vertexIds: remainingVertexIds });
+      removeGeodesicIntervalAndDerivedObjects(registry, firstInterval.id);
+      if (registry.get(vertexId)) {
+        registry.remove(vertexId);
+      }
+      request.onNotice?.({
+        kind: "free-loop-collapsed",
+        geodesicId: firstInterval.id,
+        message: "The loop around a cone point shrank to a point and was removed.",
+      });
+      return { changedIds: [firstInterval.id, pair.id] };
+    }
+    return { changedIds: markUnresolved(request, pair, "loop-blocked") };
+  }
+
+  const anchorA = registry.get(firstInterval[oppositeRole(firstEnd.role)].anchorObjectId);
+  const anchorB = registry.get(secondInterval[oppositeRole(secondEnd.role)].anchorObjectId);
+  if (!canObjectAttachGeodesics(anchorA) || !canObjectAttachGeodesics(anchorB)) {
+    return { changedIds: markUnresolved(request, pair, "anchor") };
+  }
+  const word = reduceAdjacentInversePortalTraversals([
+    ...getPortalWordBetweenEndpointRoles({ interval: firstInterval, sourceRole: oppositeRole(firstEnd.role), targetRole: firstEnd.role }),
+    ...getPortalWordBetweenEndpointRoles({ interval: secondInterval, sourceRole: secondEnd.role, targetRole: oppositeRole(secondEnd.role) }),
+  ]);
+  const mergedId = [firstInterval.id, secondInterval.id].sort()[0];
+  const removedId = mergedId === firstInterval.id ? secondInterval.id : firstInterval.id;
+  const stillMoving = remainingVertexIds.includes(anchorA.id) || remainingVertexIds.includes(anchorB.id);
+  const merged = createGeodesicIntervalObject({
+    id: mergedId,
+    startAnchorObjectId: anchorA.id,
+    endAnchorObjectId: anchorB.id,
+    startCellId: anchorA.cellId,
+    portalWord: word,
+    motionState: stillMoving ? "moving" : "stable",
+  });
+  const preview = previewRebuildGeodesicInterval({ world, registry, interval: merged });
+  if (!preview) {
+    const lifted = liftGeodesicEndpointWithAnchors({ world, registry, interval: merged, sourceRole: "start" });
+    if (lifted && Math.hypot(
+      lifted.targetPointInSourceCell.x - lifted.sourcePoint.x,
+      lifted.targetPointInSourceCell.y - lifted.sourcePoint.y,
+    ) < GEODESIC_MIN_LENGTH_METERS) {
+      registry.update({ ...pair, vertexIds: remainingVertexIds });
+      removeGeodesicIntervalAndDerivedObjects(registry, firstInterval.id);
+      removeGeodesicIntervalAndDerivedObjects(registry, secondInterval.id);
+      if (registry.get(vertexId)) {
+        registry.remove(vertexId);
+      }
+      request.onNotice?.({
+        kind: "collapsed",
+        geodesicIds: [firstInterval.id, secondInterval.id],
+        message: "The tied geodesic shrank to a point and was removed.",
+      });
+      return { changedIds: [firstInterval.id, secondInterval.id, pair.id] };
+    }
+    return { changedIds: markUnresolved(request, pair, "merge-blocked") };
+  }
+
+  if (!stillMoving) {
+    const existing = findEquivalentStableInterval(registry, merged, [firstInterval.id, secondInterval.id]);
+    if (existing) {
+      registry.update({ ...pair, vertexIds: remainingVertexIds });
+      removeGeodesicIntervalAndDerivedObjects(registry, firstInterval.id);
+      removeGeodesicIntervalAndDerivedObjects(registry, secondInterval.id);
+      if (registry.get(vertexId)) {
+        registry.remove(vertexId);
+      }
+      return { changedIds: [firstInterval.id, secondInterval.id, pair.id] };
+    }
+  }
+  // Commit: the merged interval overwrites the one with the smaller id, the other goes last so that the free-end sweep of its removal
+  // finds the merged interval already detached from the vertex.
+  registry.update(merged);
+  registry.update({ ...pair, vertexIds: remainingVertexIds });
+  removeGeodesicIntervalAndDerivedObjects(registry, removedId);
+  if (registry.get(vertexId)) {
+    registry.remove(vertexId);
+  }
+  replaceDerivedSegmentsFromTraces({ registry, geodesicId: merged.id, traces: preview.traces });
+  syncEmitterGeodesicMenuCaches(registry, merged.id);
+  return { changedIds: [merged.id, removedId, pair.id] };
+}
+
 
 // Finds a stable interval that is the same geodesic as `candidate`: same two endpoint anchors and the same portal word, read in
 // either direction (A -> B with word w equals B -> A with the inverse word). The word, not just the anchor pair, is the identity:
@@ -236,26 +665,6 @@ function findEquivalentStableInterval(
     ));
 }
 
-// Ends a curve-shortening pair whose fused result would duplicate `existing`: deletes the moving arcs, the free end and the pair, and
-// keeps the geodesic that is already there.
-function discardCurveShorteningPairInFavorOf(
-  registry: RuntimeObjectRegistry,
-  pair: CurveShorteningPairObject,
-  intervals: readonly GeodesicIntervalObject[],
-  existing: GeodesicIntervalObject,
-): GeodesicIntervalObject {
-  for (const interval of intervals) {
-    removeGeodesicIntervalAndDerivedObjects(registry, interval.id);
-  }
-  if (registry.get(pair.freeEndAnchorId)) {
-    registry.remove(pair.freeEndAnchorId);
-  }
-  if (registry.get(pair.id)) {
-    registry.remove(pair.id);
-  }
-  requestGeodesicIntersectionUpdate(registry);
-  return existing;
-}
 
 // De-duplicates intervals by id (a loop pair names the same interval twice), keeping the last occurrence.
 function uniqueIntervals(intervals: readonly GeodesicIntervalObject[]): readonly GeodesicIntervalObject[] {
@@ -266,44 +675,6 @@ function uniqueIntervals(intervals: readonly GeodesicIntervalObject[]): readonly
   return [...byId.values()];
 }
 
-// Resolves and validates the intervals owned by a pair: both exist, the named role of each is attached to the pair's free end, and
-// every interval is `"moving"`. Returns `undefined` otherwise. One interval is returned for a free loop.
-function resolvePairIntervals(
-  registry: RuntimeObjectRegistry,
-  pair: CurveShorteningPairObject,
-): { readonly intervals: readonly GeodesicIntervalObject[] } | undefined {
-  const first = registry.get(pair.first.geodesicId);
-  const second = registry.get(pair.second.geodesicId);
-  if (first?.kind !== "geodesic-interval" || second?.kind !== "geodesic-interval") {
-    return undefined;
-  }
-  if (
-    first[pair.first.role].anchorObjectId !== pair.freeEndAnchorId ||
-    second[pair.second.role].anchorObjectId !== pair.freeEndAnchorId
-  ) {
-    return undefined;
-  }
-  const intervals = uniqueIntervals([first, second]);
-  return intervals.every((interval) => interval.motionState === "moving") ? { intervals } : undefined;
-}
-
-// Destructive failure cleanup: deletes the given intervals with their derived objects, the shared free end and optionally the pair,
-// then refreshes intersection markers. No survivor is kept.
-function cleanupCurveShorteningFailure(
-  registry: RuntimeObjectRegistry,
-  geodesicIds: readonly string[],
-  freeEndAnchorId: string,
-  pairId: string | undefined,
-): void {
-  for (const geodesicId of [...new Set(geodesicIds)]) {
-    removeGeodesicIntervalAndDerivedObjects(registry, geodesicId);
-  }
-  registry.remove(freeEndAnchorId);
-  if (pairId) {
-    registry.remove(pairId);
-  }
-  requestGeodesicIntersectionUpdate(registry);
-}
 
 // Rollback helper: puts back saved interval objects (re-adding any that were deleted) together with their saved segment chains.
 function restoreGeodesicIntervalsAndSegments(
@@ -325,263 +696,9 @@ function restoreGeodesicIntervalsAndSegments(
   }
 }
 
-// ---- Exact resolution (sleeve and funnel) ----
 
-/** A user-visible event of the curve-shortening resolution; the shell logs it (there is no on-screen message system yet). */
+/** A user-visible event of the curve shortening flow; the shell logs it (there is no on-screen message system yet). */
 export type CurveShorteningNotice =
   | { readonly kind: "free-loop-collapsed"; readonly geodesicId: string; readonly message: string }
   | { readonly kind: "collapsed"; readonly geodesicIds: readonly string[]; readonly message: string }
   | { readonly kind: "unresolved"; readonly pairId: string; readonly reason: string; readonly message: string };
-
-/**
- * Outcome of {@link resolveCurveShorteningPair}.
- *
- * `resolved`: `geodesicIds` are the intervals of the result (first the surviving id, then the pieces) and `removedIds` the arcs that no longer exist.
- * `deleted`: the pair ended without a result (invalid pair, collapsed loop or chord); `removedIds` are the deleted arcs.
- * `unresolved`: nothing changed except the pair's `state`, which is now `"unresolved"`.
- */
-export type CurveShorteningResolution =
-  | { readonly status: "resolved"; readonly geodesicIds: readonly string[]; readonly removedIds: readonly string[] }
-  | { readonly status: "deleted"; readonly removedIds: readonly string[] }
-  | { readonly status: "unresolved"; readonly reason: string };
-
-/** Holonomy rotation (radians) above which a free loop encircles a cone point and collapses. */
-const freeLoopRotationToleranceRadians = 1e-9;
-
-/** Distance (meters) within which a developed junction position counts as the wrapped disk centre. */
-const cornerJunctionToleranceMeters = 1e-6;
-
-/**
- * Resolves one curve-shortening pair completely: replaces its two arcs (or its free loop) by the length-minimizing path of their homotopy class.
- *
- * The fused portal word (first arc read from its non-free anchor to the free end F, then the second arc from F to its non-free anchor, freely reduced; for a loop the loop's word with A = B = F) is developed into a sleeve (`developSleeve`). A free loop whose holonomy rotates is deleted with notice `free-loop-collapsed`. Otherwise `solveTautPath` gives the straight chord or the taut string around the forbidden disks (radius `forbiddenPortalJunctionRadiusMeters` plus `geodesicCornerClearanceMeters`). Each wrap is replaced by pinned `GeodesicCornerObject` anchors named `<pairId>:corner:<j>`, and the result is a chain of stable intervals: the first keeps the smaller arc id (the loop's id), the others are `<id>:piece:<j>`; each is previewed with `previewRebuildGeodesicInterval` before anything is written. A single-interval result that duplicates an existing stable geodesic is discarded in its favour.
- *
- * Nothing is deleted because a path touches a disk. Failures (`word-mismatch`, `infeasible`, `no-convergence`, a piece shorter than `GEODESIC_MIN_LENGTH_METERS`, sub-words that do not reduce to the fused word, a failed sub-interval preview) change nothing except `pair.state = "unresolved"`, and send notice `unresolved`. A result without corner whose chord is shorter than `GEODESIC_MIN_LENGTH_METERS` is deleted with notice `collapsed`. Non-free anchors may be of any kind that attaches geodesics (emitter, corner, free end).
- */
-export function resolveCurveShorteningPair(input: {
-  readonly world: CompiledCellComplex;
-  readonly registry: RuntimeObjectRegistry;
-  readonly pairId: string;
-  readonly onNotice?: (notice: CurveShorteningNotice) => void;
-}): CurveShorteningResolution {
-  return withDeferredGeodesicIntersections(input.registry, () => resolveCurveShorteningPairNow(input));
-}
-
-function resolveCurveShorteningPairNow(input: Parameters<typeof resolveCurveShorteningPair>[0]): CurveShorteningResolution {
-  const { world, registry } = input;
-  const pair = registry.get(input.pairId);
-  if (pair?.kind !== "curve-shortening-pair") {
-    return { status: "unresolved", reason: "missing-pair" };
-  }
-  const freeEnd = registry.get(pair.freeEndAnchorId);
-  const owned = freeEnd?.kind === "free-geodesic-end" ? resolvePairIntervals(registry, pair) : undefined;
-  if (!owned || freeEnd?.kind !== "free-geodesic-end") {
-    registry.remove(pair.id);
-    return { status: "deleted", removedIds: [] };
-  }
-  const ownedIds = owned.intervals.map(({ id }) => id);
-  const fail = (reason: string): CurveShorteningResolution => {
-    registry.update({ ...pair, state: "unresolved" });
-    input.onNotice?.({
-      kind: "unresolved",
-      pairId: pair.id,
-      reason,
-      message: `The tied geodesic could not be straightened (${reason}).`,
-    });
-    return { status: "unresolved", reason };
-  };
-
-  // Anchors A and B (ends of the result chain), the fused word w and the id of the first interval.
-  const isLoop = owned.intervals.length === 1;
-  let anchorA: RuntimeWorldObject | undefined = freeEnd;
-  let anchorB: RuntimeWorldObject | undefined = freeEnd;
-  let word: readonly GeodesicPortalTraversal[];
-  let firstId: string;
-  if (isLoop) {
-    word = owned.intervals[0].portalWord;
-    firstId = owned.intervals[0].id;
-  } else {
-    const [first, second] = [registry.get(pair.first.geodesicId), registry.get(pair.second.geodesicId)];
-    if (first?.kind !== "geodesic-interval" || second?.kind !== "geodesic-interval") {
-      return fail("missing-interval");
-    }
-    const firstNonFreeRole = getOppositeEndRole(pair.first.role);
-    const secondNonFreeRole = getOppositeEndRole(pair.second.role);
-    anchorA = registry.get(first[firstNonFreeRole].anchorObjectId);
-    anchorB = registry.get(second[secondNonFreeRole].anchorObjectId);
-    word = reduceAdjacentInversePortalTraversals([
-      ...getPortalWordBetweenEndpointRoles({ interval: first, sourceRole: firstNonFreeRole, targetRole: pair.first.role }),
-      ...getPortalWordBetweenEndpointRoles({ interval: second, sourceRole: pair.second.role, targetRole: secondNonFreeRole }),
-    ]);
-    firstId = [first.id, second.id].sort()[0];
-  }
-  if (!canObjectAttachGeodesics(anchorA) || !canObjectAttachGeodesics(anchorB)) {
-    return fail("anchor");
-  }
-  const pointA = getAnchorBeamPoint(anchorA);
-  const pointB = getAnchorBeamPoint(anchorB);
-
-  const developed = developSleeve({
-    world,
-    startCellId: anchorA.cellId,
-    start: { x: pointA.x, y: pointA.y },
-    word,
-    end: { x: pointB.x, y: pointB.y },
-  });
-  if (developed.status !== "ok" || developed.sleeve.endCellId !== anchorB.cellId) {
-    return fail("word-mismatch");
-  }
-  const sleeve = developed.sleeve;
-
-  // A free loop whose holonomy rotates encircles a cone point: its length shrinks to zero, so it is deleted.
-  if (isLoop) {
-    const rotation = Math.atan2(sleeve.startFromEnd.rotation.m10, sleeve.startFromEnd.rotation.m00);
-    if (Math.abs(rotation) > freeLoopRotationToleranceRadians) {
-      cleanupCurveShorteningFailure(registry, ownedIds, pair.freeEndAnchorId, pair.id);
-      input.onNotice?.({
-        kind: "free-loop-collapsed",
-        geodesicId: ownedIds[0],
-        message: "The loop around a cone point shrank to a point and was removed.",
-      });
-      return { status: "deleted", removedIds: ownedIds };
-    }
-  }
-
-  const taut = solveTautPath(sleeve, forbiddenPortalJunctionRadiusMeters + geodesicCornerClearanceMeters);
-  if (taut.status !== "ok") {
-    return fail(taut.status);
-  }
-  if (taut.apexes.length === 0 && lengthVec2(subVec2(sleeve.end, sleeve.start)) < GEODESIC_MIN_LENGTH_METERS) {
-    cleanupCurveShorteningFailure(registry, ownedIds, pair.freeEndAnchorId, pair.id);
-    input.onNotice?.({
-      kind: "collapsed",
-      geodesicIds: ownedIds,
-      message: "The tied geodesic shrank to a point and was removed.",
-    });
-    return { status: "deleted", removedIds: ownedIds };
-  }
-
-  // Walk the polyline through the world: this yields the cell of each corner, its local position and the portal word of each piece.
-  const points = taut.points;
-  for (let index = 0; index + 1 < points.length; index += 1) {
-    if (lengthVec2(subVec2(points[index + 1], points[index])) < GEODESIC_MIN_LENGTH_METERS - 1e-9) {
-      return fail("short-piece");
-    }
-  }
-  const corners: GeodesicCornerObject[] = [];
-  const subWords: GeodesicPortalTraversal[][] = [];
-  if (taut.apexes.length === 0) {
-    subWords.push([...word]);
-  } else {
-    let previousCellId = anchorA.cellId;
-    let previousFromDeveloped: RigidTransform3 = identityRigidTransform3;
-    for (let index = 1; index < points.length; index += 1) {
-      const from = points[index - 1];
-      const to = points[index];
-      const localFrom = transformPoint3(previousFromDeveloped, vec3(from.x, from.y, 0));
-      const localDirection = transformDirection3(previousFromDeveloped, vec3(to.x - from.x, to.y - from.y, 0));
-      const walk = walkDevelopedSegment({
-        world,
-        cellId: previousCellId,
-        start: { x: localFrom.x, y: localFrom.y },
-        direction: { x: localDirection.x, y: localDirection.y },
-        lengthMeters: lengthVec2(subVec2(to, from)),
-      });
-      const lastPiece = walk.pieces.at(-1);
-      if (walk.status !== "end" || !lastPiece) {
-        return fail(`walk-${walk.status}`);
-      }
-      const fromDeveloped = orthonormalizeYawRigidTransform3(composeRigidTransform3(lastPiece.cellFromStart, previousFromDeveloped));
-      subWords.push(walk.crossings.map((crossing) => ({
-        sourceCellId: crossing.sourceCellId,
-        sourcePortalId: crossing.portalId,
-        targetCellId: crossing.targetCellId,
-        targetPortalId: crossing.targetPortalId,
-      })));
-      if (index < points.length - 1) {
-        const apex = taut.apexes[taut.cornerApexIndex[index - 1]];
-        const cell = world.cellsById.get(lastPiece.cellId);
-        const developedFromCell = invertRigidTransform3(fromDeveloped);
-        const junction = cell?.portalJunctions.find((candidate) => {
-          const position = transformPoint3(developedFromCell, vec3(candidate.position.x, candidate.position.y, 0));
-          return Math.hypot(position.x - apex.center.x, position.y - apex.center.y) <= cornerJunctionToleranceMeters;
-        });
-        if (!junction) {
-          return fail("corner-junction");
-        }
-        const local = transformPoint3(fromDeveloped, vec3(to.x, to.y, 0));
-        corners.push(createGeodesicCornerObject({
-          id: `${pair.id}:corner:${corners.length}`,
-          cellId: lastPiece.cellId,
-          point: vec3(local.x, local.y, pointA.z),
-          junctionId: junction.id,
-          side: apex.side,
-        }));
-      } else if (lastPiece.cellId !== anchorB.cellId) {
-        return fail("end-cell");
-      }
-      previousCellId = lastPiece.cellId;
-      previousFromDeveloped = fromDeveloped;
-    }
-    if (!samePortalWord(
-      reduceAdjacentInversePortalTraversals(subWords.flat()),
-      reduceAdjacentInversePortalTraversals(word),
-    )) {
-      return fail("word-reduction");
-    }
-  }
-
-  // The chain A -> corner_0 -> ... -> B; each interval is previewed before anything is written.
-  const chainAnchors: RuntimeWorldObject[] = [anchorA, ...corners, anchorB];
-  const intervals = subWords.map((subWord, index) => createGeodesicIntervalObject({
-    id: index === 0 ? firstId : `${firstId}:piece:${index}`,
-    startAnchorObjectId: chainAnchors[index].id,
-    endAnchorObjectId: chainAnchors[index + 1].id,
-    startCellId: chainAnchors[index].cellId,
-    portalWord: subWord,
-    motionState: "stable",
-  }));
-  const candidateAnchorsById = new Map<string, RuntimeWorldObject>(corners.map((corner) => [corner.id, corner]));
-  const previewTraces: (readonly TraceGeodesicSegmentResult[])[] = [];
-  for (const interval of intervals) {
-    const preview = previewRebuildGeodesicInterval({ world, registry, interval, candidateAnchorsById });
-    if (!preview) {
-      return fail("preview");
-    }
-    previewTraces.push(preview.traces);
-  }
-
-  if (intervals.length === 1 && !isLoop) {
-    const existing = findEquivalentStableInterval(registry, intervals[0], ownedIds);
-    if (existing) {
-      discardCurveShorteningPairInFavorOf(registry, pair, owned.intervals, existing);
-      return { status: "resolved", geodesicIds: [], removedIds: ownedIds };
-    }
-  }
-
-  // Commit. The interval with `firstId` already exists (a surviving arc or the loop) and is overwritten; the other arc goes last, so
-  // that the free-end sweep of its removal finds every kept anchor still attached.
-  for (const corner of corners) {
-    registry.add(corner);
-  }
-  registry.update(intervals[0]);
-  for (const interval of intervals.slice(1)) {
-    registry.add(interval);
-  }
-  const removedIds = ownedIds.filter((id) => id !== firstId);
-  for (const removedId of removedIds) {
-    removeGeodesicIntervalAndDerivedObjects(registry, removedId);
-  }
-  registry.remove(pair.id);
-  if (!isLoop) {
-    registry.remove(freeEnd.id);
-  }
-  // The previewed traces are committed as they are: each chord was traced once, by its preview.
-  for (const [index, interval] of intervals.entries()) {
-    replaceDerivedSegmentsFromTraces({ registry, geodesicId: interval.id, traces: previewTraces[index] });
-    syncEmitterGeodesicMenuCaches(registry, interval.id);
-  }
-  requestGeodesicIntersectionUpdate(registry);
-
-  return { status: "resolved", geodesicIds: intervals.map(({ id }) => id), removedIds };
-}

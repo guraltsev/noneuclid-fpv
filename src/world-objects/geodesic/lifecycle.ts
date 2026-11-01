@@ -42,13 +42,13 @@ export function getGeodesicConnection(
   return undefined;
 }
 
-// Emitters and taut-polygon corners are pinned anchors; a free end is not.
+// Emitters are pinned anchors; a free end is not.
 function isPinnedAnchorKind(kind: string | undefined): boolean {
-  return kind === "geodesic-cannon" || kind === "geodesic-corner";
+  return kind === "geodesic-cannon";
 }
 
 /**
- * True when both endpoints of the geodesic are pinned anchors, each an emitter or a polygon corner (a "locked" geodesic that cannot be extended or aimed freely).
+ * True when both endpoints of the geodesic are pinned anchors, each an emitter (a "locked" geodesic that cannot be extended or aimed freely).
  * An id that is not an interval is never locked.
  */
 export function isGeodesicLocked(registry: RuntimeObjectRegistry, geodesicId: string): boolean {

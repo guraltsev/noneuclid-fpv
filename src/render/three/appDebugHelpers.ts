@@ -279,15 +279,11 @@ export interface AllGeodesicsDebugDump {
     readonly point: string;
     readonly attachedEndpoints: readonly string[];
   }[];
-  /** State of the curve-shortening pairs; the last-good fields record the most recent valid free-end position. */
+  /** State of the curve-shortening pairs and the current position of their free vertices. */
   readonly curveShorteningPairs: readonly {
     readonly id: string;
     readonly state: string;
-    readonly freeEndAnchorId: string;
-    readonly first: string;
-    readonly second: string;
-    readonly lastGoodFreeEndCellId: string;
-    readonly lastGoodFreeEndPoint: string;
+    readonly vertices: readonly { readonly id: string; readonly cellId: string; readonly point: string }[];
   }[];
 }
 

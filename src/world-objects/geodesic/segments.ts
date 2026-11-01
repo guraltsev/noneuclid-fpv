@@ -18,6 +18,7 @@ import {
 import { requestGeodesicIntersectionUpdate, withDeferredGeodesicIntersections } from "./intersections";
 import {
   getGeodesicPortalWord,
+  removeGeodesicAssociationFromEmitter,
   removeGeodesicAssociations,
   removeUnusedFreeGeodesicEnds,
 } from "./endpoints";
@@ -281,8 +282,7 @@ function resolveDerivedSegmentConnectionState(
   }
   const start = registry.get(interval.start.anchorObjectId);
   const end = registry.get(interval.end.anchorObjectId);
-  const pinned = (kind: string | undefined): boolean => kind === "geodesic-cannon" || kind === "geodesic-corner";
-  return pinned(start?.kind) && pinned(end?.kind) ? "connected" : "open";
+  return start?.kind === "geodesic-cannon" && end?.kind === "geodesic-cannon" ? "connected" : "open";
 }
 
 /** Converts a derived segment back to the trace piece it was built from. */
@@ -303,7 +303,7 @@ export function getGeodesicTotalLengthMeters(registry: RuntimeObjectRegistry, ge
 }
 
 // Refreshes the emitter-side caches (`geodesicIds`, `activeGeodesicId`, per-geodesic yaw) from the interval: each emitter endpoint
-// lists the geodesic and records the tangent yaw at its anchor. The registry attachments remain the source of truth.
+// lists the geodesic and records the tangent yaw at its anchor; every other emitter drops it. The registry attachments remain the source of truth.
 /** Updates the menu caches of an emitter from the geodesic intervals that attach to it. */
 export function syncEmitterGeodesicMenuCaches(registry: RuntimeObjectRegistry, geodesicId: string): void {
   const interval = registry.get(geodesicId);
@@ -327,6 +327,12 @@ export function syncEmitterGeodesicMenuCaches(registry: RuntimeObjectRegistry, g
           }
         : anchor.geodesicEmitterYawRadiansById,
     });
+  }
+  // An emitter the interval no longer attaches to (it was untied or detached) must not keep listing it.
+  for (const emitter of registry.getObjectsOfKind("geodesic-cannon")) {
+    if (emitter.id !== interval.start.anchorObjectId && emitter.id !== interval.end.anchorObjectId) {
+      removeGeodesicAssociationFromEmitter(registry, emitter.id, geodesicId);
+    }
   }
 }
 

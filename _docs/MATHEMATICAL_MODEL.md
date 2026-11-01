@@ -276,49 +276,45 @@ always freely reduced.)
 ## 7. Curve shortening
 
 Tying two geodesic ends and releasing them produces a *curve-shortening pair*
-(`src/world-objects/geodesic/objects.ts#CurveShorteningPairObject`): two arcs meeting at a **free vertex** $F$, whose other
-ends $A$, $B$ are fixed by their anchors (or one *free loop*, an interval with both ends on $F$). The tie does not change the
-geometry. The next call of `src/world-objects/geodesic/curveShortening.ts#advanceCurveShorteningPairs` resolves every pair
-completely, in one tick, with `src/world-objects/geodesic/curveShortening.ts#resolveCurveShorteningPair`: the pair is replaced by
-the **length-minimizing path of its homotopy class**. There is no gradient descent and no animation.
+(`src/world-objects/geodesic/objects.ts#CurveShorteningPairObject`): a **piecewise-geodesic curve**, a chain of geodesic arcs
+(the `"moving"` intervals) meeting at **free vertices** $F_1,dots,F_n$ and ending at fixed anchors $A$ and $B$ (emitters or pinned
+corners), or a closed *free loop* (an interval with both ends on one $F$). The tie does not change the geometry: it starts with the two arcs at one
+vertex. The curve is real state at every tick: the registry holds exactly the current arcs, their portal words and segments.
 
-**Sleeve.** The fused portal word $w=(p_1,\dots,p_k)$ is the first arc read from $A$ to $F$ followed by the second arc read
-from $F$ to $B$, freely reduced. `src/world-objects/geodesic/sleeve.ts#developSleeve` develops it into the frame of $A$'s cell:
-$M_0=I$, $M_i=M_{i-1}\circ T_{p_i}^{-1}$, $\tilde B=M_k(B)$. Portal $p_i$ leaves cell $C_{i-1}$ through side $s$; its developed
-*aperture* is the segment from $R_i=M_{i-1}(\text{side.start})$ (right when facing through the portal) to
-$L_i=M_{i-1}(\text{side.end})$ (left). Both endpoints carry the forbidden disks of radius $\rho$ (the junction radius plus
-`src/world-objects/geodesic/sleeve.ts#geodesicCornerClearanceMeters` $=10^{-6}$ m, so that a tangent path never counts as a zone hit). If an aperture
-is shorter than $2\rho$ the word is infeasible.
+**The flow.** Each call of `src/world-objects/geodesic/curveShortening.ts#advanceCurveShorteningPairs` is one tick of the curve shortening flow.
+At a free vertex $F$ let $u_1,u_2$ be the unit tangents of its two arcs pointing away from $F$ (each arc is lifted into $F$'s cell frame by
+its portal word, `liftGeodesicEndpointWithAnchors`, and is the straight segment to the lifted far end). The total length $ell(F)$
+has the descent direction $d=u_1+u_2$ and $|d|approx$ the turning angle. $F$ moves along $hat d$ by
+$$t=minigl(v,Delta t,;t^*igr),qquad t^*=argmin_{sge 0} ell(F+shat d),$$
+with $v=$ `curveShorteningSpeedMetersPerSecond` $=1.5$ m/s and $Delta t$ the frame time clamped to $0.1$ s. Along the ray $ell$ is convex
+with derivative $-hat dcdot(u_1+u_2)$ evaluated at the candidate position, so $t^*$ is found by bisection on its sign: the step never
+overshoots the minimum and never stalls (the descent of job 06 stalled because it had a fixed step). The vertices of a curve are visited in
+order and each sees the position its neighbour just took. The walk of $F$ through the world
+(`src/cell-complex/segmentWalk.ts#walkDevelopedSegment`) records the portals it crosses; the word of an arc that ends at $F$ is extended by them,
+the word of an arc that starts at $F$ is prefixed by their inverse, both freely reduced, and both arcs are previewed
+(`previewRebuildGeodesicInterval`) before anything is written. A step that is rejected (a wall, a forbidden zone, or a result that is not
+shorter) is halved up to eight times. The total length therefore never grows.
 
-**Taut string.** `src/world-objects/geodesic/sleeve.ts#solveTautPath` finds the shortest path from $A$ to $\tilde B$ that crosses
-every aperture between its two disks. It is a chain of straight pieces tangent to disks at aperture endpoints, each wrapped on
-its own side (a *left* disk is passed on its right, so the path turns left around it). The point funnel
-(`src/world-objects/geodesic/sleeve.ts#funnelPointApexes`, the simple stupid funnel algorithm) gives the corner points; point
-turns are replaced by disk tangents, wrong-signed wraps are dropped and disks that a piece still penetrates are inserted until
-none is. If the chord $A\tilde B$ stays in the sleeve (no disk is touched) the result is the straight geodesic.
+**Taut vertices.** A vertex whose turning angle $|d|$ is below `curveShorteningTautTurnRadians` $=5cdot10^{-3}$, or that cannot move
+at all, is removed: its two arcs merge into one interval from the far anchor of the first to the far anchor of the second, whose word is the
+reduced concatenation of the two words. The merged interval is *stable* when neither of its anchors is a free vertex of the curve any more, so a
+curve ends when its last free vertex is removed. A free loop on $F$ with holonomy a translation (every word on a torus) is taut at once and
+stays as a stable loop on $F$. A loop with holonomy a rotation $	heta
+e0$ encircles a cone point $c$, its length $2|sin(	heta/2)|,|F-c|$
+shrinks as $F$ flows to $c$, and when the loop is shorter than four times the minimum geodesic length it is deleted with a notice. A merged chord shorter than
+`src/world-objects/geodesic/objects.ts#GEODESIC_MIN_LENGTH_METERS` is deleted with a notice. A merged interval that duplicates an existing stable geodesic
+(same anchors, same word read in either direction) is discarded in its favour.
 
-**Corners.** A wrap of turn $\Phi$ is drawn as $m=\lceil\Phi/(2\pi/3)\rceil$ polyline corners at distance
-$\rho/\cos(\Phi/2m)$ from the disk centre; the length error is $m\rho(2\tan(\Phi/2m)-\Phi/m)$ per wrap, about
-$1.3\cdot10^{-5}$ m for $\Phi=0.1$ rad. Each corner becomes a pinned invisible anchor
-(`src/world-objects/geodesic/objects.ts#GeodesicCornerObject`, id `<pairId>:corner:<j>`), found by walking the polyline through
-the world with `src/cell-complex/segmentWalk.ts#walkDevelopedSegment`; the result is a chain of stable intervals between
-$A$, the corners and $B$, each *locked* (pinned at both ends). The first interval keeps the smaller arc id, the others are named
-`<id>:piece:<j>`. Every piece is previewed (`src/world-objects/geodesic/intervals.ts#previewRebuildGeodesicInterval`) before anything is
-written. A result that duplicates an existing stable geodesic is discarded in its favour.
+**The vertex count never grows.** The flow only moves and removes vertices; it never inserts one. A curve whose taut shape would wrap a
+forbidden-zone disk at a portal junction (that would need new corner vertices on the disk boundary) is therefore not finished: the step toward
+the disk is rejected, the merge that would cut the corner is rejected too, and the pair is marked `unresolved`, skipped by later ticks, with a
+notice. Nothing is deleted because a path touches a disk. Apertures at vertices that are not portal endpoints, and in the end cells, are not
+modelled; the previews catch any hit there.
 
-**Free loops.** For a loop $A=B=F$ and the holonomy $g_w=M_k$ has a rotation angle $\theta$. If $\theta=0$ (every word on a torus) every
-point gives a closed geodesic of the same class and the loop is resolved like a pair from $F$ to $\tilde F$ (it stays a
-stable loop on $F$). If $\theta\ne0$ the loop encircles a cone point, its length $2|\sin(\theta/2)|\,|F-c|$ shrinks onto it, and it
-is deleted with a notice. A pair or loop whose result has no corner and a chord shorter than
-`src/world-objects/geodesic/objects.ts#GEODESIC_MIN_LENGTH_METERS` is deleted with a notice.
-
-**Failure.** The resolution never deletes an arc because the path touches a disk. It fails (nothing changes except the pair's state,
-which becomes `unresolved` and is skipped by later ticks, and a notice is sent) when the word does not chain, an aperture is narrower
-than $2\rho$, the taut-path iteration does not converge, a polyline piece is shorter than the minimum geodesic length, the walked
-sub-words do not reduce to $w$ or a piece preview fails. Apertures at vertices that are not portal endpoints, and in the end
-cells, are not modelled; the previews catch any hit there. A carried emitter rebuilds its emitter-to-corner interval with the corner
-fixed; the chain is not re-tautened. The design is `_issues/67_exact_curve_shortening_via_sleeve_funnel.md`; the earlier descent is described in
-`_issues/_closed/32_phase_f_curve_shortening_algorithm_note.md`.
+**Limit.** The limit of the flow is the shortest path of the curve's homotopy class when no disk is in the way: for two emitters the straight
+chord of the developed word. The tests compare the limit of curves of up to six arcs, in the 6 m cell and across the seam of the 15 m torus,
+with that chord within a tolerance of $10^{-2}$ m. The exact sleeve-and-funnel solution of job 26 was removed with the one-tick resolution:
+the flow does not need it, and without vertex insertion it could not be used.
 
 ## 8. Visibility and rendering through portals
 
@@ -501,7 +497,6 @@ positions, and any that cannot be re-solved are deleted and reported. Tool selec
 | player radius / height | 0.25 m / 1.6 m | `src/movement/playerBody.ts#DEFAULT_PLAYER_RADIUS_METERS` | body cylinder |
 | beam height | 1.08 m | `src/world-objects/geodesic/objects.ts#geodesicRayBeamHeightMeters` | height at which geodesics are traced and drawn |
 | minimum geodesic length | 0.15 m | `src/world-objects/geodesic/objects.ts#GEODESIC_MIN_LENGTH_METERS` | shorter arcs are rejected |
-| corner clearance | $10^{-6}$ m | `src/world-objects/geodesic/sleeve.ts#geodesicCornerClearanceMeters` | extra radius of the forbidden disk wrapped by a taut geodesic, so tangent pieces keep clear of the zone |
 | segment-walk vertex tie | $10^{-9}$ m | `src/math/tolerances.ts#segmentWalkVertexTieMeters` | crossings closer than this are a pass through a shared vertex |
 | cell containment tolerance | $10^{-6}$ m | `src/math/tolerances.ts#cellContainmentToleranceMeters` | a walk start or atlas centre this far outside its cell still counts as inside |
 | outgoing dot tolerance | $10^{-12}$ | `src/math/tolerances.ts#segmentWalkOutgoingDotTolerance` | a side is crossed outward when dot(direction, inward normal) is below minus this |
@@ -540,7 +535,5 @@ rather than discovered.
 - **Yaw conventions.** Rigid-transform yaw is $\operatorname{atan2}(R_{10},R_{00})$ and forward is $R e_y$. The marmot
   derives its yaw from its velocity as $\operatorname{atan2}(-v_x,v_y)$, so it walks along $v$. Geodesic cannon and
   protractor yaws are direction angles along $(\cos\psi,\sin\psi)$.
-- **Curve shortening.** A step that would lengthen the pair is skipped rather than rolled back to a fused geodesic, so a pair
-  whose recorded length is stale may stall without ever becoming ready to fuse. Fusion and absorption assume the non-free ends are emitters, and
-  intervals are assumed to run emitter→free end with the emitter at the `start` role.
+- **Curve shortening.** The flow does not insert vertices: a curve that needs a wrap around a forbidden-zone disk stays `unresolved`.
   The segments of a moving interval carry the display state `"moving"` (drawn in the moving colour).

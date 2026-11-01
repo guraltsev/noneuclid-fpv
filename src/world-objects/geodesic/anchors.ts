@@ -3,12 +3,7 @@
  */
 import type { Vec3 } from "../../math/vec3";
 import type { RuntimeWorldObject } from "../runtimeObjectRegistry";
-import { getGeodesicCannonEmitterPoint, type GeodesicCornerObject } from "./objects";
-
-/** Type guard: true when the object is a `GeodesicCornerObject`. */
-export function isGeodesicCornerObject(object: RuntimeWorldObject | undefined): object is GeodesicCornerObject {
-  return object?.kind === "geodesic-corner";
-}
+import { getGeodesicCannonEmitterPoint } from "./objects";
 
 /** True when the object may be the anchor of a geodesic interval endpoint. */
 export function canObjectAttachGeodesics(object: RuntimeWorldObject | undefined): object is RuntimeWorldObject {

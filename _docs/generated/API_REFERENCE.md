@@ -662,7 +662,6 @@ Anchors of geodesic intervals: which registry objects can hold an endpoint, and 
 
 | Kind | Name | Summary |
 | --- | --- | --- |
-| function | `isGeodesicCornerObject` | Type guard: true when the object is a `GeodesicCornerObject`. |
 | function | `canObjectAttachGeodesics` | True when the object may be the anchor of a geodesic interval endpoint. |
 | function | `getAnchorBeamPoint` | Beam-height point of an anchor object in its cell frame. |
 
@@ -713,17 +712,17 @@ What an emitter does to its geodesics when it has been carried: rebuild after a 
 
 ### `world-objects/geodesic/curveShortening.ts`
 
-Curve shortening: tie-and-detach of two endpoint roles into a curve-shortening pair, and its exact resolution in one tick.
+Curve shortening: tie-and-detach of two endpoint roles into a curve-shortening pair, and the curve shortening flow that then runs over many frames.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
 | interface | `TieAndDetachGeodesicEndpointsRequest` | Request for `tieAndDetachGeodesicEndpoints`: detach two endpoint roles from one emitter and tie them at a new shared free end. |
-| interface | `AdvanceCurveShorteningPairsRequest` | Request for `advanceCurveShorteningPairs`: resolve every moving pair (the time step only gates the call; a pair is resolved in one tick). |
+| interface | `AdvanceCurveShorteningPairsRequest` | Request for `advanceCurveShorteningPairs`: one tick of the curve shortening flow of every moving pair. |
 | function | `tieAndDetachGeodesicEndpoints` | Detaches two endpoint roles from one emitter and ties them to a new shared free end, starting a curve-shortening pair. |
-| function | `advanceCurveShorteningPairs` | Resolves every `"moving"` curve-shortening pair completely, in this one call, and returns the ids that changed. |
-| type | `CurveShorteningNotice` | A user-visible event of the curve-shortening resolution; the shell logs it (there is no on-screen message system yet). |
-| type | `CurveShorteningResolution` | Outcome of {@link resolveCurveShorteningPair}. |
-| function | `resolveCurveShorteningPair` | Resolves one curve-shortening pair completely: replaces its two arcs (or its free loop) by the length-minimizing path of their homotopy class. |
+| const | `curveShorteningSpeedMetersPerSecond` | Speed (meters per second) at which a free vertex moves along its descent direction; the exact line search never overshoots the minimum. |
+| const | `curveShorteningTautTurnRadians` | Turning angle (radians) below which a vertex counts as taut: its two arcs are one geodesic and the vertex is removed. |
+| function | `advanceCurveShorteningPairs` | Advances every moving curve-shortening curve by one tick of the curve shortening flow and returns the ids that changed. |
+| type | `CurveShorteningNotice` | A user-visible event of the curve shortening flow; the shell logs it (there is no on-screen message system yet). |
 
 ### `world-objects/geodesic/development.ts`
 
@@ -748,9 +747,10 @@ Endpoint attachments of geodesic intervals: lookup by anchor, re-attachment, lif
 | function | `portalWordMatchesCurrentEndpointCells` | True when the interval's portal word leads from the start anchor's cell to the end anchor's cell. |
 | function | `portalWordMatchesEndpointCellsWithAnchors` | Like `portalWordMatchesCurrentEndpointCells`, with candidate anchors that may differ from the registry. |
 | function | `isAimableFreeGeodesic` | True for a stable interval with one emitter endpoint and one free end that no other geodesic uses. |
-| function | `removeUnusedFreeGeodesicEnds` | Removes free-end and polygon-corner anchors that no interval attaches to any more. |
+| function | `removeUnusedFreeGeodesicEnds` | Removes free-end anchors that no interval attaches to any more. |
 | function | `collectIncidentGeodesicIdsForEmitter` | Ids of all geodesics incident on an emitter. |
 | function | `removeGeodesicAssociations` | Removes a geodesic id from the caches of every emitter. |
+| function | `removeGeodesicAssociationFromEmitter` | Removes the geodesic id from one emitter's menu caches (id list, active id and yaw); a no-op when it holds nothing. |
 
 ### `world-objects/geodesic/intersections.ts`
 
@@ -791,7 +791,7 @@ Queries whether a geodesic is locked or connected, and removal of geodesics and 
 | Kind | Name | Summary |
 | --- | --- | --- |
 | function | `getGeodesicConnection` | Describes how an interval geodesic attaches to emitters. |
-| function | `isGeodesicLocked` | True when both endpoints of the geodesic are pinned anchors, each an emitter or a polygon corner (a "locked" geodesic that cannot be extended or aimed freely). |
+| function | `isGeodesicLocked` | True when both endpoints of the geodesic are pinned anchors, each an emitter (a "locked" geodesic that cannot be extended or aimed freely). |
 | function | `collectLockedIncidentGeodesicIdsForEmitter` | Lists the ids of locked geodesics (see `isGeodesicLocked`) that have an endpoint on the emitter. |
 | function | `removeGeodesic` | Removes a geodesic and its derived objects (an interval via `removeGeodesicIntervalAndDerivedObjects`; any other id only has stale segments and emitter cache entries removed), then refreshes intersections. |
 | function | `removeUnlockedGeodesicsFromCannon` | Removes every non-locked geodesic listed on the cannon and returns the removed ids (empty if the id is not a cannon). |
@@ -811,9 +811,8 @@ Geodesic emitters ("cannons"), geodesic intervals and curve shortening on a glue
 | interface | `GeodesicEndpointAttachment` | Attachment of one endpoint role of one geodesic interval to an anchor object (emitter or free end). |
 | interface | `GeodesicEndpointSelection` | An endpoint attachment picked by the user (typically from a segment hit) as input to tie-and-detach. |
 | interface | `FreeGeodesicEndObject` | An invisible, non-colliding anchor object marking a geodesic endpoint that is not on an emitter. |
-| interface | `GeodesicCornerObject` | A pinned, invisible anchor at a corner of a taut geodesic polygon, next to the forbidden disk it wraps. |
 | interface | `GeodesicIntervalObject` | The authoritative description of one geodesic: two endpoint attachments plus the portal word joining them. |
-| interface | `CurveShorteningPairObject` | Bookkeeping object owning one curve-shortening process: two endpoint roles glued at a shared free end, resolved in one tick. |
+| interface | `CurveShorteningPairObject` | Bookkeeping object owning one curve-shortening process: a piecewise-geodesic curve whose free vertices relax under the curve shortening flow. |
 | interface | `LiftedGeodesicEndpoint` | An interval's far endpoint pulled back into the cell of a chosen source endpoint (the "development" of the interval). |
 | interface | `GeodesicTraceBuildResult` | Outcome of rebuilding an interval's derived geometry: the interval, its new segments, and how the trace ended. |
 | interface | `GeodesicSegmentObject` | A derived, per-cell straight piece of a geodesic: a ray inside one cell from `start` along `direction` for `lengthMeters`. |
@@ -835,7 +834,6 @@ Geodesic emitters ("cannons"), geodesic intervals and curve shortening on a glue
 | function | `createGeodesicCannonObject` | Builds a geodesic emitter object from options, filling defaults. |
 | function | `isGeodesicSegmentObject` | Type guard: true when the object is a `GeodesicSegmentObject` (`kind === "geodesic-segment"`). |
 | function | `isFreeGeodesicEndObject` | Type guard: true when the object is a `FreeGeodesicEndObject`. |
-| function | `createGeodesicCornerObject` | Builds a corner anchor at `point` (cell-local meters, z = beam height) in cell `cellId`, wrapping the disk `junctionId` on `side`. |
 | function | `createFreeGeodesicEndObject` | Builds a free-end anchor at `point` (cell-local meters, including its beam height in z) in cell `cellId`. |
 | function | `createGeodesicIntervalObject` | Builds a geodesic interval from two anchor ids, a start cell and an optional portal word. |
 | function | `createCurveShorteningPairObject` | Builds a curve-shortening pair object (see `CurveShorteningPairObject`); `state` defaults to `"moving"`. |
@@ -899,27 +897,6 @@ Derived geodesic segments: lookup by geodesic, building segments from traces wit
 | function | `totalLengthThroughSegment` | Arc length from the start of the geodesic to a point inside the given segment. |
 | function | `totalGeodesicLengthFromSegments` | Sum of the lengths of the given segments, in meters. |
 | function | `removeGeodesicSegments` | Removes all derived segments of a geodesic and refreshes the intersection markers. |
-
-### `world-objects/geodesic/sleeve.ts`
-
-Sleeve of a portal word and the taut string through it: developed apertures, the point funnel, disk tangents and the shortest path that wraps the forbidden-zone disks; pure.
-
-| Kind | Name | Summary |
-| --- | --- | --- |
-| const | `geodesicCornerClearanceMeters` | Extra radius (meters) added to the forbidden disk so that taut tangent pieces keep a clearance from the real circle and never count as zone hits. |
-| interface | `SleeveAperture` | One developed portal aperture: the portal's two side endpoints in the developed frame and the ids of their forbidden junction disks. |
-| interface | `DevelopedSleeve` | A developed portal word: the endpoints, the apertures between them, and the map from the end cell's frame into the start frame. |
-| type | `DevelopSleeveResult` | Result of {@link developSleeve}. |
-| function | `developSleeve` | Develops `word` starting in `startCellId` into the frame of that cell. |
-| interface | `FunnelApex` | A corner of the point funnel: the aperture endpoint (left or right side of the travel direction) that the shortest path touches. |
-| function | `funnelPointApexes` | Simple-stupid-funnel on the aperture endpoints (radius 0): returns the corners of the shortest polyline from `sleeve.start` to `sleeve.end` through every aperture, in travel order. |
-| interface | `TangentPiece` | A straight tangent piece: it runs from `from` to `to` in the unit `direction`. |
-| function | `tangentFromPointToDisk` | Tangent from `point` to the disk (`center`, `rho`) that lies on `side` of the path (a "left" disk is passed with the disk on the left, so the path turns left around it). |
-| function | `tangentFromDiskToPoint` | Tangent from the disk (`center`, `rho`) on `side` of the path to `point`: the piece runs from the tangent point to `point`. |
-| function | `tangentBetweenDisks` | Common tangent of two disks of equal radius `rho` that the path wraps on `firstSide` and `secondSide`: the outer tangent when the sides agree, the inner tangent otherwise. |
-| interface | `TautApex` | A wrapped disk of the taut string. |
-| type | `TautPathResult` | Result of {@link solveTautPath}. |
-| function | `solveTautPath` | Shortest path from `sleeve.start` to `sleeve.end` that crosses every aperture between its two disks of radius `rho`. |
 
 ### `world-objects/geodesic/trace.ts`
 

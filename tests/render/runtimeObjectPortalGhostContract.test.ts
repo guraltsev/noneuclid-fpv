@@ -120,7 +120,6 @@ const kinds: Record<Kind, KindCase> = {
   },
   "geodesic-interval": { exempt: notDrawn },
   "free-geodesic-end": { exempt: notDrawn },
-  "geodesic-corner": { exempt: notDrawn },
   "curve-shortening-pair": { exempt: notDrawn },
 };
 

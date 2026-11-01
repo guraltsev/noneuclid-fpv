@@ -227,11 +227,12 @@ export function createGeodesicDebugDumps(deps: GeodesicDebugDumpsDeps) {
       curveShorteningPairs: curveShorteningPairs.map((pair) => ({
         id: pair.id,
         state: pair.state,
-        freeEndAnchorId: pair.freeEndAnchorId,
-        first: formatEndpointRef(pair.first),
-        second: formatEndpointRef(pair.second),
-        lastGoodFreeEndCellId: pair.lastGoodFreeEndCellId,
-        lastGoodFreeEndPoint: formatVec3(pair.lastGoodFreeEndPoint),
+        vertices: pair.vertexIds.map((vertexId) => {
+          const vertex = runtimeObjectRegistry.get(vertexId);
+          return vertex
+            ? { id: vertexId, cellId: vertex.cellId, point: formatVec3(vertex.localPose.translation) }
+            : { id: vertexId, cellId: "(missing)", point: "(missing)" };
+        }),
       })),
     };
 
@@ -303,9 +304,6 @@ export function createGeodesicDebugDumps(deps: GeodesicDebugDumpsDeps) {
         }
       } else if (object.kind === "geodesic-interval") {
         ids.add(object.id);
-      } else if (object.kind === "curve-shortening-pair") {
-        ids.add(object.first.geodesicId);
-        ids.add(object.second.geodesicId);
       }
     }
     return [...ids];
