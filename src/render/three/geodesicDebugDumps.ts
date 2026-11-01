@@ -109,7 +109,7 @@ export function createGeodesicDebugDumps(deps: GeodesicDebugDumpsDeps) {
     }
 
     const segments = getGeodesicSegments(runtimeObjectRegistry, geodesicId);
-    const word = collectGeodesicPortalWord(deps.getWorld(), runtimeObjectRegistry, geodesicId);
+    const word = collectGeodesicPortalWord(runtimeObjectRegistry, geodesicId);
     const start = segments[0]?.start;
     const dump: GeodesicPathDebugDump = {
       geodesicId,
@@ -275,7 +275,7 @@ export function createGeodesicDebugDumps(deps: GeodesicDebugDumpsDeps) {
 
   function createGeodesicWordDebugDump(geodesicId: string): GeodesicWordDebugDump {
     const segments = getGeodesicSegments(runtimeObjectRegistry, geodesicId);
-    const word = collectGeodesicPortalWord(deps.getWorld(), runtimeObjectRegistry, geodesicId);
+    const word = collectGeodesicPortalWord(runtimeObjectRegistry, geodesicId);
     const start = segments[0]?.start;
     return {
       geodesicId,

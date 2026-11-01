@@ -1,7 +1,6 @@
 /**
  * Derived geodesic segments: lookup by geodesic, building segments from traces with the start/end half split, lengths, tangents at anchors, display numbers and the emitter-side caches.
  */
-import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex";
 import { yawRigidTransform3 } from "../../math/rigidTransform3";
 import { addVec3, scaleVec3, type Vec3 } from "../../math/vec3";
 import type { RuntimeObjectRegistry, RuntimeWorldObject } from "../runtimeObjectRegistry";
@@ -277,24 +276,23 @@ export function buildDerivedSegmentsFromTraces(input: {
     .map((segment) => ({
       ...segment,
       connectionState,
-      tooltip: createGeodesicSegmentTooltip(segment.geodesicNumber, connectionState),
+      tooltip: createGeodesicSegmentTooltip(segment.geodesicNumber),
     }));
   return splitSegments;
 }
 
-// Display state of a geodesic's segments. A `"moving"` interval is reported as `"straightening"` (the renderer's moving
-// color); a stable emitter-to-emitter interval is `"connected"`; everything else is `"open"`. So `"straightening"` is still
-// produced for curve-shortening intervals, even though the old same-cell straightening model is retired.
+// Display state of a geodesic's segments: `"moving"` for a moving interval, `"connected"` for a stable interval pinned at
+// both ends, else `"open"`. An id that is not an interval is `"open"`.
 function resolveDerivedSegmentConnectionState(
   registry: RuntimeObjectRegistry,
   geodesicId: string,
-): "open" | "connected" | "straightening" {
+): "open" | "connected" | "moving" {
   const interval = registry.get(geodesicId);
   if (interval?.kind !== "geodesic-interval") {
-    return getGeodesicTail(registry, geodesicId)?.terminal.kind === "emitter-hit" ? "connected" : "open";
+    return "open";
   }
   if (interval.motionState === "moving") {
-    return "straightening";
+    return "moving";
   }
   const start = registry.get(interval.start.anchorObjectId);
   const end = registry.get(interval.end.anchorObjectId);
@@ -322,7 +320,7 @@ export function getGeodesicTotalLengthMeters(registry: RuntimeObjectRegistry, ge
 // Refreshes the emitter-side caches (`geodesicIds`, `activeGeodesicId`, per-geodesic yaw) from the interval: each emitter endpoint
 // lists the geodesic and records the tangent yaw at its anchor. The registry attachments remain the source of truth.
 /** Updates the menu caches of an emitter from the geodesic intervals that attach to it. */
-export function syncLegacyEmitterGeodesicFields(registry: RuntimeObjectRegistry, geodesicId: string): void {
+export function syncEmitterGeodesicMenuCaches(registry: RuntimeObjectRegistry, geodesicId: string): void {
   const interval = registry.get(geodesicId);
   if (interval?.kind !== "geodesic-interval") {
     return;
@@ -347,42 +345,12 @@ export function syncLegacyEmitterGeodesicFields(registry: RuntimeObjectRegistry,
   }
 }
 
-/**
- * Returns the portal word of a geodesic: the stored word for an interval, else (legacy) the traversals read off the segment chain.
- *
- * For legacy chains each `portal-hit` terminal contributes its traversal; hits whose portal is unknown to `world` are skipped.
- * Returns `[]` for unknown ids or geodesics that never cross a portal.
- */
+/** Returns the stored portal word of an interval geodesic; `[]` for unknown ids or geodesics that never cross a portal. */
 export function collectGeodesicPortalWord(
-  world: CompiledCellComplex,
   registry: RuntimeObjectRegistry,
   geodesicId: string,
 ): readonly GeodesicPortalTraversal[] {
-  const intervalWord = getGeodesicPortalWord(registry, geodesicId);
-  if (intervalWord) {
-    return intervalWord;
-  }
-
-  const word: GeodesicPortalTraversal[] = [];
-  for (const segment of getGeodesicSegments(registry, geodesicId)) {
-    if (segment.terminal.kind !== "portal-hit") {
-      continue;
-    }
-
-    const portal = world.cellsById.get(segment.cellId)?.portalsById.get(segment.terminal.portalId);
-    if (!portal) {
-      continue;
-    }
-
-    word.push({
-      sourceCellId: segment.cellId,
-      sourcePortalId: portal.id,
-      targetCellId: portal.targetCellId,
-      targetPortalId: portal.targetPortalId,
-    });
-  }
-
-  return word;
+  return getGeodesicPortalWord(registry, geodesicId) ?? [];
 }
 
 // Builds one segment object from a trace; its `halfRole` is provisionally `"start"` and is overwritten by `splitDerivedSegmentsIntoEndpointHalves`.
@@ -405,7 +373,7 @@ export function createSegmentFromTrace(options: {
     localPose: yawRigidTransform3(yaw, options.trace.start),
     portalRenderable: true,
     displayHelpMessage: "A locally straight geodesic ray segment. Use the active tool to extend, measure, or select it.",
-    tooltip: createGeodesicSegmentTooltip(options.geodesicNumber, connectionState),
+    tooltip: createGeodesicSegmentTooltip(options.geodesicNumber),
     geodesicId: options.geodesicId,
     geodesicNumber: options.geodesicNumber,
     segmentIndex: options.segmentIndex,
@@ -419,18 +387,8 @@ export function createSegmentFromTrace(options: {
 }
 
 /** Tooltip text of a derived segment. */
-export function createGeodesicSegmentTooltip(
-  geodesicNumber: number | undefined,
-  connectionState: "open" | "connected" | "straightening",
-): GeodesicSegmentObject["tooltip"] {
+export function createGeodesicSegmentTooltip(geodesicNumber: number | undefined): GeodesicSegmentObject["tooltip"] {
   const label = geodesicNumber === undefined ? "Geodesic" : `Geodesic G${geodesicNumber}`;
-  if (connectionState === "connected" || connectionState === "straightening") {
-    return {
-      label,
-      rangeMeters: 6,
-    };
-  }
-
   return {
     label,
     rangeMeters: 6,

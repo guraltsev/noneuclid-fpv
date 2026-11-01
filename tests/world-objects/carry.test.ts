@@ -401,7 +401,7 @@ describe("pickup", () => {
         route: move.route,
       });
       if (result.moved) {
-        const word = collectGeodesicPortalWord(world, registry, "g-a");
+        const word = collectGeodesicPortalWord(registry, "g-a");
         word.slice(1).forEach((traversal, index) => expect(traversal.sourceCellId).toBe(word[index].targetCellId));
         expect(word.at(-1)?.targetCellId ?? "front").toBe(registry.get("cannon-b")?.cellId);
       }

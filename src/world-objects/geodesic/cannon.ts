@@ -40,7 +40,7 @@ import {
   getGeodesicTotalLengthMeters,
   removeGeodesicSegments,
   resolveEndpointTangentAtAnchor,
-  syncLegacyEmitterGeodesicFields,
+  syncEmitterGeodesicMenuCaches,
   totalGeodesicLengthFromSegments,
   totalLengthThroughSegment,
 } from "./segments";
@@ -283,7 +283,7 @@ function shootGeodesicNow(input: ShootGeodesicInput): GeodesicSegmentObject {
       [input.geodesicId]: aimYawRadians,
     },
   });
-  syncLegacyEmitterGeodesicFields(input.registry, input.geodesicId);
+  syncEmitterGeodesicMenuCaches(input.registry, input.geodesicId);
   requestGeodesicIntersectionUpdate(input.registry);
   return segment;
 }
@@ -513,7 +513,7 @@ function connectGeodesicToEmitterNow(
     if (tail.terminal.emitterId !== request.incomingEmitterId) {
       return getGeodesicSegments(request.registry, request.geodesicId);
     }
-    syncLegacyEmitterGeodesicFields(request.registry, request.geodesicId);
+    syncEmitterGeodesicMenuCaches(request.registry, request.geodesicId);
     requestGeodesicIntersectionUpdate(request.registry);
     return getGeodesicSegments(request.registry, request.geodesicId);
   }

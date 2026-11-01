@@ -111,7 +111,7 @@ describe("geodesic tracing on the kernel", () => {
     const segments = rebuildConnectedGeodesicBetweenEmitters({ world: torusWorld, registry, geodesicId: "g-wrap" });
 
     expect(segments.filter((segment) => segment.terminal.kind === "portal-hit")).toHaveLength(10);
-    expect(collectGeodesicPortalWord(torusWorld, registry, "g-wrap")).toEqual(word);
+    expect(collectGeodesicPortalWord(registry, "g-wrap")).toEqual(word);
     const last = segments[segments.length - 1];
     const end = getGeodesicSegmentEnd(last);
     expect(Math.hypot(end.x - (7.5 - 1e-5), end.y - 2.3)).toBeLessThan(1e-8);

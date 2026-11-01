@@ -51,12 +51,8 @@
  *
  * ## Intersections and bookkeeping
  * `updateGeodesicIntersectionObjects` recomputes the crossing markers of all segments (same cell, different geodesics) and keeps marker ids
- * stable. Emitter objects also carry caches (`geodesicIds`, `activeGeodesicId`, per-geodesic yaw) that `syncLegacyEmitterGeodesicFields`
+ * stable. Emitter objects also carry caches (`geodesicIds`, `activeGeodesicId`, per-geodesic yaw) that `syncEmitterGeodesicMenuCaches`
  * keeps in line with the intervals.
- *
- * ## Legacy
- * The pre-interval emitter-connection model was deleted (job 26). Its readers remain (`geodesicConnectionsById`, `GeodesicEmitterConnection`,
- * `getGeodesicConnection`) and are marked `Legacy:`; the `"straightening"` connection state survives only as the display state of moving intervals.
  *
  * ## Constants
  * Meters unless stated. `GEODESIC_MIN_LENGTH_METERS` (0.15) minimum chord of a geodesic; `minGeodesicSegmentLengthMeters` (0.05) minimum
@@ -81,8 +77,8 @@ import type { RuntimeWorldObjectBase } from "../runtimeObjectBase";
  * The cannon sits on the cell floor (`localPose.translation.z` is the floor height); the beam it emits starts
  * `geodesicRayBeamHeightMeters` above that. Frames are cell-local (x right, y forward, z up). The cannon does NOT own
  * geometry: the authoritative geodesic data are the `GeodesicIntervalObject`s whose `start`/`end` attachments reference
- * this cannon's id; `geodesicIds`, `activeGeodesicId`, `geodesicEmitterYawRadiansById` and `geodesicConnectionsById` are
- * menu/UI caches kept in sync by `syncLegacyEmitterGeodesicFields` and may lag behind the registry.
+ * this cannon's id; `geodesicIds`, `activeGeodesicId`, and `geodesicEmitterYawRadiansById` are
+ * menu/UI caches kept in sync by `syncEmitterGeodesicMenuCaches` and may lag behind the registry.
  */
 export interface GeodesicCannonObject extends RuntimeWorldObjectBase {
   readonly kind: "geodesic-cannon";
@@ -98,22 +94,15 @@ export interface GeodesicCannonObject extends RuntimeWorldObjectBase {
   readonly geodesicIds: readonly string[];
   /** Per-geodesic launch yaw in radians (cell-local, 0 = +x, counter-clockwise); overrides `aimYawRadians` for that geodesic. */
   readonly geodesicEmitterYawRadiansById?: Readonly<Record<string, number>>;
-  /** Legacy: per-geodesic connection state from the pre-interval model; superseded by interval endpoint attachments (see `getGeodesicConnection`). */
-  readonly geodesicConnectionsById?: Readonly<Record<string, GeodesicEmitterConnection>>;
   /** Default launch yaw in radians, normalized by `sanitizeYaw`; equals the yaw of `localPose.rotation`. */
   readonly aimYawRadians: number;
 }
 
-/**
- * Legacy: connection record of the pre-interval model describing how a geodesic leaves and (maybe) re-enters emitters.
- *
- * In the current model this is derived from interval attachments by `getGeodesicConnection`; a stored `"straightening"`
- * state belongs to the retired same-cell straightening path, which no longer exists.
- */
-export interface GeodesicEmitterConnection {
+/** How an interval geodesic attaches to emitters, derived from its endpoint attachments by `getGeodesicConnection`. */
+export interface GeodesicEmitterAttachment {
   readonly outgoingEmitterId: string;
   readonly incomingEmitterId?: string;
-  readonly state: "open" | "connected" | "straightening";
+  readonly state: "open" | "connected";
 }
 
 /**
@@ -274,7 +263,7 @@ export interface GeodesicTraceBuildResult {
  */
 export interface GeodesicSegmentObject extends RuntimeWorldObjectBase {
   readonly kind: "geodesic-segment";
-  /** Id of the owning `GeodesicIntervalObject` (or, for legacy data, of the emitter-side geodesic). */
+  /** Id of the owning `GeodesicIntervalObject`. */
   readonly geodesicId: string;
   /** Display number ("G1", "G2", ...) assigned by `getGlobalGeodesicNumbers`; optional cache. */
   readonly geodesicNumber?: number;
@@ -290,8 +279,8 @@ export interface GeodesicSegmentObject extends RuntimeWorldObjectBase {
   readonly lengthMeters: number;
   /** What stops this segment; `portal-hit` means the geodesic continues in the next segment. */
   readonly terminal: GeodesicSegmentTerminal;
-  /** Display state of the owning geodesic: `"connected"` (emitter at both ends), `"open"`, or `"straightening"`, which is now also used for `"moving"` curve-shortening intervals (see `resolveDerivedSegmentConnectionState`). */
-  readonly connectionState?: "open" | "connected" | "straightening";
+  /** Display state of the owning geodesic: `"connected"` (pinned anchors at both ends), `"open"`, or `"moving"` for a curve-shortening interval in motion (see `resolveDerivedSegmentConnectionState`). */
+  readonly connectionState?: "open" | "connected" | "moving";
   /** UI-only highlight for a half chosen in the tie-and-detach flow. */
   readonly highlightState?: "tie-detach-selected";
 }
@@ -342,7 +331,6 @@ export interface CreateGeodesicCannonOptions {
   readonly activeGeodesicId?: string;
   readonly geodesicIds?: readonly string[];
   readonly geodesicEmitterYawRadiansById?: Readonly<Record<string, number>>;
-  readonly geodesicConnectionsById?: Readonly<Record<string, GeodesicEmitterConnection>>;
   readonly aimYawRadians?: number;
   readonly collision?: SimpleCollisionCylinder;
 }
@@ -464,7 +452,6 @@ export function createGeodesicCannonObject(options: CreateGeodesicCannonOptions)
     activeGeodesicId: options.activeGeodesicId,
     geodesicIds: options.geodesicIds ?? (options.activeGeodesicId ? [options.activeGeodesicId] : []),
     geodesicEmitterYawRadiansById: options.geodesicEmitterYawRadiansById,
-    geodesicConnectionsById: options.geodesicConnectionsById,
     aimYawRadians,
   };
 }

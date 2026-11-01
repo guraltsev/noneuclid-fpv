@@ -177,7 +177,7 @@ describe("geodesic cannon world objects: curve shortening", () => {
       { geodesicId: "g-loop", role: "end", anchorObjectId: "free-loop" },
     ]);
     expect(registry.get("g-loop")).toMatchObject({ kind: "geodesic-interval", motionState: "moving" });
-    expect(getGeodesicSegments(registry, "g-loop").map((segment) => segment.connectionState)).toContain("straightening");
+    expect(getGeodesicSegments(registry, "g-loop").map((segment) => segment.connectionState)).toContain("moving");
   });
 
   it("fuses a ready pair into one stable locked interval, keeping the lower geodesic id", () => {
@@ -323,7 +323,7 @@ describe("geodesic cannon world objects: curve shortening", () => {
       segmentIndex: 0,
       direction: { x: 1, y: 0, z: 0 },
       lengthMeters: 0.03,
-      connectionState: "straightening",
+      connectionState: "moving",
     }));
     registry.add(createSegment({
       id: "g-loop:segment:1",
@@ -332,7 +332,7 @@ describe("geodesic cannon world objects: curve shortening", () => {
       start: { x: 0.03, y: 0, z: geodesicRayBeamHeightMeters },
       direction: { x: 0, y: -1, z: 0 },
       lengthMeters: 0.03,
-      connectionState: "straightening",
+      connectionState: "moving",
     }));
     registry.add(createCurveShorteningPairObject({
       id: "pair-loop",
@@ -621,7 +621,7 @@ describe("geodesic cannon world objects: curve shortening", () => {
         segmentIndex: 0,
         direction: { x: 1, y: 0, z: 0 },
         lengthMeters: 0.03,
-        connectionState: "straightening",
+        connectionState: "moving",
       }));
       registry.add(createSegment({
         id: "g-loop:segment:1",
@@ -630,7 +630,7 @@ describe("geodesic cannon world objects: curve shortening", () => {
         start: { x: 0.03, y: 0, z: geodesicRayBeamHeightMeters },
         direction: { x: 0, y: -1, z: 0 },
         lengthMeters: 0.03,
-        connectionState: "straightening",
+        connectionState: "moving",
       }));
       registry.add(createCurveShorteningPairObject({
         id: "pair-loop",

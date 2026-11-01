@@ -29,13 +29,13 @@ function lockedPair() {
   return { world, registry };
 }
 
-const wordOf = (world: ReturnType<typeof compileLargePortalWorld>, registry: ReturnType<typeof createRuntimeObjectRegistry>) =>
-  collectGeodesicPortalWord(world, registry, "g-a").map((step) => `${step.sourceCellId}>${step.targetCellId}`);
+const wordOf = (registry: ReturnType<typeof createRuntimeObjectRegistry>) =>
+  collectGeodesicPortalWord(registry, "g-a").map((step) => `${step.sourceCellId}>${step.targetCellId}`);
 
 describe("moveEmitterAlongRoute", () => {
   it("extends the geodesic's word by the portal crossed, and shortens it crossing back", () => {
     const { world, registry } = lockedPair();
-    expect(wordOf(world, registry)).toEqual(["a>b"]);
+    expect(wordOf(registry)).toEqual(["a>b"]);
 
     const back = moveEmitterAlongRoute({
       registry,
@@ -47,7 +47,7 @@ describe("moveEmitterAlongRoute", () => {
 
     expect(back).toEqual({ moved: true, brokenGeodesicIds: [] });
     expect(registry.get("cannon-b")).toMatchObject({ cellId: "a" });
-    expect(wordOf(world, registry)).toEqual([]);
+    expect(wordOf(registry)).toEqual([]);
   });
 
   it("refuses a move the route does not explain and changes nothing", () => {
@@ -71,11 +71,11 @@ describe("moveEmitterAlongRoute", () => {
     expect(wrongRoute).toEqual({ moved: false, brokenGeodesicIds: ["g-a"] });
     expect(noRoute).toEqual({ moved: false, brokenGeodesicIds: ["g-a"] });
     expect(registry.get("cannon-b")).toMatchObject({ cellId: "b" });
-    expect(wordOf(world, registry)).toEqual(["a>b"]);
+    expect(wordOf(registry)).toEqual(["a>b"]);
   });
 
   it("moves within a cell without touching the word", () => {
-    const { world, registry } = lockedPair();
+    const { registry } = lockedPair();
 
     const result = moveEmitterAlongRoute({
       registry,
@@ -87,7 +87,7 @@ describe("moveEmitterAlongRoute", () => {
 
     expect(result).toEqual({ moved: true, brokenGeodesicIds: [] });
     expect(registry.get("cannon-b")).toMatchObject({ cellId: "b" });
-    expect(wordOf(world, registry)).toEqual(["a>b"]);
+    expect(wordOf(registry)).toEqual(["a>b"]);
   });
 
   it("moves an emitter that has no locked geodesic, and ignores an unknown emitter", () => {

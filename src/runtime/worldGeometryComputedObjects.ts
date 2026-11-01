@@ -143,7 +143,6 @@ function collectCannonGeodesicIds(registry: RuntimeObjectRegistry): readonly str
     .flatMap((object) => [
       ...object.geodesicIds,
       ...(object.activeGeodesicId ? [object.activeGeodesicId] : []),
-      ...Object.keys(object.geodesicConnectionsById ?? {}),
     ]);
 }
 

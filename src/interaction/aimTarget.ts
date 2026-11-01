@@ -335,7 +335,7 @@ function resolveObjectAimTargets(
       continue;
     }
 
-    if (object.kind === "geodesic-segment" && object.connectionState === "straightening") {
+    if (object.kind === "geodesic-segment" && object.connectionState === "moving") {
       continue;
     }
 

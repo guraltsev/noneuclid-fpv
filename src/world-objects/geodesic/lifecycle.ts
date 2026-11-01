@@ -2,28 +2,26 @@
  * Queries whether a geodesic is locked or connected, and removal of geodesics and cannons together with their derived objects.
  */
 import type { RuntimeObjectRegistry } from "../runtimeObjectRegistry";
-import type { GeodesicEmitterConnection } from "./objects";
+import type { GeodesicEmitterAttachment } from "./objects";
 import { requestGeodesicIntersectionUpdate, withDeferredGeodesicIntersections } from "./intersections";
 import {
   collectIncidentGeodesicIdsForEmitter,
-  findSourceEmitterForGeodesic,
   getGeodesicEndpointAttachmentsForAnchor,
   removeGeodesicAssociations,
 } from "./endpoints";
-import { getGeodesicTail, removeGeodesicIntervalAndDerivedObjects, removeGeodesicSegments } from "./segments";
+import { removeGeodesicIntervalAndDerivedObjects, removeGeodesicSegments } from "./segments";
 
 /**
- * Describes the emitter connection of a geodesic.
+ * Describes how an interval geodesic attaches to emitters.
  *
- * For an interval it is derived from the attachments: start on an emitter gives `outgoing = start`, and `connected`
+ * It is derived from the interval's attachments: start on an emitter gives `outgoing = start`, and `connected`
  * when the end is also an emitter (else `open`); an interval with only its end on an emitter reports that emitter as
- * outgoing and `open`. Legacy: otherwise falls back to the cannon-stored `geodesicConnectionsById` records and finally to
- * the source emitter, reporting `open`. Returns `undefined` when nothing owns the geodesic.
+ * outgoing and `open`. Returns `undefined` for an id that is not an interval or has no emitter at either end.
  */
 export function getGeodesicConnection(
   registry: RuntimeObjectRegistry,
   geodesicId: string,
-): GeodesicEmitterConnection | undefined {
+): GeodesicEmitterAttachment | undefined {
   const interval = registry.get(geodesicId);
   if (interval?.kind === "geodesic-interval") {
     const start = registry.get(interval.start.anchorObjectId);
@@ -42,16 +40,7 @@ export function getGeodesicConnection(
       };
     }
   }
-
-  for (const object of registry.getObjectsOfKind("geodesic-cannon")) {
-    const connection = object.geodesicConnectionsById?.[geodesicId];
-    if (connection) {
-      return connection;
-    }
-  }
-
-  const source = findSourceEmitterForGeodesic(registry, geodesicId);
-  return source ? { outgoingEmitterId: source.id, state: "open" } : undefined;
+  return undefined;
 }
 
 // Emitters and taut-polygon corners are pinned anchors; a free end is not.
@@ -61,22 +50,13 @@ function isPinnedAnchorKind(kind: string | undefined): boolean {
 
 /**
  * True when both endpoints of the geodesic are pinned anchors, each an emitter or a polygon corner (a "locked" geodesic that cannot be extended or aimed freely).
- *
- * Legacy: for non-interval geodesics, falls back to `connected`/`straightening` connection state or an `emitter-hit` tail.
+ * An id that is not an interval is never locked.
  */
 export function isGeodesicLocked(registry: RuntimeObjectRegistry, geodesicId: string): boolean {
   const interval = registry.get(geodesicId);
-  if (interval?.kind === "geodesic-interval") {
-    return isPinnedAnchorKind(registry.get(interval.start.anchorObjectId)?.kind) &&
-      isPinnedAnchorKind(registry.get(interval.end.anchorObjectId)?.kind);
-  }
-
-  const state = getGeodesicConnection(registry, geodesicId)?.state;
-  if (state === "connected" || state === "straightening") {
-    return true;
-  }
-
-  return getGeodesicTail(registry, geodesicId)?.terminal.kind === "emitter-hit";
+  return interval?.kind === "geodesic-interval" &&
+    isPinnedAnchorKind(registry.get(interval.start.anchorObjectId)?.kind) &&
+    isPinnedAnchorKind(registry.get(interval.end.anchorObjectId)?.kind);
 }
 
 /** Lists the ids of locked geodesics (see `isGeodesicLocked`) that have an endpoint on the emitter. */
@@ -90,7 +70,7 @@ export function collectLockedIncidentGeodesicIdsForEmitter(
 
 // ---- Removal ----
 
-/** Removes a geodesic and its derived objects (interval path via `removeGeodesicIntervalAndDerivedObjects`; legacy path removes segments and emitter associations), then refreshes intersections. */
+/** Removes a geodesic and its derived objects (an interval via `removeGeodesicIntervalAndDerivedObjects`; any other id only has stale segments and emitter cache entries removed), then refreshes intersections. */
 export function removeGeodesic(registry: RuntimeObjectRegistry, geodesicId: string): void {
   withDeferredGeodesicIntersections(registry, () => removeGeodesicNow(registry, geodesicId));
 }

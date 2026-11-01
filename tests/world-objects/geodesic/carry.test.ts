@@ -82,7 +82,7 @@ describe("carrying a geodesic across a portal", () => {
     });
 
     expect(rebuilt.length).toBeGreaterThan(0);
-    expect(collectGeodesicPortalWord(world, registry, "g-a")).toEqual([]);
+    expect(collectGeodesicPortalWord(registry, "g-a")).toEqual([]);
     expect(isGeodesicLocked(registry, "g-a")).toBe(true);
   });
 
@@ -102,7 +102,7 @@ describe("carrying a geodesic across a portal", () => {
     registry.add(source);
     registry.add(incoming);
     shootGeodesic({ world, registry, cannon: source, geodesicId: "g-a", maxLengthMeters: 3 });
-    expect(collectGeodesicPortalWord(world, registry, "g-a")).toEqual([{
+    expect(collectGeodesicPortalWord(registry, "g-a")).toEqual([{
       sourceCellId: "a",
       sourcePortalId: "ab",
       targetCellId: "b",
@@ -260,7 +260,7 @@ describe("carrying a geodesic across a portal", () => {
     });
 
     const carryWord = [
-      ...collectGeodesicPortalWord(world, registry, "g-a"),
+      ...collectGeodesicPortalWord(registry, "g-a"),
       createCarryPortalTraversal(world, "b", "ba"),
     ];
     const rebuilt = rebuildConnectedGeodesicBetweenEmitters({
@@ -282,7 +282,7 @@ describe("carrying a geodesic across a portal", () => {
       state: "connected",
     });
     expect(isGeodesicLocked(registry, "g-a")).toBe(true);
-    expect(collectGeodesicPortalWord(world, registry, "g-a")).toEqual([]);
+    expect(collectGeodesicPortalWord(registry, "g-a")).toEqual([]);
   });
 
   it("derives a cross-cell carry transition from endpoint cells, with no player transition state", () => {
@@ -321,7 +321,7 @@ describe("carrying a geodesic across a portal", () => {
     });
 
     expect(rebuilt.length).toBeGreaterThan(0);
-    expect(collectGeodesicPortalWord(world, registry, "g-a")).toEqual([]);
+    expect(collectGeodesicPortalWord(registry, "g-a")).toEqual([]);
     expect(isGeodesicLocked(registry, "g-a")).toBe(true);
   });
 
@@ -341,7 +341,7 @@ describe("carrying a geodesic across a portal", () => {
     registry.add(source);
     registry.add(incoming);
     shootGeodesic({ world, registry, cannon: source, geodesicId: "g-a", maxLengthMeters: 3 });
-    expect(collectGeodesicPortalWord(world, registry, "g-a")).toEqual([{
+    expect(collectGeodesicPortalWord(registry, "g-a")).toEqual([{
       sourceCellId: "front",
       sourcePortalId: "front-left",
       targetCellId: "left",
@@ -360,7 +360,7 @@ describe("carrying a geodesic across a portal", () => {
     registry.update(carriedIncoming);
 
     const carryWord = [
-      ...collectGeodesicPortalWord(world, registry, "g-a"),
+      ...collectGeodesicPortalWord(registry, "g-a"),
       createCarryPortalTraversal(world, "left", "left-back"),
     ];
     const liveRebuilt = rebuildConnectedGeodesicBetweenEmitters({
@@ -392,7 +392,7 @@ describe("carrying a geodesic across a portal", () => {
     expect(getCannonGeodesicIds(registry, "cannon-a")).toEqual(["g-a"]);
     expect(getCannonGeodesicIds(registry, "cannon-b")).toEqual(["g-a"]);
     expect(isGeodesicLocked(registry, "g-a")).toBe(true);
-    expect(collectGeodesicPortalWord(world, registry, "g-a")).toEqual(carryWord);
+    expect(collectGeodesicPortalWord(registry, "g-a")).toEqual(carryWord);
   });
 });
 
@@ -438,7 +438,7 @@ describe("carrying a geodesic within one cell", () => {
       terminal: { kind: "emitter-hit", emitterId: "cannon-b" },
       connectionState: "connected",
     });
-    expect(collectGeodesicPortalWord(world, registry, "g-a")).toEqual([{
+    expect(collectGeodesicPortalWord(registry, "g-a")).toEqual([{
       sourceCellId: "torus-room",
       sourcePortalId: "right-left",
       targetCellId: "torus-room",
@@ -483,7 +483,7 @@ describe("carrying a geodesic within one cell", () => {
     });
 
     expect(rebuilt.length).toBeGreaterThan(0);
-    expect(collectGeodesicPortalWord(world, registry, "g-a")).toEqual([]);
+    expect(collectGeodesicPortalWord(registry, "g-a")).toEqual([]);
     expect(isGeodesicLocked(registry, "g-a")).toBe(true);
   });
 });
@@ -505,7 +505,7 @@ describe("updating a locked interval's portal word from carried traversal", () =
     registry.add(source);
     registry.add(incoming);
     shootGeodesic({ world, registry, cannon: source, geodesicId: "g-a", maxLengthMeters: 3 });
-    expect(collectGeodesicPortalWord(world, registry, "g-a")).toEqual([{
+    expect(collectGeodesicPortalWord(registry, "g-a")).toEqual([{
       sourceCellId: "a",
       sourcePortalId: "ab",
       targetCellId: "b",
@@ -528,7 +528,7 @@ describe("updating a locked interval's portal word from carried traversal", () =
 
     expect(nextWord).toEqual([]);
     expect(rebuilt.length).toBeGreaterThan(0);
-    expect(collectGeodesicPortalWord(world, registry, "g-a")).toEqual([]);
+    expect(collectGeodesicPortalWord(registry, "g-a")).toEqual([]);
     expect(isGeodesicLocked(registry, "g-a")).toBe(true);
   });
 
@@ -638,7 +638,7 @@ describe("live carry rebuilds that cannot connect cleanly", () => {
       terminal: { kind: "emitter-hit", emitterId: "cannon-b" },
       connectionState: "connected",
     });
-    expect(collectGeodesicPortalWord(world, registry, "g-a")).toEqual([]);
+    expect(collectGeodesicPortalWord(registry, "g-a")).toEqual([]);
     expect(registry.get("g-a")?.kind).toBe("geodesic-interval");
   });
 
@@ -763,7 +763,7 @@ describe("loop words under anchor portal crossings", () => {
     const segments = getGeodesicSegments(registry, "g-loop");
     expect(segments).toHaveLength(3);
     expect(segments[segments.length - 1].terminal).toMatchObject({ kind: "emitter-hit", emitterId: "cannon-a" });
-    expect(collectGeodesicPortalWord(world, registry, "g-loop")).toEqual([px, py]);
+    expect(collectGeodesicPortalWord(registry, "g-loop")).toEqual([px, py]);
     expect(totalGeodesicLength(registry, "g-loop")).toBeCloseTo(15 * Math.SQRT2, 6);
   });
 

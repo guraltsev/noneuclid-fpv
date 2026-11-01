@@ -753,7 +753,6 @@ Endpoint attachments of geodesic intervals: lookup by anchor, re-attachment, lif
 | function | `removeUnusedFreeGeodesicEnds` | Removes free-end and polygon-corner anchors that no interval attaches to any more. |
 | function | `collectIncidentGeodesicIdsForEmitter` | Ids of all geodesics incident on an emitter. |
 | function | `removeGeodesicAssociations` | Removes a geodesic id from the caches of every emitter. |
-| function | `findSourceEmitterForGeodesic` | The emitter that a geodesic originates from, if any. |
 
 ### `world-objects/geodesic/intersections.ts`
 
@@ -794,10 +793,10 @@ Queries whether a geodesic is locked or connected, and removal of geodesics and 
 
 | Kind | Name | Summary |
 | --- | --- | --- |
-| function | `getGeodesicConnection` | Describes the emitter connection of a geodesic. |
+| function | `getGeodesicConnection` | Describes how an interval geodesic attaches to emitters. |
 | function | `isGeodesicLocked` | True when both endpoints of the geodesic are pinned anchors, each an emitter or a polygon corner (a "locked" geodesic that cannot be extended or aimed freely). |
 | function | `collectLockedIncidentGeodesicIdsForEmitter` | Lists the ids of locked geodesics (see `isGeodesicLocked`) that have an endpoint on the emitter. |
-| function | `removeGeodesic` | Removes a geodesic and its derived objects (interval path via `removeGeodesicIntervalAndDerivedObjects`; legacy path removes segments and emitter associations), then refreshes intersections. |
+| function | `removeGeodesic` | Removes a geodesic and its derived objects (an interval via `removeGeodesicIntervalAndDerivedObjects`; any other id only has stale segments and emitter cache entries removed), then refreshes intersections. |
 | function | `removeUnlockedGeodesicsFromCannon` | Removes every non-locked geodesic listed on the cannon and returns the removed ids (empty if the id is not a cannon). |
 | function | `removeGeodesicCannonAndSegments` | Deletes a cannon and every geodesic that starts, ends, or connects (as incoming emitter) on it. |
 
@@ -808,7 +807,7 @@ Geodesic emitters ("cannons"), geodesic intervals and curve shortening on a glue
 | Kind | Name | Summary |
 | --- | --- | --- |
 | interface | `GeodesicCannonObject` | A geodesic emitter ("cannon"): a placeable runtime object that geodesic intervals attach their endpoints to. |
-| interface | `GeodesicEmitterConnection` | Legacy: connection record of the pre-interval model describing how a geodesic leaves and (maybe) re-enters emitters. |
+| interface | `GeodesicEmitterAttachment` | How an interval geodesic attaches to emitters, derived from its endpoint attachments by `getGeodesicConnection`. |
 | interface | `GeodesicPortalTraversal` | One crossing of a portal, recorded by the ids on both sides; a sequence of these is a portal word. |
 | interface | `GeodesicCarryPortalTransition` | A `GeodesicPortalTraversal` that also carries the portal's rigid transform, reported when a carried emitter crosses a portal. |
 | type | `GeodesicEndRole` | Which end of a geodesic interval: `"start"` is the end the portal word is read from, `"end"` the one it arrives at. |
@@ -901,8 +900,8 @@ Derived geodesic segments: lookup by geodesic, building segments from traces wit
 | function | `buildDerivedSegmentsFromTraces` | Builds, without side effects, the derived segments of an interval from traces. |
 | function | `segmentToTrace` | Converts a derived segment back to the trace piece it was built from. |
 | function | `getGeodesicTotalLengthMeters` | Total length of a geodesic, the sum over its derived segments, in meters. |
-| function | `syncLegacyEmitterGeodesicFields` | Updates the menu caches of an emitter from the geodesic intervals that attach to it. |
-| function | `collectGeodesicPortalWord` | Returns the portal word of a geodesic: the stored word for an interval, else (legacy) the traversals read off the segment chain. |
+| function | `syncEmitterGeodesicMenuCaches` | Updates the menu caches of an emitter from the geodesic intervals that attach to it. |
+| function | `collectGeodesicPortalWord` | Returns the stored portal word of an interval geodesic; `[]` for unknown ids or geodesics that never cross a portal. |
 | function | `createSegmentFromTrace` | Creates a derived segment object from one trace piece. |
 | function | `createGeodesicSegmentTooltip` | Tooltip text of a derived segment. |
 | function | `canConnectGeodesicSegmentAtDistance` | True when a point at the given distance along a segment can be connected to. |
@@ -2015,7 +2014,7 @@ Render sources and per-frame render records for geodesic cannons, geodesic segme
 | --- | --- | --- |
 | const | `geodesicSegmentArchetypeKey` | Archetype of an ordinary (unconnected) geodesic segment ribbon. |
 | const | `geodesicSegmentConnectedArchetypeKey` | Archetype of a geodesic segment that is connected (tied) to others; amber ribbon. |
-| const | `geodesicSegmentStraighteningArchetypeKey` | Archetype of a segment currently being straightened; orange ribbon. |
+| const | `geodesicSegmentMovingArchetypeKey` | Archetype of a segment currently being straightened; orange ribbon. |
 | const | `geodesicSegmentTieDetachSelectedArchetypeKey` | Archetype of a segment selected for tie detachment; green ribbon. |
 | const | `geodesicRayPostArchetypePrefix` | Archetype-key prefix (followed by `:<mesh>`) for the cannon post meshes. |
 | const | `geodesicRayHeadArchetypePrefix` | Archetype-key prefix (followed by `:<mesh>`) for the per-geodesic cannon head (lightsaber) meshes. |

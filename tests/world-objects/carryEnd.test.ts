@@ -65,7 +65,7 @@ describe("rebuilding an emitter's geodesics after it moved", () => {
     expect(rebuild.rebuiltGeodesicIds).toEqual(["g-a"]);
     expect(rebuild.regrownActiveGeodesicId).toBeUndefined();
     expect(isGeodesicLocked(registry, "g-a")).toBe(true);
-    const word = collectGeodesicPortalWord(world, registry, "g-a");
+    const word = collectGeodesicPortalWord(registry, "g-a");
     word.slice(1).forEach((traversal, index) => expect(traversal.sourceCellId).toBe(word[index].targetCellId));
     expect(word.at(-1)?.targetCellId ?? "front").toBe(registry.get("cannon-b")?.cellId);
   });
@@ -87,7 +87,7 @@ describe("releasing a carried emitter", () => {
     expect(release.rebuiltGeodesicIds).toEqual(["g-a"]);
     expect(release.prunedIntersectionIds).toEqual([]);
     expect(isGeodesicLocked(registry, "g-a")).toBe(true);
-    const word = collectGeodesicPortalWord(world, registry, "g-a");
+    const word = collectGeodesicPortalWord(registry, "g-a");
     word.slice(1).forEach((traversal, index) => expect(traversal.sourceCellId).toBe(word[index].targetCellId));
     expect(word.at(-1)?.targetCellId ?? "front").toBe(registry.get("cannon-b")?.cellId);
   });

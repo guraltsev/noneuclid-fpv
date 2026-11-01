@@ -29,7 +29,7 @@ import {
   removeGeodesicIntervalAndDerivedObjects,
   removeGeodesicSegments,
   replaceDerivedSegmentsFromTraces,
-  syncLegacyEmitterGeodesicFields,
+  syncEmitterGeodesicMenuCaches,
 } from "./segments";
 import { isGeodesicLocked } from "./lifecycle";
 import { previewRebuildGeodesicInterval, rebuildDerivedGeodesicSegments } from "./intervals";
@@ -142,7 +142,7 @@ function tieAndDetachGeodesicEndpointsNow(
       requestGeodesicIntersectionUpdate(request.registry);
       return undefined;
     }
-    syncLegacyEmitterGeodesicFields(request.registry, interval.id);
+    syncEmitterGeodesicMenuCaches(request.registry, interval.id);
   }
 
   // The pair remembers where the free end was born (the emitter's beam point).
@@ -321,7 +321,7 @@ function restoreGeodesicIntervalsAndSegments(
     for (const segment of segmentsByGeodesicId.get(interval.id) ?? []) {
       registry.add(segment);
     }
-    syncLegacyEmitterGeodesicFields(registry, interval.id);
+    syncEmitterGeodesicMenuCaches(registry, interval.id);
   }
 }
 
@@ -579,7 +579,7 @@ function resolveCurveShorteningPairNow(input: Parameters<typeof resolveCurveShor
   // The previewed traces are committed as they are: each chord was traced once, by its preview.
   for (const [index, interval] of intervals.entries()) {
     replaceDerivedSegmentsFromTraces({ registry, geodesicId: interval.id, traces: previewTraces[index] });
-    syncLegacyEmitterGeodesicFields(registry, interval.id);
+    syncEmitterGeodesicMenuCaches(registry, interval.id);
   }
   requestGeodesicIntersectionUpdate(registry);
 

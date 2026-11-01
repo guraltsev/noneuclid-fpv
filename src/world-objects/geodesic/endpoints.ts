@@ -4,7 +4,7 @@
 import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex";
 import { transformPoint3 } from "../../math/rigidTransform3";
 import type { RuntimeObjectRegistry, RuntimeWorldObject } from "../runtimeObjectRegistry";
-import { GEODESIC_MIN_LENGTH_METERS, type GeodesicCannonObject, type GeodesicEndpointAttachment, type GeodesicEndpointSelection, type GeodesicEndRole, type GeodesicIntervalObject, type GeodesicPortalTraversal, intersectionTolerance, type LiftedGeodesicEndpoint } from "./objects";
+import { GEODESIC_MIN_LENGTH_METERS, type GeodesicEndpointAttachment, type GeodesicEndpointSelection, type GeodesicEndRole, type GeodesicIntervalObject, type GeodesicPortalTraversal, intersectionTolerance, type LiftedGeodesicEndpoint } from "./objects";
 import { canObjectAttachGeodesics, getAnchorBeamPoint } from "./anchors";
 import { reverseGeodesicPortalWord } from "./portalWord";
 import { inversePortalTransform } from "./development";
@@ -296,7 +296,7 @@ export function removeUnusedFreeGeodesicEnds(registry: RuntimeObjectRegistry): v
   }
 }
 
-// Ids of all geodesics incident on an emitter, from interval attachments, the emitter's own caches, and legacy connection records of any cannon.
+// Ids of all geodesics incident on an emitter, from interval attachments and the emitter's own caches.
 /** Ids of all geodesics incident on an emitter. */
 export function collectIncidentGeodesicIdsForEmitter(
   registry: RuntimeObjectRegistry,
@@ -316,14 +316,6 @@ export function collectIncidentGeodesicIdsForEmitter(
     }
   }
 
-  for (const object of registry.getObjectsOfKind("geodesic-cannon")) {
-    for (const [geodesicId, connection] of Object.entries(object.geodesicConnectionsById ?? {})) {
-      if (connection.outgoingEmitterId === emitterId || connection.incomingEmitterId === emitterId) {
-        ids.add(geodesicId);
-      }
-    }
-  }
-
   return [...ids];
 }
 
@@ -334,7 +326,7 @@ export function removeGeodesicAssociations(registry: RuntimeObjectRegistry, geod
   }
 }
 
-// Removes the geodesic id from the emitter's caches (id list, active id, yaw and connection records). No-op when it holds nothing.
+// Removes the geodesic id from the emitter's caches (id list, active id and yaw). No-op when it holds nothing.
 function removeGeodesicAssociationFromEmitter(
   registry: RuntimeObjectRegistry,
   emitterId: string,
@@ -345,46 +337,20 @@ function removeGeodesicAssociationFromEmitter(
     return;
   }
   const hasYaw = geodesicId in (object.geodesicEmitterYawRadiansById ?? {});
-  const hasConnection = geodesicId in (object.geodesicConnectionsById ?? {});
   if (
     !object.geodesicIds.includes(geodesicId) &&
     object.activeGeodesicId !== geodesicId &&
-    !hasYaw &&
-    !hasConnection
+    !hasYaw
   ) {
     return;
   }
 
   const { [geodesicId]: _removedYaw, ...remainingYaws } = object.geodesicEmitterYawRadiansById ?? {};
-  const { [geodesicId]: _removedConnection, ...remainingConnections } = object.geodesicConnectionsById ?? {};
   const geodesicIds = object.geodesicIds.filter((id) => id !== geodesicId);
   registry.update({
     ...object,
     activeGeodesicId: object.activeGeodesicId === geodesicId ? geodesicIds[0] : object.activeGeodesicId,
     geodesicIds,
     geodesicEmitterYawRadiansById: remainingYaws,
-    geodesicConnectionsById: remainingConnections,
   });
-}
-
-// Legacy: finds the emitter that owns a non-interval geodesic, preferring the recorded outgoing connection, then yaw record,
-// then active id, then any listing.
-/** The emitter that a geodesic originates from, if any. */
-export function findSourceEmitterForGeodesic(
-  registry: RuntimeObjectRegistry,
-  geodesicId: string,
-): GeodesicCannonObject | undefined {
-  const cannons = registry.getObjectsOfKind("geodesic-cannon");
-  for (const object of cannons) {
-    const connection = object.geodesicConnectionsById?.[geodesicId];
-    if (connection?.outgoingEmitterId === object.id) {
-      return object;
-    }
-  }
-
-  return cannons.find((object) =>
-    object.geodesicIds.includes(geodesicId) &&
-    object.geodesicEmitterYawRadiansById?.[geodesicId] !== undefined
-  ) ?? cannons.find((object) => object.activeGeodesicId === geodesicId) ??
-    cannons.find((object) => object.geodesicIds.includes(geodesicId));
 }

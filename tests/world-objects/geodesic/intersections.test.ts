@@ -54,7 +54,7 @@ describe("geodesic cannon world objects: intersections", () => {
     expect(registry.get("cannon-a")?.kind).toBe("geodesic-cannon");
   });
 
-  it("clears the old emitter legacy attachment when an interval endpoint is detached", () => {
+  it("clears the old emitter attachment when an interval endpoint is detached", () => {
     const registry = createRuntimeObjectRegistry([
       createGeodesicCannonObject({
         id: "cannon-a",
@@ -99,7 +99,6 @@ describe("geodesic cannon world objects: intersections", () => {
         activeGeodesicId: "g-a",
         geodesicIds: [],
         geodesicEmitterYawRadiansById: { "g-a": 0 },
-        geodesicConnectionsById: { "g-a": { outgoingEmitterId: "cannon-a", state: "open" } },
       }),
       createFreeGeodesicEndObject({
         id: "free-a",
@@ -120,7 +119,6 @@ describe("geodesic cannon world objects: intersections", () => {
     const cannon = registry.get("cannon-a");
     expect(cannon?.kind === "geodesic-cannon" ? cannon.activeGeodesicId : undefined).toBeUndefined();
     expect(cannon?.kind === "geodesic-cannon" ? cannon.geodesicEmitterYawRadiansById : undefined).toEqual({});
-    expect(cannon?.kind === "geodesic-cannon" ? cannon.geodesicConnectionsById : undefined).toEqual({});
   });
 
   it("creates a vertex balloon where two geodesics intersect outside an emitter", () => {

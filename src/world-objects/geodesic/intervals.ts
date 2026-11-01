@@ -26,7 +26,7 @@ import {
   removeGeodesicIntervalAndDerivedObjects,
   replaceDerivedSegmentsFromTraces,
   segmentToTrace,
-  syncLegacyEmitterGeodesicFields,
+  syncEmitterGeodesicMenuCaches,
   totalGeodesicLengthFromSegments,
   totalLengthThroughSegment,
   withAnchoredTargetTerminal,
@@ -305,7 +305,7 @@ function aimFreeGeodesicFromEndpointNow(input: Parameters<typeof aimFreeGeodesic
       geodesicId: input.geodesicId,
     });
     if (rebuilt) {
-      syncLegacyEmitterGeodesicFields(input.registry, input.geodesicId);
+      syncEmitterGeodesicMenuCaches(input.registry, input.geodesicId);
       requestGeodesicIntersectionUpdate(input.registry);
       return {
         interval: rebuilt.interval,
@@ -320,7 +320,7 @@ function aimFreeGeodesicFromEndpointNow(input: Parameters<typeof aimFreeGeodesic
     geodesicId: input.geodesicId,
     traces,
   });
-  syncLegacyEmitterGeodesicFields(input.registry, input.geodesicId);
+  syncEmitterGeodesicMenuCaches(input.registry, input.geodesicId);
   requestGeodesicIntersectionUpdate(input.registry);
   return {
     interval: nextInterval,
@@ -499,9 +499,9 @@ function splitGeodesicIntervalAtSegmentHitNow(input: Parameters<typeof splitGeod
     });
   }
   removeUnusedFreeGeodesicEnds(input.registry);
-  syncLegacyEmitterGeodesicFields(input.registry, input.geodesicId);
+  syncEmitterGeodesicMenuCaches(input.registry, input.geodesicId);
   if (continuationId) {
-    syncLegacyEmitterGeodesicFields(input.registry, continuationId);
+    syncEmitterGeodesicMenuCaches(input.registry, continuationId);
   }
   requestGeodesicIntersectionUpdate(input.registry);
   return [input.registry.get(input.geodesicId), continuationId ? input.registry.get(continuationId) : undefined]
@@ -580,7 +580,7 @@ function rebuildLockedGeodesicDetailedNow(
     allowUnexpectedPortalWord: input.allowOutOfBoundsCarriedEndpoint,
   });
   if (rebuilt.result) {
-    syncLegacyEmitterGeodesicFields(input.registry, input.geodesicId);
+    syncEmitterGeodesicMenuCaches(input.registry, input.geodesicId);
     requestGeodesicIntersectionUpdate(input.registry);
   }
   return rebuilt;

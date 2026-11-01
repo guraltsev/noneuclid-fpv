@@ -148,7 +148,7 @@ describe("world geometry computed object policy", () => {
     expect(registry.get("angle-segment-incoming")?.kind).toBe("protractor-angle");
   });
 
-  it("rebuilds locked interval geodesics even without legacy cannon-owned ids", () => {
+  it("rebuilds locked interval geodesics even without cannon-owned ids", () => {
     const world = compileLargeWorld();
     const registry = createRuntimeObjectRegistry();
     addCannon(registry, "cannon-a", "a", yawRigidTransform3(0, vec3(-1.5, 0, 0)));
@@ -161,7 +161,6 @@ describe("world geometry computed object policy", () => {
           activeGeodesicId: undefined,
           geodesicIds: [],
           geodesicEmitterYawRadiansById: {},
-          geodesicConnectionsById: {},
         });
       }
     }

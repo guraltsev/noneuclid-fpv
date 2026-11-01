@@ -53,7 +53,7 @@ export function rebuildEmitterGeodesics(input: {
       registry,
       geodesicId: lockedGeodesicId,
       carriedEmitterId: cannon.id,
-      carriedPortalWord: collectGeodesicPortalWord(world, registry, lockedGeodesicId),
+      carriedPortalWord: collectGeodesicPortalWord(registry, lockedGeodesicId),
       preserveGeodesicOnRebuildFailure: input.preserveGeodesicOnRebuildFailure,
     });
   };

@@ -66,13 +66,6 @@ describe("protractor tool objects", () => {
       localPose: yawRigidTransform3(Math.PI, { x: 1, y: 0, z: 0 }),
       geodesicIds: ["g-a"],
       geodesicEmitterYawRadiansById: { "g-a": Math.PI },
-      geodesicConnectionsById: {
-        "g-a": {
-          outgoingEmitterId: "source-a",
-          incomingEmitterId: "emitter-a",
-          state: "connected",
-        },
-      },
     }));
     const segment = createSegment({
       geodesicId: "g-a",

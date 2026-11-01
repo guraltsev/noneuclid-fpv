@@ -244,7 +244,7 @@ describe("geodesic cannon world objects: cannon", () => {
     const segments = getGeodesicSegments(registry, "g-a");
     expect(segments.length).toBeGreaterThanOrEqual(2);
     expect(segments.map((segment) => segment.cellId).every((cellId) => cellId === "torus-room")).toBe(true);
-    expect(collectGeodesicPortalWord(world, registry, "g-a")).not.toHaveLength(0);
+    expect(collectGeodesicPortalWord(registry, "g-a")).not.toHaveLength(0);
     expect(getGeodesicTail(registry, "g-a")).toMatchObject({
       terminal: { kind: "emitter-hit", emitterId: "cannon-a" },
       connectionState: "connected",

@@ -544,4 +544,4 @@ rather than discovered.
 - **Curve shortening.** A step that would lengthen the pair is skipped rather than rolled back to a fused geodesic, so a pair
   whose recorded length is stale may stall without ever becoming ready to fuse. Fusion and absorption assume the non-free ends are emitters, and
   intervals are assumed to run emitter→free end with the emitter at the `start` role.
-  The old "straightening" string survives as the render state of moving intervals.
+  The segments of a moving interval carry the display state `"moving"` (drawn in the moving colour).

@@ -6,7 +6,7 @@
  * maps each runtime object to records naming an archetype and a Three.js model matrix (meters, cell-local pose converted
  * from world axes with x right, y forward, z up). Segments are a unit-length ribbon along local +x scaled non-uniformly to
  * the segment length; cannon heads are yawed per geodesic emitter. The ribbon colour selects archetype state: tie-detach
- * selection beats straightening, which beats connected, which beats the default. Assets that fail to be preloaded fall back to simple procedural
+ * selection beats moving, which beats connected, which beats the default. Assets that fail to be preloaded fall back to simple procedural
  * stand-ins, so source creation never throws.
  */
 import * as THREE from "three";
@@ -26,7 +26,7 @@ export const geodesicSegmentArchetypeKey = "geodesic-segment:ribbon-cross";
 /** Archetype of a geodesic segment that is connected (tied) to others; amber ribbon. */
 export const geodesicSegmentConnectedArchetypeKey = "geodesic-segment:ribbon-cross:connected";
 /** Archetype of a segment currently being straightened; orange ribbon. */
-export const geodesicSegmentStraighteningArchetypeKey = "geodesic-segment:ribbon-cross:straightening";
+export const geodesicSegmentMovingArchetypeKey = "geodesic-segment:ribbon-cross:moving";
 /** Archetype of a segment selected for tie detachment; green ribbon. */
 export const geodesicSegmentTieDetachSelectedArchetypeKey = "geodesic-segment:ribbon-cross:tie-detach-selected";
 /** Archetype-key prefix (followed by `:<mesh>`) for the cannon post meshes. */
@@ -67,7 +67,7 @@ export function createGeodesicRuntimeRenderSources(
       opacity: 0.92,
     }),
     createSegmentSource({
-      archetypeKey: geodesicSegmentStraighteningArchetypeKey,
+      archetypeKey: geodesicSegmentMovingArchetypeKey,
       color: 0xf59e0b,
       opacity: 0.94,
     }),
@@ -181,11 +181,11 @@ export function collectGeodesicRuntimeRenderRecords(
     {
       objectId: object.id,
       cellId: object.cellId,
-      // State priority: tie-detach selection, then straightening, then connected, else default.
+      // State priority: tie-detach selection, then moving, then connected, else default.
       archetypeKey: object.highlightState === "tie-detach-selected"
         ? geodesicSegmentTieDetachSelectedArchetypeKey
-        : object.connectionState === "straightening"
-        ? geodesicSegmentStraighteningArchetypeKey
+        : object.connectionState === "moving"
+        ? geodesicSegmentMovingArchetypeKey
         : object.connectionState === "connected"
           ? geodesicSegmentConnectedArchetypeKey
           : geodesicSegmentArchetypeKey,
