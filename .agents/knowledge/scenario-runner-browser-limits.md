@@ -60,3 +60,8 @@
   resolves against that module's own file), but **not** inside Vitest's `globalSetup` entry, which needs an
   absolute `file://` URL built with `pathToFileURL` instead (see `globalSetup.ts`).
 - On 2026-11-01 `appCommands.release.test.ts` ("changeWorld switches to the requested world", `Runtime.evaluate` got no response within 6000 ms) failed 4 times out of 4 on this machine, with nothing else running, including on commit `d873688` (before the layer-DAG work); the other release files passed. So a failure of that one case is not evidence about your change: run it on a clean worktree of an older commit before chasing it.
+
+- On 2026-11-01 (job 31) the file failed with the same `Runtime.evaluate (id 7)` timeout in 3 of 3 isolated runs at the unchanged base commit
+  `d2a15d5` (`npm run test:release -- tests/app/appCommands.release.test.ts` in a throwaway worktree), and in 2 of 3 full release runs, each time
+  in a different test of the file. On this machine today it is not "once in several runs"; compare a change against the base commit, not
+  against one green run.

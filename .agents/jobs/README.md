@@ -116,7 +116,7 @@ queued job, despite their numbers (they were numbered after the existing queue t
 | [28](_done/28_frame_snapshot_instance_sync.md) | Sync runtime-object instances once per frame against the rendered root | done, needs review | [71](../../_issues/71_runtime_object_instance_sync_runs_twice_with_stale_root.md) |  |
 | [29](_done/29_frame_loop_allocation_and_draw_calls.md) | Frame-loop allocation and per-object draw calls | done, needs review | [75](../../_issues/75_frame_loop_allocation_and_per_object_draw_calls.md) |  |
 | [30](30_deformation_rebuild_pipeline.md) | Incremental deformation rebuild pipeline | queued | [55](../../_issues/55_live_deformation_rebuild_cost_and_se2_transforms.md), [82](../../_issues/82_deformation_commit_rebuilds_whole_scene_and_reuploads_floor_texture.md) |  |
-| [31](31_app_shell_state_holder.md) | Shell cleanups: dead field, one portal sync, split the palette adapter | queued | - | 77 |
+| [31](_done/31_app_shell_state_holder.md) | Shell cleanups: dead field, one portal sync, split the palette adapter | done, needs review | - | 77 |
 | [32](_done/32_layer_dag.md) | Make the layer rule a real DAG | done, needs review | [78](../../_issues/78_enforce_layer_dag_and_move_domain_logic_out_of_render.md) |  |
 | [33](33_decompose_runtime_monoliths.md) | Decompose runtime monoliths and retire legacy paths | queued | - | 38 |
 | [34](34_type_strictness_lint_bundle.md) | Type strictness, linting and bundle configuration | queued | - | 80 |

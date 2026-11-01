@@ -103,7 +103,7 @@ to `src/cell-complex/validateCellComplexSpec.ts`.
 | # | Pri | Title |
 | --- | --- | --- |
 | [76](../.agents/jobs/25_split_geodesic_cannon_modules.md) | P1 | Concrete seams for `geodesicCannon.ts` (5,942 lines) and `geodesicCannonTools.ts` |
-| [77](../.agents/jobs/31_app_shell_state_holder.md) | P2 | One state holder and one command path for `createThreeApp` |
+| [77](../.agents/jobs/_done/31_app_shell_state_holder.md) | P2 | One state holder and one command path for `createThreeApp` |
 | [78](78_enforce_layer_dag_and_move_domain_logic_out_of_render.md) | P2 | Make the layer rule a real DAG; 5 import cycles; move domain logic out of `render/three` |
 | [79](../.agents/jobs/11_property_tests_for_geometry_core.md) | P2 | Property-based invariants (fast-check) for the geometry core |
 | [80](../.agents/jobs/34_type_strictness_lint_bundle.md) | P2/P3 | `noUncheckedIndexedAccess` (353 errors), lint, bundle chunking (1.44 MB single chunk) |

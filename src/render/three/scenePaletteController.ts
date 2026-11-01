@@ -1,7 +1,7 @@
 /**
  * Controller that owns the in-scene palette's scene graph and routes pointer input to palette actions, for both desktop and XR.
  * Each frame the shell calls update() with a ScenePaletteInputFrame, the renderer-neutral PaletteDefinition (src/ui/paletteDefinition.ts) and the panel placement;
- * the controller rebuilds the library adapter (vrPaletteLibraryAdapter.ts) when the definition version changes (never by comparing content), ray-casts the active pointer against the panel, shows a hit marker and hover tooltip,
+ * the controller rebuilds the palette adapter (palette/scenePaletteAdapter.ts) when the definition version changes (never by comparing content), ray-casts the active pointer against the panel, shows a hit marker and hover tooltip,
  * and invokes the hit item's action on the select-pressed edge reported by scenePointers.ts. Actions are mapped to the ScenePaletteControllerOptions callbacks.
  * All scene objects live in the Three.js world frame, in meters. The controller adds objects to options.scene and removes them in dispose().
  */
@@ -14,7 +14,7 @@ import type { PlacedFlagType } from "../../world-objects/toolObjects";
 import { resolvePaletteTooltipLabel } from "../../ui/paletteTooltips";
 import { roundRect } from "./canvasDrawing";
 import { disposeObject3DWithTextures } from "./runtimeSceneUtils";
-import { createScenePaletteLibraryAdapter } from "./scenePaletteLibraryAdapter";
+import { createScenePaletteAdapter } from "./palette/scenePaletteAdapter";
 import type {
   ScenePaletteInputFrame,
   ScenePalettePlacement,
@@ -162,7 +162,7 @@ export function createScenePaletteController(options: ScenePaletteControllerOpti
   const sceneRayObjects = new Map<string, THREE.Line>();
   const paletteRoot = new THREE.Group();
   paletteRoot.name = "scene-palette-root";
-  const adapter = createScenePaletteLibraryAdapter({
+  const adapter = createScenePaletteAdapter({
     onLeftAction(actionId) {
       if (actionId === "settings") {
         options.onShowSettingsRequested();

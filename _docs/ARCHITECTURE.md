@@ -174,7 +174,7 @@ Input from the mouse/keyboard (`src/render/three/desktopControls.ts`) and from W
 (`src/render/three/xrControls.ts`) is reduced to one `RuntimeInputFrame` per tick. Menus are described once as
 renderer-neutral data (`src/ui/paletteDefinition.ts#createPaletteDefinition`) and drawn by the in-scene palette
 (`src/render/three/scenePaletteController.ts`) on desktop and in VR through the same code path
-(`src/render/three/vrPaletteLibraryAdapter.ts` builds the VR widgets). Commands requested by the UI are plain data
+(`src/render/three/palette/scenePaletteAdapter.ts` builds the VR widgets). Commands requested by the UI are plain data
 (`src/runtime/runtimeCommands.ts`) dispatched by `src/runtime/appCommandDispatcher.ts#createAppCommandDispatcher`.
 
 ## Testing strategy

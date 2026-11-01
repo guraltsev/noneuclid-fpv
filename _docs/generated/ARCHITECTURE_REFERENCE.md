@@ -5,7 +5,7 @@
 
 This reference is produced from the source code. For the *meaning* of the modules — the mathematical model they implement — read [../MATHEMATICAL_MODEL.md](../MATHEMATICAL_MODEL.md) and [../ARCHITECTURE.md](../ARCHITECTURE.md). For every exported symbol see [API_REFERENCE.md](API_REFERENCE.md).
 
-**202 modules, 47,168 lines** under `src/`.
+**213 modules, 47,347 lines** under `src/`.
 
 ## Layers
 
@@ -25,7 +25,7 @@ A module belongs to the layer named by its first path segment under `src/`. "May
 | `interaction` | 4 | 1,537 | `math`, `cell-complex`, `movement`, `world-objects`, `glue` | Renderer-free interaction logic: input frames, aim picking, VR locomotion, XR session state, carried-object portal transitions. |
 | `runtime` | 12 | 2,149 | `math`, `cell-complex`, `diagnostics`, `movement`, `world-objects`, `authoring`, `glue` | Application state, runtime menu state, command dispatch, geometry session/worker, server channel and public API. |
 | `ui` | 6 | 1,320 | `math`, `cell-complex`, `world-objects`, `authoring`, `glue`, `runtime` | Renderer-neutral palette, help, tooltip and input-intent definitions. |
-| `render` | 93 | 23,117 | every lower layer | Three.js / DOM / WebXR rendering and input adapters (the application shell). |
+| `render` | 104 | 23,296 | every lower layer | Three.js / DOM / WebXR rendering and input adapters (the application shell). |
 | `root` | 1 | 213 | every lower layer | Entry point. |
 
 ## Layer dependency graph
@@ -64,14 +64,14 @@ flowchart LR
   movement -->|21| math
   render -->|50| cell_complex
   render -->|14| diagnostics
-  render -->|25| glue
+  render -->|28| glue
   render -->|18| interaction
   render -->|30| math
   render -->|28| movement
-  render -->|22| runtime
-  render -->|8| ui
+  render -->|23| runtime
+  render -->|18| ui
   render -->|7| visibility
-  render -->|72| world_objects
+  render -->|75| world_objects
   root -->|1| authoring
   root -->|2| cell_complex
   root -->|1| diagnostics
@@ -313,6 +313,19 @@ None: every import respects the intended layering.
 | `render/three/geometryComputerMenu.ts` | 156 | Menu logic for the in-world geometry computer, which edits the torus-skew parameters of the world and starts the deformation. | `render/three/runtimeSceneUtils`, `runtime/runtimeMenuState`, `runtime/worldGeometrySession` |
 | `render/three/helpLensRenderer.ts` | 301 | Help panel ("help lens") renderer: shows the current contextual help definition either as a DOM panel (desktop) or as a floating textured plane in front of the camera (XR). | `glue/assetUrls`, `render/three/canvasDrawing`, `ui/helpLensDefinition` |
 | `render/three/measureLengthRenderer.ts` | 104 | Renderer for measured-geodesic-length labels placed in the world. | `render/three/runtimeSceneUtils`, `render/three/worldAxes`, `render/three/worldResultBadge`, `world-objects/measureLengthTool`, `world-objects/toolObjects` |
+| `render/three/palette/adapterTypes.ts` | 81 | Option and handle types of the in-scene palette panel adapter (the contract between the scene palette controller and the panel builders). | `glue/portalPanelMode`, `glue/toolIds`, `runtime/runtimeMenuState`, `ui/paletteDefinition`, `world-objects/toolObjects` |
+| `render/three/palette/header.ts` | 240 | The palette panel header row: left action (plus home and reload on the main page), contextual actions and the right action. | `render/three/palette/adapterTypes`, `render/three/palette/icons`, `render/three/palette/tokens`, `render/three/palette/widgets`, `render/three/vrPaletteHeaderActions`, `ui/paletteDefinition` |
+| `render/three/palette/icons.ts` | 263 | Icon factories of the in-scene palette panel: each wraps an Image, a lucide icon or a small container and records its source in userData.scenePaletteIconSrc for inspection. | `glue/assetUrls`, `glue/toolIds`, `render/three/palette/tokens`, `ui/paletteDefinition`, `world-objects/toolObjects` |
+| `render/three/palette/latticeDiagram.ts` | 218 | The world-deformation lattice diagram shown on the geometry computer page: a small parallelogram of lattice points with labels, drawn with uikit containers. | `render/three/palette/tokens`, `ui/paletteDefinition` |
+| `render/three/palette/pages/debugSettings.ts` | 224 | Settings palette pages: the world, config, debug and comfort settings page and the debug settings page. | `glue/portalPanelMode`, `render/three/palette/adapterTypes`, `render/three/palette/tokens`, `render/three/palette/widgets`, `runtime/runtimeMenuState`, `ui/paletteDefinition` |
+| `render/three/palette/pages/geodesicActions.ts` | 117 | Geodesic cannon palette page: a scrollable list with one row per geodesic. | `render/three/palette/adapterTypes`, `render/three/palette/icons`, `render/three/palette/tokens`, `render/three/palette/widgets`, `ui/paletteDefinition` |
+| `render/three/palette/pages/geometryComputer.ts` | 93 | Geometry computer palette page: target stepping controls, the lattice diagram and the go button. | `render/three/palette/adapterTypes`, `render/three/palette/latticeDiagram`, `render/three/palette/tokens`, `render/three/palette/widgets`, `ui/paletteDefinition` |
+| `render/three/palette/pages/help.ts` | 182 | Help palette pages: the question-mark hub and the paged tutorial and goal pages. | `render/three/palette/adapterTypes`, `render/three/palette/tokens`, `render/three/palette/widgets`, `ui/paletteDefinition` |
+| `render/three/palette/pages/main.ts` | 96 | Main palette page: a row of tool tiles, with the place-flag tile showing the currently selected sign type. | `glue/toolIds`, `render/three/palette/adapterTypes`, `render/three/palette/icons`, `render/three/palette/tokens`, `render/three/palette/widgets`, `ui/paletteDefinition`, `world-objects/toolObjects` |
+| `render/three/palette/pages/signs.ts` | 218 | Sign palette pages: the place-sign options page and the sign editor with its on-panel keyboard. | `render/three/palette/adapterTypes`, `render/three/palette/icons`, `render/three/palette/tokens`, `render/three/palette/widgets`, `ui/paletteDefinition`, `world-objects/toolObjects` |
+| `render/three/palette/scenePaletteAdapter.ts` | 125 | Builds the in-scene tool palette panel as a @pmndrs/uikit component tree from a renderer-neutral PaletteDefinition (src/ui/paletteDefinition.ts). | `render/three/palette/adapterTypes`, `render/three/palette/header`, `render/three/palette/pages/debugSettings`, `render/three/palette/pages/geodesicActions`, `render/three/palette/pages/geometryComputer`, `render/three/palette/pages/help`, `render/three/palette/pages/main`, `render/three/palette/pages/signs`, `render/three/palette/tokens`, `render/three/palette/widgets`, `render/three/scenePaletteLayout`, `ui/paletteDefinition` |
+| `render/three/palette/tokens.ts` | 34 | Color tokens (CSS hex strings) shared by every part of the in-scene palette panel. | — |
+| `render/three/palette/widgets.ts` | 309 | Generic uikit widgets of the in-scene palette panel (buttons, toggles, option grids, section labels, the interactive surface) and disposal of rendered trees. | `render/three/palette/icons`, `render/three/palette/tokens` |
 | `render/three/pathTraceOverlay.ts` | 173 | Debug overlay that draws a traced portal path through the cells it crosses. | `cell-complex/portalPaths`, `cell-complex/prismCells`, `math/rigidTransform3`, `render/three/runtimeSceneUtils`, `render/three/worldAxes`, `runtime/appState` |
 | `render/three/placedFlagRenderer.ts` | 378 | Renderer for player-placed text signs ("flags"): a glTF sign model with the user's message drawn on both faces. | `render/three/preparedWorldAssets`, `render/three/worldAxes`, `world-objects/placedFlags`, `world-objects/toolObjects` |
 | `render/three/playerRoverModel.ts` | 100 | Render model for the player's own rover avatar. | `math/rigidTransform3`, `movement/playerPose`, `render/three/preparedWorldAssets`, `render/three/runtimeObjectRenderRecords`, `render/three/worldAxes`, `world-objects/library` |
@@ -342,10 +355,9 @@ None: every import respects the intended layering.
 | `render/three/runtimeSceneUtils.ts` | 192 | Small scene-graph, geometry, and pose helpers shared by the app shell. | `cell-complex/prismCells`, `cell-complex/worldGeometryDeformations`, `math/vec3`, `movement/playerBody`, `render/three/debugCollisionWireframes`, `runtime/appState`, `world-objects/runtimeObjectRegistry` |
 | `render/three/sceneColors.ts` | 8 | Shared scene colour constants for the Three.js renderer. | — |
 | `render/three/sceneLighting.ts` | 70 | Lighting rig for the stylized (non-physical) look of the scene. | — |
-| `render/three/scenePaletteController.ts` | 623 | Controller that owns the in-scene palette's scene graph and routes pointer input to palette actions, for both desktop and XR. | `glue/portalPanelMode`, `glue/toolIds`, `render/three/canvasDrawing`, `render/three/runtimeSceneUtils`, `render/three/scenePaletteInput`, `render/three/scenePaletteLibraryAdapter`, `render/three/scenePointers`, `runtime/runtimeMenuState`, `ui/paletteDefinition`, `ui/paletteTooltips`, `world-objects/toolObjects` |
+| `render/three/scenePaletteController.ts` | 623 | Controller that owns the in-scene palette's scene graph and routes pointer input to palette actions, for both desktop and XR. | `glue/portalPanelMode`, `glue/toolIds`, `render/three/canvasDrawing`, `render/three/palette/scenePaletteAdapter`, `render/three/runtimeSceneUtils`, `render/three/scenePaletteInput`, `render/three/scenePointers`, `runtime/runtimeMenuState`, `ui/paletteDefinition`, `ui/paletteTooltips`, `world-objects/toolObjects` |
 | `render/three/scenePaletteInput.ts` | 70 | Renderer-side input contract for the in-scene palette, shared by the desktop and XR input paths. | — |
 | `render/three/scenePaletteLayout.ts` | 84 | Shared panel dimensions for the in-scene palette, used by both the canvas rendering and the pointer clamping. | — |
-| `render/three/scenePaletteLibraryAdapter.ts` | 11 | Stable public entry point for the in-scene palette library adapter. | `render/three/vrPaletteLibraryAdapter` |
 | `render/three/scenePointers.ts` | 148 | Per-source ray pointers that drive hover and select events on the XR scene palette (and desktop pointer sources). | `render/three/scenePaletteInput` |
 | `render/three/staticAssetRenderRoot.ts` | 38 | Render root of a static asset: the template that the runtime-object render path turns into instanced meshes drawn at the asset's registry pose. | `cell-complex/specs`, `math/rigidTransform3`, `render/three/buildDecorationMesh`, `render/three/preparedWorldAssets`, `render/three/worldAxes` |
 | `render/three/staticObjectCollisionWireframes.ts` | 37 | Debug overlay builder for the collision shapes of static asset objects in one cell. | `render/three/debugCollisionWireframes`, `world-objects/runtimeObjectBase`, `world-objects/runtimeObjectRegistry` |
@@ -355,7 +367,6 @@ None: every import respects the intended layering.
 | `render/three/visiblePortalPaths.ts` | 91 | Three.js adapter of the renderer-free portal visibility pass (`visibility/visiblePortalPaths`): it takes `THREE.Camera`s, refreshes their matrices, and returns the visible paths with `rootFromDestinationMatrix` as a `TH… | `math/rigidTransform3`, `render/three/worldAxes`, `visibility/visiblePortalPaths` |
 | `render/three/vrComfort.ts` | 205 | Comfort settings for VR locomotion and the anti-nausea vignette. | `glue/vrComfortOptions`, `interaction/inputFrame` |
 | `render/three/vrPaletteHeaderActions.ts` | 56 | Maps the palette definition's header actions onto the layout used by the in-scene (XR and desktop) palette header. | `ui/paletteDefinition` |
-| `render/three/vrPaletteLibraryAdapter.ts` | 2010 | Builds the in-scene tool palette panel as a @pmndrs/uikit component tree from a renderer-neutral PaletteDefinition (src/ui/paletteDefinition.ts). | `glue/assetUrls`, `glue/portalPanelMode`, `glue/toolIds`, `render/three/scenePaletteLayout`, `render/three/vrPaletteHeaderActions`, `runtime/runtimeMenuState`, `ui/paletteDefinition`, `world-objects/toolObjects` |
 | `render/three/vrPalettePlacement.ts` | 132 | Placement math for the XR palette: where the panel floats relative to the head and how it faces the viewer. | — |
 | `render/three/worldAxes.ts` | 91 | Conversion between the simulation's world frame and the Three.js scene frame. | `math/rigidTransform3`, `math/vec3` |
 | `render/three/worldResultBadge.ts` | 168 | Floating text badge ("pill" with an optional downward pointer) used as an in-world result label, for example for measured lengths and protractor angles. | `render/three/canvasDrawing` |

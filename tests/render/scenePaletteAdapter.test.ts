@@ -1,5 +1,5 @@
 /**
- * Scene palette library adapter (src/render/three/scenePaletteLibraryAdapter.ts): turns a `PaletteDefinition`
+ * Scene palette adapter (src/render/three/palette/scenePaletteAdapter.ts): turns a `PaletteDefinition`
  * (src/ui/paletteDefinition.ts) into a Three.js object tree the VR panel renders, tagging every interactive mesh
  * with a `scenePaletteItemId` (and `scenePaletteAction` where it is clickable) that the input layer reads back.
  * This file covers only what the adapter itself decides that `PaletteDefinition` does not: which icon goes with
@@ -15,12 +15,12 @@ import {
   showRuntimeMenuGeometryComputerActions,
 } from "../../src/runtime/runtimeMenuState";
 import { publicAssetUrl } from "../../src/glue/assetUrls";
-import { createScenePaletteLibraryAdapter } from "../../src/render/three/scenePaletteLibraryAdapter";
+import { createScenePaletteAdapter } from "../../src/render/three/palette/scenePaletteAdapter";
 import { createPaletteDefinition } from "../../src/ui/paletteDefinition";
 
-describe("scenePaletteLibraryAdapter", () => {
+describe("scenePaletteAdapter", () => {
   it("maps each main tool and its nested options to the right icon", () => {
-    const adapter = createScenePaletteLibraryAdapter(createNoopOptions());
+    const adapter = createScenePaletteAdapter(createNoopOptions());
     adapter.setDefinition(createPaletteDefinition(createRuntimeMenuState({ selectedWorldId: "cube" })));
 
     const itemIds = collectPaletteItemIds(adapter.root);
@@ -36,7 +36,7 @@ describe("scenePaletteLibraryAdapter", () => {
   });
 
   it("maps each geodesic emitter action to the right icon", () => {
-    const adapter = createScenePaletteLibraryAdapter(createNoopOptions());
+    const adapter = createScenePaletteAdapter(createNoopOptions());
     adapter.setDefinition(createPaletteDefinition(showRuntimeMenuGeodesicCannonActions(
       createRuntimeMenuState({ selectedWorldId: "cube" }),
       { cannonId: "cannon-a", geodesicIds: ["g-a"], canTieAndDetach: true },
@@ -52,7 +52,7 @@ describe("scenePaletteLibraryAdapter", () => {
   });
 
   it("omits the tie-and-detach action when it is unavailable", () => {
-    const adapter = createScenePaletteLibraryAdapter(createNoopOptions());
+    const adapter = createScenePaletteAdapter(createNoopOptions());
     adapter.setDefinition(createPaletteDefinition(showRuntimeMenuGeodesicCannonActions(
       createRuntimeMenuState({ selectedWorldId: "cube" }),
       { cannonId: "cannon-a", geodesicIds: ["g-a"], canTieAndDetach: false },
@@ -65,7 +65,7 @@ describe("scenePaletteLibraryAdapter", () => {
   });
 
   it("renders locked geodesic emitter actions with a lock segment marker", () => {
-    const adapter = createScenePaletteLibraryAdapter(createNoopOptions());
+    const adapter = createScenePaletteAdapter(createNoopOptions());
     adapter.setDefinition(createPaletteDefinition(showRuntimeMenuGeodesicCannonActions(
       createRuntimeMenuState({ selectedWorldId: "cube" }),
       { cannonId: "cannon-a", geodesicIds: ["g-a"], lockedGeodesicIds: ["g-a"] },
@@ -90,7 +90,7 @@ describe("scenePaletteLibraryAdapter", () => {
 
 
   it("renders a sign's keyboard, cursor and preview, fixed keys only, with a trash action", () => {
-    const adapter = createScenePaletteLibraryAdapter(createNoopOptions());
+    const adapter = createScenePaletteAdapter(createNoopOptions());
     const definition = createPaletteDefinition(showRuntimeMenuEditSign(
       createRuntimeMenuState({ selectedWorldId: "cube" }),
       { flagId: "sign-a", message: "A\nB" },
@@ -124,7 +124,7 @@ describe("scenePaletteLibraryAdapter", () => {
   });
 
   it("renders a fundamental tile picture on geometry computer action menus", () => {
-    const adapter = createScenePaletteLibraryAdapter(createNoopOptions());
+    const adapter = createScenePaletteAdapter(createNoopOptions());
     adapter.setDefinition(createPaletteDefinition(showRuntimeMenuGeometryComputerActions(
       createRuntimeMenuState({ selectedWorldId: "torus" }),
       {
@@ -244,7 +244,7 @@ function collectSignPreviewLines(root: { readonly children: readonly any[]; read
   return lines.sort((left, right) => left.index - right.index).map((line) => line.text);
 }
 
-function createNoopOptions(): Parameters<typeof createScenePaletteLibraryAdapter>[0] {
+function createNoopOptions(): Parameters<typeof createScenePaletteAdapter>[0] {
   return {
     onLeftAction: () => undefined,
     onRightAction: () => undefined,

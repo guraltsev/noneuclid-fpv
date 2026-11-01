@@ -1,12 +1,12 @@
 /**
- * `tests/ui/paletteDefinition.test.ts` — unit tier.
+ * `tests/ui/paletteDefinition.test.ts` â€” unit tier.
  *
  * `createPaletteDefinition` turns a `RuntimeMenuState` plus the app config into the renderer-neutral
- * `PaletteDefinition` both the desktop DOM menu and the VR panel (`scenePaletteLibraryAdapter`) draw from: which
+ * `PaletteDefinition` both the desktop DOM menu and the VR panel (`scenePaletteAdapter`) draw from: which
  * options a page offers, which are disabled, and which sections the app config hides. These tests check that
  * decision directly, without going through either renderer. The scene adapter's own rendering mechanism (icon
  * lookup, the on-screen sign keyboard's key choice, suppressing an action for a locked geodesic) is covered in
- * `tests/render/scenePaletteLibraryAdapter.test.ts` instead, since none of it is decided here.
+ * `tests/render/scenePaletteAdapter.test.ts` instead, since none of it is decided here.
  */
 import { describe, expect, it } from "vitest";
 import { normalizeAppConfig } from "../../src/glue/appConfig";

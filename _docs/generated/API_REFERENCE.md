@@ -2003,6 +2003,138 @@ Renderer for measured-geodesic-length labels placed in the world.
 | interface | `MeasuredGeodesicLengthRuntime` | Lifecycle handle for one measured-length label in the scene. |
 | function | `createMeasuredGeodesicLengthRuntime` | Creates the runtime that renders `object`'s measured length as a floating label. |
 
+### `render/three/palette/adapterTypes.ts`
+
+Option and handle types of the in-scene palette panel adapter (the contract between the scene palette controller and the panel builders).
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `ScenePaletteAdapterOptions` | Callbacks the palette panel invokes when the user activates a control; supplied by scenePaletteController.ts, which forwards them from createThreeApp#shell. |
+| interface | `ScenePaletteAdapter` | Handle to a built palette panel: a uikit root plus content, visibility, animation and disposal controls. |
+
+### `render/three/palette/header.ts`
+
+The palette panel header row: left action (plus home and reload on the main page), contextual actions and the right action.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| function | `buildHeader` | Header row: left (action, plus home/reload on the main page and a confirm tooltip), center contextual actions, right action. |
+
+### `render/three/palette/icons.ts`
+
+Icon factories of the in-scene palette panel: each wraps an Image, a lucide icon or a small container and records its source in userData.scenePaletteIconSrc for inspection.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| function | `createToolIcon` | Icon for a tool id; unknown ids get an invisible 64x64 placeholder. |
+| function | `createGeodesicCannonActionIcon` | Icon of a geodesic cannon header action: a plus for "add-geodesic", the carry or aim image otherwise. |
+| function | `createUnlinkIcon` | Unlink image (24 px) used by the tie-and-detach action. |
+| function | `createLockedGeodesicSegmentStatus` | Composite emitter-line-lock-line-emitter glyph shown in place of Aim for locked geodesics. |
+| function | `createSignImage` | Square image of a sign type at `size` pixels. |
+| function | `createHeaderIcon` | Lucide icon for a header action id; "none" has no icon. |
+
+### `render/three/palette/latticeDiagram.ts`
+
+The world-deformation lattice diagram shown on the geometry computer page: a small parallelogram of lattice points with labels, drawn with uikit containers.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| function | `createWorldDeformationDiagram` | Draw the current (white) and target (green) deformation parallelograms into a 900x280 pixel box. |
+
+### `render/three/palette/pages/debugSettings.ts`
+
+Settings palette pages: the world, config, debug and comfort settings page and the debug settings page.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| function | `buildDebugSettingsContent` | Debug settings page: log level, overlay toggles (items only when the overlay is on), portal options, wireframes, aim outlines and an optional copy-URL button. |
+| function | `buildSettingsContent` | Settings page: world, config, debug and comfort sections (the fallthrough of the page dispatcher). |
+
+### `render/three/palette/pages/geodesicActions.ts`
+
+Geodesic cannon palette page: a scrollable list with one row per geodesic.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| function | `buildGeodesicCannonActionsContent` | Geodesic cannon page: a scrollable list with one row per geodesic (label, locked-status icon or Aim button, delete button). |
+
+### `render/three/palette/pages/geometryComputer.ts`
+
+Geometry computer palette page: target stepping controls, the lattice diagram and the go button.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| function | `buildGeometryComputerActionsContent` | Geometry computer page: status text, deformation diagram, coordinate readout, a 4-column grid of step buttons and a Go button. |
+
+### `render/three/palette/pages/help.ts`
+
+Help palette pages: the question-mark hub and the paged tutorial and goal pages.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| function | `buildQuestionHelpContent` | Help hub page: title, body text and one button per option, dispatching to the tutorial or goal callback. |
+| function | `buildPagedHelpContent` | Tutorial or goal page: title, body, and previous / page label / next controls; disabled arrows are inert. |
+
+### `render/three/palette/pages/main.ts`
+
+Main palette page: a row of tool tiles, with the place-flag tile showing the currently selected sign type.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| function | `buildMainContent` | Main page: a row of tool tiles, with the place-flag tile showing the currently selected sign type. |
+
+### `render/three/palette/pages/signs.ts`
+
+Sign palette pages: the place-sign options page and the sign editor with its on-panel keyboard.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| function | `buildPlaceSignOptionsContent` | Sign type chooser: one tile per flag type option. |
+| function | `buildEditSignContent` | Sign editor: text preview, four key rows from signKeyboardRows, and an Enter / Space / Backspace row. |
+
+### `render/three/palette/scenePaletteAdapter.ts`
+
+Builds the in-scene tool palette panel as a @pmndrs/uikit component tree from a renderer-neutral PaletteDefinition (src/ui/paletteDefinition.ts).
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| function | `createScenePaletteAdapter` | Creates the in-scene palette panel: an empty, hidden uikit root at the standard palette size, ready for setDefinition. |
+
+### `render/three/palette/tokens.ts`
+
+Color tokens (CSS hex strings) shared by every part of the in-scene palette panel.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| const | `surfaceColor` | Panel background. |
+| const | `sectionColor` | Background of a section or page card on the panel. |
+| const | `borderColor` | Outline of the panel, cards and option buttons. |
+| const | `actionColor` | Background of an enabled action button. |
+| const | `activeColor` | Background of a selected tile, option or toggle. |
+| const | `inactiveColor` | Background of an unselected tile, option or toggle. |
+| const | `textColor` | Main text and icon color. |
+| const | `mutedTextColor` | Text color of secondary lines. |
+| const | `scrollbarColor` | Scrollbar thumb color of the scrolling pages. |
+| const | `scrollbarBorderColor` | Scrollbar border color of the scrolling pages. |
+
+### `render/three/palette/widgets.ts`
+
+Generic uikit widgets of the in-scene palette panel (buttons, toggles, option grids, section labels, the interactive surface) and disposal of rendered trees.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| function | `createSettingsScrollContainer` | Fixed 400 pixel tall scrolling column with a styled scrollbar. |
+| function | `createSectionLabel` | Muted section heading text that shrinks and wraps within its row. |
+| function | `createChoiceSection` | Labelled single-choice option grid. |
+| function | `createOptionGrid` | Two-column grid of option buttons; the selected one is highlighted. |
+| function | `createToggleRow` | Label plus On/Off toggle. |
+| function | `createToggleButton` | On/Off button; clicking calls onToggled with the inverted value of the state captured at build time (state is not read back). |
+| function | `createActionButton` | Generic labelled action button with an optional home/reload icon. |
+| function | `createHeaderActionButton` | Square icon button for contextual header actions; disabled ones are dimmed and inert. |
+| function | `createInteractiveSurface` | Base clickable Container. |
+| function | `createButtonText` | Bold label text that wraps and may shrink. |
+| function | `disposeRenderedChildren` | Dispose each top-level child tree. |
+
 ### `render/three/pathTraceOverlay.ts`
 
 Debug overlay that draws a traced portal path through the cells it crosses.
@@ -2400,12 +2532,6 @@ Shared panel dimensions for the in-scene palette, used by both the canvas render
 | const | `scenePalettePanelBorderRadiusMeters` | Physical corner radius of the panel in meters. |
 | function | `clampScenePaletteLocalPoint` | Clamps a panel-local point (meters, origin at panel center) to the rounded-rectangle outline of the palette panel. |
 
-### `render/three/scenePaletteLibraryAdapter.ts`
-
-Stable public entry point for the in-scene palette library adapter.
-
-_No exports._
-
 ### `render/three/scenePointers.ts`
 
 Per-source ray pointers that drive hover and select events on the XR scene palette (and desktop pointer sources).
@@ -2495,19 +2621,6 @@ Maps the palette definition's header actions onto the layout used by the in-scen
 | --- | --- | --- |
 | interface | `VrPaletteHeaderActions` | The two header buttons the in-scene palette actually renders. |
 | function | `resolveVrPaletteHeaderActions` | Resolves the left and right header actions for the in-scene palette from a palette definition. |
-
-### `render/three/vrPaletteLibraryAdapter.ts`
-
-Builds the in-scene tool palette panel as a @pmndrs/uikit component tree from a renderer-neutral PaletteDefinition (src/ui/paletteDefinition.ts).
-
-| Kind | Name | Summary |
-| --- | --- | --- |
-| interface | `VrPaletteLibraryAdapterOptions` | Callbacks the palette panel invokes when the user activates a control; supplied by scenePaletteController.ts, which forwards them from createThreeApp#shell. |
-| interface | `VrPaletteLibraryAdapter` | Handle to a built palette panel: a uikit root plus content, visibility, animation and disposal controls. |
-| type | `ScenePaletteLibraryAdapterOptions` | Renderer-neutral alias of VrPaletteLibraryAdapterOptions used by the desktop and XR palette controller. |
-| type | `ScenePaletteLibraryAdapter` | Renderer-neutral alias of VrPaletteLibraryAdapter used by the desktop and XR palette controller. |
-| function | `createVrPaletteLibraryAdapter` | Creates the in-scene palette panel: an empty, hidden uikit root at the standard palette size, ready for setDefinition. |
-| const | `createScenePaletteLibraryAdapter` | Renderer-neutral name for createVrPaletteLibraryAdapter, used by scenePaletteController.ts. |
 
 ### `render/three/vrPalettePlacement.ts`
 
