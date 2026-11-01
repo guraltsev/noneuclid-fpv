@@ -740,12 +740,10 @@ Endpoint attachments of geodesic intervals: lookup by anchor, re-attachment, lif
 | Kind | Name | Summary |
 | --- | --- | --- |
 | function | `getGeodesicEndpointAttachmentsForAnchor` | Lists every interval endpoint attachment (start or end of any interval) whose anchor is `anchorObjectId`. |
-| function | `getGeodesicEndpoints` | Returns `[start, end]` attachments of the interval `geodesicId`, or `undefined` if no such interval exists. |
 | function | `replaceGeodesicEndpointAttachment` | Re-attaches one endpoint role of an interval to another anchor object and returns the updated interval. |
 | function | `getGeodesicPortalWord` | Returns the stored portal word of an interval (ordered `start` -> `end`), or `undefined` if `geodesicId` is not an interval. |
 | function | `liftGeodesicEndpoint` | Develops an interval into the source endpoint's cell: pulls the opposite endpoint back through the inverse portal transforms. |
 | function | `liftGeodesicEndpointWithAnchors` | Lifts the far endpoint of an interval into the source cell, with candidate anchors that may differ from the registry. |
-| function | `geodesicHasNonzeroLiftedDisplacement` | True when the interval's lifted start-to-end chord is at least `GEODESIC_MIN_LENGTH_METERS` long (horizontally). |
 | function | `resolveGeodesicEndpointSelectionFromSegmentHit` | Maps a clicked segment (by id) to the endpoint attachment of its half, or `undefined` if it is not a half-labelled segment of an existing interval. |
 | function | `portalWordMatchesCurrentEndpointCells` | True when the interval's portal word leads from the start anchor's cell to the end anchor's cell. |
 | function | `portalWordMatchesEndpointCellsWithAnchors` | Like `portalWordMatchesCurrentEndpointCells`, with candidate anchors that may differ from the registry. |
@@ -783,7 +781,6 @@ Interval rebuilds: realizing an interval's lifted chord, aiming free geodesics, 
 | function | `rebuildLockedGeodesicFromEndpointsAndPortalWordDetailed` | Like `rebuildLockedGeodesicFromEndpointsAndPortalWord`, and also returns how the chord was realized (`undefined` when `geodesicId` is not an interval), so that the caller can tell a forbidden-zone failure from the other… |
 | function | `updateLockedGeodesicPortalWordForCarriedAnchorTraversal` | Extends an interval's stored portal word with one portal crossing made by a carried anchor, and saves it. |
 | function | `updateLockedGeodesicPortalWordForCarriedAnchorTraversals` | Same as {@link updateLockedGeodesicPortalWordForCarriedAnchorTraversal} for a chain of traversals the carried anchor made in one frame, in order. |
-| function | `updatePortalWordForMovedEndpoint` | Returns the interval's portal word after one of its endpoints crossed a portal, or `undefined` if the result is inconsistent. |
 | function | `previewRebuildGeodesicInterval` | Computes the segments an interval would have, without touching the registry (rollback-safe). |
 | interface | `GeodesicIntervalPreview` | A previewed interval: the build result plus the traces it was built from, so that a caller can commit them without tracing again. |
 
@@ -844,7 +841,6 @@ Geodesic emitters ("cannons"), geodesic intervals and curve shortening on a glue
 | function | `createCurveShorteningPairObject` | Builds a curve-shortening pair object (see `CurveShorteningPairObject`); `state` defaults to `"moving"`. |
 | function | `getGeodesicSegmentEnd` | Returns the segment's end point, `start + direction * lengthMeters`, in the segment's cell frame (meters). |
 | function | `canExtendGeodesicSegment` | True unless the segment ended at a wall, forbidden zone or emitter (those terminals cannot be continued). |
-| function | `resolveGeodesicCannonAimYawRadians` | Yaw (radians, normalized by `sanitizeYaw`) from the cannon toward a cell-local target point. |
 | function | `getGeodesicCannonEmitterPoint` | Point where the cannon's beam starts, in the cannon's cell frame. |
 | function | `getOppositeEndRole` | The other endpoint role: `start` for `end` and `end` for `start`. |
 | function | `directionFromYaw` | Unit horizontal direction of a yaw (radians counter-clockwise from +x). |
@@ -1001,16 +997,13 @@ Placed flags (signs): player-placed wooden signs carrying a short text label.
 | const | `defaultPlacedFlagTextColor` | Default sign text color (CSS hex). |
 | const | `placedFlagMaxMessageLength` | Maximum number of characters (code points) in a sign message. |
 | interface | `CreatePlacedFlagOptions` | Inputs for createPlacedFlagObject. |
-| interface | `PlaceFlagFromAimRequest` | Request to place a flag where the player's view ray hits the floor. |
 | interface | `PlaceFlagAtFloorPointRequest` | Request to place a flag at a known floor point. |
 | interface | `PlaceFlagResult` | Outcome of a placement attempt: on success `placed` is true and `object` is the new (already registered) flag. |
-| function | `isPlacedFlagType` | Type guard: true when the string names a known sign type. |
 | function | `sanitizePlacedFlagMessage` | Normalizes a sign message: CRLF/CR become LF, runs of non-newline whitespace become a single space, and the result is truncated to `placedFlagMaxMessageLength` code points. |
 | function | `defaultPlacedFlagMessage` | Chooses the next default sign text for a flag type: the type's prefix ("A" or "B") followed by one more than the largest existing number among `existingObjects` whose message is exactly prefix+digits. |
 | function | `createPlacedFlagObject` | Creates a flag record with default collision, tooltip and edit interaction. |
 | function | `updatePlacedFlagMessage` | Returns a copy of the flag with a sanitized message. |
 | function | `placedFlagToDynamicObjectState` | Returns the flag's cell id, pose and collision as a DynamicObjectState for collision queries. |
-| function | `placeFlagFromAim` | Places a flag where the view ray meets the floor plane z = 0 of the given cell. |
 | function | `placeFlagAtFloorPoint` | Places a flag at a floor point, registering it on success. |
 
 ### `world-objects/protractorTool.ts`
@@ -2025,7 +2018,6 @@ Render sources and per-frame render records for geodesic cannons, geodesic segme
 | const | `geodesicRayPostAssetFloorOffsetMeters` | Lifts the loaded post model so its base sits on the floor (meters, Three.js y); not applied to the fallback. |
 | const | `geodesicRayEmitterPosition` | Position of the lightsaber (beam emission point) in the cannon's local Three.js frame, meters; y matches the beam height used for aiming and ray tracing. |
 | function | `createGeodesicRuntimeRenderSources` | Builds all source meshes for geodesic objects: four segment ribbon variants, cannon post, cannon head and intersection balloon. |
-| function | `getGeodesicRayArchetypeKeys` | Filters `sources` down to the archetype keys of cannon post and head meshes. |
 | interface | `GeodesicBodyPlacement` | A body part of a geodesic object: meshes drawn at a pose of the object (the cannon post, a cannon head, an intersection balloon). |
 | function | `collectGeodesicBodyPlacements` | The body parts of one geodesic object, in drawing order (none for a segment, and none when `geodesicArchetypeKeys` has no matching key). |
 | function | `collectGeodesicRuntimeRenderRecords` | Produces the render records of one geodesic object in its own cell, one per matching archetype mesh (no portal ghosts; the instance sync adds them for the body parts, see {@link collectGeodesicBodyPlacements}). |

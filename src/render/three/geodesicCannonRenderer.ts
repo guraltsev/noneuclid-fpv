@@ -82,22 +82,6 @@ export function createGeodesicRuntimeRenderSources(
 }
 
 /**
- * Filters `sources` down to the archetype keys of cannon post and head meshes.
- *
- * Pass the result to {@link collectGeodesicRuntimeRenderRecords} when rendering cannons.
- */
-export function getGeodesicRayArchetypeKeys(
-  sources: readonly RuntimeObjectRenderSourceMesh[],
-): readonly string[] {
-  return sources
-    .map((source) => source.archetypeKey)
-    .filter((key) =>
-      key.startsWith(`${geodesicRayPostArchetypePrefix}:`) ||
-      key.startsWith(`${geodesicRayHeadArchetypePrefix}:`)
-    );
-}
-
-/**
  * A body part of a geodesic object: meshes drawn at a pose of the object (the cannon post, a cannon head, an intersection balloon).
  *
  * A body part is an ordinary rigid object piece, so it gets portal ghosts exactly like the parts of any other object (the instance sync sends

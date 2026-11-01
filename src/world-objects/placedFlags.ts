@@ -11,7 +11,7 @@ import type { Vec3 } from "../math/vec3";
 import type { RuntimeObjectInteraction } from "./runtimeObjectBase";
 import { runtimeObjectToDynamicObjectState } from "./runtimeObjectBase";
 import type { RuntimeObjectRegistry } from "./runtimeObjectRegistry";
-import { placedFlagTypes, type PlacedFlagObject, type PlacedFlagType } from "./toolObjects";
+import { type PlacedFlagObject, type PlacedFlagType } from "./toolObjects";
 
 /**
  * Maps each sign type to its glTF asset path under the assets directory.
@@ -41,20 +41,6 @@ export interface CreatePlacedFlagOptions {
   readonly flagType: PlacedFlagType;
   readonly message?: string;
   readonly collision?: SimpleCollisionCylinder;
-}
-
-/**
- * Request to place a flag where the player's view ray hits the floor.
- * `eyePosition` and `forward` (unit view direction) are in the local frame of `cellId`, with the floor at z = 0.
- */
-export interface PlaceFlagFromAimRequest {
-  readonly world: CompiledCellComplex;
-  readonly registry: RuntimeObjectRegistry;
-  readonly cellId: string;
-  readonly eyePosition: Vec3;
-  readonly forward: Vec3;
-  readonly flagType: PlacedFlagType;
-  readonly id: string;
 }
 
 /**
@@ -92,13 +78,6 @@ const defaultFlagInteraction: RuntimeObjectInteraction = {
   action: "edit-flag",
   rangeMeters: 2.5,
 };
-
-/**
- * Type guard: true when the string names a known sign type.
- */
-export function isPlacedFlagType(value: string): value is PlacedFlagType {
-  return (placedFlagTypes as readonly string[]).includes(value);
-}
 
 /**
  * Normalizes a sign message: CRLF/CR become LF, runs of non-newline whitespace become a single space, and the result is truncated to `placedFlagMaxMessageLength` code points.
@@ -168,42 +147,6 @@ export function updatePlacedFlagMessage(object: PlacedFlagObject, message: strin
  */
 export function placedFlagToDynamicObjectState(object: PlacedFlagObject): DynamicObjectState {
   return runtimeObjectToDynamicObjectState(object);
-}
-
-/**
- * Places a flag where the view ray meets the floor plane z = 0 of the given cell.
- * Fails with "no-floor-hit" if the ray is not pointing downward by more than 0.02 (forward.z >= -0.02) or the hit is farther than 8 m; otherwise delegates to placeFlagAtFloorPoint. The ray is intersected only within this cell, without following portals.
- */
-export function placeFlagFromAim(request: PlaceFlagFromAimRequest): PlaceFlagResult {
-  const cell = request.world.cellsById.get(request.cellId);
-  if (!cell) {
-    return { placed: false, reason: "missing-cell" };
-  }
-
-  if (request.forward.z >= -0.02) {
-    return { placed: false, reason: "no-floor-hit" };
-  }
-
-  // Ray/plane intersection with the floor z = 0: eye.z + t * forward.z = 0.
-  const distance = -request.eyePosition.z / request.forward.z;
-  if (!Number.isFinite(distance) || distance <= 0 || distance > 8) {
-    return { placed: false, reason: "no-floor-hit" };
-  }
-
-  const floorPoint = {
-    x: request.eyePosition.x + request.forward.x * distance,
-    y: request.eyePosition.y + request.forward.y * distance,
-    z: 0,
-  };
-  return placeFlagAtFloorPoint({
-    world: request.world,
-    registry: request.registry,
-    cellId: request.cellId,
-    eyePosition: request.eyePosition,
-    floorPoint,
-    flagType: request.flagType,
-    id: request.id,
-  });
 }
 
 /**

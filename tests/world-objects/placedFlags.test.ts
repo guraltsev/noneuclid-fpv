@@ -1,10 +1,10 @@
 /**
  * `tests/world-objects/placedFlags.test.ts` — unit tier.
  *
- * A placed flag is a wooden-sign world object a player authors in place: `placeFlagAtFloorPoint`/`placeFlagFromAim`
- * place one at a floor point or along an aim ray, with numbered default text continuing from existing flags of the
+ * A placed flag is a wooden-sign world object a player authors in place: `placeFlagAtFloorPoint`
+ * places one at a floor point, with numbered default text continuing from existing flags of the
  * same type; its message is sanitized (clamped length, newlines preserved, other whitespace normalized). These
- * tests check type acceptance, message sanitizing, default-text numbering, placement and orientation toward the
+ * tests check message sanitizing, default-text numbering, placement and orientation toward the
  * eye, font colour updates, and conversion to a dynamic-object state for collision.
  */
 import { describe, expect, it } from "vitest";
@@ -14,21 +14,13 @@ import { identityRigidTransform3, transformDirection3 } from "../../src/math/rig
 import {
   createPlacedFlagObject,
   defaultPlacedFlagMessage,
-  isPlacedFlagType,
   placeFlagAtFloorPoint,
-  placeFlagFromAim,
   placedFlagToDynamicObjectState,
   sanitizePlacedFlagMessage,
 } from "../../src/world-objects/placedFlags";
 import { createRuntimeObjectRegistry } from "../../src/world-objects/runtimeObjectRegistry";
 
 describe("placedFlags", () => {
-  it("accepts the two wooden sign flag types", () => {
-    expect(isPlacedFlagType("WoodenSign1")).toBe(true);
-    expect(isPlacedFlagType("WoodenSign2")).toBe(true);
-    expect(isPlacedFlagType("MapMarker")).toBe(false);
-  });
-
   it("clamps messages to twenty characters", () => {
     expect(sanitizePlacedFlagMessage("1234567890123456789012345")).toBe("12345678901234567890");
   });
@@ -83,21 +75,21 @@ describe("placedFlags", () => {
       }),
     ]);
 
-    const sign1Result = placeFlagFromAim({
+    const sign1Result = placeFlagAtFloorPoint({
       world,
       registry,
       cellId: "room",
       eyePosition: { x: -1.5, y: -2, z: 1.6 },
-      forward: { x: 0, y: 0, z: -1 },
+      floorPoint: { x: -1.5, y: -2, z: 0 },
       flagType: "WoodenSign1",
       id: "flag-new-a",
     });
-    const sign2Result = placeFlagFromAim({
+    const sign2Result = placeFlagAtFloorPoint({
       world,
       registry,
       cellId: "room",
       eyePosition: { x: 1.5, y: -2, z: 1.6 },
-      forward: { x: 0, y: 0, z: -1 },
+      floorPoint: { x: 1.5, y: -2, z: 0 },
       flagType: "WoodenSign2",
       id: "flag-new-b",
     });

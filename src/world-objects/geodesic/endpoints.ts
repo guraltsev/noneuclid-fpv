@@ -4,7 +4,7 @@
 import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex";
 import { transformPoint3 } from "../../math/rigidTransform3";
 import type { RuntimeObjectRegistry, RuntimeWorldObject } from "../runtimeObjectRegistry";
-import { GEODESIC_MIN_LENGTH_METERS, type GeodesicEndpointAttachment, type GeodesicEndpointSelection, type GeodesicEndRole, type GeodesicIntervalObject, type GeodesicPortalTraversal, intersectionTolerance, type LiftedGeodesicEndpoint } from "./objects";
+import { type GeodesicEndpointAttachment, type GeodesicEndpointSelection, type GeodesicEndRole, type GeodesicIntervalObject, type GeodesicPortalTraversal, type LiftedGeodesicEndpoint } from "./objects";
 import { canObjectAttachGeodesics, getAnchorBeamPoint } from "./anchors";
 import { reverseGeodesicPortalWord } from "./portalWord";
 import { inversePortalTransform } from "./development";
@@ -23,15 +23,6 @@ export function getGeodesicEndpointAttachmentsForAnchor(
   return registry.getObjectsOfKind("geodesic-interval")
     .flatMap((interval) => [interval.start, interval.end])
     .filter((attachment) => attachment.anchorObjectId === anchorObjectId);
-}
-
-/** Returns `[start, end]` attachments of the interval `geodesicId`, or `undefined` if no such interval exists. */
-export function getGeodesicEndpoints(
-  registry: RuntimeObjectRegistry,
-  geodesicId: string,
-): readonly [GeodesicEndpointAttachment, GeodesicEndpointAttachment] | undefined {
-  const interval = registry.get(geodesicId);
-  return interval?.kind === "geodesic-interval" ? [interval.start, interval.end] : undefined;
 }
 
 /**
@@ -198,27 +189,6 @@ export function liftGeodesicEndpointWithAnchors(input: {
     targetPointInSourceCell,
     portalWordFromSourceToTarget,
   };
-}
-
-/**
- * True when the interval's lifted start-to-end chord is at least `GEODESIC_MIN_LENGTH_METERS` long (horizontally).
- *
- * False also when the lift fails (missing anchors/portals). Used to reject degenerate (point-like) geodesics, e.g. a
- * closed loop that has shrunk to nothing.
- */
-export function geodesicHasNonzeroLiftedDisplacement(input: {
-  readonly world: CompiledCellComplex;
-  readonly registry: RuntimeObjectRegistry;
-  readonly interval: GeodesicIntervalObject;
-}): boolean {
-  const lifted = liftGeodesicEndpoint({ ...input, sourceRole: "start" });
-  if (!lifted) {
-    return false;
-  }
-  return Math.hypot(
-    lifted.targetPointInSourceCell.x - lifted.sourcePoint.x,
-    lifted.targetPointInSourceCell.y - lifted.sourcePoint.y,
-  ) >= GEODESIC_MIN_LENGTH_METERS - intersectionTolerance;
 }
 
 /** Maps a clicked segment (by id) to the endpoint attachment of its half, or `undefined` if it is not a half-labelled segment of an existing interval. */

@@ -646,28 +646,6 @@ export function updateLockedGeodesicPortalWordForCarriedAnchorTraversals(input: 
 }
 
 /**
- * Returns the interval's portal word after one of its endpoints crossed a portal, or `undefined` if the result is inconsistent.
- *
- * `movedRole === "end"` appends `traversal`; `"start"` prepends its inverse. Adjacent inverse traversals are cancelled
- * (so walking back through the same portal restores the old word), then the word must chain from the start anchor's cell
- * to the end anchor's cell as currently stored in the registry. If the other role is on the same anchor (a loop), that role
- * moves too and the word is conjugated. Does not write anything.
- */
-export function updatePortalWordForMovedEndpoint(input: {
-  readonly registry: RuntimeObjectRegistry;
-  readonly interval: GeodesicIntervalObject;
-  readonly movedRole: GeodesicEndRole;
-  readonly traversal: GeodesicPortalTraversal;
-}): readonly GeodesicPortalTraversal[] | undefined {
-  const word = portalWordAfterAnchorCrossing({
-    interval: input.interval,
-    anchorObjectId: input.interval[input.movedRole].anchorObjectId,
-    traversal: input.traversal,
-  });
-  return word && portalWordMatchesCurrentEndpointCells(input.registry, input.interval, word) ? word : undefined;
-}
-
-/**
  * Computes the segments an interval would have, without touching the registry (rollback-safe).
  *
  * Same chord construction as `rebuildDerivedGeodesicSegments`, but anchors can be shadowed by `candidateAnchorsById`

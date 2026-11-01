@@ -15,12 +15,10 @@ import {
   createGeodesicCannonObject,
   geodesicRayBeamHeightMeters,
   geodesicRayBeamStartOffsetMeters,
-  resolveGeodesicCannonAimYawRadians,
 } from "../../../src/world-objects/geodesic/objects";
 import { extendGeodesic, rebuildGeodesicToLength, shootGeodesic } from "../../../src/world-objects/geodesic/cannon";
 import {
   getGeodesicEndpointAttachmentsForAnchor,
-  getGeodesicEndpoints,
   resolveGeodesicEndpointSelectionFromSegmentHit,
 } from "../../../src/world-objects/geodesic/endpoints";
 import { getGeodesicSegments, resolveGeodesicNumber } from "../../../src/world-objects/geodesic/segments";
@@ -93,7 +91,8 @@ describe("geodesic cannon world objects: trace", () => {
     expect(getGeodesicEndpointAttachmentsForAnchor(registry, "cannon-a")).toEqual([
       { geodesicId: "g-a", role: "start", anchorObjectId: "cannon-a" },
     ]);
-    const freeEndId = getGeodesicEndpoints(registry, "g-a")?.[1].anchorObjectId;
+    const interval = registry.get("g-a");
+    const freeEndId = interval?.kind === "geodesic-interval" ? interval.end.anchorObjectId : undefined;
     expect(freeEndId).toBeDefined();
     expect(freeEndId ? getGeodesicEndpointAttachmentsForAnchor(registry, freeEndId) : []).toEqual([
       { geodesicId: "g-a", role: "end", anchorObjectId: freeEndId },
@@ -209,27 +208,6 @@ describe("geodesic cannon world objects: trace", () => {
     expect(first.start.x).toBeCloseTo(-1.5 + geodesicRayBeamStartOffsetMeters);
     expect(first.start.y).toBeCloseTo(0);
     expect(first.start.z).toBeCloseTo(geodesicRayBeamHeightMeters);
-  });
-
-  it("resolves cannon aim yaw from the local euclidean target direction", () => {
-    const cannon = createGeodesicCannonObject({
-      id: "cannon-a",
-      cellId: "a",
-      localPose: yawRigidTransform3(0, { x: 1, y: 1, z: 0 }),
-    });
-
-    expect(resolveGeodesicCannonAimYawRadians(cannon, { x: 1, y: 4, z: 2 })).toBeCloseTo(Math.PI / 2);
-    expect(resolveGeodesicCannonAimYawRadians(cannon, { x: -2, y: 1, z: -1 })).toBeCloseTo(Math.PI);
-  });
-
-  it("does not resolve aim yaw at the same horizontal point as the cannon", () => {
-    const cannon = createGeodesicCannonObject({
-      id: "cannon-a",
-      cellId: "a",
-      localPose: yawRigidTransform3(0, { x: 1, y: 1, z: 0 }),
-    });
-
-    expect(resolveGeodesicCannonAimYawRadians(cannon, { x: 1, y: 1, z: 2 })).toBeUndefined();
   });
 
   it("shortens a segment at a wall hit", () => {

@@ -587,24 +587,6 @@ export function canExtendGeodesicSegment(segment: GeodesicSegmentObject): boolea
     segment.terminal.kind !== "emitter-hit";
 }
 
-/**
- * Yaw (radians, normalized by `sanitizeYaw`) from the cannon toward a cell-local target point.
- *
- * Returns `undefined` if the target is non-finite or horizontally within `intersectionTolerance` of the cannon.
- */
-export function resolveGeodesicCannonAimYawRadians(
-  cannon: GeodesicCannonObject,
-  targetLocalPoint: Vec3,
-): number | undefined {
-  const dx = targetLocalPoint.x - cannon.localPose.translation.x;
-  const dy = targetLocalPoint.y - cannon.localPose.translation.y;
-  if (!Number.isFinite(dx) || !Number.isFinite(dy) || Math.hypot(dx, dy) <= intersectionTolerance) {
-    return undefined;
-  }
-
-  return sanitizeYaw(Math.atan2(dy, dx));
-}
-
 /** Point where the cannon's beam starts, in the cannon's cell frame. */
 export function getGeodesicCannonEmitterPoint(cannon: GeodesicCannonObject): Vec3 {
   return {

@@ -258,8 +258,7 @@ its portal word, so the arc is determined by (anchor positions, word) alone. Thi
 anchor $b$ (in cell $C_k$), the straight arc is the Euclidean segment from $a$ to the *developed* target
 $$\tilde b \;=\; g_1^{-1}\circ g_2^{-1}\circ\cdots\circ g_k^{-1}\,(b)$$
 in the frame of $C_0$ (`src/world-objects/geodesic/endpoints.ts#liftGeodesicEndpoint`; the inverses are applied from the
-last portal back to the first). Its length is $|\tilde b-a|$ (nonzero lift required:
-`src/world-objects/geodesic/endpoints.ts#geodesicHasNonzeroLiftedDisplacement`, minimum
+last portal back to the first). Its length is $|\tilde b-a|$ (the minimum is
 `src/world-objects/geodesic/objects.ts#GEODESIC_MIN_LENGTH_METERS` $=0.15$ m). The direction at $a$ is the direction of
 $\tilde b-a$, and re-tracing from $a$ in that direction for length $|\tilde b-a|$ must reproduce the word —
 this is how `src/world-objects/geodesic/intervals.ts#rebuildLockedGeodesicFromEndpointsAndPortalWord` rebuilds a *locked*
@@ -269,7 +268,7 @@ the arc from the other end: reverse the order and swap source/target of each ste
 **Why words, not just positions.** In a quotient space such as the torus two anchors are joined by infinitely many
 geodesics, distinguished by the sequence of portals crossed. Keeping the word makes a rebuilt arc a continuous
 deformation of the previous one rather than a jump to a different homotopy class
-(`src/world-objects/geodesic/intervals.ts#updatePortalWordForMovedEndpoint` appends the crossed portal p when the `end`
+(`src/world-objects/geodesic/intervals.ts#updateLockedGeodesicPortalWordForCarriedAnchorTraversal` appends the crossed portal p when the `end`
 anchor crosses it, prepends p⁻¹ when the `start` anchor crosses it, and does both when one anchor holds both ends of
 a loop. The loop's word then becomes the conjugate $p^{-1}wp$, the same loop read from the new base point. Words are
 always freely reduced.)

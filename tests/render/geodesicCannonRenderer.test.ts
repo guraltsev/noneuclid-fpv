@@ -21,7 +21,6 @@ import {
   geodesicSegmentMovingArchetypeKey,
   geodesicSegmentTieDetachSelectedArchetypeKey,
   geodesicSegmentArchetypeKey,
-  getGeodesicRayArchetypeKeys,
 } from "../../src/render/three/geodesicCannonRenderer";
 import { createFakePreparedAssets } from "../support/preparedAssets";
 import type {
@@ -90,7 +89,7 @@ describe("geodesic cannon renderer", () => {
 
   it("publishes ray-emitter-on-post records from shared source archetype keys", () => {
     const sources = createGeodesicRuntimeRenderSources();
-    const rayKeys = getGeodesicRayArchetypeKeys(sources);
+    const rayKeys = rayArchetypeKeys(sources);
     const records = collectGeodesicRuntimeRenderRecords(createRayEmitter(), rayKeys);
 
     expect(rayKeys.length).toBeGreaterThan(0);
@@ -104,7 +103,7 @@ describe("geodesic cannon renderer", () => {
 
   it("publishes one laser emitter head record for each geodesic on the same post", () => {
     const sources = createGeodesicRuntimeRenderSources();
-    const rayKeys = getGeodesicRayArchetypeKeys(sources);
+    const rayKeys = rayArchetypeKeys(sources);
     const headKeys = rayKeys.filter((key) => key.startsWith(`${geodesicRayHeadArchetypePrefix}:`));
     const postKeys = rayKeys.filter((key) => key.startsWith(`${geodesicRayPostArchetypePrefix}:`));
     const records = collectGeodesicRuntimeRenderRecords(createRayEmitter({
@@ -117,7 +116,7 @@ describe("geodesic cannon renderer", () => {
 
   it("does not publish laser emitter head records for an empty post", () => {
     const sources = createGeodesicRuntimeRenderSources();
-    const rayKeys = getGeodesicRayArchetypeKeys(sources);
+    const rayKeys = rayArchetypeKeys(sources);
     const headKeys = rayKeys.filter((key) => key.startsWith(`${geodesicRayHeadArchetypePrefix}:`));
     const postKeys = rayKeys.filter((key) => key.startsWith(`${geodesicRayPostArchetypePrefix}:`));
     const records = collectGeodesicRuntimeRenderRecords(createRayEmitter({
@@ -229,4 +228,14 @@ function getSourceMeshWorldBounds(source: { readonly mesh: THREE.Mesh }): THREE.
   const geometry = source.mesh.geometry;
   geometry.computeBoundingBox();
   return geometry.boundingBox!.clone().applyMatrix4(source.mesh.matrixWorld);
+}
+
+// The archetype keys of the cannon post and head meshes among `sources`.
+function rayArchetypeKeys(sources: readonly { readonly archetypeKey: string }[]): readonly string[] {
+  return sources
+    .map((source) => source.archetypeKey)
+    .filter((key) =>
+      key.startsWith(`${geodesicRayPostArchetypePrefix}:`) ||
+      key.startsWith(`${geodesicRayHeadArchetypePrefix}:`)
+    );
 }
