@@ -15,7 +15,7 @@
  * ## Frame loop (`renderFrame`, driven by `renderer.setAnimationLoop`)
  * One call per animation frame, on the main thread, with no re-entrancy. In order:
  * 0. Bookkeeping: `clock.getDelta()` gives `deltaSeconds`; a finished background geometry deformation is
- *    committed first (`commitReadyWorldGeometrySnapshot` -> `commitWorldGeometrySnapshot`), so the rest of the
+ *    committed first (`geometryCommit.commitReady` -> `geometryCommit.commit`), so the rest of the
  *    frame sees one consistent world.
  * 1. Input: `getXrInputFrame` or `getDesktopInputFrame` consume one `RuntimeInputFrame` (XR is used only when
  *    `renderer.xr.isPresenting` and the session state is `active`).
@@ -72,33 +72,27 @@ import { type DebugOptionId, hasActiveDebugOption } from "../../glue/debugOption
 import { type DebugSettings } from "../../glue/debugSettings";
 import { type PortalPanelModeId } from "../../glue/portalPanelMode";
 import { type LaunchOptions } from "../../glue/readLaunchOptions";
-import { yawRigidTransform3 } from "../../math/rigidTransform3";
 import { buildStaticAssetRenderRoot } from "./staticAssetRenderRoot";
 import { simpleCollisionCylinder } from "../../movement/dynamicObject";
 import { movePlayer } from "../../movement/movePlayer";
 import { DEFAULT_PLAYER_EYE_HEIGHT_METERS } from "../../movement/playerBody";
-import { type PlayerPose, playerPoseFromDynamicObject, playerPoseToDynamicObject } from "../../movement/playerPose";
-import { depenetrateDynamicObject } from "../../movement/depenetrateDynamicObject";
-import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex";
+import { type PlayerPose, playerPoseToDynamicObject } from "../../movement/playerPose";
 import { createAppSession, initialObjectIdSerials } from "../../runtime/appSession";
 import { applyRuntimeCommand } from "../../runtime/applyRuntimeCommand";
 import { type RuntimeCommand, type RuntimeEffect } from "../../runtime/runtimeCommands";
 import { createDebugSettingsFromRuntimeMenuState, createRuntimeMenuState } from "../../runtime/runtimeMenuState";
 import { type RuntimeDebugOverlayItemId } from "../../glue/toolIds";
-import { applyGeometryCommitComputedObjectPolicy } from "../../runtime/worldGeometryComputedObjects";
 import {
   createDefaultWorldDeformationFamilyRegistry,
   createInitialWorldDeformationState,
-  getWorldDeformationFamilyOrThrow,
 } from "../../runtime/worldGeometryDeformationFamilies";
-import { type CellDeformationMap, transformPoseWithCellMaps } from "../../cell-complex/worldGeometryDeformations";
 import { type WorldGeometrySnapshot, createWorldGeometrySession } from "../../runtime/worldGeometrySession";
 import { type PaletteDefinition, createPaletteDefinitionCache } from "../../ui/paletteDefinition";
 import { advanceCurveShorteningPairs } from "../../world-objects/geodesic/curveShortening";
 import { pruneMissingGeodesicIntersectionObjects } from "../../world-objects/geodesic/intersections";
 import { isGeodesicMarmotObjectSpec } from "../../world-objects/geodesicMarmot";
 import { type GeodesicMarmotRuntime, createGeodesicMarmotRuntime } from "./creatures/geodesicMarmotView";
-import { type RuntimeWorldObject, createRuntimeObjectRegistry, createRuntimeStaticAssetObject } from "../../world-objects/runtimeObjectRegistry";
+import { createRuntimeObjectRegistry, createRuntimeStaticAssetObject } from "../../world-objects/runtimeObjectRegistry";
 import { runtimeObjectToDynamicObjectState } from "../../world-objects/runtimeObjectBase";
 import { isSimpleGeoCreatureObjectSpec } from "../../world-objects/simpleGeoCreature";
 import { type SimpleGeoCreatureRuntime, createSimpleGeoCreatureRuntime } from "./creatures/simpleGeoCreatureView";
@@ -120,9 +114,7 @@ import {
 import { logDebugStartupGuide } from "./appDebugLogging";
 import { installRenderInspectionApi, uninstallRenderInspectionApi } from "./renderInspection";
 import { XrHeadWorldPose } from "./carriedGeodesicCannon";
-import {
-  deriveCellRenderArchetypeCapacities,
-} from "./cellRenderArchetypes";
+import { createGeometryCommit } from "./geometryCommit";
 import { createDebugOverlay } from "./debugOverlay";
 import { createDebugVisualization } from "./debugVisualization";
 import { createDesktopControls } from "./desktopControls";
@@ -180,14 +172,11 @@ import {
 import { RuntimeObjectRenderSourceMesh } from "./runtimeObjectRenderRecords";
 import {
   buildCurrentCellForbiddenZoneWireframes,
-  createCellWarmupViews,
   disableFrustumCulling,
   disableShadows,
   disposeCanvasTextures,
   disposeObject3D,
   isGeodesicRuntimeRenderObject,
-  transformYawWithMap,
-  yawFromPose,
 } from "./runtimeSceneUtils";
 import { SCENE_BACKGROUND_COLOR } from "./sceneColors";
 import {
@@ -278,13 +267,6 @@ export interface ThreeAppOptions {
   readonly onCopyUrlWithOptionsRequested?: () => void;
 }
 
-// Per-geometry-snapshot data derived once in createActiveWorldBundle and replaced as a whole on each commit.
-interface ActiveWorldBundle {
-  readonly snapshot: WorldGeometrySnapshot;
-  readonly archetypeCapacitiesByCellId: ReadonlyMap<string, number>;
-  readonly warmupViewsByCellId: ReadonlyMap<string, ReturnType<typeof createCellWarmupViews>>;
-}
-
 // Time (milliseconds) within which a second reload request counts as confirmation.
 const reloadConfirmationWindowMs = 2000;
 // Consecutive failed frames (about half a second at 60-90 Hz) before an immersive session is ended.
@@ -341,7 +323,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   /** Longest simulation step per frame, in seconds; longer wall-clock gaps (hidden tab, debugger pause) are treated as this long. */
   const maxSimulationStepSeconds = 0.1;
   // The authoritative player pose (cell id, cell-local position in meters, yaw in radians) is session.playerPose.
-  // Written only in renderFrame (movement), transformPlayerForGeometryCommit and the reset/teleport helpers,
+  // Written only in renderFrame (movement), geometryCommit and the reset/teleport helpers,
   // through the set-player-pose command; factories read it from the session.
   // Incremented once per rendered frame; keys the per-frame aim-ray cache.
   let aimFrameSerial = 0;
@@ -590,9 +572,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       worker: false,
     },
   };
-  // Current world snapshot plus derived render data. Replaced only by commitWorldGeometrySnapshot (at the
-  // start of a frame); every other reader goes through activeWorld()/activeStaticCull().
-  let activeWorldBundle = createActiveWorldBundle(initialWorldSnapshot);
   // Owns background geometry deformation; renderFrame polls it for finished snapshots.
   const geometrySession = createWorldGeometrySession({
     baseSpec: options.worldSpec,
@@ -604,23 +583,31 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       snapToleranceMeters: 1e-6,
     },
   });
-  const activeWorld = () => activeWorldBundle.snapshot.world;
-  const activeStaticCull = () => activeWorldBundle.snapshot.staticCull;
-
-  function createActiveWorldBundle(snapshot: WorldGeometrySnapshot): ActiveWorldBundle {
-    return {
-      snapshot,
-      archetypeCapacitiesByCellId: deriveCellRenderArchetypeCapacities(
-        snapshot.world,
-        snapshot.staticCull,
-        maxVisiblePaths,
-        2,
-      ),
-      warmupViewsByCellId: new Map(
-        snapshot.world.cells.map((cell) => [cell.id, createCellWarmupViews(cell)] as const),
-      ),
-    };
-  }
+  // The active world (snapshot plus derived render data) is owned by geometryCommit and replaced only by its commit, at the
+  // start of a frame; every other reader goes through activeWorld()/activeStaticCull().
+  const geometryCommit = createGeometryCommit({
+    initialSnapshot: initialWorldSnapshot,
+    maxVisiblePaths,
+    familyRegistry: deformationFamilyRegistry,
+    geometrySession,
+    session,
+    dispatch: dispatchRuntimeCommand,
+    runtimeObjectRegistry,
+    objectHost,
+    createPlayerCollisionState,
+    resetPlayerToHome: () => resetPlayerToHome(),
+    removePlacedFlagRuntime: (flagId) => removePlacedFlagRuntime(flagId),
+    syncPlacedFlagRuntime: (flag) => syncPlacedFlagRuntime(flag),
+    computedObjectCallbacks: {
+      removeMeasuredGeodesicLength: (objectId) => removeMeasuredGeodesicLengthRuntime(objectId),
+      syncMeasuredGeodesicLength: (object) => syncMeasuredGeodesicLengthRuntime(object),
+      removeProtractorAngle: (objectId) => removeProtractorAngleRuntime(objectId),
+      syncProtractorAngle: (object) => syncProtractorAngleRuntime(object),
+    },
+    afterSwap: () => finishGeometryCommit(),
+  });
+  const activeWorld = () => geometryCommit.active().snapshot.world;
+  const activeStaticCull = () => geometryCommit.active().snapshot.staticCull;
 
   const dynamicObjectRuntimes: Array<GeodesicMarmotRuntime | SimpleGeoCreatureRuntime> = [];
   const staticAssetOwners: PlainWorldObject[] = [];
@@ -1085,7 +1072,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     camera,
     cellMeshes,
     activeCellId: session.get().playerPose.cellId,
-    warmupViewsByCellId: activeWorldBundle.warmupViewsByCellId,
+    warmupViewsByCellId: geometryCommit.active().warmupViewsByCellId,
   });
   runtimeDiagnostics().recordWarmup("startup", performance.now() - warmupStartMs);
 
@@ -1170,7 +1157,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
         ? frameRateFps
         : THREE.MathUtils.lerp(smoothedFrameRateFps, frameRateFps, 0.15);
     // Swap in a finished background geometry deformation before anything reads the world this frame.
-    commitReadyWorldGeometrySnapshot();
+    geometryCommit.commitReady();
     // Phase 1: input. Head pose is in the XR local-floor reference space (meters / radians), not cell frame.
     const xrActive = renderer.xr.isPresenting && xrSession.sessionState().status === "active";
     const xrReferenceSpace = xrActive ? renderer.xr.getReferenceSpace() : null;
@@ -1462,41 +1449,9 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     });
   }
 
-  // Polls the geometry session once and, if a deformed world is ready, commits it. Called at frame start.
-  function commitReadyWorldGeometrySnapshot(): void {
-    const snapshot = geometrySession.pollReadySnapshot();
-    if (!snapshot) {
-      return;
-    }
-
-    commitWorldGeometrySnapshot(snapshot);
-  }
-
-  /**
-   * Replaces the active world with a newly deformed snapshot and carries all live state across.
-   *
-   * Computes per-cell deformation maps from the previous to the new snapshot, then moves the player (reset to
-   * home if the pose cannot be mapped), creatures, flags and cannons through them (objects that cannot be
-   * mapped are removed, collidable assets are mapped by their owners), swaps `activeWorldBundle`, drops
-   * visibility caches and tool selections, rebuilds cell meshes and portal instances, and recreates the portal
-   * debug runtime. Positions are cell-local meters and yaw is in radians. Throws if the deformation family is
-   * not registered. Runs on the frame loop only, before input is read.
-   */
-  function commitWorldGeometrySnapshot(snapshot: WorldGeometrySnapshot): void {
-    const previousSnapshot = activeWorldBundle.snapshot;
-    const family = getWorldDeformationFamilyOrThrow(deformationFamilyRegistry, snapshot.deformation.kind);
-    const mapByCellId = family.createDynamicObjectMaps(
-      previousSnapshot.deformation as never,
-      snapshot.deformation as never,
-      previousSnapshot.world,
-      snapshot.world,
-    );
-
-    // Order matters: the player and objects are mapped using the previous world's cell ids, then the bundle
-    // is swapped so later helpers (activeWorld()) see the new world.
-    transformPlayerForGeometryCommit(mapByCellId, snapshot.world);
-    transformRuntimeObjectsForGeometryCommit(mapByCellId, snapshot);
-    activeWorldBundle = createActiveWorldBundle(snapshot);
+  // What the shell redraws after the geometry commit swapped the active world: visibility caches, tool state, meshes,
+  // portal instances, debug runtime and diagnostics. Runs inside geometryCommit.commit, after the swap.
+  function finishGeometryCommit(): void {
     // Visibility results refer to old path ids; drop them until the next sync.
     portalFrame.reset();
     clearGeometryToolStateAfterCommit();
@@ -1524,122 +1479,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
         "runtime-diagnostics",
       ),
     );
-  }
-
-  function transformPlayerForGeometryCommit(
-    mapByCellId: ReadonlyMap<string, CellDeformationMap>,
-    nextWorld: CompiledCellComplex,
-  ): void {
-    const transformed = transformPoseWithCellMaps(
-      {
-        cellId: session.get().playerPose.cellId,
-        localPose: yawRigidTransform3(session.get().playerPose.yawRadians, session.get().playerPose.position),
-      },
-      mapByCellId,
-    );
-
-    if (!transformed || !nextWorld.cellsById.has(transformed.cellId)) {
-      resetPlayerToHome();
-      return;
-    }
-
-    const mappedPose: PlayerPose = {
-      ...session.get().playerPose,
-      cellId: transformed.cellId,
-      position: transformed.localPose.translation,
-      yawRadians: yawFromPose(transformed.localPose),
-    };
-    const result = depenetrateDynamicObject(nextWorld, createPlayerCollisionState(mappedPose));
-    if (result.kind === "failed") {
-      console.warn("Deformation commit: no legal player pose found; keeping the mapped pose.");
-      dispatchRuntimeCommand({ kind: "set-player-pose", pose: mappedPose });
-      return;
-    }
-    dispatchRuntimeCommand({ kind: "set-player-pose", pose: playerPoseFromDynamicObject(result.object, mappedPose.pitchRadians) });
-  }
-
-  function transformRuntimeObjectsForGeometryCommit(
-    mapByCellId: ReadonlyMap<string, CellDeformationMap>,
-    snapshot: WorldGeometrySnapshot,
-  ): void {
-    objectHost.transformGeometry(mapByCellId, snapshot.world);
-
-    for (const object of runtimeObjectRegistry.getAll()) {
-      if (object.kind === "placed-flag") {
-        const transformed = transformPoseWithCellMaps(object, mapByCellId);
-        if (!transformed) {
-          runtimeObjectRegistry.remove(object.id);
-          removePlacedFlagRuntime(object.id);
-          continue;
-        }
-
-        const depenetrated = depenetrateDynamicObject(
-          snapshot.world,
-          runtimeObjectToDynamicObjectState({ ...object, cellId: transformed.cellId, localPose: transformed.localPose }),
-        );
-        const nextObject = {
-          ...object,
-          cellId: depenetrated.object.cellId,
-          localPose: depenetrated.object.localPose,
-        };
-        runtimeObjectRegistry.update(nextObject);
-        syncPlacedFlagRuntime(nextObject);
-      } else if (object.kind === "geodesic-cannon") {
-        const transformed = transformGeodesicCannonForGeometryCommit(object, mapByCellId);
-        if (!transformed) {
-          runtimeObjectRegistry.remove(object.id);
-          continue;
-        }
-
-        runtimeObjectRegistry.update(transformed);
-      }
-    }
-
-    rebuildGeometryDependentRuntimeObjectsAfterCommit(snapshot);
-  }
-
-  function transformGeodesicCannonForGeometryCommit(
-    object: Extract<RuntimeWorldObject, { readonly kind: "geodesic-cannon" }>,
-    mapByCellId: ReadonlyMap<string, CellDeformationMap>,
-  ): Extract<RuntimeWorldObject, { readonly kind: "geodesic-cannon" }> | undefined {
-    const map = mapByCellId.get(object.cellId);
-    if (!map) {
-      return undefined;
-    }
-
-    const position = map.mapPoint(object.localPose.translation);
-    const aimYawRadians = transformYawWithMap(object.aimYawRadians, object.localPose.translation, map);
-    const geodesicEmitterYawRadiansById = object.geodesicEmitterYawRadiansById
-      ? Object.fromEntries(
-          Object.entries(object.geodesicEmitterYawRadiansById).map(([geodesicId, yawRadians]) => [
-            geodesicId,
-            transformYawWithMap(yawRadians, object.localPose.translation, map),
-          ]),
-        )
-      : undefined;
-
-    return {
-      ...object,
-      cellId: map.cellId,
-      localPose: yawRigidTransform3(aimYawRadians, position),
-      aimYawRadians,
-      geodesicEmitterYawRadiansById,
-    };
-  }
-
-  function rebuildGeometryDependentRuntimeObjectsAfterCommit(snapshot: WorldGeometrySnapshot): void {
-    applyGeometryCommitComputedObjectPolicy({
-      world: snapshot.world,
-      registry: runtimeObjectRegistry,
-      playerCellId: session.get().playerPose.cellId,
-      playerPoint: session.get().playerPose.position,
-      callbacks: {
-        removeMeasuredGeodesicLength: removeMeasuredGeodesicLengthRuntime,
-        syncMeasuredGeodesicLength: syncMeasuredGeodesicLengthRuntime,
-        removeProtractorAngle: removeProtractorAngleRuntime,
-        syncProtractorAngle: syncProtractorAngleRuntime,
-      },
-    });
   }
 
   function clearGeometryToolStateAfterCommit(): void {
@@ -2116,7 +1955,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       scene.add(cellMesh);
     }
 
-    const deformation = activeWorldBundle.snapshot.deformation;
+    const deformation = geometryCommit.active().snapshot.deformation;
     const floorUvFramesByCellId = deformationFamilyRegistry
       .get(deformation.kind)
       ?.floorUvFrames?.(options.worldSpec, deformation as never);
@@ -2127,7 +1966,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       portalPanelMode: session.get().debugSettings.portalPanelMode,
       eyeHeightMeters: DEFAULT_PLAYER_EYE_HEIGHT_METERS,
       assets: options.assets,
-      capacitiesByCellId: activeWorldBundle.archetypeCapacitiesByCellId,
+      capacitiesByCellId: geometryCommit.active().archetypeCapacitiesByCellId,
       showForbiddenZoneWireframes: false,
     });
     for (const runtime of placedFlagRuntimes.values()) {

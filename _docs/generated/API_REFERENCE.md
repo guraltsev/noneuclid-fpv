@@ -2074,6 +2074,28 @@ Floating text labels shown next to geodesic emitters.
 | function | `resolveGeodesicEmitterLabelPosition` | Computes the Three.js-space position of the label for one geodesic emitter of a cannon. |
 | function | `createGeodesicEmitterLabel` | Creates a hidden 0.24 m by 0.12 m textured plane showing `text` on a rounded dark plate. |
 
+### `render/three/geometryCommit.ts`
+
+Commit of a deformed world geometry: polls the geometry session at frame start and, when a snapshot is ready, replaces the active world and carries the live state across (player, creatures, signs, emitters), then rebuilds what depends on the geometry.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `ActiveWorldBundle` | Per-snapshot data derived once when a snapshot becomes active and replaced as a whole on each commit. |
+| interface | `GeometryCommitDeps` | Dependencies of {@link createGeometryCommit}. |
+| interface | `GeometryCommit` | Handle returned by {@link createGeometryCommit}. |
+| function | `createGeometryCommit` | Creates the geometry commit; see the module comment. |
+
+### `render/three/geometryCommitTransforms.ts`
+
+Pure transforms that carry live state across a geometry commit: the player pose, a placed sign and a geodesic emitter are sent through the per-cell deformation maps of the previous to the new world.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| type | `PlayerGeometryCommitResult` | Outcome of mapping the player: no legal image (reset to home), or a pose; `foundLegalPose` is false when no legal pose was found and the mapped pose is kept. |
+| function | `transformPlayerPoseForGeometryCommit` | Maps the player through the cell maps and pushes the image out of obstacles of `nextWorld`. |
+| function | `transformPlacedFlagForGeometryCommit` | Maps a placed sign through the cell maps and pushes it out of obstacles; `undefined` when its cell has no map (the sign is removed). |
+| function | `transformGeodesicCannonForGeometryCommit` | Maps an emitter's pose, aim yaw and per-geodesic launch yaws through its cell's map; `undefined` when the cell has no map (the emitter is removed). |
+
 ### `render/three/geometryComputerMenu.ts`
 
 Menu logic for the in-world geometry computer, which edits the torus-skew parameters of the world and starts the deformation.
