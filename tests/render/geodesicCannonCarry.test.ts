@@ -2,7 +2,7 @@
  * `tests/render/geodesicCannonCarry.test.ts` — unit tier.
  *
  * Carrying a geodesic emitter that anchors a locked geodesic, driven through the real tool controller
- * (`createGeodesicCannonTools`) with plain-value dependencies for the renderer, scene and input.
+ * (`createGeodesicCannonTools`) with plain-value dependencies for the renderer and input.
  *
  * Three things make this behaviour subtle:
  * - The emitter is held at the player's hand, and the hand can be on another face than the one the player stands on.
@@ -15,8 +15,8 @@
  *   to explain it, and the geodesic must still join both emitters through the pickup, the carry and the release.
  *   A drop onto another face works on its own; picking that emitter up again from there has to keep the geodesic too.
  *
- * - The pink glow around the carried emitter is drawn in the player's frame, at the hand, wherever the emitter is stored:
- *   it must stay at the hand when the emitter is on another face than the player.
+ * - The highlight around the carried emitter is not the tool's: the instance sync draws it on the emitter itself
+ *   (`tests/render/carryHighlight.test.ts`), so a stuck emitter is visibly stuck.
  *
  * - A face can be turned relative to its neighbour (on the cube, by a quarter turn). An emitter carried onto the next
  *   face keeps its physical direction, so its yaw turns with the face, and its default launch yaw stays equal to the yaw
@@ -50,9 +50,7 @@ function createHarness(
 ) {
   const session = createTestAppSession({ playerPose: startPose });
   const nothing = (): void => {};
-  const scene = new THREE.Scene();
   const tools = createGeodesicCannonTools({
-    scene,
     renderer: { xr: { isPresenting: false } } as unknown as THREE.WebGLRenderer,
     controls: { requestPointerLock: () => Promise.resolve() } as never,
     runtimeObjectRegistry: registry,
@@ -86,7 +84,7 @@ function createHarness(
     });
   }
 
-  return { world, registry, tools, walkInto, scene };
+  return { world, registry, tools, walkInto };
 }
 
 function setup() {
@@ -209,23 +207,6 @@ describe("releasing a carried emitter of a locked geodesic", () => {
 
     expect(cellsSeen.size).toBeGreaterThan(1);
     expect(registry.get("g-a")).toMatchObject({ kind: "geodesic-interval" });
-  });
-
-  it("draws the glow of a carried emitter at the hand even when the emitter is on another face", () => {
-    const { tools, scene } = setup();
-    const glow = (): THREE.Object3D | undefined => scene.getObjectByName("carried-geodesic-emitter-glow");
-
-    tools.startGeodesicCannonCarry("cannon-b");
-    tools.updateCarriedGeodesicCannonPose(true, handAt(4.6, 3.2));
-    const beside = glow()?.position.clone();
-    // The player (in cell a) holds the hand past a's portal, so the emitter is stored in cell b.
-    tools.updateCarriedGeodesicCannonPose(true, handAt(5.8, 3));
-    const beyond = glow()?.position.clone();
-
-    expect(glow()?.visible).toBe(true);
-    expect(beside?.x).toBeCloseTo(worldPointToThree({ x: 4.6, y: 3.2, z: 0 }).x, 6);
-    expect(beyond?.x).toBeCloseTo(worldPointToThree({ x: 5.8, y: 3, z: 0 }).x, 6);
-    expect(beyond?.z).toBeCloseTo(worldPointToThree({ x: 5.8, y: 3, z: 0 }).z, 6);
   });
 
   it("turns an emitter with the face it is carried onto, its launch yaw following", () => {

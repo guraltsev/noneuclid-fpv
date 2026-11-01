@@ -987,14 +987,12 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     trySelectTieAndDetachGeodesicFromAim,
     syncTieAndDetachSelectionHighlights,
     updateCarriedGeodesicCannonPose,
-    clearCarriedGeodesicCannonGlow,
     updateActiveGeodesicCannonRotation,
     updateActiveGeodesicCannonAim,
     getLockedGeodesicIds,
     freezeXrHeadHeightDuringGeodesicCannonRotation,
     resetGeodesicCannonRotationTracking,
   } = createGeodesicCannonTools({
-    scene,
     renderer,
     controls,
     runtimeObjectRegistry,
@@ -1720,7 +1718,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   function clearGeometryToolStateAfterCommit(): void {
     dispatchRuntimeCommand({ kind: "set-cannon-tool-state", state: {} });
     dispatchRuntimeCommand({ kind: "set-protractor-tool-state", state: {} });
-    clearCarriedGeodesicCannonGlow();
     clearProtractorToolFeedback();
     refreshOpenGeometryComputerMenu();
     syncDesktopPalette();

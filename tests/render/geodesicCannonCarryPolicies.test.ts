@@ -31,7 +31,6 @@ function createHarness(world: CompiledCellComplex, registry: RuntimeObjectRegist
   const session = createTestAppSession({ playerPose });
   const nothing = (): void => {};
   const tools = createGeodesicCannonTools({
-    scene: new THREE.Scene(),
     renderer: { xr: { isPresenting: false } } as unknown as THREE.WebGLRenderer,
     controls: { requestPointerLock: () => Promise.resolve() } as never,
     runtimeObjectRegistry: registry,

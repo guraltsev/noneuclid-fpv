@@ -1781,7 +1781,7 @@ Canvas 2D drawing helpers used to build text-label textures.
 
 ### `render/three/carriedGeodesicCannon.ts`
 
-Pure placement, glow, and naming helpers for carrying and aiming geodesic emitters.
+Pure placement and naming helpers for carrying and aiming geodesic emitters.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
@@ -1789,11 +1789,23 @@ Pure placement, glow, and naming helpers for carrying and aiming geodesic emitte
 | interface | `XrHeadWorldPose` | Head pose in Three.js world space: position in meters and orientation quaternion. |
 | function | `resolveDesktopCarriedGeodesicCannonAnchor` | Computes where a carried cannon sits on desktop: the point 0.75 m along the aim ray, in cell-local coordinates. |
 | function | `resolveVrCarriedGeodesicCannonAnchor` | Computes where a carried cannon sits in VR: directly under the aim-ray origin (the hand), in cell-local coordinates. |
-| function | `createCarriedGeodesicCannonGlow` | Creates the hidden translucent pink open cylinder that highlights a carried emitter. |
 | function | `resolveCannonGeodesicId` | Picks which of a cannon's geodesics an action applies to. |
 | function | `resolveGeodesicCannonAbsoluteEmitterPoint` | Returns the cell-local emitter (beam origin) point of a cannon in meters. |
 | function | `getDistanceAlongGeodesicSegment` | Returns the signed distance in meters from a segment's start to a cell-local point, projected onto the segment direction. |
 | function | `formatGeodesicTerminal` | Formats a geodesic segment's terminal as a compact debug string such as `wall-hit:2` or `portal-hit:p->cell:q`. |
+
+### `render/three/carryHighlight.ts`
+
+The translucent ball drawn around an object that is being carried.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| const | `carryHighlightArchetypePrefix` | Archetype-key prefix of the highlight ball (the key is `<prefix>:mesh:0`). |
+| const | `carryHighlightArchetypeKey` | Archetype key of the highlight ball. |
+| const | `carryHighlightMarginMeters` | Margin in meters added to the collision radius to get the radius of the ball. |
+| type | `CarryHighlightObject` | What the highlight needs of a carried object: an id and a pose with a collision shape. |
+| function | `createCarryHighlightSource` | Builds the render source of the ball: a unit sphere, scaled per record to the object it surrounds. |
+| function | `collectCarryHighlightRecords` | The records of the highlight ball for `object`, one for each place in `objectRecords` where the object itself is drawn. |
 
 ### `render/three/cellRenderArchetypes.ts`
 

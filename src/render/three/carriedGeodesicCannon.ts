@@ -1,9 +1,8 @@
 /**
- * Pure placement, glow, and naming helpers for carrying and aiming geodesic emitters.
+ * Pure placement and naming helpers for carrying and aiming geodesic emitters.
  *
  * Anchors are returned in cell-local coordinates (meters; x right, y forward, z up), converted
- * from the Three.js frame of the active aim ray via `threePointToWorld`. Only the glow factory
- * allocates GPU resources; everything else is side-effect free.
+ * from the Three.js frame of the active aim ray via `threePointToWorld`. Everything here is side-effect free.
  */
 import * as THREE from "three";
 import { type Vec3 } from "../../math/vec3";
@@ -67,29 +66,6 @@ export function resolveVrCarriedGeodesicCannonAnchor(
     y: handPoint.y,
     z: cannon.localPose.translation.z,
   };
-}
-
-/**
- * Creates the hidden translucent pink open cylinder that highlights a carried emitter.
- *
- * The mesh starts invisible and unparented; the caller positions, shows, and adds it to the scene. The caller
- * owns its geometry and material and must dispose them (e.g. via `disposeObject3D`).
- */
-export function createCarriedGeodesicCannonGlow(): THREE.Mesh {
-  const glow = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.44, 0.44, 1.72, 32, 1, true),
-    new THREE.MeshBasicMaterial({
-      color: 0xff7ac8,
-      transparent: true,
-      opacity: 0.18,
-      depthWrite: false,
-      side: THREE.DoubleSide,
-    }),
-  );
-  glow.name = "carried-geodesic-emitter-glow";
-  glow.renderOrder = 925;
-  glow.visible = false;
-  return glow;
 }
 
 /**

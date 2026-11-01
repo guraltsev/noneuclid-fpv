@@ -6,7 +6,7 @@
  * the shell-owned cannon tool state and menu state through getter/setter dependencies, then triggers the
  * follow-up syncs (palette, portal instances, hitbox debug, dependent measurements and protractor angles).
  * Poses and distances are cell-local (meters; x right, y forward, z up) with yaws in radians
- * counter-clockwise from +x; Three.js-space values only appear for the carried-emitter glow and aim rays.
+ * counter-clockwise from +x; Three.js-space values only appear for aim rays.
  * Ids of new cannons and geodesics embed `Date.now()` plus a per-factory counter.
  */
 import { takeObjectIdSerial } from "../../runtime/appSession";
@@ -47,7 +47,6 @@ import { AimTarget } from "../../interaction/aimTarget";
 import { decideHandCarry, handCarryLeashMeters } from "../../interaction/handCarry";
 import {
   carriedGeodesicEmitterDesktopDistanceMeters,
-  createCarriedGeodesicCannonGlow,
   getDistanceAlongGeodesicSegment,
   resolveCannonGeodesicId,
   resolveDesktopCarriedGeodesicCannonAnchor,
@@ -64,7 +63,6 @@ import {
   getRuntimeObjectInteractionRangeMeters,
   intersectRootRayWithFloor,
 } from "./rootAimRay";
-import { worldPointToThree } from "./worldAxes";
 
 export type { GeodesicCannonToolState };
 
@@ -76,8 +74,6 @@ export type { GeodesicCannonToolState };
  * those variables back.
  */
 export interface GeodesicCannonToolsDeps {
-  /** Scene that receives the carried-emitter glow mesh. */
-  readonly scene: THREE.Scene;
   /** Renderer; only `xr.isPresenting` is read, to skip pointer lock in XR. */
   readonly renderer: THREE.WebGLRenderer;
   /** Desktop controls, used to request pointer lock while rotating, aiming, or carrying. */
@@ -132,14 +128,11 @@ export interface GeodesicCannonToolsDeps {
  * `finishGeodesicCannonCarry`. Locked geodesics cannot be rotated or aimed. Operations with missing or wrong-kind cannons close the menu and return
  * without throwing. Placement helpers that need a horizontal facing silently do nothing when the aim ray is vertical.
  *
- * Lifecycle: the only owned GPU resource is the lazily created carried-emitter glow mesh, which is added to the
- * scene on first use and only hidden (never removed or disposed) by `clearCarriedGeodesicCannonGlow`; the shell
- * must dispose it with the scene. Closure state (id counters, frozen XR head height, target geodesic length) lives for
- * the factory's lifetime.
+ * Lifecycle: the tools own no GPU resource (the highlight around a carried emitter is drawn by the runtime-object instance sync).
+ * Closure state (id counters, frozen XR head height, target geodesic length) lives for the factory's lifetime.
  */
 export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
   const {
-    scene,
     renderer,
     controls,
     runtimeObjectRegistry,
@@ -161,7 +154,6 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
   } = deps;
   let geodesicCannonRotationHeadHeightMeters: number | undefined;
   let geodesicCannonRotationTargetLengthMeters: number | undefined;
-  let carriedGeodesicCannonGlow: THREE.Mesh | undefined;
 
   /** Forgets the frozen head height and target length once the matching tool mode has ended. */
   function resetGeodesicCannonRotationTracking(mode: { readonly rotating: boolean; readonly aiming: boolean }): void {
@@ -535,7 +527,6 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
     geodesicCannonRotationTargetLengthMeters = undefined;
     deps.dispatch({ kind: "end-carry" });
     deps.dispatch({ kind: "clear-selected-tool" });
-    clearCarriedGeodesicCannonGlow();
     syncDesktopPalette();
     return true;
   }
@@ -716,7 +707,6 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
 
   function updateCarriedGeodesicCannonPose(xrActive: boolean, activeAimRay: RootAimRay | undefined, deltaSeconds?: number): void {
     if (deps.session.get().menuState.selectedTool !== "geodesic-cannon-carry") {
-      clearCarriedGeodesicCannonGlow();
       return;
     }
 
@@ -738,7 +728,6 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
     const playerPose = deps.session.get().playerPose;
     const hand = locateCarrierTarget(deps.getWorld(), playerPose, anchor);
     if (!hand) {
-      syncCarriedGeodesicCannonGlow(anchor);
       return;
     }
     const emitterBody = getDynamicObjectCollisionBounds(runtimeObjectToDynamicObjectState(cannon));
@@ -792,9 +781,7 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
     });
     if (decideHandCarry(advance.remaining, leashMeters) === "release") {
       finishGeodesicCannonCarry();
-      return;
     }
-    syncCarriedGeodesicCannonGlow(anchor);
   }
   // Draws again what depends on the geodesics an emitter just rebuilt: measured lengths, protractor angles and, when the emitter's plain
   // active geodesic was regrown, the cannon tool's selection of it. What was rebuilt is the emitter's rule (geodesic/carryEnd.ts).
@@ -811,26 +798,6 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
         selectedCannonId: cannonId,
         activeGeodesicId: rebuild.regrownActiveGeodesicId,
       } });
-    }
-  }
-
-  // The glow is a child of the scene, which is drawn in the player's frame, so it goes at the hand (the emitter's place as seen
-  // from the player's cell), not at the emitter's pose, which is in the frame of whichever face the emitter is on.
-  function syncCarriedGeodesicCannonGlow(handPoint: { readonly x: number; readonly y: number; readonly z: number }): void {
-    const glow = carriedGeodesicCannonGlow ?? createCarriedGeodesicCannonGlow();
-    carriedGeodesicCannonGlow = glow;
-    if (!glow.parent) {
-      scene.add(glow);
-    }
-
-    glow.visible = deps.session.get().menuState.selectedTool === "geodesic-cannon-carry";
-    // Glow cylinder is 1.72 m tall, so center it 0.86 m above the cannon base.
-    glow.position.copy(worldPointToThree({ x: handPoint.x, y: handPoint.y, z: handPoint.z + 0.86 }));
-  }
-
-  function clearCarriedGeodesicCannonGlow(): void {
-    if (carriedGeodesicCannonGlow) {
-      carriedGeodesicCannonGlow.visible = false;
     }
   }
 
@@ -1032,8 +999,6 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
     trySelectTieAndDetachGeodesicFromAim,
     syncTieAndDetachSelectionHighlights,
     updateCarriedGeodesicCannonPose,
-    syncCarriedGeodesicCannonGlow,
-    clearCarriedGeodesicCannonGlow,
     updateActiveGeodesicCannonRotation,
     updateActiveGeodesicCannonAim,
     getGeodesicTotalLengthMeters,

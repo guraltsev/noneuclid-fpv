@@ -8,12 +8,15 @@
  * portal) and the per-eye camera positions. Per sync it (a) updates the render sources and the archetype-key prefix
  * index, (b) collects the render records once, (c) creates or grows archetypes, and (d) writes every archetype's
  * instances. Records of unchanged objects (same registry value, same world, same archetype keys) are reused,
- * ghosts included. It never touches the selectable-hitbox debug meshes.
+ * ghosts included. While the session names a carried object, a translucent ball around it is drawn from that object's own records
+ * (`carryHighlight.ts`), so it appears wherever the object does. It never touches the selectable-hitbox debug meshes.
  */
 import type { AppSession } from "../../runtime/appSession";
 import type * as THREE from "three";
 import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex";
 import type { RuntimeObjectRegistry, RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
+import { runtimeObjectToDynamicObjectState } from "../../world-objects/runtimeObjectBase";
+import { collectCarryHighlightRecords, createCarryHighlightSource } from "./carryHighlight";
 import type { FrameRenderSnapshot } from "./frameRenderSnapshot";
 import { collectGeodesicRuntimeRenderRecords } from "./geodesicCannonRenderer";
 import type { PlayerRoverRenderModel } from "./playerRoverModel";
@@ -100,6 +103,7 @@ export function createRuntimeObjectInstanceSync(deps: RuntimeObjectInstanceSyncD
   // Source keys last collected per object (key `object:<id>`) and for the rover (`rover`), with the root they came from.
   const sourceKeysByObjectId = new Map<string, { readonly root: THREE.Object3D; readonly keys: readonly string[] }>();
   const seenSourceKeys = new Set<string>();
+  const carryHighlightSource = createCarryHighlightSource();
   let archetypeKeysByPrefix = new Map<string, string[]>();
   const stats = { syncs: 0, recordCollections: 0, ghostComputations: 0 };
 
@@ -158,6 +162,12 @@ export function createRuntimeObjectInstanceSync(deps: RuntimeObjectInstanceSyncD
         renderSourcesByKey.set(source.archetypeKey, source);
       }
     };
+
+    // The highlight ball exists as an archetype only while something is carried.
+    const carriedId = deps.session.get().carry?.objectId;
+    if (carriedId !== undefined && objects.some((object) => object.id === carriedId)) {
+      addSource(carryHighlightSource);
+    }
 
     if (objects.some((object) => object.portalRenderable && isGeodesicRuntimeRenderObject(object))) {
       for (const source of deps.geodesicRenderSources) {
@@ -236,6 +246,7 @@ export function createRuntimeObjectInstanceSync(deps: RuntimeObjectInstanceSyncD
     const world = deps.getWorld();
     const seenIds = new Set<string>();
     const records: RuntimeObjectRenderRecord[] = [];
+    const carriedId = deps.session.get().carry?.objectId;
 
     for (const object of objects) {
       const geodesic = object.portalRenderable && isGeodesicRuntimeRenderObject(object);
@@ -250,6 +261,9 @@ export function createRuntimeObjectInstanceSync(deps: RuntimeObjectInstanceSyncD
 
       if (cached && cached.object === object && cached.world === world && sameStrings(cached.archetypeKeys, archetypeKeys)) {
         records.push(...cached.records);
+        if (object.id === carriedId) {
+          records.push(...collectCarryHighlightRecords({ ...runtimeObjectToDynamicObjectState(object), id: object.id }, cached.records));
+        }
         continue;
       }
 
@@ -277,6 +291,9 @@ export function createRuntimeObjectInstanceSync(deps: RuntimeObjectInstanceSyncD
 
       recordCacheByObjectId.set(object.id, { object, world, archetypeKeys: [...archetypeKeys], records: objectRecords });
       records.push(...objectRecords);
+      if (object.id === carriedId) {
+        records.push(...collectCarryHighlightRecords({ ...runtimeObjectToDynamicObjectState(object), id: object.id }, objectRecords));
+      }
     }
 
     for (const id of [...recordCacheByObjectId.keys()]) {

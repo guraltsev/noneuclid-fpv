@@ -87,6 +87,7 @@ export function buildRuntimeObjectRenderArchetype(
   const portalClipIndexAttribute = new THREE.InstancedBufferAttribute(new Float32Array(capacity), 1);
 
   mesh.name = `runtime-object-archetype:${source.archetypeKey}`;
+  mesh.renderOrder = source.mesh.renderOrder;
   mesh.count = 0;
   mesh.frustumCulled = false;
   mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
