@@ -602,6 +602,7 @@ The carry contract: what it means for an object to be carried, stated once, as p
 | const | `carryStepCapMeters` | Longest displacement step the reaction is defined for, in meters. |
 | const | `carryMaxSpeedMetersPerSecond` | Fastest travel of a carried object toward its carrier's hand, in meters per second (about 20 m/s). |
 | const | `carryWallMarginMeters` | Distance a carried object keeps from a wall it was stopped by, in meters. |
+| const | `carryZoneMarginMeters` | Distance a carried object keeps from an exclusion zone it was stopped by, in meters: the skin the movement layer keeps from every obstacle. |
 | const | `carryArrivalToleranceMeters` | Distance to the target under which the object counts as having arrived, in meters. |
 | const | `carryMaxStepsPerCall` | Most steps one call of `carryTowardTarget` applies; the rest of the way is left to the next frame. |
 | interface | `CarriableMarker` | Marker on an object type: it can be carried. |
@@ -609,14 +610,16 @@ The carry contract: what it means for an object to be carried, stated once, as p
 | interface | `CarriedPlace` | Where a carried object is: its cell, its point in that cell's frame (z is the object's own height and is never changed by a step) and its yaw. |
 | interface | `CarryStep` | A displacement step: a vector in the frame of the cell the object is in, at most `carryStepCapMeters` long. |
 | interface | `CarryPlacement` | Where a step leaves the object: a place valid in its cell. |
-| interface | `CarryMove` | The step moved the object: its new place, the portals crossed (in order) and whether a wall cut the step short. |
+| interface | `CarryMove` | The step moved the object: its new place, the portals crossed (in order) and whether a wall or an exclusion zone cut the step short. |
 | type | `CarryStayReason` | Why a step did not move the object. |
-| type | `CarryReaction` | What an object does with one displacement step. |
+| type | `CarryReaction` | What an object does with one displacement step: it moves (possibly cut short), or it stays. |
 | function | `reactToDisplacement` | The reaction of a carried object to one displacement step; see the module header for the rules. |
 | function | `locateCarrierTarget` | Where the carrier's hand is, as a place on the surface: the cell it is in and its point in that cell's frame, found by walking from the carrier to the hand through the portals between them. |
 | function | `displacementToTarget` | The displacement from the object to the target in the nearest valid straight development, in the object's cell frame: the way round is the chain of portals whose image of the object lies nearest the target and that the … |
 | type | `CarryAdvanceEnd` | How `carryTowardTarget` ended. |
-| interface | `CarryAdvance` | What `carryTowardTarget` did: where the object is now and how many steps were applied. |
+| type | `CarryRemaining` | How far the object is from the target: the length of the displacement along the valid straight development, in meters, or "unreachable" when no development of at most six portals reaches the target. |
+| interface | `CarryAdvance` | What `carryTowardTarget` did: where the object is now, how many steps were applied and how far from the target it ended. |
+| function | `remainingToTarget` | The distance from the object to the target along the valid straight development, or "unreachable". |
 | function | `carryTowardTarget` | Moves a carried object toward a target as a stream of steps: each is the displacement to the target from the object's current place (in the nearest valid straight development), cut to at most the step cap and to what is… |
 
 ### `world-objects/creatures/geodesicMarmotBehavior.ts`
@@ -689,17 +692,14 @@ The editing state of the geodesic emitter (cannon) tools, as plain data: which c
 
 ### `world-objects/geodesic/carryEnd.ts`
 
-What an emitter does to its geodesics when it has been carried: rebuild after a move, the final rebuild when the carry ends, and the removal of the emitter when it is destroyed.
+What an emitter does to its geodesics when it has been carried: rebuild after a move and the final rebuild when the carry ends.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
 | interface | `EmitterGeodesicRebuild` | What a rebuild of an emitter's geodesics touched. |
 | function | `rebuildEmitterGeodesics` | Rebuilds the geodesics that depend on an emitter after it moved. |
 | interface | `CarriedEmitterRelease` | What releasing a carried emitter touched. |
-| function | `releaseCarriedEmitter` | The emitter has stopped being carried, whether it was put down or dropped where it stood: its geodesics are rebuilt one last time without the safety net of the carry, and the intersection objects whose geodesics no long… |
-| interface | `DestroyedEmitter` | What destroying an emitter removed. |
-| function | `destroyEmitter` | The emitter ends: it is removed together with its geodesics and the intersection objects that depended on them. |
-| function | `collectEmitterGeodesicIds` | The ids of every geodesic that belongs to an emitter: its own, its active one and those other emitters record as connected to it. |
+| function | `releaseCarriedEmitter` | The emitter has stopped being carried, whether the hand put it down or let it go: its geodesics are rebuilt one last time without the safety net of the carry, and the intersection objects whose geodesics no longer exist… |
 
 ### `world-objects/geodesic/curveShortening.ts`
 
@@ -1323,6 +1323,18 @@ Aim picking: finds what an aim ray (desktop crosshair or XR controller) hits, ac
 | function | `resolveAimTargets` | Returns the best aim target along the ray, or `undefined` if nothing is hit. |
 | function | `getGeodesicEmitterAimCylinderBounds` | Returns the vertical-cylinder proxy used to pick a geodesic cannon, or `undefined` if the cannon has no collision bounds. |
 | function | `getGeodesicEmitterAimSphereCenter` | Returns the centre of the sphere used to pick (and snap the aim to) a geodesic cannon, in the cell-local frame (meters). |
+
+### `interaction/handCarry.ts`
+
+The player's hand as a carrier: when does it let go of what it carries?
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| type | `HandCarryDecision` | What the hand does after a frame of carrying: keep holding, or let go (the carry ends where the object is). |
+| const | `handCarrySlowestFrameSeconds` | The slowest frame the leash allows for, in seconds: the object may lag the hand by what it travels at the speed cap in one such frame. |
+| const | `handCarryLeashSlackMeters` | Lag the leash allows on top of the pickup distance, in meters (about 0.67): the speed cap times the slowest frame. |
+| function | `handCarryLeashMeters` | The leash of the hand, in meters: how far the carried object may be from the hand before it is let go. |
+| function | `decideHandCarry` | Holds while the object is within the leash of the hand; releases when it is farther or cannot be reached. |
 
 ### `interaction/inputFrame.ts`
 

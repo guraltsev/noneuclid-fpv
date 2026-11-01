@@ -5,7 +5,7 @@
 
 This reference is produced from the source code. For the *meaning* of the modules — the mathematical model they implement — read [../MATHEMATICAL_MODEL.md](../MATHEMATICAL_MODEL.md) and [../ARCHITECTURE.md](../ARCHITECTURE.md). For every exported symbol see [API_REFERENCE.md](API_REFERENCE.md).
 
-**217 modules, 48,221 lines** under `src/`.
+**218 modules, 48,173 lines** under `src/`.
 
 ## Layers
 
@@ -19,13 +19,13 @@ A module belongs to the layer named by its first path segment under `src/`. "May
 | `visibility` | 2 | 1,036 | `math`, `cell-complex` | Per-frame portal visibility: funnel clipping of portal-path tables against a camera. Pure; no renderer. |
 | `movement` | 10 | 1,645 | `math`, `cell-complex` | Player body, collision, movement and portal crossing in compiled cell complexes. |
 | `world-assets` | 1 | 201 | `cell-complex` | Floor-texture and asset descriptors. |
-| `world-objects` | 32 | 9,649 | `math`, `cell-complex`, `diagnostics`, `movement`, `world-assets` | Placeable runtime objects: registry, geodesic emitters, measurement tools, flags, creature behaviors. |
+| `world-objects` | 32 | 9,595 | `math`, `cell-complex`, `diagnostics`, `movement`, `world-assets` | Placeable runtime objects: registry, geodesic emitters, measurement tools, flags, creature behaviors. |
 | `authoring` | 5 | 671 | `math`, `cell-complex`, `examples`, `world-assets`, `world-objects` | World builder DSL, world-script compiler, validation and world catalog. |
 | `glue` | 11 | 1,007 | `math`, `cell-complex`, `diagnostics`, `authoring` | Launch options, debug settings, tool ids, asset URLs, app configuration. |
-| `interaction` | 4 | 1,537 | `math`, `cell-complex`, `movement`, `world-objects`, `glue` | Renderer-free interaction logic: input frames, aim picking, VR locomotion, XR session state, carried-object portal transitions. |
+| `interaction` | 5 | 1,575 | `math`, `cell-complex`, `movement`, `world-objects`, `glue` | Renderer-free interaction logic: input frames, aim picking, VR locomotion, XR session state, carried-object portal transitions. |
 | `runtime` | 13 | 2,672 | `math`, `cell-complex`, `diagnostics`, `movement`, `world-objects`, `authoring`, `glue` | Application state, runtime menu state, command dispatch, geometry session/worker, server channel and public API. |
 | `ui` | 6 | 1,320 | `math`, `cell-complex`, `world-objects`, `authoring`, `glue`, `runtime` | Renderer-neutral palette, help, tooltip and input-intent definitions. |
-| `render` | 104 | 23,052 | every lower layer | Three.js / DOM / WebXR rendering and input adapters (the application shell). |
+| `render` | 104 | 23,020 | every lower layer | Three.js / DOM / WebXR rendering and input adapters (the application shell). |
 | `root` | 1 | 213 | every lower layer | Entry point. |
 
 ## Layer dependency graph
@@ -59,7 +59,7 @@ flowchart LR
   interaction -->|1| glue
   interaction -->|4| math
   interaction -->|1| movement
-  interaction -->|4| world_objects
+  interaction -->|5| world_objects
   movement -->|11| cell_complex
   movement -->|21| math
   render -->|48| cell_complex
@@ -179,13 +179,13 @@ None: every import respects the intended layering.
 
 | Module | Lines | Summary | Imports |
 | --- | ---: | --- | --- |
-| `world-objects/carry.ts` | 395 | The carry contract: what it means for an object to be carried, stated once, as pure functions of the world and the object. | `cell-complex/compileCellComplex`, `cell-complex/portalRoute`, `cell-complex/segmentWalk`, `math/rigidTransform3`, `math/tolerances`, `math/vec3`, `movement/collision`, `movement/dynamicObject`, `world-objects/geodesic/objects` |
+| `world-objects/carry.ts` | 394 | The carry contract: what it means for an object to be carried, stated once, as pure functions of the world and the object. | `cell-complex/compileCellComplex`, `cell-complex/portalRoute`, `cell-complex/segmentWalk`, `math/rigidTransform3`, `math/tolerances`, `math/vec3`, `movement/developedObstacles`, `movement/sweptCollision`, `world-objects/geodesic/objects` |
 | `world-objects/creatures/geodesicMarmotBehavior.ts` | 149 | Motion of the geodesic marmot, with no renderer: the state it owns, how it advances each frame along its heading (a locally straight geodesic that stays straight as portals re-express the frame), and how it follows geom… | `cell-complex/compileCellComplex`, `cell-complex/prismCells`, `cell-complex/specs`, `cell-complex/worldGeometryDeformations`, `math/rigidTransform3`, `math/vec3`, `movement/depenetrateDynamicObject`, `movement/dynamicObject`, `movement/moveDynamicObject`, `world-objects/geodesicMarmot`, `world-objects/runtimeObjectBase`, `world-objects/runtimeObjectRegistry`, `world-objects/worldObjectOwner` |
 | `world-objects/creatures/simpleGeoCreatureBehavior.ts` | 546 | Motion of the simple geodesic creatures (the mouse and the butterfly), with no renderer: the state a creature owns, how it advances each frame, and how it follows geometry changes. | `cell-complex/compileCellComplex`, `cell-complex/prismCells`, `cell-complex/segmentWalk`, `cell-complex/specs`, `cell-complex/worldGeometryDeformations`, `math/rigidTransform3`, `math/vec3`, `movement/collision`, `movement/depenetrateDynamicObject`, `movement/dynamicObject`, `movement/moveDynamicObject`, `world-objects/runtimeObjectBase`, `world-objects/runtimeObjectRegistry`, `world-objects/simpleGeoCreature`, `world-objects/worldObjectOwner` |
 | `world-objects/geodesic/anchors.ts` | 25 | Anchors of geodesic intervals: which registry objects can hold an endpoint, and where the beam of one starts in its cell frame. | `math/vec3`, `world-objects/geodesic/objects`, `world-objects/runtimeObjectRegistry` |
 | `world-objects/geodesic/cannon.ts` | 900 | Emitter (cannon) operations: shooting, extending and re-aiming geodesics, connecting a geodesic to an emitter, rebuilding locked geodesics between emitters, and placing cannons on the floor, on a geodesic or at a geodes… | `cell-complex/compileCellComplex`, `math/rigidTransform3`, `math/vec3`, `movement/collision`, `world-objects/geodesic/endpoints`, `world-objects/geodesic/intersections`, `world-objects/geodesic/intervals`, `world-objects/geodesic/lifecycle`, `world-objects/geodesic/objects`, `world-objects/geodesic/segments`, `world-objects/geodesic/trace`, `world-objects/runtimeObjectBase`, `world-objects/runtimeObjectRegistry` |
 | `world-objects/geodesic/cannonToolState.ts` | 16 | The editing state of the geodesic emitter (cannon) tools, as plain data: which cannon and geodesic the tool works on and the endpoints picked by tie-and-detach. | `world-objects/geodesic/objects` |
-| `world-objects/geodesic/carryEnd.ts` | 173 | What an emitter does to its geodesics when it has been carried: rebuild after a move, the final rebuild when the carry ends, and the removal of the emitter when it is destroyed. | `cell-complex/compileCellComplex`, `world-objects/geodesic/cannon`, `world-objects/geodesic/intersections`, `world-objects/geodesic/lifecycle`, `world-objects/geodesic/segments`, `world-objects/runtimeObjectRegistry` |
+| `world-objects/geodesic/carryEnd.ts` | 120 | What an emitter does to its geodesics when it has been carried: rebuild after a move and the final rebuild when the carry ends. | `cell-complex/compileCellComplex`, `world-objects/geodesic/cannon`, `world-objects/geodesic/intersections`, `world-objects/geodesic/lifecycle`, `world-objects/geodesic/segments`, `world-objects/runtimeObjectRegistry` |
 | `world-objects/geodesic/curveShortening.ts` | 588 | Curve shortening: tie-and-detach of two endpoint roles into a curve-shortening pair, and its exact resolution in one tick. | `cell-complex/compileCellComplex`, `cell-complex/forbiddenZones`, `cell-complex/segmentWalk`, `math/rigidTransform3`, `math/vec2`, `math/vec3`, `world-objects/geodesic/anchors`, `world-objects/geodesic/endpoints`, `world-objects/geodesic/intersections`, `world-objects/geodesic/intervals`, `world-objects/geodesic/lifecycle`, `world-objects/geodesic/objects`, `world-objects/geodesic/portalWord`, `world-objects/geodesic/segments`, `world-objects/geodesic/sleeve`, `world-objects/runtimeObjectRegistry` |
 | `world-objects/geodesic/development.ts` | 21 | Development of portal words: inverse portal transforms, cached per compiled portal (a compiled world is immutable, so a WeakMap keyed by portal is always valid); pure. | `cell-complex/specs`, `math/rigidTransform3` |
 | `world-objects/geodesic/endpoints.ts` | 391 | Endpoint attachments of geodesic intervals: lookup by anchor, re-attachment, lifting the far endpoint into the source cell, word-against-cell-chain checks, and emitter cache cleanup. | `cell-complex/compileCellComplex`, `math/rigidTransform3`, `world-objects/geodesic/anchors`, `world-objects/geodesic/development`, `world-objects/geodesic/objects`, `world-objects/geodesic/portalWord`, `world-objects/runtimeObjectRegistry` |
@@ -243,6 +243,7 @@ None: every import respects the intended layering.
 | Module | Lines | Summary | Imports |
 | --- | ---: | --- | --- |
 | `interaction/aimTarget.ts` | 1209 | Aim picking: finds what an aim ray (desktop crosshair or XR controller) hits, across portals. | `cell-complex/compileCellComplex`, `cell-complex/prismCells`, `cell-complex/segmentWalk`, `math/rigidTransform3`, `math/vec3`, `movement/collision`, `world-objects/geodesic/objects`, `world-objects/protractorTool`, `world-objects/runtimeObjectBase`, `world-objects/runtimeObjectRegistry` |
+| `interaction/handCarry.ts` | 38 | The player's hand as a carrier: when does it let go of what it carries? | `world-objects/carry` |
 | `interaction/inputFrame.ts` | 35 | The per-frame input sample handed to the simulation by either the desktop or the XR controller (`DesktopInputFrame` in desktopControls derives from it). | `math/vec3` |
 | `interaction/vrLocomotion.ts` | 144 | Pure functions turning XR thumbstick and head-tracking input into player-local motion requests. | `glue/vrComfortOptions`, `math/vec3` |
 | `interaction/xrSessionState.ts` | 149 | Pure model of the immersive-VR session lifecycle shown in the UI and debug state, plus support detection. | — |
@@ -309,7 +310,7 @@ None: every import respects the intended layering.
 | `render/three/frameRenderSnapshot.ts` | 74 | Frame render snapshot: the portal-render values of one frame, computed once where the cell instances are written. | `render/three/renderPortalInstances`, `render/three/visiblePortalPaths` |
 | `render/three/geodesicCannonAimTarget.ts` | 35 | Computes the yaw a geodesic cannon should adopt to face a target point. | `math/vec3` |
 | `render/three/geodesicCannonRenderer.ts` | 361 | Render sources and per-frame render records for geodesic cannons, geodesic segments and geodesic intersections. | `math/rigidTransform3`, `render/three/preparedWorldAssets`, `render/three/runtimeObjectRenderRecords`, `render/three/worldAxes`, `world-objects/geodesic/objects` |
-| `render/three/geodesicCannonTools.ts` | 1066 | Geodesic emitter (cannon) tools: place, rotate, aim, carry, tie-and-detach, and delete geodesics. | `cell-complex/compileCellComplex`, `interaction/aimTarget`, `math/rigidTransform3`, `math/vec3`, `movement/collision`, `render/three/carriedGeodesicCannon`, `render/three/desktopControls`, `render/three/geodesicCannonAimTarget`, `render/three/rootAimRay`, `render/three/worldAxes`, `runtime/appSession`, `runtime/runtimeCommands`, `world-objects/carry`, `world-objects/geodesic/cannon`, `world-objects/geodesic/cannonToolState`, `world-objects/geodesic/carryEnd`, `world-objects/geodesic/curveShortening`, `world-objects/geodesic/endpoints`, `world-objects/geodesic/intersections`, `world-objects/geodesic/lifecycle`, `world-objects/geodesic/objects`, `world-objects/geodesic/segments`, `world-objects/runtimeObjectBase`, `world-objects/runtimeObjectRegistry` |
+| `render/three/geodesicCannonTools.ts` | 1034 | Geodesic emitter (cannon) tools: place, rotate, aim, carry, tie-and-detach, and delete geodesics. | `cell-complex/compileCellComplex`, `interaction/aimTarget`, `math/rigidTransform3`, `math/vec3`, `movement/collision`, `render/three/carriedGeodesicCannon`, `render/three/desktopControls`, `render/three/geodesicCannonAimTarget`, `render/three/rootAimRay`, `render/three/worldAxes`, `runtime/appSession`, `runtime/runtimeCommands`, `world-objects/carry`, `world-objects/geodesic/cannon`, `world-objects/geodesic/cannonToolState`, `world-objects/geodesic/carryEnd`, `world-objects/geodesic/curveShortening`, `world-objects/geodesic/endpoints`, `world-objects/geodesic/intersections`, `world-objects/geodesic/lifecycle`, `world-objects/geodesic/objects`, `world-objects/geodesic/segments`, `world-objects/runtimeObjectBase`, `world-objects/runtimeObjectRegistry` |
 | `render/three/geodesicCreatureDebug.ts` | 258 | Consistency checker for geodesic creatures (marmot, mouse, butterfly) that produces a debug dump. | `cell-complex/compileCellComplex`, `movement/collision`, `render/three/creatures/geodesicMarmotView`, `render/three/creatures/simpleGeoCreatureView`, `render/three/worldAxes`, `world-objects/runtimeObjectBase`, `world-objects/runtimeObjectRegistry` |
 | `render/three/geodesicDebugDumps.ts` | 384 | Console debug dumps for geodesics and geodesic creatures, plus the periodic creature consistency check. | `cell-complex/compileCellComplex`, `interaction/aimTarget`, `math/vec3`, `render/three/appDebugHelpers`, `render/three/carriedGeodesicCannon`, `render/three/creatures/geodesicMarmotView`, `render/three/creatures/simpleGeoCreatureView`, `render/three/geodesicCreatureDebug`, `runtime/appSession`, `world-objects/geodesic/lifecycle`, `world-objects/geodesic/segments`, `world-objects/runtimeObjectRegistry` |
 | `render/three/geodesicEmitterLabelController.ts` | 195 | Keeps the floating geodesic-name labels next to nearby emitters in sync with the registry. | `cell-complex/compileCellComplex`, `cell-complex/portalRoute`, `math/rigidTransform3`, `render/three/geodesicEmitterLabels`, `render/three/runtimeSceneUtils`, `render/three/worldAxes`, `runtime/appSession`, `world-objects/geodesic/segments`, `world-objects/runtimeObjectRegistry` |
@@ -396,5 +397,6 @@ None: every import respects the intended layering.
 Modules not reachable from `src/main.ts`. They are exercised only by tests; review whether they are still needed.
 
 - `authoring/validateAuthoringSpec.ts`
+- `interaction/handCarry.ts`
 - `math/intersections.ts`
 - `math/planes.ts`

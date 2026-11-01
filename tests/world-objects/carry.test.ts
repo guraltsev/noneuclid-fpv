@@ -3,8 +3,8 @@
  *
  * The carry contract (`src/world-objects/carry.ts`): an object that can be carried reacts to a stream of displacement steps.
  * The scenarios are those of design 012, P4: carrier and object in one cell; the object one and two portals away; the carrier crossing a portal
- * while carrying; the step sweeping across a junction (the object is dropped at its last valid position); the step against a wall (the object
- * stops short); a locked geodesic kept chained through all of it; the yaw turned with a quarter-turned face. Further tests pin down the rules of
+ * while carrying; the step sweeping across or ending in a junction's exclusion zone (the object stops short, as against a wall, and stays carried); the
+ * step against a wall (the object stops short); a locked geodesic kept chained through all of it; the yaw turned with a quarter-turned face. Further tests pin down the rules of
  * the stream: a long target is several steps in order, a lost frame changes nothing, pickup glides without jumping, and steps are never merged.
  * Two worlds: two square rooms side by side (`a` -> `b` through the whole side x = 5, walls elsewhere) and the cube (every side a portal,
  * every corner a junction, neighbouring faces quarter-turned).
@@ -23,12 +23,13 @@ import {
   displacementToTarget,
   locateCarrierTarget,
   reactToDisplacement,
+  remainingToTarget,
   type CarriedPlace,
   type CarryMove,
 } from "../../src/world-objects/carry";
 import { shootGeodesic, moveEmitterAlongRoute } from "../../src/world-objects/geodesic/cannon";
 import { isGeodesicLocked } from "../../src/world-objects/geodesic/lifecycle";
-import { createGeodesicCannonObject } from "../../src/world-objects/geodesic/objects";
+import { createGeodesicCannonObject, emitterConnectionToleranceMeters } from "../../src/world-objects/geodesic/objects";
 import { collectGeodesicPortalWord } from "../../src/world-objects/geodesic/segments";
 import { createRuntimeObjectRegistry } from "../../src/world-objects/runtimeObjectRegistry";
 import { compileLargePortalWorld } from "../fixtures/world-objects/geodesic";
@@ -119,45 +120,75 @@ describe("one displacement step", () => {
     expect(reactToDisplacement({ world, object: { ...placeIn("a", 0, 0), ...against }, step: { x: 0, y: 0.5 } })).toEqual({ stay: "wall" });
   });
 
-  it("is dropped at its last valid position when the step sweeps through a junction", () => {
-    const world = compileLargePortalWorld();
+  describe("an exclusion zone is a wall", () => {
+    const cubeCorner = { x: 7.5, y: -7.5 };
+    const awayFrom = (move: CarryMove, corner: { x: number; y: number }) =>
+      Math.hypot(move.placement.position.x - corner.x, move.placement.position.y - corner.y);
 
-    // Straight through the corner (7.5, -7.5) of the cube's right face and out beyond its zone.
-    expect(reactToDisplacement({ world: cubeWorld(), object: placeIn("right", 7, -7), step: { x: 0.7071, y: -0.7071 } })).toEqual({ detach: {} });
-    // A legal crossing of the portal, but within the exclusion zone (0.15 m) of the corner.
-    expect(reactToDisplacement({ world, object: placeIn("a", 4.5, 0.1), step: { x: 1, y: 0 } })).toEqual({ detach: {} });
-    // The same crossing farther from the corner is not a sweep.
-    expect("placement" in reactToDisplacement({ world, object: placeIn("a", 4.5, 0.6), step: { x: 1, y: 0 } })).toBe(true);
-  });
+    it("cuts a step that sweeps through a junction short, just before the zone", () => {
+      const world = compileLargePortalWorld();
 
-  it("widens the exclusion zone by the body radius", () => {
-    const world = compileLargePortalWorld();
-    const object = { ...placeIn("a", 4.5, 0.4), radiusMeters: 0.3 };
+      // Straight at the corner (7.5, -7.5) of the cube's right face: it stops 0.15 m (the zone) before it.
+      const head = asMove(reactToDisplacement({ world: cubeWorld(), object: placeIn("right", 7, -7), step: { x: 0.7071, y: -0.7071 } }));
+      expect(head.stoppedByZone).toBe(true);
+      expect(head.placement.cellId).toBe("right");
+      expect(awayFrom(head, cubeCorner)).toBeGreaterThanOrEqual(0.15);
+      expect(awayFrom(head, cubeCorner)).toBeLessThan(0.15 + 1e-4);
+      // A legal crossing of the portal, but within the exclusion zone (0.15 m) of the corner (5, 0): it stops in `a`, before the portal.
+      const sweep = asMove(reactToDisplacement({ world, object: placeIn("a", 4.5, 0.1), step: { x: 1, y: 0 } }));
+      expect(sweep.stoppedByZone).toBe(true);
+      expect(sweep.placement.cellId).toBe("a");
+      expect(sweep.route).toEqual([]);
+      expect(sweep.placement.position.x).toBeCloseTo(5 - Math.sqrt(0.15 ** 2 - 0.1 ** 2), 4);
+      // The same crossing farther from the corner is not cut short.
+      const clear = asMove(reactToDisplacement({ world, object: placeIn("a", 4.5, 0.6), step: { x: 1, y: 0 } }));
+      expect(clear.stoppedByZone).toBeUndefined();
+      expect(clear.placement.cellId).toBe("b");
+    });
 
-    expect(reactToDisplacement({ world, object, step: { x: 1, y: 0 } })).toEqual({ detach: {} });
-  });
+    it("widens the exclusion zone by the body radius", () => {
+      const world = compileLargePortalWorld();
+      const object = { ...placeIn("a", 4.5, 0.4), radiusMeters: emitterConnectionToleranceMeters };
 
-  it("places an object with no collision shape that ends a step in a zone", () => {
-    const world = compileLargePortalWorld();
+      const move = asMove(reactToDisplacement({ world, object, step: { x: 1, y: 0 } }));
+      expect(move.stoppedByZone).toBe(true);
+      expect(move.placement.position.x).toBeCloseTo(5 - Math.sqrt((0.15 + emitterConnectionToleranceMeters) ** 2 - 0.4 ** 2), 4);
+    });
 
-    expect("placement" in reactToDisplacement({ world, object: placeIn("a", 4, 0.05), step: { x: 0.95, y: 0 } })).toBe(true);
-  });
+    it("applies to an object with no body radius too, using the zone radius alone", () => {
+      const world = compileLargePortalWorld();
+      const move = asMove(reactToDisplacement({ world, object: placeIn("a", 4, 0.05), step: { x: 0.95, y: 0 } }));
 
-  it("destroys an emitter whose step ends with its body inside a zone", () => {
-    const emitter = createGeodesicCannonObject({ id: "e", cellId: "right", localPose: yawRigidTransform3(0, vec3(7, -7, 0)) });
-    const object = { ...placeIn("right", 7, -7), collision: emitter.collision };
+      expect(move.stoppedByZone).toBe(true);
+      expect(move.placement.position.x).toBeCloseTo(5 - Math.sqrt(0.15 ** 2 - 0.05 ** 2), 4);
+    });
 
-    // Ends at (7.4, -7.4), 0.14 m from the corner (7.5, -7.5) whose zone has radius 0.15 m: inside, not a sweep.
-    expect(reactToDisplacement({ world: cubeWorld(), object, step: { x: 0.4, y: -0.4 } })).toEqual({ destroy: { reason: "forbidden-zone" } });
-    // The same direction ending clear of the zone and the body (0.15 m + the emitter's radius) is a plain move.
-    expect("placement" in reactToDisplacement({ world: cubeWorld(), object, step: { x: 0.1, y: -0.1 } })).toBe(true);
-  });
+    it("stops an emitter whose body would end inside a zone, without destroying or detaching it", () => {
+      const object = { ...placeIn("right", 7, -7), radiusMeters: emitterConnectionToleranceMeters };
 
-  it("drops, not destroys, an emitter whose step only passes through a zone", () => {
-    const emitter = createGeodesicCannonObject({ id: "e", cellId: "right", localPose: yawRigidTransform3(0, vec3(7, -7, 0)) });
-    const object = { ...placeIn("right", 7, -7), collision: emitter.collision, radiusMeters: emitter.collision?.radius };
+      // Ends at (7.4, -7.4), 0.14 m from the corner, inside the zone widened by the body (0.15 + 0.3 m).
+      const stopped = asMove(reactToDisplacement({ world: cubeWorld(), object, step: { x: 0.4, y: -0.4 } }));
+      expect(stopped.stoppedByZone).toBe(true);
+      expect(awayFrom(stopped, cubeCorner)).toBeGreaterThanOrEqual(0.15 + emitterConnectionToleranceMeters);
+      // The same direction ending clear of the zone and the body is a plain move.
+      expect(asMove(reactToDisplacement({ world: cubeWorld(), object, step: { x: 0.1, y: -0.1 } })).stoppedByZone).toBeUndefined();
+    });
 
-    expect(reactToDisplacement({ world: cubeWorld(), object, step: { x: 0.7071, y: -0.7071 } })).toEqual({ detach: {} });
+    it("stays when it already stands against the zone and the step goes on toward it", () => {
+      const object = { ...placeIn("right", 7, -7), radiusMeters: emitterConnectionToleranceMeters };
+      const against = asMove(reactToDisplacement({ world: cubeWorld(), object, step: { x: 0.4, y: -0.4 } })).placement;
+
+      expect(reactToDisplacement({ world: cubeWorld(), object: { ...object, ...against }, step: { x: 0.2, y: -0.2 } })).toEqual({ stay: "zone" });
+    });
+
+    it("moves away from a zone it stands against, and along it", () => {
+      const object = { ...placeIn("right", 7, -7), radiusMeters: emitterConnectionToleranceMeters };
+      const against = { ...object, ...asMove(reactToDisplacement({ world: cubeWorld(), object, step: { x: 0.4, y: -0.4 } })).placement };
+
+      const back = asMove(reactToDisplacement({ world: cubeWorld(), object: against, step: { x: -0.2, y: 0.2 } }));
+      expect(back.stoppedByZone).toBeUndefined();
+      expect(awayFrom(back, cubeCorner)).toBeGreaterThan(awayFrom({ placement: against, route: [] }, cubeCorner));
+    });
   });
 
   it("turns the yaw with the face crossed, on the cube", () => {
@@ -223,24 +254,60 @@ describe("the stream of steps", () => {
     expect(apart).toBeGreaterThan(0.5);
   });
 
-  it("is dropped at the last valid position when a later step sweeps a junction", () => {
+  it("stops at the edge of a zone a later step would sweep and reports the remaining distance", () => {
     const world = cubeWorld();
     // Written in the right face's frame, straight down along x = 7.4, 0.1 m from the corner (7.5, -7.5).
-    const { place, end, moves } = carry(world, placeIn("right", 7.4, -6), target("right", 7.4, -9));
+    const { place, end, moves, remaining } = carry(world, placeIn("right", 7.4, -6), target("right", 7.4, -9));
 
-    expect(end).toBe("detached");
-    expect(moves).toHaveLength(1);
+    expect(end).toBe("zone");
+    expect(moves).toHaveLength(2);
     expect(place.cellId).toBe("right");
-    expect(place.position.y).toBeCloseTo(-7, 9);
+    expect(place.position.y).toBeCloseTo(-7.5 + Math.sqrt(0.15 ** 2 - 0.1 ** 2), 4);
+    expect(remaining).toBeCloseTo(9 + place.position.y, 4);
   });
 
-  it("ends the stream without committing the step when the emitter is destroyed", () => {
-    const emitter = createGeodesicCannonObject({ id: "e", cellId: "right", localPose: yawRigidTransform3(0, vec3(7, -7, 0)) });
-    const object = { ...placeIn("right", 7, -7), collision: emitter.collision };
-    const stream = carry(cubeWorld(), object, target("right", 7.4, -7.4));
+  it("keeps an emitter at a zone's edge, still carried, while the hand is held beyond it", () => {
+    const world = cubeWorld();
+    const object = { ...placeIn("right", 7, -7), radiusMeters: emitterConnectionToleranceMeters };
+    const hand = target("right", 7.45, -7.45);
+    const first = carry(world, object, hand);
+    const second = carry(world, first.place, hand);
 
-    expect(stream.end).toBe("destroyed");
-    expect(stream.moves).toEqual([]);
+    expect(first.end).toBe("zone");
+    expect(first.moves.length).toBeGreaterThan(0);
+    // Nothing more happens while the hand stays: no step, no end of the carry, the same place.
+    expect(second.end).toBe("zone");
+    expect(second.moves).toHaveLength(0);
+    expect(second.place).toEqual(first.place);
+    // When the hand moves away, the emitter follows again.
+    const away = carry(world, second.place, target("right", 6, -6));
+    expect(away.end).toBe("arrived");
+  });
+
+  it("never gets stuck in a loop at a zone when moved in tiny steps", () => {
+    const world = cubeWorld();
+    const hand = target("right", 7.4, -7.4);
+    let place: CarriedPlace = { ...placeIn("right", 6.2, -6.2), radiusMeters: emitterConnectionToleranceMeters };
+    const ends = new Set<string>();
+
+    for (let frame = 0; frame < 200; frame += 1) {
+      const advance = carry(world, place, hand, 0.02);
+      ends.add(advance.end);
+      place = advance.place;
+    }
+
+    // Every frame was either limited by the travel allowed or stopped by the zone; none was refused, lost or ended the carry.
+    expect([...ends].every((end) => end === "travel-limited" || end === "zone")).toBe(true);
+    expect(ends.has("zone")).toBe(true);
+    expect(Math.hypot(place.position.x - 7.5, place.position.y + 7.5)).toBeGreaterThanOrEqual(0.15 + emitterConnectionToleranceMeters);
+  });
+
+  it("reports the remaining distance to the target, or that it is unreachable", () => {
+    const world = compileLargePortalWorld();
+
+    expect(carry(world, placeIn("a", 1, 2.5), target("a", 4.5, 2.5)).remaining).toBeCloseTo(0, 6);
+    expect(carry(world, placeIn("a", 2.5, 2.5), target("a", 2.5, 4), 0.5).remaining).toBeCloseTo(1, 6);
+    expect(remainingToTarget(world, placeIn("a", 1, 1), target("a", 4, 5))).toBeCloseTo(5, 6);
   });
 
   it("stops short of a wall after a gliding step and reports it", () => {

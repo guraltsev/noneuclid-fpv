@@ -13,19 +13,19 @@
  *     of the step crossed, read off the walk, never inferred from positions.
  *   - Orientation: the object keeps its physical direction, so its yaw turns with the frames of the faces it crosses.
  *   - A wall in the way: the object stops just short of it (`carryWallMarginMeters`), and the reaction says it was stopped by the wall.
- *   - The step (not the object) sweeps across a portal junction's exclusion zone: the object stays at its last valid position and is
- *     detached (`{ detach }`), so it stays continuous and no portal word becomes illegal. The kick that will later send it flying is the
- *     `impulse` of the same outcome.
- *   - An object that ends a step inside an exclusion zone (its collision shape, when it gives one, overlaps a zone) is destroyed:
- *     the reaction is `{ destroy: { reason: "forbidden-zone" } }`. The object decides this itself; a carrier only applies it. An object
- *     that gives no collision shape cannot touch a zone and is placed. Later, touching a zone will end the carry with a kick instead,
- *     which is `{ detach: { impulse } }` in place of `{ destroy }` here and nowhere else.
- *   - The two zone rules differ at one edge, on purpose and as before: a step that only passes through a zone is dropped at its last
- *     valid position (continuity), while a step that ends inside one, including a step the wall stopped inside one, destroys the object.
- * - Release is a detach and nothing else on the carrier's side. What the emitter does to its geodesics when the carry ends (the final
- *   rebuild without the carry's safety net, pruning what vanished), and what it does when it is destroyed, are rules of the emitter, in
- *   `geodesic/carryEnd.ts`: `releaseCarriedEmitter` and `destroyEmitter`. Every carrier ends a carry through them, whether the emitter was
- *   put down, dropped by a swept junction or destroyed.
+ *   - A portal junction's exclusion zone is a wall (maintainer, 2026-11-01): a step that would enter the zone widened by the body radius, or
+ *     sweep through it, is cut short just before the zone (`carryZoneMarginMeters`) and the reaction says it was stopped by the zone. The
+ *     object is still carried, nothing is destroyed or detached because of a zone, and the hand can move on: the next step away from the
+ *     zone is free. This replaces the earlier rules "drop at the last valid position on a swept junction" and "destroy on touch". Every
+ *     step is a valid shorter step, so a locked geodesic stays chained. The zone geometry is the shared swept-collision code of the
+ *     movement layer (`collectDevelopedObstacles`, `sweepDiscAgainstObstacle`), so creatures and carried emitters see the same zones; the
+ *     difference is that a carried object stops where a creature slides. Walls stay as above (the anchor stops, not the body).
+ *   - A later kick is not part of this contract: if touching a zone should ever end a carry and fling the object, that is a new outcome of
+ *     this reaction and a change in this one function.
+ * - Release is a detach and nothing else on the carrier's side, and so is the decision to let go of a distant object, which is the
+ *   carrier's policy (`src/interaction/handCarry.ts` for the hand), not the object's. What the emitter does to its geodesics when the carry
+ *   ends (the final rebuild without the carry's safety net, pruning what vanished) is a rule of the emitter, in `geodesic/carryEnd.ts`
+ *   (`releaseCarriedEmitter`); every carrier ends a carry through it.
  * - Carriers should not carry an object another carrier holds; if they do, the steps interleave, which is safe (every step is checked
  *   on its own) but erratic. The contract stays stateless and keeps no table of carriers.
  *
@@ -43,13 +43,12 @@ import {
   identityRigidTransform3,
   invertRigidTransform3,
   transformPoint3,
-  yawRigidTransform3,
   type RigidTransform3,
 } from "../math/rigidTransform3";
-import { degenerateLengthMeters } from "../math/tolerances";
+import { collisionSkinMeters, degenerateLengthMeters } from "../math/tolerances";
 import { vec3, type Vec3 } from "../math/vec3";
-import { testCellCollision } from "../movement/collision";
-import type { DynamicObjectCollisionShape } from "../movement/dynamicObject";
+import { collectDevelopedObstacles } from "../movement/developedObstacles";
+import { sweepDiscAgainstObstacle } from "../movement/sweptCollision";
 import { sanitizeYaw } from "./geodesic/objects";
 
 /** Longest displacement step the reaction is defined for, in meters. */
@@ -58,6 +57,8 @@ export const carryStepCapMeters = 1;
 export const carryMaxSpeedMetersPerSecond = 20;
 /** Distance a carried object keeps from a wall it was stopped by, in meters. */
 export const carryWallMarginMeters = 0.02;
+/** Distance a carried object keeps from an exclusion zone it was stopped by, in meters: the skin the movement layer keeps from every obstacle. */
+export const carryZoneMarginMeters = collisionSkinMeters;
 /** Distance to the target under which the object counts as having arrived, in meters. */
 export const carryArrivalToleranceMeters = 1e-4;
 /** Most steps one call of `carryTowardTarget` applies; the rest of the way is left to the next frame. */
@@ -83,10 +84,8 @@ export interface CarriedPlace {
   readonly cellId: string;
   readonly position: Vec3;
   readonly yawRadians: number;
-  /** Radius of the object's body, used to keep a swept step out of the exclusion zones; default 0. */
+  /** Radius of the object's body, added to the radius of every exclusion zone it must keep out of; default 0. */
   readonly radiusMeters?: number;
-  /** The object's collision shape, used to decide whether it touches a forbidden zone where it ends a step; without one it cannot touch a zone. */
-  readonly collision?: DynamicObjectCollisionShape;
 }
 
 /** A displacement step: a vector in the frame of the cell the object is in, at most `carryStepCapMeters` long. */
@@ -102,22 +101,19 @@ export interface CarryPlacement {
   readonly yawRadians: number;
 }
 
-/** The step moved the object: its new place, the portals crossed (in order) and whether a wall cut the step short. */
+/** The step moved the object: its new place, the portals crossed (in order) and whether a wall or an exclusion zone cut the step short. */
 export interface CarryMove {
   readonly placement: CarryPlacement;
   readonly route: readonly PortalRouteHop[];
   readonly stoppedByWall?: true;
+  readonly stoppedByZone?: true;
 }
 
 /** Why a step did not move the object. */
-export type CarryStayReason = "wall" | "step-exceeds-cap" | "walk-failed";
+export type CarryStayReason = "wall" | "zone" | "step-exceeds-cap" | "walk-failed";
 
-/** What an object does with one displacement step. */
-export type CarryReaction =
-  | CarryMove
-  | { readonly stay: CarryStayReason }
-  | { readonly detach: { readonly impulse?: Vec3 } }
-  | { readonly destroy: { readonly reason: "forbidden-zone" } };
+/** What an object does with one displacement step: it moves (possibly cut short), or it stays. The object stays carried either way. */
+export type CarryReaction = CarryMove | { readonly stay: CarryStayReason };
 
 /** The reaction of a carried object to one displacement step; see the module header for the rules. Pure. */
 export function reactToDisplacement(input: {
@@ -142,6 +138,7 @@ export function reactToDisplacement(input: {
   let walk = walkTo(length);
   let travelled = length;
   let stoppedByWall = false;
+  let stoppedByZone = false;
 
   if (walk.status === "wall") {
     const wallPiece = walk.pieces[walk.pieces.length - 1];
@@ -152,16 +149,24 @@ export function reactToDisplacement(input: {
     walk = walkTo(travelled);
     stoppedByWall = true;
   }
+
+  // An exclusion zone is a wall too: the part of the step before the body would touch a zone, less the margin.
+  const beforeZone = distanceBeforeExclusionZone(world, object, start, direction, travelled);
+  if (beforeZone !== undefined) {
+    if (beforeZone <= degenerateLengthMeters) {
+      return { stay: "zone" };
+    }
+    travelled = beforeZone;
+    walk = walkTo(travelled);
+    stoppedByWall = false;
+    stoppedByZone = true;
+  }
   const last = walk.pieces[walk.pieces.length - 1];
   if (walk.status !== "end" || !last) {
     return { stay: "walk-failed" };
   }
 
   const endInStartFrame = { x: start.x + direction.x * travelled, y: start.y + direction.y * travelled };
-  if (sweepsAcrossJunction(world, walk, start, direction, endInStartFrame, object.radiusMeters ?? 0)) {
-    return { detach: {} };
-  }
-
   const turn = walk.crossings.reduce(
     (frame, crossing) => composeRigidTransform3(crossing.transformToTarget, frame),
     identityRigidTransform3,
@@ -182,75 +187,48 @@ export function reactToDisplacement(input: {
     })),
   };
 
-  if (touchesForbiddenZone(world, object.collision, move.placement)) {
-    return { destroy: { reason: "forbidden-zone" } };
+  if (stoppedByZone) {
+    return { ...move, stoppedByZone: true };
   }
 
   return stoppedByWall ? { ...move, stoppedByWall: true } : move;
 }
 
-// Whether the object's collision shape, at the place a step leaves it, overlaps a forbidden zone of that cell.
-function touchesForbiddenZone(
+// How far along the straight step (at most `length` meters) the body can go before it would touch an exclusion zone, less the margin; undefined
+// when it touches none. The zones are those of the shared movement code: `collectDevelopedObstacles` develops the neighbouring cells around the
+// body and returns each zone as a disc of the zone's radius plus the body's, and `sweepDiscAgainstObstacle` finds the first approaching hit
+// (a body already inside a zone may move away from it or along it, never deeper in). A creature slides along what it hits; a carried object stops.
+function distanceBeforeExclusionZone(
   world: CompiledCellComplex,
-  collision: DynamicObjectCollisionShape | undefined,
-  placement: CarryPlacement,
-): boolean {
-  const cell = world.cellsById.get(placement.cellId);
-  if (!cell || !collision) {
-    return false;
-  }
-
-  return testCellCollision({
-    cell,
-    object: {
-      cellId: placement.cellId,
-      localPose: yawRigidTransform3(placement.yawRadians, placement.position),
-      collision,
-    },
-  }).reason === "forbidden-zone";
-}
-
-// Whether the walked segment passes through the exclusion zone of a junction (widened by the body radius) without ending inside that zone.
-// An end inside a zone is the object touching it, which is the caller's rule, not a sweep.
-function sweepsAcrossJunction(
-  world: CompiledCellComplex,
-  walk: SegmentWalkResult,
+  object: CarriedPlace,
   start: { readonly x: number; readonly y: number },
   direction: { readonly x: number; readonly y: number },
-  end: { readonly x: number; readonly y: number },
-  bodyRadiusMeters: number,
-): boolean {
-  const lastIndex = walk.pieces.length - 1;
-
-  return walk.pieces.some((piece, index) => {
-    const cell = world.cellsById.get(piece.cellId);
-    if (!cell) {
-      return false;
-    }
-    const from = transformPoint3(piece.cellFromStart, vec3(start.x + direction.x * piece.tEnter, start.y + direction.y * piece.tEnter, 0));
-    const to = transformPoint3(piece.cellFromStart, vec3(start.x + direction.x * piece.tExit, start.y + direction.y * piece.tExit, 0));
-    const endInCell = index === lastIndex ? transformPoint3(piece.cellFromStart, vec3(end.x, end.y, 0)) : undefined;
-
-    return cell.singularityColumns.some((column) => {
-      const reach = column.radius + bodyRadiusMeters;
-      if (endInCell && Math.hypot(endInCell.x - column.center.x, endInCell.y - column.center.y) < reach) {
-        return false;
-      }
-
-      return distanceFromPointToSegment(column.center, from, to) < reach;
-    });
+  length: number,
+): number | undefined {
+  const radius = object.radiusMeters ?? 0;
+  const obstacles = collectDevelopedObstacles({
+    world,
+    cellId: object.cellId,
+    center: start,
+    reachMeters: radius + length + 2 * collisionSkinMeters,
+    bodyRadius: radius,
+    bodyBottomZ: object.position.z,
+    bodyTopZ: object.position.z,
   });
-}
+  const path = { x: direction.x * length, y: direction.y * length };
+  let firstS: number | undefined;
 
-function distanceFromPointToSegment(point: { readonly x: number; readonly y: number }, a: Vec3, b: Vec3): number {
-  const abx = b.x - a.x;
-  const aby = b.y - a.y;
-  const lengthSquared = abx * abx + aby * aby;
-  const t = lengthSquared <= degenerateLengthMeters
-    ? 0
-    : Math.min(1, Math.max(0, ((point.x - a.x) * abx + (point.y - a.y) * aby) / lengthSquared));
+  for (const obstacle of obstacles) {
+    if (obstacle.reason !== "forbidden-zone") {
+      continue;
+    }
+    const hit = sweepDiscAgainstObstacle(start, path, obstacle);
+    if (hit && (firstS === undefined || hit.s < firstS)) {
+      firstS = hit.s;
+    }
+  }
 
-  return Math.hypot(point.x - (a.x + abx * t), point.y - (a.y + aby * t));
+  return firstS === undefined ? undefined : Math.max(0, firstS * length - carryZoneMarginMeters);
 }
 
 /**
@@ -308,31 +286,45 @@ export function displacementToTarget(world: CompiledCellComplex, object: Carried
   return { x: targetInObjectFrame.x - object.position.x, y: targetInObjectFrame.y - object.position.y };
 }
 
-/** How `carryTowardTarget` ended. */
+/** How `carryTowardTarget` ended. The object is still carried after every one of these; letting go is the carrier's decision. */
 export type CarryAdvanceEnd =
   | "arrived"
   | "travel-limited"
   | "step-limited"
   | "wall"
-  | "detached"
-  | "destroyed"
+  | "zone"
   | "refused"
   | "no-route";
 
-/** What `carryTowardTarget` did: where the object is now and how many steps were applied. */
+/**
+ * How far the object is from the target: the length of the displacement along the valid straight development, in meters, or
+ * "unreachable" when no development of at most six portals reaches the target. A carrier decides from this whether to hold on or let go.
+ */
+export type CarryRemaining = number | "unreachable";
+
+/** What `carryTowardTarget` did: where the object is now, how many steps were applied and how far from the target it ended. */
 export interface CarryAdvance {
   readonly place: CarriedPlace;
   readonly steps: number;
   readonly end: CarryAdvanceEnd;
-  /** The impulse of a detach, if the object's reaction asked for one. */
-  readonly impulse?: Vec3;
+  /** Distance from `place` to the target when the call ended, or "unreachable". */
+  readonly remaining: CarryRemaining;
+}
+
+/** The distance from the object to the target along the valid straight development, or "unreachable". */
+export function remainingToTarget(world: CompiledCellComplex, object: CarriedPlace, target: CellPoint): CarryRemaining {
+  const displacement = displacementToTarget(world, object, target);
+
+  return displacement ? Math.hypot(displacement.x, displacement.y) : "unreachable";
 }
 
 /**
  * Moves a carried object toward a target as a stream of steps: each is the displacement to the target from the object's current place (in
  * the nearest valid straight development), cut to at most the step cap and to what is left of `maxTravelMeters` (no limit when absent).
  * Every step goes to `reactToDisplacement` and its result to `commit`, which stores it and answers whether it was accepted (false stops the
- * stream with end "refused"). Pure apart from `commit`. At most `carryMaxStepsPerCall` steps are applied.
+ * stream with end "refused"). A step cut short by a wall or an exclusion zone ends the call with "wall" or "zone" and the object stays
+ * carried. The result reports the remaining distance to the target, for the carrier's own policy. Pure apart from `commit`.
+ * At most `carryMaxStepsPerCall` steps are applied.
  */
 export function carryTowardTarget(input: {
   readonly world: CompiledCellComplex;
@@ -344,18 +336,28 @@ export function carryTowardTarget(input: {
   let place = input.object;
   let travelLeft = input.maxTravelMeters ?? Infinity;
   let steps = 0;
+  // The distance measured from the current place at the top of the loop; it is the answer whenever the loop ends before the object moves again.
+  let remaining: CarryRemaining = "unreachable";
+  const ended = (end: CarryAdvanceEnd, measuredFromPlace: boolean): CarryAdvance => ({
+    place,
+    steps,
+    end,
+    remaining: measuredFromPlace ? remaining : remainingToTarget(input.world, place, input.target),
+  });
 
   while (steps < carryMaxStepsPerCall) {
     const displacement = displacementToTarget(input.world, place, input.target);
     if (!displacement) {
-      return { place, steps, end: "no-route" };
+      remaining = "unreachable";
+      return ended("no-route", true);
     }
     const distance = Math.hypot(displacement.x, displacement.y);
+    remaining = distance;
     if (distance <= carryArrivalToleranceMeters) {
-      return { place, steps, end: "arrived" };
+      return ended("arrived", true);
     }
     if (travelLeft <= degenerateLengthMeters) {
-      return { place, steps, end: "travel-limited" };
+      return ended("travel-limited", true);
     }
 
     const stepLength = Math.min(distance, carryStepCapMeters, travelLeft);
@@ -364,17 +366,11 @@ export function carryTowardTarget(input: {
       object: place,
       step: { x: (displacement.x / distance) * stepLength, y: (displacement.y / distance) * stepLength },
     });
-    if ("detach" in reaction) {
-      return { place, steps, end: "detached", ...(reaction.detach.impulse ? { impulse: reaction.detach.impulse } : {}) };
-    }
-    if ("destroy" in reaction) {
-      return { place, steps, end: "destroyed" };
-    }
     if ("stay" in reaction) {
-      return { place, steps, end: "wall" };
+      return ended(reaction.stay === "zone" ? "zone" : "wall", true);
     }
     if (!input.commit(reaction)) {
-      return { place, steps, end: "refused" };
+      return ended("refused", true);
     }
 
     place = {
@@ -386,9 +382,12 @@ export function carryTowardTarget(input: {
     steps += 1;
     travelLeft -= stepLength;
     if (reaction.stoppedByWall) {
-      return { place, steps, end: "wall" };
+      return ended("wall", false);
+    }
+    if (reaction.stoppedByZone) {
+      return ended("zone", false);
     }
   }
 
-  return { place, steps, end: "step-limited" };
+  return ended("step-limited", false);
 }

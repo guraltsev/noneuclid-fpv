@@ -1,8 +1,8 @@
 /**
  * `tests/world-objects/carryEnd.test.ts` — unit tier.
  *
- * What an emitter does to its geodesics when a carry ends or when it is destroyed (`src/world-objects/geodesic/carryEnd.ts`): the rebuild after
- * a move, the final rebuild at release, and the removal of the emitter with its geodesics. The scene is the cube with a locked geodesic from an
+ * What an emitter does to its geodesics when it has been carried (`src/world-objects/geodesic/carryEnd.ts`): the rebuild after a move and the
+ * final rebuild at release. The scene is the cube with a locked geodesic from an
  * emitter on the front face to one on the right face, the carried one.
  */
 import { describe, expect, it } from "vitest";
@@ -10,7 +10,7 @@ import { cube } from "../../src/authoring/exampleWorlds";
 import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
 import { vec3 } from "../../src/math/vec3";
 import { yawRigidTransform3 } from "../../src/math/rigidTransform3";
-import { destroyEmitter, rebuildEmitterGeodesics, releaseCarriedEmitter } from "../../src/world-objects/geodesic/carryEnd";
+import { rebuildEmitterGeodesics, releaseCarriedEmitter } from "../../src/world-objects/geodesic/carryEnd";
 import { moveEmitterAlongRoute, shootGeodesic } from "../../src/world-objects/geodesic/cannon";
 import { isGeodesicLocked } from "../../src/world-objects/geodesic/lifecycle";
 import { createGeodesicCannonObject } from "../../src/world-objects/geodesic/objects";
@@ -101,24 +101,5 @@ describe("releasing a carried emitter", () => {
 
     expect(release.rebuiltGeodesicIds).toEqual([]);
     expect(registry.get("lone")).toBe(before);
-  });
-});
-
-describe("destroying an emitter", () => {
-  it("removes it and its geodesics after the caller dropped what depends on them", () => {
-    const { registry } = lockedCube();
-    const seen: Array<{ geodesicId: string; geodesicStillThere: boolean }> = [];
-
-    const destroyed = destroyEmitter({
-      registry,
-      emitterId: "cannon-b",
-      removeDerivedObjectsOfGeodesic: (geodesicId) => seen.push({ geodesicId, geodesicStillThere: registry.get(geodesicId) !== undefined }),
-    });
-
-    expect(destroyed.removedGeodesicIds).toContain("g-a");
-    expect(seen).toContainEqual({ geodesicId: "g-a", geodesicStillThere: true });
-    expect(registry.get("cannon-b")).toBeUndefined();
-    expect(registry.get("g-a")).toBeUndefined();
-    expect(registry.get("cannon-a")).toBeDefined();
   });
 });

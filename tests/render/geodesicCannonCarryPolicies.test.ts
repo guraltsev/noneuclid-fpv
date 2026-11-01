@@ -4,7 +4,7 @@
  * The carry tool sends displacement steps and applies the carry contract's answer (`src/world-objects/carry.ts`, tested in
  * `tests/world-objects/carry.test.ts`); these tests drive the real tool (`createGeodesicCannonTools`) through the agreed policies:
  * - the emitter stops just short of a wall that stands between it and the hand;
- * - a step that sweeps across a junction ends the carry and leaves the emitter at its last valid position;
+ * - an exclusion zone is a wall: a step that would sweep across or end inside one stops short of it, and the emitter stays carried;
  * - the emitter glides to the hand at no more than the speed cap when the tool is told how much time passed.
  * `tests/render/geodesicCannonCarry.test.ts` keeps the release, re-homing, glow and yaw behaviour.
  */
@@ -18,7 +18,7 @@ import { createTestAppSession } from "../support/appSession";
 import { carryMaxSpeedMetersPerSecond } from "../../src/world-objects/carry";
 import { shootGeodesic } from "../../src/world-objects/geodesic/cannon";
 import { isGeodesicLocked } from "../../src/world-objects/geodesic/lifecycle";
-import { createGeodesicCannonObject } from "../../src/world-objects/geodesic/objects";
+import { createGeodesicCannonObject, emitterConnectionToleranceMeters } from "../../src/world-objects/geodesic/objects";
 import { createRuntimeObjectRegistry, type RuntimeObjectRegistry } from "../../src/world-objects/runtimeObjectRegistry";
 import { createGeodesicCannonTools } from "../../src/render/three/geodesicCannonTools";
 import type { RootAimRay } from "../../src/render/three/rootAimRay";
@@ -97,37 +97,45 @@ describe("the carry tool applies the agreed policies", () => {
     expect(isGeodesicLocked(registry, "g-a")).toBe(true);
   });
 
-  it("drops the emitter at its last valid position when a step sweeps across a junction", () => {
+  it("stops the emitter at a junction's zone, still carried, when a step would sweep it", () => {
     // Two rooms; the emitter hangs in b at x = 1.6, y = 4.7. The hand is in a at y = 4.7, so the glide crosses the portal 0.3 m from the corner
     // (0, 5): inside the exclusion zone (0.15 m) widened by the emitter's body, though the portal itself is open.
     const world = compileLargePortalWorld();
     const registry = createRuntimeObjectRegistry();
     registry.add(createGeodesicCannonObject({ id: "lamp", cellId: "b", localPose: yawRigidTransform3(0, { x: 1.6, y: 4.7, z: 0 }) }));
     const { tools, selectedTool } = createHarness(world, registry, { ...createDefaultPlayerPose("a"), position: { x: 3.5, y: 2.5, z: 0 } });
+    const stopX = Math.sqrt((0.15 + emitterConnectionToleranceMeters) ** 2 - 0.3 ** 2);
 
     tools.startGeodesicCannonCarry("lamp");
     expect(selectedTool()).toBe("geodesic-cannon-carry");
     tools.updateCarriedGeodesicCannonPose(true, handAt(4, 4.7));
 
-    // It followed the hand for one step, then the next step would have swept the corner: the carry ended and the emitter stays put.
-    expect(selectedTool()).toBe("none");
+    // It followed the hand for one step, then the next step would have swept the zone: it stops at the zone's edge and is still carried.
+    expect(selectedTool()).toBe("geodesic-cannon-carry");
     expect(registry.get("lamp")).toMatchObject({ kind: "geodesic-cannon", cellId: "b" });
-    expect(registry.get("lamp")?.localPose.translation.x).toBeCloseTo(0.6, 6);
+    expect(registry.get("lamp")?.localPose.translation.x).toBeCloseTo(stopX, 3);
     expect(registry.get("lamp")?.localPose.translation.y).toBeCloseTo(4.7, 6);
+    // The hand stays where it is: another frame changes nothing and the carry goes on.
+    tools.updateCarriedGeodesicCannonPose(true, handAt(4, 4.7));
+    expect(selectedTool()).toBe("geodesic-cannon-carry");
+    expect(registry.get("lamp")?.localPose.translation.x).toBeCloseTo(stopX, 3);
   });
 
-  it("destroys the emitter and its geodesic when the hand puts it inside a forbidden zone", () => {
+  it("stops the emitter at a forbidden zone the hand put it in, keeping it and its geodesic", () => {
     const { registry, tools, selectedTool } = setupRooms(3.5, 2.5);
 
     tools.startGeodesicCannonCarry("cannon-a");
     // The hand is 0.22 m from the corner (5, 5) of the room, inside its exclusion zone widened by the emitter's body, and the glide
-    // does not cross a portal on the way: the emitter ends its step in the zone.
+    // does not cross a portal on the way: the emitter stops at the edge of the zone.
     tools.updateCarriedGeodesicCannonPose(true, handAt(4.9, 4.8));
 
-    expect(registry.get("cannon-a")).toBeUndefined();
-    expect(registry.get("g-a")).toBeUndefined();
+    const emitter = registry.get("cannon-a");
+    expect(emitter).toMatchObject({ kind: "geodesic-cannon", cellId: "a" });
+    expect(Math.hypot((emitter?.localPose.translation.x ?? 0) - 5, (emitter?.localPose.translation.y ?? 0) - 5))
+      .toBeGreaterThanOrEqual(0.15 + emitterConnectionToleranceMeters);
+    expect(registry.get("g-a")).toBeDefined();
     expect(registry.get("cannon-b")).toBeDefined();
-    expect(selectedTool()).toBe("none");
+    expect(selectedTool()).toBe("geodesic-cannon-carry");
   });
 
   it("glides to the hand no faster than the speed cap when told how much time passed", () => {

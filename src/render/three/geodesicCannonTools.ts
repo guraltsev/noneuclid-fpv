@@ -55,7 +55,7 @@ import {
 import { createDesktopControls } from "./desktopControls";
 import { resolveGeodesicCannonAimYawFromAbsolutePoints } from "./geodesicCannonAimTarget";
 import { carryMaxSpeedMetersPerSecond, carryTowardTarget, locateCarrierTarget } from "../../world-objects/carry";
-import { destroyEmitter, rebuildEmitterGeodesics, releaseCarriedEmitter } from "../../world-objects/geodesic/carryEnd";
+import { rebuildEmitterGeodesics, releaseCarriedEmitter } from "../../world-objects/geodesic/carryEnd";
 import {
   RootAimRay,
   getAimForwardVector,
@@ -747,7 +747,6 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
         position: cannon.localPose.translation,
         yawRadians: cannon.aimYawRadians,
         radiusMeters: emitterBody?.radius,
-        collision: cannon.collision,
       },
       target: { cellId: hand.cellId, point: { x: hand.point.x, y: hand.point.y, z: 0 } },
       maxTravelMeters: deltaSeconds === undefined ? undefined : carryMaxSpeedMetersPerSecond * deltaSeconds,
@@ -771,11 +770,6 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
         return moved.moved;
       },
     });
-    if (advance.end === "destroyed") {
-      // The emitter touched a forbidden zone and ended: it goes, with its geodesics.
-      destroyCarriedGeodesicCannon(cannon.id);
-      return;
-    }
     if (advance.steps > 0) {
       const rebuild = rebuildEmitterGeodesics({
         world: deps.getWorld(),
@@ -788,11 +782,6 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
       refreshAfterEmitterRebuild(cannon.id, rebuild);
       syncRuntimeObjectPortalInstances();
       syncSelectableHitboxDebug();
-    }
-    if (advance.end === "detached") {
-      // The step would have swept across a junction: the emitter is dropped where it is.
-      finishGeodesicCannonCarry();
-      return;
     }
     syncCarriedGeodesicCannonGlow(anchor);
   }
@@ -812,27 +801,6 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
         activeGeodesicId: rebuild.regrownActiveGeodesicId,
       } });
     }
-  }
-
-  // The emitter touched a forbidden zone and ends. The emitter's rule removes it with its geodesics; the tool drops the overlays of those
-  // geodesics, clears its own state and redraws.
-  function destroyCarriedGeodesicCannon(cannonId: string): void {
-    const destroyed = destroyEmitter({
-      registry: runtimeObjectRegistry,
-      emitterId: cannonId,
-      removeDerivedObjectsOfGeodesic: (geodesicId) => {
-        removeProtractorAnglesForGeodesic(geodesicId);
-        removeMeasuredGeodesicLengthsForGeodesic(geodesicId);
-      },
-    });
-    deps.dispatch({ kind: "set-cannon-tool-state", state: {} });
-    geodesicCannonRotationTargetLengthMeters = undefined;
-    deps.dispatch({ kind: "clear-selected-tool" });
-    clearCarriedGeodesicCannonGlow();
-    removeProtractorAnglesForMissingVertices(destroyed.prunedIntersectionIds);
-    syncRuntimeObjectPortalInstances();
-    syncSelectableHitboxDebug();
-    syncDesktopPalette();
   }
 
   // The glow is a child of the scene, which is drawn in the player's frame, so it goes at the hand (the emitter's place as seen
