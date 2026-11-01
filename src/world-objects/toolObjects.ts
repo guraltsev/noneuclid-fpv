@@ -22,7 +22,6 @@ export interface PlacedFlagObject extends RuntimeWorldObjectBase {
   readonly kind: "placed-flag";
   readonly flagType: PlacedFlagType;
   readonly message: string;
-  readonly fontColor: string;
 }
 
 /**

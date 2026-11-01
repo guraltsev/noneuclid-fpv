@@ -798,7 +798,6 @@ Queries whether a geodesic is locked or connected, and removal of geodesics and 
 | function | `collectLockedIncidentGeodesicIdsForEmitter` | Lists the ids of locked geodesics (see `isGeodesicLocked`) that have an endpoint on the emitter. |
 | function | `removeGeodesic` | Removes a geodesic and its derived objects (an interval via `removeGeodesicIntervalAndDerivedObjects`; any other id only has stale segments and emitter cache entries removed), then refreshes intersections. |
 | function | `removeUnlockedGeodesicsFromCannon` | Removes every non-locked geodesic listed on the cannon and returns the removed ids (empty if the id is not a cannon). |
-| function | `removeGeodesicCannonAndSegments` | Deletes a cannon and every geodesic that starts, ends, or connects (as incoming emitter) on it. |
 
 ### `world-objects/geodesic/objects.ts`
 
@@ -838,12 +837,8 @@ Geodesic emitters ("cannons"), geodesic intervals and curve shortening on a glue
 | const | `emitterConnectionToleranceMeters` | Perpendicular distance (meters) within which a ray counts as hitting an emitter; equal to the cannon collision radius. |
 | function | `createGeodesicCannonObject` | Builds a geodesic emitter object from options, filling defaults. |
 | function | `isGeodesicSegmentObject` | Type guard: true when the object is a `GeodesicSegmentObject` (`kind === "geodesic-segment"`). |
-| function | `isGeodesicIntersectionObject` | Type guard: true when the object is a `GeodesicIntersectionObject`. |
-| function | `isGeodesicCannonObject` | Type guard: true when the object is a `GeodesicCannonObject`. |
-| function | `isGeodesicIntervalObject` | Type guard: true when the object is a `GeodesicIntervalObject`. |
 | function | `isFreeGeodesicEndObject` | Type guard: true when the object is a `FreeGeodesicEndObject`. |
 | function | `createGeodesicCornerObject` | Builds a corner anchor at `point` (cell-local meters, z = beam height) in cell `cellId`, wrapping the disk `junctionId` on `side`. |
-| function | `isCurveShorteningPairObject` | Type guard: true when the object is a `CurveShorteningPairObject`. |
 | function | `createFreeGeodesicEndObject` | Builds a free-end anchor at `point` (cell-local meters, including its beam height in z) in cell `cellId`. |
 | function | `createGeodesicIntervalObject` | Builds a geodesic interval from two anchor ids, a start cell and an optional portal word. |
 | function | `createCurveShorteningPairObject` | Builds a curve-shortening pair object (see `CurveShorteningPairObject`); `state` defaults to `"moving"`. |
@@ -893,7 +888,6 @@ Derived geodesic segments: lookup by geodesic, building segments from traces wit
 | function | `resolveGeodesicNumber` | Returns the 1-based display number of a geodesic, defaulting to 1 when it has none. |
 | function | `splitDerivedSegmentsIntoEndpointHalves` | Labels segments with `halfRole`, cutting the one that straddles the midpoint of the total length into two. |
 | function | `resolveEndpointTangentAtAnchor` | Yaw (radians) of the geodesic's tangent at the anchor of the given role, pointing away from the anchor along the geodesic. |
-| function | `collectGeodesicMenuRowsForEmitter` | Lists one menu row (`G<n>` label) per distinct geodesic attached to the emitter, in attachment order. |
 | function | `withAnchoredTargetTerminal` | Re-labels the tail of a trace as an emitter hit when the interval ends on an emitter. |
 | function | `withAnchoredTargetTerminalForAnchors` | Like `withAnchoredTargetTerminal`, with candidate anchors that may differ from the registry. |
 | function | `replaceDerivedSegmentsFromTraces` | Replaces the derived segments of an interval by segments built from traces. |
@@ -1004,8 +998,7 @@ Placed flags (signs): player-placed wooden signs carrying a short text label.
 | Kind | Name | Summary |
 | --- | --- | --- |
 | const | `placedFlagAssetPaths` | Maps each sign type to its glTF asset path under the assets directory. |
-| const | `defaultPlacedFlagFontColor` | Default sign text color (CSS hex). |
-| const | `placedFlagFontColors` | The allowed sign text colors (CSS hex); the first entry is the default. |
+| const | `defaultPlacedFlagTextColor` | Default sign text color (CSS hex). |
 | const | `placedFlagMaxMessageLength` | Maximum number of characters (code points) in a sign message. |
 | interface | `CreatePlacedFlagOptions` | Inputs for createPlacedFlagObject. |
 | interface | `PlaceFlagFromAimRequest` | Request to place a flag where the player's view ray hits the floor. |
@@ -1013,11 +1006,9 @@ Placed flags (signs): player-placed wooden signs carrying a short text label.
 | interface | `PlaceFlagResult` | Outcome of a placement attempt: on success `placed` is true and `object` is the new (already registered) flag. |
 | function | `isPlacedFlagType` | Type guard: true when the string names a known sign type. |
 | function | `sanitizePlacedFlagMessage` | Normalizes a sign message: CRLF/CR become LF, runs of non-newline whitespace become a single space, and the result is truncated to `placedFlagMaxMessageLength` code points. |
-| function | `sanitizePlacedFlagFontColor` | Returns the color if it is in the allowed palette, otherwise the default color. |
 | function | `defaultPlacedFlagMessage` | Chooses the next default sign text for a flag type: the type's prefix ("A" or "B") followed by one more than the largest existing number among `existingObjects` whose message is exactly prefix+digits. |
 | function | `createPlacedFlagObject` | Creates a flag record with default collision, tooltip and edit interaction. |
 | function | `updatePlacedFlagMessage` | Returns a copy of the flag with a sanitized message. |
-| function | `updatePlacedFlagFontColor` | Returns a copy of the flag with a font color restricted to the allowed palette. |
 | function | `placedFlagToDynamicObjectState` | Returns the flag's cell id, pose and collision as a DynamicObjectState for collision queries. |
 | function | `placeFlagFromAim` | Places a flag where the view ray meets the floor plane z = 0 of the given cell. |
 | function | `placeFlagAtFloorPoint` | Places a flag at a floor point, registering it on success. |
@@ -1368,7 +1359,6 @@ Pure functions turning XR thumbstick and head-tracking input into player-local m
 | --- | --- | --- |
 | interface | `StickAxes` | A thumbstick position with each axis in [-1, 1] (x right, y down by gamepad convention). |
 | interface | `VrLocomotionRequest` | Result of stick locomotion. |
-| function | `applyJoystickDeadZone` | Zeroes the stick if its magnitude is within `deadZone`, normalizes it to unit length if it exceeds 1, and otherwise returns it unchanged. |
 | function | `computeJoystickLocomotion` | Converts a stick position into forward/back displacement for this frame: `moveSpeedMetersPerSecond * deltaSeconds` scaled by the clamped y axis, with the sign flipped (stick up moves along +y forward). |
 | function | `computeContinuousTurn` | Returns the yaw change in radians for this frame from the stick x axis (stick right gives negative, i.e. |
 | function | `computePhysicalRoomScaleDisplacement` | Computes the horizontal displacement (meters, z ignored) between two head positions in game-world axes. |
@@ -1647,15 +1637,6 @@ Renderer-neutral description of what the player can do with the world object the
 | function | `formatWorldFocusMessageTextForLegacyFallback` | Formats a definition as plain multi-line text (title, subtitle, then "<input> - <label>" per available action sorted by priority) for renderers without rich panels; returns undefined for an undefined definition. |
 
 ## `render`
-
-### `render/dom/desktopFlagEditor.ts`
-
-Modal DOM editor for a placed flag (sign): message text, text color, delete, and close.
-
-| Kind | Name | Summary |
-| --- | --- | --- |
-| interface | `DesktopFlagEditor` | Handle to the flag editor created by {@link createDesktopFlagEditor}. |
-| function | `createDesktopFlagEditor` | Creates the (initially hidden) flag editor, appends it to container and returns its handle. |
 
 ### `render/dom/desktopToolIndicator.ts`
 
@@ -2056,7 +2037,6 @@ Console debug dumps for geodesics and geodesic creatures, plus the periodic crea
 
 | Kind | Name | Summary |
 | --- | --- | --- |
-| interface | `GeodesicDebugToolState` | Subset of the geodesic emitter tool state the dumps read. |
 | interface | `GeodesicDebugDumpsDeps` | Dependencies of the geodesic debug dumps, supplied by createThreeApp's shell. |
 | function | `createGeodesicDebugDumps` | Creates the geodesic debug-dump functions. |
 

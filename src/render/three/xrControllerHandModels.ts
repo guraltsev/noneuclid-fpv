@@ -653,6 +653,7 @@ function hideInstances(instances: Map<"left" | "right", THREE.Object3D>): void {
   }
 }
 
+// Local variant: disposes every object that has a geometry (Line and Points included) and no textures; runtimeSceneUtils#disposeObject3D covers Mesh and Line only.
 function disposeObject3D(root: THREE.Object3D): void {
   root.traverse((object) => {
     const mesh = object as THREE.Mesh;

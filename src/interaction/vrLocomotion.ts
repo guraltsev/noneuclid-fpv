@@ -24,30 +24,6 @@ export interface VrLocomotionRequest {
 }
 
 /**
- * Zeroes the stick if its magnitude is within `deadZone`, normalizes it to unit length if it exceeds 1, and otherwise returns it unchanged.
- * No rescaling of the live range is applied. Radial (2D) dead zone, unlike the per-axis checks in the compute functions below.
- */
-export function applyJoystickDeadZone(
-  axes: StickAxes,
-  deadZone: number = defaultVrComfortOptions.joystickDeadZone,
-): StickAxes {
-  const length = Math.hypot(axes.x, axes.y);
-
-  if (length <= deadZone) {
-    return { x: 0, y: 0 };
-  }
-
-  if (length <= 1) {
-    return axes;
-  }
-
-  return {
-    x: axes.x / length,
-    y: axes.y / length,
-  };
-}
-
-/**
  * Converts a stick position into forward/back displacement for this frame: `moveSpeedMetersPerSecond * deltaSeconds` scaled by the clamped y axis, with the sign flipped
  * (stick up moves along +y forward). Horizontal stick input never strafes. Returns zero when `axes` is undefined or |y| is within the dead zone (per-axis test).
  */
@@ -100,8 +76,6 @@ export function computeContinuousTurn(
  * Computes the horizontal displacement (meters, z ignored) between two head positions in game-world axes.
  * Returns zero when either position is missing (accepting the current one as baseline); a step longer than `maxPhysicalStepMeters`
  * (default from comfort options) is reported as `ignoredTrackingJump` with zero displacement and the previous position kept as the accepted one.
- * `nextAcceptedHeadLocalMeters` is the position the caller should treat as accepted; note that xrPlayerRig#consumePhysicalInput does not use it and instead
- * records acceptance through `acceptPhysicalMove` after collision.
  */
 export function computePhysicalRoomScaleDisplacement(request: {
   readonly previousHeadLocalMeters?: Vec3;
@@ -109,13 +83,11 @@ export function computePhysicalRoomScaleDisplacement(request: {
   readonly maxPhysicalStepMeters?: number;
 }): {
   readonly localDisplacement: Vec3;
-  readonly nextAcceptedHeadLocalMeters?: Vec3;
   readonly ignoredTrackingJump: boolean;
 } {
   if (!request.previousHeadLocalMeters || !request.currentHeadLocalMeters) {
     return {
       localDisplacement: vec3(0, 0, 0),
-      nextAcceptedHeadLocalMeters: request.currentHeadLocalMeters,
       ignoredTrackingJump: false,
     };
   }
@@ -130,14 +102,12 @@ export function computePhysicalRoomScaleDisplacement(request: {
   if (Math.hypot(delta.x, delta.y) > maxStep) {
     return {
       localDisplacement: vec3(0, 0, 0),
-      nextAcceptedHeadLocalMeters: request.previousHeadLocalMeters,
       ignoredTrackingJump: true,
     };
   }
 
   return {
     localDisplacement: delta,
-    nextAcceptedHeadLocalMeters: request.currentHeadLocalMeters,
     ignoredTrackingJump: false,
   };
 }

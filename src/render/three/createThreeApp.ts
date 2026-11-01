@@ -102,7 +102,6 @@ import { type GeodesicMarmotRuntime, createGeodesicMarmotRuntime } from "./creat
 import { createMeasuredGeodesicLengthObject } from "../../world-objects/measureLengthTool";
 import {
   placeFlagAtFloorPoint,
-  updatePlacedFlagFontColor,
   updatePlacedFlagMessage,
 } from "../../world-objects/placedFlags";
 import { type ProtractorCenterSelection, createProtractorAngleObject, protractorSelectionsUseDifferentGeodesics, resolveProtractorCenterSelection, resolveProtractorDirectedGeodesicSelection, resolveProtractorEmitterGeodesicSelection } from "../../world-objects/protractorTool";
@@ -113,7 +112,6 @@ import { isSimpleGeoCreatureObjectSpec } from "../../world-objects/simpleGeoCrea
 import { type SimpleGeoCreatureRuntime, createSimpleGeoCreatureRuntime } from "./creatures/simpleGeoCreatureView";
 import { createObjectHost, createPlainWorldObject, type PlainWorldObject } from "../../world-objects/worldObjectOwner";
 import { setApiNamespace } from "../../runtime/publicApi";
-import { createDesktopFlagEditor } from "../dom/desktopFlagEditor";
 import { createDesktopToolIndicator } from "../dom/desktopToolIndicator";
 import { createFloatingObjectTooltip } from "../dom/floatingObjectTooltip";
 import { createAimCrossMarker } from "./aimCrossMarker";
@@ -471,42 +469,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   const xrControllerHandModels = createXrControllerHandModels(scene);
   const runtimeObjectRegistry = createRuntimeObjectRegistry();
   const objectHost = createObjectHost();
-  const desktopFlagEditor = createDesktopFlagEditor(document.body, {
-    onMessageChanged(flagId, message) {
-      const flag = runtimeObjectRegistry.get(flagId);
-      if (flag?.kind !== "placed-flag") {
-        return;
-      }
-
-      const nextFlag = updatePlacedFlagMessage(flag, message);
-      runtimeObjectRegistry.update(nextFlag);
-      syncPlacedFlagRuntime(nextFlag);
-    },
-    onFontColorChanged(flagId, fontColor) {
-      const flag = runtimeObjectRegistry.get(flagId);
-      if (flag?.kind !== "placed-flag") {
-        return;
-      }
-
-      const nextFlag = updatePlacedFlagFontColor(flag, fontColor);
-      runtimeObjectRegistry.update(nextFlag);
-      syncPlacedFlagRuntime(nextFlag);
-    },
-    onDeleteRequested(flagId) {
-      const flag = runtimeObjectRegistry.get(flagId);
-      if (flag?.kind !== "placed-flag") {
-        return;
-      }
-
-      runtimeObjectRegistry.remove(flagId);
-      removePlacedFlagRuntime(flagId);
-      requestRuntimeObjectInstanceSync();
-    },
-    onClosed() {
-      dispatchRuntimeCommand({ kind: "set-editing-flag", flagId: undefined });
-      void controls.requestPointerLock();
-    },
-  });
   const aimCrossMarker = createAimCrossMarker(scene);
   const aimControllerRayPositions = new Float32Array(6);
   const aimControllerRayGeometry = new THREE.BufferGeometry();
@@ -1329,14 +1291,14 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     const xrHeadWorldPose = xrActive ? resolveXrHeadWorldPose(xrViewerPose) : undefined;
     const activeAimRay = resolveActiveRootAimRay(xrActive, xrFrame, xrReferenceSpace);
     updateCarriedGeodesicCannonPose(xrActive, activeAimRay, deltaSeconds);
-    if (frame.helpRequested && !desktopFlagEditor.isOpen()) {
+    if (frame.helpRequested) {
       requestHelpLensForFocusedObject(activeAimRay);
     }
-    const worldPrimaryActionRequested = frame.primaryActionRequested && !currentMenuState().isOpen && !desktopFlagEditor.isOpen();
+    const worldPrimaryActionRequested = frame.primaryActionRequested && !currentMenuState().isOpen;
     // Tool dispatch: modal cannon tools consume the primary action themselves; world tools act only when
-    // no menu or flag editor is open. primaryActionConsumed stops the generic focused-object interaction.
+    // no menu is open. primaryActionConsumed stops the generic focused-object interaction.
     let primaryActionConsumed = false;
-    if (frame.carryActionRequested && !currentMenuState().isOpen && !desktopFlagEditor.isOpen()) {
+    if (frame.carryActionRequested && !currentMenuState().isOpen) {
       primaryActionConsumed = currentMenuState().selectedTool === "geodesic-cannon-carry"
         ? finishGeodesicCannonCarry()
         : tryStartFocusedGeodesicCannonCarry(activeAimRay);
@@ -1380,7 +1342,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       invalidateAimCache();
     }
 
-    if (frame.interactRequested && !desktopFlagEditor.isOpen()) {
+    if (frame.interactRequested) {
       openContextMenuFromAim(activeAimRay);
     }
     const frameAfterMoveMs = performance.now();
@@ -1887,7 +1849,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       xrControllerHandModels.dispose();
       desktopScenePaletteInput.dispose();
       desktopToolIndicator.dispose();
-      desktopFlagEditor.dispose();
       aimCrossMarker.dispose();
       aimControllerRay.removeFromParent();
       aimControllerRayGeometry.dispose();
@@ -2198,7 +2159,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       return;
     }
 
-    if (event.code === "Tab" && !currentMenuState().isOpen && !desktopFlagEditor.isOpen()) {
+    if (event.code === "Tab" && !currentMenuState().isOpen) {
       if (cycleFocusedAimTarget(resolveActiveRootAimRay(false))) {
         event.preventDefault();
       }
@@ -2206,7 +2167,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   }
 
   function onDesktopWheel(event: WheelEvent): void {
-    if (renderer.xr.isPresenting || currentMenuState().isOpen || desktopFlagEditor.isOpen()) {
+    if (renderer.xr.isPresenting || currentMenuState().isOpen) {
       return;
     }
 
@@ -2773,9 +2734,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   }
 
   function closeMenusForHomeTeleport(): void {
-    if (desktopFlagEditor.isOpen()) {
-      desktopFlagEditor.close();
-    }
     if (currentMenuState().isOpen || currentMenuState().selectedTool !== "none") {
       dispatchRuntimeCommand({ kind: "cancel-menu-and-tool" });
     }
@@ -3031,7 +2989,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     activeAimRay: RootAimRay | undefined,
     xrHeadWorldPose: XrHeadWorldPose | undefined,
   ): void {
-    if (currentMenuState().isOpen || desktopFlagEditor.isOpen()) {
+    if (currentMenuState().isOpen) {
       floatingObjectTooltip.update({ visible: false });
       updateXrObjectTooltip(undefined);
       return;
@@ -3072,8 +3030,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
         currentMenuState().selectedTool !== "measure-length" &&
         currentMenuState().selectedTool !== "protractor"
       ) ||
-      currentMenuState().isOpen ||
-      desktopFlagEditor.isOpen()
+      currentMenuState().isOpen
     ) {
       aimCrossMarker.update(undefined);
       updateAimControllerRay(false);
@@ -3107,7 +3064,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
 
   function updateProtractorToolFeedback(activeAimRay: RootAimRay | undefined): void {
     const protractor = session.get().protractorToolState;
-    if (currentMenuState().selectedTool !== "protractor" || currentMenuState().isOpen || desktopFlagEditor.isOpen()) {
+    if (currentMenuState().selectedTool !== "protractor" || currentMenuState().isOpen) {
       clearProtractorToolFeedback();
       return;
     }
@@ -3208,7 +3165,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   }
 
   function updateHelpLens(xrActive: boolean, activeAimRay: RootAimRay | undefined): void {
-    if (currentMenuState().isOpen || desktopFlagEditor.isOpen()) {
+    if (currentMenuState().isOpen) {
       helpLensRenderer.update({ visible: false, xrActive, camera });
       return;
     }

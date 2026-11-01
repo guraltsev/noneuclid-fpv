@@ -11,7 +11,7 @@
  */
 import * as THREE from "three";
 import type { PlacedFlagObject } from "../../world-objects/toolObjects";
-import { placedFlagAssetPaths } from "../../world-objects/placedFlags";
+import { defaultPlacedFlagTextColor, placedFlagAssetPaths } from "../../world-objects/placedFlags";
 import type { PreparedWorldAssets } from "./preparedWorldAssets";
 import { applyWorldRigidTransform } from "./worldAxes";
 
@@ -30,14 +30,13 @@ export interface PlacedFlagRuntime {
   dispose(): void;
 }
 
-// Mutable state of one rendered sign; message/fontColor cache what is currently painted on the canvas.
+// Mutable state of one rendered sign; message caches what is currently painted on the canvas.
 interface RenderedFlag {
   readonly root: THREE.Group;
   readonly textTexture: THREE.CanvasTexture;
   cellId: string;
   flagType: PlacedFlagObject["flagType"];
   message: string;
-  fontColor: string;
 }
 
 // Text-plane placement in the sign model's local (Three.js) frame, meters; front/back Z are the two face depths.
@@ -161,7 +160,6 @@ function createRenderedFlag(flag: PlacedFlagObject, assets: PreparedWorldAssets)
     cellId: flag.cellId,
     flagType: flag.flagType,
     message: "",
-    fontColor: "",
   };
   redrawText(rendered, flag);
   syncRenderedFlag(flag, rendered);
@@ -175,7 +173,7 @@ function syncRenderedFlag(flag: PlacedFlagObject, rendered: RenderedFlag): void 
 
   rendered.cellId = flag.cellId;
   applyWorldRigidTransform(rendered.root, flag.localPose);
-  if (rendered.message !== flag.message || rendered.fontColor !== flag.fontColor) {
+  if (rendered.message !== flag.message) {
     redrawText(rendered, flag);
   }
 }
@@ -191,7 +189,7 @@ function redrawText(rendered: RenderedFlag, flag: PlacedFlagObject): void {
   // Text is centred; lines are stacked as a block centred vertically on the canvas.
   context.textAlign = "center";
   context.textBaseline = "middle";
-  context.fillStyle = flag.fontColor;
+  context.fillStyle = defaultPlacedFlagTextColor;
 
   const layout = fitTextToCanvas(context, flag.message, canvas.width, canvas.height);
   context.font = `bold ${layout.fontSize}px sans-serif`;
@@ -203,7 +201,6 @@ function redrawText(rendered: RenderedFlag, flag: PlacedFlagObject): void {
   }
 
   rendered.message = flag.message;
-  rendered.fontColor = flag.fontColor;
   rendered.flagType = flag.flagType;
   rendered.textTexture.needsUpdate = true;
 }

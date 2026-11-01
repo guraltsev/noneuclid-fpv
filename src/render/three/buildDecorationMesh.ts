@@ -11,6 +11,7 @@ import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js
 import type { AssetObjectSpec, CellObjectSpec } from "../../cell-complex/specs";
 import { runtimeDiagnostics } from "../../diagnostics/runtimeDiagnostics";
 import type { PreparedGltfAsset, PreparedWorldAssets } from "./preparedWorldAssets";
+import { disposeObject3D } from "./runtimeSceneUtils";
 import { worldPointToThree, worldYawRadiansToThree } from "./worldAxes";
 
 /** Legacy asset path that is replaced by the procedural marmot proxy instead of loading a glTF. */
@@ -158,24 +159,4 @@ function replacePlaceholderWithPreparedAsset(
   disposeObject3D(placeholder);
   prepared.scene.name = `asset:${objectSpec.id}`;
   group.add(prepared.scene);
-}
-
-function disposeObject3D(object: THREE.Object3D): void {
-  object.traverse((child) => {
-    if (child instanceof THREE.Mesh) {
-      child.geometry.dispose();
-      disposeMaterial(child.material);
-    }
-  });
-}
-
-function disposeMaterial(material: THREE.Material | THREE.Material[]): void {
-  if (Array.isArray(material)) {
-    for (const item of material) {
-      item.dispose();
-    }
-    return;
-  }
-
-  material.dispose();
 }

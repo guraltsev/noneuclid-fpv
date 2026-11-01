@@ -24,11 +24,7 @@ export const placedFlagAssetPaths: Record<PlacedFlagType, string> = {
 /**
  * Default sign text color (CSS hex).
  */
-export const defaultPlacedFlagFontColor = "#f8fafc";
-/**
- * The allowed sign text colors (CSS hex); the first entry is the default.
- */
-export const placedFlagFontColors = [defaultPlacedFlagFontColor, "#111827", "#ef4444", "#2563eb", "#16a34a"] as const;
+export const defaultPlacedFlagTextColor = "#f8fafc";
 /**
  * Maximum number of characters (code points) in a sign message.
  */
@@ -44,7 +40,6 @@ export interface CreatePlacedFlagOptions {
   readonly localPose: RigidTransform3;
   readonly flagType: PlacedFlagType;
   readonly message?: string;
-  readonly fontColor?: string;
   readonly collision?: SimpleCollisionCylinder;
 }
 
@@ -115,13 +110,6 @@ export function sanitizePlacedFlagMessage(message: string): string {
 }
 
 /**
- * Returns the color if it is in the allowed palette, otherwise the default color.
- */
-export function sanitizePlacedFlagFontColor(color: string): string {
-  return (placedFlagFontColors as readonly string[]).includes(color) ? color : defaultPlacedFlagFontColor;
-}
-
-/**
  * Chooses the next default sign text for a flag type: the type's prefix ("A" or "B") followed by one more than the largest existing number among `existingObjects` whose message is exactly prefix+digits.
  * Only the message text is inspected, so renamed signs do not reserve numbers.
  */
@@ -154,7 +142,7 @@ export function createPlacedFlagObject(options: CreatePlacedFlagOptions): Placed
     localPose: options.localPose,
     collision: options.collision ?? defaultFlagCollision,
     portalRenderable: true,
-    displayHelpMessage: "A placed note. Open its menu to edit the text, change its color, or delete it.",
+    displayHelpMessage: "A placed note. Open its menu to edit the text or delete it.",
     tooltip: {
       label: "Sign",
       rangeMeters: 2.5,
@@ -162,7 +150,6 @@ export function createPlacedFlagObject(options: CreatePlacedFlagOptions): Placed
     interactable: defaultFlagInteraction,
     flagType: options.flagType,
     message: sanitizePlacedFlagMessage(options.message ?? defaultPlacedFlagMessage(options.flagType)),
-    fontColor: sanitizePlacedFlagFontColor(options.fontColor ?? defaultPlacedFlagFontColor),
   };
 }
 
@@ -173,16 +160,6 @@ export function updatePlacedFlagMessage(object: PlacedFlagObject, message: strin
   return {
     ...object,
     message: sanitizePlacedFlagMessage(message),
-  };
-}
-
-/**
- * Returns a copy of the flag with a font color restricted to the allowed palette.
- */
-export function updatePlacedFlagFontColor(object: PlacedFlagObject, fontColor: string): PlacedFlagObject {
-  return {
-    ...object,
-    fontColor: sanitizePlacedFlagFontColor(fontColor),
   };
 }
 

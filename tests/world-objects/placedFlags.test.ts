@@ -19,7 +19,6 @@ import {
   placeFlagFromAim,
   placedFlagToDynamicObjectState,
   sanitizePlacedFlagMessage,
-  updatePlacedFlagFontColor,
 } from "../../src/world-objects/placedFlags";
 import { createRuntimeObjectRegistry } from "../../src/world-objects/runtimeObjectRegistry";
 
@@ -142,17 +141,6 @@ describe("placedFlags", () => {
     }
   });
 
-  it("defaults font color to white", () => {
-    const flag = createPlacedFlagObject({
-      id: "flag-a",
-      cellId: "room-a",
-      localPose: identityRigidTransform3,
-      flagType: "WoodenSign1",
-    });
-
-    expect(flag.fontColor).toBe("#f8fafc");
-  });
-
   it("keeps sign tooltip metadata separate from structured edit actions", () => {
     const flag = createPlacedFlagObject({
       id: "flag-a",
@@ -174,25 +162,6 @@ describe("placedFlags", () => {
     });
   });
 
-  it("font color updates preserve unrelated flag state", () => {
-    const flag = createPlacedFlagObject({
-      id: "flag-a",
-      cellId: "room-a",
-      localPose: identityRigidTransform3,
-      flagType: "WoodenSign1",
-      message: "Hi",
-    });
-
-    const updated = updatePlacedFlagFontColor(flag, "#2563eb");
-
-    expect(updated).toMatchObject({
-      id: "flag-a",
-      cellId: "room-a",
-      flagType: "WoodenSign1",
-      message: "Hi",
-      fontColor: "#2563eb",
-    });
-  });
 
   it("exposes placed flags as dynamic object state for collision", () => {
     const flag = createPlacedFlagObject({

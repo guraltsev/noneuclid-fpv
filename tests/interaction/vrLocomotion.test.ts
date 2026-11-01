@@ -59,7 +59,6 @@ describe("VR locomotion mapping", () => {
 
     expect(result.ignoredTrackingJump).toBe(true);
     expect(result.localDisplacement).toEqual({ x: 0, y: 0, z: 0 });
-    expect(result.nextAcceptedHeadLocalMeters).toEqual({ x: 0, y: 0, z: 1.6 });
   });
 
   it("uses one shared first-pass XR render root cell", () => {

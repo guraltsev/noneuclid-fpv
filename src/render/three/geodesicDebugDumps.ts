@@ -35,12 +35,6 @@ import { GeodesicCreatureDebugDump, collectGeodesicCreatureDebugDump } from "./g
 const geodesicCreatureDebugCheckIntervalSeconds = 0.1;
 const geodesicCreatureHealthyLogIntervalSeconds = 5;
 
-/** Subset of the geodesic emitter tool state the dumps read. */
-export interface GeodesicDebugToolState {
-  readonly selectedCannonId?: string;
-  readonly activeGeodesicId?: string;
-}
-
 /** Dependencies of the geodesic debug dumps, supplied by createThreeApp's shell. */
 export interface GeodesicDebugDumpsDeps {
   /** Selected world id; value (fixed for the app's lifetime), reported in the all-geodesics dump. */

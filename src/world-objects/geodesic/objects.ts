@@ -461,21 +461,6 @@ export function isGeodesicSegmentObject(object: { readonly kind: string }): obje
   return object.kind === "geodesic-segment";
 }
 
-/** Type guard: true when the object is a `GeodesicIntersectionObject`. */
-export function isGeodesicIntersectionObject(object: { readonly kind: string }): object is GeodesicIntersectionObject {
-  return object.kind === "geodesic-intersection";
-}
-
-/** Type guard: true when the object is a `GeodesicCannonObject`. */
-export function isGeodesicCannonObject(object: { readonly kind: string }): object is GeodesicCannonObject {
-  return object.kind === "geodesic-cannon";
-}
-
-/** Type guard: true when the object is a `GeodesicIntervalObject`. */
-export function isGeodesicIntervalObject(object: { readonly kind: string }): object is GeodesicIntervalObject {
-  return object.kind === "geodesic-interval";
-}
-
 /** Type guard: true when the object is a `FreeGeodesicEndObject`. */
 export function isFreeGeodesicEndObject(object: { readonly kind: string }): object is FreeGeodesicEndObject {
   return object.kind === "free-geodesic-end";
@@ -503,11 +488,6 @@ export function createGeodesicCornerObject(input: {
     junctionId: input.junctionId,
     side: input.side,
   };
-}
-
-/** Type guard: true when the object is a `CurveShorteningPairObject`. */
-export function isCurveShorteningPairObject(object: { readonly kind: string }): object is CurveShorteningPairObject {
-  return object.kind === "curve-shortening-pair";
 }
 
 /**

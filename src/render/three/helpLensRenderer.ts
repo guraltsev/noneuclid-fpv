@@ -276,7 +276,7 @@ function wrapText(
 }
 
 
-// Local variant that also disposes texture maps (runtimeSceneUtils#disposeObject3D does not).
+// Local variant: Mesh only, and it also disposes the texture map of a single material (runtimeSceneUtils#disposeObject3D disposes no textures, and disposeObject3DWithTextures also walks Sprites).
 function disposeObject3D(object: THREE.Object3D): void {
   object.traverse((child) => {
     if (child instanceof THREE.Mesh) {

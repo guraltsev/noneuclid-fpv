@@ -6,7 +6,6 @@ import type { GeodesicEmitterAttachment } from "./objects";
 import { requestGeodesicIntersectionUpdate, withDeferredGeodesicIntersections } from "./intersections";
 import {
   collectIncidentGeodesicIdsForEmitter,
-  getGeodesicEndpointAttachmentsForAnchor,
   removeGeodesicAssociations,
 } from "./endpoints";
 import { removeGeodesicIntervalAndDerivedObjects, removeGeodesicSegments } from "./segments";
@@ -115,44 +114,3 @@ function removeUnlockedGeodesicsFromCannonNow(
   return removed;
 }
 
-/**
- * Deletes a cannon and every geodesic that starts, ends, or connects (as incoming emitter) on it.
- *
- * Geodesics owned by other emitters but arriving here are removed as well. Safe for non-cannon ids (only the final
- * remove and intersection refresh run).
- */
-export function removeGeodesicCannonAndSegments(registry: RuntimeObjectRegistry, cannonId: string): void {
-  withDeferredGeodesicIntersections(registry, () => removeGeodesicCannonAndSegmentsNow(registry, cannonId));
-}
-
-function removeGeodesicCannonAndSegmentsNow(registry: RuntimeObjectRegistry, cannonId: string): void {
-  const cannon = registry.get(cannonId);
-  if (cannon?.kind === "geodesic-cannon") {
-    const geodesicIds = new Set(getGeodesicEndpointAttachmentsForAnchor(registry, cannonId).map((attachment) => attachment.geodesicId));
-    for (const geodesicId of cannon.geodesicIds) {
-      geodesicIds.add(geodesicId);
-    }
-    if (cannon.activeGeodesicId) {
-      geodesicIds.add(cannon.activeGeodesicId);
-    }
-    for (const geodesicId of geodesicIds) {
-      removeGeodesic(registry, geodesicId);
-    }
-  }
-  for (const object of registry.getObjectsOfKind("geodesic-cannon")) {
-    if (
-      object.id !== cannonId &&
-      object.geodesicIds.some((geodesicId) =>
-        getGeodesicConnection(registry, geodesicId)?.incomingEmitterId === cannonId
-      )
-    ) {
-      for (const geodesicId of object.geodesicIds) {
-        if (getGeodesicConnection(registry, geodesicId)?.incomingEmitterId === cannonId) {
-          removeGeodesic(registry, geodesicId);
-        }
-      }
-    }
-  }
-  registry.remove(cannonId);
-  requestGeodesicIntersectionUpdate(registry);
-}

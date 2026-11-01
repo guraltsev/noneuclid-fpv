@@ -17,7 +17,6 @@ import {
 } from "./objects";
 import { requestGeodesicIntersectionUpdate, withDeferredGeodesicIntersections } from "./intersections";
 import {
-  getGeodesicEndpointAttachmentsForAnchor,
   getGeodesicPortalWord,
   removeGeodesicAssociations,
   removeUnusedFreeGeodesicEnds,
@@ -185,20 +184,6 @@ export function resolveEndpointTangentAtAnchor(input: {
     anchorObjectId: attachment.anchorObjectId,
     yawRadians: sanitizeYaw(yawRadians),
   };
-}
-
-/** Lists one menu row (`G<n>` label) per distinct geodesic attached to the emitter, in attachment order. */
-export function collectGeodesicMenuRowsForEmitter(
-  registry: RuntimeObjectRegistry,
-  emitterId: string,
-): readonly { readonly geodesicId: string; readonly label: string }[] {
-  const rows = getGeodesicEndpointAttachmentsForAnchor(registry, emitterId)
-    .map((attachment) => attachment.geodesicId)
-    .filter((geodesicId, index, ids) => ids.indexOf(geodesicId) === index);
-  return rows.map((geodesicId) => ({
-    geodesicId,
-    label: `G${resolveGeodesicNumber(registry, geodesicId)}`,
-  }));
 }
 
 /** Re-labels the tail of a trace as an emitter hit when the interval ends on an emitter. */
