@@ -11,7 +11,6 @@ import { type CompiledCellComplex } from "../../cell-complex/compileCellComplex"
 import { type DebugLevelId } from "../../diagnostics/debugLevels";
 import { addVec3, scaleVec3 } from "../../math/vec3";
 import { type RuntimeMenuState } from "../../runtime/runtimeMenuState";
-import { type GeodesicCarryPortalTransition, type GeodesicPortalTraversal } from "../../world-objects/geodesic/objects";
 import { collectGeodesicPortalWord, getGeodesicSegments } from "../../world-objects/geodesic/segments";
 import { getGeodesicConnection, isGeodesicLocked } from "../../world-objects/geodesic/lifecycle";
 import { type GeodesicMarmotRuntime } from "./creatures/geodesicMarmotView";
@@ -41,8 +40,6 @@ const geodesicCreatureHealthyLogIntervalSeconds = 5;
 export interface GeodesicDebugToolState {
   readonly selectedCannonId?: string;
   readonly activeGeodesicId?: string;
-  readonly carryPortalWord?: readonly GeodesicPortalTraversal[];
-  readonly carryPortalWordsByGeodesicId?: Readonly<Record<string, readonly GeodesicPortalTraversal[]>>;
 }
 
 /** Dependencies of the geodesic debug dumps, supplied by createThreeApp's shell. */
@@ -66,7 +63,6 @@ export interface GeodesicDebugDumpsDeps {
   /** Getter for the emitter tool state used to pick the default geodesic and carry-session words. */
   getCannonToolState(): GeodesicDebugToolState;
   /** Getter for the most recent portal crossing by the player or carried emitter, if any. */
-  getLatestPlayerPortalTransition(): GeodesicCarryPortalTransition | undefined;
   /** Geodesic or emitter the camera ray currently targets, if any. */
   resolveCameraAimTarget(): AimTarget | undefined;
 }
@@ -119,10 +115,6 @@ export function createGeodesicDebugDumps(deps: GeodesicDebugDumpsDeps) {
 
     const segments = getGeodesicSegments(runtimeObjectRegistry, geodesicId);
     const word = collectGeodesicPortalWord(deps.getWorld(), runtimeObjectRegistry, geodesicId);
-    const carrySessionWord = deps.getCannonToolState().carryPortalWordsByGeodesicId?.[geodesicId] ??
-      (deps.getCannonToolState().activeGeodesicId === geodesicId
-        ? deps.getCannonToolState().carryPortalWord
-        : undefined);
     const start = segments[0]?.start;
     const dump: GeodesicPathDebugDump = {
       geodesicId,
@@ -132,12 +124,7 @@ export function createGeodesicDebugDumps(deps: GeodesicDebugDumpsDeps) {
       start: start ? formatVec3(start) : undefined,
       word,
       wordText: formatGeodesicPortalWord(word),
-      carrySessionWord,
-      carrySessionWordText: carrySessionWord
-        ? formatGeodesicPortalWord(carrySessionWord)
-        : undefined,
       reverseWordText: formatGeodesicPortalWord([...word].reverse().map(reverseGeodesicPortalTraversal)),
-      latestPlayerPortalTransition: deps.getLatestPlayerPortalTransition(),
       segments: segments.map((segment) => ({
         id: segment.id,
         cellId: segment.cellId,

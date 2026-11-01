@@ -1,0 +1,10 @@
+# Carrying an emitter of a locked geodesic
+
+Invariant: a geodesic interval's portal word must chain from its start anchor's cell to its end anchor's cell. Anything that changes an anchor's cell without extending the word breaks the geodesic silently (rebuilds fail, the carry mode keeps the stale geodesic, release deletes it with no console message). Symptom seen: after picking up an emitter that lives on another face than the player, then releasing, the geodesic is gone.
+
+- The only way to change the cell of an emitter that anchors a locked geodesic is `moveEmitterAlongRoute` (`world-objects/geodesic/cannon.ts`): all or nothing, it refuses (and reports) a move the route does not explain.
+- While carrying, the emitter is stored in the cell the hand is really in (walk from the player to the hand with `locateDevelopedPoint`; a wall in the way means the emitter stays). Which portals it crossed comes from `findNearestImageRoute` (`cell-complex/portalRoute.ts`) between its previous and new place, not from the player's crossing log (that log no longer exists).
+- `findNearestImageRoute` must validate that the straight segment to the chosen image crosses exactly the route's portals. Without it, a route that winds around a cube corner can have a nearer image and gets picked for a jump (pickup from another face).
+- A place on the surface does not determine the way round, so a pickup is a jump that needs a convention: the nearest valid straight development (searched up to 6 portals; a frame step up to 2).
+- Test trap: in `tests/render/geodesicCannonCarry.test.ts` the player must stand somewhere a player could, with the hand elsewhere. A player placed exactly at the hand finds no crossing at all and makes every release look broken (I once "reproduced" the bug that way, and it was a test artifact).
+- Reproducing a live bug: record to disk as it happens. A recorder that lives only in the page is lost when the window closes.

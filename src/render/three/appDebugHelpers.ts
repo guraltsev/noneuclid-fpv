@@ -14,7 +14,6 @@ import { setApiNamespace } from "../../runtime/publicApi";
 import { type RuntimeToolId } from "../../glue/toolIds";
 import { type LiveGeometryDebugState } from "../../runtime/worldGeometrySession";
 import {
-  type GeodesicCarryPortalTransition,
   type GeodesicPortalTraversal,
   geodesicRayBeamHeightMeters,
 } from "../../world-objects/geodesic/objects";
@@ -184,11 +183,8 @@ export interface GeodesicPathDebugDump {
   readonly word: readonly GeodesicPortalTraversal[];
   readonly wordText: string;
   /** Portal word accumulated during the current carry session, if any. */
-  readonly carrySessionWord?: readonly GeodesicPortalTraversal[];
-  readonly carrySessionWordText?: string;
   /** Text of the word read backwards with each traversal reversed. */
   readonly reverseWordText: string;
-  readonly latestPlayerPortalTransition?: GeodesicCarryPortalTransition;
   readonly segments: readonly {
     readonly id: string;
     readonly cellId: string;

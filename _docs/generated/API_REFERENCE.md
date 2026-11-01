@@ -239,6 +239,17 @@ Portal-path tables: for each root cell, every portal word (sequence of portals c
 | function | `buildPortalPathTables` | Builds the complete (unculled) portal-path table for every cell as a root, up to options.maxDepth. |
 | function | `createPortalPathTable` | Wraps a list of paths in a {@link PortalPathTable}, building the id, destination-cell and parent indexes. |
 
+### `cell-complex/portalRoute.ts`
+
+Routes through portals that best explain a movement: which chain of portals an object crossed to get from one place to another.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `PortalRouteHop` | One portal crossed on a route: the portal left, the reciprocal portal entered, and the map from the source cell's frame to the target cell's. |
+| interface | `CellPoint` | A place on the surface: a cell and a point in that cell's frame (meters). |
+| interface | `NearestImageRoute` | The chosen route and how far the old point's image lies from the new point (meters). |
+| function | `findNearestImageRoute` | Finds the route of at most `maxHops` portals from `from.cellId` to `to.cellId` that maps `from.point` nearest to `to.point` and that the straight segment between the two places crosses (checked by walking it, in the pla… |
+
 ### `cell-complex/prismBase.ts`
 
 Type-level and runtime validation of the base polygon of a prism cell.
@@ -634,6 +645,9 @@ Emitter (cannon) operations: shooting, extending and re-aiming geodesics, connec
 | function | `rebuildGeodesicToLength` | Re-shoots a geodesic from its cannon so that its total length is `totalLengthMeters`, returning the new segments. |
 | function | `connectGeodesicToEmitter` | Tries to close a free geodesic onto the emitter `incomingEmitterId`, producing a locked geodesic. |
 | function | `rebuildConnectedGeodesicBetweenEmitters` | Recomputes a locked geodesic after one of its emitters moved, keeping its homotopy class when possible. |
+| interface | `MoveEmitterAlongRouteInput` | Input for {@link moveEmitterAlongRoute}. |
+| interface | `MoveEmitterAlongRouteResult` | What {@link moveEmitterAlongRoute} did: whether the emitter moved, and which locked geodesics could not be kept consistent with it. |
+| function | `moveEmitterAlongRoute` | Moves an emitter and keeps every locked geodesic that ends on it consistent: the emitter's new cell and pose are stored and each such geodesic's portal word is extended by the portals the emitter crossed. |
 | function | `placeGeodesicCannonOnGeodesic` | Places a new cannon at a point of a free geodesic and splits the geodesic there into two intervals. |
 | function | `placeGeodesicCannonAtGeodesicVertex` | Places a cannon at a vertex where segments pass and cuts every passing geodesic there, connecting the pieces to the new cannon. |
 
@@ -1258,16 +1272,6 @@ Aim picking: finds what an aim ray (desktop crosshair or XR controller) hits, ac
 | function | `resolveAimTargets` | Returns the best aim target along the ray, or `undefined` if nothing is hit. |
 | function | `getGeodesicEmitterAimCylinderBounds` | Returns the vertical-cylinder proxy used to pick a geodesic cannon, or `undefined` if the cannon has no collision bounds. |
 | function | `getGeodesicEmitterAimSphereCenter` | Returns the centre of the sphere used to pick (and snap the aim to) a geodesic cannon, in the cell-local frame (meters). |
-
-### `interaction/carryPortalTransition.ts`
-
-Derives the portal-crossing record a carried geodesic cannon needs from a player move result.
-
-| Kind | Name | Summary |
-| --- | --- | --- |
-| function | `resolveGeodesicCarryPortalTransitionFromMove` | Resolves the carry-portal transition implied by a `movePlayer` result. |
-| function | `resolveGeodesicCarryPortalTransitionsFromCrossings` | Maps the ordered crossings of one move (`MoveResult.crossings`) to carry-portal transitions, one per crossing. |
-| function | `resolveGeodesicCarryPortalTransitionFromPortalMove` | Builds the transition describing which portal a move crossed, or `undefined` if no consistent crossing happened. |
 
 ### `interaction/inputFrame.ts`
 

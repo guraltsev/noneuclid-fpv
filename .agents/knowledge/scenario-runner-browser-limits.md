@@ -59,3 +59,4 @@
 - Dynamic `import()` of a plain `.mjs` script works with a relative path inside an ordinary test module (it
   resolves against that module's own file), but **not** inside Vitest's `globalSetup` entry, which needs an
   absolute `file://` URL built with `pathToFileURL` instead (see `globalSetup.ts`).
+- On 2026-11-01 `appCommands.release.test.ts` ("changeWorld switches to the requested world", `Runtime.evaluate` got no response within 6000 ms) failed 4 times out of 4 on this machine, with nothing else running, including on commit `d873688` (before the layer-DAG work); the other release files passed. So a failure of that one case is not evidence about your change: run it on a clean worktree of an older commit before chasing it.

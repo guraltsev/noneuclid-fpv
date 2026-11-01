@@ -3,7 +3,7 @@
  */
 import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex";
 import { getDynamicObjectCollisionBounds, simpleCylinderIntersectsSimpleCylinder, testCellCollision } from "../../movement/collision";
-import { yawRigidTransform3 } from "../../math/rigidTransform3";
+import { yawRigidTransform3, type RigidTransform3 } from "../../math/rigidTransform3";
 import { addVec3, distanceSquaredVec3, scaleVec3, type Vec3 } from "../../math/vec3";
 import { type RuntimeObjectRegistry } from "../runtimeObjectRegistry";
 import { runtimeObjectToDynamicObjectState } from "../runtimeObjectBase";
@@ -44,11 +44,12 @@ import {
   totalGeodesicLengthFromSegments,
   totalLengthThroughSegment,
 } from "./segments";
-import { isGeodesicLocked, removeGeodesic } from "./lifecycle";
+import { collectLockedIncidentGeodesicIdsForEmitter, isGeodesicLocked, removeGeodesic } from "./lifecycle";
 import {
   aimFreeGeodesicFromEndpoint,
   rebuildLockedGeodesicFromEndpointsAndPortalWordDetailed,
   splitGeodesicIntervalAtSegmentHit,
+  updateLockedGeodesicPortalWordForCarriedAnchorTraversals,
 } from "./intervals";
 
 /**
@@ -568,6 +569,92 @@ function rebuildConnectedGeodesicBetweenEmittersNow(
   }
 
   return getGeodesicSegments(request.registry, request.geodesicId);
+}
+
+// ---- Moving an emitter ----
+
+/** Input for {@link moveEmitterAlongRoute}. */
+export interface MoveEmitterAlongRouteInput {
+  readonly registry: RuntimeObjectRegistry;
+  readonly emitterId: string;
+  /** Cell the emitter is in after the move. */
+  readonly cellId: string;
+  /** Pose of the emitter in that cell's frame. */
+  readonly localPose: RigidTransform3;
+  /** Portals the emitter crossed, in order, from its current cell to `cellId`; empty when it stayed in its cell. */
+  readonly route: readonly GeodesicPortalTraversal[];
+}
+
+/** What {@link moveEmitterAlongRoute} did: whether the emitter moved, and which locked geodesics could not be kept consistent with it. */
+export interface MoveEmitterAlongRouteResult {
+  /** False when the emitter was unknown or the move was refused; then nothing was changed. */
+  readonly moved: boolean;
+  /** Locked geodesics of the emitter whose portal word could not follow the move (the reason it was refused). */
+  readonly brokenGeodesicIds: readonly string[];
+}
+
+/**
+ * Moves an emitter and keeps every locked geodesic that ends on it consistent: the emitter's new cell and pose are stored and each such
+ * geodesic's portal word is extended by the portals the emitter crossed. This is the one way to change the cell of an emitter that anchors
+ * a geodesic, because the word (which way round the geodesic goes) and the cell it ends in must always agree; the geodesic is not retraced here.
+ * All or nothing: if the route does not lead from the emitter's current cell to `cellId` (an empty route for a change of cell included), or the
+ * word of any locked geodesic cannot follow, nothing is changed and the geodesics that could not follow are listed in `brokenGeodesicIds`.
+ * Does nothing and reports `moved: false` for an unknown emitter.
+ */
+export function moveEmitterAlongRoute(input: MoveEmitterAlongRouteInput): MoveEmitterAlongRouteResult {
+  const emitter = input.registry.get(input.emitterId);
+  if (emitter?.kind !== "geodesic-cannon") {
+    return { moved: false, brokenGeodesicIds: [] };
+  }
+
+  const lockedGeodesics = collectLockedIncidentGeodesicIdsForEmitter(input.registry, emitter.id)
+    .map((geodesicId) => input.registry.get(geodesicId))
+    .filter((geodesic): geodesic is NonNullable<typeof geodesic> => geodesic !== undefined);
+  const first = input.route[0];
+  const last = input.route.at(-1);
+  const routeExplainsMove = last === undefined
+    ? emitter.cellId === input.cellId
+    : first?.sourceCellId === emitter.cellId && last.targetCellId === input.cellId;
+  if (!routeExplainsMove) {
+    return lockedGeodesics.length === 0
+      ? moveWithoutGeodesics(input, emitter)
+      : { moved: false, brokenGeodesicIds: lockedGeodesics.map((geodesic) => geodesic.id) };
+  }
+
+  input.registry.update({ ...emitter, cellId: input.cellId, localPose: input.localPose });
+  if (last === undefined) {
+    return { moved: true, brokenGeodesicIds: [] };
+  }
+
+  // The word is checked against the anchor's cell as stored, so the emitter is stored first.
+  const brokenGeodesicIds = lockedGeodesics
+    .filter((geodesic) =>
+      updateLockedGeodesicPortalWordForCarriedAnchorTraversals({
+        registry: input.registry,
+        geodesicId: geodesic.id,
+        carriedAnchorObjectId: emitter.id,
+        traversals: input.route,
+      }) === undefined
+    )
+    .map((geodesic) => geodesic.id);
+  if (brokenGeodesicIds.length === 0) {
+    return { moved: true, brokenGeodesicIds };
+  }
+
+  // Put everything back, so that no half-applied move is stored.
+  input.registry.update(emitter);
+  for (const geodesic of lockedGeodesics) {
+    input.registry.update(geodesic);
+  }
+
+  return { moved: false, brokenGeodesicIds };
+}
+
+// An emitter without locked geodesics has no word to keep in line, so any move is stored.
+function moveWithoutGeodesics(input: MoveEmitterAlongRouteInput, emitter: GeodesicCannonObject): MoveEmitterAlongRouteResult {
+  input.registry.update({ ...emitter, cellId: input.cellId, localPose: input.localPose });
+
+  return { moved: true, brokenGeodesicIds: [] };
 }
 
 // ---- Placing cannons on geodesics ----
