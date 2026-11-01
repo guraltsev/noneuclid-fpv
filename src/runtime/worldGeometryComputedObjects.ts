@@ -182,6 +182,7 @@ function refreshMeasuredGeodesicLength(
 ): void {
   const refreshed = refreshMeasuredGeodesicLengthObject({
     registry: options.registry,
+    world: options.world,
     measurement: object,
     playerCellId: options.playerCellId,
     playerPoint: options.playerPoint,

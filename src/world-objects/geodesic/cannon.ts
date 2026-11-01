@@ -621,7 +621,7 @@ export function moveEmitterAlongRoute(input: MoveEmitterAlongRouteInput): MoveEm
       : { moved: false, brokenGeodesicIds: lockedGeodesics.map((geodesic) => geodesic.id) };
   }
 
-  input.registry.update({ ...emitter, cellId: input.cellId, localPose: input.localPose });
+  input.registry.update(emitterAtPose(emitter, input.cellId, input.localPose));
   if (last === undefined) {
     return { moved: true, brokenGeodesicIds: [] };
   }
@@ -652,9 +652,35 @@ export function moveEmitterAlongRoute(input: MoveEmitterAlongRouteInput): MoveEm
 
 // An emitter without locked geodesics has no word to keep in line, so any move is stored.
 function moveWithoutGeodesics(input: MoveEmitterAlongRouteInput, emitter: GeodesicCannonObject): MoveEmitterAlongRouteResult {
-  input.registry.update({ ...emitter, cellId: input.cellId, localPose: input.localPose });
+  input.registry.update(emitterAtPose(emitter, input.cellId, input.localPose));
 
   return { moved: true, brokenGeodesicIds: [] };
+}
+
+// The emitter at a new cell and pose. Its default launch yaw equals the yaw of its pose and each geodesic's own launch yaw is in the
+// same frame, so when the pose turns (a face turned relative to the last one) all of them turn by the same angle.
+function emitterAtPose(emitter: GeodesicCannonObject, cellId: string, localPose: RigidTransform3): GeodesicCannonObject {
+  const poseYaw = Math.atan2(localPose.rotation.m10, localPose.rotation.m00);
+  const turnRadians = sanitizeYaw(poseYaw - emitter.aimYawRadians);
+  if (Math.abs(turnRadians) < 1e-12) {
+    return { ...emitter, cellId, localPose };
+  }
+
+  const launchYaws = emitter.geodesicEmitterYawRadiansById;
+
+  return {
+    ...emitter,
+    cellId,
+    localPose,
+    aimYawRadians: sanitizeYaw(poseYaw),
+    ...(launchYaws
+      ? {
+          geodesicEmitterYawRadiansById: Object.fromEntries(
+            Object.entries(launchYaws).map(([geodesicId, yaw]) => [geodesicId, sanitizeYaw(yaw + turnRadians)]),
+          ),
+        }
+      : {}),
+  };
 }
 
 // ---- Placing cannons on geodesics ----

@@ -18,6 +18,10 @@
  * - The pink glow around the carried emitter is drawn in the player's frame, at the hand, wherever the emitter is stored:
  *   it must stay at the hand when the emitter is on another face than the player.
  *
+ * - A face can be turned relative to its neighbour (on the cube, by a quarter turn). An emitter carried onto the next
+ *   face keeps its physical direction, so its yaw turns with the face, and its default launch yaw stays equal to the yaw
+ *   of its pose. (Picking an emitter up removes its free geodesics, so only locked geodesics are carried.)
+ *
  * The checks: the geodesic is still locked, still joins both emitters and ends in the emitter's cell, and the emitter
  * lives in the cell it is in. The geodesic-level rules are in `tests/world-objects/geodesic/carry.test.ts`.
  */
@@ -226,5 +230,28 @@ describe("releasing a carried emitter of a locked geodesic", () => {
     expect(beside?.x).toBeCloseTo(worldPointToThree({ x: 4.6, y: 3.2, z: 0 }).x, 6);
     expect(beyond?.x).toBeCloseTo(worldPointToThree({ x: 5.8, y: 3, z: 0 }).x, 6);
     expect(beyond?.z).toBeCloseTo(worldPointToThree({ x: 5.8, y: 3, z: 0 }).z, 6);
+  });
+
+  it("turns an emitter with the face it is carried onto, its launch yaw following", () => {
+    const { world, registry, tools } = setupCube("right", 0, -6);
+    const toBottom = world.cellsById.get("right")?.portals.find((portal) => portal.targetCellId === "bottom");
+    const faceTurn = Math.atan2(toBottom?.transformToTarget.rotation.m10 ?? 0, toBottom?.transformToTarget.rotation.m00 ?? 1);
+    expect(Math.abs(faceTurn)).toBeGreaterThan(1);
+
+    tools.startGeodesicCannonCarry("cannon-b");
+    // The hand is past the wall of the right face, on the bottom face.
+    tools.updateCarriedGeodesicCannonPose(true, handAt(0.2, -8.2));
+    tools.updateCarriedGeodesicCannonPose(true, handAt(0.3, -8.4));
+
+    const emitter = registry.get("cannon-b");
+    if (emitter?.kind !== "geodesic-cannon") {
+      throw new Error("Expected the emitter.");
+    }
+    const poseYaw = Math.atan2(emitter.localPose.rotation.m10, emitter.localPose.rotation.m00);
+
+    expect(emitter.cellId).toBe("bottom");
+    expect(Math.cos(poseYaw - faceTurn)).toBeCloseTo(1, 6);
+    expect(Math.cos(emitter.aimYawRadians - poseYaw)).toBeCloseTo(1, 6);
+    expect(isGeodesicLocked(registry, "g-a")).toBe(true);
   });
 });

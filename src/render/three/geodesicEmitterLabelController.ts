@@ -7,9 +7,19 @@
  * removed and disposed when their cannon or geodesic disappears. The label map is owned by the caller.
  */
 import * as THREE from "three";
+import { type CompiledCellComplex } from "../../cell-complex/compileCellComplex";
+import { findNearestImageRoute } from "../../cell-complex/portalRoute";
+import {
+  composeRigidTransform3,
+  identityRigidTransform3,
+  invertRigidTransform3,
+  transformPoint3,
+  type RigidTransform3,
+} from "../../math/rigidTransform3";
 import { type PlayerPose } from "../../movement/playerPose";
 import { resolveGeodesicNumber } from "../../world-objects/geodesic/segments";
-import { type RuntimeObjectRegistry } from "../../world-objects/runtimeObjectRegistry";
+import { type RuntimeObjectRegistry, type RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
+import { threePointToWorld, worldPointToThree } from "./worldAxes";
 import {
   createGeodesicEmitterLabel,
   geodesicEmitterLabelRangeMeters,
@@ -17,6 +27,9 @@ import {
   resolveGeodesicEmitterLabelPosition,
 } from "./geodesicEmitterLabels";
 import { disposeObject3D } from "./runtimeSceneUtils";
+
+// Most portals a straight line from the player to a labelled cannon may cross; the label range is a few meters.
+const geodesicEmitterLabelMaxHops = 2;
 
 /** One live label: the text it was drawn with and its scene object. */
 export interface GeodesicEmitterLabel {
@@ -36,6 +49,8 @@ export interface GeodesicEmitterLabelControllerDeps {
   readonly runtimeObjectRegistry: RuntimeObjectRegistry;
   /** Mutable label store keyed by `getGeodesicEmitterLabelKey`; shared with the shell, mutated in place by the controller. */
   readonly geodesicEmitterLabelsByKey: Map<string, GeodesicEmitterLabel>;
+  /** Getter for the active compiled world, used to find where a cannon on another face appears from the player. */
+  getWorld(): CompiledCellComplex;
   /** Getter (not a value) because the shell reassigns the player pose each frame. */
   getPlayerPose(): PlayerPose;
   /** Current registry version; the create/remove sweep runs only when it differs from the last sweep's. */
@@ -72,13 +87,9 @@ export function createGeodesicEmitterLabelController(deps: GeodesicEmitterLabelC
         continue;
       }
 
-      const inCurrentCell = object.cellId === deps.getPlayerPose().cellId;
-      const distanceMeters = Math.hypot(
-        deps.getPlayerPose().position.x - object.localPose.translation.x,
-        deps.getPlayerPose().position.y - object.localPose.translation.y,
-      );
+      const appearance = resolveCannonAppearance(object);
       // Labels exist for every geodesic regardless of range; only visibility and placement are gated.
-      const visible = inCurrentCell && distanceMeters <= geodesicEmitterLabelRangeMeters;
+      const visible = appearance !== undefined && appearance.distanceMeters <= geodesicEmitterLabelRangeMeters;
       object.geodesicIds.forEach((geodesicId) => {
         const key = getGeodesicEmitterLabelKey(object.id, geodesicId);
         activeLabelKeys.add(key);
@@ -89,7 +100,12 @@ export function createGeodesicEmitterLabelController(deps: GeodesicEmitterLabelC
           return;
         }
 
-        label.root.position.copy(resolveGeodesicEmitterLabelPosition(object, geodesicId));
+        const position = resolveGeodesicEmitterLabelPosition(object, geodesicId);
+        label.root.position.copy(
+          appearance?.playerFrameFromCell
+            ? worldPointToThree(transformPoint3(appearance.playerFrameFromCell, threePointToWorld(position)))
+            : position,
+        );
         label.root.quaternion.copy(cameraQuaternion);
         label.root.updateMatrixWorld(true);
       });
@@ -109,6 +125,42 @@ export function createGeodesicEmitterLabelController(deps: GeodesicEmitterLabelC
       disposeObject3D(label.root);
       geodesicEmitterLabelsByKey.delete(key);
     }
+  }
+
+  // Where a cannon appears from the player: in the player's cell its own frame is the player's; in another cell it is the image
+  // through the portals that a straight line from the player to the cannon crosses (at most two), with the map from the cannon's
+  // frame to the player's. Undefined when no such line exists, so a cannon behind a wall gets no label.
+  function resolveCannonAppearance(
+    cannon: Extract<RuntimeWorldObject, { readonly kind: "geodesic-cannon" }>,
+  ): { readonly distanceMeters: number; readonly playerFrameFromCell?: RigidTransform3 } | undefined {
+    const player = deps.getPlayerPose();
+    if (cannon.cellId === player.cellId) {
+      return {
+        distanceMeters: Math.hypot(
+          player.position.x - cannon.localPose.translation.x,
+          player.position.y - cannon.localPose.translation.y,
+        ),
+      };
+    }
+
+    const route = findNearestImageRoute(
+      deps.getWorld(),
+      { cellId: player.cellId, point: player.position },
+      { cellId: cannon.cellId, point: cannon.localPose.translation },
+      geodesicEmitterLabelMaxHops,
+    );
+    if (!route) {
+      return undefined;
+    }
+
+    const cellFromPlayerFrame = route.hops.reduce((frame, hop) => composeRigidTransform3(hop.transformToTarget, frame), identityRigidTransform3);
+    const playerFrameFromCell = invertRigidTransform3(cellFromPlayerFrame);
+    const image = transformPoint3(playerFrameFromCell, cannon.localPose.translation);
+
+    return {
+      distanceMeters: Math.hypot(player.position.x - image.x, player.position.y - image.y),
+      playerFrameFromCell,
+    };
   }
 
   function syncGeodesicEmitterLabelObject(key: string, text: string): { readonly text: string; readonly root: THREE.Object3D } {

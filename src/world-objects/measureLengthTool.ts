@@ -3,7 +3,9 @@
  * A geodesic (GeodesicIntervalObject) is rendered as a chain of straight GeodesicSegmentObjects, one run per cell it passes through, joined at portals; the measured length is the sum of `lengthMeters` over all registry segments with that `geodesicId`, i.e. the true intrinsic length along the geodesic through portals, not a Euclidean distance within one cell.
  * The label object is placed in the cell-local frame (meters) at the point of the segment, in the player's current cell, nearest to the player, and is refreshed as the geodesic is extended, rebuilt or the player moves.
  */
-import { yawRigidTransform3 } from "../math/rigidTransform3";
+import type { CompiledCellComplex } from "../cell-complex/compileCellComplex";
+import { enumerateCellImages } from "../cell-complex/portalRoute";
+import { identityRigidTransform3, transformPoint3, yawRigidTransform3 } from "../math/rigidTransform3";
 import type { Vec3 } from "../math/vec3";
 import type { GeodesicSegmentObject } from "./geodesic/objects";
 import type { RuntimeObjectRegistry } from "./runtimeObjectRegistry";
@@ -19,15 +21,19 @@ export function createMeasuredGeodesicLengthObject(options: {
   readonly geodesicId: string;
   readonly playerCellId: string;
   readonly playerPoint: Vec3;
+  /** The compiled world; when given, segments seen through the portals of the player's cell are candidates too. */
+  readonly world?: CompiledCellComplex;
   readonly label?: string;
   readonly fallbackSegment?: GeodesicSegmentObject;
 }): MeasuredGeodesicLengthObject | undefined {
-  const segment = findClosestGeodesicSegmentInCell(
+  const closest = findClosestGeodesicSegment(
     options.registry,
+    options.world,
     options.geodesicId,
     options.playerCellId,
     options.playerPoint,
-  ) ?? options.fallbackSegment;
+  );
+  const segment = closest?.segment ?? options.fallbackSegment;
   if (!segment) {
     return undefined;
   }
@@ -37,7 +43,7 @@ export function createMeasuredGeodesicLengthObject(options: {
     registry: options.registry,
     geodesicId: options.geodesicId,
     label: options.label,
-    playerPoint: options.playerPoint,
+    playerPoint: closest?.playerPoint ?? options.playerPoint,
     segment,
   });
 }
@@ -51,19 +57,22 @@ export function refreshMeasuredGeodesicLengthObject(options: {
   readonly measurement: MeasuredGeodesicLengthObject;
   readonly playerCellId: string;
   readonly playerPoint: Vec3;
+  /** The compiled world; when given, segments seen through the portals of the player's cell are candidates too. */
+  readonly world?: CompiledCellComplex;
 }): MeasuredGeodesicLengthObject | undefined {
   const lengthMeters = getGeodesicTotalLengthMeters(options.registry, options.measurement.geodesicId);
   if (!(lengthMeters > 0)) {
     return undefined;
   }
 
-  const closestSegment = findClosestGeodesicSegmentInCell(
+  const closest = findClosestGeodesicSegment(
     options.registry,
+    options.world,
     options.measurement.geodesicId,
     options.playerCellId,
     options.playerPoint,
   );
-  if (!closestSegment) {
+  if (!closest) {
     return withMeasuredGeodesicLengthTooltip({
       ...options.measurement,
       lengthMeters,
@@ -75,8 +84,8 @@ export function refreshMeasuredGeodesicLengthObject(options: {
     registry: options.registry,
     geodesicId: options.measurement.geodesicId,
     label: options.measurement.label,
-    playerPoint: options.playerPoint,
-    segment: closestSegment,
+    playerPoint: closest.playerPoint,
+    segment: closest.segment,
   });
 }
 
@@ -136,23 +145,42 @@ function withMeasuredGeodesicLengthTooltip(
   };
 }
 
-function findClosestGeodesicSegmentInCell(
+// Most portals between the player's cell and a segment that may still make that segment the nearest one.
+const closestSegmentMaxHops = 2;
+
+// The segment of the geodesic nearest the player, and the player's point in that segment's cell frame. Without the world only the player's
+// own cell is searched. With it, segments seen through the portals of the player's cell are searched too, each measured in the player's
+// frame (the player's point mapped into the segment's cell), so the nearest one changes continuously as the player moves, also when
+// the player crosses into the next cell.
+function findClosestGeodesicSegment(
   registry: RuntimeObjectRegistry,
+  world: CompiledCellComplex | undefined,
   geodesicId: string,
   cellId: string,
   point: Vec3,
-): GeodesicSegmentObject | undefined {
-  return registry.getAll()
-    .filter((object): object is GeodesicSegmentObject =>
-      object.kind === "geodesic-segment" &&
-      object.geodesicId === geodesicId &&
-      object.cellId === cellId
-    )
-    .map((segment) => ({
-      segment,
-      distanceSquared: distanceSquared(point, getClosestPointOnSegment(segment, point)),
-    }))
-    .sort((left, right) => left.distanceSquared - right.distanceSquared)[0]?.segment;
+): { readonly segment: GeodesicSegmentObject; readonly playerPoint: Vec3 } | undefined {
+  const segments = registry.getAll().filter((object): object is GeodesicSegmentObject =>
+    object.kind === "geodesic-segment" && object.geodesicId === geodesicId
+  );
+  const images = world
+    ? enumerateCellImages(world, cellId, closestSegmentMaxHops)
+    : [{ cellId, cellFromStart: identityRigidTransform3, hops: 0 }];
+  let best: { readonly segment: GeodesicSegmentObject; readonly playerPoint: Vec3; readonly distanceSquared: number } | undefined;
+
+  for (const image of images) {
+    const playerPoint = transformPoint3(image.cellFromStart, point);
+    for (const segment of segments) {
+      if (segment.cellId !== image.cellId) {
+        continue;
+      }
+      const distance = distanceSquared(playerPoint, getClosestPointOnSegment(segment, playerPoint));
+      if (!best || distance < best.distanceSquared) {
+        best = { segment, playerPoint, distanceSquared: distance };
+      }
+    }
+  }
+
+  return best;
 }
 
 function getGeodesicTotalLengthMeters(registry: RuntimeObjectRegistry, geodesicId: string): number {

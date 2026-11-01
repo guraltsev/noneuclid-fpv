@@ -11,6 +11,7 @@
  */
 import * as THREE from "three";
 import { type PlayerPose } from "../../movement/playerPose";
+import { type CompiledCellComplex } from "../../cell-complex/compileCellComplex";
 import { refreshMeasuredGeodesicLengthObject } from "../../world-objects/measureLengthTool";
 import { refreshProtractorAngleObject } from "../../world-objects/protractorTool";
 import { type ProtractorAngleObject } from "../../world-objects/toolObjects";
@@ -50,6 +51,8 @@ export interface ToolObjectRuntimesDeps {
   readonly runtimeObjectRenderArchetypesByKey: Map<string, RuntimeObjectRenderArchetype>;
   /** Parent object of the instanced archetype meshes. */
   readonly runtimeObjectRenderRoot: THREE.Object3D;
+  /** Getter for the active compiled world, used to re-measure lengths against geodesic parts seen through portals. */
+  getWorld(): CompiledCellComplex;
   /** Getter because the shell reassigns the player pose; used to re-measure lengths from the player's position. */
   getPlayerPose(): PlayerPose;
   /** Resets the shell's protractor tool state to empty. */
@@ -243,6 +246,7 @@ export function createToolObjectRuntimes(deps: ToolObjectRuntimesDeps) {
     // A falsy result means the measurement could not be recomputed: delete the object and its runtime.
     const refreshed = refreshMeasuredGeodesicLengthObject({
       registry: runtimeObjectRegistry,
+      world: deps.getWorld(),
       measurement: object,
       playerCellId: deps.getPlayerPose().cellId,
       playerPoint: deps.getPlayerPose().position,

@@ -1,7 +1,9 @@
 /**
  * Geodesic emitter label sync (src/render/three/geodesicEmitterLabelController.ts): keeps one "G<n>" billboard
  * label per (cannon, geodesic) pair in the registry, in the shared `geodesicEmitterLabelsByKey` map the caller
- * owns. A label is swept once its cannon (or the whole registry entry) disappears.
+ * owns. A label is swept once its cannon (or the whole registry entry) disappears. A label is shown for a cannon within
+ * range of the player that the player could see: in the player's cell, or in a neighbouring cell reached through portals.
+ * It is drawn where the cannon appears in the player's frame, which for a cannon on another face is not its own pose.
  *
  * `document.createElement("canvas")` (the label's text texture) is faked by tests/support/fakeCanvas2d.ts.
  */
@@ -14,14 +16,16 @@ import {
 import { yawRigidTransform3 } from "../../src/math/rigidTransform3";
 import type { GeodesicCannonObject } from "../../src/world-objects/geodesic/objects";
 import { createRuntimeObjectRegistry } from "../../src/world-objects/runtimeObjectRegistry";
+import { resolveGeodesicEmitterLabelPosition } from "../../src/render/three/geodesicEmitterLabels";
 import { installFakeCanvas2d } from "../support/fakeCanvas2d";
+import { compileLargePortalWorld } from "../fixtures/world-objects/geodesic";
 
-function cannon(id: string): GeodesicCannonObject {
+function cannon(id: string, cellId = "a", x = 0, y = 0): GeodesicCannonObject {
   return {
     id,
     kind: "geodesic-cannon",
-    cellId: "a",
-    localPose: yawRigidTransform3(0, { x: 0, y: 0, z: 0 }),
+    cellId,
+    localPose: yawRigidTransform3(0, { x, y, z: 0 }),
     portalRenderable: true,
     geodesicIds: ["g-a"],
     aimYawRadians: 0,
@@ -38,6 +42,7 @@ describe("geodesicEmitterLabelController sweep", () => {
       camera: new THREE.PerspectiveCamera(),
       runtimeObjectRegistry: registry,
       geodesicEmitterLabelsByKey: labels,
+      getWorld: () => compileLargePortalWorld(),
       getPlayerPose: () => ({ cellId: "a", position: { x: 0, y: 0, z: 0 }, yawRadians: 0 }) as never,
       getRegistryVersion: () => registry.getVersion(),
     });
@@ -48,5 +53,42 @@ describe("geodesicEmitterLabelController sweep", () => {
     registry.remove("cannon-a");
     controller.updateGeodesicEmitterLabels();
     expect(labels.has("cannon-a:g-a")).toBe(false);
+  });
+});
+
+describe("geodesicEmitterLabelController placement", () => {
+  function setup(cannons: readonly GeodesicCannonObject[]) {
+    installFakeCanvas2d();
+    const labels = new Map<string, GeodesicEmitterLabel>();
+    const registry = createRuntimeObjectRegistry(cannons);
+    const world = compileLargePortalWorld();
+    const controller = createGeodesicEmitterLabelController({
+      scene: new THREE.Scene(),
+      camera: new THREE.PerspectiveCamera(),
+      runtimeObjectRegistry: registry,
+      geodesicEmitterLabelsByKey: labels,
+      getWorld: () => world,
+      getPlayerPose: () => ({ cellId: "a", position: { x: 4.5, y: 2.5, z: 0 }, yawRadians: 0, pitchRadians: 0 }),
+      getRegistryVersion: () => registry.getVersion(),
+    });
+    controller.updateGeodesicEmitterLabels();
+
+    return labels;
+  }
+
+  it("labels a cannon on the neighbouring face where it appears in the player's frame", () => {
+    // The player is in cell a, next to a's portal at x = 5; the cannon is in cell b at (0.8, 2.5), which appears at (5.8, 2.5) in a.
+    const labels = setup([cannon("cannon-b", "b", 0.8, 2.5)]);
+    const label = labels.get("cannon-b:g-a");
+    const expected = resolveGeodesicEmitterLabelPosition(cannon("seen-from-a", "a", 5.8, 2.5), "g-a");
+
+    expect(label?.root.visible).toBe(true);
+    expect(label?.root.position.distanceTo(expected)).toBeLessThan(1e-6);
+  });
+
+  it("shows no label for a cannon on the neighbouring face that is out of range", () => {
+    const labels = setup([cannon("cannon-b", "b", 4.5, 2.5)]);
+
+    expect(labels.get("cannon-b:g-a")?.root.visible).toBe(false);
   });
 });

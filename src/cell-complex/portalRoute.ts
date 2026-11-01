@@ -32,6 +32,48 @@ export interface NearestImageRoute {
   readonly distanceMeters: number;
 }
 
+/** A cell reached from a starting cell through some portals, with the map from the starting cell's frame to this cell's frame. */
+export interface CellImage {
+  readonly cellId: string;
+  readonly cellFromStart: RigidTransform3;
+  readonly hops: number;
+}
+
+/**
+ * Lists the starting cell (with the identity map) and every cell reachable from it through at most `maxHops` portals, once for each distinct
+ * chain of portals (a cell glued to itself, or reached two ways, appears once per chain), with the map of each chain. A chain never leaves
+ * a cell through the portal it just entered. Nearest chains come first. The list has at most (portals per cell)^maxHops entries.
+ */
+export function enumerateCellImages(world: CompiledCellComplex, fromCellId: string, maxHops: number): readonly CellImage[] {
+  const images: CellImage[] = [];
+  let frontier: { readonly cellId: string; readonly cellFromStart: RigidTransform3; readonly cameThrough?: string }[] = [
+    { cellId: fromCellId, cellFromStart: identityRigidTransform3 },
+  ];
+
+  for (let hops = 0; hops <= maxHops && frontier.length > 0; hops += 1) {
+    const next: typeof frontier = [];
+    for (const node of frontier) {
+      images.push({ cellId: node.cellId, cellFromStart: node.cellFromStart, hops });
+      if (hops === maxHops) {
+        continue;
+      }
+      for (const portal of world.cellsById.get(node.cellId)?.portals ?? []) {
+        if (portal.id === node.cameThrough) {
+          continue;
+        }
+        next.push({
+          cellId: portal.targetCellId,
+          cellFromStart: composeRigidTransform3(portal.transformToTarget, node.cellFromStart),
+          cameThrough: portal.targetPortalId,
+        });
+      }
+    }
+    frontier = next;
+  }
+
+  return images;
+}
+
 // Two routes whose distances differ by less than this are the same geometry; the shorter route wins.
 const tieToleranceMeters = 1e-9;
 

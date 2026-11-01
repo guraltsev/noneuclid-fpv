@@ -1007,6 +1007,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     runtimeObjectRenderSourcesByKey,
     runtimeObjectRenderArchetypesByKey,
     runtimeObjectRenderRoot,
+    getWorld: activeWorld,
     getPlayerPose: () => playerPose,
     resetProtractorToolState: () => {
       activeProtractorToolState = {};
@@ -1022,6 +1023,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       camera,
       runtimeObjectRegistry,
       geodesicEmitterLabelsByKey,
+      getWorld: activeWorld,
       getPlayerPose: () => playerPose,
       getRegistryVersion: () => runtimeObjectRegistry.getVersion(),
     });
@@ -2906,6 +2908,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     const measurement = createMeasuredGeodesicLengthObject({
       id: existing?.id ?? `measured-geodesic-length:${Date.now()}:${measuredGeodesicLengthIdCounter++}`,
       registry: runtimeObjectRegistry,
+      world: activeWorld(),
       geodesicId,
       playerCellId: playerPose.cellId,
       playerPoint: playerPose.position,

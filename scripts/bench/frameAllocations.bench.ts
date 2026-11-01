@@ -107,6 +107,7 @@ function geodesicEmitterLabelCase(): () => void {
     camera: new THREE.PerspectiveCamera(),
     runtimeObjectRegistry: { getAll: () => [] } as never,
     geodesicEmitterLabelsByKey: new Map(),
+    getWorld: () => ({ cellsById: new Map() }) as never,
     getPlayerPose: () => ({ cellId: "a", position: { x: 0, y: 0, z: 0 }, yawRadians: 0 }) as never,
     getRegistryVersion: () => 0,
   });

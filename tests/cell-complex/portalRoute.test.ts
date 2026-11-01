@@ -10,7 +10,8 @@
 import { describe, expect, it } from "vitest";
 import { cube } from "../../src/authoring/exampleWorlds";
 import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
-import { findNearestImageRoute } from "../../src/cell-complex/portalRoute";
+import { enumerateCellImages, findNearestImageRoute } from "../../src/cell-complex/portalRoute";
+import { transformPoint3 } from "../../src/math/rigidTransform3";
 import { compileLargePortalWorld, compileTorusLoopWorld } from "../fixtures/world-objects/geodesic";
 
 const at = (cellId: string, x: number, y: number) => ({ cellId, point: { x, y, z: 0 } });
@@ -59,5 +60,25 @@ describe("findNearestImageRoute", () => {
     const world = compileLargePortalWorld();
 
     expect(findNearestImageRoute(world, at("a", 1, 1), at("b", 1, 1), 0)).toBeUndefined();
+  });
+});
+
+describe("enumerateCellImages", () => {
+  it("lists the starting cell and the neighbour, with the map into the neighbour's frame", () => {
+    const world = compileLargePortalWorld();
+    const images = enumerateCellImages(world, "a", 1);
+
+    expect(images.map((image) => `${image.cellId}:${image.hops}`)).toEqual(["a:0", "b:1"]);
+    const mapped = transformPoint3(images[1].cellFromStart, { x: 5.1, y: 2.5, z: 0 });
+    expect(mapped.x).toBeCloseTo(0.1, 9);
+    expect(mapped.y).toBeCloseTo(2.5, 9);
+  });
+
+  it("lists a cell glued to itself once for each of its portals and never walks straight back", () => {
+    const world = compileTorusLoopWorld();
+    const cell = [...world.cellsById.keys()][0];
+
+    expect(enumerateCellImages(world, cell, 1)).toHaveLength(5);
+    expect(enumerateCellImages(world, cell, 2)).toHaveLength(1 + 4 + 4 * 3);
   });
 });

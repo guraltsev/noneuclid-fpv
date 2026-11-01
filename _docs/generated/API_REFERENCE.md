@@ -248,6 +248,8 @@ Routes through portals that best explain a movement: which chain of portals an o
 | interface | `PortalRouteHop` | One portal crossed on a route: the portal left, the reciprocal portal entered, and the map from the source cell's frame to the target cell's. |
 | interface | `CellPoint` | A place on the surface: a cell and a point in that cell's frame (meters). |
 | interface | `NearestImageRoute` | The chosen route and how far the old point's image lies from the new point (meters). |
+| interface | `CellImage` | A cell reached from a starting cell through some portals, with the map from the starting cell's frame to this cell's frame. |
+| function | `enumerateCellImages` | Lists the starting cell (with the identity map) and every cell reachable from it through at most `maxHops` portals, once for each distinct chain of portals (a cell glued to itself, or reached two ways, appears once per … |
 | function | `findNearestImageRoute` | Finds the route of at most `maxHops` portals from `from.cellId` to `to.cellId` that maps `from.point` nearest to `to.point` and that the straight segment between the two places crosses (checked by walking it, in the pla… |
 
 ### `cell-complex/prismBase.ts`
