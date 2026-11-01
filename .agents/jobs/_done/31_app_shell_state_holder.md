@@ -2,7 +2,7 @@
 
 Status: done, needs review on 2026-11-01.
 Resolves: nothing fully. It does items 3, 4 and 6 of the old job 31 (former issue 77). The state holder and command path
-(items 1 and 2) are now [job 46](../46_shell_session_and_command_path.md); item 5 (startup static cull on the worker) is dropped
+(items 1 and 2) are now [job 46](46_shell_session_and_command_path.md); item 5 (startup static cull on the worker) is dropped
 here, see Decisions.
 
 ## Goal

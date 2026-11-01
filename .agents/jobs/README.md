@@ -132,5 +132,5 @@ queued job, despite their numbers (they were numbered after the existing queue t
 | [43](_done/43_clean_render_tests_and_shared_fakes.md) | Clean the render tests and share the boundary fakes | done, needs review | - |  |
 | [44](_done/44_api_scenario_runner_and_manual_checklist.md) | API scenario runner, first scenarios, and the manual checklist | done, needs review | - |  |
 | [45](45_api_functions_for_scenarios.md) | API functions that scenarios need, and the checks they convert | blocked on the maintainer (012) | - |  |
-| [46](46_shell_session_and_command_path.md) | One shell-side state holder and one command path | queued (31 and 47 done) | - | 77 |
+| [46](_done/46_shell_session_and_command_path.md) | One shell-side state holder and one command path | done, needs review | - | 77 |
 | [47](_done/47_carry_contract.md) | The carry contract: an emitter that can be carried reacts to a stream of displacement steps | done, needs review | - |  |
