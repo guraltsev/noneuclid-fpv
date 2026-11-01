@@ -116,7 +116,7 @@ queued job, despite their numbers (they were numbered after the existing queue t
 | [28](_done/28_frame_snapshot_instance_sync.md) | Sync runtime-object instances once per frame against the rendered root | done, needs review | [71](../../_issues/71_runtime_object_instance_sync_runs_twice_with_stale_root.md) |  |
 | [29](_done/29_frame_loop_allocation_and_draw_calls.md) | Frame-loop allocation and per-object draw calls | done, needs review | [75](../../_issues/75_frame_loop_allocation_and_per_object_draw_calls.md) |  |
 | [30](30_deformation_rebuild_pipeline.md) | Incremental deformation rebuild pipeline | queued | [55](../../_issues/55_live_deformation_rebuild_cost_and_se2_transforms.md), [82](../../_issues/82_deformation_commit_rebuilds_whole_scene_and_reuploads_floor_texture.md) |  |
-| [31](31_app_shell_state_holder.md) | One state holder and one command path for the app shell | queued | - | 77 |
+| [31](31_app_shell_state_holder.md) | Shell cleanups: dead field, one portal sync, split the palette adapter | queued | - | 77 |
 | [32](_done/32_layer_dag.md) | Make the layer rule a real DAG | done, needs review | [78](../../_issues/78_enforce_layer_dag_and_move_domain_logic_out_of_render.md) |  |
 | [33](33_decompose_runtime_monoliths.md) | Decompose runtime monoliths and retire legacy paths | queued | - | 38 |
 | [34](34_type_strictness_lint_bundle.md) | Type strictness, linting and bundle configuration | queued | - | 80 |
@@ -132,3 +132,5 @@ queued job, despite their numbers (they were numbered after the existing queue t
 | [43](_done/43_clean_render_tests_and_shared_fakes.md) | Clean the render tests and share the boundary fakes | done, needs review | - |  |
 | [44](_done/44_api_scenario_runner_and_manual_checklist.md) | API scenario runner, first scenarios, and the manual checklist | done, needs review | - |  |
 | [45](45_api_functions_for_scenarios.md) | API functions that scenarios need, and the checks they convert | blocked on the maintainer (012) | - |  |
+| [46](46_shell_session_and_command_path.md) | One shell-side state holder and one command path | queued (after 31 and 47) | - | 77 |
+| [47](47_carry_contract.md) | The carry contract: an emitter that can be carried reacts to a stream of displacement steps | queued | - |  |

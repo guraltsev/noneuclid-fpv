@@ -327,6 +327,19 @@ anyway for predicting its own movement (P5).
 Selected tool and active tool session are per-participant engine state. Menu open, current page, debug overlays, camera
 and the VR palette are client-local and never enter the command log. This splits `RuntimeMenuState`.
 
+**Agreed (maintainer, 2026-11-01): not this split, for now.** The state holder (job 31's aim) is **shell-side**: the
+selected tool, the tool sessions and the menu state stay together in the shell's session, and `RuntimeMenuState` is not
+split. What keeps the engine reachable is that **an object knows what it can do, and the meaning of each ability is a
+defined contract in the world-objects layer**: an emitter declares that it can be carried, and what carrying means
+(where the object is, wall and junction policies, re-homing, what release does; see P4) is one contract with pure
+functions, not code inside a tool. The shell session only remembers which object is carried and the offset, and hands
+them to the contract. *Consequence:* moving the holder into the engine later moves a holder, not the rules.
+*Maintainer's formulation (2026-11-01), proposed as the shape of the contract:* carrying is **a stream of displacement
+messages** and the object decides how it reacts. Steps are bounded by the step cap, applied in order and never merged (the
+sum of displacements is not the path; a merged step can change the homotopy class), each computed by the sender as target
+minus the object's current place so that drift corrects itself; picking up is a separate "attach here" message. This is
+job 47.
+
 ### P4. Modal tools as per-participant tool sessions
 
 Carry, rotate and aim become sessions with begin, update, commit and cancel. Begin, commit and cancel are commands;
@@ -878,8 +891,9 @@ marked below. *Stages*, each useful on its own (S2 to S4 still **Proposed**):
   ownership and delegated commands, roles.
 - **Phase 2, transports and external clients.**
 
-Existing jobs to absorb or reorder rather than duplicate (see `.agents/jobs/README.md` for conventions): job 31 (one
-state holder and one command path; proposed: build its `appSession` as engine state, not a shell-side holder), job 32
+Existing jobs to absorb or reorder rather than duplicate (see `.agents/jobs/README.md` for conventions): job 31 (shell
+cleanups) and job 46 (one state holder and one command path; **Agreed 2026-11-01: a shell-side session**, see P3), job 47
+(the carry contract in world-objects), job 32
 (layer DAG; its `src/interaction/` move is the first engine step), job 33 (decompose runtime monoliths), job 30
 (incremental deformation rebuild), job 24 (lazy path trie), job 35 (torus family as Teichmüller space).
 
@@ -954,3 +968,4 @@ state holder and one command path; proposed: build its `appSession` as engine st
 | 2026-10-31 | Agreed: literal calls on the public API object, no registry. Jobs written for S0 and S1. |
 | 2026-10-31 | Status update (maintainer): S0 and S1 are implemented (jobs 39 and 40, done, awaiting review). The server allows real-time debugging and testing. Still open from S1: the `docs:check` plain-data rule. S3 (scenario scripts) can start. |
 | 2026-10-31 | Agreed: the channel uses WebSocket (the `ws` package on the server), not Server-Sent Events plus POST, because S2 and S4 need frequent messages in both directions. |
+| 2026-11-01 | Agreed (maintainer): the state holder is shell-side, not engine state, and `RuntimeMenuState` is not split for now (P3 revised). An object declares what it can do (an emitter "can be carried") and the meaning of each ability is a defined contract in the world-objects layer (jobs 46 and 47). Revises the placement of the P4 carry attachment: its rules are the object's contract; the holder of the current carry is the shell session. |

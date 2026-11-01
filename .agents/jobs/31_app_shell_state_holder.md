@@ -1,79 +1,79 @@
-# Job 31 - One state holder and one command path for the app shell
+# Job 31 - Shell cleanups before the state holder
 
 Status: queued.
-Former issue: 77 (converted to a job on 2026-10-28).
+Resolves: nothing fully. It does items 3, 4 and 6 of the old job 31 (former issue 77). The state holder and command path
+(items 1 and 2) are now [job 46](46_shell_session_and_command_path.md); item 5 (startup static cull on the worker) is dropped
+here, see Decisions.
 
-Priority: P2 (architecture). Refines the `createThreeApp` part of issue 38 ("introduce an explicit shared-state holder
-instead of more getter/setter pairs") into a concrete design.
+## Goal
 
-## Status update 2026-10-28
+Three contained cleanups of the rendering shell that do not change behaviour and do not depend on any open design decision:
 
-Nothing in this issue has been implemented. Re-checked against the current code; line numbers and counts in the
-evidence below are updated (`createThreeApp.ts` is now 3,555 lines).
+1. delete the unread `AppState.selectedTool` field;
+2. replace the two near-identical portal-instance sync functions with one;
+3. split the 2,000-line VR/scene palette adapter into small modules and drop its misleading alias.
 
-Done:
-- One small step toward item 6: `src/render/three/scenePaletteLibraryAdapter.ts` (10 lines) is now the public entry
-  point that re-exports the adapter under the `ScenePalette*` names, so consumers no longer import the
-  `vrPaletteLibraryAdapter.ts` file directly. The implementation is still one 2,035-line file and the aliases remain.
+## Depends on
 
-Remains:
-- No `src/runtime/appSession.ts`; `createThreeApp` has 35 `let` declarations and 39 `menuState = ` assignments.
-- `RuntimeCommand` still has 4 kinds (`src/runtime/runtimeCommands.ts:8-12`); only `go-home` (`createThreeApp.ts:609`)
-  and `reload-world` (`:2966`) are dispatched.
-- `AppState.selectedTool` (`src/appState.ts:18`) is still present and unread.
-- Startup still calls `buildStaticallyCulledPortalPathTables` on the main thread (`createThreeApp.ts:775`).
-- Mono and stereo portal sync are still two functions (`:2326-2393`, `:2397-2518`); no `portalFrameRender.ts`.
+Nothing. Job 46 depends on this job (it is easier once the palette code is split and the portal sync is one function).
 
-## Summary
+## Before you start
 
-There is no single source of truth for mutable app state and no consistent command model. `createThreeApp` keeps ~30
-`let` variables, reassigns `menuState` in 38 places, and hands 25 getter/setter closures plus ~45 `on*` callbacks to
-factories. `RuntimeCommand` exists but covers 4 actions, of which 2 are dispatched. `AppState` carries a dead field. Mono
-and stereo portal rendering are two near-copies. The VR palette adapter is one 2,000-line file.
+- Work in your own git worktree and branch (`git worktree add ../noneuclid-job31 -b job-31 design/012-engine-api`), not in the
+  maintainer's working directory: two agents sharing one working directory overwrite each other's edits and commits. Link
+  `node_modules` into the worktree (a directory junction on Windows) or run `npm install` there.
+- Read `.agents/knowledge/index.md` and the notes that match (`layer-dag.md`, `windows-shell.md`, `scenario-runner-browser-limits.md`).
+- There is no pre-push hook gate any more. Run the checks yourself (see Tests and checks) before the first change, to learn the
+  baseline. `tests/app/appCommands.release.test.ts` ("changeWorld switches to the requested world") already fails with a DevTools
+  timeout on this machine at the base commit; it is not yours to fix and not evidence about your change.
 
-## Evidence
+## Background
 
-- Mutable state in the closure: `src/render/three/createThreeApp.ts:438-485`, `:784-885` (`playerPose`, `menuState`,
-  `debugLevel`, `debugOptions`, tool states, id counters `placedFlagIdCounter` :817, `latestVisibleResult` :857, ...).
-- `menuState = ...` occurs 39 times in `createThreeApp.ts` (e.g. :539, :571, :667, :917, :1036, :2120-2154, :2875-3235);
-  palette callbacks at :566-755 are ~200 lines of inline `on*` handlers each doing its own state transition.
-- Getter/setter deps: `createThreeApp.ts:900`, `:915-917`, `:1002`, `:1034-1036` (`getMenuState`/`setMenuState`-style pairs passed to
-  `portalDebugRuntime`, `aimInteraction`, `geodesicCannonTools`, ...).
-- `src/runtime/runtimeCommands.ts:8-12` defines 4 kinds; only `go-home` (`createThreeApp.ts:609`) and `reload-world`
-  (`:2966`) are dispatched; `dispatchRuntimeCommand` (:3552) is a one-line wrapper.
-- `src/appState.ts:18` `selectedTool: "none" | "straight-ray" | "marker"` names tools that no longer exist and is never
-  read; `RuntimeMenuState.selectedTool` is the real one.
-- Startup computes the static cull on the main thread (`createThreeApp.ts:775`) although a worker exists for exactly that
-  (`src/runtime/worldGeometryWorkerClient.ts:72`).
-- Mono vs stereo duplication: `syncPortalInstanceRender` (:2326-2393) and `syncStereoPortalInstanceRender` (:2397-2518)
-  repeat the empty-table reset block verbatim; mono is the 1-eye case. The mono default parameter allocates a
-  `THREE.Matrix4` per call (:2330).
-- `src/render/three/vrPaletteLibraryAdapter.ts` (2,035 lines) mixes page builders (:436-1700), a lattice diagram widget
-  (:799-1008), ~15 icon factories (:1403-1620), generic widgets (:1747-2000) and disposal (:2021-2035); it exports
-  `ScenePaletteLibraryAdapter` as an alias of `VrPaletteLibraryAdapter` (:103-107, :205) though it serves desktop too; `scenePaletteLibraryAdapter.ts`
-  re-exports those aliases.
+- `src/runtime/appState.ts` (`AppState`, `createInitialAppState`): `selectedTool: "none" | "straight-ray" | "marker"` names tools
+  that no longer exist and is never read; `RuntimeMenuState.selectedTool` is the real one.
+- `src/render/three/createThreeApp.ts`: `syncPortalInstanceRender` and `syncStereoPortalInstanceRender` repeat the empty-table
+  reset block; mono is the one-eye case. The mono default parameter allocates a `THREE.Matrix4` per call.
+- `src/render/three/vrPaletteLibraryAdapter.ts` (about 2,000 lines) mixes page builders, a lattice diagram widget, about fifteen icon
+  factories, generic widgets and disposal. It exports `ScenePaletteLibraryAdapter` as an alias of `VrPaletteLibraryAdapter` although it
+  serves the desktop too; `scenePaletteLibraryAdapter.ts` (10 lines) re-exports the aliases.
 
-## Proposed change
+## Decisions
 
-1. **`src/runtime/appSession.ts`**: a plain object `AppSessionState { playerPose, menuState, toolStates, debug,
-   idCounters, xr }` plus `createAppSession(initial)` returning `{ get(): AppSessionState; update(fn) }`. Factories receive
-   the session instead of getter/setter pairs. No events, no framework (per `docs/coding_style.md`).
-2. **Widen `RuntimeCommand`** to every UI-originated action (select tool, open page, select world/config, toggle debug
-   option, sign editing, geodesic-cannon menu actions). `scenePaletteController` callbacks become
-   `dispatch({ kind: ... })`. `appCommandDispatcher.ts` grows into `applyRuntimeCommand(session, command)`, a pure
-   menu-state reducer for menu commands and an effect list for the rest. Test it in `tests/runtime/` without Three.js.
-3. Delete `AppState.selectedTool`; consider folding `AppState` into `AppSessionState` seed.
-4. Replace the two portal sync functions with one `syncPortalInstances(renderRoots: readonly XrPortalEyeRenderRoot[])`
-   in a new `render/three/portalFrameRender.ts`; mono passes a one-element array built from a reused root.
-5. Take the startup static cull from the geometry worker (first snapshot), show the existing loading status meanwhile.
-6. Split `vrPaletteLibraryAdapter.ts` into `palette/pages/*.ts` (main, geodesicActions, geometryComputer, help, signs,
-   debugSettings), `palette/latticeDiagram.ts`, `palette/icons.ts`, `palette/widgets.ts`; rename the type to
-   `ScenePaletteAdapter` and drop the alias.
+- No behaviour change anywhere. A refactor that needs a behaviour change is stopped and reported, not made.
+- Palette split target: `src/render/three/palette/pages/*.ts` (main, geodesicActions, geometryComputer, help, signs, debugSettings),
+  `palette/latticeDiagram.ts`, `palette/icons.ts`, `palette/widgets.ts`, and one small `palette/scenePaletteAdapter.ts` that assembles
+  them. The exported type is named `ScenePaletteAdapter`; the `Vr*` names and the alias disappear and every importer is updated.
+- The single portal sync takes a list of render roots; mono passes a one-element list built from a reused root (no per-call allocation).
+- Layering: everything stays in `render` (see `scripts/docs/lib.mjs`); `npm run docs:check` must stay green, including "import cycles".
+- Item 5 of the old job (take the startup static cull from the geometry worker) is not part of this job: design 012 decides the
+  static cull's future (an optional accelerator behind a hook, measured first) and job 24 reshapes path tables.
 
-## Acceptance criteria
+## Steps
 
-- `grep -c "menuState = " src/render/three/createThreeApp.ts` is 0; menu transitions happen only in the reducer.
-- No factory `deps` interface contains `get*`/`set*` pairs for shell state; they take the session.
-- Every palette action is a `RuntimeCommand` variant with a reducer test.
-- One portal-instance sync function; `createThreeApp.ts` < 1,500 lines.
-- No main-thread `buildStaticallyCulledPortalPathTables` call during startup.
+1. Baseline: run the checks below and write the results into the Report.
+2. Delete `AppState.selectedTool` and anything that sets it; run typecheck and the unit tests.
+3. One portal sync function: add `src/render/three/portalFrameRender.ts` with `syncPortalInstances(renderRoots)`; make mono and stereo
+   call it; delete the two old functions. Run the unit tests and the release tests (the stereo and portal scenarios live there).
+4. Split the palette adapter in the order: widgets, icons, lattice diagram, pages one at a time, then the assembling module and the rename.
+   After each piece run typecheck and `npx vitest run tests/render/scenePaletteLibraryAdapter.test.ts` and the other palette tests.
+5. Regenerate the documents (`npm run docs:generate`), then run all checks.
+
+## Tests and checks
+
+- `npm run typecheck`
+- `npm test`
+- `npm run docs:check`
+- `npm run test:release` (compare with the baseline; only `appCommands.release.test.ts` may differ from a clean run)
+- Do not weaken or delete a test to get green. Moving a test with the code it covers is fine; record each such move in the Report.
+
+## Do not
+
+- Do not touch `geodesicCannonTools.ts`, the carry code, or `menuState` assignments (job 46 and job 47 own those).
+- Do not rename or reorder anything in `createThreeApp.ts` beyond the portal sync and the removed field.
+- Do not commit with failing checks, and do not push; leave the branch for the maintainer.
+
+## Done when
+
+- `AppState` has no `selectedTool`; there is one portal-instance sync function and no per-call `Matrix4` allocation in it.
+- `vrPaletteLibraryAdapter.ts` is gone, no module under `palette/` is longer than about 600 lines, and `ScenePaletteAdapter` is the only name.
+- All checks above pass (apart from the known `appCommands` timeout), and a `## Report` is appended (see `.agents/jobs/README.md`).
