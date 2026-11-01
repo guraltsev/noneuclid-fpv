@@ -758,7 +758,7 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
     const placement = resolveCarriedEmitterPlacement(cannon, anchor);
     if (!placement) {
       // The hand is behind a wall: the emitter stays where it was.
-      syncCarriedGeodesicCannonGlow(cannon);
+      syncCarriedGeodesicCannonGlow(anchor);
       return;
     }
     const placed = { ...cannon, cellId: placement.cellId, localPose: placement.localPose };
@@ -773,7 +773,7 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
       distanceSquared(placed.localPose.translation, cannon.localPose.translation) <=
         carriedGeodesicEmitterPoseToleranceMeters * carriedGeodesicEmitterPoseToleranceMeters
     ) {
-      syncCarriedGeodesicCannonGlow(cannon);
+      syncCarriedGeodesicCannonGlow(anchor);
       return;
     }
 
@@ -788,7 +788,7 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
     if (!moved.moved) {
       // The move cannot be reconciled with the portal words of the emitter's geodesics, so the emitter stays where it was.
       console.warn(`Carried emitter "${cannon.id}" stays in "${cannon.cellId}": no route to "${placed.cellId}" fits the portal word of ${moved.brokenGeodesicIds.join(", ")}.`);
-      syncCarriedGeodesicCannonGlow(cannon);
+      syncCarriedGeodesicCannonGlow(anchor);
       return;
     }
     const nextCannon = runtimeObjectRegistry.get(cannon.id);
@@ -796,7 +796,7 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
       return;
     }
     rebuildCarriedGeodesicFromCannon(nextCannon, { preserveGeodesicOnRebuildFailure: true });
-    syncCarriedGeodesicCannonGlow(nextCannon);
+    syncCarriedGeodesicCannonGlow(anchor);
     syncRuntimeObjectPortalInstances();
     syncSelectableHitboxDebug();
   }
@@ -924,9 +924,9 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
     syncDesktopPalette();
   }
 
-  function syncCarriedGeodesicCannonGlow(
-    cannon: Extract<RuntimeWorldObject, { readonly kind: "geodesic-cannon" }>,
-  ): void {
+  // The glow is a child of the scene, which is drawn in the player's frame, so it goes at the hand (the emitter's place as seen
+  // from the player's cell), not at the emitter's pose, which is in the frame of whichever face the emitter is on.
+  function syncCarriedGeodesicCannonGlow(handPoint: { readonly x: number; readonly y: number; readonly z: number }): void {
     const glow = carriedGeodesicCannonGlow ?? createCarriedGeodesicCannonGlow();
     carriedGeodesicCannonGlow = glow;
     if (!glow.parent) {
@@ -935,11 +935,7 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
 
     glow.visible = deps.getMenuState().selectedTool === "geodesic-cannon-carry";
     // Glow cylinder is 1.72 m tall, so center it 0.86 m above the cannon base.
-    glow.position.copy(worldPointToThree({
-      x: cannon.localPose.translation.x,
-      y: cannon.localPose.translation.y,
-      z: cannon.localPose.translation.z + 0.86,
-    }));
+    glow.position.copy(worldPointToThree({ x: handPoint.x, y: handPoint.y, z: handPoint.z + 0.86 }));
   }
 
   function clearCarriedGeodesicCannonGlow(): void {
