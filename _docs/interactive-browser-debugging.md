@@ -256,10 +256,12 @@ Positions are in world axes (x, y, z up), in the frame named in each field (`pos
 | `render.records {objectId?, source?, archetypePrefix?, limit?}` | The records themselves: object, cell, archetype key, where the record puts the object in its cell, and its flags (`omitRootVisiblePath`, `suppressWithinCameraDistanceMeters`). A ghost is a record in another cell than the object's own. |
 | `render.explainGhosts <objectId>` | For each drawn part of the object (the player's rover included): the render footprint used, the developed disk it asked for, and for every cell copy the disk reached whether it is the `own` cell, gets a `ghost`, or is dropped as a `duplicate` of a kept copy. Same code as the records come from. |
 | `render.instances {archetypePrefix?, objectId?, detail?, limit?}` | The live archetypes: capacity, instances drawn, instances per destination cell and, with `detail`, each instance's path id, cell, depth, clip row (`-2` unclipped, `-1` no slot) and root-frame position. |
+| `render.paths {cellId?, containsNdc?: {x, y}, limit?}` | The visible portal paths of the frame: destination cell, depth, clip row and the clip polygon each is drawn inside (NDC, -1..1). With `containsNdc`, which paths cover a screen point: the deepest one is the cell copy drawn there. |
 | `render.explainInstances <objectId>` | For every record of the object and every visible path to its cell: `written`, `omitted-root-path`, `suppressed-near-camera` (with the distance to the camera), `merged-into-root-copy` or `over-capacity`. Re-runs the writer on the last frame's inputs, so it writes what it wrote before. |
 
 A missing far-side copy is then a three-step question: is there a record in that cell (`records`), did the ghost rule keep the cell copy
-(`explainGhosts`), and was the record drawn on the visible paths to that cell (`explainInstances`).
+(`explainGhosts`), and was the record drawn on the visible paths to that cell (`explainInstances`). `paths` tells which cell copy is on screen at a
+given pixel, and `instances {detail: true}` shows the polygon each instance was clipped to.
 
 ## 4. Ending the session
 

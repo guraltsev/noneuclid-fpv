@@ -16,6 +16,7 @@ import {
   explainObjectGhosts,
   explainObjectInstances,
   inspectInstances,
+  inspectPaths,
   inspectRecordSources,
   inspectRecords,
 } from "../../src/render/three/renderInspection";
@@ -259,5 +260,28 @@ describe("render inspection", () => {
     const { context } = setup();
 
     expect(() => explainObjectInstances(context, "mouse-1")).toThrow("no frame has been synced yet");
+    expect(() => inspectPaths(context)).toThrow("no frame has been synced yet");
+  });
+
+  it("lists the visible paths with their screen regions and answers which cover a point", () => {
+    const { sync, context } = setup();
+    const left = path("room-a", 7, 1, new THREE.Matrix4().makeTranslation(-6, 0, 0));
+    sync.sync(snapshot({
+      "room-b": [path("room-b", 0, 0)],
+      "room-a": [{ ...left, clipPolygonNdc: [{ x: -1, y: -1 }, { x: 0, y: -1 }, { x: 0, y: 1 }, { x: -1, y: 1 }] }],
+    }));
+
+    const all = inspectPaths(context);
+    const covering = inspectPaths(context, { containsNdc: { x: -0.5, y: 0 } });
+
+    expect(all).toMatchObject({ rootCellId: "room-b", total: 2 });
+    expect(all.paths.map((entry) => [entry.pathId, entry.destinationCellId, entry.depth, entry.clipIndex])).toEqual([
+      [0, "room-b", 0, -2],
+      [7, "room-a", 1, 3],
+    ]);
+    expect(all.paths[1].clipPolygonNdc).toEqual([{ x: -1, y: -1 }, { x: 0, y: -1 }, { x: 0, y: 1 }, { x: -1, y: 1 }]);
+    expect(covering.paths.map((entry) => entry.pathId)).toContain(7);
+    expect(inspectPaths(context, { containsNdc: { x: 0.5, y: 0 } }).paths.map((entry) => entry.pathId)).not.toContain(7);
+    expect(inspectPaths(context, { cellId: "room-a" }).total).toBe(1);
   });
 });

@@ -2465,10 +2465,14 @@ Read-only inspection of what the runtime-object render pipeline did with the las
 | interface | `InspectedArchetypeInstances` | One archetype's instances. |
 | interface | `InspectedInstanceDecision` | Why one record was or was not drawn on one visible path. |
 | interface | `InspectedObjectInstances` | The writer decisions for one object, over every archetype it has records in. |
+| interface | `InspectPathsFilter` | Filter of {@link inspectPaths}. |
+| interface | `InspectedPath` | One visible portal path as plain data. |
+| interface | `InspectedPaths` | Result of {@link inspectPaths}. |
 | function | `inspectRecordSources` | Lists the record sources of the last collection with the number of groups and records each produced. |
 | function | `inspectRecords` | Lists the render records of the last collection that match `filter`, with where each puts its object in its own cell and its flags. |
 | function | `explainObjectGhosts` | Explains the ghost rule for each drawn part of the object `objectId` (or of the player's rover, by its object id): the footprint used, the disk developed from it and, for each cell copy the disk reaches, whether it is t… |
 | function | `inspectInstances` | Lists the live archetypes that match `filter` with their instance counts per cell and, with `detail`, every written instance (placement, path, clip row). |
+| function | `inspectPaths` | Lists the visible portal paths of the last frame with their screen regions: which cell copy each shows, how many portals deep it is, and the clip polygon it is drawn inside. |
 | function | `explainObjectInstances` | Explains, for every record of the object `objectId` and every visible path to the record's cell, whether an instance was written and, if not, why (the record skips the root path, it is hidden near a camera, it is merged… |
 | function | `installRenderInspectionApi` | Publishes the inspection functions as the public API namespace `render`; pair with {@link uninstallRenderInspectionApi} on teardown. |
 | function | `uninstallRenderInspectionApi` | Removes the public API namespace `render`. |

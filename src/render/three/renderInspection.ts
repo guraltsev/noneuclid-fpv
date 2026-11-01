@@ -9,7 +9,7 @@
  * each field (`cell`: the record's cell, `root`: the rendered root cell's frame).
  *
  * `installRenderInspectionApi` publishes the functions as the public API namespace `render` (`recordSources`, `records`, `explainGhosts`, `instances`,
- * `explainInstances`); see `_docs/interactive-browser-debugging.md`.
+ * `explainInstances`, `paths`); see `_docs/interactive-browser-debugging.md`.
  */
 import { setApiNamespace } from "../../runtime/publicApi";
 import type { FrameRenderSnapshot } from "./frameRenderSnapshot";
@@ -145,6 +145,8 @@ export interface InspectedInstance {
   readonly clipIndex: number;
   /** Where the instance origin is, in the rendered root cell's frame. */
   readonly positionInRoot: InspectedPosition;
+  /** The screen region the path is visible in (the clip polygon in normalised device coordinates, x and y in -1..1), as the visibility pass computed it. */
+  readonly pathClipPolygonNdc?: readonly { readonly x: number; readonly y: number }[];
 }
 
 /** One archetype's instances. */
@@ -175,6 +177,8 @@ export interface InspectedInstanceDecision {
   readonly suppressWithinCameraDistanceMeters?: number;
   /** Absent when the record never got a placement (it skips the root path). */
   readonly positionInRoot?: InspectedPosition;
+  /** The screen region the path is visible in (see {@link InspectedInstance.pathClipPolygonNdc}). */
+  readonly pathClipPolygonNdc?: readonly { readonly x: number; readonly y: number }[];
 }
 
 /** The writer decisions for one object, over every archetype it has records in. */
@@ -182,6 +186,38 @@ export interface InspectedObjectInstances {
   readonly objectId: string;
   readonly rootCellId: string;
   readonly decisions: readonly InspectedInstanceDecision[];
+}
+
+/** Filter of {@link inspectPaths}. */
+export interface InspectPathsFilter {
+  /** Keep paths whose destination cell is this one. */
+  readonly cellId?: string;
+  /** Keep paths whose screen region contains this point (normalised device coordinates, x and y in -1..1). */
+  readonly containsNdc?: { readonly x: number; readonly y: number };
+  /** At most this many paths are returned (default 100); `total` counts all matches. */
+  readonly limit?: number;
+}
+
+/** One visible portal path as plain data. */
+export interface InspectedPath {
+  readonly pathId: number;
+  readonly destinationCellId: string;
+  /** Portals crossed from the root cell. */
+  readonly depth: number;
+  /** The clip row of the path this frame (-2 unclipped, -1 no slot), as instances of it are written. */
+  readonly clipIndex: number;
+  /** The screen region the path is visible in, in normalised device coordinates. */
+  readonly clipPolygonNdc: readonly { readonly x: number; readonly y: number }[];
+  readonly screenAreaPixels: number;
+  /** True when the traversal did not look beyond this path. */
+  readonly terminal: boolean;
+}
+
+/** Result of {@link inspectPaths}. */
+export interface InspectedPaths {
+  readonly rootCellId: string;
+  readonly total: number;
+  readonly paths: readonly InspectedPath[];
 }
 
 const defaultRecordLimit = 100;
@@ -282,11 +318,21 @@ export function explainObjectGhosts(context: RenderInspectionContext, objectId: 
   };
 }
 
-function pathLookup(snapshot: FrameRenderSnapshot | undefined): ReadonlyMap<number, { readonly cellId: string; readonly depth: number }> {
-  const result = new Map<number, { cellId: string; depth: number }>();
+interface InspectedPathInfo {
+  readonly cellId: string;
+  readonly depth: number;
+  readonly clipPolygonNdc: readonly { readonly x: number; readonly y: number }[];
+}
+
+function roundedPolygon(polygon: readonly { readonly x: number; readonly y: number }[]): readonly { readonly x: number; readonly y: number }[] {
+  return polygon.map((point) => ({ x: Math.round(point.x * 1e4) / 1e4 + 0, y: Math.round(point.y * 1e4) / 1e4 + 0 }));
+}
+
+function pathLookup(snapshot: FrameRenderSnapshot | undefined): ReadonlyMap<number, InspectedPathInfo> {
+  const result = new Map<number, InspectedPathInfo>();
 
   for (const path of snapshot?.objectPaths ?? []) {
-    result.set(path.pathId, { cellId: path.destinationCellId, depth: path.depth });
+    result.set(path.pathId, { cellId: path.destinationCellId, depth: path.depth, clipPolygonNdc: roundedPolygon(path.clipPolygonNdc) });
   }
 
   return result;
@@ -334,6 +380,7 @@ export function inspectInstances(
           positionInRoot: roundedPosition(
             threePointToWorld(new THREE.Vector3(matrixArray[base + 12], matrixArray[base + 13], matrixArray[base + 14])),
           ),
+          pathClipPolygonNdc: path?.clipPolygonNdc,
         });
       }
     }
@@ -349,6 +396,62 @@ export function inspectInstances(
   }
 
   return result;
+}
+
+function polygonContains(polygon: readonly { readonly x: number; readonly y: number }[], point: { readonly x: number; readonly y: number }): boolean {
+  let inside = false;
+
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i, i += 1) {
+    const a = polygon[i];
+    const b = polygon[j];
+
+    if (a.y > point.y !== b.y > point.y && point.x < ((b.x - a.x) * (point.y - a.y)) / (b.y - a.y) + a.x) {
+      inside = !inside;
+    }
+  }
+
+  return inside;
+}
+
+/**
+ * Lists the visible portal paths of the last frame with their screen regions: which cell copy each shows, how many portals deep it is, and the clip polygon it is drawn
+ * inside. With `containsNdc` it answers "which paths cover this pixel?", the question behind a cut-off or doubled object. Throws before the first frame.
+ */
+export function inspectPaths(context: RenderInspectionContext, filter: InspectPathsFilter = {}): InspectedPaths {
+  const snapshot = context.snapshot();
+
+  if (!snapshot) {
+    throw new Error("no frame has been synced yet");
+  }
+
+  const limit = filter.limit ?? defaultRecordLimit;
+  const paths: InspectedPath[] = [];
+  let total = 0;
+
+  for (const path of snapshot.objectPaths) {
+    if (filter.cellId !== undefined && path.destinationCellId !== filter.cellId) {
+      continue;
+    }
+
+    if (filter.containsNdc !== undefined && !polygonContains(path.clipPolygonNdc, filter.containsNdc)) {
+      continue;
+    }
+
+    total += 1;
+    if (paths.length < limit) {
+      paths.push({
+        pathId: path.pathId,
+        destinationCellId: path.destinationCellId,
+        depth: path.depth,
+        clipIndex: resolvePortalInstanceClipIndex(path, snapshot.clipIndexByPathId, snapshot.unclippedRoot),
+        clipPolygonNdc: roundedPolygon(path.clipPolygonNdc),
+        screenAreaPixels: Math.round(path.screenAreaPixels),
+        terminal: path.terminal,
+      });
+    }
+  }
+
+  return { rootCellId: snapshot.rootCellId, total, paths };
 }
 
 const traceDiagnostics = {
@@ -371,6 +474,7 @@ export function explainObjectInstances(context: RenderInspectionContext, objectI
   }
 
   const recordsByKey = context.recordsByArchetypeKey();
+  const paths = pathLookup(snapshot);
   const decisions: InspectedInstanceDecision[] = [];
   let found = false;
 
@@ -410,6 +514,7 @@ export function explainObjectInstances(context: RenderInspectionContext, objectI
             positionInRoot: Number.isNaN(decision.position.x)
               ? undefined
               : roundedPosition(threePointToWorld(new THREE.Vector3(decision.position.x, decision.position.y, decision.position.z))),
+            pathClipPolygonNdc: paths.get(decision.path.pathId)?.clipPolygonNdc,
           });
         },
       },
@@ -431,6 +536,7 @@ export function installRenderInspectionApi(context: RenderInspectionContext): vo
     explainGhosts: (objectId: string) => explainObjectGhosts(context, objectId),
     instances: (filter?: InspectInstancesFilter) => inspectInstances(context, filter),
     explainInstances: (objectId: string) => explainObjectInstances(context, objectId),
+    paths: (filter?: InspectPathsFilter) => inspectPaths(context, filter),
   });
 }
 
