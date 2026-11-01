@@ -160,6 +160,8 @@ Baseline: `npm run typecheck`, `npm test`, and `npm run test:release` (it passes
 
 ## Report
 
+Commit: `3bbcd9d` (branch `design/012-engine-api`), not pushed.
+
 ### Done
 
 **Decision 1 (one CDP client).** Extracted `scripts/lib/cdpClient.mjs`: `spawnHeadlessBrowser`/`waitForBrowserPage`
