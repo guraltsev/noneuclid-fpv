@@ -12,7 +12,7 @@ import { refreshMeasuredGeodesicLengthObject } from "../world-objects/measureLen
 import { type MeasuredGeodesicLengthObject } from "../world-objects/toolObjects";
 import { refreshProtractorAngleObject } from "../world-objects/protractorTool";
 import { type ProtractorAngleObject } from "../world-objects/toolObjects";
-import type { RuntimeObjectRegistry, RuntimeWorldObject } from "../world-objects/runtimeObjectRegistry";
+import type { RuntimeObjectRegistry } from "../world-objects/runtimeObjectRegistry";
 
 /**
  * Optional renderer hooks invoked as the policy removes or updates dependent objects so visuals can follow.
@@ -118,7 +118,7 @@ function collectLockedGeodesicIds(registry: RuntimeObjectRegistry): Set<string> 
 }
 
 function collectAllGeodesicIds(registry: RuntimeObjectRegistry): Set<string> {
-  const geodesicIds = new Set(collectCannonGeodesicIds(registry));
+  const geodesicIds = new Set<string>();
   for (const object of registry.getAll()) {
     if (object.kind === "geodesic-interval") {
       geodesicIds.add(object.id);
@@ -133,17 +133,6 @@ function collectAllGeodesicIds(registry: RuntimeObjectRegistry): Set<string> {
   }
 
   return geodesicIds;
-}
-
-function collectCannonGeodesicIds(registry: RuntimeObjectRegistry): readonly string[] {
-  return registry.getAll()
-    .filter((object): object is Extract<RuntimeWorldObject, { readonly kind: "geodesic-cannon" }> =>
-      object.kind === "geodesic-cannon"
-    )
-    .flatMap((object) => [
-      ...object.geodesicIds,
-      ...(object.activeGeodesicId ? [object.activeGeodesicId] : []),
-    ]);
 }
 
 function removeMeasuredGeodesicLengthsForGeodesic(

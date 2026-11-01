@@ -60,15 +60,11 @@ describe("geodesic cannon world objects: intersections", () => {
         id: "cannon-a",
         cellId: "a",
         localPose: yawRigidTransform3(0, { x: 0, y: 0, z: 0 }),
-        activeGeodesicId: "g-a",
-        geodesicIds: ["g-a"],
       }),
       createGeodesicCannonObject({
         id: "cannon-b",
         cellId: "a",
         localPose: yawRigidTransform3(Math.PI, { x: 1, y: 0, z: 0 }),
-        activeGeodesicId: "g-a",
-        geodesicIds: ["g-a"],
       }),
       createFreeGeodesicEndObject({
         id: "free-a",
@@ -90,15 +86,12 @@ describe("geodesic cannon world objects: intersections", () => {
     expect(getCannonGeodesicIds(registry, "cannon-b")).toEqual(["g-a"]);
   });
 
-  it("clears stale active emitter state when a deleted interval is no longer in geodesicIds", () => {
+  it("lists no geodesic for an emitter once its interval is removed", () => {
     const registry = createRuntimeObjectRegistry([
       createGeodesicCannonObject({
         id: "cannon-a",
         cellId: "a",
         localPose: yawRigidTransform3(0, { x: 0, y: 0, z: 0 }),
-        activeGeodesicId: "g-a",
-        geodesicIds: [],
-        geodesicEmitterYawRadiansById: { "g-a": 0 },
       }),
       createFreeGeodesicEndObject({
         id: "free-a",
@@ -116,9 +109,7 @@ describe("geodesic cannon world objects: intersections", () => {
 
     removeGeodesic(registry, "g-a");
 
-    const cannon = registry.get("cannon-a");
-    expect(cannon?.kind === "geodesic-cannon" ? cannon.activeGeodesicId : undefined).toBeUndefined();
-    expect(cannon?.kind === "geodesic-cannon" ? cannon.geodesicEmitterYawRadiansById : undefined).toEqual({});
+    expect(getCannonGeodesicIds(registry, "cannon-a")).toEqual([]);
   });
 
   it("creates a vertex balloon where two geodesics intersect outside an emitter", () => {

@@ -236,13 +236,17 @@ export function findNearestEmitterHitOnTrace(input: {
 }): { readonly emitter: GeodesicCannonObject; readonly distanceMeters: number } | undefined {
   const direction = normalizeHorizontalDirection(input.direction);
   let nearest: { readonly emitter: GeodesicCannonObject; readonly distanceMeters: number } | undefined;
+  // An emitter the geodesic is already attached to is not a hit (only the source emitter, handled below, is exempt from that).
+  const interval = input.geodesicId ? input.registry.get(input.geodesicId) : undefined;
+  const isAttached = (emitterId: string): boolean =>
+    interval?.kind === "geodesic-interval" && (interval.start.anchorObjectId === emitterId || interval.end.anchorObjectId === emitterId);
 
   for (const object of input.registry.getObjectsInCell(input.cellId)) {
     if (object.kind !== "geodesic-cannon") {
       continue;
     }
     const isSourceEmitter = object.id === input.sourceEmitterId;
-    if (!isSourceEmitter && input.geodesicId && object.geodesicIds.includes(input.geodesicId)) {
+    if (!isSourceEmitter && isAttached(object.id)) {
       continue;
     }
 

@@ -9,8 +9,9 @@ import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex"
 import type { RuntimeObjectRegistry } from "../runtimeObjectRegistry";
 import { rebuildConnectedGeodesicBetweenEmitters, rebuildGeodesicToLength } from "./cannon";
 import { pruneMissingGeodesicIntersectionObjects, withDeferredGeodesicIntersections } from "./intersections";
+import { getEmitterGeodesicIds } from "./endpoints";
 import { collectLockedIncidentGeodesicIdsForEmitter, isGeodesicLocked } from "./lifecycle";
-import { collectGeodesicPortalWord, getGeodesicSegments } from "./segments";
+import { collectGeodesicPortalWord, getGeodesicSegments, resolveEmitterLaunchYaw } from "./segments";
 
 /** What a rebuild of an emitter's geodesics touched. */
 export interface EmitterGeodesicRebuild {
@@ -41,7 +42,7 @@ export function rebuildEmitterGeodesics(input: {
     return { rebuiltGeodesicIds: [] };
   }
 
-  const geodesicId = cannon.activeGeodesicId ?? input.activeGeodesicId;
+  const geodesicId = input.activeGeodesicId ?? getEmitterGeodesicIds(registry, cannon.id)[0];
   const lockedIncidentGeodesicIds = collectLockedIncidentGeodesicIdsForEmitter(registry, cannon.id);
   if (lockedIncidentGeodesicIds.length === 0 && !geodesicId) {
     return { rebuiltGeodesicIds: [] };
@@ -77,6 +78,7 @@ export function rebuildEmitterGeodesics(input: {
       registry,
       cannon,
       geodesicId,
+      launchYawRadians: resolveEmitterLaunchYaw(registry, cannon, geodesicId),
       totalLengthMeters: input.rotationTargetLengthMeters ?? geodesicTotalLengthMeters(registry, geodesicId),
       connectEmitters: false,
       breakOnForbiddenZone: true,

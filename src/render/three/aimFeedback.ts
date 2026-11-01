@@ -223,7 +223,7 @@ export function createAimFeedback(deps: AimFeedbackDeps): AimFeedback {
     const usableTarget = deps.targetIsWithinInteractionRange(target) ? target : undefined;
     const center = protractor.center ??
       (usableTarget?.object?.kind === "geodesic-cannon" || usableTarget?.object?.kind === "geodesic-intersection"
-        ? resolveProtractorCenterSelection(usableTarget.object)
+        ? resolveProtractorCenterSelection(runtimeObjectRegistry, usableTarget.object)
         : undefined);
     if (!center) {
       clearProtractorToolFeedback();

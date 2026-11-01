@@ -83,20 +83,11 @@ export function transformGeodesicCannonForGeometryCommit(
 
   const position = map.mapPoint(object.localPose.translation);
   const aimYawRadians = transformYawWithMap(object.aimYawRadians, object.localPose.translation, map);
-  const geodesicEmitterYawRadiansById = object.geodesicEmitterYawRadiansById
-    ? Object.fromEntries(
-        Object.entries(object.geodesicEmitterYawRadiansById).map(([geodesicId, yawRadians]) => [
-          geodesicId,
-          transformYawWithMap(yawRadians, object.localPose.translation, map),
-        ]),
-      )
-    : undefined;
 
   return {
     ...object,
     cellId: map.cellId,
     localPose: yawRigidTransform3(aimYawRadians, position),
     aimYawRadians,
-    geodesicEmitterYawRadiansById,
   };
 }

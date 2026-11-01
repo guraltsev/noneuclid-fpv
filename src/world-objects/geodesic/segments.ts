@@ -1,10 +1,11 @@
 /**
- * Derived geodesic segments: lookup by geodesic, building segments from traces with the start/end half split, lengths, tangents at anchors, display numbers and the emitter-side caches.
+ * Derived geodesic segments: lookup by geodesic, building segments from traces with the start/end half split, lengths, tangents at anchors and display numbers.
  */
 import { yawRigidTransform3 } from "../../math/rigidTransform3";
 import { addVec3, scaleVec3, type Vec3 } from "../../math/vec3";
 import type { RuntimeObjectRegistry, RuntimeWorldObject } from "../runtimeObjectRegistry";
 import {
+  type GeodesicCannonObject,
   type GeodesicEndRole,
   type GeodesicHalfRole,
   type GeodesicIntervalObject,
@@ -18,8 +19,6 @@ import {
 import { requestGeodesicIntersectionUpdate, withDeferredGeodesicIntersections } from "./intersections";
 import {
   getGeodesicPortalWord,
-  removeGeodesicAssociationFromEmitter,
-  removeGeodesicAssociations,
   removeUnusedFreeGeodesicEnds,
 } from "./endpoints";
 
@@ -65,7 +64,6 @@ function removeGeodesicIntervalAndDerivedObjectsNow(
   for (const object of doomed) {
     registry.remove(object.id);
   }
-  removeGeodesicAssociations(registry, geodesicId);
   removeUnusedFreeGeodesicEnds(registry);
   requestGeodesicIntersectionUpdate(registry);
 }
@@ -187,6 +185,29 @@ export function resolveEndpointTangentAtAnchor(input: {
   };
 }
 
+/**
+ * Launch yaw (radians, in the emitter's cell frame) of a geodesic at an emitter: the tangent of the geodesic where it attaches to the
+ * emitter, or the emitter's default `aimYawRadians` when the geodesic has no segments yet (or does not attach to it).
+ */
+export function resolveEmitterLaunchYaw(
+  registry: RuntimeObjectRegistry,
+  emitter: GeodesicCannonObject,
+  geodesicId: string,
+): number {
+  const interval = registry.get(geodesicId);
+  if (interval?.kind === "geodesic-interval") {
+    for (const endRole of ["start", "end"] as const) {
+      if (interval[endRole].anchorObjectId === emitter.id) {
+        const tangent = resolveEndpointTangentAtAnchor({ registry, geodesicId, endRole });
+        if (tangent) {
+          return tangent.yawRadians;
+        }
+      }
+    }
+  }
+  return sanitizeYaw(emitter.aimYawRadians);
+}
+
 /** Re-labels the tail of a trace as an emitter hit when the interval ends on an emitter. */
 export function withAnchoredTargetTerminal(
   registry: RuntimeObjectRegistry,
@@ -300,40 +321,6 @@ export function segmentToTrace(segment: GeodesicSegmentObject): TraceGeodesicSeg
 export function getGeodesicTotalLengthMeters(registry: RuntimeObjectRegistry, geodesicId: string): number {
   return getGeodesicSegments(registry, geodesicId)
     .reduce((total, segment) => total + segment.lengthMeters, 0);
-}
-
-// Refreshes the emitter-side caches (`geodesicIds`, `activeGeodesicId`, per-geodesic yaw) from the interval: each emitter endpoint
-// lists the geodesic and records the tangent yaw at its anchor; every other emitter drops it. The registry attachments remain the source of truth.
-/** Updates the menu caches of an emitter from the geodesic intervals that attach to it. */
-export function syncEmitterGeodesicMenuCaches(registry: RuntimeObjectRegistry, geodesicId: string): void {
-  const interval = registry.get(geodesicId);
-  if (interval?.kind !== "geodesic-interval") {
-    return;
-  }
-  for (const role of ["start", "end"] as const) {
-    const anchor = registry.get(interval[role].anchorObjectId);
-    if (anchor?.kind !== "geodesic-cannon") {
-      continue;
-    }
-    const tangent = resolveEndpointTangentAtAnchor({ registry, geodesicId, endRole: role });
-    registry.update({
-      ...anchor,
-      activeGeodesicId: geodesicId,
-      geodesicIds: anchor.geodesicIds.includes(geodesicId) ? anchor.geodesicIds : [...anchor.geodesicIds, geodesicId],
-      geodesicEmitterYawRadiansById: tangent
-        ? {
-            ...anchor.geodesicEmitterYawRadiansById,
-            [geodesicId]: tangent.yawRadians,
-          }
-        : anchor.geodesicEmitterYawRadiansById,
-    });
-  }
-  // An emitter the interval no longer attaches to (it was untied or detached) must not keep listing it.
-  for (const emitter of registry.getObjectsOfKind("geodesic-cannon")) {
-    if (emitter.id !== interval.start.anchorObjectId && emitter.id !== interval.end.anchorObjectId) {
-      removeGeodesicAssociationFromEmitter(registry, emitter.id, geodesicId);
-    }
-  }
 }
 
 /** Returns the stored portal word of an interval geodesic; `[]` for unknown ids or geodesics that never cross a portal. */
@@ -450,14 +437,7 @@ function getGlobalGeodesicNumbers(
   }
 
   for (const object of registry.getAll()) {
-    if (object.kind === "geodesic-cannon") {
-      for (const geodesicId of object.geodesicIds) {
-        pushUniqueId(ids, seenIds, geodesicId);
-      }
-      if (object.activeGeodesicId) {
-        pushUniqueId(ids, seenIds, object.activeGeodesicId);
-      }
-    } else if (object.kind === "geodesic-segment") {
+    if (object.kind === "geodesic-segment") {
       pushUniqueId(ids, seenIds, object.geodesicId);
     } else if (object.kind === "geodesic-interval") {
       pushUniqueId(ids, seenIds, object.id);

@@ -26,6 +26,7 @@ import {
 import { createProtractorAngleObject } from "../../src/world-objects/protractorTool";
 import { getGeodesicEmitterAimSphereCenter, resolveAimTarget, resolveAimTargets, type AimRay } from "../../src/interaction/aimTarget";
 import { normalizeVec3, subVec3 } from "../../src/math/vec3";
+import { addGeodesicLeavingEmitter } from "../fixtures/world-objects/geodesic";
 
 describe("resolveAimTarget", () => {
   it("resolves the floor point in the current cell", () => {
@@ -196,8 +197,6 @@ describe("resolveAimTarget", () => {
       id: "cannon-a",
       cellId: "room",
       localPose: yawRigidTransform3(0, { x: 0, y: 0, z: 0 }),
-      activeGeodesicId: "g-a",
-      geodesicIds: ["g-a"],
     });
     const segment = createGeodesicSegment({
       start: { x: 0, y: 0, z: 1.08 },
@@ -225,14 +224,13 @@ describe("resolveAimTarget", () => {
       id: "cannon-a",
       cellId: "room",
       localPose: yawRigidTransform3(0, { x: 0, y: 0, z: 0 }),
-      activeGeodesicId: "g-a",
-      geodesicIds: ["g-a"],
     });
     const segment = createGeodesicSegment({
       start: { x: 0.2, y: 0, z: 1.08 },
       lengthMeters: 1.8,
     });
     const registry = createRuntimeObjectRegistry([cannon, segment]);
+    addGeodesicLeavingEmitter(registry, "cannon-a", "g-handle", 0);
     const rootPath = buildPortalPathTables(world, { maxDepth: 0 }).tablesByRootCellId.get("room")!.pathsById.get(0)!;
     const ray = aimRayLookingAt({ x: 0, y: -0.35, z: 1.08 }, { x: 0.8, y: 0, z: 1.08 });
 
@@ -253,14 +251,10 @@ describe("resolveAimTarget", () => {
       id: "cannon-a",
       cellId: "room",
       localPose: yawRigidTransform3(0, { x: 0, y: 0, z: 0 }),
-      activeGeodesicId: "g-a",
-      geodesicIds: ["g-a", "g-b"],
-      geodesicEmitterYawRadiansById: {
-        "g-a": 0,
-        "g-b": Math.PI / 2,
-      },
     });
     const registry = createRuntimeObjectRegistry([cannon]);
+    addGeodesicLeavingEmitter(registry, "cannon-a", "g-a", 0);
+    addGeodesicLeavingEmitter(registry, "cannon-a", "g-b", Math.PI / 2);
     const rootPath = buildPortalPathTables(world, { maxDepth: 0 }).tablesByRootCellId.get("room")!.pathsById.get(0)!;
 
     const firstTarget = resolveAimTarget({
@@ -294,14 +288,10 @@ describe("resolveAimTarget", () => {
       id: "cannon-a",
       cellId: "room",
       localPose: yawRigidTransform3(0, { x: 0, y: 0, z: 0 }),
-      activeGeodesicId: "g-a",
-      geodesicIds: ["g-a", "g-b"],
-      geodesicEmitterYawRadiansById: {
-        "g-a": 0,
-        "g-b": Math.PI / 2,
-      },
     });
     const registry = createRuntimeObjectRegistry([cannon]);
+    addGeodesicLeavingEmitter(registry, "cannon-a", "g-a", 0);
+    addGeodesicLeavingEmitter(registry, "cannon-a", "g-b", Math.PI / 2);
     const rootPath = buildPortalPathTables(world, { maxDepth: 0 }).tablesByRootCellId.get("room")!.pathsById.get(0)!;
 
     const target = resolveAimTarget({
@@ -325,14 +315,10 @@ describe("resolveAimTarget", () => {
       id: "cannon-a",
       cellId: "room",
       localPose: yawRigidTransform3(0, { x: 0, y: 0, z: 0 }),
-      activeGeodesicId: "g-a",
-      geodesicIds: ["g-a", "g-b"],
-      geodesicEmitterYawRadiansById: {
-        "g-a": 0,
-        "g-b": Math.PI / 2,
-      },
     });
     const registry = createRuntimeObjectRegistry([cannon]);
+    addGeodesicLeavingEmitter(registry, "cannon-a", "g-a", 0);
+    addGeodesicLeavingEmitter(registry, "cannon-a", "g-b", Math.PI / 2);
     const rootPath = buildPortalPathTables(world, { maxDepth: 0 }).tablesByRootCellId.get("room")!.pathsById.get(0)!;
 
     const target = resolveAimTarget({
@@ -356,8 +342,6 @@ describe("resolveAimTarget", () => {
       id: "cannon-a",
       cellId: "room",
       localPose: yawRigidTransform3(0, { x: 0, y: 0, z: 0 }),
-      activeGeodesicId: "g-a",
-      geodesicIds: ["g-a"],
     });
     const registry = createRuntimeObjectRegistry([cannon]);
     const rootPath = buildPortalPathTables(world, { maxDepth: 0 }).tablesByRootCellId.get("room")!.pathsById.get(0)!;
@@ -392,8 +376,6 @@ describe("resolveAimTarget", () => {
       id: "cannon-a",
       cellId: "room",
       localPose: yawRigidTransform3(0, { x: 0, y: 0, z: 0 }),
-      activeGeodesicId: "g-a",
-      geodesicIds: ["g-a"],
     });
     const segment = createGeodesicSegment({
       start: { x: 0.2, y: 0, z: 1.08 },

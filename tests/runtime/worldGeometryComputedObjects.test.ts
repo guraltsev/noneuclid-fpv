@@ -16,6 +16,7 @@ import { yawRigidTransform3 } from "../../src/math/rigidTransform3";
 import { vec3, type Vec3 } from "../../src/math/vec3";
 import { applyGeometryCommitComputedObjectPolicy } from "../../src/runtime/worldGeometryComputedObjects";
 import { createGeodesicCannonObject, geodesicRayBeamHeightMeters } from "../../src/world-objects/geodesic/objects";
+import { getEmitterGeodesicIds } from "../../src/world-objects/geodesic/endpoints";
 import { getGeodesicSegments, getGeodesicTail } from "../../src/world-objects/geodesic/segments";
 import { isGeodesicLocked } from "../../src/world-objects/geodesic/lifecycle";
 import { shootGeodesic } from "../../src/world-objects/geodesic/cannon";
@@ -24,7 +25,6 @@ import { createProtractorAngleObject, protractorAngleRadiusMeters, resolveProtra
 import { type ProtractorAngleObject } from "../../src/world-objects/toolObjects";
 import {
   createRuntimeObjectRegistry,
-  type RuntimeWorldObject,
   type RuntimeObjectRegistry,
 } from "../../src/world-objects/runtimeObjectRegistry";
 
@@ -71,7 +71,7 @@ describe("world geometry computed object policy", () => {
     expect(getGeodesicSegments(registry, "g-open")).toHaveLength(0);
     expect(registry.get("measure-open")).toBeUndefined();
     expect(registry.get("angle-open")).toBeUndefined();
-    expect(cannonGeodesicIds(registry.get("cannon-a"))).not.toContain("g-open");
+    expect(getEmitterGeodesicIds(registry, "cannon-a")).not.toContain("g-open");
   });
 
   it("rebuilds locked geodesics and refreshes attached measurements and protractor angles", () => {
@@ -148,36 +148,6 @@ describe("world geometry computed object policy", () => {
     expect(registry.get("angle-segment-incoming")?.kind).toBe("protractor-angle");
   });
 
-  it("rebuilds locked interval geodesics even without cannon-owned ids", () => {
-    const world = compileLargeWorld();
-    const registry = createRuntimeObjectRegistry();
-    addCannon(registry, "cannon-a", "a", yawRigidTransform3(0, vec3(-1.5, 0, 0)));
-    addCannon(registry, "cannon-b", "a", yawRigidTransform3(Math.PI, vec3(1, 0, 0)));
-    shoot(world, registry, "cannon-a", "g-a");
-    for (const object of registry.getAll()) {
-      if (object.kind === "geodesic-cannon") {
-        registry.update({
-          ...object,
-          activeGeodesicId: undefined,
-          geodesicIds: [],
-          geodesicEmitterYawRadiansById: {},
-        });
-      }
-    }
-    moveIncoming(registry, vec3(1, 1, 0));
-
-    const result = applyGeometryCommitComputedObjectPolicy({
-      world,
-      registry,
-      playerCellId: "a",
-      playerPoint: centerPoint,
-    });
-
-    expect(result.rebuiltGeodesicIds).toEqual(["g-a"]);
-    expect(result.removedGeodesicIds).toEqual([]);
-    expect(isGeodesicLocked(registry, "g-a")).toBe(true);
-    expect(getGeodesicTail(registry, "g-a")?.terminal).toEqual({ kind: "emitter-hit", emitterId: "cannon-b" });
-  });
 });
 
 function compileLargeWorld(): CompiledCellComplex {
@@ -273,7 +243,7 @@ function createIncomingEmitterAngle(registry: RuntimeObjectRegistry): Protractor
     throw new Error("Expected incoming emitter.");
   }
 
-  const center = resolveProtractorCenterSelection(object);
+  const center = resolveProtractorCenterSelection(registry, object);
   const first = resolveProtractorEmitterGeodesicSelection({ center, emitter: object, geodesicId: "g-a" });
   const second = resolveProtractorEmitterGeodesicSelection({ center, emitter: object, geodesicId: "g-b" });
   if (!first || !second) {
@@ -294,7 +264,7 @@ function createIncomingSegmentAngle(registry: RuntimeObjectRegistry): Protractor
     throw new Error("Expected incoming emitter.");
   }
 
-  const center = resolveProtractorCenterSelection(object);
+  const center = resolveProtractorCenterSelection(registry, object);
   const firstSegment = getGeodesicSegments(registry, "g-a").at(-1);
   const secondSegment = getGeodesicSegments(registry, "g-b").at(-1);
   if (!firstSegment || !secondSegment) {
@@ -321,8 +291,4 @@ function createIncomingSegmentAngle(registry: RuntimeObjectRegistry): Protractor
     first,
     second,
   });
-}
-
-function cannonGeodesicIds(object: RuntimeWorldObject | undefined): readonly string[] {
-  return object?.kind === "geodesic-cannon" ? object.geodesicIds : [];
 }

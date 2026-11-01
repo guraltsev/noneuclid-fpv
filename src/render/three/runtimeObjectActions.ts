@@ -13,6 +13,7 @@ import { yawRigidTransform3 } from "../../math/rigidTransform3";
 import type { PlayerPose } from "../../movement/playerPose";
 import type { AimTarget } from "../../interaction/aimTarget";
 import { takeObjectIdSerial, type AppSession } from "../../runtime/appSession";
+import { getEmitterGeodesicIds } from "../../world-objects/geodesic/endpoints";
 import type { RuntimeCommand, ShowGeometryComputerActionsPayload } from "../../runtime/runtimeCommands";
 import { createMeasuredGeodesicLengthObject } from "../../world-objects/measureLengthTool";
 import { placeFlagAtFloorPoint, updatePlacedFlagMessage } from "../../world-objects/placedFlags";
@@ -33,6 +34,7 @@ import type { PlainWorldObject } from "../../world-objects/worldObjectOwner";
 import type { PlayerPoseDebugDump } from "./appDebugHelpers";
 import type { GeodesicMarmotRuntime } from "./creatures/geodesicMarmotView";
 import type { SimpleGeoCreatureRuntime } from "./creatures/simpleGeoCreatureView";
+import { resolveCannonGeodesicId } from "./carriedGeodesicCannon";
 import { reduceDesktopScenePaletteToggle } from "./desktopScenePaletteInput";
 import type { FocusedRuntimeObject, RootAimRay } from "./rootAimRay";
 import type * as THREE from "three";
@@ -404,7 +406,7 @@ export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): Runt
       }
 
       dispatchRuntimeCommand({ kind: "set-protractor-tool-state", state: {
-        center: resolveProtractorCenterSelection(target.object),
+        center: resolveProtractorCenterSelection(runtimeObjectRegistry, target.object),
       } });
       syncDesktopPalette();
       return;
@@ -533,14 +535,20 @@ export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): Runt
     if (focused.object.kind === "geodesic-cannon" && isRuntimeToolEnabled(appConfig, "geodesic-cannon")) {
       dispatchRuntimeCommand({ kind: "set-cannon-tool-state", state: {
         selectedCannonId: focused.object.id,
-        activeGeodesicId: focused.object.activeGeodesicId,
+        activeGeodesicId: resolveCannonGeodesicId(
+          runtimeObjectRegistry,
+          focused.object,
+          undefined,
+          session.get().cannonToolState.activeGeodesicId,
+        ),
       } });
+      const geodesicIds = getEmitterGeodesicIds(runtimeObjectRegistry, focused.object.id);
       dispatchRuntimeCommand({
         kind: "show-geodesic-cannon-actions",
         cannonId: focused.object.id,
-        geodesicIds: focused.object.geodesicIds,
-        geodesicLabelsById: getGeodesicLabelsById(focused.object.geodesicIds),
-        lockedGeodesicIds: getLockedGeodesicIds(focused.object.geodesicIds),
+        geodesicIds,
+        geodesicLabelsById: getGeodesicLabelsById(geodesicIds),
+        lockedGeodesicIds: getLockedGeodesicIds(geodesicIds),
         canTieAndDetach: canTieAndDetachGeodesicsFromCannon(focused.object.id),
       });
       return true;

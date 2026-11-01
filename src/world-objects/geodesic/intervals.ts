@@ -26,7 +26,6 @@ import {
   removeGeodesicIntervalAndDerivedObjects,
   replaceDerivedSegmentsFromTraces,
   segmentToTrace,
-  syncEmitterGeodesicMenuCaches,
   totalGeodesicLengthFromSegments,
   totalLengthThroughSegment,
   withAnchoredTargetTerminal,
@@ -305,7 +304,6 @@ function aimFreeGeodesicFromEndpointNow(input: Parameters<typeof aimFreeGeodesic
       geodesicId: input.geodesicId,
     });
     if (rebuilt) {
-      syncEmitterGeodesicMenuCaches(input.registry, input.geodesicId);
       requestGeodesicIntersectionUpdate(input.registry);
       return {
         interval: rebuilt.interval,
@@ -320,7 +318,6 @@ function aimFreeGeodesicFromEndpointNow(input: Parameters<typeof aimFreeGeodesic
     geodesicId: input.geodesicId,
     traces,
   });
-  syncEmitterGeodesicMenuCaches(input.registry, input.geodesicId);
   requestGeodesicIntersectionUpdate(input.registry);
   return {
     interval: nextInterval,
@@ -499,9 +496,7 @@ function splitGeodesicIntervalAtSegmentHitNow(input: Parameters<typeof splitGeod
     });
   }
   removeUnusedFreeGeodesicEnds(input.registry);
-  syncEmitterGeodesicMenuCaches(input.registry, input.geodesicId);
   if (continuationId) {
-    syncEmitterGeodesicMenuCaches(input.registry, continuationId);
   }
   requestGeodesicIntersectionUpdate(input.registry);
   return [input.registry.get(input.geodesicId), continuationId ? input.registry.get(continuationId) : undefined]
@@ -580,7 +575,6 @@ function rebuildLockedGeodesicDetailedNow(
     allowUnexpectedPortalWord: input.allowOutOfBoundsCarriedEndpoint,
   });
   if (rebuilt.result) {
-    syncEmitterGeodesicMenuCaches(input.registry, input.geodesicId);
     requestGeodesicIntersectionUpdate(input.registry);
   }
   return rebuilt;

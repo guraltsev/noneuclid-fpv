@@ -36,7 +36,6 @@ function emitter(id: string, cellId: string, extra: Partial<GeodesicCannonObject
     cellId,
     localPose: identityRigidTransform3,
     portalRenderable: true,
-    geodesicIds: [],
     aimYawRadians: 0,
     ...extra,
   };

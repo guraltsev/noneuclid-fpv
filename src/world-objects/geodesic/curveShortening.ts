@@ -22,7 +22,6 @@ import {
   removeGeodesicIntervalAndDerivedObjects,
   removeGeodesicSegments,
   replaceDerivedSegmentsFromTraces,
-  syncEmitterGeodesicMenuCaches,
 } from "./segments";
 import { isGeodesicLocked } from "./lifecycle";
 import { previewRebuildGeodesicInterval, rebuildDerivedGeodesicSegments } from "./intervals";
@@ -136,7 +135,6 @@ function tieAndDetachGeodesicEndpointsNow(
       requestGeodesicIntersectionUpdate(request.registry);
       return undefined;
     }
-    syncEmitterGeodesicMenuCaches(request.registry, interval.id);
   }
 
   const pair = createCurveShorteningPairObject({
@@ -632,7 +630,6 @@ function mergeVertexOrFail(
     registry.remove(vertexId);
   }
   replaceDerivedSegmentsFromTraces({ registry, geodesicId: merged.id, traces: preview.traces });
-  syncEmitterGeodesicMenuCaches(registry, merged.id);
   return { changedIds: [merged.id, removedId, pair.id] };
 }
 
@@ -692,7 +689,6 @@ function restoreGeodesicIntervalsAndSegments(
     for (const segment of segmentsByGeodesicId.get(interval.id) ?? []) {
       registry.add(segment);
     }
-    syncEmitterGeodesicMenuCaches(registry, interval.id);
   }
 }
 

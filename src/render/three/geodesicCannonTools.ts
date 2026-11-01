@@ -30,6 +30,7 @@ import { type GeodesicEndpointSelection } from "../../world-objects/geodesic/obj
 import type { GeodesicCannonToolState } from "../../world-objects/geodesic/cannonToolState";
 import { pruneMissingGeodesicIntersectionObjects } from "../../world-objects/geodesic/intersections";
 import {
+  getEmitterGeodesicIds,
   getGeodesicEndpointAttachmentsForAnchor,
   resolveGeodesicEndpointSelectionFromSegmentHit,
 } from "../../world-objects/geodesic/endpoints";
@@ -215,7 +216,7 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
 
       deps.dispatch({ kind: "set-cannon-tool-state", state: {
         selectedCannonId: result.object.id,
-        activeGeodesicId: result.object.activeGeodesicId ?? result.object.geodesicIds[0],
+        activeGeodesicId: getEmitterGeodesicIds(runtimeObjectRegistry, result.object.id)[0],
       } });
       deps.dispatch({ kind: "clear-selected-tool" });
       syncDesktopPalette();
@@ -383,12 +384,13 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
         deps.dispatch({ kind: "close-menu" });
         deps.dispatch({ kind: "clear-selected-tool" });
       } else {
+        const geodesicIds = getEmitterGeodesicIds(runtimeObjectRegistry, updatedCannon.id);
         deps.dispatch({
           kind: "show-geodesic-cannon-actions",
           cannonId: updatedCannon.id,
-          geodesicIds: updatedCannon.geodesicIds,
-          geodesicLabelsById: getGeodesicLabelsById(updatedCannon.geodesicIds),
-          lockedGeodesicIds: getLockedGeodesicIds(updatedCannon.geodesicIds),
+          geodesicIds,
+          geodesicLabelsById: getGeodesicLabelsById(geodesicIds),
+          lockedGeodesicIds: getLockedGeodesicIds(geodesicIds),
           canTieAndDetach: canTieAndDetachGeodesicsFromCannon(updatedCannon.id),
         });
       }
@@ -410,20 +412,14 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
       return;
     }
 
-    const geodesicId = resolveCannonGeodesicId(cannon, requestedGeodesicId);
+    const geodesicId = resolveCannonGeodesicId(runtimeObjectRegistry, cannon, requestedGeodesicId, deps.session.get().cannonToolState.activeGeodesicId);
     if (geodesicId && isGeodesicLocked(runtimeObjectRegistry, geodesicId)) {
       syncDesktopPalette();
       return;
     }
 
-    const selectedCannon = geodesicId && cannon.activeGeodesicId !== geodesicId
-      ? { ...cannon, activeGeodesicId: geodesicId }
-      : cannon;
-    if (selectedCannon !== cannon) {
-      runtimeObjectRegistry.update(selectedCannon);
-    }
     deps.dispatch({ kind: "set-cannon-tool-state", state: {
-      selectedCannonId: selectedCannon.id,
+      selectedCannonId: cannon.id,
       activeGeodesicId: geodesicId,
     } });
     geodesicCannonRotationTargetLengthMeters = geodesicId
@@ -443,20 +439,14 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
       return;
     }
 
-    const geodesicId = resolveCannonGeodesicId(cannon, requestedGeodesicId);
+    const geodesicId = resolveCannonGeodesicId(runtimeObjectRegistry, cannon, requestedGeodesicId, deps.session.get().cannonToolState.activeGeodesicId);
     if (geodesicId && isGeodesicLocked(runtimeObjectRegistry, geodesicId)) {
       syncDesktopPalette();
       return;
     }
 
-    const selectedCannon = geodesicId && cannon.activeGeodesicId !== geodesicId
-      ? { ...cannon, activeGeodesicId: geodesicId }
-      : cannon;
-    if (selectedCannon !== cannon) {
-      runtimeObjectRegistry.update(selectedCannon);
-    }
     deps.dispatch({ kind: "set-cannon-tool-state", state: {
-      selectedCannonId: selectedCannon.id,
+      selectedCannonId: cannon.id,
       activeGeodesicId: geodesicId,
     } });
     geodesicCannonRotationTargetLengthMeters = geodesicId
@@ -477,22 +467,16 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
       return;
     }
 
-    const geodesicId = resolveCannonGeodesicId(cannon, requestedGeodesicId);
-    const selectedCannon = geodesicId && cannon.activeGeodesicId !== geodesicId
-      ? { ...cannon, activeGeodesicId: geodesicId }
-      : cannon;
-    if (selectedCannon !== cannon) {
-      runtimeObjectRegistry.update(selectedCannon);
-    }
+    const geodesicId = resolveCannonGeodesicId(runtimeObjectRegistry, cannon, requestedGeodesicId, deps.session.get().cannonToolState.activeGeodesicId);
     deps.dispatch({ kind: "set-cannon-tool-state", state: {
-      selectedCannonId: selectedCannon.id,
+      selectedCannonId: cannon.id,
       activeGeodesicId: geodesicId,
     } });
     geodesicCannonRotationTargetLengthMeters = geodesicId
       ? getGeodesicTotalLengthMeters(geodesicId)
       : undefined;
     deps.dispatch({ kind: "enter-tool-mode", toolId: "geodesic-cannon-carry" });
-    deps.dispatch({ kind: "begin-carry", objectId: selectedCannon.id });
+    deps.dispatch({ kind: "begin-carry", objectId: cannon.id });
     syncDesktopPalette();
     if (!renderer.xr.isPresenting) {
       void controls.requestPointerLock();
@@ -509,7 +493,7 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
       return false;
     }
 
-    startGeodesicCannonCarry(focused.object.id, focused.object.activeGeodesicId);
+    startGeodesicCannonCarry(focused.object.id, deps.session.get().cannonToolState.activeGeodesicId);
     return true;
   }
 
@@ -555,7 +539,13 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
     removeGeodesic(runtimeObjectRegistry, geodesicId);
     const refreshed = runtimeObjectRegistry.get(cannonId);
     const updatedCannon = refreshed?.kind === "geodesic-cannon" ? refreshed : cannon;
-    const activeGeodesicId = updatedCannon.activeGeodesicId;
+    const geodesicIds = getEmitterGeodesicIds(runtimeObjectRegistry, updatedCannon.id);
+    const activeGeodesicId = resolveCannonGeodesicId(
+      runtimeObjectRegistry,
+      updatedCannon,
+      undefined,
+      deps.session.get().cannonToolState.activeGeodesicId,
+    );
     deps.dispatch({ kind: "set-cannon-tool-state", state: {
       selectedCannonId: updatedCannon.id,
       activeGeodesicId,
@@ -563,9 +553,9 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
     deps.dispatch({
       kind: "show-geodesic-cannon-actions",
       cannonId: updatedCannon.id,
-      geodesicIds: updatedCannon.geodesicIds,
-      geodesicLabelsById: getGeodesicLabelsById(updatedCannon.geodesicIds),
-      lockedGeodesicIds: getLockedGeodesicIds(updatedCannon.geodesicIds),
+      geodesicIds,
+      geodesicLabelsById: getGeodesicLabelsById(geodesicIds),
+      lockedGeodesicIds: getLockedGeodesicIds(geodesicIds),
       canTieAndDetach: canTieAndDetachGeodesicsFromCannon(updatedCannon.id),
     });
     syncDesktopPalette();
@@ -829,22 +819,15 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
     }
 
     if (yawDeltaRadians !== 0 && Number.isFinite(yawDeltaRadians)) {
-      // Wrap to (-pi, pi]; the yaw is also stored per active geodesic so each emitter keeps its own direction.
+      // Wrap to (-pi, pi]; the rebuild below launches the active geodesic along it.
       const nextYaw = Math.atan2(
         Math.sin(cannon.aimYawRadians + yawDeltaRadians),
         Math.cos(cannon.aimYawRadians + yawDeltaRadians),
       );
-      const activeGeodesicId = deps.session.get().cannonToolState.activeGeodesicId;
       const nextCannon = {
         ...cannon,
         aimYawRadians: nextYaw,
         localPose: yawRigidTransform3(nextYaw, cannon.localPose.translation),
-        geodesicEmitterYawRadiansById: activeGeodesicId
-          ? {
-              ...cannon.geodesicEmitterYawRadiansById,
-              [activeGeodesicId]: nextYaw,
-            }
-          : cannon.geodesicEmitterYawRadiansById,
       };
       runtimeObjectRegistry.update(nextCannon);
       rebuildActiveGeodesicFromCannon(nextCannon, { connectEmitters: false });
@@ -899,17 +882,10 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
         Math.cos(nextYaw - cannon.aimYawRadians),
       );
       if (Math.abs(yawDelta) > 1e-6) {
-        const activeGeodesicId = deps.session.get().cannonToolState.activeGeodesicId;
         const nextCannon = {
           ...cannon,
           aimYawRadians: nextYaw,
           localPose: yawRigidTransform3(nextYaw, cannon.localPose.translation),
-          geodesicEmitterYawRadiansById: activeGeodesicId
-            ? {
-                ...cannon.geodesicEmitterYawRadiansById,
-                [activeGeodesicId]: nextYaw,
-              }
-            : cannon.geodesicEmitterYawRadiansById,
         };
         runtimeObjectRegistry.update(nextCannon);
         rebuildActiveGeodesicFromCannon(nextCannon, { connectEmitters: false });
@@ -973,7 +949,7 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
       readonly breakOnForbiddenZone?: boolean;
     } = {},
   ): void {
-    const geodesicId = cannon.activeGeodesicId ?? deps.session.get().cannonToolState.activeGeodesicId;
+    const geodesicId = deps.session.get().cannonToolState.activeGeodesicId;
     if (!geodesicId) {
       return;
     }
@@ -984,6 +960,7 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
       registry: runtimeObjectRegistry,
       cannon,
       geodesicId,
+      launchYawRadians: cannon.aimYawRadians,
       totalLengthMeters,
       connectEmitters: options.connectEmitters,
       snapToEmitter: options.snapToEmitter,

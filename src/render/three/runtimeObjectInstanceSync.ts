@@ -19,7 +19,7 @@ import type { RuntimeObjectRegistry, RuntimeWorldObject } from "../../world-obje
 import { runtimeObjectToDynamicObjectState } from "../../world-objects/runtimeObjectBase";
 import { collectCarryHighlightRecords, createCarryHighlightSource, type CarryHighlightObject } from "./carryHighlight";
 import type { FrameRenderSnapshot } from "./frameRenderSnapshot";
-import { collectGeodesicBodyPlacements, collectGeodesicRuntimeRenderRecords } from "./geodesicCannonRenderer";
+import { collectGeodesicBodyPlacements, collectGeodesicRuntimeRenderRecords, emitterHeadsKey } from "./geodesicCannonRenderer";
 import type { PlayerRoverRenderModel } from "./playerRoverModel";
 import { updateRuntimeObjectRenderArchetypeInstances } from "./renderPortalInstances";
 import {
@@ -111,6 +111,8 @@ export interface RuntimeObjectInstanceSync {
 interface CachedObjectRecords {
   readonly object: RuntimeWorldObject;
   readonly world: CompiledCellComplex;
+  /** emitterHeadsKey of the object when cached: the heads of a cannon follow its attached geodesics, which live in the registry. */
+  readonly headsKey: string;
   readonly archetypeKeys: readonly string[];
   readonly records: PortalGhostedRecords;
 }
@@ -336,13 +338,13 @@ export function createRuntimeObjectInstanceSync(deps: RuntimeObjectInstanceSyncD
         source: "geodesic-segments",
         archetypeKeys,
         exemption: "geodesic-segment",
-        records: () => collectGeodesicRuntimeRenderRecords(object, deps.geodesicArchetypeKeys),
+        records: () => collectGeodesicRuntimeRenderRecords(registry, object, deps.geodesicArchetypeKeys),
       }];
     }
 
     if (geodesic) {
       // Cannon post and heads, intersection balloon: each body part is placed and ghosted like any other object.
-      return collectGeodesicBodyPlacements(object, deps.geodesicArchetypeKeys).map((placement) => ({
+      return collectGeodesicBodyPlacements(registry, object, deps.geodesicArchetypeKeys).map((placement) => ({
         partId: placement.objectId,
         source: "geodesic-body-parts" as const,
         archetypeKeys: placement.archetypeKeys,
@@ -431,8 +433,9 @@ export function createRuntimeObjectInstanceSync(deps: RuntimeObjectInstanceSyncD
       const archetypeKeys = geodesic ? deps.geodesicArchetypeKeys : archetypeKeysForObject(object, prefix);
       const source: RuntimeObjectRecordSource = !geodesic ? "runtime-objects" : object.kind === "geodesic-segment" ? "geodesic-segments" : "geodesic-body-parts";
       const cached = recordCacheByObjectId.get(object.id);
+      const headsKey = emitterHeadsKey(registry, object);
 
-      if (cached && cached.object === object && cached.world === world && sameStrings(cached.archetypeKeys, archetypeKeys)) {
+      if (cached && cached.object === object && cached.world === world && cached.headsKey === headsKey && sameStrings(cached.archetypeKeys, archetypeKeys)) {
         groups.push(cached.records);
         groupSources.push(source);
         continue;
@@ -443,7 +446,7 @@ export function createRuntimeObjectInstanceSync(deps: RuntimeObjectInstanceSyncD
       }
       const objectRecords = recordsOfParts(ghostPartsOfObject(object, world));
 
-      recordCacheByObjectId.set(object.id, { object, world, archetypeKeys: [...archetypeKeys], records: objectRecords });
+      recordCacheByObjectId.set(object.id, { object, world, headsKey, archetypeKeys: [...archetypeKeys], records: objectRecords });
       groups.push(objectRecords);
       groupSources.push(source);
     }

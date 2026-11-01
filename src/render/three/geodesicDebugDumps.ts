@@ -10,6 +10,7 @@ import * as THREE from "three";
 import { type CompiledCellComplex } from "../../cell-complex/compileCellComplex";
 import { addVec3, scaleVec3 } from "../../math/vec3";
 import type { AppSession } from "../../runtime/appSession";
+import { getEmitterGeodesicIds } from "../../world-objects/geodesic/endpoints";
 import { collectGeodesicPortalWord, getGeodesicSegments } from "../../world-objects/geodesic/segments";
 import { getGeodesicConnection, isGeodesicLocked } from "../../world-objects/geodesic/lifecycle";
 import { type GeodesicMarmotRuntime } from "./creatures/geodesicMarmotView";
@@ -295,13 +296,6 @@ export function createGeodesicDebugDumps(deps: GeodesicDebugDumpsDeps) {
     for (const object of runtimeObjectRegistry.getAll()) {
       if (object.kind === "geodesic-segment") {
         ids.add(object.geodesicId);
-      } else if (object.kind === "geodesic-cannon") {
-        for (const geodesicId of object.geodesicIds) {
-          ids.add(geodesicId);
-        }
-        if (object.activeGeodesicId) {
-          ids.add(object.activeGeodesicId);
-        }
       } else if (object.kind === "geodesic-interval") {
         ids.add(object.id);
       }
@@ -317,7 +311,7 @@ export function createGeodesicDebugDumps(deps: GeodesicDebugDumpsDeps) {
     const cannonId = deps.session.get().cannonToolState.selectedCannonId;
     const selectedCannon = cannonId ? runtimeObjectRegistry.get(cannonId) : undefined;
     if (selectedCannon?.kind === "geodesic-cannon") {
-      return selectedCannon.activeGeodesicId ?? selectedCannon.geodesicIds[0];
+      return getEmitterGeodesicIds(runtimeObjectRegistry, selectedCannon.id)[0];
     }
 
     const target = deps.resolveCameraAimTarget();
@@ -326,7 +320,7 @@ export function createGeodesicDebugDumps(deps: GeodesicDebugDumpsDeps) {
       return object.geodesicId;
     }
     if (object?.kind === "geodesic-cannon") {
-      return object.activeGeodesicId ?? object.geodesicIds[0];
+      return getEmitterGeodesicIds(runtimeObjectRegistry, object.id)[0];
     }
 
     return undefined;

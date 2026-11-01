@@ -17,6 +17,7 @@ import {
   transformPoint3,
   type RigidTransform3,
 } from "../../math/rigidTransform3";
+import { getEmitterGeodesicIds } from "../../world-objects/geodesic/endpoints";
 import { resolveGeodesicNumber } from "../../world-objects/geodesic/segments";
 import { type RuntimeObjectRegistry, type RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
 import { threePointToWorld, worldPointToThree } from "./worldAxes";
@@ -90,7 +91,7 @@ export function createGeodesicEmitterLabelController(deps: GeodesicEmitterLabelC
       const appearance = resolveCannonAppearance(object);
       // Labels exist for every geodesic regardless of range; only visibility and placement are gated.
       const visible = appearance !== undefined && appearance.distanceMeters <= geodesicEmitterLabelRangeMeters;
-      object.geodesicIds.forEach((geodesicId) => {
+      getEmitterGeodesicIds(runtimeObjectRegistry, object.id).forEach((geodesicId) => {
         const key = getGeodesicEmitterLabelKey(object.id, geodesicId);
         activeLabelKeys.add(key);
         const label = (!sweep && geodesicEmitterLabelsByKey.get(key)) ||
@@ -100,7 +101,7 @@ export function createGeodesicEmitterLabelController(deps: GeodesicEmitterLabelC
           return;
         }
 
-        const position = resolveGeodesicEmitterLabelPosition(object, geodesicId);
+        const position = resolveGeodesicEmitterLabelPosition(runtimeObjectRegistry, object, geodesicId);
         label.root.position.copy(
           appearance?.playerFrameFromCell
             ? worldPointToThree(transformPoint3(appearance.playerFrameFromCell, threePointToWorld(position)))

@@ -8,7 +8,8 @@
  */
 import * as THREE from "three";
 import { yawRigidTransform3 } from "../../math/rigidTransform3";
-import { type RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
+import { resolveEmitterLaunchYaw } from "../../world-objects/geodesic/segments";
+import { type RuntimeObjectRegistry, type RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
 import { roundRect } from "./canvasDrawing";
 import { geodesicRayEmitterPosition } from "./geodesicCannonRenderer";
 import { rigidTransformToThreeMatrix } from "./worldAxes";
@@ -30,15 +31,15 @@ export function getGeodesicEmitterLabelKey(cannonId: string, geodesicId: string)
 /**
  * Computes the Three.js-space position of the label for one geodesic emitter of a cannon.
  *
- * The emitter yaw is the per-geodesic entry in `geodesicEmitterYawRadiansById` when present, otherwise the
- * cannon's `aimYawRadians`. The local emitter position plus the label offsets is carried by the cannon's
+ * The emitter yaw is the geodesic's launch tangent at the cannon (`resolveEmitterLaunchYaw`). The local emitter position plus the label offsets is carried by the cannon's
  * yawed pose into the world, so the label tracks emitter rotation. Returns a fresh vector.
  */
 export function resolveGeodesicEmitterLabelPosition(
+  registry: RuntimeObjectRegistry,
   cannon: Extract<RuntimeWorldObject, { readonly kind: "geodesic-cannon" }>,
   geodesicId: string,
 ): THREE.Vector3 {
-  const yawRadians = cannon.geodesicEmitterYawRadiansById?.[geodesicId] ?? cannon.aimYawRadians;
+  const yawRadians = resolveEmitterLaunchYaw(registry, cannon, geodesicId);
   const emitterMatrix = rigidTransformToThreeMatrix(yawRigidTransform3(yawRadians, cannon.localPose.translation));
   return new THREE.Vector3(
     geodesicRayEmitterPosition.x + geodesicEmitterLabelLocalForwardOffsetMeters,

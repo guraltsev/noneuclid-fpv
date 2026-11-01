@@ -120,8 +120,7 @@ describe("geodesic cannon world objects: trace", () => {
     expect(second.geodesicNumber).toBe(2);
     expect(second.tooltip?.label).toBe("Geodesic G2");
     expect(second.start.y).toBeCloseTo(0);
-    const finalCannon = registry.get("cannon-a");
-    expect(finalCannon?.kind === "geodesic-cannon" ? finalCannon.geodesicIds : []).toEqual(["g-a", "g-b"]);
+    expect(getCannonGeodesicIds(registry, "cannon-a")).toEqual(["g-a", "g-b"]);
   });
 
   it("numbers geodesics globally across emitters", () => {
@@ -426,9 +425,8 @@ describe("geodesic cannon world objects: trace", () => {
     registry.add(cannon);
 
     const first = shootGeodesic({ world, registry, cannon, geodesicId: "g-a", maxLengthMeters: 1 });
-    const updatedCannon = registry.get("cannon-a");
     expect(first.segmentIndex).toBe(0);
-    expect(updatedCannon?.kind === "geodesic-cannon" ? updatedCannon.geodesicIds : []).toEqual(["g-a"]);
+    expect(getCannonGeodesicIds(registry, "cannon-a")).toEqual(["g-a"]);
     expect(first.terminal.kind).toBe("portal-hit");
     if (first.terminal.kind !== "portal-hit") {
       throw new Error("Expected portal-hit terminal.");

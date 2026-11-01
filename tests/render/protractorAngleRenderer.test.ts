@@ -11,13 +11,14 @@ import {
   resolveProtractorCenterSelection,
 } from "../../src/world-objects/protractorTool";
 import { yawRigidTransform3 } from "../../src/math/rigidTransform3";
+import { createRuntimeObjectRegistry } from "../../src/world-objects/runtimeObjectRegistry";
 import type { GeodesicCannonObject } from "../../src/world-objects/geodesic/objects";
 
 describe("protractor angle renderer", () => {
   it("creates portal-renderable source meshes for the highlighted angle", () => {
     const object = createProtractorAngleObject({
       id: "angle-a",
-      center: resolveProtractorCenterSelection(createEmitter()),
+      center: resolveProtractorCenterSelection(createRuntimeObjectRegistry(), createEmitter()),
       first: { geodesicId: "g-a", segmentId: "segment-a", yawRadians: 0 },
       second: { geodesicId: "g-b", segmentId: "segment-b", yawRadians: Math.PI / 2 },
     });
@@ -48,7 +49,7 @@ describe("protractor angle renderer", () => {
   it("places the floating label above the midpoint of the angle arc and tangent to it", () => {
     const object = createProtractorAngleObject({
       id: "angle-a",
-      center: resolveProtractorCenterSelection(createEmitter()),
+      center: resolveProtractorCenterSelection(createRuntimeObjectRegistry(), createEmitter()),
       first: { geodesicId: "g-a", segmentId: "segment-a", yawRadians: 0 },
       second: { geodesicId: "g-b", segmentId: "segment-b", yawRadians: Math.PI / 2 },
     });
@@ -73,7 +74,6 @@ function createEmitter(overrides: Partial<GeodesicCannonObject> = {}): GeodesicC
     cellId: "cell-a",
     localPose: yawRigidTransform3(0, { x: 0, y: 0, z: 0 }),
     portalRenderable: true,
-    geodesicIds: ["g-a", "g-b"],
     aimYawRadians: 0,
     ...overrides,
   };

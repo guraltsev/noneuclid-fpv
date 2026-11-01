@@ -19,7 +19,7 @@ import type { GeodesicCannonObject } from "../../src/world-objects/geodesic/obje
 import { createRuntimeObjectRegistry } from "../../src/world-objects/runtimeObjectRegistry";
 import { resolveGeodesicEmitterLabelPosition } from "../../src/render/three/geodesicEmitterLabels";
 import { installFakeCanvas2d } from "../support/fakeCanvas2d";
-import { compileLargePortalWorld } from "../fixtures/world-objects/geodesic";
+import { addGeodesicLeavingEmitter, compileLargePortalWorld } from "../fixtures/world-objects/geodesic";
 
 function cannon(id: string, cellId = "a", x = 0, y = 0): GeodesicCannonObject {
   return {
@@ -28,7 +28,6 @@ function cannon(id: string, cellId = "a", x = 0, y = 0): GeodesicCannonObject {
     cellId,
     localPose: yawRigidTransform3(0, { x, y, z: 0 }),
     portalRenderable: true,
-    geodesicIds: ["g-a"],
     aimYawRadians: 0,
   };
 }
@@ -38,6 +37,7 @@ describe("geodesicEmitterLabelController sweep", () => {
     installFakeCanvas2d();
     const labels = new Map<string, GeodesicEmitterLabel>();
     const registry = createRuntimeObjectRegistry([cannon("cannon-a")]);
+    addGeodesicLeavingEmitter(registry, "cannon-a", "g-a", 0);
     const controller = createGeodesicEmitterLabelController({
       scene: new THREE.Scene(),
       camera: new THREE.PerspectiveCamera(),
@@ -62,6 +62,9 @@ describe("geodesicEmitterLabelController placement", () => {
     installFakeCanvas2d();
     const labels = new Map<string, GeodesicEmitterLabel>();
     const registry = createRuntimeObjectRegistry(cannons);
+    for (const object of cannons) {
+      addGeodesicLeavingEmitter(registry, object.id, "g-a", 0);
+    }
     const world = compileLargePortalWorld();
     const controller = createGeodesicEmitterLabelController({
       scene: new THREE.Scene(),
@@ -81,7 +84,10 @@ describe("geodesicEmitterLabelController placement", () => {
     // The player is in cell a, next to a's portal at x = 5; the cannon is in cell b at (0.8, 2.5), which appears at (5.8, 2.5) in a.
     const labels = setup([cannon("cannon-b", "b", 0.8, 2.5)]);
     const label = labels.get("cannon-b:g-a");
-    const expected = resolveGeodesicEmitterLabelPosition(cannon("seen-from-a", "a", 5.8, 2.5), "g-a");
+    const seenFromA = cannon("seen-from-a", "a", 5.8, 2.5);
+    const reference = createRuntimeObjectRegistry([seenFromA]);
+    addGeodesicLeavingEmitter(reference, seenFromA.id, "g-a", 0);
+    const expected = resolveGeodesicEmitterLabelPosition(reference, seenFromA, "g-a");
 
     expect(label?.root.visible).toBe(true);
     expect(label?.root.position.distanceTo(expected)).toBeLessThan(1e-6);

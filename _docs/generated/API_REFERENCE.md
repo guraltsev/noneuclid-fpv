@@ -748,9 +748,7 @@ Endpoint attachments of geodesic intervals: lookup by anchor, re-attachment, lif
 | function | `portalWordMatchesEndpointCellsWithAnchors` | Like `portalWordMatchesCurrentEndpointCells`, with candidate anchors that may differ from the registry. |
 | function | `isAimableFreeGeodesic` | True for a stable interval with one emitter endpoint and one free end that no other geodesic uses. |
 | function | `removeUnusedFreeGeodesicEnds` | Removes free-end anchors that no interval attaches to any more. |
-| function | `collectIncidentGeodesicIdsForEmitter` | Ids of all geodesics incident on an emitter. |
-| function | `removeGeodesicAssociations` | Removes a geodesic id from the caches of every emitter. |
-| function | `removeGeodesicAssociationFromEmitter` | Removes the geodesic id from one emitter's menu caches (id list, active id and yaw); a no-op when it holds nothing. |
+| function | `getEmitterGeodesicIds` | Ids of the geodesics attached to an emitter (either end), each once, in registry order. |
 
 ### `world-objects/geodesic/intersections.ts`
 
@@ -872,7 +870,7 @@ Portal-word algebra of geodesic intervals: reversal, free reduction, comparison,
 
 ### `world-objects/geodesic/segments.ts`
 
-Derived geodesic segments: lookup by geodesic, building segments from traces with the start/end half split, lengths, tangents at anchors, display numbers and the emitter-side caches.
+Derived geodesic segments: lookup by geodesic, building segments from traces with the start/end half split, lengths, tangents at anchors and display numbers.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
@@ -882,13 +880,13 @@ Derived geodesic segments: lookup by geodesic, building segments from traces wit
 | function | `resolveGeodesicNumber` | Returns the 1-based display number of a geodesic, defaulting to 1 when it has none. |
 | function | `splitDerivedSegmentsIntoEndpointHalves` | Labels segments with `halfRole`, cutting the one that straddles the midpoint of the total length into two. |
 | function | `resolveEndpointTangentAtAnchor` | Yaw (radians) of the geodesic's tangent at the anchor of the given role, pointing away from the anchor along the geodesic. |
+| function | `resolveEmitterLaunchYaw` | Launch yaw (radians, in the emitter's cell frame) of a geodesic at an emitter: the tangent of the geodesic where it attaches to the emitter, or the emitter's default `aimYawRadians` when the geodesic has no segments yet… |
 | function | `withAnchoredTargetTerminal` | Re-labels the tail of a trace as an emitter hit when the interval ends on an emitter. |
 | function | `withAnchoredTargetTerminalForAnchors` | Like `withAnchoredTargetTerminal`, with candidate anchors that may differ from the registry. |
 | function | `replaceDerivedSegmentsFromTraces` | Replaces the derived segments of an interval by segments built from traces. |
 | function | `buildDerivedSegmentsFromTraces` | Builds, without side effects, the derived segments of an interval from traces. |
 | function | `segmentToTrace` | Converts a derived segment back to the trace piece it was built from. |
 | function | `getGeodesicTotalLengthMeters` | Total length of a geodesic, the sum over its derived segments, in meters. |
-| function | `syncEmitterGeodesicMenuCaches` | Updates the menu caches of an emitter from the geodesic intervals that attach to it. |
 | function | `collectGeodesicPortalWord` | Returns the stored portal word of an interval geodesic; `[]` for unknown ids or geodesics that never cross a portal. |
 | function | `createSegmentFromTrace` | Creates a derived segment object from one trace piece. |
 | function | `createGeodesicSegmentTooltip` | Tooltip text of a derived segment. |
@@ -1998,6 +1996,7 @@ Render sources and per-frame render records for geodesic cannons, geodesic segme
 | interface | `GeodesicBodyPlacement` | A body part of a geodesic object: meshes drawn at a pose of the object (the cannon post, a cannon head, an intersection balloon). |
 | function | `collectGeodesicBodyPlacements` | The body parts of one geodesic object, in drawing order (none for a segment, and none when `geodesicArchetypeKeys` has no matching key). |
 | function | `collectGeodesicRuntimeRenderRecords` | Produces the render records of one geodesic object in its own cell, one per matching archetype mesh (no portal ghosts; the instance sync adds them for the body parts, see {@link collectGeodesicBodyPlacements}). |
+| function | `emitterHeadsKey` | A string that changes whenever the heads drawn at a cannon change: the attached geodesics and their launch yaws. |
 | function | `composeSegmentMatrix` | Returns the Three.js model matrix mapping the unit ribbon (x from 0 to 1) onto `segment`. |
 
 ### `render/three/geodesicCannonTools.ts`

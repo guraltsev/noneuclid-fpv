@@ -27,10 +27,12 @@ import {
   type GeodesicSegmentObject,
 } from "../../src/world-objects/geodesic/objects";
 import { updateGeodesicIntersectionObjects } from "../../src/world-objects/geodesic/intersections";
+import { getGeodesicSegments } from "../../src/world-objects/geodesic/segments";
+import { addGeodesicLeavingEmitter } from "../fixtures/world-objects/geodesic";
 
 describe("protractor tool objects", () => {
   it("uses the ray emitter height as the center for emitter selections", () => {
-    const center = resolveProtractorCenterSelection(createEmitter({
+    const center = resolveProtractorCenterSelection(createRuntimeObjectRegistry(), createEmitter({
       localPose: yawRigidTransform3(0, { x: 2, y: 3, z: 0.5 }),
     }));
 
@@ -38,7 +40,7 @@ describe("protractor tool objects", () => {
   });
 
   it("selects the side of a geodesic segment from the center toward the hit point", () => {
-    const center = resolveProtractorCenterSelection(createIntersection());
+    const center = resolveProtractorCenterSelection(createRuntimeObjectRegistry(), createIntersection());
     const segment = createSegment({
       geodesicId: "g-a",
       start: { x: -1, y: 0, z: 1.08 },
@@ -62,11 +64,10 @@ describe("protractor tool objects", () => {
   });
 
   it("uses the outgoing side from an endpoint-centered locked geodesic selection", () => {
-    const center = resolveProtractorCenterSelection(createEmitter({
-      localPose: yawRigidTransform3(Math.PI, { x: 1, y: 0, z: 0 }),
-      geodesicIds: ["g-a"],
-      geodesicEmitterYawRadiansById: { "g-a": Math.PI },
-    }));
+    const emitter = createEmitter({ localPose: yawRigidTransform3(Math.PI, { x: 1, y: 0, z: 0 }) });
+    const registry = createRuntimeObjectRegistry([emitter]);
+    addGeodesicLeavingEmitter(registry, emitter.id, "g-a", Math.PI);
+    const center = resolveProtractorCenterSelection(registry, emitter);
     const segment = createSegment({
       geodesicId: "g-a",
       start: { x: -1, y: 0, z: geodesicRayBeamHeightMeters },
@@ -87,7 +88,7 @@ describe("protractor tool objects", () => {
   });
 
   it("measures the second selected side counterclockwise from the first", () => {
-    const center = resolveProtractorCenterSelection(createEmitter());
+    const center = resolveProtractorCenterSelection(createRuntimeObjectRegistry(), createEmitter());
     const angle = createProtractorAngleObject({
       id: "angle-a",
       center,
@@ -109,14 +110,14 @@ describe("protractor tool objects", () => {
     expect(protractorSelectionsUseDifferentGeodesics(first, second)).toBe(false);
     expect(() => createProtractorAngleObject({
       id: "angle-a",
-      center: resolveProtractorCenterSelection(createEmitter()),
+      center: resolveProtractorCenterSelection(createRuntimeObjectRegistry(), createEmitter()),
       first,
       second,
     })).toThrow("Cannot create a protractor angle from the same geodesic endpoint twice.");
   });
 
   it("allows measuring different endpoint roles of the same geodesic", () => {
-    const center = resolveProtractorCenterSelection(createEmitter());
+    const center = resolveProtractorCenterSelection(createRuntimeObjectRegistry(), createEmitter());
     const first = { geodesicId: "g-a", endRole: "start" as const, segmentId: "segment-a", yawRadians: 0 };
     const second = { geodesicId: "g-a", endRole: "end" as const, segmentId: "segment-b", yawRadians: Math.PI / 2 };
 
@@ -127,7 +128,7 @@ describe("protractor tool objects", () => {
   });
 
   it("uses supplied geodesic labels in the displayed angle measurement", () => {
-    const center = resolveProtractorCenterSelection(createEmitter());
+    const center = resolveProtractorCenterSelection(createRuntimeObjectRegistry(), createEmitter());
     const angle = createProtractorAngleObject({
       id: "angle-a",
       center,
@@ -141,7 +142,7 @@ describe("protractor tool objects", () => {
   });
 
   it("wraps clockwise-looking selections into positive counterclockwise angles", () => {
-    const center = resolveProtractorCenterSelection(createEmitter());
+    const center = resolveProtractorCenterSelection(createRuntimeObjectRegistry(), createEmitter());
     const angle = createProtractorAngleObject({
       id: "angle-a",
       center,
@@ -153,48 +154,38 @@ describe("protractor tool objects", () => {
   });
 
   it("selects a geodesic side directly from an emitter", () => {
-    const center = resolveProtractorCenterSelection(createEmitter({
-      geodesicIds: ["g-a", "g-b"],
-      activeGeodesicId: "g-b",
-      geodesicEmitterYawRadiansById: { "g-b": Math.PI / 4 },
-    }));
+    const emitter = createEmitter();
+    const registry = createRuntimeObjectRegistry([emitter]);
+    addGeodesicLeavingEmitter(registry, emitter.id, "g-a", 0);
+    addGeodesicLeavingEmitter(registry, emitter.id, "g-b", Math.PI / 4);
+    const center = resolveProtractorCenterSelection(registry, emitter);
 
-    const selected = resolveProtractorEmitterGeodesicSelection({
-      center,
-      emitter: createEmitter({
-        geodesicIds: ["g-a", "g-b"],
-        activeGeodesicId: "g-b",
-        geodesicEmitterYawRadiansById: { "g-b": Math.PI / 4 },
-      }),
-    });
+    const selected = resolveProtractorEmitterGeodesicSelection({ center, emitter, registry, geodesicId: "g-b" });
 
     expect(selected).toEqual({
       geodesicId: "g-b",
+      endRole: "start",
       segmentId: "emitter-a:g-b:emitter",
       yawRadians: Math.PI / 4,
       directionSign: 1,
     });
   });
 
-  it("refreshes emitter-selected angle measurements from live emitter yaw", () => {
-    const emitter = createEmitter({
-      geodesicEmitterYawRadiansById: { "g-a": 0, "g-b": Math.PI / 2 },
-    });
+  it("refreshes emitter-selected angle measurements from the live geodesic directions", () => {
+    const emitter = createEmitter();
     const registry = createRuntimeObjectRegistry([emitter]);
-    const center = resolveProtractorCenterSelection(emitter);
-    const first = resolveProtractorEmitterGeodesicSelection({ center, emitter, geodesicId: "g-a" });
-    const second = resolveProtractorEmitterGeodesicSelection({ center, emitter, geodesicId: "g-b" });
+    addGeodesicLeavingEmitter(registry, emitter.id, "g-a", 0);
+    addGeodesicLeavingEmitter(registry, emitter.id, "g-b", Math.PI / 2);
+    const center = resolveProtractorCenterSelection(registry, emitter);
+    const first = resolveProtractorEmitterGeodesicSelection({ center, emitter, registry, geodesicId: "g-a" });
+    const second = resolveProtractorEmitterGeodesicSelection({ center, emitter, registry, geodesicId: "g-b" });
     if (!first || !second) {
       throw new Error("Expected emitter protractor selections.");
     }
     const angle = createProtractorAngleObject({ id: "angle-a", center, first, second });
 
-    registry.update({
-      ...emitter,
-      aimYawRadians: Math.PI,
-      localPose: yawRigidTransform3(Math.PI, emitter.localPose.translation),
-      geodesicEmitterYawRadiansById: { "g-a": 0, "g-b": Math.PI },
-    });
+    const turned = getGeodesicSegments(registry, "g-b")[0];
+    registry.update({ ...turned, direction: { x: -1, y: 0, z: 0 } });
 
     const refreshed = refreshProtractorAngleObject({ registry, angle });
 
@@ -205,20 +196,12 @@ describe("protractor tool objects", () => {
 
   it("refreshes segment-selected angle measurements from live segment directions", () => {
     const emitter = createEmitter();
-    const firstSegment = createSegment({
-      id: "g-a:segment:0",
-      geodesicId: "g-a",
-      start: { x: 0.2, y: 0, z: geodesicRayBeamHeightMeters },
-      direction: { x: 1, y: 0, z: 0 },
-    });
-    const secondSegment = createSegment({
-      id: "g-b:segment:0",
-      geodesicId: "g-b",
-      start: { x: 0, y: 0.2, z: geodesicRayBeamHeightMeters },
-      direction: { x: 0, y: 1, z: 0 },
-    });
-    const registry = createRuntimeObjectRegistry([emitter, firstSegment, secondSegment]);
-    const center = resolveProtractorCenterSelection(emitter);
+    const registry = createRuntimeObjectRegistry([emitter]);
+    addGeodesicLeavingEmitter(registry, emitter.id, "g-a", 0);
+    addGeodesicLeavingEmitter(registry, emitter.id, "g-b", Math.PI / 2);
+    const firstSegment = getGeodesicSegments(registry, "g-a")[0];
+    const secondSegment = getGeodesicSegments(registry, "g-b")[0];
+    const center = resolveProtractorCenterSelection(registry, emitter);
     const first = resolveProtractorDirectedGeodesicSelection({
       center,
       segment: firstSegment,
@@ -263,7 +246,7 @@ describe("protractor tool objects", () => {
     });
     const registry = createRuntimeObjectRegistry([firstSegment, secondSegment]);
     const [vertex] = updateGeodesicIntersectionObjects(registry);
-    const center = resolveProtractorCenterSelection(vertex);
+    const center = resolveProtractorCenterSelection(registry, vertex);
     const first = resolveProtractorDirectedGeodesicSelection({
       center,
       segment: firstSegment,
@@ -330,7 +313,6 @@ function createEmitter(overrides: Partial<GeodesicCannonObject> = {}): GeodesicC
     cellId: "cell-a",
     localPose: yawRigidTransform3(0, { x: 0, y: 0, z: 0 }),
     portalRenderable: true,
-    geodesicIds: ["g-a", "g-b"],
     aimYawRadians: 0,
     ...overrides,
   };

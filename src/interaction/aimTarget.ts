@@ -16,7 +16,9 @@ import type { CompiledCellComplex } from "../cell-complex/compileCellComplex";
 import type { CompiledPrismCell } from "../cell-complex/prismCells";
 import { dotVec3, normalizeVec3, subVec3, type Vec3 } from "../math/vec3";
 import { getDynamicObjectCollisionBounds, signedDistanceToSide, type SimpleCylinderBounds } from "../movement/collision";
+import { getEmitterGeodesicIds } from "../world-objects/geodesic/endpoints";
 import { geodesicRayBeamHeightMeters, geodesicRayBeamStartOffsetMeters } from "../world-objects/geodesic/objects";
+import { resolveEmitterLaunchYaw } from "../world-objects/geodesic/segments";
 import { createProtractorAngleLabelHitbox } from "../world-objects/protractorTool";
 import { type RuntimeObjectRegistry, type RuntimeWorldObject } from "../world-objects/runtimeObjectRegistry";
 import { runtimeObjectToDynamicObjectState } from "../world-objects/runtimeObjectBase";
@@ -296,6 +298,7 @@ function compareAimTargets(left: AimTarget, right: AimTarget): number {
 
 // Object proxy hit for one object in the cell-local frame (before the window test).
 function intersectAimObject(
+  registry: RuntimeObjectRegistry,
   object: RuntimeWorldObject,
   origin: Vec3,
   direction: Vec3,
@@ -308,7 +311,7 @@ function intersectAimObject(
     : object.kind === "geodesic-segment"
     ? intersectRayWithSelectableSegment(object, origin, direction)
     : object.kind === "geodesic-cannon"
-      ? intersectRayWithGeodesicEmitterAimCylinder(origin, direction, object, ignoredGeodesicIds)
+      ? intersectRayWithGeodesicEmitterAimCylinder(registry, origin, direction, object, ignoredGeodesicIds)
     : bounds
       ? intersectRayWithVerticalCylinder(origin, direction, bounds)
       : intersectRayWithSphere(origin, direction, object.localPose.translation, fallbackObjectRadiusMeters);
@@ -339,11 +342,11 @@ function resolveObjectAimTargets(
       continue;
     }
 
-    let hit = intersectAimObject(object, ray.origin, ray.direction, ignoredGeodesicIds);
+    let hit = intersectAimObject(registry, object, ray.origin, ray.direction, ignoredGeodesicIds);
     if (hit && hit.distance < window.tMin - hitWindowToleranceMeters && window.tMin > 0) {
       // The nearest surface lies before this cell copy (the proxy pokes across the entry portal); the part of the proxy
       // inside this cell is what the ray can hit here, so test again from the window start.
-      const shifted = intersectAimObject(object, pointOnRay(ray.origin, ray.direction, window.tMin), ray.direction, ignoredGeodesicIds);
+      const shifted = intersectAimObject(registry, object, pointOnRay(ray.origin, ray.direction, window.tMin), ray.direction, ignoredGeodesicIds);
       hit = shifted ? { ...shifted, distance: shifted.distance + window.tMin } : undefined;
     }
 
@@ -967,6 +970,7 @@ function scaleVec3Like(vector: Vec3, scale: number): Vec3 {
 
 // Cannon proxy: union of padded cylinder and sphere, plus per-geodesic handle capsules which win if within the priority tolerance of the body hit.
 function intersectRayWithGeodesicEmitterAimCylinder(
+  registry: RuntimeObjectRegistry,
   origin: Vec3,
   direction: Vec3,
   emitter: Extract<RuntimeWorldObject, { readonly kind: "geodesic-cannon" }>,
@@ -981,7 +985,7 @@ function intersectRayWithGeodesicEmitterAimCylinder(
   const cylinderHit = intersectRayWithVerticalCylinder(origin, direction, bounds);
   const sphereHit = intersectRayWithSphere(origin, direction, sphereCenter, bounds.radius);
   const emitterHit = chooseNearestHit(cylinderHit, sphereHit);
-  const geodesicHit = intersectRayWithEmitterGeodesicHandles(origin, direction, emitter, ignoredGeodesicIds);
+  const geodesicHit = intersectRayWithEmitterGeodesicHandles(registry, origin, direction, emitter, ignoredGeodesicIds);
   const hit = chooseEmitterAimHit(emitterHit, geodesicHit);
   if (!hit) {
     return undefined;
@@ -991,12 +995,13 @@ function intersectRayWithGeodesicEmitterAimCylinder(
     ...hit,
     targetPoint: sphereCenter,
     geodesicEmitterGeodesicId: hit.geodesicEmitterGeodesicId ??
-      resolveDefaultEmitterGeodesicId(emitter, ignoredGeodesicIds),
+      resolveDefaultEmitterGeodesicId(registry, emitter, ignoredGeodesicIds),
   };
 }
 
 // One capsule per non-ignored geodesic along its emission yaw, starting at the beam start offset at beam height; nearest wins.
 function intersectRayWithEmitterGeodesicHandles(
+  registry: RuntimeObjectRegistry,
   origin: Vec3,
   direction: Vec3,
   emitter: Extract<RuntimeWorldObject, { readonly kind: "geodesic-cannon" }>,
@@ -1009,12 +1014,12 @@ function intersectRayWithEmitterGeodesicHandles(
   };
   let best: ObjectAimHit | undefined;
 
-  for (const geodesicId of emitter.geodesicIds) {
+  for (const geodesicId of getEmitterGeodesicIds(registry, emitter.id)) {
     if (ignoredGeodesicIds.has(geodesicId)) {
       continue;
     }
 
-    const yawRadians = emitter.geodesicEmitterYawRadiansById?.[geodesicId] ?? emitter.aimYawRadians;
+    const yawRadians = resolveEmitterLaunchYaw(registry, emitter, geodesicId);
     const handleStart = {
       x: center.x + Math.cos(yawRadians) * geodesicRayBeamStartOffsetMeters,
       y: center.y + Math.sin(yawRadians) * geodesicRayBeamStartOffsetMeters,
@@ -1050,15 +1055,13 @@ function intersectRayWithEmitterGeodesicHandles(
   return best;
 }
 
+// The emitter's first attached geodesic that is not ignored.
 function resolveDefaultEmitterGeodesicId(
+  registry: RuntimeObjectRegistry,
   emitter: Extract<RuntimeWorldObject, { readonly kind: "geodesic-cannon" }>,
   ignoredGeodesicIds: ReadonlySet<string>,
 ): string | undefined {
-  if (emitter.activeGeodesicId && !ignoredGeodesicIds.has(emitter.activeGeodesicId)) {
-    return emitter.activeGeodesicId;
-  }
-
-  return emitter.geodesicIds.find((geodesicId) => !ignoredGeodesicIds.has(geodesicId));
+  return getEmitterGeodesicIds(registry, emitter.id).find((geodesicId) => !ignoredGeodesicIds.has(geodesicId));
 }
 
 // Prefers the handle hit unless it is farther than the body hit by more than the priority tolerance.

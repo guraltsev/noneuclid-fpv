@@ -3,8 +3,7 @@
  * records for geodesic cannons, segments and intersections, drawn through the instanced runtime-object pipeline.
  * A segment's record matrix scales a unit-length ribbon to the segment's length; its archetype is chosen by
  * state, highest priority first: tie-detach selection, moving, connected, default. A cannon's ray-emitter
- * records include one post, one head per active geodesic on that post, and no head records when no geodesic is
- * active. Assets that fail to preload fall back to simple procedural stand-ins, so source creation never throws.
+ * records include one post, one head per geodesic attached to it, and no head records when none is attached. Assets that fail to preload fall back to simple procedural stand-ins, so source creation never throws.
  */
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
@@ -29,11 +28,13 @@ import type {
   GeodesicSegmentObject,
 } from "../../src/world-objects/geodesic/objects";
 import { yawRigidTransform3 } from "../../src/math/rigidTransform3";
+import { createRuntimeObjectRegistry } from "../../src/world-objects/runtimeObjectRegistry";
+import { addGeodesicLeavingEmitter } from "../fixtures/world-objects/geodesic";
 
 describe("geodesic cannon renderer", () => {
   it("publishes one render record per geodesic segment in the segment cell", () => {
     const segment = createSegment({ cellId: "cell-b", lengthMeters: 1.75 });
-    const records = collectGeodesicRuntimeRenderRecords(segment);
+    const records = collectGeodesicRuntimeRenderRecords(createRuntimeObjectRegistry(), segment);
 
     expect(records).toHaveLength(1);
     expect(records[0].objectId).toBe(segment.id);
@@ -42,7 +43,7 @@ describe("geodesic cannon renderer", () => {
   });
 
   it("publishes connected geodesic segments with the connected archetype", () => {
-    const records = collectGeodesicRuntimeRenderRecords(createSegment({
+    const records = collectGeodesicRuntimeRenderRecords(createRuntimeObjectRegistry(), createSegment({
       connectionState: "connected",
       terminal: { kind: "emitter-hit", emitterId: "ray-emitter-b" },
     }));
@@ -51,7 +52,7 @@ describe("geodesic cannon renderer", () => {
   });
 
   it("publishes moving geodesic segments with the orange archetype", () => {
-    const records = collectGeodesicRuntimeRenderRecords(createSegment({
+    const records = collectGeodesicRuntimeRenderRecords(createRuntimeObjectRegistry(), createSegment({
       connectionState: "moving",
     }));
 
@@ -59,7 +60,7 @@ describe("geodesic cannon renderer", () => {
   });
 
   it("publishes tie-detach selected geodesic segments with the selection archetype", () => {
-    const records = collectGeodesicRuntimeRenderRecords(createSegment({
+    const records = collectGeodesicRuntimeRenderRecords(createRuntimeObjectRegistry(), createSegment({
       connectionState: "connected",
       highlightState: "tie-detach-selected",
     }));
@@ -90,7 +91,7 @@ describe("geodesic cannon renderer", () => {
   it("publishes ray-emitter-on-post records from shared source archetype keys", () => {
     const sources = createGeodesicRuntimeRenderSources();
     const rayKeys = rayArchetypeKeys(sources);
-    const records = collectGeodesicRuntimeRenderRecords(createRayEmitter(), rayKeys);
+    const records = collectGeodesicRuntimeRenderRecords(registryWithEmitter(["g-a"]), createRayEmitter(), rayKeys);
 
     expect(rayKeys.length).toBeGreaterThan(0);
     expect(rayKeys.some((key) => key.startsWith(`${geodesicRayPostArchetypePrefix}:`))).toBe(true);
@@ -106,9 +107,7 @@ describe("geodesic cannon renderer", () => {
     const rayKeys = rayArchetypeKeys(sources);
     const headKeys = rayKeys.filter((key) => key.startsWith(`${geodesicRayHeadArchetypePrefix}:`));
     const postKeys = rayKeys.filter((key) => key.startsWith(`${geodesicRayPostArchetypePrefix}:`));
-    const records = collectGeodesicRuntimeRenderRecords(createRayEmitter({
-      geodesicIds: ["g-a", "g-b", "g-c"],
-    }), rayKeys);
+    const records = collectGeodesicRuntimeRenderRecords(registryWithEmitter(["g-a", "g-b", "g-c"]), createRayEmitter(), rayKeys);
 
     expect(records.filter((record) => postKeys.includes(record.archetypeKey))).toHaveLength(postKeys.length);
     expect(records.filter((record) => headKeys.includes(record.archetypeKey))).toHaveLength(headKeys.length * 3);
@@ -119,10 +118,7 @@ describe("geodesic cannon renderer", () => {
     const rayKeys = rayArchetypeKeys(sources);
     const headKeys = rayKeys.filter((key) => key.startsWith(`${geodesicRayHeadArchetypePrefix}:`));
     const postKeys = rayKeys.filter((key) => key.startsWith(`${geodesicRayPostArchetypePrefix}:`));
-    const records = collectGeodesicRuntimeRenderRecords(createRayEmitter({
-      activeGeodesicId: undefined,
-      geodesicIds: [],
-    }), rayKeys);
+    const records = collectGeodesicRuntimeRenderRecords(registryWithEmitter([]), createRayEmitter(), rayKeys);
 
     expect(records.filter((record) => postKeys.includes(record.archetypeKey))).toHaveLength(postKeys.length);
     expect(records.filter((record) => headKeys.includes(record.archetypeKey))).toHaveLength(0);
@@ -132,7 +128,7 @@ describe("geodesic cannon renderer", () => {
     const sources = createGeodesicRuntimeRenderSources();
     const keys = sources.map((source) => source.archetypeKey);
     const balloonKeys = keys.filter((key) => key.startsWith(`${geodesicIntersectionArchetypePrefix}:`));
-    const records = collectGeodesicRuntimeRenderRecords(createIntersection(), keys);
+    const records = collectGeodesicRuntimeRenderRecords(createRuntimeObjectRegistry(), createIntersection(), keys);
 
     expect(balloonKeys.length).toBeGreaterThan(0);
     expect(records).toHaveLength(balloonKeys.length);
@@ -176,11 +172,16 @@ function createRayEmitter(overrides: Partial<GeodesicCannonObject> = {}): Geodes
     localPose: yawRigidTransform3(0, { x: 0, y: 0, z: 0 }),
     collision: { radius: 0.3, height: 0.5 },
     portalRenderable: true,
-    activeGeodesicId: "g-a",
-    geodesicIds: ["g-a"],
     aimYawRadians: 0,
     ...overrides,
   };
+}
+
+// A registry holding the ray emitter and one free geodesic leaving it for each id.
+function registryWithEmitter(geodesicIds: readonly string[]) {
+  const registry = createRuntimeObjectRegistry([createRayEmitter()]);
+  geodesicIds.forEach((geodesicId, index) => addGeodesicLeavingEmitter(registry, "ray-emitter-a", geodesicId, index));
+  return registry;
 }
 
 function createPreparedRayAssets() {

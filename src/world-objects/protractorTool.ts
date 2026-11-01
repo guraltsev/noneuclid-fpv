@@ -13,7 +13,7 @@ import {
   type GeodesicSegmentObject,
 } from "./geodesic/objects";
 import { getRememberedGeodesicIntersectionObject } from "./geodesic/intersections";
-import { getGeodesicEndpointAttachmentsForAnchor } from "./geodesic/endpoints";
+import { getEmitterGeodesicIds, getGeodesicEndpointAttachmentsForAnchor } from "./geodesic/endpoints";
 import { resolveEndpointTangentAtAnchor } from "./geodesic/segments";
 import type { RuntimeObjectRegistry } from "./runtimeObjectRegistry";
 import type {
@@ -71,13 +71,14 @@ export interface ProtractorToolState {
  * The centre point is the object's `aimStickyTarget` if present, otherwise its pose translation (raised by the ray beam height for cannons so it lies on the drawn beam).
  */
 export function resolveProtractorCenterSelection(
+  registry: RuntimeObjectRegistry,
   object: GeodesicCannonObject | GeodesicIntersectionObject,
 ): ProtractorCenterSelection {
   return {
     objectId: object.id,
     cellId: object.cellId,
     point: resolveProtractorCenterPoint(object),
-    geodesicIds: object.geodesicIds,
+    geodesicIds: object.kind === "geodesic-cannon" ? getEmitterGeodesicIds(registry, object.id) : object.geodesicIds,
   };
 }
 
@@ -138,7 +139,7 @@ export function resolveProtractorDirectedGeodesicSelection(options: {
 
 /**
  * Resolves an emitter at the centre into a ray along one of its geodesics, or undefined if it is not in the centre's cell or shares no geodesic with it.
- * The geodesic defaults to the emitter's active one, else the first shared one. Direction priority: the endpoint tangent read from the registry (when the attached end can be determined), then the emitter's stored per-geodesic yaw, then its aim yaw. The direction sign is always +1 and the segment id is synthetic.
+ * The geodesic defaults to the first one the centre lists. Direction priority: the endpoint tangent read from the registry (when the attached end can be determined), then the emitter's aim yaw. The direction sign is always +1 and the segment id is synthetic.
  */
 export function resolveProtractorEmitterGeodesicSelection(options: {
   readonly center: ProtractorCenterSelection;
@@ -152,10 +153,8 @@ export function resolveProtractorEmitterGeodesicSelection(options: {
     return undefined;
   }
 
-  const geodesicId = options.geodesicId ??
-    emitter.activeGeodesicId ??
-    emitter.geodesicIds.find((candidate) => center.geodesicIds.includes(candidate));
-  if (!geodesicId || !center.geodesicIds.includes(geodesicId) || !emitter.geodesicIds.includes(geodesicId)) {
+  const geodesicId = options.geodesicId ?? center.geodesicIds[0];
+  if (!geodesicId || !center.geodesicIds.includes(geodesicId)) {
     return undefined;
   }
 
@@ -178,7 +177,7 @@ export function resolveProtractorEmitterGeodesicSelection(options: {
     geodesicId,
     ...(selectedEndRole ? { endRole: selectedEndRole } : {}),
     segmentId: `${emitter.id}:${geodesicId}:emitter`,
-    yawRadians: normalizeSignedRadians(tangent?.yawRadians ?? emitter.geodesicEmitterYawRadiansById?.[geodesicId] ?? emitter.aimYawRadians),
+    yawRadians: normalizeSignedRadians(tangent?.yawRadians ?? emitter.aimYawRadians),
     directionSign: 1,
   };
 }
@@ -283,7 +282,7 @@ export function refreshProtractorAngleObject(options: {
     } : undefined;
   }
 
-  const center = resolveProtractorCenterSelection(centerObject);
+  const center = resolveProtractorCenterSelection(options.registry, centerObject);
   const first = resolveLiveProtractorDirectedGeodesic(options.registry, center, options.angle.first);
   const second = resolveLiveProtractorDirectedGeodesic(options.registry, center, options.angle.second);
   if (!first || !second) {

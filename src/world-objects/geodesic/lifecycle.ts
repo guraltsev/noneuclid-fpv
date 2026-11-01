@@ -5,8 +5,7 @@ import type { RuntimeObjectRegistry } from "../runtimeObjectRegistry";
 import type { GeodesicEmitterAttachment } from "./objects";
 import { requestGeodesicIntersectionUpdate, withDeferredGeodesicIntersections } from "./intersections";
 import {
-  collectIncidentGeodesicIdsForEmitter,
-  removeGeodesicAssociations,
+  getEmitterGeodesicIds,
 } from "./endpoints";
 import { removeGeodesicIntervalAndDerivedObjects, removeGeodesicSegments } from "./segments";
 
@@ -63,7 +62,7 @@ export function collectLockedIncidentGeodesicIdsForEmitter(
   registry: RuntimeObjectRegistry,
   emitterId: string,
 ): readonly string[] {
-  return collectIncidentGeodesicIdsForEmitter(registry, emitterId)
+  return getEmitterGeodesicIds(registry, emitterId)
     .filter((geodesicId) => isGeodesicLocked(registry, geodesicId));
 }
 
@@ -80,7 +79,6 @@ function removeGeodesicNow(registry: RuntimeObjectRegistry, geodesicId: string):
     return;
   }
   removeGeodesicSegments(registry, geodesicId);
-  removeGeodesicAssociations(registry, geodesicId);
   requestGeodesicIntersectionUpdate(registry);
 }
 
@@ -102,7 +100,7 @@ function removeUnlockedGeodesicsFromCannonNow(
   }
 
   const removed: string[] = [];
-  for (const geodesicId of cannon.geodesicIds) {
+  for (const geodesicId of getEmitterGeodesicIds(registry, cannonId)) {
     if (isGeodesicLocked(registry, geodesicId)) {
       continue;
     }

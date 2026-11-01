@@ -18,7 +18,8 @@ import {
   geodesicRayBeamHeightMeters,
   type GeodesicSegmentObject,
 } from "../../../src/world-objects/geodesic/objects";
-import { getGeodesicSegments } from "../../../src/world-objects/geodesic/segments";
+import { getEmitterGeodesicIds } from "../../../src/world-objects/geodesic/endpoints";
+import { getGeodesicSegments, resolveEmitterLaunchYaw } from "../../../src/world-objects/geodesic/segments";
 import { rebuildConnectedGeodesicBetweenEmitters } from "../../../src/world-objects/geodesic/cannon";
 import { rebuildDerivedGeodesicSegments } from "../../../src/world-objects/geodesic/intervals";
 import { yawRigidTransform3 } from "../../../src/math/rigidTransform3";
@@ -76,8 +77,41 @@ export function totalGeodesicLength(registry: ReturnType<typeof createRuntimeObj
 }
 
 export function getCannonGeodesicIds(registry: ReturnType<typeof createRuntimeObjectRegistry>, cannonId: string): readonly string[] {
+  return getEmitterGeodesicIds(registry, cannonId);
+}
+
+// Attaches a one-metre free geodesic to an emitter, leaving along `yawRadians`: a free end, the interval and its single segment.
+export function addGeodesicLeavingEmitter(
+  registry: ReturnType<typeof createRuntimeObjectRegistry>,
+  cannonId: string,
+  geodesicId: string,
+  yawRadians: number,
+): void {
   const cannon = registry.get(cannonId);
-  return cannon?.kind === "geodesic-cannon" ? cannon.geodesicIds : [];
+  if (cannon?.kind !== "geodesic-cannon") {
+    throw new Error(`No emitter "${cannonId}".`);
+  }
+  const start = { x: cannon.localPose.translation.x, y: cannon.localPose.translation.y, z: cannon.localPose.translation.z + geodesicRayBeamHeightMeters };
+  const direction = { x: Math.cos(yawRadians), y: Math.sin(yawRadians), z: 0 };
+  registry.add(createFreeGeodesicEndObject({
+    id: `${geodesicId}:free-end`,
+    cellId: cannon.cellId,
+    point: { x: start.x + direction.x, y: start.y + direction.y, z: start.z },
+  }));
+  registry.add(createGeodesicIntervalObject({
+    id: geodesicId,
+    startAnchorObjectId: cannonId,
+    endAnchorObjectId: `${geodesicId}:free-end`,
+    startCellId: cannon.cellId,
+  }));
+  registry.add(createSegment({
+    id: `${geodesicId}:segment:0`,
+    geodesicId,
+    cellId: cannon.cellId,
+    start,
+    direction,
+    lengthMeters: 1,
+  }));
 }
 
 export function getCannonGeodesicYaw(
@@ -86,7 +120,7 @@ export function getCannonGeodesicYaw(
   geodesicId: string,
 ): number | undefined {
   const cannon = registry.get(cannonId);
-  return cannon?.kind === "geodesic-cannon" ? cannon.geodesicEmitterYawRadiansById?.[geodesicId] : undefined;
+  return cannon?.kind === "geodesic-cannon" ? resolveEmitterLaunchYaw(registry, cannon, geodesicId) : undefined;
 }
 
 export function getCannonPoseYaw(

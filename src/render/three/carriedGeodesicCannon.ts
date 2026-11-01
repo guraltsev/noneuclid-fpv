@@ -6,8 +6,9 @@
  */
 import * as THREE from "three";
 import { type Vec3 } from "../../math/vec3";
+import { getEmitterGeodesicIds } from "../../world-objects/geodesic/endpoints";
 import { geodesicRayBeamHeightMeters } from "../../world-objects/geodesic/objects";
-import { type RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
+import { type RuntimeObjectRegistry, type RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
 import { RootAimRay } from "./rootAimRay";
 import { threePointToWorld } from "./worldAxes";
 
@@ -71,18 +72,21 @@ export function resolveVrCarriedGeodesicCannonAnchor(
 /**
  * Picks which of a cannon's geodesics an action applies to.
  *
- * Returns the requested id if the cannon owns it, otherwise the cannon's active geodesic, otherwise its first
- * geodesic; `undefined` only when the cannon has none and no active id.
+ * Returns the requested id if the cannon is attached to it, otherwise the session's active geodesic when the cannon is attached to
+ * that, otherwise its first attached geodesic; `undefined` when the cannon has none.
  */
 export function resolveCannonGeodesicId(
+  registry: RuntimeObjectRegistry,
   cannon: Extract<RuntimeWorldObject, { readonly kind: "geodesic-cannon" }>,
   requestedGeodesicId: string | undefined,
+  activeGeodesicId: string | undefined,
 ): string | undefined {
-  if (requestedGeodesicId && cannon.geodesicIds.includes(requestedGeodesicId)) {
+  const attached = getEmitterGeodesicIds(registry, cannon.id);
+  if (requestedGeodesicId && attached.includes(requestedGeodesicId)) {
     return requestedGeodesicId;
   }
 
-  return cannon.activeGeodesicId ?? cannon.geodesicIds[0];
+  return activeGeodesicId && attached.includes(activeGeodesicId) ? activeGeodesicId : attached[0];
 }
 
 /**

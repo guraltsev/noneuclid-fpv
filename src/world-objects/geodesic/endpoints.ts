@@ -30,8 +30,7 @@ export function getGeodesicEndpointAttachmentsForAnchor(
  *
  * Returns `undefined` (and changes nothing) if the interval does not exist or the new anchor cannot attach geodesics.
  * Does NOT update `startCellId`, the portal word or the derived segments: the caller must keep them consistent and
- * rebuild. Side effects: drops the geodesic id from the previous emitter's lists when no role still uses it, and
- * deletes free ends that became unreferenced.
+ * rebuild. Side effect: deletes free ends that became unreferenced.
  */
 export function replaceGeodesicEndpointAttachment(
   registry: RuntimeObjectRegistry,
@@ -43,7 +42,6 @@ export function replaceGeodesicEndpointAttachment(
   if (interval?.kind !== "geodesic-interval" || !canObjectAttachGeodesics(registry.get(nextAnchorObjectId))) {
     return undefined;
   }
-  const previousAnchorObjectId = interval[endRole].anchorObjectId;
 
   const next: GeodesicIntervalObject = {
     ...interval,
@@ -54,12 +52,6 @@ export function replaceGeodesicEndpointAttachment(
     },
   };
   registry.update(next);
-  if (
-    previousAnchorObjectId !== nextAnchorObjectId &&
-    !(["start", "end"] as const).some((role) => next[role].anchorObjectId === previousAnchorObjectId)
-  ) {
-    removeGeodesicAssociationFromEmitter(registry, previousAnchorObjectId, geodesicId);
-  }
   removeUnusedFreeGeodesicEnds(registry);
   return next;
 }
@@ -263,61 +255,7 @@ export function removeUnusedFreeGeodesicEnds(registry: RuntimeObjectRegistry): v
   }
 }
 
-// Ids of all geodesics incident on an emitter, from interval attachments and the emitter's own caches.
-/** Ids of all geodesics incident on an emitter. */
-export function collectIncidentGeodesicIdsForEmitter(
-  registry: RuntimeObjectRegistry,
-  emitterId: string,
-): readonly string[] {
-  const ids = new Set<string>();
-  for (const attachment of getGeodesicEndpointAttachmentsForAnchor(registry, emitterId)) {
-    ids.add(attachment.geodesicId);
-  }
-  const emitter = registry.get(emitterId);
-  if (emitter?.kind === "geodesic-cannon") {
-    for (const geodesicId of emitter.geodesicIds) {
-      ids.add(geodesicId);
-    }
-    if (emitter.activeGeodesicId) {
-      ids.add(emitter.activeGeodesicId);
-    }
-  }
-
-  return [...ids];
-}
-
-/** Removes a geodesic id from the caches of every emitter. */
-export function removeGeodesicAssociations(registry: RuntimeObjectRegistry, geodesicId: string): void {
-  for (const object of registry.getObjectsOfKind("geodesic-cannon")) {
-    removeGeodesicAssociationFromEmitter(registry, object.id, geodesicId);
-  }
-}
-
-/** Removes the geodesic id from one emitter's menu caches (id list, active id and yaw); a no-op when it holds nothing. */
-export function removeGeodesicAssociationFromEmitter(
-  registry: RuntimeObjectRegistry,
-  emitterId: string,
-  geodesicId: string,
-): void {
-  const object = registry.get(emitterId);
-  if (object?.kind !== "geodesic-cannon") {
-    return;
-  }
-  const hasYaw = geodesicId in (object.geodesicEmitterYawRadiansById ?? {});
-  if (
-    !object.geodesicIds.includes(geodesicId) &&
-    object.activeGeodesicId !== geodesicId &&
-    !hasYaw
-  ) {
-    return;
-  }
-
-  const { [geodesicId]: _removedYaw, ...remainingYaws } = object.geodesicEmitterYawRadiansById ?? {};
-  const geodesicIds = object.geodesicIds.filter((id) => id !== geodesicId);
-  registry.update({
-    ...object,
-    activeGeodesicId: object.activeGeodesicId === geodesicId ? geodesicIds[0] : object.activeGeodesicId,
-    geodesicIds,
-    geodesicEmitterYawRadiansById: remainingYaws,
-  });
+/** Ids of the geodesics attached to an emitter (either end), each once, in registry order. This is the only record of which geodesics belong to an emitter. */
+export function getEmitterGeodesicIds(registry: RuntimeObjectRegistry, emitterId: string): readonly string[] {
+  return [...new Set(getGeodesicEndpointAttachmentsForAnchor(registry, emitterId).map((attachment) => attachment.geodesicId))];
 }

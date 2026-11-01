@@ -49,8 +49,7 @@
  *
  * ## Intersections and bookkeeping
  * `updateGeodesicIntersectionObjects` recomputes the crossing markers of all segments (same cell, different geodesics) and keeps marker ids
- * stable. Emitter objects also carry caches (`geodesicIds`, `activeGeodesicId`, per-geodesic yaw) that `syncEmitterGeodesicMenuCaches`
- * keeps in line with the intervals.
+ * stable. An emitter stores no list of its geodesics: they are the intervals attached to it (`getEmitterGeodesicIds`).
  *
  * ## Constants
  * Meters unless stated. `GEODESIC_MIN_LENGTH_METERS` (0.15) minimum chord of a geodesic; `minGeodesicSegmentLengthMeters` (0.05) minimum
@@ -74,8 +73,7 @@ import type { RuntimeWorldObjectBase } from "../runtimeObjectBase";
  * The cannon sits on the cell floor (`localPose.translation.z` is the floor height); the beam it emits starts
  * `geodesicRayBeamHeightMeters` above that. Frames are cell-local (x right, y forward, z up). The cannon does NOT own
  * geometry: the authoritative geodesic data are the `GeodesicIntervalObject`s whose `start`/`end` attachments reference
- * this cannon's id; `geodesicIds`, `activeGeodesicId`, and `geodesicEmitterYawRadiansById` are
- * menu/UI caches kept in sync by `syncEmitterGeodesicMenuCaches` and may lag behind the registry.
+ * this cannon's id (`getEmitterGeodesicIds` lists them); the cannon stores no copy of that list.
  */
 export interface GeodesicCannonObject extends RuntimeWorldObjectBase {
   readonly kind: "geodesic-cannon";
@@ -85,12 +83,6 @@ export interface GeodesicCannonObject extends RuntimeWorldObjectBase {
   readonly canBeCarried?: true;
   /** The shape of the highlight drawn around the emitter while it is carried (`cannonCarryHighlight`). */
   readonly carryHighlight?: CarryHighlightShape;
-  /** Geodesic currently selected in the emitter menu (cache; may name a geodesic that no longer exists). */
-  readonly activeGeodesicId?: string;
-  /** Ids of geodesics listed under this cannon (cache of the interval attachments). */
-  readonly geodesicIds: readonly string[];
-  /** Per-geodesic launch yaw in radians (cell-local, 0 = +x, counter-clockwise); overrides `aimYawRadians` for that geodesic. */
-  readonly geodesicEmitterYawRadiansById?: Readonly<Record<string, number>>;
   /** Default launch yaw in radians, normalized by `sanitizeYaw`; equals the yaw of `localPose.rotation`. */
   readonly aimYawRadians: number;
 }
@@ -304,9 +296,6 @@ export interface CreateGeodesicCannonOptions {
   readonly id: string;
   readonly cellId: string;
   readonly localPose: RigidTransform3;
-  readonly activeGeodesicId?: string;
-  readonly geodesicIds?: readonly string[];
-  readonly geodesicEmitterYawRadiansById?: Readonly<Record<string, number>>;
   readonly aimYawRadians?: number;
   readonly collision?: SimpleCollisionCylinder;
 }
@@ -401,7 +390,7 @@ export const emitterConnectionToleranceMeters = 0.3;
  * Builds a geodesic emitter object from options, filling defaults.
  *
  * `aimYawRadians` defaults to the yaw of `localPose` and is sanitized; the stored pose rotation is replaced by a pure
- * yaw rotation of that angle (so pitch/roll are discarded). `geodesicIds` defaults to `[activeGeodesicId]` or empty.
+ * yaw rotation of that angle (so pitch/roll are discarded).
  * Pure; does not touch any registry.
  */
 export function createGeodesicCannonObject(options: CreateGeodesicCannonOptions): GeodesicCannonObject {
@@ -425,9 +414,6 @@ export function createGeodesicCannonObject(options: CreateGeodesicCannonOptions)
       label: "Geodesic emitter",
       rangeMeters: 2.5,
     },
-    activeGeodesicId: options.activeGeodesicId,
-    geodesicIds: options.geodesicIds ?? (options.activeGeodesicId ? [options.activeGeodesicId] : []),
-    geodesicEmitterYawRadiansById: options.geodesicEmitterYawRadiansById,
     aimYawRadians,
   };
 }

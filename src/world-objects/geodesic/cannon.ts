@@ -40,7 +40,6 @@ import {
   getGeodesicTotalLengthMeters,
   removeGeodesicSegments,
   resolveEndpointTangentAtAnchor,
-  syncEmitterGeodesicMenuCaches,
   totalGeodesicLengthFromSegments,
   totalLengthThroughSegment,
 } from "./segments";
@@ -91,6 +90,8 @@ export interface RebuildGeodesicToLengthInput {
   readonly geodesicId: string;
   /** Desired total length in meters; a non-positive or non-finite value clears the geodesic's segments and returns `[]`. */
   readonly totalLengthMeters: number;
+  /** Launch yaw of the geodesic at the cannon; defaults to the cannon's `aimYawRadians`. A caller that keeps the geodesic's direction passes `resolveEmitterLaunchYaw`. */
+  readonly launchYawRadians?: number;
   /** If true (default), the trace may end by attaching to an emitter it reaches. */
   readonly connectEmitters?: boolean;
   /** If true, the cannon is first re-aimed at the nearest emitter lying on its straight ray (within tolerance). */
@@ -272,18 +273,7 @@ function shootGeodesicNow(input: ShootGeodesicInput): GeodesicSegmentObject {
         aimYawRadians: input.cannon.aimYawRadians,
       }
     : input.cannon;
-  input.registry.update({
-    ...cannonForUpdate,
-    activeGeodesicId: input.geodesicId,
-    geodesicIds: cannonForUpdate.geodesicIds.includes(input.geodesicId)
-      ? cannonForUpdate.geodesicIds
-      : [...cannonForUpdate.geodesicIds, input.geodesicId],
-    geodesicEmitterYawRadiansById: {
-      ...cannonForUpdate.geodesicEmitterYawRadiansById,
-      [input.geodesicId]: aimYawRadians,
-    },
-  });
-  syncEmitterGeodesicMenuCaches(input.registry, input.geodesicId);
+  input.registry.update(cannonForUpdate);
   requestGeodesicIntersectionUpdate(input.registry);
   return segment;
 }
@@ -355,7 +345,7 @@ function rebuildUnlockedGeodesicToLength(input: RebuildGeodesicToLengthInput): r
     return [];
   }
 
-  const yawAdjustedCannon = resolveCannonForGeodesic(input.cannon, input.geodesicId);
+  const yawAdjustedCannon = resolveCannonForGeodesic(input.cannon, input.launchYawRadians);
   const cannon = input.snapToEmitter
     ? resolveCannonSnappedToEmitter({ ...input, cannon: yawAdjustedCannon }) ?? yawAdjustedCannon
     : yawAdjustedCannon;
@@ -422,23 +412,11 @@ function resolveCannonSnappedToEmitter(input: RebuildGeodesicToLengthInput): Geo
     ...input.cannon,
     aimYawRadians: nextYaw,
     localPose: yawRigidTransform3(nextYaw, input.cannon.localPose.translation),
-    activeGeodesicId: input.geodesicId,
-    geodesicIds: input.cannon.geodesicIds.includes(input.geodesicId)
-      ? input.cannon.geodesicIds
-      : [...input.cannon.geodesicIds, input.geodesicId],
-    geodesicEmitterYawRadiansById: {
-      ...input.cannon.geodesicEmitterYawRadiansById,
-      [input.geodesicId]: nextYaw,
-    },
   };
 }
 
-function resolveEmitterYawForGeodesic(cannon: GeodesicCannonObject, geodesicId: string): number {
-  return sanitizeYaw(cannon.geodesicEmitterYawRadiansById?.[geodesicId] ?? cannon.aimYawRadians);
-}
-
-function resolveCannonForGeodesic(cannon: GeodesicCannonObject, geodesicId: string): GeodesicCannonObject {
-  const aimYawRadians = resolveEmitterYawForGeodesic(cannon, geodesicId);
+function resolveCannonForGeodesic(cannon: GeodesicCannonObject, launchYawRadians: number | undefined): GeodesicCannonObject {
+  const aimYawRadians = sanitizeYaw(launchYawRadians ?? cannon.aimYawRadians);
   if (Math.abs(sanitizeYaw(cannon.aimYawRadians - aimYawRadians)) <= intersectionTolerance) {
     return cannon;
   }
@@ -513,7 +491,6 @@ function connectGeodesicToEmitterNow(
     if (tail.terminal.emitterId !== request.incomingEmitterId) {
       return getGeodesicSegments(request.registry, request.geodesicId);
     }
-    syncEmitterGeodesicMenuCaches(request.registry, request.geodesicId);
     requestGeodesicIntersectionUpdate(request.registry);
     return getGeodesicSegments(request.registry, request.geodesicId);
   }
@@ -657,30 +634,10 @@ function moveWithoutGeodesics(input: MoveEmitterAlongRouteInput, emitter: Geodes
   return { moved: true, brokenGeodesicIds: [] };
 }
 
-// The emitter at a new cell and pose. Its default launch yaw equals the yaw of its pose and each geodesic's own launch yaw is in the
-// same frame, so when the pose turns (a face turned relative to the last one) all of them turn by the same angle.
+// The emitter at a new cell and pose. Its default launch yaw equals the yaw of its pose (a face turned relative to the last one turns it).
 function emitterAtPose(emitter: GeodesicCannonObject, cellId: string, localPose: RigidTransform3): GeodesicCannonObject {
   const poseYaw = Math.atan2(localPose.rotation.m10, localPose.rotation.m00);
-  const turnRadians = sanitizeYaw(poseYaw - emitter.aimYawRadians);
-  if (Math.abs(turnRadians) < 1e-12) {
-    return { ...emitter, cellId, localPose };
-  }
-
-  const launchYaws = emitter.geodesicEmitterYawRadiansById;
-
-  return {
-    ...emitter,
-    cellId,
-    localPose,
-    aimYawRadians: sanitizeYaw(poseYaw),
-    ...(launchYaws
-      ? {
-          geodesicEmitterYawRadiansById: Object.fromEntries(
-            Object.entries(launchYaws).map(([geodesicId, yaw]) => [geodesicId, sanitizeYaw(yaw + turnRadians)]),
-          ),
-        }
-      : {}),
-  };
+  return { ...emitter, cellId, localPose, aimYawRadians: sanitizeYaw(poseYaw) };
 }
 
 // ---- Placing cannons on geodesics ----
@@ -832,13 +789,6 @@ function placeGeodesicCannonAtGeodesicVertexNow(
     const continuationSource = createGeodesicCannonObject({
       ...placed,
       aimYawRadians: yaw,
-      geodesicIds: placed.geodesicIds.includes(continuationGeodesicId)
-        ? placed.geodesicIds
-        : [...placed.geodesicIds, continuationGeodesicId],
-      geodesicEmitterYawRadiansById: {
-        ...placed.geodesicEmitterYawRadiansById,
-        [continuationGeodesicId]: yaw,
-      },
     });
     request.registry.update(continuationSource);
     const created = shootGeodesic({
