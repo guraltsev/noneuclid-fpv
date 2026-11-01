@@ -44,7 +44,9 @@ import {
 import { type RuntimeObjectRegistry, type RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
 import { runtimeObjectToDynamicObjectState } from "../../world-objects/runtimeObjectBase";
 import { AimTarget } from "../../interaction/aimTarget";
+import { decideHandCarry, handCarryLeashMeters } from "../../interaction/handCarry";
 import {
+  carriedGeodesicEmitterDesktopDistanceMeters,
   createCarriedGeodesicCannonGlow,
   getDistanceAlongGeodesicSegment,
   resolveCannonGeodesicId,
@@ -782,6 +784,15 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
       refreshAfterEmitterRebuild(cannon.id, rebuild);
       syncRuntimeObjectPortalInstances();
       syncSelectableHitboxDebug();
+    }
+    // Whether the hand goes on holding the emitter is the hand's policy (a wall or a zone never ends a carry): it lets go of what is too far.
+    const leashMeters = handCarryLeashMeters({
+      pickupRangeMeters: getRuntimeObjectInteractionRangeMeters(cannon),
+      handReachMeters: xrActive ? 0 : carriedGeodesicEmitterDesktopDistanceMeters,
+    });
+    if (decideHandCarry(advance.remaining, leashMeters) === "release") {
+      finishGeodesicCannonCarry();
+      return;
     }
     syncCarriedGeodesicCannonGlow(anchor);
   }
