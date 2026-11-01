@@ -1,6 +1,6 @@
-# Job 33 - Decompose runtime monoliths and retire legacy paths
+﻿# Job 33 - Decompose runtime monoliths and retire legacy paths
 
-Status: queued.
+Status: done (branch `job-33`, not merged).
 Former issue: 38 (converted to a job on 2026-10-28).
 
 Priority: P1 for geodesic correctness boundaries; P3 for dead UI cleanup.
@@ -123,3 +123,45 @@ Dead code, duplication and naming from issue 41:
   - `formatVec3`/`roundNumber` in `debugOverlay.ts` and `appDebugHelpers.ts`, plus a third private `roundNumber` in
     `geodesicCreatureDebug.ts` and one in the `geodesicCannon` debug code.
 - Naming: the `"geodesci-marmot"` kind literal and the capitalisation of `ShowCellPathRendersInstances`.
+
+
+## Report
+
+Branch `job-33` (worktree `../noneuclid-job33`), base `324a715`, not pushed. Commits: `733b5a3` (Part A), `3fd7f2d` (Part B), `58aed40` runtimeObjectActions, `6d9205e` aimFeedback, `a71caed` xrSessionController, `46f189a` portalFramePass, `b3fb009` geometryCommit, `f19863a` desktopInputHandlers, `529d32c` runtimeEffects + scenePaletteCommands + geometryDebugHelpers, `43abdc7` exports only tests used.
+
+### What was done
+- **Part A.** `geodesicConnectionsById` and every reader are gone; `getGeodesicConnection` keeps the interval branch only and its type is now `GeodesicEmitterAttachment` (`open | connected`) - it stays because `removeGeodesicCannonAndSegments`'s former caller path and the debug dumps (`geodesicDebugDumps.ts`, `appDebugHelpers.ts`) read it. `isGeodesicLocked`, `resolveDerivedSegmentConnectionState` and `collectGeodesicPortalWord` have no non-interval branch; `findSourceEmitterForGeodesic` is deleted. `"straightening"` is `"moving"` everywhere; `geodesicSegmentMovingArchetypeKey` = `geodesic-segment:ribbon-cross:moving`. `createGeodesicSegmentTooltip` lost its parameter. `syncLegacyEmitterGeodesicFields` is `syncEmitterGeodesicMenuCaches`. `Legacy:` comments and `_docs/MATHEMATICAL_MODEL.md` rewritten.
+- **Part B.** Deleted `desktopFlagEditor` (module, construction, 13 guards, CSS), the whole sign-colour feature (`defaultPlacedFlagFontColor` is now `defaultPlacedFlagTextColor`, a constant the renderer uses), `applyJoystickDeadZone` and `nextAcceptedHeadLocalMeters`. `buildDecorationMesh` uses `runtimeSceneUtils.disposeObject3D`; `helpLensRenderer` and `xrControllerHandModels` keep their copies with a comment on how they differ.
+- **Part C.** New modules in `src/render/three/`, each with a contract test in `tests/render/`: `runtimeObjectActions`, `aimFeedback`, `xrSessionController`, `portalFramePass`, `geometryCommit` (+ `geometryCommitTransforms`), `desktopInputHandlers`, `runtimeEffects`, `scenePaletteCommands`, `geometryDebugHelpers`. No deps interface has a getter/setter pair; moved `let`s are owned by the module and read through its handle.
+
+### Size
+| | lines |
+| --- | --- |
+| `createThreeApp.ts` at `324a715` | 3,398 |
+| after Part B | 3,355 |
+| after step 12 / 13 / 14 / 15 / 16 | 3,030 / 2,766 / 2,627 / 2,295 / 2,134 |
+| after step 17 and the three extra modules | 1,739 (target < 1,800 reached) |
+
+### Deviations
+- **Test changes (Decisions required a record).** Part A: fixtures that set `geodesicConnectionsById` (`intersections.test.ts`, `protractorTool.test.ts`, `worldGeometryComputedObjects.test.ts`) only lost that line; one `intersections` assertion about the removed field was deleted; titles that said "legacy" were reworded. `collectGeodesicPortalWord` lost its unused `world` parameter, so about 30 call sites in tests changed (`wordOf` in `moveEmitter.test.ts` too). Renamed `"straightening"` literals and archetype key in `geodesicCannonRenderer.test.ts` and `curveShortening.test.ts`. Part B: the two sign-colour tests in `placedFlags.test.ts`, one `nextAcceptedHeadLocalMeters` assertion. Stale sweep: three `getGeodesicRayArchetypeKeys` tests now use a local filter; `trace.test.ts` reads the end anchor from the registry and two `resolveGeodesicCannonAimYawRadians` tests and the `isPlacedFlagType` test are deleted; the "numbered default text" test now calls `placeFlagAtFloorPoint` with the old ray's floor points (assertions unchanged).
+- **`geodesicCreatureDebug.ts` keeps its private `roundNumber`.** The body equals `appDebugHelpers.roundNumber`, but importing it creates an import cycle (`docs:check` FAIL). `debugOverlay.ts` keeps its copies: they round to 3 digits, `appDebugHelpers` to 6 (and `formatVec3` there does not round).
+- **Geometry-commit transforms stay in `render/three`** (they import `runtimeSceneUtils`); moving them to `runtime/` would break the layer order. `geometryCommit.active()` is a third handle method beyond `commitReady`/`commit`, because the shell reads the bundle.
+- **`aimFrameSerial` stays in the shell** and is passed to each `portalFramePass` sync call (a getter would break the no-getter rule). `rebuildCellMeshes`, `applyDebugSettings` and the frame loop stay in the shell.
+- `aimFeedback` has two update calls (tooltips, aim) because the frame loop runs them under different error guards. `desktopInputHandlers` took `applyDesktopScenePaletteToggle` into the `runtimeObjectActions` handle to avoid a dependency cycle. Dispose order in `createThreeApp` changed slightly (entry UI before palette controller).
+- Extra modules beyond the plan (`runtimeEffects`, `scenePaletteCommands`, `geometryDebugHelpers`) were extracted to get under 1,800 lines.
+
+### Stale sweep (both sweeps)
+Removed, transitively with their tests: `desktopFlagEditor`, `placedFlagFontColors`, `sanitizePlacedFlagFontColor`, `updatePlacedFlagFontColor`, `applyJoystickDeadZone`, `removeGeodesicCannonAndSegments`, `isGeodesicIntersectionObject`, `isGeodesicCannonObject`, `isGeodesicIntervalObject`, `isCurveShorteningPairObject`, `collectGeodesicMenuRowsForEmitter`, `GeodesicDebugToolState`, `getGeodesicRayArchetypeKeys`, `getGeodesicEndpoints`, `geodesicHasNonzeroLiftedDisplacement`, `updatePortalWordForMovedEndpoint`, `resolveGeodesicCannonAimYawRadians`, `isPlacedFlagType`, `placeFlagFromAim` (+ `PlaceFlagFromAimRequest`). The sweep after Part C found nothing more in the Part C modules.
+
+### Uncertain
+- The non-interval returns in `cannon.ts` (`rebuildConnectedGeodesicBetweenEmitters`, `connectGeodesicToEmitter`) were not examined for reachability; kept.
+- `removeGeodesicNow` keeps its non-interval branch (removes stale segments and emitter cache entries for an id that is not an interval); not on the list, not proven dead.
+- `MATHEMATICAL_MODEL.md` now points at `updateLockedGeodesicPortalWordForCarriedAnchorTraversal` where it named `updatePortalWordForMovedEndpoint`; whether the sentence matches that function exactly was not re-read.
+- Factory handles are now `const`s built in order; a use before the factory call is a temporal-dead-zone error that typecheck cannot see. Nothing does it, and the release tier passes.
+- XR `end`-listener removal and late-`end` handling are tested only against the fake session, not a headset.
+
+### Not done
+- `rebuildCellMeshes`, `applyDebugSettings`, `syncLaunchOptionsState` and the frame loop remain in the shell (they touch `visibleCellId`, `cellRootsGeneration`, the recreated `portalDebugRuntime`).
+
+### Checks
+Baseline at `324a715`: typecheck green, `npm test` 144 files / 1237 tests. Final (`43abdc7`): `npm run typecheck`, `npm run docs:check` green; `npm test` 153 files / 1281 tests; `npm run test:release` 6 files / 13 tests, the known `appCommands` CDP timeout did not occur in these runs. Both done-greps print nothing.

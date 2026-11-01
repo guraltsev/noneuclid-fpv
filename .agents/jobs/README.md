@@ -1,4 +1,4 @@
-# Jobs
+﻿# Jobs
 
 A **job** is a work order: carry out this change, in this scope, and verify it like this. An **issue**
 (`_issues/`) describes something that is wrong: the defect, the evidence and the impact. Small fixes and mitigation
@@ -118,9 +118,9 @@ queued job, despite their numbers (they were numbered after the existing queue t
 | [30](30_deformation_rebuild_pipeline.md) | Incremental deformation rebuild pipeline | queued | [55](../../_issues/55_live_deformation_rebuild_cost_and_se2_transforms.md), [82](../../_issues/82_deformation_commit_rebuilds_whole_scene_and_reuploads_floor_texture.md) |  |
 | [31](_done/31_app_shell_state_holder.md) | Shell cleanups: dead field, one portal sync, split the palette adapter | done, needs review | - | 77 |
 | [32](_done/32_layer_dag.md) | Make the layer rule a real DAG | done, needs review | [78](../../_issues/78_enforce_layer_dag_and_move_domain_logic_out_of_render.md) |  |
-| [33](33_decompose_runtime_monoliths.md) | Decompose runtime monoliths and retire legacy paths | queued | - | 38 |
+| [33](33_decompose_runtime_monoliths.md) | Decompose runtime monoliths and retire legacy paths | done | - | 38 |
 | [34](34_type_strictness_lint_bundle.md) | Type strictness, linting and bundle configuration | queued | - | 80 |
-| [35](35_torus_family_as_teichmuller_space.md) | Treat the torus family as TeichmÃƒÂ¼ller space | queued | - | 54 |
+| [35](35_torus_family_as_teichmuller_space.md) | Treat the torus family as TeichmÃƒÆ’Ã‚Â¼ller space | queued | - | 54 |
 | [36](_done/36_creatures_detour_and_resume_geodesic.md) | Creatures detour around obstacles and resume their geodesic | done, needs review | - |  |
 | [37](_done/37_object_owners_and_place_at.md) | Objects own their position; `placeAt` moves any positioned object | done, needs review | - |  |
 | [38](_done/38_draw_assets_from_registry.md) | Draw static assets from their registry record | done, needs review | - |  |
