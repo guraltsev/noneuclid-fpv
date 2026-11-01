@@ -43,9 +43,12 @@ export default defineWorkspace([
       // never touched it).
       // Scenarios drive a real browser and a background build worker; give them more room than the default 5 s.
       // A load takes well under 5 s in practice; the margin absorbs occasional machine-level slowness rather than
-      // failing a scenario for it.
-      testTimeout: 45000,
-      hookTimeout: 45000,
+      // failing a scenario for it. 90 s specifically leaves room for `openApp.ts`'s own bounded recovery (a poll
+      // loop that reconnects a stuck CDP session once per failure streak, each step capped at
+      // `scripts/lib/cdpClient.mjs`'s own 6 s connect/command deadlines) to actually run its course within one
+      // test, rather than racing it and usually losing (see `.agents/knowledge/scenario-runner-browser-limits.md`).
+      testTimeout: 90000,
+      hookTimeout: 90000,
     },
   },
   {

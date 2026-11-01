@@ -146,11 +146,6 @@ async function evaluateRaw(box: SessionBox, expression: string): Promise<unknown
 async function callApiPath(box: SessionBox, pathSegments: readonly string[], args: readonly unknown[]): Promise<unknown> {
   // The page catches its own exception and reports it as plain data, so the call rejects with exactly the page
   // error's message, never a DevTools exception description (a multi-line stack trace).
-  //
-  // Plain, undeferred call (not combined with a requestAnimationFrame wait in the same round trip, unlike
-  // waitForAppLoaded's read-only check below): a scenario that restarts the running app more than once in one
-  // page has occasionally left the page's DevTools agent not answering Runtime.evaluate at all for a while
-  // afterwards, on this machine. See `.agents/knowledge/scenario-runner-browser-limits.md`.
   const expression = `(async () => {
     try {
       const value = await window.noneuclid.api.${pathSegments.join(".")}(...${JSON.stringify(args)});
@@ -159,7 +154,25 @@ async function callApiPath(box: SessionBox, pathSegments: readonly string[], arg
       return { ok: false, message: (error && error.message) ? String(error.message) : String(error) };
     }
   })()`;
-  const value = (await evaluateRaw(box, expression)) as { readonly ok: boolean; readonly value?: unknown; readonly message?: string } | undefined;
+
+  // A round trip has occasionally gone unanswered altogether (cdpClient.mjs's own command timeout then rejects it
+  // cleanly instead of hanging forever; see `.agents/knowledge/scenario-runner-browser-limits.md`), unlike the poll
+  // loops below, this single call had no recovery at all before: one reconnect-and-retry gives it the same chance,
+  // which is safe because every api call this runner makes (restart commands, state reads, debug queries) is
+  // idempotent — calling it twice after a lost response is never worse than calling it once.
+  let raw: unknown;
+  try {
+    raw = await evaluateRaw(box, expression);
+  } catch (firstError) {
+    await box.reconnect().catch(() => {});
+    try {
+      raw = await evaluateRaw(box, expression);
+    } catch {
+      throw firstError;
+    }
+  }
+
+  const value = raw as { readonly ok: boolean; readonly value?: unknown; readonly message?: string } | undefined;
   if (!value || value.ok === false) {
     throw new Error(value?.message ?? "api call returned no result");
   }

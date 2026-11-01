@@ -12,22 +12,46 @@
   (`app.changeWorld`/`app.changeConfig`/`app.reload`, each a full dispose of the current Three.js app and
   renderer, then creating a new one), even running one scenario file alone with files fully serialized.**
   Diagnosed at length while writing job 44's scenario runner, in `tests/app/appCommands.release.test.ts`, the one
-  scenario file that restarts the app more than once in the same page: a real CDP-level timeout (not a slow
-  response — `scripts/lib/cdpClient.mjs`'s own `send()` deadline is what surfaces it as a clean error instead of
-  an indefinite hang), on roughly one restart in several, with no fixed test or call it always lands on (seen on
-  `changeWorld` three runs running, then on `changeConfig` on a fourth) — a genuine low-frequency flake, not a
-  deterministic one. Not fixed by: halving the round trips per poll (folding the animation-frame wait into the
-  same `Runtime.evaluate` call as the api call — reverted, since it did not help and the extra round trip is cheap
-  next to the flake's rate); reconnecting a fresh WebSocket to the same page target on repeated failures
-  (`SessionBox.reconnect`, kept as cheap insurance against a dead *connection*, though it cannot fix a wedged
-  renderer process); switching the destination world; or dropping the extra `debug`-namespace check from the
-  poll. A plain Node script driving the same calls directly (no Vitest) did not reproduce it in several tries, so
-  something about running under Vitest specifically plays a part, not confirmed what. This is the same class of
-  flake as the pre-existing, already-documented one in `npm run smoke` over several worlds
-  (`test-and-smoke-timing.md`), so it is likely a property of this machine's headless Chromium-based browser under
-  SwiftShader (software) rendering under repeated heavy page work, not a bug introduced by the scenario runner.
-  Chasing a product-level fix was out of scope for job 44 (test infrastructure); recorded here, and in job 44's
-  Report, so the next person does not have to re-run this whole diagnosis.
+  scenario file that restarts the app more than once in the same page. See `_issues/83_scenario_runner_app_restart_hangs_the_cdp_session.md`
+  for the full, still-open investigation; summary of what is now understood (2026-10-31):
+  - **Root cause of the original symptom** ("got no response at all, not just slowly"): `createCdpSession`
+    (`scripts/lib/cdpClient.mjs`) opened its WebSocket with **no timeout on the connect handshake itself** —
+    every other operation in the file already had a deadline, this one did not. `SessionBox.reconnect()` (built
+    specifically to recover a stuck session) called this same unguarded function, so the *recovery path itself*
+    was the thing with no escape hatch. Fixed: the connect handshake now has the same 6 s deadline as everything
+    else, and `openApp.ts`'s single un-retried `callApiPath` call (behind every `app.*`/`debug.*`/`geometry.*`
+    call) now reconnects and retries once on failure, matching the tolerance the polling loops already had.
+  - **This measurably helped but did not eliminate the flake**: across 5 `npm run test:release` runs after the
+    fix, `appCommands` passed 3 and failed 2, both times on `changeConfig`'s single upfront call, both times at
+    the *same* command id in the sequence (7), and both times the failure survived a reconnect-and-retry (a fresh
+    WebSocket to the same page also got no answer within 6 s). That rules out a dead *connection* as the
+    remaining cause — reconnecting a transport layer that is itself fine cannot help — and points at the
+    browser's renderer process genuinely pausing for several seconds at that point in a restart, which no
+    client-side retry can fix.
+  - **Checked directly, not just assumed**: system-wide CPU during a run peaks around 70% and mostly sits at
+    15-40%, so this is not simple whole-machine CPU starvation delaying Node's own timers (which would need the
+    OS scheduler itself to be starved); the pause looks internal to the browser process.
+  - Not fixed by (tried before the connect-timeout fix was found, still true after it): halving the round trips
+    per poll (folding the animation-frame wait into the same `Runtime.evaluate` call as the api call); switching
+    the destination world; dropping the extra `debug`-namespace check from the poll. Also tried and reverted
+    *after* the connect-timeout fix: retrying the reconnect on every consecutive poll failure instead of once per
+    failure streak — this compounds badly (a full reconnect, worst case, costs up to 4× the per-command timeout:
+    one connect plus three `Runtime`/`Page`/`Network` `.enable` calls) and can alone exceed a test's own timeout
+    budget; reverted back to once per streak.
+  - A plain Node script driving the same calls directly (no Vitest) did not reproduce it in several tries, so
+    something about running under Vitest specifically plays a part, not confirmed what.
+  - Same class of flake as the pre-existing, already-documented one in `npm run smoke` over several worlds
+    (`test-and-smoke-timing.md`): a rerun with no code change flips from a real failure to passing.
+  - `appCommands.release.test.ts` was briefly parked in `tests/_temp/issue83/` (renamed `.report.test.ts`, run
+    only on demand) to stop it blocking pushes while this was being investigated, then promoted back to the
+    normal suite once failures became clean/bounded instead of opaque 45 s hangs — a park trades "doesn't block
+    pushes" for "doesn't get run or improved," which stopped being the right trade once there was a real,
+    partial fix worth keeping visible.
+  - Candidates not yet tried: one headless browser per scenario *file* instead of one for the whole `release` run
+    (moving the launch from `globalSetup.ts`'s once-per-run hook into `releaseSetup.ts`'s per-file
+    `beforeAll`/`afterAll`); listening for `Runtime.executionContextDestroyed`/`Page.frameNavigated` events to
+    time patience against instead of a fixed deadline; a longer timeout specifically for restart-triggering calls
+    (trading "fail fast" for "wait out a known-slow operation," unverified whether the pause is actually bounded).
 - **A page that times out on its own `openApp()` (never returns to the test) keeps rendering until something
   closes it**, slowing every scenario that runs afterward. `openApp.ts` tracks every page it opened in a
   module-level map; `tests/support/scenario/releaseSetup.ts`'s `afterEach` closes anything left in it, so one

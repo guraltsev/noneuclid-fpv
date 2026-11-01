@@ -236,11 +236,34 @@ export function collectFailureReasons(events, { loadState, timeoutMs } = {}) {
  * wants the raw stream too (`scripts/debug/cdp.mjs`'s `console`/`record` commands). Enables `Runtime`, `Page` and
  * `Network`. `close()` closes the socket only; the caller owns the browser process and any opened page target.
  */
+// The WebSocket connect handshake itself has occasionally never called `onopen` or `onerror` at all (the browser's
+// DevTools agent accepted the TCP connection but stalled completing it), unlike every other wait in this module,
+// which already has a deadline. Without one here, a caller (including `SessionBox.reconnect()` in
+// `tests/support/scenario/openApp.ts`, which exists specifically to recover from a stuck session) could hang
+// forever with no way to notice or retry.
+const connectTimeoutMs = 6000;
+
 export async function createCdpSession(webSocketDebuggerUrl) {
   const ws = new WebSocket(webSocketDebuggerUrl);
   await new Promise((resolve, reject) => {
-    ws.onopen = resolve;
-    ws.onerror = reject;
+    const timer = setTimeout(() => {
+      ws.onopen = null;
+      ws.onerror = null;
+      try {
+        ws.close();
+      } catch {
+        // already in a bad state; nothing more to clean up
+      }
+      reject(new Error(`WebSocket to ${webSocketDebuggerUrl} did not open within ${connectTimeoutMs} ms`));
+    }, connectTimeoutMs);
+    ws.onopen = () => {
+      clearTimeout(timer);
+      resolve();
+    };
+    ws.onerror = (error) => {
+      clearTimeout(timer);
+      reject(error);
+    };
   });
 
   let nextId = 0;
@@ -260,8 +283,11 @@ export async function createCdpSession(webSocketDebuggerUrl) {
   };
 
   // A command has occasionally gone unanswered altogether (seen while writing the release-tier scenario runner,
-  // under a software-rendered headless browser): without a deadline, that silently hangs the caller forever.
-  const commandTimeoutMs = 12000;
+  // under a software-rendered headless browser): without a deadline, that silently hangs the caller forever. Kept
+  // short (not the DevTools HTTP endpoint's more generous devToolsHttpTimeoutMs above) because a retry loop
+  // (tests/support/scenario/openApp.ts's waitForCondition/waitForAppLoaded) can hit this more than once per call
+  // and reconnect, and its own outer test timeout must still have room left after several worst-case misses.
+  const commandTimeoutMs = 6000;
 
   const send = (method, params = {}) =>
     new Promise((resolve, reject) => {
