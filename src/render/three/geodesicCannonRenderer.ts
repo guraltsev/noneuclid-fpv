@@ -41,10 +41,10 @@ export const geodesicRayAssetPaths = {
   lightsaber: "flashlight/Lightsaber.glb",
   balloon: "baloon/Balloon.glb",
 } as const;
-// Uniform scale of the post and lightsaber models.
-const geodesicRayAssetScale = 0.42;
-// Lifts the loaded post model so its base sits on the floor (meters, Three.js y); not applied to the fallback.
-const geodesicRayPostAssetFloorOffsetMeters = 0.74;
+/** Uniform scale of the post and lightsaber models. */
+export const geodesicRayAssetScale = 0.42;
+/** Lifts the loaded post model so its base sits on the floor (meters, Three.js y); not applied to the fallback. */
+export const geodesicRayPostAssetFloorOffsetMeters = 0.74;
 // Uniform scale of the balloon model.
 const geodesicIntersectionBalloonScale = 0.825;
 /** Position of the lightsaber (beam emission point) in the cannon's local Three.js frame, meters; y matches the beam height used for aiming and ray tracing. */

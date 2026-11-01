@@ -1,13 +1,14 @@
 /**
  * `tests/world-objects/carryHighlightShape.test.ts` — unit tier.
  *
- * Each carryable object declares its own highlight shape (src/world-objects/carryHighlightShape.ts). The emitter's is an ellipsoid around its
- * whole post; an object that declares none gets a sphere from its collision shape, and an object with neither has no highlight.
+ * Each carryable object declares its own highlight shape (src/world-objects/carryHighlightShape.ts). The emitter's is a thin ellipsoid hugging the
+ * model it draws (pinned to the assets by tests/render/cannonModelBounds.test.ts); an object that declares none gets a sphere from its collision
+ * shape, and an object with neither has no highlight.
  */
 import { describe, expect, it } from "vitest";
 import { yawRigidTransform3 } from "../../src/math/rigidTransform3";
 import { carryHighlightMarginMeters, carryHighlightShapeOf, type CarryHighlightShape } from "../../src/world-objects/carryHighlightShape";
-import { cannonCarryHighlight, createGeodesicCannonObject } from "../../src/world-objects/geodesic/objects";
+import { cannonCarryHighlight, cannonModelHalfExtentsMeters, createGeodesicCannonObject } from "../../src/world-objects/geodesic/objects";
 
 // Whether a point of the object's frame lies inside the ellipsoid.
 function inside(shape: CarryHighlightShape, point: { x: number; y: number; z: number }): boolean {
@@ -28,21 +29,23 @@ describe("the emitter's carry highlight", () => {
     expect(shape!.radii.x).toBe(shape!.radii.y);
   });
 
-  it("encloses the post from floor to top, and the collision cylinder's axis and mid rim", () => {
-    const collision = emitter.collision!;
-    const postHeightMeters = 1.7;
+  it("encloses the model's axis from the floor to its top and its sideways reach at mid height", () => {
+    const { x: reach, z: halfHeight } = cannonModelHalfExtentsMeters;
 
-    for (const z of [0, 0.5, 1, postHeightMeters]) {
+    for (const z of [0, halfHeight, 2 * halfHeight]) {
       expect(inside(shape!, { x: 0, y: 0, z })).toBe(true);
     }
-    // The collision cylinder stands on the floor (its offset is half its height), so its axis runs from 0 to its height.
-    for (const z of [0, collision.height]) {
-      expect(inside(shape!, { x: 0, y: 0, z })).toBe(true);
+    for (const [x, y] of [[reach, 0], [-reach, 0], [0, reach], [0, -reach]]) {
+      expect(inside(shape!, { x, y, z: halfHeight })).toBe(true);
     }
-    const midHeight = collision.height / 2;
-    for (const [x, y] of [[collision.radius, 0], [-collision.radius, 0], [0, collision.radius], [0, -collision.radius]]) {
-      expect(inside(shape!, { x, y, z: midHeight })).toBe(true);
-    }
+  });
+
+  it("follows the drawn model, not the collision cylinder that is much wider", () => {
+    const collision = emitter.collision!;
+
+    expect(shape!.radii.x).toBeLessThan(collision.radius);
+    expect(shape!.radii.z).toBeLessThan(2 * cannonModelHalfExtentsMeters.z);
+    expect(inside(shape!, { x: collision.radius, y: 0, z: collision.height / 2 })).toBe(false);
   });
 });
 

@@ -5,7 +5,7 @@
 
 This reference is produced from the source code. For the *meaning* of the modules — the mathematical model they implement — read [../MATHEMATICAL_MODEL.md](../MATHEMATICAL_MODEL.md) and [../ARCHITECTURE.md](../ARCHITECTURE.md). For every exported symbol see [API_REFERENCE.md](API_REFERENCE.md).
 
-**220 modules, 48,339 lines** under `src/`.
+**220 modules, 48,354 lines** under `src/`.
 
 ## Layers
 
@@ -19,7 +19,7 @@ A module belongs to the layer named by its first path segment under `src/`. "May
 | `visibility` | 2 | 1,036 | `math`, `cell-complex` | Per-frame portal visibility: funnel clipping of portal-path tables against a camera. Pure; no renderer. |
 | `movement` | 10 | 1,645 | `math`, `cell-complex` | Player body, collision, movement and portal crossing in compiled cell complexes. |
 | `world-assets` | 1 | 201 | `cell-complex` | Floor-texture and asset descriptors. |
-| `world-objects` | 33 | 9,662 | `math`, `cell-complex`, `diagnostics`, `movement`, `world-assets` | Placeable runtime objects: registry, geodesic emitters, measurement tools, flags, creature behaviors. |
+| `world-objects` | 33 | 9,677 | `math`, `cell-complex`, `diagnostics`, `movement`, `world-assets` | Placeable runtime objects: registry, geodesic emitters, measurement tools, flags, creature behaviors. |
 | `authoring` | 5 | 671 | `math`, `cell-complex`, `examples`, `world-assets`, `world-objects` | World builder DSL, world-script compiler, validation and world catalog. |
 | `glue` | 11 | 1,007 | `math`, `cell-complex`, `diagnostics`, `authoring` | Launch options, debug settings, tool ids, asset URLs, app configuration. |
 | `interaction` | 5 | 1,595 | `math`, `cell-complex`, `movement`, `world-objects`, `glue` | Renderer-free interaction logic: input frames, aim picking, VR locomotion, XR session state, carried-object portal transitions. |
@@ -193,7 +193,7 @@ None: every import respects the intended layering.
 | `world-objects/geodesic/intersections.ts` | 387 | Geodesic intersection markers: crossings of segments in the same cell, stable marker identities between updates, and the per-registry marker memory. | `math/rigidTransform3`, `math/vec2`, `math/vec3`, `world-objects/geodesic/objects`, `world-objects/geodesic/perfCounters`, `world-objects/runtimeObjectRegistry` |
 | `world-objects/geodesic/intervals.ts` | 925 | Interval rebuilds: realizing an interval's lifted chord, aiming free geodesics, splitting at a segment hit, rebuilding locked intervals after a carried anchor moved, and side-effect-free previews. | `cell-complex/compileCellComplex`, `math/rigidTransform3`, `math/vec3`, `world-objects/geodesic/anchors`, `world-objects/geodesic/endpoints`, `world-objects/geodesic/intersections`, `world-objects/geodesic/objects`, `world-objects/geodesic/portalWord`, `world-objects/geodesic/segments`, `world-objects/geodesic/trace`, `world-objects/runtimeObjectRegistry` |
 | `world-objects/geodesic/lifecycle.ts` | 179 | Queries whether a geodesic is locked or connected, and removal of geodesics and cannons together with their derived objects. | `world-objects/geodesic/endpoints`, `world-objects/geodesic/intersections`, `world-objects/geodesic/objects`, `world-objects/geodesic/segments`, `world-objects/runtimeObjectRegistry` |
-| `world-objects/geodesic/objects.ts` | 691 | Geodesic emitters ("cannons"), geodesic intervals and curve shortening on a glued cell complex. | `math/rigidTransform3`, `math/vec3`, `movement/dynamicObject`, `world-objects/carryHighlightShape`, `world-objects/runtimeObjectBase` |
+| `world-objects/geodesic/objects.ts` | 706 | Geodesic emitters ("cannons"), geodesic intervals and curve shortening on a glued cell complex. | `math/rigidTransform3`, `math/vec3`, `movement/dynamicObject`, `world-objects/carryHighlightShape`, `world-objects/runtimeObjectBase` |
 | `world-objects/geodesic/perfCounters.ts` | 14 | Counters of the expensive geodesic operations, read by the performance tests. | — |
 | `world-objects/geodesic/portalWord.ts` | 159 | Portal-word algebra of geodesic intervals: reversal, free reduction, comparison, role-aware sub-words and the update of a word when an anchor crosses a portal; pure, no registry access. | `cell-complex/compileCellComplex`, `world-objects/geodesic/objects` |
 | `world-objects/geodesic/segments.ts` | 543 | Derived geodesic segments: lookup by geodesic, building segments from traces with the start/end half split, lengths, tangents at anchors, display numbers and the emitter-side caches. | `cell-complex/compileCellComplex`, `math/rigidTransform3`, `math/vec3`, `world-objects/geodesic/endpoints`, `world-objects/geodesic/intersections`, `world-objects/geodesic/objects`, `world-objects/runtimeObjectRegistry` |

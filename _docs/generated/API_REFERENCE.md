@@ -827,7 +827,9 @@ Geodesic emitters ("cannons"), geodesic intervals and curve shortening on a glue
 | interface | `CreateGeodesicCannonOptions` | Construction options for `createGeodesicCannonObject`; omitted optional fields get the defaults documented there. |
 | interface | `TraceGeodesicSegmentResult` | One traced piece: the cell, the (normalized) ray used, the length actually travelled, and why it stopped. |
 | interface | `PlaceGeodesicCannonResult` | Result of the cannon placement functions: the placed (registry) cannon, or `placed: false` with a coarse `reason`. |
-| const | `cannonCarryHighlight` | Carry highlight of an emitter: an ellipsoid around the whole post, loosely. |
+| const | `cannonModelHalfExtentsMeters` | Half-extents in meters of the visible emitter model in the emitter's frame (z up, the box centred at `(0, 0, half.z)`), measured from the assets the renderer draws (`geodesicCannonRenderer.ts`), not guessed: - `flashlig… |
+| const | `cannonCarryHighlightLooseness` | Factor by which the emitter's highlight ellipsoid exceeds the model's half-extents, so it is a loose fit and not skin-tight. |
+| const | `cannonCarryHighlight` | Carry highlight of an emitter: an ellipsoid hugging the visible model (`cannonModelHalfExtentsMeters`) a little loosely, so it is thin and a bit taller than wide, centred at half the model's height: semi-axes `(0.159, 0… |
 | const | `geodesicRayBeamHeightMeters` | Height of the geodesic beam above an emitter's floor point, in meters. |
 | const | `geodesicRayBeamStartOffsetMeters` | Horizontal distance (meters) by which a beam starts away from its emitter center along the launch direction; currently 0. |
 | const | `GEODESIC_MIN_LENGTH_METERS` | Smallest lifted chord length (meters) of a valid interval; shorter intervals are degenerate and are deleted or rejected. |
@@ -2017,6 +2019,8 @@ Render sources and per-frame render records for geodesic cannons, geodesic segme
 | const | `geodesicRayHeadArchetypePrefix` | Archetype-key prefix (followed by `:<mesh>`) for the per-geodesic cannon head (lightsaber) meshes. |
 | const | `geodesicIntersectionArchetypePrefix` | Archetype-key prefix (followed by `:<mesh>`) for the intersection balloon meshes. |
 | const | `geodesicRayAssetPaths` | glTF asset paths (relative to the public asset root) needed by the geodesic renderer. |
+| const | `geodesicRayAssetScale` | Uniform scale of the post and lightsaber models. |
+| const | `geodesicRayPostAssetFloorOffsetMeters` | Lifts the loaded post model so its base sits on the floor (meters, Three.js y); not applied to the fallback. |
 | const | `geodesicRayEmitterPosition` | Position of the lightsaber (beam emission point) in the cannon's local Three.js frame, meters; y matches the beam height used for aiming and ray tracing. |
 | function | `createGeodesicRuntimeRenderSources` | Builds all source meshes for geodesic objects: four segment ribbon variants, cannon post, cannon head and intersection balloon. |
 | function | `getGeodesicRayArchetypeKeys` | Filters `sources` down to the archetype keys of cannon post and head meshes. |

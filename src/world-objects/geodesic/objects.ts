@@ -381,18 +381,33 @@ const defaultCannonCollision: SimpleCollisionCylinder = {
 };
 
 /**
- * Carry highlight of an emitter: an ellipsoid around the whole post, loosely.
- *
- * The visible post is about 1.7 m tall (the loaded model at its scale; the procedural stand-in is 1.55 m) standing on the floor, so the
- * vertical semi-axis is half that height plus a 0.1 m margin (0.95 m) and the centre is at half the height (0.85 m). The horizontal
- * semi-axes are the collision radius 0.3 m plus the same 0.1 m margin (0.4 m): wider than the post and its 0.26 m base, which leaves room
- * for the lightsaber head. The collision cylinder is only 0.75 m tall, so the ellipsoid follows the visible post, not the collision shape: it
- * contains the cylinder's axis and its mid-height rim, and the cylinder's bottom rim edge, which no one sees, lies just outside.
+ * Half-extents in meters of the visible emitter model in the emitter's frame (z up, the box centred at `(0, 0, half.z)`), measured from the
+ * assets the renderer draws (`geodesicCannonRenderer.ts`), not guessed:
+ * - `flashlight/Post.glb` is 3.013 units tall (y from -1.9996 to 1.0131) and 0.37 wide; drawn at scale 0.42 and lifted by 0.74 it spans
+ *   -0.10 to 1.166 m above the floor (only the part from the floor up is visible) and reaches 0.085 m from its axis.
+ * - `flashlight/Lightsaber.glb` is 0.5215 long (x from -0.198 to 0.3235) and 0.1 thick; at scale 0.42 on the beam height (1.08 m) it reaches
+ *   0.138 m from the post axis, turning with the aim, and is 0.042 m thick.
+ * So the model is a thin post, 1.166 m tall from the floor, with a head that reaches 0.138 m sideways: half-extents `(0.138, 0.138, 0.583)`.
+ * `tests/render/cannonModelBounds.test.ts` re-measures the two files and fails when they stop matching these numbers.
+ */
+export const cannonModelHalfExtentsMeters: Vec3 = { x: 0.138, y: 0.138, z: 0.583 };
+
+/** Factor by which the emitter's highlight ellipsoid exceeds the model's half-extents, so it is a loose fit and not skin-tight. */
+export const cannonCarryHighlightLooseness = 1.15;
+
+/**
+ * Carry highlight of an emitter: an ellipsoid hugging the visible model (`cannonModelHalfExtentsMeters`) a little loosely, so it is thin and
+ * a bit taller than wide, centred at half the model's height: semi-axes `(0.159, 0.159, 0.670)` m around `(0, 0, 0.583)`. It does not follow
+ * the collision cylinder (radius 0.3 m, 0.75 m tall), which is a physics shape and much wider than anything drawn.
  */
 export const cannonCarryHighlight: CarryHighlightShape = {
   kind: "ellipsoid",
-  centre: { x: 0, y: 0, z: 0.85 },
-  radii: { x: 0.4, y: 0.4, z: 0.95 },
+  centre: { x: 0, y: 0, z: cannonModelHalfExtentsMeters.z },
+  radii: {
+    x: cannonModelHalfExtentsMeters.x * cannonCarryHighlightLooseness,
+    y: cannonModelHalfExtentsMeters.y * cannonCarryHighlightLooseness,
+    z: cannonModelHalfExtentsMeters.z * cannonCarryHighlightLooseness,
+  },
 };
 
 /** Height of the geodesic beam above an emitter's floor point, in meters. */
