@@ -17,12 +17,8 @@ import { yawRigidTransform3 } from "../../math/rigidTransform3";
 import { type Vec3, normalizeVec3 } from "../../math/vec3";
 import { getDynamicObjectCollisionBounds, testCellCollision } from "../../movement/collision";
 import { type PlayerPose } from "../../movement/playerPose";
-import {
-  type RuntimeMenuState,
-  closeRuntimeMenu,
-  setRuntimeMenuSelectedTool,
-  showRuntimeMenuGeodesicCannonActions,
-} from "../../runtime/runtimeMenuState";
+import type { AppSession } from "../../runtime/appSession";
+import type { RuntimeCommand } from "../../runtime/runtimeCommands";
 import { type GeodesicEndpointSelection } from "../../world-objects/geodesic/objects";
 import {
   pruneMissingGeodesicIntersectionObjects,
@@ -101,10 +97,10 @@ export interface GeodesicCannonToolsDeps {
   readonly runtimeObjectRegistry: RuntimeObjectRegistry;
   /** Getter for the active compiled world. */
   getWorld(): CompiledCellComplex;
-  /** Getter for the runtime menu state (selected tool, open menu). */
-  getMenuState(): RuntimeMenuState;
-  /** Replaces the shell's menu state. */
-  setMenuState(next: RuntimeMenuState): void;
+  /** The shell session; the menu state (selected tool, open menu) is read from it. */
+  readonly session: AppSession;
+  /** Runs a command through the shell's one command path (menu changes go through it, never by assignment). */
+  dispatch(command: RuntimeCommand): void;
   /** Getter for the cannon tool state. */
   getCannonToolState(): GeodesicCannonToolState;
   /** Replaces the shell's cannon tool state (not merged; pass `{}` to clear). */
@@ -239,7 +235,7 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
         selectedCannonId: result.object.id,
         activeGeodesicId: result.object.activeGeodesicId ?? result.object.geodesicIds[0],
       });
-      deps.setMenuState(setRuntimeMenuSelectedTool(deps.getMenuState(), "none"));
+      deps.dispatch({ kind: "clear-selected-tool" });
       syncDesktopPalette();
       syncRuntimeObjectPortalInstances();
       syncSelectableHitboxDebug();
@@ -279,7 +275,7 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
         selectedCannonId: result.object.id,
         activeGeodesicId: target.object.geodesicId,
       });
-      deps.setMenuState(setRuntimeMenuSelectedTool(deps.getMenuState(), "none"));
+      deps.dispatch({ kind: "clear-selected-tool" });
       syncDesktopPalette();
       syncRuntimeObjectPortalInstances();
       syncSelectableHitboxDebug();
@@ -325,7 +321,7 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
       selectedCannonId: result.object.id,
       activeGeodesicId: geodesicId,
     });
-    deps.setMenuState(setRuntimeMenuSelectedTool(deps.getMenuState(), "none"));
+    deps.dispatch({ kind: "clear-selected-tool" });
     syncDesktopPalette();
     syncRuntimeObjectPortalInstances();
     syncSelectableHitboxDebug();
@@ -373,9 +369,10 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
     const afterAdd = options.afterAdd ?? "show-cannon-menu";
     const cannon = runtimeObjectRegistry.get(cannonId);
     if (cannon?.kind !== "geodesic-cannon") {
-      deps.setMenuState(afterAdd === "return-to-none"
-        ? closeRuntimeMenu(setRuntimeMenuSelectedTool(deps.getMenuState(), "none"))
-        : closeRuntimeMenu(deps.getMenuState()));
+      deps.dispatch({ kind: "close-menu" });
+      if (afterAdd === "return-to-none") {
+        deps.dispatch({ kind: "clear-selected-tool" });
+      }
       syncDesktopPalette();
       return;
     }
@@ -400,15 +397,19 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
         selectedCannonId: updatedCannon.id,
         activeGeodesicId: geodesicId,
       });
-      deps.setMenuState(afterAdd === "return-to-none"
-        ? closeRuntimeMenu(setRuntimeMenuSelectedTool(deps.getMenuState(), "none"))
-        : showRuntimeMenuGeodesicCannonActions(deps.getMenuState(), {
-            cannonId: updatedCannon.id,
-            geodesicIds: updatedCannon.geodesicIds,
-            geodesicLabelsById: getGeodesicLabelsById(updatedCannon.geodesicIds),
-            lockedGeodesicIds: getLockedGeodesicIds(updatedCannon.geodesicIds),
-            canTieAndDetach: canTieAndDetachGeodesicsFromCannon(updatedCannon.id),
-          }));
+      if (afterAdd === "return-to-none") {
+        deps.dispatch({ kind: "close-menu" });
+        deps.dispatch({ kind: "clear-selected-tool" });
+      } else {
+        deps.dispatch({
+          kind: "show-geodesic-cannon-actions",
+          cannonId: updatedCannon.id,
+          geodesicIds: updatedCannon.geodesicIds,
+          geodesicLabelsById: getGeodesicLabelsById(updatedCannon.geodesicIds),
+          lockedGeodesicIds: getLockedGeodesicIds(updatedCannon.geodesicIds),
+          canTieAndDetach: canTieAndDetachGeodesicsFromCannon(updatedCannon.id),
+        });
+      }
     }
 
     if (segment) {
@@ -422,7 +423,7 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
     const object = runtimeObjectRegistry.get(cannonId);
     const cannon = object?.kind === "geodesic-cannon" ? object : undefined;
     if (cannon?.kind !== "geodesic-cannon") {
-      deps.setMenuState(closeRuntimeMenu(deps.getMenuState()));
+      deps.dispatch({ kind: "close-menu" });
       syncDesktopPalette();
       return;
     }
@@ -446,7 +447,7 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
     geodesicCannonRotationTargetLengthMeters = geodesicId
       ? getGeodesicTotalLengthMeters(geodesicId)
       : undefined;
-    deps.setMenuState(closeRuntimeMenu(setRuntimeMenuSelectedTool(deps.getMenuState(), "geodesic-cannon-rotate")));
+    deps.dispatch({ kind: "enter-tool-mode", toolId: "geodesic-cannon-rotate" });
     syncDesktopPalette();
     void controls.requestPointerLock();
   }
@@ -455,7 +456,7 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
     const object = runtimeObjectRegistry.get(cannonId);
     const cannon = object?.kind === "geodesic-cannon" ? object : undefined;
     if (cannon?.kind !== "geodesic-cannon") {
-      deps.setMenuState(closeRuntimeMenu(deps.getMenuState()));
+      deps.dispatch({ kind: "close-menu" });
       syncDesktopPalette();
       return;
     }
@@ -479,7 +480,7 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
     geodesicCannonRotationTargetLengthMeters = geodesicId
       ? getGeodesicTotalLengthMeters(geodesicId)
       : undefined;
-    deps.setMenuState(closeRuntimeMenu(setRuntimeMenuSelectedTool(deps.getMenuState(), "geodesic-cannon-aim")));
+    deps.dispatch({ kind: "enter-tool-mode", toolId: "geodesic-cannon-aim" });
     syncDesktopPalette();
     if (!renderer.xr.isPresenting) {
       void controls.requestPointerLock();
@@ -489,7 +490,7 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
   function startGeodesicCannonCarry(cannonId: string, requestedGeodesicId?: string): void {
     const cannon = prepareGeodesicCannonForLift(cannonId);
     if (cannon?.kind !== "geodesic-cannon") {
-      deps.setMenuState(closeRuntimeMenu(deps.getMenuState()));
+      deps.dispatch({ kind: "close-menu" });
       syncDesktopPalette();
       return;
     }
@@ -508,7 +509,7 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
     geodesicCannonRotationTargetLengthMeters = geodesicId
       ? getGeodesicTotalLengthMeters(geodesicId)
       : undefined;
-    deps.setMenuState(closeRuntimeMenu(setRuntimeMenuSelectedTool(deps.getMenuState(), "geodesic-cannon-carry")));
+    deps.dispatch({ kind: "enter-tool-mode", toolId: "geodesic-cannon-carry" });
     syncDesktopPalette();
     if (!renderer.xr.isPresenting) {
       void controls.requestPointerLock();
@@ -530,7 +531,7 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
   }
 
   function finishGeodesicCannonCarry(): boolean {
-    if (deps.getMenuState().selectedTool !== "geodesic-cannon-carry") {
+    if (deps.session.get().menuState.selectedTool !== "geodesic-cannon-carry") {
       return false;
     }
 
@@ -544,7 +545,7 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
     }
     deps.setCannonToolState({});
     geodesicCannonRotationTargetLengthMeters = undefined;
-    deps.setMenuState(setRuntimeMenuSelectedTool(deps.getMenuState(), "none"));
+    deps.dispatch({ kind: "clear-selected-tool" });
     clearCarriedGeodesicCannonGlow();
     syncDesktopPalette();
     return true;
@@ -553,7 +554,7 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
   function deleteGeodesicFromCannon(cannonId: string, geodesicId: string): void {
     const cannon = runtimeObjectRegistry.get(cannonId);
     if (cannon?.kind !== "geodesic-cannon") {
-      deps.setMenuState(closeRuntimeMenu(deps.getMenuState()));
+      deps.dispatch({ kind: "close-menu" });
       syncDesktopPalette();
       return;
     }
@@ -568,13 +569,14 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
       selectedCannonId: updatedCannon.id,
       activeGeodesicId,
     });
-    deps.setMenuState(showRuntimeMenuGeodesicCannonActions(deps.getMenuState(), {
+    deps.dispatch({
+      kind: "show-geodesic-cannon-actions",
       cannonId: updatedCannon.id,
       geodesicIds: updatedCannon.geodesicIds,
       geodesicLabelsById: getGeodesicLabelsById(updatedCannon.geodesicIds),
       lockedGeodesicIds: getLockedGeodesicIds(updatedCannon.geodesicIds),
       canTieAndDetach: canTieAndDetachGeodesicsFromCannon(updatedCannon.id),
-    }));
+    });
     syncDesktopPalette();
     syncRuntimeObjectPortalInstances();
     syncSelectableHitboxDebug();
@@ -597,7 +599,7 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
       selectedCannonId: cannonId,
       tieAndDetachEndpointSelections: [],
     });
-    deps.setMenuState(closeRuntimeMenu(setRuntimeMenuSelectedTool(deps.getMenuState(), "geodesic-cannon-tie-detach")));
+    deps.dispatch({ kind: "enter-tool-mode", toolId: "geodesic-cannon-tie-detach" });
     syncDesktopPalette();
     if (!renderer.xr.isPresenting) {
       void controls.requestPointerLock();
@@ -678,7 +680,8 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
     }
 
     deps.setCannonToolState({});
-    deps.setMenuState(closeRuntimeMenu(setRuntimeMenuSelectedTool(deps.getMenuState(), "none")));
+    deps.dispatch({ kind: "close-menu" });
+    deps.dispatch({ kind: "clear-selected-tool" });
     removeProtractorAnglesForMissingVertices(pruneMissingGeodesicIntersectionObjects(runtimeObjectRegistry));
     syncDesktopPalette();
     syncRuntimeObjectPortalInstances();
@@ -723,7 +726,7 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
   }
 
   function updateCarriedGeodesicCannonPose(xrActive: boolean, activeAimRay: RootAimRay | undefined, deltaSeconds?: number): void {
-    if (deps.getMenuState().selectedTool !== "geodesic-cannon-carry") {
+    if (deps.session.get().menuState.selectedTool !== "geodesic-cannon-carry") {
       clearCarriedGeodesicCannonGlow();
       return;
     }
@@ -877,7 +880,7 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
     removeGeodesicCannonAndSegments(runtimeObjectRegistry, cannonId);
     deps.setCannonToolState({});
     geodesicCannonRotationTargetLengthMeters = undefined;
-    deps.setMenuState(setRuntimeMenuSelectedTool(deps.getMenuState(), "none"));
+    deps.dispatch({ kind: "clear-selected-tool" });
     clearCarriedGeodesicCannonGlow();
     removeProtractorAnglesForMissingVertices(pruneMissingGeodesicIntersectionObjects(runtimeObjectRegistry));
     syncRuntimeObjectPortalInstances();
@@ -894,7 +897,7 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
       scene.add(glow);
     }
 
-    glow.visible = deps.getMenuState().selectedTool === "geodesic-cannon-carry";
+    glow.visible = deps.session.get().menuState.selectedTool === "geodesic-cannon-carry";
     // Glow cylinder is 1.72 m tall, so center it 0.86 m above the cannon base.
     glow.position.copy(worldPointToThree({ x: handPoint.x, y: handPoint.y, z: handPoint.z + 0.86 }));
   }
@@ -934,7 +937,7 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
 
     if (!cannon || cannon.kind !== "geodesic-cannon") {
       deps.setCannonToolState({});
-      deps.setMenuState(setRuntimeMenuSelectedTool(deps.getMenuState(), "none"));
+      deps.dispatch({ kind: "clear-selected-tool" });
       syncDesktopPalette();
       return;
     }
@@ -967,7 +970,7 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
       const refreshed = runtimeObjectRegistry.get(cannon.id);
       finishActiveGeodesicCannonEdit(refreshed?.kind === "geodesic-cannon" ? refreshed : cannon);
       geodesicCannonRotationTargetLengthMeters = undefined;
-      deps.setMenuState(setRuntimeMenuSelectedTool(deps.getMenuState(), "none"));
+      deps.dispatch({ kind: "clear-selected-tool" });
       syncDesktopPalette();
     }
   }
@@ -1045,7 +1048,7 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
 
   function finishGeodesicCannonAimMode(): void {
     geodesicCannonRotationTargetLengthMeters = undefined;
-    deps.setMenuState(setRuntimeMenuSelectedTool(deps.getMenuState(), "none"));
+    deps.dispatch({ kind: "clear-selected-tool" });
     syncDesktopPalette();
   }
 

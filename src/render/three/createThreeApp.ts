@@ -45,7 +45,7 @@
  *
  * ## State ownership
  * All mutable state lives in the `createThreeApp` closure and is mutated only by it (or through the
- * setter callbacks it hands to the factories above). `playerPose`, `menuState`, `activeWorldBundle`,
+ * setter callbacks it hands to the factories above). `playerPose`, `currentMenuState()`, `activeWorldBundle`,
  * `latestVisibleResult`, `latestFrameSnapshot` and the tool states are replaced immutably (never edited in place). `appState`
  * supplies the initial pose, world and player body; after startup the shell's `playerPose` is authoritative
  * and `appState.playerPose` is not written back. `cellMeshes`, the render archetypes and the runtime object
@@ -80,9 +80,10 @@ import { DEFAULT_PLAYER_EYE_HEIGHT_METERS } from "../../movement/playerBody";
 import { type PlayerPose, playerPoseFromDynamicObject, playerPoseToDynamicObject } from "../../movement/playerPose";
 import { depenetrateDynamicObject } from "../../movement/depenetrateDynamicObject";
 import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex";
-import { createAppCommandDispatcher } from "../../runtime/appCommandDispatcher";
-import { type RuntimeCommand } from "../../runtime/runtimeCommands";
-import { closeRuntimeMenu, createDebugSettingsFromRuntimeMenuState, createRuntimeMenuState, openRuntimeMenu, selectRuntimeMenuPlaceFlagToolType, setRuntimeMenuAimCollisionOutlinesEnabled, setRuntimeMenuAntiNauseaModeEnabled, setRuntimeMenuCollisionGeometryWireframesEnabled, setRuntimeMenuConsoleLogLevel, setRuntimeMenuDebugEnabled, setRuntimeMenuDebugOverlayEnabled, setRuntimeMenuEditingFlagId, setRuntimeMenuEditingSignMessage, setRuntimeMenuGoalPageIndex, setRuntimeMenuPortalInspectionEnabled, setRuntimeMenuPortalPanelMode, setRuntimeMenuReloadConfirmUntilMs, setRuntimeMenuSelectedAppConfigName, setRuntimeMenuSelectedTool, setRuntimeMenuSelectedWorldId, setRuntimeMenuTutorialPageIndex, showRuntimeMenuDebugSettings, showRuntimeMenuEditSign, showRuntimeMenuGeodesicCannonActions, showRuntimeMenuGeometryComputerActions, showRuntimeMenuGoal, showRuntimeMenuMainPage, showRuntimeMenuPlaceFlagOptions, showRuntimeMenuQuestionHelp, showRuntimeMenuQuestionTutorial, showRuntimeMenuSettings, toggleRuntimeMenuDebugOverlayItem } from "../../runtime/runtimeMenuState";
+import { createAppSession } from "../../runtime/appSession";
+import { applyRuntimeCommand } from "../../runtime/applyRuntimeCommand";
+import { type RuntimeCommand, type RuntimeEffect } from "../../runtime/runtimeCommands";
+import { createDebugSettingsFromRuntimeMenuState, createRuntimeMenuState } from "../../runtime/runtimeMenuState";
 import { type RuntimeDebugOverlayItemId } from "../../glue/toolIds";
 import { applyGeometryCommitComputedObjectPolicy } from "../../runtime/worldGeometryComputedObjects";
 import {
@@ -423,19 +424,22 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     debugOptions,
     "portal-path-overlay-instances",
   );
-  // Runtime menu state (page, selected tool, debug toggles). Replaced immutably by menu callbacks and
-  // frame-loop code in this closure; shared with factories via getMenuState/setMenuState.
-  let menuState = createRuntimeMenuState({
-    selectedWorldId: options.selectedWorldId,
-    selectedAppConfigName: options.appConfigName,
-    debugSettings: {
-      debugLevel: options.debugLevel,
-      portalPanelMode: options.portalPanelMode,
-      debugOptions: options.debugOptions,
-    },
-    debugOverlayEnabled: options.debugOverlayEnabled,
-    debugOverlayItems: options.debugOverlayItems,
-    vrComfortOptions,
+  // The session: the one record of shell state that commands change (appSession.ts). The menu state (page,
+  // selected tool, debug toggles) is replaced only by applyRuntimeCommand; read it with currentMenuState().
+  const session = createAppSession({
+    menuState: createRuntimeMenuState({
+      selectedWorldId: options.selectedWorldId,
+      selectedAppConfigName: options.appConfigName,
+      debugSettings: {
+        debugLevel: options.debugLevel,
+        portalPanelMode: options.portalPanelMode,
+        debugOptions: options.debugOptions,
+      },
+      debugOverlayEnabled: options.debugOverlayEnabled,
+      debugOverlayItems: options.debugOverlayItems,
+      vrComfortOptions,
+    }),
+    appConfig,
   });
   let previousDesktopPalettePlacement: ReturnType<typeof resolveDesktopScenePalettePlacement> | undefined;
   let reloadConfirmationTimeout: number | undefined;
@@ -453,20 +457,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   let xrSessionEndHandlerCleanup: (() => void) | undefined;
   const xrSessionRestartCoordinator = createXrSessionRestartCoordinator();
   const debugOverlay = createDebugOverlay(container);
-  const commandDispatcher = createAppCommandDispatcher({
-    reloadWorld() {
-      requestAppRestart(() => options.onReloadRequested?.());
-    },
-    goHome() {
-      teleportPlayerHome();
-    },
-    changeWorld(worldId) {
-      requestAppRestart(() => options.onWorldChangeRequested?.(worldId));
-    },
-    setDebugOverlayEnabled(enabled) {
-      applyMenuDebugState(setRuntimeMenuDebugOverlayEnabled(menuState, enabled));
-    },
-  });
   const desktopToolIndicator = createDesktopToolIndicator(document.body);
   const desktopScenePaletteInput = createDesktopScenePaletteInput();
   const xrScenePaletteInput = createXrScenePaletteInput();
@@ -505,8 +495,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       requestRuntimeObjectInstanceSync();
     },
     onClosed() {
-      menuState = setRuntimeMenuEditingFlagId(menuState, undefined);
-      syncDesktopPalette();
+      dispatchRuntimeCommand({ kind: "set-editing-flag", flagId: undefined });
       void controls.requestPointerLock();
     },
   });
@@ -535,188 +524,123 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   const scenePaletteController = createScenePaletteController({
     scene,
     getCamera: () => camera,
-    getIsOpen: () => menuState.isOpen,
+    session,
     onOpenRequested() {
-      menuState = openRuntimeMenu(menuState);
-      syncDesktopPalette();
+      dispatchRuntimeCommand({ kind: "open-menu" });
     },
     onCloseRequested() {
-      cancelRuntimeMenuAndSelectedTool();
+      dispatchRuntimeCommand({ kind: "cancel-menu-and-tool" });
     },
     onShowSettingsRequested() {
-      menuState = showRuntimeMenuSettings(menuState);
-      syncDesktopPalette();
+      dispatchRuntimeCommand({ kind: "show-settings" });
     },
     onShowMainRequested() {
-      menuState = menuState.page === "debug-settings"
-        ? showRuntimeMenuSettings(menuState)
-        : menuState.page === "tutorial" || menuState.page === "goal"
-          ? showRuntimeMenuQuestionHelp(menuState)
-          : showRuntimeMenuMainPage(menuState);
-      syncDesktopPalette();
+      dispatchRuntimeCommand({ kind: "show-main-page" });
     },
     onWorldSelected(worldId) {
-      if (!appConfig.menu.worldSelectionSectionEnabled) {
-        return;
-      }
-      menuState = setRuntimeMenuSelectedWorldId(menuState, worldId);
-      syncDesktopPalette();
-      requestAppRestart(() => options.onWorldChangeRequested?.(worldId));
+      dispatchRuntimeCommand({ kind: "select-world", worldId });
     },
     onConfigSelected(configName) {
-      if (!appConfig.menu.configSelectionSectionEnabled) {
-        return;
-      }
-      menuState = setRuntimeMenuSelectedAppConfigName(menuState, configName);
-      syncDesktopPalette();
-      requestAppRestart(() => options.onAppConfigChangeRequested?.(configName));
+      dispatchRuntimeCommand({ kind: "select-config", configName });
     },
     onReloadRequested() {
-      requestConfirmedReload();
+      dispatchRuntimeCommand({ kind: "press-reload", nowMs: Date.now(), windowMs: reloadConfirmationWindowMs });
     },
     onHomeRequested() {
       dispatchRuntimeCommand({ kind: "go-home" });
     },
     onDebugEnabledChanged(enabled) {
-      if (!appConfig.menu.debugSectionEnabled) {
-        return;
-      }
-      applyMenuDebugState(setRuntimeMenuDebugEnabled(menuState, enabled));
+      dispatchRuntimeCommand({ kind: "set-debug-enabled", enabled });
     },
     onDebugSettingsRequested() {
-      if (!appConfig.menu.debugSectionEnabled) {
-        return;
-      }
-      menuState = showRuntimeMenuDebugSettings(menuState);
-      syncDesktopPalette();
+      dispatchRuntimeCommand({ kind: "show-debug-settings" });
     },
     onConsoleLogLevelSelected(level) {
-      applyMenuDebugState(setRuntimeMenuConsoleLogLevel(menuState, level));
+      dispatchRuntimeCommand({ kind: "set-console-log-level", level });
     },
     onDebugOverlayToggled(enabled) {
-      applyMenuDebugState(setRuntimeMenuDebugOverlayEnabled(menuState, enabled));
+      dispatchRuntimeCommand({ kind: "set-debug-overlay", enabled });
     },
     onDebugOverlayItemToggled(itemId, enabled) {
-      applyMenuDebugState(toggleRuntimeMenuDebugOverlayItem(menuState, itemId, enabled));
+      dispatchRuntimeCommand({ kind: "toggle-debug-overlay-item", itemId, enabled });
     },
     onAntiNauseaModeToggled(enabled) {
-      applyMenuComfortState(setRuntimeMenuAntiNauseaModeEnabled(menuState, enabled));
+      dispatchRuntimeCommand({ kind: "set-anti-nausea-mode", enabled });
     },
     onPortalPanelModeSelected(mode) {
-      applyMenuDebugState(setRuntimeMenuPortalPanelMode(menuState, mode));
+      dispatchRuntimeCommand({ kind: "set-portal-panel-mode", mode });
     },
     onPortalInspectionToggled(enabled) {
-      applyMenuDebugState(setRuntimeMenuPortalInspectionEnabled(menuState, enabled));
+      dispatchRuntimeCommand({ kind: "set-portal-inspection", enabled });
     },
     onCollisionGeometryWireframesToggled(enabled) {
-      applyMenuDebugState(setRuntimeMenuCollisionGeometryWireframesEnabled(menuState, enabled));
+      dispatchRuntimeCommand({ kind: "set-collision-geometry-wireframes", enabled });
     },
     onAimCollisionOutlinesToggled(enabled) {
-      applyMenuDebugState(setRuntimeMenuAimCollisionOutlinesEnabled(menuState, enabled));
+      dispatchRuntimeCommand({ kind: "set-aim-collision-outlines", enabled });
     },
     onCopyUrlWithOptionsRequested() {
-      options.onCopyUrlWithOptionsRequested?.();
+      dispatchRuntimeCommand({ kind: "copy-url-with-options" });
     },
     onToolSelected(toolId) {
-      if (!isRuntimeToolEnabled(appConfig, toolId)) {
-        return;
-      }
-      if (toolId !== "protractor") {
-        activeProtractorToolState = {};
-        clearProtractorToolFeedback();
-      }
-      if (toolId !== "geodesic-cannon-tie-detach") {
-        syncTieAndDetachSelectionHighlights([]);
-        requestRuntimeObjectInstanceSync();
-        activeGeodesicCannonToolState = {
-          ...activeGeodesicCannonToolState,
-          tieAndDetachEndpointSelections: undefined,
-        };
-      }
-      menuState = closeRuntimeMenu(setRuntimeMenuSelectedTool(menuState, toolId));
-      syncDesktopPalette();
+      dispatchRuntimeCommand({ kind: "select-tool", toolId });
     },
     onPlaceFlagOptionsRequested() {
-      if (!isRuntimeToolEnabled(appConfig, "place-flag")) {
-        return;
-      }
-      menuState = showRuntimeMenuPlaceFlagOptions(menuState);
-      syncDesktopPalette();
+      dispatchRuntimeCommand({ kind: "show-place-flag-options" });
     },
     onPlaceFlagTypeSelected(flagType) {
-      if (!isRuntimeToolEnabled(appConfig, "place-flag")) {
-        return;
-      }
-      menuState = closeRuntimeMenu(selectRuntimeMenuPlaceFlagToolType(menuState, flagType));
-      syncDesktopPalette();
+      dispatchRuntimeCommand({ kind: "choose-place-flag-type", flagType });
     },
     onGeodesicCannonAddRequested(cannonId) {
-      if (!isRuntimeToolEnabled(appConfig, "geodesic-cannon")) {
-        return;
-      }
-      addGeodesicToCannon(cannonId);
+      dispatchRuntimeCommand({ kind: "add-geodesic-to-cannon", cannonId });
     },
     onGeodesicCannonCarryRequested(cannonId) {
-      if (!isRuntimeToolEnabled(appConfig, "geodesic-cannon-carry")) {
-        return;
-      }
-      startGeodesicCannonCarry(cannonId);
+      dispatchRuntimeCommand({ kind: "start-cannon-carry", cannonId });
     },
     onGeodesicCannonTieAndDetachRequested(cannonId) {
-      if (!isRuntimeToolEnabled(appConfig, "geodesic-cannon-tie-detach")) {
-        return;
-      }
-      startGeodesicCannonTieAndDetach(cannonId);
+      dispatchRuntimeCommand({ kind: "start-cannon-tie-and-detach", cannonId });
     },
     onGeodesicCannonRotateRequested(cannonId, geodesicId) {
-      if (!isRuntimeToolEnabled(appConfig, "geodesic-cannon-rotate")) {
-        return;
-      }
-      startGeodesicCannonRotation(cannonId, geodesicId);
+      dispatchRuntimeCommand({ kind: "start-cannon-rotation", cannonId, geodesicId });
     },
     onGeodesicCannonAimRequested(cannonId, geodesicId) {
-      if (!isRuntimeToolEnabled(appConfig, "geodesic-cannon-aim")) {
-        return;
-      }
-      startGeodesicCannonAim(cannonId, geodesicId);
+      dispatchRuntimeCommand({ kind: "start-cannon-aim", cannonId, geodesicId });
     },
     onGeodesicCannonDeleteRequested(cannonId, geodesicId) {
-      deleteGeodesicFromCannon(cannonId, geodesicId);
+      dispatchRuntimeCommand({ kind: "delete-geodesic-from-cannon", cannonId, geodesicId });
     },
     onGeometryComputerStepTargetRequested(computerId, axis, deltaMeters) {
-      stepGeometryComputerPendingTarget(computerId, axis, deltaMeters);
+      dispatchRuntimeCommand({ kind: "step-geometry-computer-target", computerId, axis, deltaMeters });
     },
     onGeometryComputerGoRequested(computerId) {
-      startGeometryComputerDeformation(computerId);
+      dispatchRuntimeCommand({ kind: "start-geometry-computer-deformation", computerId });
     },
     onQuestionHelpTutorialRequested() {
-      menuState = showRuntimeMenuQuestionTutorial(menuState);
-      syncDesktopPalette();
+      dispatchRuntimeCommand({ kind: "show-question-tutorial" });
     },
     onQuestionHelpGoalRequested() {
-      menuState = showRuntimeMenuGoal(menuState);
-      syncDesktopPalette();
+      dispatchRuntimeCommand({ kind: "show-goal" });
     },
     onTutorialPreviousRequested() {
-      stepOpenTutorialPage(-1);
+      dispatchRuntimeCommand({ kind: "step-tutorial-page", delta: -1 });
     },
     onTutorialNextRequested() {
-      stepOpenTutorialPage(1);
+      dispatchRuntimeCommand({ kind: "step-tutorial-page", delta: 1 });
     },
     onGoalPreviousRequested() {
-      stepOpenGoalPage(-1);
+      dispatchRuntimeCommand({ kind: "step-goal-page", delta: -1 });
     },
     onGoalNextRequested() {
-      stepOpenGoalPage(1);
+      dispatchRuntimeCommand({ kind: "step-goal-page", delta: 1 });
     },
     onSignKeyboardCharacter(character) {
-      appendEditingSignCharacter(character);
+      dispatchRuntimeCommand({ kind: "type-sign-character", character });
     },
     onSignKeyboardBackspace() {
-      backspaceEditingSignMessage();
+      dispatchRuntimeCommand({ kind: "backspace-sign" });
     },
     onSignDeleteRequested() {
-      deleteEditingSign();
+      dispatchRuntimeCommand({ kind: "delete-sign" });
     },
   });
 
@@ -943,7 +867,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     cellMeshes,
     getWorld: activeWorld,
     getDebugLevel: () => debugLevel,
-    getMenuState: () => menuState,
+    session,
     getVisibleCellId: () => visibleCellId,
     getCannonToolState: () => activeGeodesicCannonToolState,
     resolveCameraAimTarget: () => resolveCurrentAimTarget(resolveCameraRootRay()),
@@ -956,10 +880,8 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     startGeometryComputerDeformation,
   } = createGeometryComputerMenu({
     geometrySession,
-    getMenuState: () => menuState,
-    setMenuState: (next) => {
-      menuState = next;
-    },
+    session,
+    dispatch: dispatchRuntimeCommand,
     syncDesktopPalette,
   });
 
@@ -1054,7 +976,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     runtimeObjectRegistry,
     getWorld: activeWorld,
     getDebugLevel: () => debugLevel,
-    getMenuState: () => menuState,
+    session,
     getCannonToolState: () => activeGeodesicCannonToolState,
     getPlayerPose: () => playerPose,
     getFrameSerial: () => aimFrameSerial,
@@ -1087,10 +1009,8 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     controls,
     runtimeObjectRegistry,
     getWorld: activeWorld,
-    getMenuState: () => menuState,
-    setMenuState: (next) => {
-      menuState = next;
-    },
+    session,
+    dispatch: dispatchRuntimeCommand,
     getCannonToolState: () => activeGeodesicCannonToolState,
     setCannonToolState: (next) => {
       activeGeodesicCannonToolState = next;
@@ -1141,7 +1061,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       portalInstanceDebugRenderer,
       portalInstanceRenderState,
       showCellPathRendersInstances,
-      menuState,
+      menuState: currentMenuState(),
       smoothedFrameRateFps,
       smoothedFramePerformance,
       latestWebGlRenderInfo,
@@ -1352,8 +1272,8 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       deltaSeconds,
       normalFovDegrees: camera.fov,
     });
-    const rotatingGeodesicCannon = menuState.selectedTool === "geodesic-cannon-rotate";
-    const aimingGeodesicCannon = menuState.selectedTool === "geodesic-cannon-aim";
+    const rotatingGeodesicCannon = currentMenuState().selectedTool === "geodesic-cannon-rotate";
+    const aimingGeodesicCannon = currentMenuState().selectedTool === "geodesic-cannon-aim";
     const effectiveHeadLocalMeters = rotatingGeodesicCannon && xrActive
       ? freezeXrHeadHeightDuringGeodesicCannonRotation(headLocalMeters)
       : headLocalMeters;
@@ -1427,45 +1347,45 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     if (frame.helpRequested && !desktopFlagEditor.isOpen()) {
       requestHelpLensForFocusedObject(activeAimRay);
     }
-    const worldPrimaryActionRequested = frame.primaryActionRequested && !menuState.isOpen && !desktopFlagEditor.isOpen();
+    const worldPrimaryActionRequested = frame.primaryActionRequested && !currentMenuState().isOpen && !desktopFlagEditor.isOpen();
     // Tool dispatch: modal cannon tools consume the primary action themselves; world tools act only when
     // no menu or flag editor is open. primaryActionConsumed stops the generic focused-object interaction.
     let primaryActionConsumed = false;
-    if (frame.carryActionRequested && !menuState.isOpen && !desktopFlagEditor.isOpen()) {
-      primaryActionConsumed = menuState.selectedTool === "geodesic-cannon-carry"
+    if (frame.carryActionRequested && !currentMenuState().isOpen && !desktopFlagEditor.isOpen()) {
+      primaryActionConsumed = currentMenuState().selectedTool === "geodesic-cannon-carry"
         ? finishGeodesicCannonCarry()
         : tryStartFocusedGeodesicCannonCarry(activeAimRay);
     }
 
-    if (menuState.selectedTool === "geodesic-cannon-carry") {
+    if (currentMenuState().selectedTool === "geodesic-cannon-carry") {
       if (frame.primaryActionRequested) {
         finishGeodesicCannonCarry();
         primaryActionConsumed = true;
       }
-    } else if (menuState.selectedTool === "geodesic-cannon-rotate") {
+    } else if (currentMenuState().selectedTool === "geodesic-cannon-rotate") {
       updateActiveGeodesicCannonRotation(frame.yawDeltaRadians, frame.primaryActionRequested);
       primaryActionConsumed = frame.primaryActionRequested;
-    } else if (menuState.selectedTool === "geodesic-cannon-aim") {
+    } else if (currentMenuState().selectedTool === "geodesic-cannon-aim") {
       updateActiveGeodesicCannonAim(frame.primaryActionRequested, activeAimRay);
       primaryActionConsumed = frame.primaryActionRequested;
-    } else if (worldPrimaryActionRequested && menuState.selectedTool === "geodesic-cannon-tie-detach") {
+    } else if (worldPrimaryActionRequested && currentMenuState().selectedTool === "geodesic-cannon-tie-detach") {
       primaryActionConsumed = trySelectTieAndDetachGeodesicFromAim(activeAimRay);
-    } else if (worldPrimaryActionRequested && menuState.selectedTool === "place-flag") {
+    } else if (worldPrimaryActionRequested && currentMenuState().selectedTool === "place-flag") {
       tryPlaceFlagFromAim(activeAimRay);
       primaryActionConsumed = true;
-    } else if (worldPrimaryActionRequested && menuState.selectedTool === "geodesic-cannon") {
+    } else if (worldPrimaryActionRequested && currentMenuState().selectedTool === "geodesic-cannon") {
       tryUseGeodesicCannonToolFromAim(activeAimRay);
       primaryActionConsumed = true;
-    } else if (worldPrimaryActionRequested && menuState.selectedTool === "measure-length") {
+    } else if (worldPrimaryActionRequested && currentMenuState().selectedTool === "measure-length") {
       tryUseMeasureLengthToolFromAim(activeAimRay);
       primaryActionConsumed = true;
-    } else if (worldPrimaryActionRequested && menuState.selectedTool === "protractor") {
+    } else if (worldPrimaryActionRequested && currentMenuState().selectedTool === "protractor") {
       tryUseProtractorToolFromAim(activeAimRay);
       primaryActionConsumed = true;
     } else if (
       worldPrimaryActionRequested &&
       !primaryActionConsumed &&
-      (menuState.selectedTool === "none" || menuState.selectedTool === "aim")
+      (currentMenuState().selectedTool === "none" || currentMenuState().selectedTool === "aim")
     ) {
       primaryActionConsumed = tryUseFocusedObjectPrimaryInteraction(activeAimRay);
     }
@@ -1598,8 +1518,8 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       xrDebugPanel.update({
         visible: isXrDebugPanelVisible({
           xrActive,
-          debugEnabled: menuState.debugEnabled,
-          debugOverlayEnabled: menuState.debugOverlayEnabled,
+          debugEnabled: currentMenuState().debugEnabled,
+          debugOverlayEnabled: currentMenuState().debugOverlayEnabled,
         }),
         state: overlayState,
         head: xrActive ? resolveXrHeadWorldPose(xrViewerPose) : undefined,
@@ -1871,18 +1791,18 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     });
   }
 
-  function applyMenuDebugState(nextMenuState: typeof menuState): void {
-    menuState = nextMenuState;
+  // Effect "apply-debug-state": the menu's debug fields changed.
+  function applyMenuDebugState(): void {
     syncLaunchOptionsState();
-    applyDebugSettings(createDebugSettingsFromRuntimeMenuState(menuState));
+    applyDebugSettings(createDebugSettingsFromRuntimeMenuState(currentMenuState()));
     syncDesktopPalette();
   }
 
-  function applyMenuComfortState(nextMenuState: typeof menuState): void {
-    menuState = nextMenuState;
+  // Effect "apply-comfort-state": the menu's comfort fields changed.
+  function applyMenuComfortState(): void {
     vrComfortOptions = {
       ...vrComfortOptions,
-      antiNauseaModeEnabled: menuState.antiNauseaModeEnabled,
+      antiNauseaModeEnabled: currentMenuState().antiNauseaModeEnabled,
     };
     vrComfortVignette.setOptions(vrComfortOptions);
     syncLaunchOptionsState();
@@ -1931,13 +1851,13 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   }
 
   function syncLaunchOptionsState(): void {
-    const settings = createDebugSettingsFromRuntimeMenuState(menuState);
+    const settings = createDebugSettingsFromRuntimeMenuState(currentMenuState());
     options.onLaunchOptionsChanged?.({
       debugLevel: settings.debugLevel,
       portalPanelMode: settings.portalPanelMode,
       debugOptions: settings.debugOptions,
-      debugOverlayEnabled: menuState.debugOverlayEnabled,
-      debugOverlayItems: menuState.debugOverlayItems,
+      debugOverlayEnabled: currentMenuState().debugOverlayEnabled,
+      debugOverlayItems: currentMenuState().debugOverlayItems,
       vrComfortOptions,
     });
   }
@@ -1962,22 +1882,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       // menu shows the live values. Deliberately does not call syncLaunchOptionsState (that would echo the
       // change back to the caller) nor applyMenuDebugState (that would rebuild twice).
       applyDebugSettings(settings);
-      const seeded = createRuntimeMenuState({
-        selectedWorldId: menuState.selectedWorldId,
-        debugSettings: settings,
-        debugOverlayEnabled: menuState.debugOverlayEnabled,
-        debugOverlayItems: menuState.debugOverlayItems,
-      });
-      menuState = {
-        ...menuState,
-        debugEnabled: seeded.debugEnabled,
-        consoleLogLevel: seeded.consoleLogLevel,
-        portalPanelMode: seeded.portalPanelMode,
-        portalInspectionEnabled: seeded.portalInspectionEnabled,
-        collisionGeometryWireframesEnabled: seeded.collisionGeometryWireframesEnabled,
-        aimCollisionOutlinesEnabled: seeded.aimCollisionOutlinesEnabled,
-      };
-      syncDesktopPalette();
+      dispatchRuntimeCommand({ kind: "adopt-debug-settings", settings });
     },
     dispose() {
       if (disposed) {
@@ -2195,7 +2100,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     readonly definition: PaletteDefinition;
     readonly definitionVersion: number;
   } {
-    const cached = paletteDefinitionCache.get(menuState, inputMode);
+    const cached = paletteDefinitionCache.get(currentMenuState(), inputMode);
     return { definition: cached.definition, definitionVersion: cached.version };
   }
 
@@ -2234,8 +2139,8 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
         xrFrame,
         referenceSpace: xrReferenceSpace,
         referenceSpaceToWorldMatrix: xrRig.root.matrixWorld,
-        selectedTool: menuState.selectedTool,
-        placeFlagType: menuState.placeFlagOptions.flagType,
+        selectedTool: currentMenuState().selectedTool,
+        placeFlagType: currentMenuState().placeFlagOptions.flagType,
       });
       return;
     }
@@ -2255,7 +2160,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
         },
         deltaSeconds,
         camera,
-        isOpen: menuState.isOpen,
+        isOpen: currentMenuState().isOpen,
         placement,
       }),
       ...paletteDefinitionFrame("desktop"),
@@ -2301,7 +2206,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     }
 
     if (event.code === "Escape") {
-      const action = reduceDesktopScenePaletteToggle(menuState.isOpen, "escape-key");
+      const action = reduceDesktopScenePaletteToggle(currentMenuState().isOpen, "escape-key");
       if (action !== "none") {
         event.preventDefault();
         applyDesktopScenePaletteToggle(action);
@@ -2312,7 +2217,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       return;
     }
 
-    if (event.code === "Tab" && !menuState.isOpen && !desktopFlagEditor.isOpen()) {
+    if (event.code === "Tab" && !currentMenuState().isOpen && !desktopFlagEditor.isOpen()) {
       if (cycleFocusedAimTarget(resolveActiveRootAimRay(false))) {
         event.preventDefault();
       }
@@ -2320,7 +2225,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   }
 
   function onDesktopWheel(event: WheelEvent): void {
-    if (renderer.xr.isPresenting || menuState.isOpen || desktopFlagEditor.isOpen()) {
+    if (renderer.xr.isPresenting || currentMenuState().isOpen || desktopFlagEditor.isOpen()) {
       return;
     }
 
@@ -2334,49 +2239,18 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   }
 
   function applyDesktopScenePaletteToggle(action: "open" | "right-action" | "close" | "none"): void {
-    if (action === "open" && !menuState.isOpen) {
-      menuState = openRuntimeMenu(menuState);
-      syncDesktopPalette();
-    } else if (action === "right-action" && menuState.isOpen) {
-      applyRuntimeMenuRightAction();
-    } else if (action === "close" && menuState.isOpen) {
-      cancelRuntimeMenuAndSelectedTool();
+    if (action === "open" && !currentMenuState().isOpen) {
+      dispatchRuntimeCommand({ kind: "open-menu" });
+    } else if (action === "right-action" && currentMenuState().isOpen) {
+      dispatchRuntimeCommand({ kind: "menu-right-action" });
+    } else if (action === "close" && currentMenuState().isOpen) {
+      dispatchRuntimeCommand({ kind: "cancel-menu-and-tool" });
     }
-  }
-
-  function applyRuntimeMenuRightAction(): void {
-    if (
-      menuState.page === "main" ||
-      menuState.page === "edit-sign" ||
-      menuState.page === "geodesic-cannon-actions" ||
-      menuState.page === "geometry-computer-actions" ||
-      menuState.page === "question-help"
-    ) {
-      cancelRuntimeMenuAndSelectedTool();
-      return;
-    } else if (menuState.page === "tutorial" || menuState.page === "goal") {
-      menuState = showRuntimeMenuQuestionHelp(menuState);
-    } else if (menuState.page === "debug-settings") {
-      menuState = showRuntimeMenuSettings(menuState);
-    } else {
-      menuState = showRuntimeMenuMainPage(menuState);
-    }
-    syncDesktopPalette();
-  }
-
-  function cancelRuntimeMenuAndSelectedTool(): void {
-    activeProtractorToolState = {};
-    activeGeodesicCannonToolState = {};
-    syncTieAndDetachSelectionHighlights([]);
-    clearProtractorToolFeedback();
-    menuState = closeRuntimeMenu(setRuntimeMenuSelectedTool(menuState, "none"));
-    requestRuntimeObjectInstanceSync();
-    syncDesktopPalette();
   }
 
   // Consumes accumulated keyboard/mouse input; the palette look mode is used while the menu is open.
   function getDesktopInputFrame(deltaSeconds: number): RuntimeInputFrame {
-    controls.setLookMode(menuState.isOpen ? "palette" : "camera");
+    controls.setLookMode(currentMenuState().isOpen ? "palette" : "camera");
     const frame = controls.consumeFrame(deltaSeconds);
 
     return {
@@ -2754,8 +2628,8 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   }
 
   function syncDesktopPalette(): void {
-    controls.setLookMode(menuState.isOpen ? "palette" : "camera");
-    desktopToolIndicator.setTool(menuState.selectedTool, menuState.placeFlagOptions.flagType, {
+    controls.setLookMode(currentMenuState().isOpen ? "palette" : "camera");
+    desktopToolIndicator.setTool(currentMenuState().selectedTool, currentMenuState().placeFlagOptions.flagType, {
       protractorPrompt: getProtractorToolPrompt(),
       tieAndDetachPrompt: getTieAndDetachToolPrompt(),
     });
@@ -2783,7 +2657,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       return;
     }
 
-    const editState = menuState.editSignOptions;
+    const editState = currentMenuState().editSignOptions;
     if (!editState) {
       return;
     }
@@ -2792,7 +2666,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   }
 
   function backspaceEditingSignMessage(): void {
-    const editState = menuState.editSignOptions;
+    const editState = currentMenuState().editSignOptions;
     if (!editState) {
       return;
     }
@@ -2801,7 +2675,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   }
 
   function deleteEditingSign(): void {
-    const editState = menuState.editSignOptions;
+    const editState = currentMenuState().editSignOptions;
     if (!editState) {
       return;
     }
@@ -2812,23 +2686,20 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       removePlacedFlagRuntime(editState.flagId);
       requestRuntimeObjectInstanceSync();
     }
-    menuState = closeRuntimeMenu(menuState);
-    syncDesktopPalette();
+    dispatchRuntimeCommand({ kind: "close-menu" });
   }
 
   function setEditingSignMessage(flagId: string, message: string): void {
     const flag = runtimeObjectRegistry.get(flagId);
     if (flag?.kind !== "placed-flag") {
-      menuState = closeRuntimeMenu(menuState);
-      syncDesktopPalette();
+      dispatchRuntimeCommand({ kind: "close-menu" });
       return;
     }
 
     const nextFlag = updatePlacedFlagMessage(flag, message);
     runtimeObjectRegistry.update(nextFlag);
     syncPlacedFlagRuntime(nextFlag);
-    menuState = setRuntimeMenuEditingSignMessage(menuState, nextFlag.message);
-    syncDesktopPalette();
+    dispatchRuntimeCommand({ kind: "set-editing-sign-message", message: nextFlag.message });
   }
 
   function tryPlaceFlagFromAim(ray?: RootAimRay): void {
@@ -2847,14 +2718,13 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       cellId: target.cellId,
       eyePosition: target.localEyePosition,
       floorPoint: target.localPoint,
-      flagType: menuState.placeFlagOptions.flagType,
+      flagType: currentMenuState().placeFlagOptions.flagType,
       id: `placed-flag:${Date.now()}:${placedFlagIdCounter++}`,
     });
 
     if (result.placed && result.object) {
       syncPlacedFlagRuntime(result.object);
-      menuState = setRuntimeMenuSelectedTool(menuState, "none");
-      syncDesktopPalette();
+      dispatchRuntimeCommand({ kind: "clear-selected-tool" });
       requestSelectableHitboxDebugSync();
     }
   }
@@ -2894,35 +2764,8 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       runtimeObjectRegistry.add(measurement);
     }
     syncMeasuredGeodesicLengthRuntime(measurement);
-    menuState = setRuntimeMenuSelectedTool(menuState, "none");
-    syncDesktopPalette();
+    dispatchRuntimeCommand({ kind: "clear-selected-tool" });
     requestSelectableHitboxDebugSync();
-  }
-
-  function requestConfirmedReload(): void {
-    const now = Date.now();
-    if ((menuState.reloadConfirmUntilMs ?? 0) > now) {
-      menuState = setRuntimeMenuReloadConfirmUntilMs(menuState, undefined);
-      syncDesktopPalette();
-      dispatchRuntimeCommand({ kind: "reload-world" });
-      return;
-    }
-
-    const confirmUntilMs = now + reloadConfirmationWindowMs;
-    menuState = setRuntimeMenuReloadConfirmUntilMs(menuState, confirmUntilMs);
-    syncDesktopPalette();
-
-    if (reloadConfirmationTimeout !== undefined) {
-      window.clearTimeout(reloadConfirmationTimeout);
-    }
-
-    reloadConfirmationTimeout = window.setTimeout(() => {
-      if ((menuState.reloadConfirmUntilMs ?? 0) <= Date.now()) {
-        menuState = setRuntimeMenuReloadConfirmUntilMs(menuState, undefined);
-        syncDesktopPalette();
-      }
-      reloadConfirmationTimeout = undefined;
-    }, reloadConfirmationWindowMs);
   }
 
   function resetPlayerToHome(): void {
@@ -2951,8 +2794,8 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     if (desktopFlagEditor.isOpen()) {
       desktopFlagEditor.close();
     }
-    if (menuState.isOpen || menuState.selectedTool !== "none") {
-      cancelRuntimeMenuAndSelectedTool();
+    if (currentMenuState().isOpen || currentMenuState().selectedTool !== "none") {
+      dispatchRuntimeCommand({ kind: "cancel-menu-and-tool" });
     }
   }
 
@@ -3026,8 +2869,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     syncProtractorAngleRuntime(angle);
     activeProtractorToolState = {};
     clearProtractorToolFeedback();
-    menuState = setRuntimeMenuSelectedTool(menuState, "none");
-    syncDesktopPalette();
+    dispatchRuntimeCommand({ kind: "clear-selected-tool" });
     requestSelectableHitboxDebugSync();
   }
 
@@ -3082,7 +2924,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   }
 
   function openContextMenuFromAim(ray?: RootAimRay): void {
-    if (menuState.isOpen) {
+    if (currentMenuState().isOpen) {
       applyDesktopScenePaletteToggle(reduceDesktopScenePaletteToggle(true, "secondary-click"));
       return;
     }
@@ -3091,8 +2933,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       return;
     }
 
-    menuState = openRuntimeMenu(menuState);
-    syncDesktopPalette();
+    dispatchRuntimeCommand({ kind: "open-menu" });
   }
 
   function tryOpenFocusedObjectMenu(ray?: RootAimRay): boolean {
@@ -3106,11 +2947,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       focused.object.interactable?.action === "edit-flag" &&
       isRuntimeToolEnabled(appConfig, "place-flag")
     ) {
-      menuState = showRuntimeMenuEditSign(menuState, {
-        flagId: focused.object.id,
-        message: focused.object.message,
-      });
-      syncDesktopPalette();
+      dispatchRuntimeCommand({ kind: "show-edit-sign", flagId: focused.object.id, message: focused.object.message });
       return true;
     }
 
@@ -3119,23 +2956,22 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
         selectedCannonId: focused.object.id,
         activeGeodesicId: focused.object.activeGeodesicId,
       };
-      menuState = showRuntimeMenuGeodesicCannonActions(menuState, {
+      dispatchRuntimeCommand({
+        kind: "show-geodesic-cannon-actions",
         cannonId: focused.object.id,
         geodesicIds: focused.object.geodesicIds,
         geodesicLabelsById: getGeodesicLabelsById(focused.object.geodesicIds),
         lockedGeodesicIds: getLockedGeodesicIds(focused.object.geodesicIds),
         canTieAndDetach: canTieAndDetachGeodesicsFromCannon(focused.object.id),
       });
-      syncDesktopPalette();
       return true;
     }
 
     if (focused.object.kind === "asset" && focused.object.interactable?.action === "open-geometry-computer") {
-      menuState = showRuntimeMenuGeometryComputerActions(
-        menuState,
-        createGeometryComputerMenuOptions(focused.object.id),
-      );
-      syncDesktopPalette();
+      dispatchRuntimeCommand({
+        kind: "show-geometry-computer-actions",
+        ...createGeometryComputerMenuOptions(focused.object.id),
+      });
       return true;
     }
 
@@ -3157,33 +2993,8 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       return false;
     }
 
-    menuState = showRuntimeMenuQuestionHelp(menuState, {
-      objectId: object.id,
-      tutorialPages,
-      goalPages,
-    });
-    syncDesktopPalette();
+    dispatchRuntimeCommand({ kind: "show-question-help", objectId: object.id, tutorialPages, goalPages });
     return true;
-  }
-
-  function stepOpenTutorialPage(delta: -1 | 1): void {
-    const options = menuState.tutorialOptions;
-    if (menuState.page !== "tutorial" || !options) {
-      return;
-    }
-
-    menuState = setRuntimeMenuTutorialPageIndex(menuState, options.pageIndex + delta);
-    syncDesktopPalette();
-  }
-
-  function stepOpenGoalPage(delta: -1 | 1): void {
-    const options = menuState.goalOptions;
-    if (menuState.page !== "goal" || !options) {
-      return;
-    }
-
-    menuState = setRuntimeMenuGoalPageIndex(menuState, options.pageIndex + delta);
-    syncDesktopPalette();
   }
 
   function playerBlockingBodiesInCell(cellId: string) {
@@ -3206,7 +3017,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     activeAimRay: RootAimRay | undefined,
     xrHeadWorldPose: XrHeadWorldPose | undefined,
   ): void {
-    if (menuState.isOpen || desktopFlagEditor.isOpen()) {
+    if (currentMenuState().isOpen || desktopFlagEditor.isOpen()) {
       floatingObjectTooltip.update({ visible: false });
       updateXrObjectTooltip(undefined);
       return;
@@ -3238,16 +3049,16 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   function updateAimCrossMarker(xrActive: boolean, activeAimRay: RootAimRay | undefined): void {
     if (
       (
-        menuState.selectedTool !== "none" &&
-        menuState.selectedTool !== "aim" &&
-        menuState.selectedTool !== "place-flag" &&
-        menuState.selectedTool !== "geodesic-cannon" &&
-        menuState.selectedTool !== "geodesic-cannon-aim" &&
-        menuState.selectedTool !== "geodesic-cannon-tie-detach" &&
-        menuState.selectedTool !== "measure-length" &&
-        menuState.selectedTool !== "protractor"
+        currentMenuState().selectedTool !== "none" &&
+        currentMenuState().selectedTool !== "aim" &&
+        currentMenuState().selectedTool !== "place-flag" &&
+        currentMenuState().selectedTool !== "geodesic-cannon" &&
+        currentMenuState().selectedTool !== "geodesic-cannon-aim" &&
+        currentMenuState().selectedTool !== "geodesic-cannon-tie-detach" &&
+        currentMenuState().selectedTool !== "measure-length" &&
+        currentMenuState().selectedTool !== "protractor"
       ) ||
-      menuState.isOpen ||
+      currentMenuState().isOpen ||
       desktopFlagEditor.isOpen()
     ) {
       aimCrossMarker.update(undefined);
@@ -3281,7 +3092,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   }
 
   function updateProtractorToolFeedback(activeAimRay: RootAimRay | undefined): void {
-    if (menuState.selectedTool !== "protractor" || menuState.isOpen || desktopFlagEditor.isOpen()) {
+    if (currentMenuState().selectedTool !== "protractor" || currentMenuState().isOpen || desktopFlagEditor.isOpen()) {
       clearProtractorToolFeedback();
       return;
     }
@@ -3382,7 +3193,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   }
 
   function updateHelpLens(xrActive: boolean, activeAimRay: RootAimRay | undefined): void {
-    if (menuState.isOpen || desktopFlagEditor.isOpen()) {
+    if (currentMenuState().isOpen || desktopFlagEditor.isOpen()) {
       helpLensRenderer.update({ visible: false, xrActive, camera });
       return;
     }
@@ -3425,7 +3236,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
 
     return createHelpLensDefinition({
       focus,
-      selectedTool: menuState.selectedTool,
+      selectedTool: currentMenuState().selectedTool,
       inputMode: xrActive ? "xr" : "desktop",
     });
   }
@@ -3465,7 +3276,108 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     requestSelectableHitboxDebugSync();
   }
 
+  // The one command path: the reducer changes the session, then the effects run in the order it listed them.
   function dispatchRuntimeCommand(command: RuntimeCommand): void {
-    commandDispatcher.dispatch(command);
+    for (const effect of applyRuntimeCommand(session, command)) {
+      runRuntimeEffect(effect);
+    }
+  }
+
+  function runRuntimeEffect(effect: RuntimeEffect): void {
+    switch (effect.kind) {
+      case "sync-palette":
+        syncDesktopPalette();
+        return;
+      case "end-tool-session":
+        activeProtractorToolState = {};
+        activeGeodesicCannonToolState = {};
+        syncTieAndDetachSelectionHighlights([]);
+        clearProtractorToolFeedback();
+        return;
+      case "switch-tool-session":
+        if (effect.toolId !== "protractor") {
+          activeProtractorToolState = {};
+          clearProtractorToolFeedback();
+        }
+        if (effect.toolId !== "geodesic-cannon-tie-detach") {
+          syncTieAndDetachSelectionHighlights([]);
+          requestRuntimeObjectInstanceSync();
+          activeGeodesicCannonToolState = {
+            ...activeGeodesicCannonToolState,
+            tieAndDetachEndpointSelections: undefined,
+          };
+        }
+        return;
+      case "sync-object-instances":
+        requestRuntimeObjectInstanceSync();
+        return;
+      case "apply-debug-state":
+        applyMenuDebugState();
+        return;
+      case "apply-comfort-state":
+        applyMenuComfortState();
+        return;
+      case "reload-world":
+        requestAppRestart(() => options.onReloadRequested?.());
+        return;
+      case "go-home":
+        teleportPlayerHome();
+        return;
+      case "change-world":
+        requestAppRestart(() => options.onWorldChangeRequested?.(effect.worldId));
+        return;
+      case "change-app-config":
+        requestAppRestart(() => options.onAppConfigChangeRequested?.(effect.configName));
+        return;
+      case "copy-url-with-options":
+        options.onCopyUrlWithOptionsRequested?.();
+        return;
+      case "arm-reload-confirmation-timer":
+        if (reloadConfirmationTimeout !== undefined) {
+          window.clearTimeout(reloadConfirmationTimeout);
+        }
+        reloadConfirmationTimeout = window.setTimeout(() => {
+          dispatchRuntimeCommand({ kind: "expire-reload-confirmation", nowMs: Date.now() });
+          reloadConfirmationTimeout = undefined;
+        }, effect.windowMs);
+        return;
+      case "add-geodesic-to-cannon":
+        addGeodesicToCannon(effect.cannonId);
+        return;
+      case "start-cannon-carry":
+        startGeodesicCannonCarry(effect.cannonId);
+        return;
+      case "start-cannon-tie-and-detach":
+        startGeodesicCannonTieAndDetach(effect.cannonId);
+        return;
+      case "start-cannon-rotation":
+        startGeodesicCannonRotation(effect.cannonId, effect.geodesicId);
+        return;
+      case "start-cannon-aim":
+        startGeodesicCannonAim(effect.cannonId, effect.geodesicId);
+        return;
+      case "delete-geodesic-from-cannon":
+        deleteGeodesicFromCannon(effect.cannonId, effect.geodesicId);
+        return;
+      case "step-geometry-computer-target":
+        stepGeometryComputerPendingTarget(effect.computerId, effect.axis, effect.deltaMeters);
+        return;
+      case "start-geometry-computer-deformation":
+        startGeometryComputerDeformation(effect.computerId);
+        return;
+      case "type-sign-character":
+        appendEditingSignCharacter(effect.character);
+        return;
+      case "backspace-sign":
+        backspaceEditingSignMessage();
+        return;
+      case "delete-sign":
+        deleteEditingSign();
+        return;
+    }
+  }
+
+  function currentMenuState() {
+    return session.get().menuState;
   }
 }

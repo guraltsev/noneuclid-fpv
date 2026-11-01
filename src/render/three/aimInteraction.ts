@@ -9,7 +9,7 @@ import { type CompiledCellComplex } from "../../cell-complex/compileCellComplex"
 import { type PlayerPose } from "../../movement/playerPose";
 import { DEFAULT_PLAYER_EYE_HEIGHT_METERS } from "../../movement/playerBody";
 import { type DebugLevelId } from "../../diagnostics/debugLevels";
-import { type RuntimeMenuState } from "../../runtime/runtimeMenuState";
+import type { AppSession } from "../../runtime/appSession";
 import {
   createWorldFocusMessageDefinition,
   formatWorldFocusMessageTextForLegacyFallback,
@@ -43,8 +43,8 @@ export interface AimInteractionDeps {
   getWorld(): CompiledCellComplex;
   /** Getter: current debug level; only the verbose level enables click logging. */
   getDebugLevel(): DebugLevelId;
-  /** Getter: current runtime menu state, whose selectedTool affects which geodesic is ignored and the focus message. */
-  getMenuState(): RuntimeMenuState;
+  /** The shell session; its menu state's selectedTool affects which geodesic is ignored and the focus message. */
+  readonly session: AppSession;
   /** Getter: geodesic cannon tool state; activeGeodesicId is excluded from aim hits while aiming a cannon. */
   getCannonToolState(): GeodesicCannonToolState;
   /** Getter: the player pose; its cell is the render root cell and its position anchors the root frame. */
@@ -96,7 +96,7 @@ export function createAimInteraction(deps: AimInteractionDeps) {
   // While the geodesic-cannon-aim tool is active, the geodesic being aimed is ignored so it cannot block its own aim.
   function resolveCurrentAimTargets(ray: RootAimRay): readonly AimTarget[] {
     const activeGeodesicId = deps.getCannonToolState().activeGeodesicId;
-    const ignoredGeodesicIds = deps.getMenuState().selectedTool === "geodesic-cannon-aim" && activeGeodesicId
+    const ignoredGeodesicIds = deps.session.get().menuState.selectedTool === "geodesic-cannon-aim" && activeGeodesicId
       ? [activeGeodesicId]
       : undefined;
     const key = [
@@ -318,7 +318,7 @@ export function createAimInteraction(deps: AimInteractionDeps) {
   function getWorldFocusMessageDefinition(object: RuntimeWorldObject) {
     return createWorldFocusMessageDefinition({
       object,
-      selectedTool: deps.getMenuState().selectedTool,
+      selectedTool: deps.session.get().menuState.selectedTool,
       canExtendGeodesic: object.kind === "geodesic-segment" &&
         canExtendGeodesicSegment(object) &&
         !isGeodesicLocked(runtimeObjectRegistry, object.geodesicId),

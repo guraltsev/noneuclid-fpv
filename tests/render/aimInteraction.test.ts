@@ -27,7 +27,7 @@ describe("createAimInteraction", () => {
       runtimeObjectRegistry: registry,
       getWorld: () => world,
       getDebugLevel: () => "off" as never,
-      getMenuState: () => ({ selectedTool: "none" }) as never,
+      session: { get: () => ({ menuState: { selectedTool: "none" } }) } as never,
       getCannonToolState: () => ({ activeGeodesicId: undefined }) as never,
       getPlayerPose: () => ({ cellId: "room-a", position: { x: 0, y: 0, z: 0 }, yawRadians: 0, pitchRadians: 0 }),
       getFrameSerial: () => frameSerial,

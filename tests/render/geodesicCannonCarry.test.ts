@@ -27,7 +27,10 @@
  */
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
-import { createRuntimeMenuState, type RuntimeMenuState } from "../../src/runtime/runtimeMenuState";
+import { defaultAppConfig } from "../../src/glue/appConfig";
+import { applyRuntimeCommand } from "../../src/runtime/applyRuntimeCommand";
+import { createAppSession } from "../../src/runtime/appSession";
+import { createRuntimeMenuState } from "../../src/runtime/runtimeMenuState";
 import { yawRigidTransform3 } from "../../src/math/rigidTransform3";
 import { createGeodesicCannonObject } from "../../src/world-objects/geodesic/objects";
 import { shootGeodesic } from "../../src/world-objects/geodesic/cannon";
@@ -47,7 +50,10 @@ function createHarness(
   registry: RuntimeObjectRegistry,
   startPose: PlayerPose,
 ) {
-  let menuState: RuntimeMenuState = createRuntimeMenuState({ selectedWorldId: "test" });
+  const session = createAppSession({
+    menuState: createRuntimeMenuState({ selectedWorldId: "test" }),
+    appConfig: defaultAppConfig,
+  });
   let toolState: GeodesicCannonToolState = {};
   let playerPose = startPose;
   const nothing = (): void => {};
@@ -58,9 +64,9 @@ function createHarness(
     controls: { requestPointerLock: () => Promise.resolve() } as never,
     runtimeObjectRegistry: registry,
     getWorld: () => world,
-    getMenuState: () => menuState,
-    setMenuState: (next) => {
-      menuState = next;
+    session,
+    dispatch: (command) => {
+      applyRuntimeCommand(session, command);
     },
     getCannonToolState: () => toolState,
     setCannonToolState: (next) => {

@@ -1349,16 +1349,25 @@ Dispatch for the public API object (`window.noneuclid.api`): a call is a path of
 | function | `listApi` | Returns the names of the API's functions as `{ namespace: [function names] }` (nested objects use dotted namespace names), sorted. |
 | function | `toPlainData` | Converts a value to JSON-safe plain data: a `Map` with all-string keys becomes an object, any other `Map` an array of `[key, value]`; a `Set` and typed arrays become arrays; an `Error` becomes `{ name, message }`; funct… |
 
-### `runtime/appCommandDispatcher.ts`
+### `runtime/applyRuntimeCommand.ts`
 
-Routes renderer-neutral RuntimeCommand values (from the desktop menu and the VR palette alike) to the host callbacks that actually reload, change world, go home or toggle the debug overlay.
+The one command path: applyRuntimeCommand(session, command) changes the session through a pure reducer and returns the effects the host must run.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
-| interface | `AppCommandDispatcher` | Sink that executes a RuntimeCommand by calling the matching host callback. |
-| interface | `CreateAppCommandDispatcherOptions` | Host callbacks that implement each RuntimeCommand kind. |
-| function | `createAppCommandDispatcher` | Builds an AppCommandDispatcher whose dispatch forwards each command to dispatchRuntimeCommand with the given callbacks. |
-| function | `dispatchRuntimeCommand` | Invokes exactly one of the option callbacks, selected by command.kind, passing along the command payload (worldId or enabled). |
+| interface | `RuntimeCommandResult` | Result of reducing one command: the next session state and the effects to run. |
+| function | `applyRuntimeCommand` | Applies `command` to the session and returns the effects the host runs, in order. |
+| function | `reduceRuntimeCommand` | Pure reducer: the next session state and the ordered effects for one command. |
+
+### `runtime/appSession.ts`
+
+The shell-side session: the one record that holds the mutable state of a running world, and the cell that owns it.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `AppSessionState` | Mutable state of one running world, as one plain record. |
+| interface | `AppSession` | Owner of the current AppSessionState. |
+| function | `createAppSession` | Creates a session holding `initial`. |
 
 ### `runtime/appState.ts`
 
@@ -1382,11 +1391,14 @@ Holder of the public API object `window.noneuclid.api`: a plain object of namesp
 
 ### `runtime/runtimeCommands.ts`
 
-Defines RuntimeCommand, the closed discriminated union of application-level actions that menus and palettes can request without knowing about the renderer.
+Defines RuntimeCommand, the closed discriminated union of every action the UI can request (a palette or menu press, a key, an API call), and RuntimeEffect, what a command asks the host to do beyond changing the session.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
-| type | `RuntimeCommand` | Application-level action requested by the UI: reload the world, go home, change world by id, or set the debug overlay flag. |
+| interface | `ShowGeodesicCannonActionsPayload` | Payload of the cannon actions page. |
+| interface | `ShowGeometryComputerActionsPayload` | Payload of the geometry computer page. |
+| type | `RuntimeCommand` | Application-level action requested by the UI. |
+| type | `RuntimeEffect` | What a command asks the host to do besides changing the session. |
 
 ### `runtime/runtimeMenuState.ts`
 
@@ -2007,7 +2019,7 @@ Menu logic for the in-world geometry computer, which edits the torus-skew parame
 
 | Kind | Name | Summary |
 | --- | --- | --- |
-| interface | `GeometryComputerMenuDeps` | Dependencies for {@link createGeometryComputerMenu}; createThreeApp#shell supplies the session by value and menu state through accessors. |
+| interface | `GeometryComputerMenuDeps` | Dependencies for {@link createGeometryComputerMenu}; createThreeApp#shell supplies the geometry session, the app session and the command path. |
 | function | `createGeometryComputerMenu` | Creates the geometry computer menu actions. |
 
 ### `render/three/helpLensRenderer.ts`

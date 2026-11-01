@@ -7,6 +7,7 @@
  */
 import * as THREE from "three";
 import type { PortalPanelModeId } from "../../glue/portalPanelMode";
+import type { AppSession } from "../../runtime/appSession";
 import type { RuntimeMenuConsoleLogLevelId } from "../../runtime/runtimeMenuState";
 import type { RuntimeDebugOverlayItemId, RuntimeToolId } from "../../glue/toolIds";
 import type { PaletteDefinition } from "../../ui/paletteDefinition";
@@ -31,8 +32,8 @@ export interface ScenePaletteControllerOptions {
   readonly scene: THREE.Scene;
   /** Getter (not a value) for the active camera, since the shell swaps cameras between desktop and XR; used for pointer event origin by scenePointers.ts. */
   readonly getCamera: () => THREE.PerspectiveCamera | THREE.OrthographicCamera;
-  /** Getter for the runtime menu open state (menuState.isOpen); read every frame so visibility and hit testing follow it. */
-  readonly getIsOpen: () => boolean;
+  /** The shell session; its menu state's isOpen is read every frame so visibility and hit testing follow it. */
+  readonly session: AppSession;
   /** Called on the rising edge of the menu toggle while the palette is closed. */
   readonly onOpenRequested: () => void;
   /** Called on the menu toggle rising edge while open, and by the header close action. */
@@ -232,7 +233,7 @@ export function createScenePaletteController(options: ScenePaletteControllerOpti
 
       // Rising edge of the menu toggle opens or closes the palette.
       if (frame.input.menuTogglePressed && !previousMenuTogglePressed) {
-        if (options.getIsOpen()) {
+        if (options.session.get().menuState.isOpen) {
           options.onCloseRequested();
         } else {
           options.onOpenRequested();
@@ -245,17 +246,17 @@ export function createScenePaletteController(options: ScenePaletteControllerOpti
       paletteRoot.quaternion.copy(frame.placement.quaternion);
       paletteRoot.scale.setScalar(frame.placement.scale ?? 1);
       paletteRoot.updateMatrixWorld(true);
-      adapter.setVisible(options.getIsOpen());
+      adapter.setVisible(options.session.get().menuState.isOpen);
       // The adapter animates in milliseconds.
       adapter.update(frame.input.deltaSeconds * 1000);
-      syncSceneRays(sceneRayObjects, options.scene, frame.input.pointers, options.getIsOpen());
+      syncSceneRays(sceneRayObjects, options.scene, frame.input.pointers, options.session.get().menuState.isOpen);
 
       // Compute select edges, choose the active pointer, and hit-test it; desktop pointers fall back to the panel plane so the cursor marker still shows off-widget.
       const pointerStates = scenePointers.update(options.scene, frame.input.pointers);
       const activePointer = chooseActiveScenePointer(pointerStates);
       const pointerSourcesById = new Map(frame.input.pointers.map((source) => [source.id, source] as const));
       const activePointerSource = activePointer ? pointerSourcesById.get(activePointer.id) : undefined;
-      const paletteHit = options.getIsOpen() && activePointerSource
+      const paletteHit = options.session.get().menuState.isOpen && activePointerSource
         ? resolvePaletteHit(adapter.root, activePointerSource.object)
         : undefined;
       const cursorPoint = paletteHit?.point

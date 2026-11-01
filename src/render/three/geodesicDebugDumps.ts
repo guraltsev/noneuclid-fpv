@@ -10,7 +10,7 @@ import * as THREE from "three";
 import { type CompiledCellComplex } from "../../cell-complex/compileCellComplex";
 import { type DebugLevelId } from "../../diagnostics/debugLevels";
 import { addVec3, scaleVec3 } from "../../math/vec3";
-import { type RuntimeMenuState } from "../../runtime/runtimeMenuState";
+import type { AppSession } from "../../runtime/appSession";
 import { collectGeodesicPortalWord, getGeodesicSegments } from "../../world-objects/geodesic/segments";
 import { getGeodesicConnection, isGeodesicLocked } from "../../world-objects/geodesic/lifecycle";
 import { type GeodesicMarmotRuntime } from "./creatures/geodesicMarmotView";
@@ -56,8 +56,8 @@ export interface GeodesicDebugDumpsDeps {
   getWorld(): CompiledCellComplex;
   /** Getter for the current debug level; only "verbose" enables the periodic check. */
   getDebugLevel(): DebugLevelId;
-  /** Getter for the menu state; only the selected tool is reported. */
-  getMenuState(): RuntimeMenuState;
+  /** The shell session; only the menu state's selected tool is reported. */
+  readonly session: AppSession;
   /** Getter for the id of the cell currently rendered as visible, if any. */
   getVisibleCellId(): string | undefined;
   /** Getter for the emitter tool state used to pick the default geodesic and carry-session words. */
@@ -187,7 +187,7 @@ export function createGeodesicDebugDumps(deps: GeodesicDebugDumpsDeps) {
     const dump: AllGeodesicsDebugDump = {
       worldId: deps.worldId,
       visibleCellId: deps.getVisibleCellId(),
-      selectedTool: deps.getMenuState().selectedTool,
+      selectedTool: deps.session.get().menuState.selectedTool,
       activeGeodesicCannonToolState: deps.getCannonToolState(),
       geodesicIds,
       intervals: intervals.map((interval) => {

@@ -175,7 +175,7 @@ Input from the mouse/keyboard (`src/render/three/desktopControls.ts`) and from W
 renderer-neutral data (`src/ui/paletteDefinition.ts#createPaletteDefinition`) and drawn by the in-scene palette
 (`src/render/three/scenePaletteController.ts`) on desktop and in VR through the same code path
 (`src/render/three/palette/scenePaletteAdapter.ts` builds the VR widgets). Commands requested by the UI are plain data
-(`src/runtime/runtimeCommands.ts`) dispatched by `src/runtime/appCommandDispatcher.ts#createAppCommandDispatcher`.
+(`src/runtime/runtimeCommands.ts`) and applied to the shell session (`src/runtime/appSession.ts`) by the pure reducer `applyRuntimeCommand` in `src/runtime/applyRuntimeCommand.ts`, which returns the effects the shell runs.
 
 ## Testing strategy
 

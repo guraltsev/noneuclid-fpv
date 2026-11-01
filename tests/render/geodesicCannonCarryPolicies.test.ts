@@ -13,7 +13,10 @@ import { describe, expect, it } from "vitest";
 import { type CompiledCellComplex } from "../../src/cell-complex/compileCellComplex";
 import { yawRigidTransform3 } from "../../src/math/rigidTransform3";
 import { createDefaultPlayerPose, type PlayerPose } from "../../src/movement/playerPose";
-import { createRuntimeMenuState, type RuntimeMenuState } from "../../src/runtime/runtimeMenuState";
+import { defaultAppConfig } from "../../src/glue/appConfig";
+import { applyRuntimeCommand } from "../../src/runtime/applyRuntimeCommand";
+import { createAppSession } from "../../src/runtime/appSession";
+import { createRuntimeMenuState } from "../../src/runtime/runtimeMenuState";
 import { carryMaxSpeedMetersPerSecond } from "../../src/world-objects/carry";
 import { shootGeodesic } from "../../src/world-objects/geodesic/cannon";
 import { isGeodesicLocked } from "../../src/world-objects/geodesic/lifecycle";
@@ -25,7 +28,10 @@ import { worldPointToThree } from "../../src/render/three/worldAxes";
 import { compileLargePortalWorld } from "../fixtures/world-objects/geodesic";
 
 function createHarness(world: CompiledCellComplex, registry: RuntimeObjectRegistry, playerPose: PlayerPose) {
-  let menuState: RuntimeMenuState = createRuntimeMenuState({ selectedWorldId: "test" });
+  const session = createAppSession({
+    menuState: createRuntimeMenuState({ selectedWorldId: "test" }),
+    appConfig: defaultAppConfig,
+  });
   let toolState: GeodesicCannonToolState = {};
   const nothing = (): void => {};
   const tools = createGeodesicCannonTools({
@@ -34,9 +40,9 @@ function createHarness(world: CompiledCellComplex, registry: RuntimeObjectRegist
     controls: { requestPointerLock: () => Promise.resolve() } as never,
     runtimeObjectRegistry: registry,
     getWorld: () => world,
-    getMenuState: () => menuState,
-    setMenuState: (next) => {
-      menuState = next;
+    session,
+    dispatch: (command) => {
+      applyRuntimeCommand(session, command);
     },
     getCannonToolState: () => toolState,
     setCannonToolState: (next) => {
@@ -61,7 +67,7 @@ function createHarness(world: CompiledCellComplex, registry: RuntimeObjectRegist
     refreshProtractorAnglesForGeodesics: nothing,
   });
 
-  return { tools, selectedTool: () => menuState.selectedTool };
+  return { tools, selectedTool: () => session.get().menuState.selectedTool };
 }
 
 function handAt(x: number, y: number): RootAimRay {
