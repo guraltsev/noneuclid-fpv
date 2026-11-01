@@ -42,6 +42,11 @@ export interface PortalGhostRuntimeObjectRenderRecordRequest {
   readonly activationClearanceMeters?: number;
   /** Horizontal render footprint radius used when the object has no collision bounds. */
   readonly footprintRadiusMeters?: number;
+  /**
+   * The horizontal reach of what is drawn, when it is not the object's collision footprint (for example a carry highlight wider than the body):
+   * the disk is taken around `center` (cell-local x and y) with this radius, whatever the object's collision bounds are.
+   */
+  readonly footprintOverride?: { readonly radiusMeters: number; readonly center: { readonly x: number; readonly y: number } };
 }
 
 /** Returns ghost render records, in every cell copy the object's footprint reaches (empty if none, or if the cell, footprint or key list is missing). */
@@ -55,7 +60,7 @@ export function collectPortalGhostRuntimeObjectRenderRecords(
   }
 
   const bounds = getDynamicObjectCollisionBounds(object);
-  const radius = bounds?.radius ?? request.footprintRadiusMeters;
+  const radius = request.footprintOverride?.radiusMeters ?? bounds?.radius ?? request.footprintRadiusMeters;
 
   if (radius === undefined || !(radius > 0)) {
     return [];
@@ -67,9 +72,11 @@ export function collectPortalGhostRuntimeObjectRenderRecords(
     return [];
   }
 
-  const center = bounds
-    ? { x: bounds.center.x, y: bounds.center.y }
-    : { x: object.localPose.translation.x, y: object.localPose.translation.y };
+  const center = request.footprintOverride
+    ? request.footprintOverride.center
+    : bounds
+      ? { x: bounds.center.x, y: bounds.center.y }
+      : { x: object.localPose.translation.x, y: object.localPose.translation.y };
   const clearance = request.activationClearanceMeters ?? defaultPortalGhostActivationClearanceMeters;
   const disk = collectDevelopedDisk({ world, cellId: object.cellId, center, radiusMeters: radius + clearance });
   const kept: { readonly cellId: string; readonly x: number; readonly y: number }[] = [];

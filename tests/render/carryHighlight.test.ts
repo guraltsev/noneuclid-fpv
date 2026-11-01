@@ -18,13 +18,13 @@ import { carryHighlightArchetypeKey, collectCarryHighlightRecords } from "../../
 import { carryHighlightMarginMeters } from "../../src/world-objects/carryHighlightShape";
 import { cannonCarryHighlight } from "../../src/world-objects/geodesic/objects";
 import { createEmptyFrameRenderSnapshot, createFrameRenderSnapshot } from "../../src/render/three/frameRenderSnapshot";
-import { createRootVisiblePortalPath } from "../../src/render/three/renderPortalInstances";
+import { createRootVisiblePortalPath, unclippedPortalClipIndex } from "../../src/render/three/renderPortalInstances";
 import {
   buildRuntimeObjectRenderArchetype,
   createRuntimeObjectRenderArchetypeDiagnostics,
 } from "../../src/render/three/runtimeObjectRenderArchetypes";
 import { createRuntimeObjectInstanceSync } from "../../src/render/three/runtimeObjectInstanceSync";
-import type { RuntimeObjectRenderRecord, RuntimeObjectRenderSourceMesh } from "../../src/render/three/runtimeObjectRenderRecords";
+import type { RuntimeObjectRenderSourceMesh } from "../../src/render/three/runtimeObjectRenderRecords";
 import type { VisiblePortalPath } from "../../src/render/three/visiblePortalPaths";
 import { rigidTransformToThreeMatrix, worldPointToThree } from "../../src/render/three/worldAxes";
 import type { RuntimeCreatureObject } from "../../src/world-objects/runtimeObjectBase";
@@ -46,25 +46,17 @@ function carried(id: string, x = 0.2): RuntimeCreatureObject & { readonly collis
   };
 }
 
-function record(objectId: string, cellId: string, matrix: THREE.Matrix4, archetypeKey = "part:mesh:0"): RuntimeObjectRenderRecord {
-  return { objectId, cellId, archetypeKey, localMatrix: matrix };
-}
-
 function scaleOf(matrix: THREE.Matrix4): THREE.Vector3 {
   return new THREE.Vector3().setFromMatrixScale(matrix);
 }
 
 describe("collectCarryHighlightRecords", () => {
-  it("draws a sphere per place for an object with no declared shape, sized by radius plus margin", () => {
-    const object = carried("m");
-    const pose = rigidTransformToThreeMatrix(object.localPose);
-    const ghost = new THREE.Matrix4().makeTranslation(5, 0, 0).multiply(pose);
+  it("draws a sphere of radius plus margin in each cell its reach touches, if shapeless", () => {
+    // 0.2 m from the portal to room-a, within the sphere's reach (0.3 + 0.1 m): the sphere crosses the portal.
+    const object = carried("m", -0.8);
+    const world = compileCellComplex(twoRooms());
 
-    const balls = collectCarryHighlightRecords(object, [
-      record("m", "room-b", pose),
-      record("m", "room-b", pose, "other:mesh:1"),
-      record("m", "room-a", ghost),
-    ]);
+    const balls = collectCarryHighlightRecords(object, world);
 
     expect(balls).toHaveLength(2);
     expect(balls.map((ball) => ball.cellId)).toEqual(["room-b", "room-a"]);
@@ -72,7 +64,7 @@ describe("collectCarryHighlightRecords", () => {
     const radius = collision.radius + carryHighlightMarginMeters;
     scaleOf(balls[0].localMatrix).toArray().forEach((value) => expect(value).toBeCloseTo(radius, 6));
     const centre = new THREE.Vector3().setFromMatrixPosition(balls[0].localMatrix);
-    const expected = worldPointToThree({ x: 0.2, y: 0.1, z: collision.offset.z });
+    const expected = worldPointToThree({ x: -0.8, y: 0.1, z: collision.offset.z });
     expect(centre.x).toBeCloseTo(expected.x, 6);
     expect(centre.y).toBeCloseTo(expected.y, 6);
     expect(centre.z).toBeCloseTo(expected.z, 6);
@@ -82,7 +74,7 @@ describe("collectCarryHighlightRecords", () => {
     const object = { ...carried("m"), carryHighlight: cannonCarryHighlight };
     const pose = rigidTransformToThreeMatrix(object.localPose);
 
-    const [shape] = collectCarryHighlightRecords(object, [record("m", "room-b", pose)]);
+    const [shape] = collectCarryHighlightRecords(object, compileCellComplex(twoRooms()));
 
     // Semi-axes along the object's x, y, z become Three.js x, z, y.
     const scale = scaleOf(shape.localMatrix);
@@ -104,20 +96,29 @@ describe("collectCarryHighlightRecords", () => {
     const object = { ...carried("m"), carryHighlight: cannonCarryHighlight };
     const turned = { ...object, localPose: yawRigidTransform3(1.2, { x: 0.2, y: 0.1, z: 0 }) };
 
-    const [before] = collectCarryHighlightRecords(object, [record("m", "room-b", rigidTransformToThreeMatrix(object.localPose))]);
-    const [after] = collectCarryHighlightRecords(turned, [record("m", "room-b", rigidTransformToThreeMatrix(turned.localPose))]);
+    const world = compileCellComplex(twoRooms());
+    const [before] = collectCarryHighlightRecords(object, world);
+    const [after] = collectCarryHighlightRecords(turned, world);
 
     const axisBefore = new THREE.Vector3().setFromMatrixColumn(before.localMatrix, 0).normalize();
     const axisAfter = new THREE.Vector3().setFromMatrixColumn(after.localMatrix, 0).normalize();
     expect(axisBefore.angleTo(axisAfter)).toBeCloseTo(1.2 - 0.4, 6);
   });
 
-  it("ignores parts under other ids and objects with no shape and no collision shape", () => {
+  it("draws nothing for an object with no shape and no collision shape", () => {
     const object = carried("m");
-    const pose = rigidTransformToThreeMatrix(object.localPose);
 
-    expect(collectCarryHighlightRecords(object, [record("m:g:head", "room-b", pose)])).toEqual([]);
-    expect(collectCarryHighlightRecords({ ...object, collision: undefined }, [record("m", "room-b", pose)])).toEqual([]);
+    expect(collectCarryHighlightRecords({ ...object, collision: undefined }, compileCellComplex(twoRooms()))).toEqual([]);
+  });
+
+  it("draws the ellipsoid in the next cell only when its own reach crosses the portal", () => {
+    const world = compileCellComplex(twoRooms());
+    const atPortal = { ...carried("m", -0.9), carryHighlight: cannonCarryHighlight };
+    const awayFromPortal = { ...carried("m", -0.75), carryHighlight: cannonCarryHighlight };
+
+    // The ellipsoid reaches 0.159 m: 0.1 m from the portal it crosses it, 0.25 m from it it does not, though the 0.3 m collision radius would reach (the shape's reach is what counts).
+    expect(collectCarryHighlightRecords(atPortal, world).map((shape) => shape.cellId)).toEqual(["room-b", "room-a"]);
+    expect(collectCarryHighlightRecords(awayFromPortal, world).map((shape) => shape.cellId)).toEqual(["room-b"]);
   });
 });
 
@@ -257,5 +258,53 @@ describe("the highlight of a carried geodesic emitter", () => {
     const scale = scaleOf(first);
     expect(scale.x).toBeCloseTo(cannonCarryHighlight.radii.x, 6);
     expect(scale.y).toBeCloseTo(cannonCarryHighlight.radii.z, 6);
+  });
+});
+
+describe("the highlight of a carried emitter that stands at a portal", () => {
+  // The emitter stands in room-b, 0.1 m from the portal to room-a, and the viewer is in room-a. A geodesic emitter's own render records are in
+  // room-b only, so seen from room-a its highlight is the room-b copy clipped at the portal. The highlight reaches 0.159 m, so it crosses the
+  // portal: the part on room-a's side must be drawn too, as one whole shape, not cut off at the portal.
+  it("is drawn whole in the viewer's room, not cut off at the portal", () => {
+    const emitter = createGeodesicCannonObject({ id: "cannon-b", cellId: "room-b", localPose: yawRigidTransform3(0, { x: -0.9, y: 0, z: 0 }) });
+    const registry = createRuntimeObjectRegistry([emitter]);
+    const world = compileCellComplex(twoRooms());
+    const geodesicRenderSources = createGeodesicRuntimeRenderSources();
+    const renderArchetypesByKey = new Map<string, ReturnType<typeof buildRuntimeObjectRenderArchetype>>();
+    const sync = createRuntimeObjectInstanceSync({
+      registry,
+      runtimeObjectRootsById: new Map(),
+      renderSourcesByKey: new Map<string, RuntimeObjectRenderSourceMesh>(),
+      renderArchetypesByKey,
+      renderRoot: new THREE.Group(),
+      geodesicRenderSources,
+      geodesicArchetypeKeys: geodesicRenderSources.map((source) => source.archetypeKey),
+      playerRoverRenderModel: undefined,
+      maxVisiblePaths: 4,
+      diagnostics: createRuntimeObjectRenderArchetypeDiagnostics(),
+      getWorld: () => world,
+      session: createTestAppSession({ carry: { objectId: "cannon-b", arrived: true } }),
+      buildArchetype: (source, capacity) => buildRuntimeObjectRenderArchetype(source, capacity, undefined),
+    });
+    // room-b's frame seen from room-a: room-b's west wall (x = -1) is room-a's east wall (x = 1).
+    const intoRoomA = new THREE.Matrix4().makeTranslation(2, 0, 0);
+
+    sync.sync(createFrameRenderSnapshot({
+      serial: 1,
+      rootCellId: "room-a",
+      visiblePathsByDestinationCell: new Map([["room-a", [path("room-a", 0, 0)]], ["room-b", [path("room-b", 5, 1, intoRoomA)]]]),
+      clipIndexByPathId: new Map([[5, 3]]),
+      cameraPositions: [],
+    }));
+
+    const highlight = renderArchetypesByKey.get(carryHighlightArchetypeKey);
+    expect(highlight?.mesh.count).toBe(1);
+    // The one copy of the shape is the unclipped depth-0 copy (the unclipped marker), not the copy clipped by the portal's planes.
+    expect(highlight?.portalClipIndexAttribute.getX(0)).toBe(unclippedPortalClipIndex);
+    const first = new THREE.Matrix4();
+    highlight?.mesh.getMatrixAt(0, first);
+    const centre = new THREE.Vector3().setFromMatrixPosition(first);
+    const expected = worldPointToThree({ x: 1.1, y: 0, z: cannonCarryHighlight.centre.z });
+    expect(centre.distanceTo(expected)).toBeLessThan(1e-6);
   });
 });

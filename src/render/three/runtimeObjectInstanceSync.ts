@@ -8,8 +8,9 @@
  * portal) and the per-eye camera positions. Per sync it (a) updates the render sources and the archetype-key prefix
  * index, (b) collects the render records once, (c) creates or grows archetypes, and (d) writes every archetype's
  * instances. Records of unchanged objects (same registry value, same world, same archetype keys) are reused,
- * ghosts included. While the session names a carried object, a translucent highlight shape (declared by the object, an ellipsoid for an emitter) around it is drawn from that object's own records
- * (`carryHighlight.ts`), so it appears wherever the object does. It never touches the selectable-hitbox debug meshes.
+ * ghosts included. While the session names a carried object, a translucent highlight shape (declared by the object, an ellipsoid for an emitter) around it is drawn
+ * (`carryHighlight.ts`) at the object's place and at its own portal ghosts, decided by the shape's reach, so it is whole on whichever side of a portal the viewer is.
+ * It never touches the selectable-hitbox debug meshes.
  */
 import type { AppSession } from "../../runtime/appSession";
 import type * as THREE from "three";
@@ -255,6 +256,7 @@ export function createRuntimeObjectInstanceSync(deps: RuntimeObjectInstanceSyncD
     const seenIds = new Set<string>();
     const records: RuntimeObjectRenderRecord[] = [];
     const carriedId = deps.session.get().carry?.objectId;
+    let carriedObject: RuntimeWorldObject | undefined;
 
     for (const object of objects) {
       const geodesic = object.portalRenderable && isGeodesicRuntimeRenderObject(object);
@@ -263,15 +265,15 @@ export function createRuntimeObjectInstanceSync(deps: RuntimeObjectInstanceSyncD
       }
 
       seenIds.add(object.id);
+      if (object.id === carriedId) {
+        carriedObject = object;
+      }
       const prefix = geodesic ? "" : runtimeObjectArchetypeKeyPrefix(object);
       const archetypeKeys = geodesic ? deps.geodesicArchetypeKeys : archetypeKeysForObject(object, prefix);
       const cached = recordCacheByObjectId.get(object.id);
 
       if (cached && cached.object === object && cached.world === world && sameStrings(cached.archetypeKeys, archetypeKeys)) {
         records.push(...cached.records);
-        if (object.id === carriedId) {
-          records.push(...collectCarryHighlightRecords(carryHighlightObject(object), cached.records));
-        }
         continue;
       }
 
@@ -299,9 +301,11 @@ export function createRuntimeObjectInstanceSync(deps: RuntimeObjectInstanceSyncD
 
       recordCacheByObjectId.set(object.id, { object, world, archetypeKeys: [...archetypeKeys], records: objectRecords });
       records.push(...objectRecords);
-      if (object.id === carriedId) {
-        records.push(...collectCarryHighlightRecords(carryHighlightObject(object), objectRecords));
-      }
+    }
+
+    // The highlight has its own portal ghosts, decided by its own reach (see carryHighlight.ts), not by the object's records.
+    if (carriedObject) {
+      records.push(...collectCarryHighlightRecords(carryHighlightObject(carriedObject), world));
     }
 
     for (const id of [...recordCacheByObjectId.keys()]) {

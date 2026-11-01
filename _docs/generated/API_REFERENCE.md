@@ -1821,7 +1821,7 @@ The translucent shape drawn around an object that is being carried.
 | const | `carryHighlightArchetypeKey` | Archetype key of the highlight shape. |
 | type | `CarryHighlightObject` | What the highlight needs of a carried object: an id, a pose, and a declared highlight shape or a collision shape to derive one from. |
 | function | `createCarryHighlightSource` | Builds the render source of the highlight: a unit sphere, scaled per record (non-uniformly for an ellipsoid) to the object it surrounds. |
-| function | `collectCarryHighlightRecords` | The records of the highlight shape for `object`, one for each place in `objectRecords` where the object itself is drawn. |
+| function | `collectCarryHighlightRecords` | The records of the highlight shape for `object`: one in the object's own cell, and one in every other cell copy that the shape's own horizontal reach touches across portals (the portal ghosts of the shape). |
 
 ### `render/three/cellRenderArchetypes.ts`
 

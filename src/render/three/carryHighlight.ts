@@ -4,15 +4,18 @@
  * The shape marks the carried object itself, wherever it actually is, so an object that is stuck (stopped short of a wall or an exclusion zone)
  * is visibly stuck and the gap to the hand is visible. What the shape is, is the object's own business: it declares a rough approximation of its
  * own shape (`carryHighlight`, src/world-objects/carryHighlightShape.ts; an ellipsoid for an emitter), and an object that declares none gets a
- * sphere from its collision shape. It is drawn by the runtime-object instance sync from the object's own render records: one shape per record of
- * the object, in the record's cell with the record's pose (so it turns with the object's yaw), on every portal path and every ghost copy where
- * the object is drawn, and on another face of the world exactly as the object is. Nothing in it is specific to one kind of object.
+ * sphere from its collision shape. It is drawn by the runtime-object instance sync at the object's place (so it turns with the object's yaw) and at
+ * its own portal ghosts, which the shape's horizontal reach decides: a shape that crosses a portal is drawn whole on both sides, on every portal
+ * path, and on another face of the world exactly as the object is. Nothing in it is specific to one kind of object.
  */
 import * as THREE from "three";
+import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex";
+import { transformPoint3 } from "../../math/rigidTransform3";
 import type { DynamicObjectState } from "../../movement/dynamicObject";
 import { carryHighlightShapeOf, type CarryHighlightShape } from "../../world-objects/carryHighlightShape";
+import { collectPortalGhostRuntimeObjectRenderRecords } from "./runtimeObjectGhostRecords";
 import { collectRuntimeObjectRenderSourceMeshes, type RuntimeObjectRenderRecord, type RuntimeObjectRenderSourceMesh } from "./runtimeObjectRenderRecords";
-import { worldPointToThree } from "./worldAxes";
+import { rigidTransformToThreeMatrix, worldPointToThree } from "./worldAxes";
 
 /** Archetype-key prefix of the highlight shape (the key is `<prefix>:mesh:0`). */
 export const carryHighlightArchetypePrefix = "carry-highlight";
@@ -46,15 +49,18 @@ export function createCarryHighlightSource(): RuntimeObjectRenderSourceMesh {
 }
 
 /**
- * The records of the highlight shape for `object`, one for each place in `objectRecords` where the object itself is drawn.
+ * The records of the highlight shape for `object`: one in the object's own cell, and one in every other cell copy that the shape's own
+ * horizontal reach touches across portals (the portal ghosts of the shape).
  *
- * `objectRecords` are the object's render records; only those under the object's own id count (its parts under other ids, such as emitter heads,
- * sit at the same place). Records at the same cell and pose are drawn once. Returns nothing when the object declares no shape and has no
+ * The ghosts are decided by the shape's reach, not by the object's collision footprint or by where the object's own meshes have records: the
+ * shape is wider than a thin object (an emitter's post), and some objects (geodesic emitters) have no ghosts of their own. So the shape is
+ * always whole on the side of a portal the viewer is on, never cut at the portal. A ghost that lands on the same place as the shape itself
+ * in the viewer's frame is drawn once, unclipped, by the instance writer. Returns nothing when the object declares no shape and has no
  * collision shape to derive a sphere from.
  */
 export function collectCarryHighlightRecords(
   object: CarryHighlightObject,
-  objectRecords: readonly RuntimeObjectRenderRecord[],
+  world: CompiledCellComplex,
 ): readonly RuntimeObjectRenderRecord[] {
   const shape = carryHighlightShapeOf(object);
   if (!shape) {
@@ -67,25 +73,34 @@ export function collectCarryHighlightRecords(
   const fromCentre = new THREE.Matrix4()
     .makeTranslation(centre.x, centre.y, centre.z)
     .multiply(new THREE.Matrix4().makeScale(Math.abs(shape.radii.x), Math.abs(shape.radii.z), Math.abs(shape.radii.y)));
+  const highlightId = `${object.id}:carry-highlight`;
+  // The shape's horizontal reach from its centre (the longest horizontal semi-axis), around the centre's cell-local place.
+  const reach = Math.max(Math.abs(shape.radii.x), Math.abs(shape.radii.y));
+  const centreInCell = transformPoint3(object.localPose, { x: shape.centre.x, y: shape.centre.y, z: 0 });
+  const places: readonly RuntimeObjectRenderRecord[] = [
+    {
+      objectId: highlightId,
+      cellId: object.cellId,
+      archetypeKey: carryHighlightArchetypeKey,
+      localMatrix: rigidTransformToThreeMatrix(object.localPose),
+    },
+    ...collectPortalGhostRuntimeObjectRenderRecords({
+      world,
+      object: { ...object, id: highlightId },
+      archetypeKeys: [carryHighlightArchetypeKey],
+      footprintOverride: { radiusMeters: reach, center: { x: centreInCell.x, y: centreInCell.y } },
+    }),
+  ];
   const seen = new Set<string>();
   const highlights: RuntimeObjectRenderRecord[] = [];
 
-  for (const record of objectRecords) {
-    if (record.objectId !== object.id) {
+  for (const place of places) {
+    const key = `${place.cellId}|${place.localMatrix.elements.join(",")}`;
+    if (seen.has(key)) {
       continue;
     }
-
-    const place = `${record.cellId}|${record.localMatrix.elements.join(",")}`;
-    if (seen.has(place)) {
-      continue;
-    }
-    seen.add(place);
-    highlights.push({
-      objectId: `${object.id}:carry-highlight`,
-      cellId: record.cellId,
-      archetypeKey: carryHighlightArchetypeKey,
-      localMatrix: record.localMatrix.clone().multiply(fromCentre),
-    });
+    seen.add(key);
+    highlights.push({ ...place, localMatrix: place.localMatrix.clone().multiply(fromCentre) });
   }
 
   return highlights;
