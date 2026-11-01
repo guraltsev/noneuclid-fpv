@@ -5,7 +5,7 @@
 
 This reference is produced from the source code. For the *meaning* of the modules — the mathematical model they implement — read [../MATHEMATICAL_MODEL.md](../MATHEMATICAL_MODEL.md) and [../ARCHITECTURE.md](../ARCHITECTURE.md). For every exported symbol see [API_REFERENCE.md](API_REFERENCE.md).
 
-**221 modules, 49,455 lines** under `src/`.
+**221 modules, 49,486 lines** under `src/`.
 
 ## Layers
 
@@ -25,7 +25,7 @@ A module belongs to the layer named by its first path segment under `src/`. "May
 | `interaction` | 5 | 1,595 | `math`, `cell-complex`, `movement`, `world-objects`, `glue` | Renderer-free interaction logic: input frames, aim picking, VR locomotion, XR session state, carried-object portal transitions. |
 | `runtime` | 13 | 2,678 | `math`, `cell-complex`, `diagnostics`, `movement`, `world-objects`, `authoring`, `glue` | Application state, runtime menu state, command dispatch, geometry session/worker, server channel and public API. |
 | `ui` | 6 | 1,320 | `math`, `cell-complex`, `world-objects`, `authoring`, `glue`, `runtime` | Renderer-neutral palette, help, tooltip and input-intent definitions. |
-| `render` | 106 | 24,194 | every lower layer | Three.js / DOM / WebXR rendering and input adapters (the application shell). |
+| `render` | 106 | 24,225 | every lower layer | Three.js / DOM / WebXR rendering and input adapters (the application shell). |
 | `root` | 1 | 213 | every lower layer | Entry point. |
 
 ## Layer dependency graph
@@ -62,7 +62,7 @@ flowchart LR
   interaction -->|5| world_objects
   movement -->|11| cell_complex
   movement -->|21| math
-  render -->|50| cell_complex
+  render -->|51| cell_complex
   render -->|11| diagnostics
   render -->|28| glue
   render -->|19| interaction
@@ -312,7 +312,7 @@ None: every import respects the intended layering.
 | `render/three/frameRenderSnapshot.ts` | 74 | Frame render snapshot: the portal-render values of one frame, computed once where the cell instances are written. | `render/three/renderPortalInstances`, `render/three/visiblePortalPaths` |
 | `render/three/geodesicCannonAimTarget.ts` | 35 | Computes the yaw a geodesic cannon should adopt to face a target point. | `math/vec3` |
 | `render/three/geodesicCannonRenderer.ts` | 392 | Render sources and per-frame render records for geodesic cannons, geodesic segments and geodesic intersections. | `math/rigidTransform3`, `render/three/preparedWorldAssets`, `render/three/runtimeObjectRenderRecords`, `render/three/worldAxes`, `world-objects/geodesic/objects` |
-| `render/three/geodesicCannonTools.ts` | 1015 | Geodesic emitter (cannon) tools: place, rotate, aim, carry, tie-and-detach, and delete geodesics. | `cell-complex/compileCellComplex`, `interaction/aimTarget`, `interaction/handCarry`, `math/rigidTransform3`, `math/vec3`, `movement/collision`, `render/three/carriedGeodesicCannon`, `render/three/desktopControls`, `render/three/geodesicCannonAimTarget`, `render/three/rootAimRay`, `runtime/appSession`, `runtime/runtimeCommands`, `world-objects/carry`, `world-objects/geodesic/cannon`, `world-objects/geodesic/cannonToolState`, `world-objects/geodesic/carryEnd`, `world-objects/geodesic/curveShortening`, `world-objects/geodesic/endpoints`, `world-objects/geodesic/intersections`, `world-objects/geodesic/lifecycle`, `world-objects/geodesic/objects`, `world-objects/geodesic/segments`, `world-objects/runtimeObjectBase`, `world-objects/runtimeObjectRegistry` |
+| `render/three/geodesicCannonTools.ts` | 1046 | Geodesic emitter (cannon) tools: place, rotate, aim, carry, tie-and-detach, and delete geodesics. | `cell-complex/compileCellComplex`, `cell-complex/portalRoute`, `interaction/aimTarget`, `interaction/handCarry`, `math/rigidTransform3`, `math/vec3`, `movement/collision`, `render/three/carriedGeodesicCannon`, `render/three/desktopControls`, `render/three/geodesicCannonAimTarget`, `render/three/rootAimRay`, `runtime/appSession`, `runtime/runtimeCommands`, `world-objects/carry`, `world-objects/geodesic/cannon`, `world-objects/geodesic/cannonToolState`, `world-objects/geodesic/carryEnd`, `world-objects/geodesic/curveShortening`, `world-objects/geodesic/endpoints`, `world-objects/geodesic/intersections`, `world-objects/geodesic/lifecycle`, `world-objects/geodesic/objects`, `world-objects/geodesic/segments`, `world-objects/runtimeObjectBase`, `world-objects/runtimeObjectRegistry` |
 | `render/three/geodesicCreatureDebug.ts` | 258 | Consistency checker for geodesic creatures (marmot, mouse, butterfly) that produces a debug dump. | `cell-complex/compileCellComplex`, `movement/collision`, `render/three/creatures/geodesicMarmotView`, `render/three/creatures/simpleGeoCreatureView`, `render/three/worldAxes`, `world-objects/runtimeObjectBase`, `world-objects/runtimeObjectRegistry` |
 | `render/three/geodesicDebugDumps.ts` | 384 | Console debug dumps for geodesics and geodesic creatures, plus the periodic creature consistency check. | `cell-complex/compileCellComplex`, `interaction/aimTarget`, `math/vec3`, `render/three/appDebugHelpers`, `render/three/carriedGeodesicCannon`, `render/three/creatures/geodesicMarmotView`, `render/three/creatures/simpleGeoCreatureView`, `render/three/geodesicCreatureDebug`, `runtime/appSession`, `world-objects/geodesic/lifecycle`, `world-objects/geodesic/segments`, `world-objects/runtimeObjectRegistry` |
 | `render/three/geodesicEmitterLabelController.ts` | 195 | Keeps the floating geodesic-name labels next to nearby emitters in sync with the registry. | `cell-complex/compileCellComplex`, `cell-complex/portalRoute`, `math/rigidTransform3`, `render/three/geodesicEmitterLabels`, `render/three/runtimeSceneUtils`, `render/three/worldAxes`, `runtime/appSession`, `world-objects/geodesic/segments`, `world-objects/runtimeObjectRegistry` |

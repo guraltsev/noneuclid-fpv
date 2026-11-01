@@ -29,7 +29,7 @@ import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import { applyRuntimeCommand } from "../../src/runtime/applyRuntimeCommand";
 import { createTestAppSession } from "../support/appSession";
-import { yawRigidTransform3 } from "../../src/math/rigidTransform3";
+import { transformPoint3, yawRigidTransform3 } from "../../src/math/rigidTransform3";
 import { createGeodesicCannonObject } from "../../src/world-objects/geodesic/objects";
 import { shootGeodesic } from "../../src/world-objects/geodesic/cannon";
 import { getGeodesicSegments } from "../../src/world-objects/geodesic/segments";
@@ -39,6 +39,7 @@ import { cube } from "../../src/authoring/exampleWorlds";
 import { compileCellComplex, type CompiledCellComplex } from "../../src/cell-complex/compileCellComplex";
 import { createGeodesicCannonTools } from "../../src/render/three/geodesicCannonTools";
 import type { RootAimRay } from "../../src/render/three/rootAimRay";
+import type { AimTarget } from "../../src/interaction/aimTarget";
 import { worldPointToThree } from "../../src/render/three/worldAxes";
 import { createDefaultPlayerPose, type PlayerPose } from "../../src/movement/playerPose";
 import { compileLargePortalWorld } from "../fixtures/world-objects/geodesic";
@@ -50,6 +51,8 @@ function createHarness(
 ) {
   const session = createTestAppSession({ playerPose: startPose });
   const nothing = (): void => {};
+  // Where the aim ray hits, in the player's frame; none by default.
+  const aim: { rootPoint?: { x: number; y: number; z: number } } = {};
   const tools = createGeodesicCannonTools({
     renderer: { xr: { isPresenting: false } } as unknown as THREE.WebGLRenderer,
     controls: { requestPointerLock: () => Promise.resolve() } as never,
@@ -59,7 +62,7 @@ function createHarness(
     dispatch: (command) => {
       applyRuntimeCommand(session, command);
     },
-    resolveCurrentAimTarget: () => undefined,
+    resolveCurrentAimTarget: () => (aim.rootPoint ? ({ kind: "floor", rootPoint: aim.rootPoint } as unknown as AimTarget) : undefined),
     resolveCurrentAimTargets: () => [],
     targetIsWithinInteractionRange: () => false,
     logVerboseAimClick: nothing,
@@ -84,7 +87,7 @@ function createHarness(
     });
   }
 
-  return { world, registry, tools, walkInto };
+  return { world, registry, tools, walkInto, session, aim };
 }
 
 function setup() {
@@ -230,5 +233,68 @@ describe("releasing a carried emitter of a locked geodesic", () => {
     expect(Math.cos(poseYaw - faceTurn)).toBeCloseTo(1, 6);
     expect(Math.cos(emitter.aimYawRadians - poseYaw)).toBeCloseTo(1, 6);
     expect(isGeodesicLocked(registry, "g-a")).toBe(true);
+  });
+});
+
+describe("aiming an emitter from a cell other than its own", () => {
+  // Two square cells glued with a quarter turn (east side of a to south side of b), with a bare emitter in a at (4, 2.5).
+  function setupTurnedPair() {
+    const square = [{ x: 0, y: 0 }, { x: 5, y: 0 }, { x: 5, y: 5 }, { x: 0, y: 5 }];
+    const world = compileCellComplex({
+      cells: [
+        { id: "a", heightMeters: 3, baseVertices: square, portals: [{ id: "ab", sideIndex: 1, targetCellId: "b", targetPortalId: "ba" }] },
+        { id: "b", heightMeters: 3, baseVertices: square, portals: [{ id: "ba", sideIndex: 0, targetCellId: "a", targetPortalId: "ab" }] },
+      ],
+    });
+    const registry = createRuntimeObjectRegistry();
+    registry.add(createGeodesicCannonObject({ id: "cannon-a", cellId: "a", localPose: yawRigidTransform3(0, { x: 4, y: 2.5, z: 0 }) }));
+    const portal = world.cellsById.get("a")?.portals[0];
+    if (!portal) {
+      throw new Error("Expected the portal.");
+    }
+    return {
+      ...createHarness(world, registry, { ...createDefaultPlayerPose("b"), position: { x: 2.5, y: 0.5, z: 0 } }),
+      toB: portal.transformToTarget,
+    };
+  }
+
+  function aimYawOf(registry: RuntimeObjectRegistry, id: string): number {
+    const emitter = registry.get(id);
+    if (emitter?.kind !== "geodesic-cannon") {
+      throw new Error("Expected the emitter.");
+    }
+    return emitter.aimYawRadians;
+  }
+
+  function startAiming(session: ReturnType<typeof createHarness>["session"]): void {
+    applyRuntimeCommand(session, { kind: "set-cannon-tool-state", state: { selectedCannonId: "cannon-a" } });
+    applyRuntimeCommand(session, { kind: "enter-tool-mode", toolId: "geodesic-cannon-aim" });
+  }
+
+  it("turns the emitter toward the aimed point when the player is across a portal", () => {
+    const { registry, tools, session, aim, toB } = setupTurnedPair();
+    const faceTurn = Math.atan2(toB.rotation.m10, toB.rotation.m00);
+    expect(Math.abs(faceTurn)).toBeGreaterThan(1);
+    startAiming(session);
+    // The player is in b, 1.5 m from the emitter, which appears there at `image`; the aimed point is due east of it in b's frame.
+    const image = transformPoint3(toB, { x: 4, y: 2.5, z: 0 });
+    aim.rootPoint = { x: image.x + 2, y: image.y, z: 0 };
+
+    tools.updateActiveGeodesicCannonAim(false, handAt(2.5, 0.5));
+
+    expect(session.get().menuState.selectedTool).toBe("geodesic-cannon-aim");
+    // Due east in b's frame is yaw 0 there, which is -faceTurn in the emitter's own frame.
+    expect(Math.cos(aimYawOf(registry, "cannon-a") - (0 - faceTurn))).toBeCloseTo(1, 6);
+  });
+
+  it("stops aiming when the emitter is out of reach", () => {
+    const { tools, walkInto, session, aim } = setupTurnedPair();
+    startAiming(session);
+    walkInto("b", 2.5, 4.5);
+    aim.rootPoint = { x: 0, y: 0, z: 0 };
+
+    tools.updateActiveGeodesicCannonAim(false, handAt(2.5, 4.5));
+
+    expect(session.get().menuState.selectedTool).toBe("none");
   });
 });

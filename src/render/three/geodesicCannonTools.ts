@@ -13,7 +13,15 @@ import { takeObjectIdSerial } from "../../runtime/appSession";
 import type { FocusedRuntimeObject } from "./rootAimRay";
 import * as THREE from "three";
 import { type CompiledCellComplex } from "../../cell-complex/compileCellComplex";
-import { yawRigidTransform3 } from "../../math/rigidTransform3";
+import { findNearestImageRoute } from "../../cell-complex/portalRoute";
+import {
+  type RigidTransform3,
+  composeRigidTransform3,
+  identityRigidTransform3,
+  invertRigidTransform3,
+  transformPoint3,
+  yawRigidTransform3,
+} from "../../math/rigidTransform3";
 import { type Vec3, normalizeVec3 } from "../../math/vec3";
 import { getDynamicObjectCollisionBounds } from "../../movement/collision";
 import type { AppSession } from "../../runtime/appSession";
@@ -65,6 +73,9 @@ import {
 } from "./rootAimRay";
 
 export type { GeodesicCannonToolState };
+
+// Most portals a straight line from the player to an emitter being aimed may cross (the same reach as the emitter labels).
+const geodesicCannonAimMaxHops = 2;
 
 /**
  * Dependencies of the geodesic cannon tools, supplied by createThreeApp's shell.
@@ -863,19 +874,25 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
       return;
     }
 
-    if (!playerIsWithinGeodesicCannonAimRange(cannon)) {
+    // The emitter may be in another cell than the player: it then appears at an image in the player's frame.
+    const appearance = resolveCannonAppearanceFromPlayer(cannon);
+    if (!appearance) {
       finishGeodesicCannonAimMode();
       return;
     }
 
-    // Aim at the hit point if any, otherwise at the ray's intersection with the floor; yaw is derived from absolute (root-frame) points.
+    // Aim at the hit point if any, otherwise at the ray's intersection with the floor; yaw is derived from absolute (root-frame) points,
+    // with the emitter's point taken in the same (player's) frame, and then turned into the emitter's own frame.
     const aimTarget = activeAimRay ? resolveCurrentAimTarget(activeAimRay) : undefined;
     const targetAbsolutePoint = aimTarget?.rootPoint
       ?? (activeAimRay ? intersectRootRayWithFloor(activeAimRay.origin, activeAimRay.direction) : undefined);
-    const nextYaw = resolveGeodesicCannonAimYawFromAbsolutePoints({
-      source: resolveGeodesicCannonAbsoluteEmitterPoint(cannon),
+    const yawInPlayerFrame = resolveGeodesicCannonAimYawFromAbsolutePoints({
+      source: transformPoint3(appearance.playerFrameFromCell, resolveGeodesicCannonAbsoluteEmitterPoint(cannon)),
       target: targetAbsolutePoint,
     });
+    const nextYaw = yawInPlayerFrame === undefined
+      ? undefined
+      : yawInPlayerFrame - Math.atan2(appearance.playerFrameFromCell.rotation.m10, appearance.playerFrameFromCell.rotation.m00);
     if (nextYaw !== undefined) {
       const yawDelta = Math.atan2(
         Math.sin(nextYaw - cannon.aimYawRadians),
@@ -908,17 +925,31 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
     }
   }
 
-  function playerIsWithinGeodesicCannonAimRange(
+  // Where the cannon appears from the player, if within aiming range: the map from the cannon's cell frame to the player's frame
+  // (the identity in the player's own cell; otherwise through the portals a straight line from the player to the cannon crosses, at most two).
+  // Undefined when the cannon is out of range or no such line exists (a wall in between).
+  function resolveCannonAppearanceFromPlayer(
     cannon: Extract<RuntimeWorldObject, { readonly kind: "geodesic-cannon" }>,
-  ): boolean {
-    if (deps.session.get().playerPose.cellId !== cannon.cellId) {
-      return false;
+  ): { readonly playerFrameFromCell: RigidTransform3 } | undefined {
+    const player = deps.session.get().playerPose;
+    let playerFrameFromCell = identityRigidTransform3;
+    if (player.cellId !== cannon.cellId) {
+      const route = findNearestImageRoute(
+        deps.getWorld(),
+        { cellId: player.cellId, point: player.position },
+        { cellId: cannon.cellId, point: cannon.localPose.translation },
+        geodesicCannonAimMaxHops,
+      );
+      if (!route) {
+        return undefined;
+      }
+      const cellFromPlayerFrame = route.hops.reduce((frame, hop) => composeRigidTransform3(hop.transformToTarget, frame), identityRigidTransform3);
+      playerFrameFromCell = invertRigidTransform3(cellFromPlayerFrame);
     }
 
-    const rangeMeters = getRuntimeObjectInteractionRangeMeters(cannon);
-    const dx = deps.session.get().playerPose.position.x - cannon.localPose.translation.x;
-    const dy = deps.session.get().playerPose.position.y - cannon.localPose.translation.y;
-    return Math.hypot(dx, dy) <= rangeMeters;
+    const image = transformPoint3(playerFrameFromCell, cannon.localPose.translation);
+    const withinRange = Math.hypot(player.position.x - image.x, player.position.y - image.y) <= getRuntimeObjectInteractionRangeMeters(cannon);
+    return withinRange ? { playerFrameFromCell } : undefined;
   }
 
   function finishGeodesicCannonAimMode(): void {
