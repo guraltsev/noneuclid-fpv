@@ -7,6 +7,11 @@
  * however many portals away, gets one record with pose `node.cellFromStart * object.localPose`, converted to a Three.js
  * matrix.
  *
+ * The developed-disk atlas needs its centre inside its start cell. The footprint centre is offset from the object's origin (the rover's is), so when the object
+ * stands at a portal side the centre can lie across the side, in the neighbouring cell, exactly where the ghost is needed; the atlas, given that centre, skips the
+ * side without a word. So the centre is first located (`locateDevelopedPoint`, the segment-walk kernel, from the origin) and the disk is developed from the cell it is
+ * in; every copy is then mapped back to the object's own frame. A centre in its own cell, or only beyond a wall, is developed from where it is, as always.
+ *
  * The footprint is what is DRAWN (`RenderFootprint`: centre and radius in the object's own frame), never the collision shape: a ghost exists
  * to show the drawn part on the other side of a portal, and the drawn part need not be centred on, or as wide as, the body that collides.
  * It is a required input. An object has no fallback footprint; a drawn part without a measured one is an error, reported by the caller.
@@ -22,8 +27,9 @@
 
 import type * as THREE from "three";
 import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex";
-import { collectDevelopedDisk, type DevelopedDiskNode } from "../../cell-complex/developedDisk";
-import { composeRigidTransform3, transformPoint3 } from "../../math/rigidTransform3";
+import { collectDevelopedDisk } from "../../cell-complex/developedDisk";
+import { locateDevelopedPoint } from "../../cell-complex/segmentWalk";
+import { composeRigidTransform3, identityRigidTransform3, transformPoint3, type RigidTransform3 } from "../../math/rigidTransform3";
 import { vec3 } from "../../math/vec3";
 import type { DynamicObjectState } from "../../movement/dynamicObject";
 import { rigidTransformToThreeMatrix } from "./worldAxes";
@@ -123,12 +129,12 @@ function withPartMatrix(poseMatrix: THREE.Matrix4, partMatrix: THREE.Matrix4 | u
 
 /** What the ghost rule decided for one cell copy the developed disk reached. */
 export interface PortalGhostCopyDecision {
-  /** Position in the disk's breadth-first order; 0 is the object's own cell. */
+  /** Position in the disk's breadth-first order. */
   readonly index: number;
   readonly cellId: string;
-  /** Portal hops from the object's own cell. */
+  /** Portal hops from the cell the disk was developed from (see {@link PortalGhostExplanation.diskStartCellId}). */
   readonly depth: number;
-  /** Side of this copy through which the disk reached it; undefined for the own cell. */
+  /** Side of this copy through which the disk reached it; undefined for the disk's start cell. */
   readonly entrySideIndex?: number;
   /** The footprint centre in this copy's cell frame (x, y meters). */
   readonly center: { readonly x: number; readonly y: number };
@@ -143,7 +149,11 @@ export interface PortalGhostExplanation {
   readonly cellId: string;
   /** The footprint used, in the object's own frame. */
   readonly footprint: RenderFootprint;
-  /** The footprint centre in the object's cell frame (x, y meters), the disk's centre before the disk's own inward nudge. */
+  /** The footprint centre in the object's cell frame (x, y meters); across a portal side when the object stands at that side and its drawn centre is offset. */
+  readonly footprintCenterInCell: { readonly x: number; readonly y: number };
+  /** The cell the disk was developed from: the object's own cell, or the cell the footprint centre lies in when it is across a portal side. */
+  readonly diskStartCellId: string;
+  /** The disk centre in the frame of `diskStartCellId` (x, y meters). */
   readonly diskCenter: { readonly x: number; readonly y: number };
   /** Footprint radius plus the activation clearance: the radius asked of the developed disk. */
   readonly diskRadiusMeters: number;
@@ -155,15 +165,28 @@ export interface PortalGhostExplanation {
 
 interface PortalGhostDevelopment {
   readonly explanation: PortalGhostExplanation;
-  /** The disk nodes that get a ghost record, with their index in the explanation's `copies`. */
-  readonly ghostNodes: readonly { readonly node: DevelopedDiskNode; readonly index: number }[];
+  /** The copies that get a ghost record: the cell and the transform from the object's own cell frame to the copy's frame. */
+  readonly ghostCopies: readonly { readonly cellId: string; readonly cellFromOwn: RigidTransform3 }[];
+}
+
+const ownCopyToleranceMeters = 1e-6;
+
+// Whether the point lies beyond a side of the cell that has a portal (the case the atlas cannot handle from there).
+function isBeyondPortalSide(
+  cell: { readonly sides: readonly { readonly portal?: unknown; readonly start: { readonly x: number; readonly y: number }; readonly inwardNormal: { readonly x: number; readonly y: number } }[] },
+  point: { readonly x: number; readonly y: number },
+): boolean {
+  return cell.sides.some(
+    (side) => side.portal !== undefined && (point.x - side.start.x) * side.inwardNormal.x + (point.y - side.start.y) * side.inwardNormal.y < 0,
+  );
 }
 
 // The one place the ghost rule is decided: the records and the explanation both come from it.
 function developPortalGhosts(request: PortalGhostRuntimeObjectRenderRecordRequest): PortalGhostDevelopment | undefined {
   const { object, world } = request;
+  const ownCell = world.cellsById.get(object.cellId);
 
-  if (!world.cellsById.has(object.cellId)) {
+  if (!ownCell) {
     return undefined;
   }
 
@@ -173,16 +196,32 @@ function developPortalGhosts(request: PortalGhostRuntimeObjectRenderRecordReques
     throw new Error(`Object "${object.id}" has no render footprint (radius ${radius}); its portal ghosts cannot be decided.`);
   }
 
-  // The footprint centre is in the object's own frame; the disk is taken in the cell's frame.
+  // The footprint centre is in the object's own frame; here it is in the cell's frame, where it may lie across a portal side.
   const center = transformPoint3(object.localPose, vec3(request.renderFootprint.center.x, request.renderFootprint.center.y, 0));
   const clearance = request.activationClearanceMeters ?? defaultPortalGhostActivationClearanceMeters;
-  const disk = collectDevelopedDisk({ world, cellId: object.cellId, center, radiusMeters: radius + clearance });
+  // The atlas needs its centre inside its start cell. A centre across a portal side is in the neighbouring cell: find that cell by walking from the origin.
+  let startCellId = object.cellId;
+  let startFromOwn: RigidTransform3 = identityRigidTransform3;
+
+  if (isBeyondPortalSide(ownCell, center)) {
+    const located = locateDevelopedPoint(world, object.cellId, object.localPose.translation, center);
+
+    if (located.status === "end") {
+      startCellId = located.cellId;
+      startFromOwn = located.cellFromStart;
+    }
+  }
+
+  const startCenter = transformPoint3(startFromOwn, vec3(center.x, center.y, 0));
+  const disk = collectDevelopedDisk({ world, cellId: startCellId, center: startCenter, radiusMeters: radius + clearance });
   const kept: { readonly index: number; readonly cellId: string; readonly x: number; readonly y: number }[] = [];
   const copies: PortalGhostCopyDecision[] = [];
-  const ghostNodes: { readonly node: DevelopedDiskNode; readonly index: number }[] = [];
+  const ghostCopies: { cellId: string; cellFromOwn: RigidTransform3 }[] = [];
 
   for (const [index, node] of disk.nodes.entries()) {
-    const ghostCenter = transformPoint3(node.cellFromStart, vec3(center.x, center.y, 0));
+    const cellFromOwn = composeRigidTransform3(node.cellFromStart, startFromOwn);
+    const ghostCenter = transformPoint3(cellFromOwn, vec3(center.x, center.y, 0));
+    const isOwn = node.cellId === object.cellId && Math.hypot(ghostCenter.x - center.x, ghostCenter.y - center.y) < ownCopyToleranceMeters;
     const conflict = kept.find(
       (other) => other.cellId === node.cellId && Math.hypot(other.x - ghostCenter.x, other.y - ghostCenter.y) < 2 * radius,
     );
@@ -195,13 +234,13 @@ function developPortalGhosts(request: PortalGhostRuntimeObjectRenderRecordReques
 
     kept.push({ index, cellId: node.cellId, x: ghostCenter.x, y: ghostCenter.y });
 
-    if (index === 0) {
+    if (isOwn) {
       copies.push({ ...base, outcome: "own" });
       continue;
     }
 
     copies.push({ ...base, outcome: "ghost" });
-    ghostNodes.push({ node, index });
+    ghostCopies.push({ cellId: node.cellId, cellFromOwn });
   }
 
   return {
@@ -209,13 +248,15 @@ function developPortalGhosts(request: PortalGhostRuntimeObjectRenderRecordReques
       objectId: object.id,
       cellId: object.cellId,
       footprint: request.renderFootprint,
-      diskCenter: { x: center.x, y: center.y },
+      footprintCenterInCell: { x: center.x, y: center.y },
+      diskStartCellId: startCellId,
+      diskCenter: { x: disk.center.x, y: disk.center.y },
       diskRadiusMeters: radius + clearance,
       activationClearanceMeters: clearance,
       truncated: disk.truncated,
       copies,
     },
-    ghostNodes,
+    ghostCopies,
   };
 }
 
@@ -249,16 +290,16 @@ export function collectPortalGhostRuntimeObjectRenderRecords(
 
   const records: RuntimeObjectRenderRecord[] = [];
 
-  for (const { node } of development.ghostNodes) {
+  for (const copy of development.ghostCopies) {
     const ghostMatrix = withPartMatrix(
-      rigidTransformToThreeMatrix(composeRigidTransform3(node.cellFromStart, request.object.localPose)),
+      rigidTransformToThreeMatrix(composeRigidTransform3(copy.cellFromOwn, request.object.localPose)),
       request.partMatrix,
     );
 
     for (const archetypeKey of archetypeKeys) {
       records.push({
         objectId: request.object.id,
-        cellId: node.cellId,
+        cellId: copy.cellId,
         archetypeKey,
         localMatrix: ghostMatrix,
         ...request.recordFlags,

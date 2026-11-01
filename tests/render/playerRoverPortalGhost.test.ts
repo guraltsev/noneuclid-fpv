@@ -56,6 +56,10 @@ describe("the player's rover standing 7 cm from a portal side of the tetrahedron
     expect(ghostCells(-58.120558)).toContain("face-a");
   });
 
+  it("makes that one ghost and no other: the drawn disk reaches only face-a", () => {
+    expect(ghostCells(-58.120558)).toEqual(["face-a"]);
+  });
+
   it("explains that copy as a ghost in face-a reached through the side", () => {
     const explained = explainPortalGhosts({ world, object: pose(-58.120558), archetypeKeys: keys, renderFootprint: footprint })!;
 

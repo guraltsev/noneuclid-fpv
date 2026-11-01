@@ -414,6 +414,9 @@ $M_p\cdot\text{local}$. Ghosts come from the developed disk (`src/cell-complex/d
 $r+0.02$ m around the centre $c$ of the object's *render footprint*: the disk that holds everything drawn of it, measured from the
 drawn meshes (`src/render/three/runtimeObjectRenderRecords.ts#computeRenderSourceFootprint`), with $c$ and $r$ in the object's own
 frame. The collision shape plays no part, and the footprint is required: a drawn part whose footprint cannot be measured is an error.
+The disk atlas needs its centre inside its start cell, but $c$ is offset from the object's origin and, for an object standing at a portal side, can lie
+across that side; $c$ is then located by walking from the origin (`src/cell-complex/segmentWalk.ts#locateDevelopedPoint`) and the disk is developed from
+the cell $c$ lies in, every copy being mapped back to the object's own frame.
 Every cell copy the disk reaches, however many portals away, gets one *ghost* with pose $g\circ\text{pose}$
 (`src/render/three/runtimeObjectGhostRecords.ts#collectPortalGhostRuntimeObjectRenderRecords`), so a creature half-way through a
 portal, or next to a vertex, is drawn in every neighbouring cell. Around a cone vertex the same cell can be reached twice; two

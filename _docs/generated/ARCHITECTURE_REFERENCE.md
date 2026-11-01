@@ -5,7 +5,7 @@
 
 This reference is produced from the source code. For the *meaning* of the modules — the mathematical model they implement — read [../MATHEMATICAL_MODEL.md](../MATHEMATICAL_MODEL.md) and [../ARCHITECTURE.md](../ARCHITECTURE.md). For every exported symbol see [API_REFERENCE.md](API_REFERENCE.md).
 
-**221 modules, 49,414 lines** under `src/`.
+**221 modules, 49,455 lines** under `src/`.
 
 ## Layers
 
@@ -25,7 +25,7 @@ A module belongs to the layer named by its first path segment under `src/`. "May
 | `interaction` | 5 | 1,595 | `math`, `cell-complex`, `movement`, `world-objects`, `glue` | Renderer-free interaction logic: input frames, aim picking, VR locomotion, XR session state, carried-object portal transitions. |
 | `runtime` | 13 | 2,678 | `math`, `cell-complex`, `diagnostics`, `movement`, `world-objects`, `authoring`, `glue` | Application state, runtime menu state, command dispatch, geometry session/worker, server channel and public API. |
 | `ui` | 6 | 1,320 | `math`, `cell-complex`, `world-objects`, `authoring`, `glue`, `runtime` | Renderer-neutral palette, help, tooltip and input-intent definitions. |
-| `render` | 106 | 24,153 | every lower layer | Three.js / DOM / WebXR rendering and input adapters (the application shell). |
+| `render` | 106 | 24,194 | every lower layer | Three.js / DOM / WebXR rendering and input adapters (the application shell). |
 | `root` | 1 | 213 | every lower layer | Entry point. |
 
 ## Layer dependency graph
@@ -62,7 +62,7 @@ flowchart LR
   interaction -->|5| world_objects
   movement -->|11| cell_complex
   movement -->|21| math
-  render -->|49| cell_complex
+  render -->|50| cell_complex
   render -->|11| diagnostics
   render -->|28| glue
   render -->|19| interaction
@@ -356,7 +356,7 @@ None: every import respects the intended layering.
 | `render/three/renderQuality.ts` | 118 | Render-resolution policy and the pixel sizes that portal clipping depends on. | — |
 | `render/three/renderState.ts` | 139 | Plain-data snapshots of runtime and render diagnostics, shared between the Three.js app, the debug overlay, the XR debug panel and the console debug helpers. | `interaction/inputFrame`, `math/vec3` |
 | `render/three/rootAimRay.ts` | 80 | Aim-ray value type and pure aim helpers shared by desktop and XR interaction code. | `interaction/aimTarget`, `math/vec3`, `render/three/worldAxes`, `world-objects/runtimeObjectRegistry` |
-| `render/three/runtimeObjectGhostRecords.ts` | 271 | Creates "ghost" render records so a dynamic object that overlaps a portal is drawn on every side of it. | `cell-complex/compileCellComplex`, `cell-complex/developedDisk`, `math/rigidTransform3`, `math/vec3`, `movement/dynamicObject`, `render/three/runtimeObjectRenderRecords`, `render/three/worldAxes` |
+| `render/three/runtimeObjectGhostRecords.ts` | 312 | Creates "ghost" render records so a dynamic object that overlaps a portal is drawn on every side of it. | `cell-complex/compileCellComplex`, `cell-complex/developedDisk`, `cell-complex/segmentWalk`, `math/rigidTransform3`, `math/vec3`, `movement/dynamicObject`, `render/three/runtimeObjectRenderRecords`, `render/three/worldAxes` |
 | `render/three/runtimeObjectInstanceSync.ts` | 569 | Runtime-object instance sync: brings the instanced render archetypes of runtime objects up to date and writes their instances from one {@link FrameRenderSnapshot}. | `cell-complex/compileCellComplex`, `render/three/carryHighlight`, `render/three/frameRenderSnapshot`, `render/three/geodesicCannonRenderer`, `render/three/playerRoverModel`, `render/three/renderInspection`, `render/three/renderPortalInstances`, `render/three/runtimeObjectGhostRecords`, `render/three/runtimeObjectRenderArchetypes`, `render/three/runtimeObjectRenderRecords`, `render/three/runtimeSceneUtils`, `runtime/appSession`, `world-objects/runtimeObjectBase`, `world-objects/runtimeObjectRegistry` |
 | `render/three/runtimeObjectRenderArchetypes.ts` | 157 | Instanced-mesh archetypes for runtime objects: one `THREE.InstancedMesh` per source mesh, drawn once per visible portal path. | `render/three/portalClipMaterial`, `render/three/runtimeObjectRenderRecords`, `render/three/runtimeSceneUtils` |
 | `render/three/runtimeObjectRenderRecords.ts` | 186 | Data records describing where runtime (non-static) objects should be drawn, and the source meshes they instance. | — |

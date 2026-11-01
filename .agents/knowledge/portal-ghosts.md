@@ -32,3 +32,11 @@ Rules (maintainer, 2026-11-01):
   not drawn in the root cell's own path wherever it appears. Its drawn disk (from `rover.glb` at scale 0.1925 and the half turn) is centre (0, 0.146), radius 0.963 m, so the
   player is ghosted within about 1 m of a portal. The rover is never cached (it moves every frame), so its ghost disk is recomputed each sync.
 - A part's own matrix in the object's frame (the highlight's ellipsoid scale) is the ghost request's `partMatrix`, applied to the own record and every ghost; do not post-process records.
+- **The rover cut off at a portal side, nothing beyond it (found 2026-11-01 with `render.explainGhosts`)**: the footprint centre is offset from the object's origin (the rover's
+  by 0.146 m), so standing 7 cm from a portal side the centre could lie 3.7 mm *across* the side, outside the object's own cell. `collectDevelopedDisk` assumes a centre inside its
+  start cell and, given one beyond a portal side, **skips that side silently** (`signedDistance <= tolerance -> continue`), so the disk found only the own cell and no ghost was made.
+  It happened for every heading that points the offset at the side (the whole -55..55 degree range at the tetrahedron pose face-c, 9.96735, 6.593276). A wall beyond the centre is fine; only a *portal*
+  side is the case. Fix: `developPortalGhosts` first locates the centre with `locateDevelopedPoint` (the segment-walk kernel, from the origin) and develops the disk from the cell the centre is in,
+  mapping each copy back to the object's own frame; a centre in its own cell is developed as before (exact, no extra ghosts). Test: `tests/render/playerRoverPortalGhost.test.ts` (real tetrahedron, real rover
+  model bounds). The explanation (`render.explainGhosts`) reports `footprintCenterInCell`, `diskStartCellId` and each copy's outcome (`own` / `ghost` / `duplicate`).
+- Do not "fix" a missing ghost by enlarging the disk or moving the centre inside the cell: that adds ghosts in cells the drawn disk does not reach (the exactness tests fail), and phantoms appear.
