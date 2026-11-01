@@ -27,10 +27,8 @@
  */
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
-import { defaultAppConfig } from "../../src/glue/appConfig";
 import { applyRuntimeCommand } from "../../src/runtime/applyRuntimeCommand";
-import { createAppSession } from "../../src/runtime/appSession";
-import { createRuntimeMenuState } from "../../src/runtime/runtimeMenuState";
+import { createTestAppSession } from "../support/appSession";
 import { yawRigidTransform3 } from "../../src/math/rigidTransform3";
 import { createGeodesicCannonObject } from "../../src/world-objects/geodesic/objects";
 import { shootGeodesic } from "../../src/world-objects/geodesic/cannon";
@@ -39,7 +37,7 @@ import { getGeodesicConnection, isGeodesicLocked } from "../../src/world-objects
 import { createRuntimeObjectRegistry, type RuntimeObjectRegistry } from "../../src/world-objects/runtimeObjectRegistry";
 import { cube } from "../../src/authoring/exampleWorlds";
 import { compileCellComplex, type CompiledCellComplex } from "../../src/cell-complex/compileCellComplex";
-import { createGeodesicCannonTools, type GeodesicCannonToolState } from "../../src/render/three/geodesicCannonTools";
+import { createGeodesicCannonTools } from "../../src/render/three/geodesicCannonTools";
 import type { RootAimRay } from "../../src/render/three/rootAimRay";
 import { worldPointToThree } from "../../src/render/three/worldAxes";
 import { createDefaultPlayerPose, type PlayerPose } from "../../src/movement/playerPose";
@@ -50,12 +48,7 @@ function createHarness(
   registry: RuntimeObjectRegistry,
   startPose: PlayerPose,
 ) {
-  const session = createAppSession({
-    menuState: createRuntimeMenuState({ selectedWorldId: "test" }),
-    appConfig: defaultAppConfig,
-  });
-  let toolState: GeodesicCannonToolState = {};
-  let playerPose = startPose;
+  const session = createTestAppSession({ playerPose: startPose });
   const nothing = (): void => {};
   const scene = new THREE.Scene();
   const tools = createGeodesicCannonTools({
@@ -68,12 +61,6 @@ function createHarness(
     dispatch: (command) => {
       applyRuntimeCommand(session, command);
     },
-    getCannonToolState: () => toolState,
-    setCannonToolState: (next) => {
-      toolState = next;
-    },
-    getPlayerPose: () => playerPose,
-    getDebugLevel: () => "off",
     resolveCurrentAimTarget: () => undefined,
     resolveCurrentAimTargets: () => [],
     targetIsWithinInteractionRange: () => false,
@@ -93,7 +80,10 @@ function createHarness(
 
   // The player stands in `cellId` at (x, y); how they got there does not matter to the tools.
   function walkInto(cellId: string, x: number, y: number): void {
-    playerPose = { ...playerPose, cellId, position: { x, y, z: 0 } };
+    applyRuntimeCommand(session, {
+      kind: "set-player-pose",
+      pose: { ...session.get().playerPose, cellId, position: { x, y, z: 0 } },
+    });
   }
 
   return { world, registry, tools, walkInto, scene };

@@ -6,9 +6,7 @@
  */
 import * as THREE from "three";
 import { type CompiledCellComplex } from "../../cell-complex/compileCellComplex";
-import { type PlayerPose } from "../../movement/playerPose";
 import { DEFAULT_PLAYER_EYE_HEIGHT_METERS } from "../../movement/playerBody";
-import { type DebugLevelId } from "../../diagnostics/debugLevels";
 import type { AppSession } from "../../runtime/appSession";
 import {
   createWorldFocusMessageDefinition,
@@ -20,7 +18,6 @@ import { type RuntimeObjectRegistry, type RuntimeWorldObject } from "../../world
 import { AimTarget } from "../../interaction/aimTarget";
 import { resolveAimTargets as defaultResolveAimTargets } from "./aimTarget";
 import { formatVec3, roundNumber } from "./appDebugHelpers";
-import { GeodesicCannonToolState } from "./geodesicCannonTools";
 import { renderCameraFarMeters, renderCameraNearMeters } from "./renderCameraClip";
 import {
   RootAimRay,
@@ -41,14 +38,8 @@ export interface AimInteractionDeps {
   readonly runtimeObjectRegistry: RuntimeObjectRegistry;
   /** Getter: the currently active (possibly deformed) compiled world. */
   getWorld(): CompiledCellComplex;
-  /** Getter: current debug level; only the verbose level enables click logging. */
-  getDebugLevel(): DebugLevelId;
   /** The shell session; its menu state's selectedTool affects which geodesic is ignored and the focus message. */
   readonly session: AppSession;
-  /** Getter: geodesic cannon tool state; activeGeodesicId is excluded from aim hits while aiming a cannon. */
-  getCannonToolState(): GeodesicCannonToolState;
-  /** Getter: the player pose; its cell is the render root cell and its position anchors the root frame. */
-  getPlayerPose(): PlayerPose;
   /** Getter: frame counter, incremented once per rendered frame; invalidates the per-frame aim cache. */
   getFrameSerial(): number;
   /** Optional override of the ray-walk resolver (tests count resolutions through it). */
@@ -95,7 +86,7 @@ export function createAimInteraction(deps: AimInteractionDeps) {
 
   // While the geodesic-cannon-aim tool is active, the geodesic being aimed is ignored so it cannot block its own aim.
   function resolveCurrentAimTargets(ray: RootAimRay): readonly AimTarget[] {
-    const activeGeodesicId = deps.getCannonToolState().activeGeodesicId;
+    const activeGeodesicId = deps.session.get().cannonToolState.activeGeodesicId;
     const ignoredGeodesicIds = deps.session.get().menuState.selectedTool === "geodesic-cannon-aim" && activeGeodesicId
       ? [activeGeodesicId]
       : undefined;
@@ -111,7 +102,7 @@ export function createAimInteraction(deps: AimInteractionDeps) {
     }
 
     const aimCamera = syncAimRayCamera(ray);
-    const pose = deps.getPlayerPose();
+    const pose = deps.session.get().playerPose;
     const targets = resolveAimTargets({
       world: deps.getWorld(),
       registry: runtimeObjectRegistry,
@@ -215,7 +206,7 @@ export function createAimInteraction(deps: AimInteractionDeps) {
 
   // Logs the aim hit to the console when the debug level is verbose.
   function logVerboseAimClick(target: ReturnType<typeof resolveCurrentAimTarget>): void {
-    if (deps.getDebugLevel() !== "verbose") {
+    if (deps.session.get().debugSettings.debugLevel !== "verbose") {
       return;
     }
 

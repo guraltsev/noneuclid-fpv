@@ -8,6 +8,7 @@
  * `document.createElement("canvas")` (the label's text texture) is faked by tests/support/fakeCanvas2d.ts.
  */
 import * as THREE from "three";
+import { createTestAppSession } from "../support/appSession";
 import { describe, expect, it } from "vitest";
 import {
   createGeodesicEmitterLabelController,
@@ -43,7 +44,7 @@ describe("geodesicEmitterLabelController sweep", () => {
       runtimeObjectRegistry: registry,
       geodesicEmitterLabelsByKey: labels,
       getWorld: () => compileLargePortalWorld(),
-      getPlayerPose: () => ({ cellId: "a", position: { x: 0, y: 0, z: 0 }, yawRadians: 0 }) as never,
+      session: createTestAppSession({ playerPose: { cellId: "a", position: { x: 0, y: 0, z: 0 }, yawRadians: 0 } as never }),
       getRegistryVersion: () => registry.getVersion(),
     });
 
@@ -68,7 +69,7 @@ describe("geodesicEmitterLabelController placement", () => {
       runtimeObjectRegistry: registry,
       geodesicEmitterLabelsByKey: labels,
       getWorld: () => world,
-      getPlayerPose: () => ({ cellId: "a", position: { x: 4.5, y: 2.5, z: 0 }, yawRadians: 0, pitchRadians: 0 }),
+      session: createTestAppSession({ playerPose: { cellId: "a", position: { x: 4.5, y: 2.5, z: 0 }, yawRadians: 0, pitchRadians: 0 } }),
       getRegistryVersion: () => registry.getVersion(),
     });
     controller.updateGeodesicEmitterLabels();

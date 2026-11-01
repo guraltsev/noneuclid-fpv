@@ -679,6 +679,14 @@ Emitter (cannon) operations: shooting, extending and re-aiming geodesics, connec
 | function | `placeGeodesicCannonOnGeodesic` | Places a new cannon at a point of a free geodesic and splits the geodesic there into two intervals. |
 | function | `placeGeodesicCannonAtGeodesicVertex` | Places a cannon at a vertex where segments pass and cuts every passing geodesic there, connecting the pieces to the new cannon. |
 
+### `world-objects/geodesic/cannonToolState.ts`
+
+The editing state of the geodesic emitter (cannon) tools, as plain data: which cannon and geodesic the tool works on and the endpoints picked by tie-and-detach.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `GeodesicCannonToolState` | Editing state of the geodesic emitter (cannon) tools. |
+
 ### `world-objects/geodesic/curveShortening.ts`
 
 Curve shortening: tie-and-detach of two endpoint roles into a curve-shortening pair, and its exact resolution in one tick.
@@ -1001,6 +1009,7 @@ Protractor tool: persistent angle measurements between two geodesic directions a
 | const | `protractorAngleLabelAimPaddingMeters` | Padding in meters added on each side of the badge to form the (more forgiving) aiming hitbox. |
 | const | `protractorAngleLabelAimDepthMeters` | Thickness in meters of the label's aiming hitbox along its normal. |
 | interface | `ProtractorCenterSelection` | The vertex chosen as the centre of an angle: where it is, which cell, and which geodesics pass through it. |
+| interface | `ProtractorToolState` | Selections made so far by the protractor tool: the centre vertex, then the first side. |
 | function | `resolveProtractorCenterSelection` | Builds the centre selection for a cannon or intersection object. |
 | function | `resolveProtractorDirectedGeodesicSelection` | Resolves a clicked geodesic segment into a ray leaving the centre, or undefined if the segment is not a valid side. |
 | function | `resolveProtractorEmitterGeodesicSelection` | Resolves an emitter at the centre into a ray along one of its geodesics, or undefined if it is not in the centre's cell or shares no geodesic with it. |
@@ -1365,9 +1374,12 @@ The shell-side session: the one record that holds the mutable state of a running
 
 | Kind | Name | Summary |
 | --- | --- | --- |
+| type | `ObjectIdFamily` | Families of runtime objects whose ids carry a serial number from the session. |
 | interface | `AppSessionState` | Mutable state of one running world, as one plain record. |
 | interface | `AppSession` | Owner of the current AppSessionState. |
 | function | `createAppSession` | Creates a session holding `initial`. |
+| const | `initialObjectIdSerials` | Serial numbers all start at zero. |
+| function | `takeObjectIdSerial` | Returns the next unused serial number of an object id family and advances the counter; the caller formats the id. |
 
 ### `runtime/appState.ts`
 
@@ -1964,7 +1976,6 @@ Geodesic emitter (cannon) tools: place, rotate, aim, carry, tie-and-detach, and 
 
 | Kind | Name | Summary |
 | --- | --- | --- |
-| interface | `GeodesicCannonToolState` | Editing state of the geodesic emitter (cannon) tools. |
 | interface | `GeodesicCannonToolsDeps` | Dependencies of the geodesic cannon tools, supplied by createThreeApp's shell. |
 | function | `createGeodesicCannonTools` | Creates the geodesic cannon tool controller and returns its operations. |
 

@@ -6,6 +6,9 @@ import type { TutorialPageSpec } from "../cell-complex/specs";
 import type { DebugSettings } from "../glue/debugSettings";
 import type { PortalPanelModeId } from "../glue/portalPanelMode";
 import type { RuntimeDebugOverlayItemId, RuntimeToolId } from "../glue/toolIds";
+import type { PlayerPose } from "../movement/playerPose";
+import type { GeodesicCannonToolState } from "../world-objects/geodesic/cannonToolState";
+import type { ProtractorToolState } from "../world-objects/protractorTool";
 import type { PlacedFlagType } from "../world-objects/toolObjects";
 import type { RuntimeMenuConsoleLogLevelId } from "./runtimeMenuState";
 
@@ -67,6 +70,10 @@ export type RuntimeCommand =
   | { readonly kind: "choose-place-flag-type"; readonly flagType: PlacedFlagType }
   | { readonly kind: "set-editing-flag"; readonly flagId: string | undefined }
   | { readonly kind: "set-editing-sign-message"; readonly message: string }
+  // Tool and player state written by the tools and the frame loop.
+  | { readonly kind: "set-cannon-tool-state"; readonly state: GeodesicCannonToolState }
+  | { readonly kind: "set-protractor-tool-state"; readonly state: ProtractorToolState }
+  | { readonly kind: "set-player-pose"; readonly pose: PlayerPose }
   // World, config, reload.
   | { readonly kind: "select-world"; readonly worldId: string }
   | { readonly kind: "select-config"; readonly configName: string }

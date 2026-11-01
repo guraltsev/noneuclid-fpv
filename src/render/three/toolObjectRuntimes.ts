@@ -9,8 +9,9 @@
  * poses are cell-local (meters, radians). Removing a registry object does not itself dispose its runtime,
  * so each removal path here pairs the two.
  */
+import type { AppSession } from "../../runtime/appSession";
+import type { RuntimeCommand } from "../../runtime/runtimeCommands";
 import * as THREE from "three";
-import { type PlayerPose } from "../../movement/playerPose";
 import { type CompiledCellComplex } from "../../cell-complex/compileCellComplex";
 import { refreshMeasuredGeodesicLengthObject } from "../../world-objects/measureLengthTool";
 import { refreshProtractorAngleObject } from "../../world-objects/protractorTool";
@@ -53,10 +54,10 @@ export interface ToolObjectRuntimesDeps {
   readonly runtimeObjectRenderRoot: THREE.Object3D;
   /** Getter for the active compiled world, used to re-measure lengths against geodesic parts seen through portals. */
   getWorld(): CompiledCellComplex;
-  /** Getter because the shell reassigns the player pose; used to re-measure lengths from the player's position. */
-  getPlayerPose(): PlayerPose;
-  /** Resets the shell's protractor tool state to empty. */
-  resetProtractorToolState(): void;
+  /** The shell session: player pose, debug settings and the cannon tool state are read from it. */
+  readonly session: AppSession;
+  /** Runs a command through the shell's one command path. */
+  dispatch(command: RuntimeCommand): void;
   /** Removes the in-scene protractor preview feedback. */
   clearProtractorToolFeedback(): void;
   /** Requests a sync of the instanced copies of runtime objects seen through portals; the frame performs it. */
@@ -248,8 +249,8 @@ export function createToolObjectRuntimes(deps: ToolObjectRuntimesDeps) {
       registry: runtimeObjectRegistry,
       world: deps.getWorld(),
       measurement: object,
-      playerCellId: deps.getPlayerPose().cellId,
-      playerPoint: deps.getPlayerPose().position,
+      playerCellId: deps.session.get().playerPose.cellId,
+      playerPoint: deps.session.get().playerPose.position,
     });
     if (!refreshed) {
       runtimeObjectRegistry.remove(object.id);
@@ -286,7 +287,7 @@ export function createToolObjectRuntimes(deps: ToolObjectRuntimesDeps) {
         removeProtractorAngleRuntime(object.id);
       }
     }
-    deps.resetProtractorToolState();
+    deps.dispatch({ kind: "set-protractor-tool-state", state: {} });
     clearProtractorToolFeedback();
     syncRuntimeObjectPortalInstances();
     syncSelectableHitboxDebug();

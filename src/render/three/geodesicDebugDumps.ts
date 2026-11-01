@@ -8,7 +8,6 @@
  */
 import * as THREE from "three";
 import { type CompiledCellComplex } from "../../cell-complex/compileCellComplex";
-import { type DebugLevelId } from "../../diagnostics/debugLevels";
 import { addVec3, scaleVec3 } from "../../math/vec3";
 import type { AppSession } from "../../runtime/appSession";
 import { collectGeodesicPortalWord, getGeodesicSegments } from "../../world-objects/geodesic/segments";
@@ -54,14 +53,10 @@ export interface GeodesicDebugDumpsDeps {
   readonly cellMeshes: ReadonlyMap<string, THREE.Object3D>;
   /** Getter for the active compiled world (it can be replaced at runtime). */
   getWorld(): CompiledCellComplex;
-  /** Getter for the current debug level; only "verbose" enables the periodic check. */
-  getDebugLevel(): DebugLevelId;
   /** The shell session; only the menu state's selected tool is reported. */
   readonly session: AppSession;
   /** Getter for the id of the cell currently rendered as visible, if any. */
   getVisibleCellId(): string | undefined;
-  /** Getter for the emitter tool state used to pick the default geodesic and carry-session words. */
-  getCannonToolState(): GeodesicDebugToolState;
   /** Getter for the most recent portal crossing by the player or carried emitter, if any. */
   /** Geodesic or emitter the camera ray currently targets, if any. */
   resolveCameraAimTarget(): AimTarget | undefined;
@@ -188,7 +183,7 @@ export function createGeodesicDebugDumps(deps: GeodesicDebugDumpsDeps) {
       worldId: deps.worldId,
       visibleCellId: deps.getVisibleCellId(),
       selectedTool: deps.session.get().menuState.selectedTool,
-      activeGeodesicCannonToolState: deps.getCannonToolState(),
+      activeGeodesicCannonToolState: deps.session.get().cannonToolState,
       geodesicIds,
       intervals: intervals.map((interval) => {
         const intervalSegments = getGeodesicSegments(runtimeObjectRegistry, interval.id);
@@ -323,11 +318,11 @@ export function createGeodesicDebugDumps(deps: GeodesicDebugDumpsDeps) {
   }
 
   function resolveDebugGeodesicId(): string | undefined {
-    if (deps.getCannonToolState().activeGeodesicId) {
-      return deps.getCannonToolState().activeGeodesicId;
+    if (deps.session.get().cannonToolState.activeGeodesicId) {
+      return deps.session.get().cannonToolState.activeGeodesicId;
     }
 
-    const cannonId = deps.getCannonToolState().selectedCannonId;
+    const cannonId = deps.session.get().cannonToolState.selectedCannonId;
     const selectedCannon = cannonId ? runtimeObjectRegistry.get(cannonId) : undefined;
     if (selectedCannon?.kind === "geodesic-cannon") {
       return selectedCannon.activeGeodesicId ?? selectedCannon.geodesicIds[0];
@@ -346,7 +341,7 @@ export function createGeodesicDebugDumps(deps: GeodesicDebugDumpsDeps) {
   }
 
   function updateGeodesicCreatureDebug(deltaSeconds: number): void {
-    if (deps.getDebugLevel() !== "verbose" || deltaSeconds <= 0) {
+    if (deps.session.get().debugSettings.debugLevel !== "verbose" || deltaSeconds <= 0) {
       return;
     }
 

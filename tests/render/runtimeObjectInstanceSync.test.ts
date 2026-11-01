@@ -11,6 +11,7 @@
  * (tests.md §2.2): those are an optimisation, not a behaviour a caller observes.
  */
 import * as THREE from "three";
+import { createTestAppSession } from "../support/appSession";
 import { describe, expect, it } from "vitest";
 import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
 import type { CellComplexSpec } from "../../src/cell-complex/specs";
@@ -114,7 +115,7 @@ function setup(
     maxVisiblePaths: 4,
     diagnostics: createRuntimeObjectRenderArchetypeDiagnostics(),
     getWorld: () => world,
-    getPlayerPose: () => ({ cellId: "room-b", position: { x: 0, y: 0, z: 0 }, yawRadians: 0 }) as unknown as PlayerPose,
+    session: createTestAppSession({ playerPose: { cellId: "room-b", position: { x: 0, y: 0, z: 0 }, yawRadians: 0 } as unknown as PlayerPose }),
     buildArchetype: (source, capacity) => buildRuntimeObjectRenderArchetype(source, capacity, undefined),
   });
   return { registry, sync, renderArchetypesByKey, roots, renderSourcesByKey };

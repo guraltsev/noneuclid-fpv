@@ -59,6 +59,14 @@ export interface ProtractorCenterSelection {
 }
 
 /**
+ * Selections made so far by the protractor tool: the centre vertex, then the first side. Empty when the tool is idle.
+ */
+export interface ProtractorToolState {
+  readonly center?: ProtractorCenterSelection;
+  readonly first?: ProtractorDirectedGeodesic;
+}
+
+/**
  * Builds the centre selection for a cannon or intersection object.
  * The centre point is the object's `aimStickyTarget` if present, otherwise its pose translation (raised by the ray beam height for cannons so it lies on the drawn beam).
  */

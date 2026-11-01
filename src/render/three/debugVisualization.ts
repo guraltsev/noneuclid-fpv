@@ -3,6 +3,7 @@
  * Static groups are rebuilt from scratch on each sync (old groups are removed and disposed) and parented to the cell mesh root, so they share the cell-local frame (meters; x right, y forward, z up mapped to Three.js via worldAxes). Visibility depends on the active debug level and options from glue/debugOptions.
  * Callers must invoke the sync functions after the world, objects, or debug options change; the frame uses `syncSelectableHitboxDebugIfChanged`, which rebuilds the hitbox groups only when the registry version, cell roots, world or debug settings changed.
  */
+import type { AppSession } from "../../runtime/appSession";
 import * as THREE from "three";
 import { type CompiledCellComplex } from "../../cell-complex/compileCellComplex";
 import { type DebugLevelId } from "../../diagnostics/debugLevels";
@@ -33,10 +34,8 @@ export interface DebugVisualizationDeps {
   readonly aimCollisionOutlineDebugGroupsByCellId: Map<string, THREE.Group>;
   /** Getter: active compiled world whose cells are iterated. */
   getWorld(): CompiledCellComplex;
-  /** Getter: current debug level. */
-  getDebugLevel(): DebugLevelId;
-  /** Getter: explicitly enabled debug options. */
-  getDebugOptions(): readonly DebugOptionId[];
+  /** The shell session: player pose, debug settings and the cannon tool state are read from it. */
+  readonly session: AppSession;
 }
 
 /**
@@ -56,7 +55,7 @@ export function createDebugVisualization(deps: DebugVisualizationDeps) {
 
   // Shows or hides each dynamic runtime's collision wireframe according to the object-collision-wireframes option.
   function syncDynamicObjectDebugWireframes(): void {
-    const visible = hasActiveDebugOption(deps.getDebugLevel(), deps.getDebugOptions(), "object-collision-wireframes");
+    const visible = hasActiveDebugOption(deps.session.get().debugSettings.debugLevel, deps.session.get().debugSettings.debugOptions, "object-collision-wireframes");
 
     for (const runtime of dynamicObjectRuntimes) {
       runtime.setCollisionWireframeVisible(visible);
@@ -71,7 +70,7 @@ export function createDebugVisualization(deps: DebugVisualizationDeps) {
     }
     staticObjectCollisionWireframeGroupsByCellId.clear();
 
-    if (!hasActiveDebugOption(deps.getDebugLevel(), deps.getDebugOptions(), "object-collision-wireframes")) {
+    if (!hasActiveDebugOption(deps.session.get().debugSettings.debugLevel, deps.session.get().debugSettings.debugOptions, "object-collision-wireframes")) {
       return;
     }
 
@@ -117,8 +116,8 @@ export function createDebugVisualization(deps: DebugVisualizationDeps) {
       registryVersion: input.registryVersion,
       cellRootsGeneration: input.cellRootsGeneration,
       world: deps.getWorld(),
-      level: deps.getDebugLevel(),
-      options: deps.getDebugOptions(),
+      level: deps.session.get().debugSettings.debugLevel,
+      options: deps.session.get().debugSettings.debugOptions,
     };
     const previous = lastHitboxKey;
     const unchanged = previous !== undefined &&
@@ -153,8 +152,8 @@ export function createDebugVisualization(deps: DebugVisualizationDeps) {
     }
     aimCollisionOutlineDebugGroupsByCellId.clear();
 
-    const selectableHitboxesActive = hasActiveDebugOption(deps.getDebugLevel(), deps.getDebugOptions(), "selectable-hitboxes");
-    const aimCollisionOutlinesActive = hasActiveDebugOption(deps.getDebugLevel(), deps.getDebugOptions(), "aim-collision-outlines");
+    const selectableHitboxesActive = hasActiveDebugOption(deps.session.get().debugSettings.debugLevel, deps.session.get().debugSettings.debugOptions, "selectable-hitboxes");
+    const aimCollisionOutlinesActive = hasActiveDebugOption(deps.session.get().debugSettings.debugLevel, deps.session.get().debugSettings.debugOptions, "aim-collision-outlines");
     if (!selectableHitboxesActive && !aimCollisionOutlinesActive) {
       return;
     }

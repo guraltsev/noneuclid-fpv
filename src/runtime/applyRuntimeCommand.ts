@@ -10,6 +10,7 @@ import type { AppSession, AppSessionState } from "./appSession";
 import type { RuntimeCommand, RuntimeEffect } from "./runtimeCommands";
 import {
   closeRuntimeMenu,
+  createDebugSettingsFromRuntimeMenuState,
   createRuntimeMenuState,
   openRuntimeMenu,
   selectRuntimeMenuPlaceFlagToolType,
@@ -73,9 +74,11 @@ export function reduceRuntimeCommand(state: AppSessionState, command: RuntimeCom
   });
   const nothing: RuntimeCommandResult = { state, effects: [] };
   const effectsOnly = (...effects: RuntimeEffect[]): RuntimeCommandResult => ({ state, effects });
-  /** Debug-field transitions: change the menu, then re-apply the debug settings (which also redraws the palette). */
-  const debugChange = (next: RuntimeMenuState): RuntimeCommandResult =>
-    withMenu(next, { kind: "apply-debug-state" });
+  /** Debug-field transitions: change the menu, take the debug settings from it, then re-apply them (which also redraws the palette). */
+  const debugChange = (next: RuntimeMenuState): RuntimeCommandResult => ({
+    state: { ...state, menuState: next, debugSettings: createDebugSettingsFromRuntimeMenuState(next) },
+    effects: [{ kind: "apply-debug-state" }],
+  });
 
   switch (command.kind) {
     case "open-menu":
@@ -214,7 +217,20 @@ export function reduceRuntimeCommand(state: AppSessionState, command: RuntimeCom
     case "set-aim-collision-outlines":
       return debugChange(setRuntimeMenuAimCollisionOutlinesEnabled(menu, command.enabled));
     case "set-anti-nausea-mode":
-      return withMenu(setRuntimeMenuAntiNauseaModeEnabled(menu, command.enabled), { kind: "apply-comfort-state" });
+      return {
+        state: {
+          ...state,
+          menuState: setRuntimeMenuAntiNauseaModeEnabled(menu, command.enabled),
+          vrComfortOptions: { ...state.vrComfortOptions, antiNauseaModeEnabled: command.enabled },
+        },
+        effects: [{ kind: "apply-comfort-state" }],
+      };
+    case "set-cannon-tool-state":
+      return { state: { ...state, cannonToolState: command.state }, effects: [] };
+    case "set-protractor-tool-state":
+      return { state: { ...state, protractorToolState: command.state }, effects: [] };
+    case "set-player-pose":
+      return { state: { ...state, playerPose: command.pose }, effects: [] };
     case "adopt-debug-settings": {
       const seeded = createRuntimeMenuState({
         selectedWorldId: menu.selectedWorldId,
@@ -222,18 +238,22 @@ export function reduceRuntimeCommand(state: AppSessionState, command: RuntimeCom
         debugOverlayEnabled: menu.debugOverlayEnabled,
         debugOverlayItems: menu.debugOverlayItems,
       });
-      return withMenu(
-        {
-          ...menu,
-          debugEnabled: seeded.debugEnabled,
-          consoleLogLevel: seeded.consoleLogLevel,
-          portalPanelMode: seeded.portalPanelMode,
-          portalInspectionEnabled: seeded.portalInspectionEnabled,
-          collisionGeometryWireframesEnabled: seeded.collisionGeometryWireframesEnabled,
-          aimCollisionOutlinesEnabled: seeded.aimCollisionOutlinesEnabled,
+      return {
+        state: {
+          ...state,
+          debugSettings: command.settings,
+          menuState: {
+            ...menu,
+            debugEnabled: seeded.debugEnabled,
+            consoleLogLevel: seeded.consoleLogLevel,
+            portalPanelMode: seeded.portalPanelMode,
+            portalInspectionEnabled: seeded.portalInspectionEnabled,
+            collisionGeometryWireframesEnabled: seeded.collisionGeometryWireframesEnabled,
+            aimCollisionOutlinesEnabled: seeded.aimCollisionOutlinesEnabled,
+          },
         },
-        syncPalette,
-      );
+        effects: [syncPalette],
+      };
     }
     case "add-geodesic-to-cannon":
       return toolEnabled("geodesic-cannon") ? effectsOnly({ ...command }) : nothing;

@@ -80,7 +80,7 @@ import { DEFAULT_PLAYER_EYE_HEIGHT_METERS } from "../../movement/playerBody";
 import { type PlayerPose, playerPoseFromDynamicObject, playerPoseToDynamicObject } from "../../movement/playerPose";
 import { depenetrateDynamicObject } from "../../movement/depenetrateDynamicObject";
 import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex";
-import { createAppSession } from "../../runtime/appSession";
+import { createAppSession, initialObjectIdSerials, takeObjectIdSerial } from "../../runtime/appSession";
 import { applyRuntimeCommand } from "../../runtime/applyRuntimeCommand";
 import { type RuntimeCommand, type RuntimeEffect } from "../../runtime/runtimeCommands";
 import { createDebugSettingsFromRuntimeMenuState, createRuntimeMenuState } from "../../runtime/runtimeMenuState";
@@ -150,7 +150,7 @@ import {
 } from "./frameDiagnostics";
 import { type FrameRenderSnapshot, createEmptyFrameRenderSnapshot, createFrameRenderSnapshot } from "./frameRenderSnapshot";
 import { createGeodesicRuntimeRenderSources } from "./geodesicCannonRenderer";
-import { GeodesicCannonToolState, createGeodesicCannonTools } from "./geodesicCannonTools";
+import { createGeodesicCannonTools } from "./geodesicCannonTools";
 import { createGeodesicDebugDumps } from "./geodesicDebugDumps";
 import { createGeodesicEmitterLabelController } from "./geodesicEmitterLabelController";
 import { createGeometryComputerMenu } from "./geometryComputerMenu";
@@ -392,18 +392,16 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   renderer.setSize(initialCanvasSize.width, initialCanvasSize.height);
   container.append(renderer.domElement);
   const controls = createDesktopControls(renderer.domElement);
-  let vrComfortOptions = options.vrComfortOptions;
-  const xrControls = createXrControls(vrComfortOptions);
-  const xrRig = createXrPlayerRig(camera, vrComfortOptions);
+  const xrControls = createXrControls(options.vrComfortOptions);
+  const xrRig = createXrPlayerRig(camera, options.vrComfortOptions);
   scene.add(xrRig.root);
-  const vrComfortVignette = createVrComfortVignette(camera, vrComfortOptions);
+  const vrComfortVignette = createVrComfortVignette(camera, options.vrComfortOptions);
   const clock = new THREE.Clock();
   /** Longest simulation step per frame, in seconds; longer wall-clock gaps (hidden tab, debugger pause) are treated as this long. */
   const maxSimulationStepSeconds = 0.1;
-  // Authoritative player pose (cell id, cell-local position in meters, yaw in radians). Written only in
-  // renderFrame (movement), transformPlayerForGeometryCommit and the reset/teleport helpers; factories read it
-  // through getPlayerPose getters.
-  let playerPose = appState.playerPose;
+  // The authoritative player pose (cell id, cell-local position in meters, yaw in radians) is session.playerPose.
+  // Written only in renderFrame (movement), transformPlayerForGeometryCommit and the reset/teleport helpers,
+  // through the set-player-pose command; factories read it from the session.
   // Incremented once per rendered frame; keys the per-frame aim-ray cache.
   let aimFrameSerial = 0;
   // XR availability/session status. Written by the async detect call, enterVr, the session "end" listener
@@ -411,17 +409,14 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   let xrSessionState: XrSessionState = createXrSessionState("unknown", {
     secureContext: window.isSecureContext,
   });
-  let xrDebugState: XrDebugRenderState = createInitialXrDebugState(xrSessionState, playerPose);
+  let xrDebugState: XrDebugRenderState = createInitialXrDebugState(xrSessionState, appState.playerPose);
   // Debug settings mirror: seeded from options, replaced by applyDebugSettings (menu or updateDebugSettings).
-  let debugLevel = options.debugLevel;
-  let portalPanelMode = options.portalPanelMode;
-  let debugOptions = options.debugOptions;
   let smoothedFrameRateFps: number | undefined;
   let smoothedFramePerformance: FramePerformanceRenderState | undefined;
   let latestWebGlRenderInfo: WebGlRenderInfoState | undefined;
   let showCellPathRendersInstances = hasActiveDebugOption(
-    debugLevel,
-    debugOptions,
+    options.debugLevel,
+    options.debugOptions,
     "portal-path-overlay-instances",
   );
   // The session: the one record of shell state that commands change (appSession.ts). The menu state (page,
@@ -437,9 +432,19 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       },
       debugOverlayEnabled: options.debugOverlayEnabled,
       debugOverlayItems: options.debugOverlayItems,
-      vrComfortOptions,
+      vrComfortOptions: options.vrComfortOptions,
     }),
     appConfig,
+    debugSettings: {
+      debugLevel: options.debugLevel,
+      portalPanelMode: options.portalPanelMode,
+      debugOptions: options.debugOptions,
+    },
+    vrComfortOptions: options.vrComfortOptions,
+    playerPose: appState.playerPose,
+    cannonToolState: {},
+    protractorToolState: {},
+    objectIdSerials: initialObjectIdSerials,
   });
   let previousDesktopPalettePlacement: ReturnType<typeof resolveDesktopScenePalettePlacement> | undefined;
   let reloadConfirmationTimeout: number | undefined;
@@ -714,14 +719,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   const placedFlagRuntimes = new Map<string, PlacedFlagRuntime>();
   const measuredGeodesicLengthRuntimes = new Map<string, MeasuredGeodesicLengthRuntime>();
   const protractorAngleRuntimes = new Map<string, ProtractorAngleRuntime>();
-  let placedFlagIdCounter = 0;
-  let measuredGeodesicLengthIdCounter = 0;
-  let protractorAngleIdCounter = 0;
-  let activeGeodesicCannonToolState: GeodesicCannonToolState = {};
-  let activeProtractorToolState: {
-    readonly center?: ProtractorCenterSelection;
-    readonly first?: ProtractorDirectedGeodesic;
-  } = {};
   let protractorToolFeedback: {
     readonly signature: string;
     readonly cellId: string;
@@ -775,7 +772,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     maxVisiblePaths,
     diagnostics: runtimeObjectRenderDiagnostics,
     getWorld: activeWorld,
-    getPlayerPose: () => playerPose,
+    session,
     buildArchetype: (source, capacity) => {
       const archetype = buildRuntimeObjectRenderArchetype(source, capacity, portalClipMaterialState);
       archetype.mesh.onBeforeRender = (renderer, _scene, renderCamera) => {
@@ -801,7 +798,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     selectableHitboxDebugSyncRequested = true;
   }
   function currentFrameSnapshot(): FrameRenderSnapshot {
-    return latestFrameSnapshot ?? createEmptyFrameRenderSnapshot(aimFrameSerial, playerPose.cellId);
+    return latestFrameSnapshot ?? createEmptyFrameRenderSnapshot(aimFrameSerial, session.get().playerPose.cellId);
   }
   // Portal visibility results for the current frame. Written by syncPortalInstances
   // (and cleared on geometry commit); read by debug and tooltip code.
@@ -852,7 +849,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   let cellRenderArchetypes: readonly CellRenderArchetype[] = [];
   let portalInstanceDebugRenderer: PortalInstanceDebugRenderer | undefined;
   // Id of the cell whose group in cellMeshes is currently visible; updated by updateVisibleCell.
-  let visibleCellId: string | undefined = playerPose.cellId;
+  let visibleCellId: string | undefined = session.get().playerPose.cellId;
 
   const {
     dumpGeodesicCreatures,
@@ -866,10 +863,8 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     dynamicObjectRuntimes,
     cellMeshes,
     getWorld: activeWorld,
-    getDebugLevel: () => debugLevel,
     session,
     getVisibleCellId: () => visibleCellId,
-    getCannonToolState: () => activeGeodesicCannonToolState,
     resolveCameraAimTarget: () => resolveCurrentAimTarget(resolveCameraRootRay()),
   });
 
@@ -899,8 +894,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       selectableHitboxDebugGroupsByCellId,
       aimCollisionOutlineDebugGroupsByCellId,
       getWorld: activeWorld,
-      getDebugLevel: () => debugLevel,
-      getDebugOptions: () => debugOptions,
+      session,
     });
 
   const {
@@ -932,10 +926,8 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     runtimeObjectRenderArchetypesByKey,
     runtimeObjectRenderRoot,
     getWorld: activeWorld,
-    getPlayerPose: () => playerPose,
-    resetProtractorToolState: () => {
-      activeProtractorToolState = {};
-    },
+    session,
+    dispatch: dispatchRuntimeCommand,
     clearProtractorToolFeedback,
     syncRuntimeObjectPortalInstances: requestRuntimeObjectInstanceSync,
     syncSelectableHitboxDebug: requestSelectableHitboxDebugSync,
@@ -948,7 +940,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       runtimeObjectRegistry,
       geodesicEmitterLabelsByKey,
       getWorld: activeWorld,
-      getPlayerPose: () => playerPose,
+      session,
       getRegistryVersion: () => runtimeObjectRegistry.getVersion(),
     });
 
@@ -975,10 +967,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     xrRig,
     runtimeObjectRegistry,
     getWorld: activeWorld,
-    getDebugLevel: () => debugLevel,
     session,
-    getCannonToolState: () => activeGeodesicCannonToolState,
-    getPlayerPose: () => playerPose,
     getFrameSerial: () => aimFrameSerial,
   });
 
@@ -1011,12 +1000,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     getWorld: activeWorld,
     session,
     dispatch: dispatchRuntimeCommand,
-    getCannonToolState: () => activeGeodesicCannonToolState,
-    setCannonToolState: (next) => {
-      activeGeodesicCannonToolState = next;
-    },
-    getPlayerPose: () => playerPose,
-    getDebugLevel: () => debugLevel,
     resolveCurrentAimTarget,
     resolveCurrentAimTargets,
     targetIsWithinInteractionRange,
@@ -1054,9 +1037,9 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     activeStaticCull,
     createPortalEyeDebugStates,
     live: () => ({
-      debugLevel,
-      debugOptions,
-      playerPose,
+      debugLevel: session.get().debugSettings.debugLevel,
+      debugOptions: session.get().debugSettings.debugOptions,
+      playerPose: session.get().playerPose,
       latestVisibleResult,
       portalInstanceDebugRenderer,
       portalInstanceRenderState,
@@ -1073,9 +1056,9 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   };
 
   let portalDebugRuntime = createPortalDebugRuntime(portalDebugRuntimeDeps);
-  logDebugStartupGuide(debugLevel, debugOptions);
+  logDebugStartupGuide(session.get().debugSettings.debugLevel, session.get().debugSettings.debugOptions);
   installGeneralDebugHelpers({
-    debugHelp: () => logDebugStartupGuide(debugLevel, debugOptions),
+    debugHelp: () => logDebugStartupGuide(session.get().debugSettings.debugLevel, session.get().debugSettings.debugOptions),
     dumpGeodesicCreatures: dumpGeodesicCreatures,
     dumpAllGeodesics: dumpAllGeodesics,
     dumpGeodesicPath: dumpGeodesicPath,
@@ -1147,7 +1130,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
 
   // Places the camera from playerPose (desktop mode) and updates the scene lighting to follow it.
   function applyDesktopCameraPose(): void {
-    xrRig.syncDesktopCamera(playerPose);
+    xrRig.syncDesktopCamera(session.get().playerPose);
     updateStylizedSceneLighting(sceneLighting, camera);
   }
 
@@ -1166,22 +1149,22 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     scene,
     camera,
     cellMeshes,
-    activeCellId: playerPose.cellId,
+    activeCellId: session.get().playerPose.cellId,
     warmupViewsByCellId: activeWorldBundle.warmupViewsByCellId,
   });
   runtimeDiagnostics().recordWarmup("startup", performance.now() - warmupStartMs);
 
   // Shows only the mesh group of the player's current cell; cheap no-op when the cell did not change.
   function updateVisibleCell(): void {
-    if (visibleCellId === playerPose.cellId) {
+    if (visibleCellId === session.get().playerPose.cellId) {
       return;
     }
 
     for (const [cellId, cellMesh] of cellMeshes) {
-      cellMesh.visible = cellId === playerPose.cellId;
+      cellMesh.visible = cellId === session.get().playerPose.cellId;
     }
 
-    visibleCellId = playerPose.cellId;
+    visibleCellId = session.get().playerPose.cellId;
   }
 
   // Window resize handler: updates camera aspect and renderer size.
@@ -1280,7 +1263,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     resetGeodesicCannonRotationTracking({ rotating: rotatingGeodesicCannon, aiming: aimingGeodesicCannon });
     const frameAfterInputMs = performance.now();
     const frameBeforeMoveMs = frameAfterInputMs;
-    const previousCellId = playerPose.cellId;
+    const previousCellId = session.get().playerPose.cellId;
     let moveResult: ReturnType<typeof movePlayer> | undefined;
 
     // Phase 2: movement. A reset request skips movement entirely (moveResult stays undefined).
@@ -1289,12 +1272,12 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       resetRuntimeWorld();
     } else {
       const yawDeltaRadians = xrActive
-        ? xrRig.resolveCameraYawRadians(headLocalYawRadians) - playerPose.yawRadians + frame.yawDeltaRadians
+        ? xrRig.resolveCameraYawRadians(headLocalYawRadians) - session.get().playerPose.yawRadians + frame.yawDeltaRadians
         : frame.yawDeltaRadians;
       const playerYawDeltaRadians = rotatingGeodesicCannon ? 0 : yawDeltaRadians;
       moveResult = movePlayer({
         world: activeWorld(),
-        pose: playerPose,
+        pose: session.get().playerPose,
         body: appState.playerBody,
         localDisplacement: rotatingGeodesicCannon ? { x: 0, y: 0, z: 0 } : frame.localDisplacement,
         yawDeltaRadians: playerYawDeltaRadians,
@@ -1302,22 +1285,22 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
         coordinateFrame: "global",
         bodiesInCell: playerBlockingBodiesInCell,
       });
-      playerPose = moveResult.pose;
+      dispatchRuntimeCommand({ kind: "set-player-pose", pose: moveResult.pose });
       recordCellTransition(previousCellId, moveResult);
 
       // XR only: apply the player's physical (room-scale) head displacement as a second move, so walking in
       // the room also crosses portals and collides; the rig then accepts or rejects that physical move.
       if (xrActive && !rotatingGeodesicCannon) {
-        const beforePhysicalCellId = playerPose.cellId;
-        const physicalReferenceSpaceYawRadians = playerPose.yawRadians - (headLocalYawRadians ?? 0);
+        const beforePhysicalCellId = session.get().playerPose.cellId;
+        const physicalReferenceSpaceYawRadians = session.get().playerPose.yawRadians - (headLocalYawRadians ?? 0);
         const physicalFrame = xrRig.consumePhysicalInput(
           effectiveHeadLocalMeters,
-          playerPose.yawRadians,
+          session.get().playerPose.yawRadians,
           physicalReferenceSpaceYawRadians,
         );
         const physicalMoveResult = movePlayer({
           world: activeWorld(),
-          pose: playerPose,
+          pose: session.get().playerPose,
           body: appState.playerBody,
           localDisplacement: physicalFrame.localDisplacement,
           yawDeltaRadians: 0,
@@ -1326,7 +1309,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
           bodiesInCell: playerBlockingBodiesInCell,
         });
         const runtimeCollisionPhysicalMoveResult = physicalMoveResult;
-        playerPose = runtimeCollisionPhysicalMoveResult.pose;
+        dispatchRuntimeCommand({ kind: "set-player-pose", pose: runtimeCollisionPhysicalMoveResult.pose });
         xrRig.acceptPhysicalMove(runtimeCollisionPhysicalMoveResult, effectiveHeadLocalMeters);
         moveResult = runtimeCollisionPhysicalMoveResult.blocked || runtimeCollisionPhysicalMoveResult.crossedPortal
           ? runtimeCollisionPhysicalMoveResult
@@ -1337,7 +1320,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
 
     // Pose the camera/rig from the new playerPose first, so aim rays and carried objects use this frame's view.
     if (xrActive) {
-      xrRig.syncXrRig(playerPose, effectiveHeadLocalMeters, headLocalYawRadians);
+      xrRig.syncXrRig(session.get().playerPose, effectiveHeadLocalMeters, headLocalYawRadians);
     } else {
       applyDesktopCameraPose();
     }
@@ -1402,7 +1385,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     const frameBeforeObjectsMs = frameAfterMoveMs;
     // Simulation of non-player objects (timed separately as objectsMs): creatures treat the player as an
     // obstacle; geodesics under curve shortening advance and dependent measurements are refreshed.
-    const playerObstacle = createPlayerCollisionState(playerPose);
+    const playerObstacle = createPlayerCollisionState(session.get().playerPose);
 
     // Each object is its own contained phase: one failing creature must not stop the others or the frame.
     for (const runtime of dynamicObjectRuntimes) {
@@ -1439,18 +1422,18 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     // Skipped while nothing it reads changed: registry contents, the player's cell and exact position.
     if (
       runtimeObjectRegistry.getVersion() !== measuredLengthsRefreshed.version ||
-      playerPose.cellId !== measuredLengthsRefreshed.cellId ||
-      playerPose.position.x !== measuredLengthsRefreshed.x ||
-      playerPose.position.y !== measuredLengthsRefreshed.y ||
-      playerPose.position.z !== measuredLengthsRefreshed.z
+      session.get().playerPose.cellId !== measuredLengthsRefreshed.cellId ||
+      session.get().playerPose.position.x !== measuredLengthsRefreshed.x ||
+      session.get().playerPose.position.y !== measuredLengthsRefreshed.y ||
+      session.get().playerPose.position.z !== measuredLengthsRefreshed.z
     ) {
       refreshMeasuredGeodesicLengths();
       // Stored after the run: the refresh itself may update the registry.
       measuredLengthsRefreshed.version = runtimeObjectRegistry.getVersion();
-      measuredLengthsRefreshed.cellId = playerPose.cellId;
-      measuredLengthsRefreshed.x = playerPose.position.x;
-      measuredLengthsRefreshed.y = playerPose.position.y;
-      measuredLengthsRefreshed.z = playerPose.position.z;
+      measuredLengthsRefreshed.cellId = session.get().playerPose.cellId;
+      measuredLengthsRefreshed.x = session.get().playerPose.position.x;
+      measuredLengthsRefreshed.y = session.get().playerPose.position.y;
+      measuredLengthsRefreshed.z = session.get().playerPose.position.z;
     }
     const frameAfterObjectsMs = performance.now();
     const frameBeforeCameraMs = frameAfterObjectsMs;
@@ -1461,7 +1444,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     if (xrActive) {
       // The rig is synced a second time (also done after movement) so the culling cameras below derive from
       // the pose as it stands after the tool phase.
-      xrRig.syncXrRig(playerPose, effectiveHeadLocalMeters, headLocalYawRadians);
+      xrRig.syncXrRig(session.get().playerPose, effectiveHeadLocalMeters, headLocalYawRadians);
       portalCullingCamera.copy(camera, false);
       xrRig.syncXrCullingCamera(portalCullingCamera, xrViewerPose);
       const xrEyeCameras = xrRig.syncXrViewCullingCameras(portalCullingEyeCameras, xrViewerPose);
@@ -1487,7 +1470,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
         const eyeRoot = resolvePortalEyeRenderRoot(cullingCamera, 0);
         syncPortalInstances(monoPortalRoots.set(eyeRoot.rootCellId, eyeRoot.camera, eyeRoot.renderFromRootMatrix));
       } else {
-        syncPortalInstances(monoPortalRoots.set(playerPose.cellId, cullingCamera));
+        syncPortalInstances(monoPortalRoots.set(session.get().playerPose.cellId, cullingCamera));
       }
     }
     // Phase 4 (objects): the only runtime-object instance write of the frame, from the snapshot the portal pass built.
@@ -1545,7 +1528,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     };
     smoothedFramePerformance = smoothFramePerformance(smoothedFramePerformance, framePerformance);
     latestWebGlRenderInfo = captureWebGlRenderInfo(renderer);
-    runtimeDiagnostics().recordFrame(playerPose.cellId, {
+    runtimeDiagnostics().recordFrame(session.get().playerPose.cellId, {
       totalMs: framePerformance.totalMs,
       moveMs: framePerformance.moveMs,
       renderMs: framePerformance.renderMs,
@@ -1610,8 +1593,12 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     portalDebugRuntime = createPortalDebugRuntime(portalDebugRuntimeDeps);
     installRuntimeDiagnostics(
       activeWorld(),
-      debugLevel,
-      hasActiveDebugOption(debugLevel, debugOptions, "runtime-diagnostics"),
+      session.get().debugSettings.debugLevel,
+      hasActiveDebugOption(
+        session.get().debugSettings.debugLevel,
+        session.get().debugSettings.debugOptions,
+        "runtime-diagnostics",
+      ),
     );
   }
 
@@ -1621,8 +1608,8 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   ): void {
     const transformed = transformPoseWithCellMaps(
       {
-        cellId: playerPose.cellId,
-        localPose: yawRigidTransform3(playerPose.yawRadians, playerPose.position),
+        cellId: session.get().playerPose.cellId,
+        localPose: yawRigidTransform3(session.get().playerPose.yawRadians, session.get().playerPose.position),
       },
       mapByCellId,
     );
@@ -1633,7 +1620,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     }
 
     const mappedPose: PlayerPose = {
-      ...playerPose,
+      ...session.get().playerPose,
       cellId: transformed.cellId,
       position: transformed.localPose.translation,
       yawRadians: yawFromPose(transformed.localPose),
@@ -1641,10 +1628,10 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     const result = depenetrateDynamicObject(nextWorld, createPlayerCollisionState(mappedPose));
     if (result.kind === "failed") {
       console.warn("Deformation commit: no legal player pose found; keeping the mapped pose.");
-      playerPose = mappedPose;
+      dispatchRuntimeCommand({ kind: "set-player-pose", pose: mappedPose });
       return;
     }
-    playerPose = playerPoseFromDynamicObject(result.object, mappedPose.pitchRadians);
+    dispatchRuntimeCommand({ kind: "set-player-pose", pose: playerPoseFromDynamicObject(result.object, mappedPose.pitchRadians) });
   }
 
   function transformRuntimeObjectsForGeometryCommit(
@@ -1720,8 +1707,8 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     applyGeometryCommitComputedObjectPolicy({
       world: snapshot.world,
       registry: runtimeObjectRegistry,
-      playerCellId: playerPose.cellId,
-      playerPoint: playerPose.position,
+      playerCellId: session.get().playerPose.cellId,
+      playerPoint: session.get().playerPose.position,
       callbacks: {
         removeMeasuredGeodesicLength: removeMeasuredGeodesicLengthRuntime,
         syncMeasuredGeodesicLength: syncMeasuredGeodesicLengthRuntime,
@@ -1732,8 +1719,8 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   }
 
   function clearGeometryToolStateAfterCommit(): void {
-    activeGeodesicCannonToolState = {};
-    activeProtractorToolState = {};
+    dispatchRuntimeCommand({ kind: "set-cannon-tool-state", state: {} });
+    dispatchRuntimeCommand({ kind: "set-protractor-tool-state", state: {} });
     clearCarriedGeodesicCannonGlow();
     clearProtractorToolFeedback();
     refreshOpenGeometryComputerMenu();
@@ -1741,7 +1728,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   }
 
   function installGeometryDebugHelpersIfAvailable(): void {
-    if (geometrySession.state.current.kind !== "torus-skew" && debugLevel === "off") {
+    if (geometrySession.state.current.kind !== "torus-skew" && session.get().debugSettings.debugLevel === "off") {
       uninstallGeometryDebugHelpers();
       return;
     }
@@ -1794,28 +1781,23 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   // Effect "apply-debug-state": the menu's debug fields changed.
   function applyMenuDebugState(): void {
     syncLaunchOptionsState();
-    applyDebugSettings(createDebugSettingsFromRuntimeMenuState(currentMenuState()));
+    applyDebugSettings();
     syncDesktopPalette();
   }
 
   // Effect "apply-comfort-state": the menu's comfort fields changed.
   function applyMenuComfortState(): void {
-    vrComfortOptions = {
-      ...vrComfortOptions,
-      antiNauseaModeEnabled: currentMenuState().antiNauseaModeEnabled,
-    };
-    vrComfortVignette.setOptions(vrComfortOptions);
+    vrComfortVignette.setOptions(session.get().vrComfortOptions);
     syncLaunchOptionsState();
     syncDesktopPalette();
   }
 
-  function applyDebugSettings(settings: DebugSettings): void {
-    debugLevel = settings.debugLevel;
-    portalPanelMode = settings.portalPanelMode;
-    debugOptions = settings.debugOptions;
+  // Rebuilds everything that depends on the debug settings in force (session.debugSettings, set by the reducer).
+  function applyDebugSettings(): void {
+    const settings = session.get().debugSettings;
     showCellPathRendersInstances = hasActiveDebugOption(
-      debugLevel,
-      debugOptions,
+      settings.debugLevel,
+      settings.debugOptions,
       "portal-path-overlay-instances",
     );
     installRuntimeDiagnostics(
@@ -1827,9 +1809,9 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     syncPlayerCellPortalInstances();
     portalDebugRuntime.dispose();
     portalDebugRuntime = createPortalDebugRuntime(portalDebugRuntimeDeps);
-    logDebugStartupGuide(debugLevel, debugOptions);
+    logDebugStartupGuide(session.get().debugSettings.debugLevel, session.get().debugSettings.debugOptions);
     installGeneralDebugHelpers({
-      debugHelp: () => logDebugStartupGuide(debugLevel, debugOptions),
+      debugHelp: () => logDebugStartupGuide(session.get().debugSettings.debugLevel, session.get().debugSettings.debugOptions),
       dumpGeodesicCreatures: dumpGeodesicCreatures,
       dumpAllGeodesics: dumpAllGeodesics,
       dumpGeodesicPath: dumpGeodesicPath,
@@ -1858,7 +1840,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       debugOptions: settings.debugOptions,
       debugOverlayEnabled: currentMenuState().debugOverlayEnabled,
       debugOverlayItems: currentMenuState().debugOverlayItems,
-      vrComfortOptions,
+      vrComfortOptions: session.get().vrComfortOptions,
     });
   }
 
@@ -1881,8 +1863,8 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       // External update: rebuild from the given settings, then mirror the debug-derived menu fields so the
       // menu shows the live values. Deliberately does not call syncLaunchOptionsState (that would echo the
       // change back to the caller) nor applyMenuDebugState (that would rebuild twice).
-      applyDebugSettings(settings);
       dispatchRuntimeCommand({ kind: "adopt-debug-settings", settings });
+      applyDebugSettings();
     },
     dispose() {
       if (disposed) {
@@ -2283,10 +2265,10 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   }
 
   function recordCellTransition(previousCellId: string, moveResult: ReturnType<typeof movePlayer>): void {
-    if (playerPose.cellId !== previousCellId) {
+    if (session.get().playerPose.cellId !== previousCellId) {
         runtimeDiagnostics().recordCellEntered(
           previousCellId,
-          playerPose.cellId,
+          session.get().playerPose.cellId,
           moveResult.crossings.at(-1)?.portalId ?? moveResult.crossedPortalId ?? "unknown-portal",
         );
       portalDebugRuntime.syncRootCell();
@@ -2303,14 +2285,14 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       activeInputSource: source,
       framePerformance: smoothedFramePerformance,
       webGlRenderInfo: latestWebGlRenderInfo,
-      currentCellId: playerPose.cellId,
-      playerPosition: playerPose.position,
-      yawRadians: playerPose.yawRadians,
+      currentCellId: session.get().playerPose.cellId,
+      playerPosition: session.get().playerPose.position,
+      yawRadians: session.get().playerPose.yawRadians,
       lastMovementBlocked: moveResult?.blocked ?? xrDebugState.lastMovementBlocked,
       lastBlockingReason: moveResult?.blockingReason ?? xrDebugState.lastBlockingReason,
       lastCrossedPortalId: moveResult?.crossedPortalId ?? xrDebugState.lastCrossedPortalId,
       inputMode: renderer.xr.isPresenting ? describeXrInputMode([...(renderer.xr.getSession()?.inputSources ?? [])]) : undefined,
-      sharedRenderRootCellId: renderer.xr.isPresenting ? xrRig.getSharedRenderRootCellId(playerPose) : undefined,
+      sharedRenderRootCellId: renderer.xr.isPresenting ? xrRig.getSharedRenderRootCellId(session.get().playerPose) : undefined,
       visiblePortalPathCount: latestVisibleResult?.paths.length,
       visiblePortalPaths: latestVisibleResult ? visibleSummaryToRenderState(latestVisibleResult.summary) : undefined,
       portalInstances: portalInstanceRenderState,
@@ -2337,7 +2319,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   function rebuildCellMeshes(): void {
     // The hitbox debug groups hang under the cell roots disposed below, so the gated hitbox sync must rebuild.
     cellRootsGeneration += 1;
-    const currentlyVisibleCellId = visibleCellId ?? playerPose.cellId;
+    const currentlyVisibleCellId = visibleCellId ?? session.get().playerPose.cellId;
 
     portalInstanceDebugRenderer?.dispose();
     portalInstanceDebugRenderer = undefined;
@@ -2362,8 +2344,8 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     }
 
     const showForbiddenZoneWireframes = hasActiveDebugOption(
-      debugLevel,
-      debugOptions,
+      session.get().debugSettings.debugLevel,
+      session.get().debugSettings.debugOptions,
       "forbidden-zone-wireframes",
     );
 
@@ -2385,8 +2367,8 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
 
     cellRenderArchetypes = buildCellRenderArchetypes(activeWorld(), {
       floorUvFramesByCellId,
-      debugLevel,
-      portalPanelMode,
+      debugLevel: session.get().debugSettings.debugLevel,
+      portalPanelMode: session.get().debugSettings.portalPanelMode,
       eyeHeightMeters: DEFAULT_PLAYER_EYE_HEIGHT_METERS,
       assets: options.assets,
       capacitiesByCellId: activeWorldBundle.archetypeCapacitiesByCellId,
@@ -2413,8 +2395,8 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   function resolvePortalEyeRenderRoot(cullingCamera: THREE.Camera, eyeIndex: number): XrPortalEyeRenderRoot {
     return resolveXrPortalEyeRenderRoot({
       world: activeWorld(),
-      sourceCellId: playerPose.cellId,
-      anchorPoint: playerPose.position,
+      sourceCellId: session.get().playerPose.cellId,
+      anchorPoint: session.get().playerPose.position,
       camera: cullingCamera,
       target: (portalEyeRootTargets[eyeIndex] ??= createXrPortalEyeRenderRootTarget()),
     });
@@ -2422,7 +2404,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
 
   // Mono visibility pass from the player's cell with the main camera.
   function syncPlayerCellPortalInstances(): void {
-    syncPortalInstances(monoPortalRoots.set(playerPose.cellId, camera));
+    syncPortalInstances(monoPortalRoots.set(session.get().playerPose.cellId, camera));
   }
 
   // The one visibility pass. `renderRoots` holds one root per eye: a single root is the mono pass, several are the
@@ -2438,7 +2420,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     );
 
     if (!hasTables) {
-      clearPortalInstances(renderRoots[0]?.rootCellId ?? playerPose.cellId);
+      clearPortalInstances(renderRoots[0]?.rootCellId ?? session.get().playerPose.cellId);
     } else if (renderRoots.length === 1) {
       syncMonoPortalFrame(renderRoots[0]);
     } else {
@@ -2542,7 +2524,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       updatePortalVisiblePathInstances(visiblePathsByDestinationCell, portalRootsUnclipped);
       latestFrameSnapshot = createFrameRenderSnapshot({
         serial: aimFrameSerial,
-        rootCellId: portalEyeRenderStates[0]?.rootCellId ?? playerPose.cellId,
+        rootCellId: portalEyeRenderStates[0]?.rootCellId ?? session.get().playerPose.cellId,
         visiblePathsByDestinationCell,
         clipIndexByPathId: portalClipData.clipIndexByPathId,
         cameraPositions,
@@ -2555,7 +2537,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
         true,
       );
     } else {
-      clearPortalInstances(renderRoots[0]?.rootCellId ?? playerPose.cellId);
+      clearPortalInstances(renderRoots[0]?.rootCellId ?? session.get().playerPose.cellId);
     }
   }
 
@@ -2636,11 +2618,11 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   }
 
   function getProtractorToolPrompt(): string {
-    if (!activeProtractorToolState.center) {
+    if (!session.get().protractorToolState.center) {
       return "select: vertex";
     }
 
-    if (!activeProtractorToolState.first) {
+    if (!session.get().protractorToolState.first) {
       return "select: side1";
     }
 
@@ -2648,7 +2630,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   }
 
   function getTieAndDetachToolPrompt(): string {
-    const selectedCount = activeGeodesicCannonToolState.tieAndDetachEndpointSelections?.length ?? 0;
+    const selectedCount = session.get().cannonToolState.tieAndDetachEndpointSelections?.length ?? 0;
     return selectedCount === 0 ? "select: geodesic 1" : "select: geodesic 2";
   }
 
@@ -2719,7 +2701,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       eyePosition: target.localEyePosition,
       floorPoint: target.localPoint,
       flagType: currentMenuState().placeFlagOptions.flagType,
-      id: `placed-flag:${Date.now()}:${placedFlagIdCounter++}`,
+      id: `placed-flag:${Date.now()}:${takeObjectIdSerial(session, "placed-flag")}`,
     });
 
     if (result.placed && result.object) {
@@ -2745,12 +2727,12 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       object.kind === "measured-geodesic-length" && object.geodesicId === geodesicId
     );
     const measurement = createMeasuredGeodesicLengthObject({
-      id: existing?.id ?? `measured-geodesic-length:${Date.now()}:${measuredGeodesicLengthIdCounter++}`,
+      id: existing?.id ?? `measured-geodesic-length:${Date.now()}:${takeObjectIdSerial(session, "measured-geodesic-length")}`,
       registry: runtimeObjectRegistry,
       world: activeWorld(),
       geodesicId,
-      playerCellId: playerPose.cellId,
-      playerPoint: playerPose.position,
+      playerCellId: session.get().playerPose.cellId,
+      playerPoint: session.get().playerPose.position,
       label: getGeodesicDisplayName(geodesicId),
       fallbackSegment: target.object,
     });
@@ -2771,7 +2753,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   function resetPlayerToHome(): void {
     const startingPosition = activeWorld().startingPosition;
     const fallbackCell = activeWorld().cells[0];
-    playerPose = startingPosition
+    const homePose: PlayerPose = startingPosition
       ? {
           cellId: startingPosition.cellId,
           position: startingPosition.position,
@@ -2782,6 +2764,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
           ...appState.playerPose,
           cellId: fallbackCell?.id ?? appState.playerPose.cellId,
         };
+    dispatchRuntimeCommand({ kind: "set-player-pose", pose: homePose });
     xrRig.reset();
   }
 
@@ -2819,6 +2802,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   }
 
   function tryUseProtractorToolFromAim(ray?: RootAimRay): void {
+    const protractor = session.get().protractorToolState;
     if (!ray) {
       return;
     }
@@ -2829,45 +2813,45 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       return;
     }
 
-    if (!activeProtractorToolState.center) {
+    if (!protractor.center) {
       if (target?.object?.kind !== "geodesic-cannon" && target?.object?.kind !== "geodesic-intersection") {
         return;
       }
 
-      activeProtractorToolState = {
+      dispatchRuntimeCommand({ kind: "set-protractor-tool-state", state: {
         center: resolveProtractorCenterSelection(target.object),
-      };
+      } });
       syncDesktopPalette();
       return;
     }
 
-    const selected = resolveProtractorDirectedSelectionFromAimTarget(target, activeProtractorToolState.center);
+    const selected = resolveProtractorDirectedSelectionFromAimTarget(target, protractor.center);
     if (!selected) {
       return;
     }
 
-    if (!activeProtractorToolState.first) {
-      activeProtractorToolState = {
-        center: activeProtractorToolState.center,
+    if (!protractor.first) {
+      dispatchRuntimeCommand({ kind: "set-protractor-tool-state", state: {
+        center: protractor.center,
         first: selected,
-      };
+      } });
       syncDesktopPalette();
       return;
     }
 
-    if (!protractorSelectionsUseDifferentGeodesics(activeProtractorToolState.first, selected)) {
+    if (!protractorSelectionsUseDifferentGeodesics(protractor.first, selected)) {
       return;
     }
 
     const angle = createProtractorAngleObject({
-      id: `protractor-angle:${Date.now()}:${protractorAngleIdCounter++}`,
-      center: activeProtractorToolState.center,
-      first: activeProtractorToolState.first,
+      id: `protractor-angle:${Date.now()}:${takeObjectIdSerial(session, "protractor-angle")}`,
+      center: protractor.center,
+      first: protractor.first,
       second: selected,
     });
     runtimeObjectRegistry.add(angle);
     syncProtractorAngleRuntime(angle);
-    activeProtractorToolState = {};
+    dispatchRuntimeCommand({ kind: "set-protractor-tool-state", state: {} });
     clearProtractorToolFeedback();
     dispatchRuntimeCommand({ kind: "clear-selected-tool" });
     requestSelectableHitboxDebugSync();
@@ -2952,10 +2936,10 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     }
 
     if (focused.object.kind === "geodesic-cannon" && isRuntimeToolEnabled(appConfig, "geodesic-cannon")) {
-      activeGeodesicCannonToolState = {
+      dispatchRuntimeCommand({ kind: "set-cannon-tool-state", state: {
         selectedCannonId: focused.object.id,
         activeGeodesicId: focused.object.activeGeodesicId,
-      };
+      } });
       dispatchRuntimeCommand({
         kind: "show-geodesic-cannon-actions",
         cannonId: focused.object.id,
@@ -3092,6 +3076,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   }
 
   function updateProtractorToolFeedback(activeAimRay: RootAimRay | undefined): void {
+    const protractor = session.get().protractorToolState;
     if (currentMenuState().selectedTool !== "protractor" || currentMenuState().isOpen || desktopFlagEditor.isOpen()) {
       clearProtractorToolFeedback();
       return;
@@ -3099,7 +3084,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
 
     const target = activeAimRay ? resolveCurrentAimTarget(activeAimRay) : undefined;
     const usableTarget = targetIsWithinInteractionRange(target) ? target : undefined;
-    const center = activeProtractorToolState.center ??
+    const center = protractor.center ??
       (usableTarget?.object?.kind === "geodesic-cannon" || usableTarget?.object?.kind === "geodesic-intersection"
         ? resolveProtractorCenterSelection(usableTarget.object)
         : undefined);
@@ -3108,17 +3093,17 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       return;
     }
 
-    const hoverSelection = activeProtractorToolState.center
-      ? resolveProtractorDirectedSelectionFromAimTarget(usableTarget, activeProtractorToolState.center)
+    const hoverSelection = protractor.center
+      ? resolveProtractorDirectedSelectionFromAimTarget(usableTarget, protractor.center)
       : undefined;
-    const validHoverSelection = hoverSelection && activeProtractorToolState.first &&
-        !protractorSelectionsUseDifferentGeodesics(activeProtractorToolState.first, hoverSelection)
+    const validHoverSelection = hoverSelection && protractor.first &&
+        !protractorSelectionsUseDifferentGeodesics(protractor.first, hoverSelection)
       ? undefined
       : hoverSelection;
     const feedbackOptions = {
       center,
-      centerLocked: Boolean(activeProtractorToolState.center),
-      first: activeProtractorToolState.first,
+      centerLocked: Boolean(protractor.center),
+      first: protractor.first,
       hover: validHoverSelection,
     };
     if (protractorToolFeedback?.signature === protractorToolFeedbackSignature(feedbackOptions)) {
@@ -3243,15 +3228,15 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
 
   function findAutomaticHelpObject(): RuntimeWorldObject | undefined {
     let best: { readonly object: RuntimeWorldObject; readonly distanceSquared: number } | undefined;
-    for (const object of runtimeObjectRegistry.getObjectsInCell(playerPose.cellId)) {
+    for (const object of runtimeObjectRegistry.getObjectsInCell(session.get().playerPose.cellId)) {
       const rangeMeters = object.autoDisplayHelpRangeMeters;
       if (!object.displayHelpMessage || rangeMeters === undefined) {
         continue;
       }
 
-      const dx = object.localPose.translation.x - playerPose.position.x;
-      const dy = object.localPose.translation.y - playerPose.position.y;
-      const dz = object.localPose.translation.z - playerPose.position.z;
+      const dx = object.localPose.translation.x - session.get().playerPose.position.x;
+      const dy = object.localPose.translation.y - session.get().playerPose.position.y;
+      const dz = object.localPose.translation.z - session.get().playerPose.position.z;
       const distanceSquared = dx * dx + dy * dy + dz * dz;
       if (distanceSquared > rangeMeters * rangeMeters) {
         continue;
@@ -3271,7 +3256,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
         runtimeObjectRegistry.remove(object.id);
       }
     }
-    activeGeodesicCannonToolState = {};
+    dispatchRuntimeCommand({ kind: "set-cannon-tool-state", state: {} });
     requestRuntimeObjectInstanceSync();
     requestSelectableHitboxDebugSync();
   }
@@ -3289,23 +3274,23 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
         syncDesktopPalette();
         return;
       case "end-tool-session":
-        activeProtractorToolState = {};
-        activeGeodesicCannonToolState = {};
+        dispatchRuntimeCommand({ kind: "set-protractor-tool-state", state: {} });
+        dispatchRuntimeCommand({ kind: "set-cannon-tool-state", state: {} });
         syncTieAndDetachSelectionHighlights([]);
         clearProtractorToolFeedback();
         return;
       case "switch-tool-session":
         if (effect.toolId !== "protractor") {
-          activeProtractorToolState = {};
+          dispatchRuntimeCommand({ kind: "set-protractor-tool-state", state: {} });
           clearProtractorToolFeedback();
         }
         if (effect.toolId !== "geodesic-cannon-tie-detach") {
           syncTieAndDetachSelectionHighlights([]);
           requestRuntimeObjectInstanceSync();
-          activeGeodesicCannonToolState = {
-            ...activeGeodesicCannonToolState,
+          dispatchRuntimeCommand({ kind: "set-cannon-tool-state", state: {
+            ...session.get().cannonToolState,
             tieAndDetachEndpointSelections: undefined,
-          };
+          } });
         }
         return;
       case "sync-object-instances":

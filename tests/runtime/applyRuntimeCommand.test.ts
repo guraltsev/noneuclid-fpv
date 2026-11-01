@@ -10,7 +10,14 @@
 import { describe, expect, it } from "vitest";
 import { defaultAppConfig, type AppConfig } from "../../src/glue/appConfig";
 import { applyRuntimeCommand, reduceRuntimeCommand } from "../../src/runtime/applyRuntimeCommand";
-import { createAppSession, type AppSessionState } from "../../src/runtime/appSession";
+import { defaultVrComfortOptions } from "../../src/glue/vrComfortOptions";
+import { createDefaultPlayerPose } from "../../src/movement/playerPose";
+import {
+  createAppSession,
+  initialObjectIdSerials,
+  takeObjectIdSerial,
+  type AppSessionState,
+} from "../../src/runtime/appSession";
 import type { RuntimeCommand, RuntimeEffect } from "../../src/runtime/runtimeCommands";
 import {
   createRuntimeMenuState,
@@ -32,6 +39,12 @@ function stateWith(menu?: Partial<RuntimeMenuState>, appConfig: AppConfig = defa
   return {
     menuState: { ...createRuntimeMenuState({ selectedWorldId: "cube" }), ...menu },
     appConfig,
+    debugSettings: { debugLevel: "off", portalPanelMode: "none", debugOptions: [] },
+    vrComfortOptions: defaultVrComfortOptions,
+    playerPose: createDefaultPlayerPose("room-a"),
+    cannonToolState: {},
+    protractorToolState: {},
+    objectIdSerials: initialObjectIdSerials,
   };
 }
 
@@ -336,10 +349,11 @@ describe("applyRuntimeCommand: debug and comfort settings", () => {
     expect(reduce({ kind: "set-debug-enabled", enabled: true }, off)).toEqual({ state: off, effects: [] });
   });
 
-  it("sets the console log level", () => {
-    const result = reduce({ kind: "set-console-log-level", level: "verbose" });
+  it("sets the console log level and takes the debug settings from the menu", () => {
+    const result = reduce({ kind: "set-console-log-level", level: "verbose" }, reduce({ kind: "set-debug-enabled", enabled: true }).state);
 
     expect(result.state.menuState.consoleLogLevel).toBe("verbose");
+    expect(result.state.debugSettings.debugLevel).toBe("verbose");
     expect(result.effects).toEqual([{ kind: "apply-debug-state" }]);
   });
 
@@ -368,6 +382,7 @@ describe("applyRuntimeCommand: debug and comfort settings", () => {
     const result = reduce({ kind: "set-anti-nausea-mode", enabled: false });
 
     expect(result.state.menuState.antiNauseaModeEnabled).toBe(false);
+    expect(result.state.vrComfortOptions.antiNauseaModeEnabled).toBe(false);
     expect(result.effects).toEqual([{ kind: "apply-comfort-state" }]);
   });
 
@@ -378,6 +393,7 @@ describe("applyRuntimeCommand: debug and comfort settings", () => {
     }, stateWith({ page: "settings" }));
 
     expect(result.state.menuState).toMatchObject({ debugEnabled: true, consoleLogLevel: "verbose", page: "settings" });
+    expect(result.state.debugSettings).toEqual({ debugLevel: "verbose", portalPanelMode: "none", debugOptions: ["runtime-diagnostics"] });
     expect(result.effects).toEqual([sync]);
   });
 });
@@ -418,5 +434,38 @@ describe("applyRuntimeCommand: cannon and geometry computer actions", () => {
     expect(reduce({ kind: "start-geometry-computer-deformation", computerId: "gc" }).effects).toEqual([
       { kind: "start-geometry-computer-deformation", computerId: "gc" },
     ]);
+  });
+});
+
+describe("applyRuntimeCommand: tool and player state", () => {
+  it("replaces the cannon tool state", () => {
+    const result = reduce({ kind: "set-cannon-tool-state", state: { selectedCannonId: "c", activeGeodesicId: "g" } });
+
+    expect(result.state.cannonToolState).toEqual({ selectedCannonId: "c", activeGeodesicId: "g" });
+    expect(result.effects).toEqual([]);
+  });
+
+  it("replaces the protractor tool state", () => {
+    const result = reduce({ kind: "set-protractor-tool-state", state: {} });
+
+    expect(result.state.protractorToolState).toEqual({});
+    expect(result.effects).toEqual([]);
+  });
+
+  it("replaces the player pose", () => {
+    const pose = { ...createDefaultPlayerPose("room-b"), yawRadians: 1 };
+    const result = reduce({ kind: "set-player-pose", pose });
+
+    expect(result.state.playerPose).toBe(pose);
+    expect(result.effects).toEqual([]);
+  });
+
+  it("hands out increasing serial numbers per object id family", () => {
+    const session = createAppSession(stateWith());
+
+    expect(takeObjectIdSerial(session, "placed-flag")).toBe(0);
+    expect(takeObjectIdSerial(session, "placed-flag")).toBe(1);
+    expect(takeObjectIdSerial(session, "geodesic")).toBe(0);
+    expect(session.get().objectIdSerials).toMatchObject({ "placed-flag": 2, geodesic: 1, "protractor-angle": 0 });
   });
 });

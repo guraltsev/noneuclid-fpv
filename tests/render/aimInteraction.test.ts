@@ -5,6 +5,7 @@
  * invalidated) rather than through resolver call counts.
  */
 import * as THREE from "three";
+import { createTestAppSession } from "../support/appSession";
 import { describe, expect, it } from "vitest";
 import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
 import type { CellComplexSpec } from "../../src/cell-complex/specs";
@@ -26,10 +27,9 @@ describe("createAimInteraction", () => {
       xrRig: {} as never,
       runtimeObjectRegistry: registry,
       getWorld: () => world,
-      getDebugLevel: () => "off" as never,
-      session: { get: () => ({ menuState: { selectedTool: "none" } }) } as never,
-      getCannonToolState: () => ({ activeGeodesicId: undefined }) as never,
-      getPlayerPose: () => ({ cellId: "room-a", position: { x: 0, y: 0, z: 0 }, yawRadians: 0, pitchRadians: 0 }),
+      session: createTestAppSession({
+        playerPose: { cellId: "room-a", position: { x: 0, y: 0, z: 0 }, yawRadians: 0, pitchRadians: 0 },
+      }),
       getFrameSerial: () => frameSerial,
     });
     const camera = cameraLookingAt({ x: 0, y: -0.5, z: 1.08 }, { x: 0, y: 0, z: 1.08 });

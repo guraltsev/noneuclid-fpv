@@ -13,26 +13,20 @@ import { describe, expect, it } from "vitest";
 import { type CompiledCellComplex } from "../../src/cell-complex/compileCellComplex";
 import { yawRigidTransform3 } from "../../src/math/rigidTransform3";
 import { createDefaultPlayerPose, type PlayerPose } from "../../src/movement/playerPose";
-import { defaultAppConfig } from "../../src/glue/appConfig";
 import { applyRuntimeCommand } from "../../src/runtime/applyRuntimeCommand";
-import { createAppSession } from "../../src/runtime/appSession";
-import { createRuntimeMenuState } from "../../src/runtime/runtimeMenuState";
+import { createTestAppSession } from "../support/appSession";
 import { carryMaxSpeedMetersPerSecond } from "../../src/world-objects/carry";
 import { shootGeodesic } from "../../src/world-objects/geodesic/cannon";
 import { isGeodesicLocked } from "../../src/world-objects/geodesic/lifecycle";
 import { createGeodesicCannonObject } from "../../src/world-objects/geodesic/objects";
 import { createRuntimeObjectRegistry, type RuntimeObjectRegistry } from "../../src/world-objects/runtimeObjectRegistry";
-import { createGeodesicCannonTools, type GeodesicCannonToolState } from "../../src/render/three/geodesicCannonTools";
+import { createGeodesicCannonTools } from "../../src/render/three/geodesicCannonTools";
 import type { RootAimRay } from "../../src/render/three/rootAimRay";
 import { worldPointToThree } from "../../src/render/three/worldAxes";
 import { compileLargePortalWorld } from "../fixtures/world-objects/geodesic";
 
 function createHarness(world: CompiledCellComplex, registry: RuntimeObjectRegistry, playerPose: PlayerPose) {
-  const session = createAppSession({
-    menuState: createRuntimeMenuState({ selectedWorldId: "test" }),
-    appConfig: defaultAppConfig,
-  });
-  let toolState: GeodesicCannonToolState = {};
+  const session = createTestAppSession({ playerPose });
   const nothing = (): void => {};
   const tools = createGeodesicCannonTools({
     scene: new THREE.Scene(),
@@ -44,12 +38,6 @@ function createHarness(world: CompiledCellComplex, registry: RuntimeObjectRegist
     dispatch: (command) => {
       applyRuntimeCommand(session, command);
     },
-    getCannonToolState: () => toolState,
-    setCannonToolState: (next) => {
-      toolState = next;
-    },
-    getPlayerPose: () => playerPose,
-    getDebugLevel: () => "off",
     resolveCurrentAimTarget: () => undefined,
     resolveCurrentAimTargets: () => [],
     targetIsWithinInteractionRange: () => false,

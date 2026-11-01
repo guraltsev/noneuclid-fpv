@@ -29,6 +29,7 @@ import {
 } from "../../src/render/three/runtimeObjectRenderArchetypes";
 import { worldPointToThree } from "../../src/render/three/worldAxes";
 import { createXrPortalEyeRenderRootTarget, resolveXrPortalEyeRenderRoot } from "../../src/render/three/xrPortalEye";
+import { createTestAppSession } from "../../tests/support/appSession";
 
 const iterationsPerTrial = 20_000;
 const trials = 7;
@@ -108,7 +109,7 @@ function geodesicEmitterLabelCase(): () => void {
     runtimeObjectRegistry: { getAll: () => [] } as never,
     geodesicEmitterLabelsByKey: new Map(),
     getWorld: () => ({ cellsById: new Map() }) as never,
-    getPlayerPose: () => ({ cellId: "a", position: { x: 0, y: 0, z: 0 }, yawRadians: 0 }) as never,
+    session: createTestAppSession({ playerPose: { cellId: "a", position: { x: 0, y: 0, z: 0 }, yawRadians: 0 } as never }),
     getRegistryVersion: () => 0,
   });
 

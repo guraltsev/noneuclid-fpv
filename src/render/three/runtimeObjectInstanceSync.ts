@@ -10,9 +10,9 @@
  * instances. Records of unchanged objects (same registry value, same world, same archetype keys) are reused,
  * ghosts included. It never touches the selectable-hitbox debug meshes.
  */
+import type { AppSession } from "../../runtime/appSession";
 import type * as THREE from "three";
 import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex";
-import type { PlayerPose } from "../../movement/playerPose";
 import type { RuntimeObjectRegistry, RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
 import type { FrameRenderSnapshot } from "./frameRenderSnapshot";
 import { collectGeodesicRuntimeRenderRecords } from "./geodesicCannonRenderer";
@@ -53,7 +53,8 @@ export interface RuntimeObjectInstanceSyncDeps {
   readonly maxVisiblePaths: number;
   readonly diagnostics: RuntimeObjectRenderArchetypeDiagnostics;
   getWorld(): CompiledCellComplex;
-  getPlayerPose(): PlayerPose;
+  /** The shell session: player pose, debug settings and the cannon tool state are read from it. */
+  readonly session: AppSession;
   /** Builds a new archetype and installs whatever hooks the shell needs on its mesh. */
   buildArchetype(source: RuntimeObjectRenderSourceMesh, capacity: number): RuntimeObjectRenderArchetype;
 }
@@ -285,7 +286,7 @@ export function createRuntimeObjectInstanceSync(deps: RuntimeObjectInstanceSyncD
     }
 
     if (deps.playerRoverRenderModel) {
-      records.push(...deps.playerRoverRenderModel.collectRecords(deps.getPlayerPose(), renderSourcesByKey.keys()));
+      records.push(...deps.playerRoverRenderModel.collectRecords(deps.session.get().playerPose, renderSourcesByKey.keys()));
     }
 
     return records;
