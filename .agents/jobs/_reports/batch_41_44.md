@@ -1,7 +1,7 @@
 # Batch report: jobs 41-44 (test rehaul)
 
 Coordinator: [00_coordinate_jobs_41_44](../_done/00_coordinate_jobs_41_44.md).
-Batch start: 2378b1f. Batch end: TBD.
+Batch start: 2378b1f. Batch end: 114c0c5.
 
 ## Start state
 
