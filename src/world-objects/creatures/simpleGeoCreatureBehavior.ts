@@ -18,7 +18,7 @@ import {
   type RigidTransform3,
 } from "../../math/rigidTransform3";
 import { vec3 } from "../../math/vec3";
-import { getDynamicObjectCollisionBounds } from "../../movement/collision";
+import { getDynamicObjectCollisionBounds, testCellCollision } from "../../movement/collision";
 import { depenetrateDynamicObject } from "../../movement/depenetrateDynamicObject";
 import type { DynamicObjectState } from "../../movement/dynamicObject";
 import {
@@ -227,17 +227,32 @@ export function createSimpleGeoCreatureBehavior(
       creatureFromLeader = orthonormalizeYawRigidTransform3(composeRigidTransform3(result.cellFromStart, creatureFromLeader));
       state = result.object;
 
-      // Heading: the leader's when the creature is on its way, else the direction of the last applied step.
+      // A body that stands inside a forbidden zone or wall rejects every step (even one that leads out), so it would stay there for good while the leader waits; push it out. A push through a portal is not taken: it would change the cell under the leader's frame map.
+      if (result.blocked && Math.hypot(result.appliedDisplacement.x, result.appliedDisplacement.y) < 1e-9) {
+        const pushed = depenetrateDynamicObject(world, state).object;
+
+        if (pushed.cellId === state.cellId) {
+          state = pushed;
+        }
+      }
+
+      // Heading: the leader's when the creature is on its way, else the direction of the last applied step. Turning swings the collision cylinder (its centre is offset from the origin), so the turn is limited to what the cell allows.
       if (lagMeters() < 1e-4 || (!result.blocked && !ruleApplied)) {
         state = {
           ...state,
-          localPose: { rotation: composeRigidTransform3(creatureFromLeader, leader.localPose).rotation, translation: state.localPose.translation },
+          localPose: turnWithoutOverlap(world, state, {
+            rotation: composeRigidTransform3(creatureFromLeader, leader.localPose).rotation,
+            translation: state.localPose.translation,
+          }),
         };
       } else {
         const applied = transformDirection3(result.cellFromStart, result.appliedDisplacement);
 
         if (Math.hypot(applied.x, applied.y) > 1e-6) {
-          state = { ...state, localPose: yawRigidTransform3(Math.atan2(-applied.x, applied.y), state.localPose.translation) };
+          state = {
+            ...state,
+            localPose: turnWithoutOverlap(world, state, yawRigidTransform3(Math.atan2(-applied.x, applied.y), state.localPose.translation)),
+          };
         }
       }
 
@@ -286,6 +301,42 @@ export function createSimpleGeoCreatureBehavior(
       publishState();
     },
   };
+}
+
+/**
+ * Returns `target` (the creature's pose turned to a new heading at the same position) when the turned body is clear of the cell's zones and walls, else the largest of half, a quarter, an eighth and a sixteenth of the turn that is clear, else the current pose.
+ * The collision cylinder's centre is offset from the pose origin and the offset turns with the pose, so a heading change moves the cylinder and has to be tested like a step.
+ */
+function turnWithoutOverlap(world: CompiledCellComplex, state: DynamicObjectState, target: RigidTransform3): RigidTransform3 {
+  const cell = world.cellsById.get(state.cellId);
+
+  if (!cell || !state.collision) {
+    return target;
+  }
+
+  const overlaps = (pose: RigidTransform3): boolean => testCellCollision({ cell, object: { ...state, localPose: pose } }).blocked;
+
+  if (!overlaps(target)) {
+    return target;
+  }
+
+  const yawOf = (pose: RigidTransform3): number => {
+    const forward = transformDirection3(pose, vec3(0, 1, 0));
+
+    return Math.atan2(-forward.x, forward.y);
+  };
+  const from = yawOf(state.localPose);
+  const turn = Math.atan2(Math.sin(yawOf(target) - from), Math.cos(yawOf(target) - from));
+
+  for (let fraction = 0.5; fraction >= 1 / 16; fraction /= 2) {
+    const pose = yawRigidTransform3(from + turn * fraction, state.localPose.translation);
+
+    if (!overlaps(pose)) {
+      return pose;
+    }
+  }
+
+  return state.localPose;
 }
 
 function lateralOscillationOffset(objectSpec: SimpleGeoCreatureObjectSpec, elapsedSeconds: number): number {
