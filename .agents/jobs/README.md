@@ -138,7 +138,7 @@ lower numbers of jobs 18, 24, 30, 34 and 35.
 | [46](_done/46_shell_session_and_command_path.md) | One shell-side state holder and one command path | done, needs review | - | 77 |
 | [47](_done/47_carry_contract.md) | The carry contract: an emitter that can be carried reacts to a stream of displacement steps | done, needs review | - |  |
 | [00](00_coordinate_jobs_48_55.md) | Coordinate jobs 48-55 (world engine, clients and modules): order, gates, fresh-context reviews, batch report | queued | [84](../../_issues/84_behaviors_are_hard_wired_into_the_shell_and_need_a_plugin_system.md) |  |
-| [48](48_module_bench_change_journal_layers.md) | Record the performance baseline, add the change journal, and add the engine and module layers | queued | - |  |
+| [48](_done/48_module_bench_change_journal_layers.md) | Record the performance baseline, add the change journal, and add the engine and module layers | done, needs review | - |  |
 | [49](49_world_engine_and_client_session.md) | Build the world engine and split the client session from it | queued | - |  |
 | [50](50_carry_as_world_attachment.md) | Make carrying a world attachment | queued | - |  |
 | [51](51_geodesic_model_module_and_renames.md) | Create the geodesic model module, with its renames and end nodes | queued | - |  |
