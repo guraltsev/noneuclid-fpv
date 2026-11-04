@@ -112,7 +112,7 @@ export function resolveGeodesicCannonAbsoluteEmitterPoint(
  * start and is not clamped to the segment length.
  */
 export function getDistanceAlongGeodesicSegment(
-  segment: Extract<RuntimeWorldObject, { readonly kind: "geodesic-segment" }>,
+  segment: Extract<RuntimeWorldObject, { readonly kind: "geodesicModel/segment" }>,
   localPoint: Vec3,
 ): number {
   const dx = localPoint.x - segment.start.x;
@@ -126,7 +126,7 @@ export function getDistanceAlongGeodesicSegment(
  *
  * The switch is exhaustive over terminal kinds, so adding a kind without updating it fails type checking.
  */
-export function formatGeodesicTerminal(terminal: Extract<RuntimeWorldObject, { readonly kind: "geodesic-segment" }>["terminal"]): string {
+export function formatGeodesicTerminal(terminal: Extract<RuntimeWorldObject, { readonly kind: "geodesicModel/segment" }>["terminal"]): string {
   switch (terminal.kind) {
     case "open":
       return "open";

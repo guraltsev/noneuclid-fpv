@@ -336,13 +336,13 @@ export function createRuntimeObjectInstanceSync(deps: RuntimeObjectInstanceSyncD
     const prefix = geodesic ? "" : runtimeObjectArchetypeKeyPrefix(object);
     const archetypeKeys = geodesic ? deps.geodesicArchetypeKeys : archetypeKeysForObject(object, prefix);
 
-    if (geodesic && object.kind === "geodesic-segment") {
+    if (geodesic && object.kind === "geodesicModel/segment") {
       // A segment is computed per cell and continues as the next segment: it has no body parts to ghost.
       return [{
         partId: object.id,
         source: "geodesic-segments",
         archetypeKeys,
-        exemption: "geodesic-segment",
+        exemption: "geodesicModel/segment",
         records: () => collectGeodesicRuntimeRenderRecords(registry, object, deps.geodesicArchetypeKeys),
       }];
     }
@@ -436,7 +436,7 @@ export function createRuntimeObjectInstanceSync(deps: RuntimeObjectInstanceSyncD
       }
       const prefix = geodesic ? "" : runtimeObjectArchetypeKeyPrefix(object);
       const archetypeKeys = geodesic ? deps.geodesicArchetypeKeys : archetypeKeysForObject(object, prefix);
-      const source: RuntimeObjectRecordSource = !geodesic ? "runtime-objects" : object.kind === "geodesic-segment" ? "geodesic-segments" : "geodesic-body-parts";
+      const source: RuntimeObjectRecordSource = !geodesic ? "runtime-objects" : object.kind === "geodesicModel/segment" ? "geodesic-segments" : "geodesic-body-parts";
       const cached = recordCacheByObjectId.get(object.id);
       const headsKey = emitterHeadsKey(registry, object);
 
@@ -446,7 +446,7 @@ export function createRuntimeObjectInstanceSync(deps: RuntimeObjectInstanceSyncD
         continue;
       }
 
-      if (!(geodesic && object.kind === "geodesic-segment")) {
+      if (!(geodesic && object.kind === "geodesicModel/segment")) {
         stats.ghostComputations += 1;
       }
       const objectRecords = recordsOfParts(ghostPartsOfObject(object, world));

@@ -1,5 +1,5 @@
 /**
- * Geodesic emitters ("cannons"), geodesic intervals and curve shortening on a glued cell complex.
+ * Geodesic emitters ("cannons"), geodesic arcs and curve shortening on a glued cell complex.
  *
  * ## Setting
  * The world is a cell complex: convex prism cells, each with its own local frame (x right, y forward, z up, meters), glued along
@@ -10,15 +10,15 @@
  *
  * ## Objects (all live in a `RuntimeObjectRegistry`)
  * - `GeodesicCannonObject` (emitter): a placed object that geodesic endpoints can attach to.
- * - `FreeGeodesicEndObject`: an invisible anchor for an endpoint that is not on an emitter.
- * - `GeodesicIntervalObject`: THE authoritative geodesic. It has two endpoint attachments (`start`, `end`; each names an anchor object, an
+ * - `GeodesicVertexObject` (`geodesicModel/vertex`, formerly "free geodesic end"): an invisible anchor for an endpoint that is not on an emitter.
+ * - `GeodesicArcObject` (`geodesicModel/arc`, formerly "geodesic interval"): THE authoritative geodesic. It has two endpoint attachments (`start`, `end`; each names an anchor object, an
  *   emitter or a free end) and a PORTAL WORD: the ordered list of portal traversals from `start` to `end`. Nothing else is stored.
- * - `GeodesicSegmentObject`: derived, per-cell straight pieces of an interval, regenerated from the interval whenever it changes.
+ * - `GeodesicSegmentObject` (`geodesicModel/segment`): derived, per-cell straight pieces of an interval, regenerated from the interval whenever it changes.
  *   Never edit them directly. Their `terminal` says why a piece stops: `open` (the length was used up), `portal-hit` (continues in the
  *   next segment), `wall-hit`, `forbidden-zone-hit` (cylinder of a junction) or `emitter-hit`. Each interval's segments are also
  *   labelled with a `halfRole` (the first half of the total length belongs to the `start` role, the second to `end`), so that a click
  *   on a segment resolves to an endpoint (`resolveGeodesicEndpointSelectionFromSegmentHit`).
- * - `GeodesicIntersectionObject`: computed markers where segments of two different geodesics cross in a cell.
+ * - `GeodesicCrossingObject` (`geodesicModel/crossing`, formerly "geodesic intersection"): computed markers where segments of two different geodesics cross in a cell.
  * - `CurveShorteningPairObject`: bookkeeping of one shortening process (see below).
  *
  * ## Development: how a portal word fixes the geometry
@@ -72,7 +72,7 @@ import type { RuntimeWorldObjectBase } from "../runtimeObjectBase";
  *
  * The cannon sits on the cell floor (`localPose.translation.z` is the floor height); the beam it emits starts
  * `geodesicRayBeamHeightMeters` above that. Frames are cell-local (x right, y forward, z up). The cannon does NOT own
- * geometry: the authoritative geodesic data are the `GeodesicIntervalObject`s whose `start`/`end` attachments reference
+ * geometry: the authoritative geodesic data are the `GeodesicArcObject`s whose `start`/`end` attachments reference
  * this cannon's id (`getEmitterGeodesicIds` lists them); the cannon stores no copy of that list.
  */
 export interface GeodesicCannonObject extends RuntimeWorldObjectBase {
@@ -142,8 +142,8 @@ export interface GeodesicEndpointSelection extends GeodesicEndpointAttachment {}
  * It is deleted automatically once no interval refers to it (`removeUnusedFreeGeodesicEnds`). A shared free end (two
  * attached roles) is the moving vertex of a curve-shortening pair.
  */
-export interface FreeGeodesicEndObject extends RuntimeWorldObjectBase {
-  readonly kind: "free-geodesic-end";
+export interface GeodesicVertexObject extends RuntimeWorldObjectBase {
+  readonly kind: "geodesicModel/vertex";
   readonly canAttachGeodesics: true;
   /** Optional face the end was authored on; informational, not used by the tracing math. */
   readonly faceId?: string;
@@ -158,8 +158,8 @@ export interface FreeGeodesicEndObject extends RuntimeWorldObjectBase {
  * development along `portalWord`) is fully determined by these data and is materialized as
  * `GeodesicSegmentObject`s by `rebuildDerivedGeodesicSegments`. The interval itself is invisible and not collidable.
  */
-export interface GeodesicIntervalObject extends RuntimeWorldObjectBase {
-  readonly kind: "geodesic-interval";
+export interface GeodesicArcObject extends RuntimeWorldObjectBase {
+  readonly kind: "geodesicModel/arc";
   readonly start: GeodesicEndpointAttachment;
   readonly end: GeodesicEndpointAttachment;
   /** Cell containing the `start` anchor; the tracing of the interval begins here. Mirrors `cellId`. */
@@ -173,7 +173,7 @@ export interface GeodesicIntervalObject extends RuntimeWorldObjectBase {
 /**
  * Bookkeeping object owning one curve-shortening process: a piecewise-geodesic curve whose free vertices relax under the curve shortening flow.
  *
- * `vertexIds` lists the ids of the `FreeGeodesicEndObject`s that are still vertices of the curve, in the order the flow visits them. The arcs are not stored:
+ * `vertexIds` lists the ids of the `GeodesicVertexObject`s that are still vertices of the curve, in the order the flow visits them. The arcs are not stored:
  * they are the `"moving"` intervals that have a vertex of the list as an endpoint (each vertex has exactly two such endpoint roles; both belong to
  * one interval for a free loop). A vertex is removed from the list when the curve is taut there; the list never grows. The object is invisible; `cellId`
  * only mirrors the cell of the first vertex. A pair that could not go on has `state: "unresolved"`.
@@ -213,7 +213,7 @@ export interface LiftedGeodesicEndpoint {
  * kind (`wall-hit`, `forbidden-zone-hit`) when the path was cut short.
  */
 export interface GeodesicTraceBuildResult {
-  readonly interval: GeodesicIntervalObject;
+  readonly interval: GeodesicArcObject;
   readonly segments: readonly GeodesicSegmentObject[];
   readonly terminal:
     | { readonly kind: "free-end"; readonly freeEndObjectId: string }
@@ -230,8 +230,8 @@ export interface GeodesicTraceBuildResult {
  * and friends); never edit them to change a geodesic. `cellId` is the cell whose frame `start`/`direction` use.
  */
 export interface GeodesicSegmentObject extends RuntimeWorldObjectBase {
-  readonly kind: "geodesic-segment";
-  /** Id of the owning `GeodesicIntervalObject`. */
+  readonly kind: "geodesicModel/segment";
+  /** Id of the owning `GeodesicArcObject`. */
   readonly geodesicId: string;
   /** Display number ("G1", "G2", ...) assigned by `getGlobalGeodesicNumbers`; optional cache. */
   readonly geodesicNumber?: number;
@@ -258,8 +258,8 @@ export interface GeodesicSegmentObject extends RuntimeWorldObjectBase {
  *
  * Derived data maintained by `updateGeodesicIntersectionObjects`; ids are remembered per geodesic/segment pair so markers stay stable between frames.
  */
-export interface GeodesicIntersectionObject extends RuntimeWorldObjectBase {
-  readonly kind: "geodesic-intersection";
+export interface GeodesicCrossingObject extends RuntimeWorldObjectBase {
+  readonly kind: "geodesicModel/crossing";
   /** The two crossing geodesics (distinct ids). */
   readonly geodesicIds: readonly [string, string];
   /** The two crossing segments, in the same order as `geodesicIds`. */
@@ -418,14 +418,14 @@ export function createGeodesicCannonObject(options: CreateGeodesicCannonOptions)
   };
 }
 
-/** Type guard: true when the object is a `GeodesicSegmentObject` (`kind === "geodesic-segment"`). */
+/** Type guard: true when the object is a `GeodesicSegmentObject` (`kind === "geodesicModel/segment"`). */
 export function isGeodesicSegmentObject(object: { readonly kind: string }): object is GeodesicSegmentObject {
-  return object.kind === "geodesic-segment";
+  return object.kind === "geodesicModel/segment";
 }
 
-/** Type guard: true when the object is a `FreeGeodesicEndObject`. */
-export function isFreeGeodesicEndObject(object: { readonly kind: string }): object is FreeGeodesicEndObject {
-  return object.kind === "free-geodesic-end";
+/** Type guard: true when the object is a `GeodesicVertexObject`. */
+export function isGeodesicVertexObject(object: { readonly kind: string }): object is GeodesicVertexObject {
+  return object.kind === "geodesicModel/vertex";
 }
 
 /**
@@ -433,14 +433,14 @@ export function isFreeGeodesicEndObject(object: { readonly kind: string }): obje
  *
  * Pure; the caller adds it to the registry. The object is non-renderable through portals and can attach geodesics.
  */
-export function createFreeGeodesicEndObject(input: {
+export function createGeodesicVertexObject(input: {
   readonly id: string;
   readonly cellId: string;
   readonly point: Vec3;
-}): FreeGeodesicEndObject {
+}): GeodesicVertexObject {
   return {
     id: input.id,
-    kind: "free-geodesic-end",
+    kind: "geodesicModel/vertex",
     canAttachGeodesics: true,
     cellId: input.cellId,
     localPose: yawRigidTransform3(0, input.point),
@@ -454,17 +454,17 @@ export function createFreeGeodesicEndObject(input: {
  * Defaults: empty `portalWord`, `motionState: "stable"`. The word is freely reduced (adjacent inverse traversals cancel). Does not validate that the word matches the anchors' cells and
  * does not generate segments; call `rebuildDerivedGeodesicSegments` afterwards. Pure; the caller adds it to the registry.
  */
-export function createGeodesicIntervalObject(input: {
+export function createGeodesicArcObject(input: {
   readonly id: string;
   readonly startAnchorObjectId: string;
   readonly endAnchorObjectId: string;
   readonly startCellId: string;
   readonly portalWord?: readonly GeodesicPortalTraversal[];
   readonly motionState?: "stable" | "moving";
-}): GeodesicIntervalObject {
+}): GeodesicArcObject {
   return {
     id: input.id,
-    kind: "geodesic-interval",
+    kind: "geodesicModel/arc",
     cellId: input.startCellId,
     localPose: identityRigidTransform3,
     portalRenderable: false,

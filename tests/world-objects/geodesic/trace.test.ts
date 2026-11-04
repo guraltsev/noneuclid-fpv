@@ -92,7 +92,7 @@ describe("geodesic cannon world objects: trace", () => {
       { geodesicId: "g-a", role: "start", anchorObjectId: "cannon-a" },
     ]);
     const interval = registry.get("g-a");
-    const freeEndId = interval?.kind === "geodesic-interval" ? interval.end.anchorObjectId : undefined;
+    const freeEndId = interval?.kind === "geodesicModel/arc" ? interval.end.anchorObjectId : undefined;
     expect(freeEndId).toBeDefined();
     expect(freeEndId ? getGeodesicEndpointAttachmentsForAnchor(registry, freeEndId) : []).toEqual([
       { geodesicId: "g-a", role: "end", anchorObjectId: freeEndId },
@@ -259,7 +259,7 @@ describe("geodesic cannon world objects: trace", () => {
     }));
     registry.add({
       id: "g-a:segment:0",
-      kind: "geodesic-segment",
+      kind: "geodesicModel/segment",
       cellId: "a",
       localPose: yawRigidTransform3(Math.atan2(direction.y, direction.x), result.start),
       portalRenderable: true,

@@ -1,6 +1,6 @@
 # Job 51 - Create the geodesic model module, with its renames and end nodes
 
-Status: queued.
+Status: in progress.
 Resolves: part of issue [84](../../_issues/84_behaviors_are_hard_wired_into_the_shell_and_need_a_plugin_system.md) (requirements 2, 5, 6).
 
 ## Goal

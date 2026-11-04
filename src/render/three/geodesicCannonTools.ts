@@ -199,7 +199,7 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
     }
 
     // Aiming at a geodesic crossing places a cannon at that vertex; the yaw below is the horizontal aim direction.
-    if (target?.object?.kind === "geodesic-intersection") {
+    if (target?.object?.kind === "geodesicModel/crossing") {
       const forward = getAimForwardVector(ray);
       if (!forward) {
         return;
@@ -236,7 +236,7 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
     }
 
     // Aiming at an existing geodesic segment places a cannon on it at the hit distance along the segment.
-    if (target?.object?.kind === "geodesic-segment") {
+    if (target?.object?.kind === "geodesicModel/segment") {
       const forward = getAimForwardVector(ray);
       if (!forward) {
         return;
@@ -331,7 +331,7 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
       return false;
     }
 
-    if (target?.object?.kind !== "geodesic-segment") {
+    if (target?.object?.kind !== "geodesicModel/segment") {
       return false;
     }
     const geodesicId = target.object.geodesicId;
@@ -643,7 +643,7 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
         continue;
       }
 
-      const endpoint = target.object?.kind === "geodesic-segment"
+      const endpoint = target.object?.kind === "geodesicModel/segment"
         ? resolveGeodesicEndpointSelectionFromSegmentHit(runtimeObjectRegistry, target.object.id)
         : undefined;
       if (
@@ -684,7 +684,7 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
   }
 
   function syncTieAndDetachSelectionHighlights(selectedEndpoints: readonly GeodesicEndpointSelection[]): void {
-    for (const object of runtimeObjectRegistry.getObjectsOfKind("geodesic-segment")) {
+    for (const object of runtimeObjectRegistry.getObjectsOfKind("geodesicModel/segment")) {
       const endpoint = resolveGeodesicEndpointSelectionFromSegmentHit(runtimeObjectRegistry, object.id);
       const nextHighlightState = endpoint && selectedEndpoints.some((selection) =>
         selection.geodesicId === endpoint.geodesicId && selection.role === endpoint.role

@@ -20,7 +20,7 @@ import { createRuntimeObjectRegistry } from "../../src/world-objects/runtimeObje
 import {
   createGeodesicCannonObject,
   geodesicRayBeamHeightMeters,
-  type GeodesicIntersectionObject,
+  type GeodesicCrossingObject,
   type GeodesicSegmentObject,
 } from "../../src/world-objects/geodesic/objects";
 import { createProtractorAngleObject } from "../../src/world-objects/protractorTool";
@@ -419,7 +419,7 @@ describe("resolveAimTarget", () => {
 
     expect(target?.kind).toBe("object");
     expect(target?.object?.id).toBe("vertex-a");
-    expect(target?.object?.kind).toBe("geodesic-intersection");
+    expect(target?.object?.kind).toBe("geodesicModel/crossing");
   });
 
   it("prioritizes geodesic emitters over overlapping geodesic intersection balloons", () => {
@@ -961,7 +961,7 @@ function squareBase(): readonly { readonly x: number; readonly y: number }[] {
 function createGeodesicSegment(overrides: Partial<GeodesicSegmentObject> = {}): GeodesicSegmentObject {
   return {
     id: "segment-a",
-    kind: "geodesic-segment",
+    kind: "geodesicModel/segment",
     cellId: "room",
     localPose: yawRigidTransform3(0, { x: -0.5, y: 0, z: 1.08 }),
     portalRenderable: true,
@@ -979,10 +979,10 @@ function createGeodesicSegment(overrides: Partial<GeodesicSegmentObject> = {}): 
   };
 }
 
-function createGeodesicIntersection(overrides: Partial<GeodesicIntersectionObject> = {}): GeodesicIntersectionObject {
+function createGeodesicIntersection(overrides: Partial<GeodesicCrossingObject> = {}): GeodesicCrossingObject {
   return {
     id: "vertex-a",
-    kind: "geodesic-intersection",
+    kind: "geodesicModel/crossing",
     cellId: "room",
     localPose: yawRigidTransform3(0, { x: 0, y: 0, z: 1.23 }),
     portalRenderable: true,

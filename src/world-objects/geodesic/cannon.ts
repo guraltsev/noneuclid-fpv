@@ -9,9 +9,9 @@ import { type RuntimeObjectRegistry } from "../runtimeObjectRegistry";
 import { runtimeObjectToDynamicObjectState } from "../runtimeObjectBase";
 import {
   canExtendGeodesicSegment,
-  createFreeGeodesicEndObject,
+  createGeodesicVertexObject,
   createGeodesicCannonObject,
-  createGeodesicIntervalObject,
+  createGeodesicArcObject,
   defaultTraceLengthMeters,
   directionFromYaw,
   emitterConnectionToleranceMeters,
@@ -238,14 +238,14 @@ function shootGeodesicNow(input: ShootGeodesicInput): GeodesicSegmentObject {
   const start = getGeodesicCannonEmitterPoint(input.cannon);
   const targetPoint = addVec3(start, scaleVec3(direction, input.maxLengthMeters ?? defaultTraceLengthMeters));
   let interval = input.registry.get(input.geodesicId);
-  if (interval?.kind !== "geodesic-interval") {
+  if (interval?.kind !== "geodesicModel/arc") {
     const freeEndId = `${input.geodesicId}:free-end`;
-    input.registry.add(createFreeGeodesicEndObject({
+    input.registry.add(createGeodesicVertexObject({
       id: freeEndId,
       cellId: input.cannon.cellId,
       point: targetPoint,
     }));
-    input.registry.add(createGeodesicIntervalObject({
+    input.registry.add(createGeodesicArcObject({
       id: input.geodesicId,
       startAnchorObjectId: input.cannon.id,
       endAnchorObjectId: freeEndId,
@@ -291,7 +291,7 @@ export function extendGeodesic(input: ExtendGeodesicInput): GeodesicSegmentObjec
 
 function extendGeodesicNow(input: ExtendGeodesicInput): GeodesicSegmentObject | undefined {
   const interval = input.registry.get(input.geodesicId);
-  if (interval?.kind !== "geodesic-interval" || !isAimableFreeGeodesic(input.registry, interval)) {
+  if (interval?.kind !== "geodesicModel/arc" || !isAimableFreeGeodesic(input.registry, interval)) {
     return undefined;
   }
   const emitterRole: GeodesicEndRole = input.registry.get(interval.start.anchorObjectId)?.kind === "geodesic-cannon"
@@ -449,13 +449,13 @@ function connectGeodesicToEmitterNow(
 ): readonly GeodesicSegmentObject[] {
   const interval = request.registry.get(request.geodesicId);
   const incoming = request.registry.get(request.incomingEmitterId);
-  if (interval?.kind === "geodesic-interval") {
+  if (interval?.kind === "geodesicModel/arc") {
     if (incoming?.kind !== "geodesic-cannon") {
       return getGeodesicSegments(request.registry, request.geodesicId);
     }
-    const freeRole = request.registry.get(interval.start.anchorObjectId)?.kind === "free-geodesic-end"
+    const freeRole = request.registry.get(interval.start.anchorObjectId)?.kind === "geodesicModel/vertex"
       ? "start"
-      : request.registry.get(interval.end.anchorObjectId)?.kind === "free-geodesic-end"
+      : request.registry.get(interval.end.anchorObjectId)?.kind === "geodesicModel/vertex"
         ? "end"
         : undefined;
     const emitterRole = freeRole ? getOppositeEndRole(freeRole) : undefined;
@@ -516,7 +516,7 @@ function rebuildConnectedGeodesicBetweenEmittersNow(
   request: RebuildConnectedGeodesicBetweenEmittersRequest,
 ): readonly GeodesicSegmentObject[] {
   const interval = request.registry.get(request.geodesicId);
-  if (interval?.kind === "geodesic-interval") {
+  if (interval?.kind === "geodesicModel/arc") {
     if (!isGeodesicLocked(request.registry, request.geodesicId)) {
       return getGeodesicSegments(request.registry, request.geodesicId);
     }
@@ -661,7 +661,7 @@ function placeGeodesicCannonOnGeodesicNow(
   request: PlaceGeodesicCannonOnGeodesicRequest,
 ): PlaceGeodesicCannonResult {
   const segment = request.registry.get(request.segmentId);
-  if (segment?.kind !== "geodesic-segment" || segment.geodesicId !== request.geodesicId) {
+  if (segment?.kind !== "geodesicModel/segment" || segment.geodesicId !== request.geodesicId) {
     return { placed: false, reason: "missing-cell" };
   }
 

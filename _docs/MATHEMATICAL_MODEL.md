@@ -248,10 +248,12 @@ The result (`src/world-objects/geodesic/intervals.ts#traceGeodesicFromLiftedChor
 per-cell **segments** of a geodesic; the ordered list of portals crossed is its **portal word**
 (`src/world-objects/geodesic/objects.ts#GeodesicPortalTraversal`).
 
-**Intervals and endpoints.** A `GeodesicIntervalObject` is a geodesic arc with a `start` and an `end`
-*attachment* (`src/world-objects/geodesic/objects.ts#GeodesicEndpointAttachment`): each end is attached to an
-*anchor object* — an emitter ("cannon"), or a `FreeGeodesicEndObject` (a loose end that can be aimed). The interval stores
-its portal word, so the arc is determined by (anchor positions, word) alone. This is the "geodesic end model" of
+**Arcs, vertices and crossings.** A `GeodesicArcObject` (kind `geodesicModel/arc`, formerly "geodesic interval") is a geodesic arc
+with a `start` and an `end` *attachment* (`src/world-objects/geodesic/objects.ts#GeodesicEndpointAttachment`): each end is attached to an
+*anchor object* — an emitter ("cannon"), or a `GeodesicVertexObject` (kind `geodesicModel/vertex`, formerly "free geodesic end"; a point of a
+cell that is not an emitter: it can be aimed when only one arc end is on it, and it is a shared vertex of a curve when two or more are). The arc stores
+its portal word, so it is determined by (anchor positions, word) alone. A `GeodesicCrossingObject` (kind `geodesicModel/crossing`, formerly
+"geodesic intersection") marks a point where the segments of two different geodesics cross. This is the "geodesic end model" of
 `_issues/_closed/31_geodesic_end_model_and_curve_shortening_rehaul.md`.
 
 **Lifting (unfolding).** Given the word $w=(p_1,\dots,p_k)$ from the source anchor $a$ (in cell $C_0$) to the target

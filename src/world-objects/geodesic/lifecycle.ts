@@ -21,7 +21,7 @@ export function getGeodesicConnection(
   geodesicId: string,
 ): GeodesicEmitterAttachment | undefined {
   const interval = registry.get(geodesicId);
-  if (interval?.kind === "geodesic-interval") {
+  if (interval?.kind === "geodesicModel/arc") {
     const start = registry.get(interval.start.anchorObjectId);
     const end = registry.get(interval.end.anchorObjectId);
     if (start?.kind === "geodesic-cannon") {
@@ -52,7 +52,7 @@ function isPinnedAnchorKind(kind: string | undefined): boolean {
  */
 export function isGeodesicLocked(registry: RuntimeObjectRegistry, geodesicId: string): boolean {
   const interval = registry.get(geodesicId);
-  return interval?.kind === "geodesic-interval" &&
+  return interval?.kind === "geodesicModel/arc" &&
     isPinnedAnchorKind(registry.get(interval.start.anchorObjectId)?.kind) &&
     isPinnedAnchorKind(registry.get(interval.end.anchorObjectId)?.kind);
 }
@@ -74,7 +74,7 @@ export function removeGeodesic(registry: RuntimeObjectRegistry, geodesicId: stri
 }
 
 function removeGeodesicNow(registry: RuntimeObjectRegistry, geodesicId: string): void {
-  if (registry.get(geodesicId)?.kind === "geodesic-interval") {
+  if (registry.get(geodesicId)?.kind === "geodesicModel/arc") {
     removeGeodesicIntervalAndDerivedObjects(registry, geodesicId);
     return;
   }

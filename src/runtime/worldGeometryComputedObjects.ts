@@ -120,9 +120,9 @@ function collectLockedGeodesicIds(registry: RuntimeObjectRegistry): Set<string> 
 function collectAllGeodesicIds(registry: RuntimeObjectRegistry): Set<string> {
   const geodesicIds = new Set<string>();
   for (const object of registry.getAll()) {
-    if (object.kind === "geodesic-interval") {
+    if (object.kind === "geodesicModel/arc") {
       geodesicIds.add(object.id);
-    } else if (object.kind === "geodesic-segment") {
+    } else if (object.kind === "geodesicModel/segment") {
       geodesicIds.add(object.geodesicId);
     } else if (object.kind === "measured-geodesic-length") {
       geodesicIds.add(object.geodesicId);

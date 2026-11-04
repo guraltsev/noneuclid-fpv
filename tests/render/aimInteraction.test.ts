@@ -98,7 +98,7 @@ function squareBase(): readonly { readonly x: number; readonly y: number }[] {
 function createGeodesicSegment(overrides: Partial<GeodesicSegmentObject> = {}): GeodesicSegmentObject {
   return {
     id: "segment-a",
-    kind: "geodesic-segment",
+    kind: "geodesicModel/segment",
     cellId: "room",
     localPose: yawRigidTransform3(0, { x: -0.5, y: 0, z: 1.08 }),
     portalRenderable: true,

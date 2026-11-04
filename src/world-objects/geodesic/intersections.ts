@@ -6,7 +6,7 @@ import { crossXY } from "../../math/vec2";
 import { distanceSquaredVec3, type Vec3 } from "../../math/vec3";
 import type { RuntimeObjectRegistry } from "../runtimeObjectRegistry";
 import {
-  type GeodesicIntersectionObject,
+  type GeodesicCrossingObject,
   geodesicRayBeamHeightMeters,
   type GeodesicSegmentObject,
   getGeodesicSegmentEnd,
@@ -24,7 +24,7 @@ const geodesicAnchorCrossingToleranceMeters = 1e-6;
 const geodesicIntersectionBalloonHeightOffsetMeters = 0.25;
 
 /** Per-registry memory of intersection markers so ids remain stable while two segments keep crossing. */
-const geodesicIntersectionMemoryByRegistry = new WeakMap<RuntimeObjectRegistry, Map<string, GeodesicIntersectionObject>>();
+const geodesicIntersectionMemoryByRegistry = new WeakMap<RuntimeObjectRegistry, Map<string, GeodesicCrossingObject>>();
 
 // ---- Intersections ----
 
@@ -36,10 +36,10 @@ const geodesicIntersectionMemoryByRegistry = new WeakMap<RuntimeObjectRegistry, 
  * is a full O(n^2) scan of all segments (TODO(issue 70): use a spatial index or per-cell buckets). Crossings within `emitterConnectionToleranceMeters` of an emitter are suppressed. Previously seen
  * markers stay in the per-registry memory (see `getRememberedGeodesicIntersectionObject`).
  */
-export function updateGeodesicIntersectionObjects(registry: RuntimeObjectRegistry): readonly GeodesicIntersectionObject[] {
+export function updateGeodesicIntersectionObjects(registry: RuntimeObjectRegistry): readonly GeodesicCrossingObject[] {
   const memory = getGeodesicIntersectionMemory(registry);
   const previous = new Map(memory);
-  for (const object of registry.getObjectsOfKind("geodesic-intersection")) {
+  for (const object of registry.getObjectsOfKind("geodesicModel/crossing")) {
     previous.set(object.id, object);
     registry.remove(object.id);
   }
@@ -102,7 +102,7 @@ export function withDeferredGeodesicIntersections<T>(registry: RuntimeObjectRegi
 export function getRememberedGeodesicIntersectionObject(
   registry: RuntimeObjectRegistry,
   intersectionId: string,
-): GeodesicIntersectionObject | undefined {
+): GeodesicCrossingObject | undefined {
   return getGeodesicIntersectionMemory(registry).get(intersectionId);
 }
 
@@ -111,7 +111,7 @@ export function pruneMissingGeodesicIntersectionObjects(registry: RuntimeObjectR
   const memory = getGeodesicIntersectionMemory(registry);
   const prunedIds: string[] = [];
   for (const [id] of [...memory]) {
-    if (registry.get(id)?.kind === "geodesic-intersection") {
+    if (registry.get(id)?.kind === "geodesicModel/crossing") {
       continue;
     }
 
@@ -126,10 +126,10 @@ export function pruneMissingGeodesicIntersectionObjects(registry: RuntimeObjectR
 // count; a crossing at an emitter is dropped, and duplicates (same rounded point and geodesic pair) are removed. Segments in different
 // cells never intersect here, even if they are adjacent through a portal: a crossing exactly on a portal side is reported once, in the
 // cell the geodesics enter (see `crossingIsAtGeodesicAnchor`).
-function findGeodesicIntersections(registry: RuntimeObjectRegistry): readonly GeodesicIntersectionObject[] {
+function findGeodesicIntersections(registry: RuntimeObjectRegistry): readonly GeodesicCrossingObject[] {
   geodesicPerfCounters.intersectionPasses += 1;
-  const segments = registry.getObjectsOfKind("geodesic-segment");
-  const intersections: GeodesicIntersectionObject[] = [];
+  const segments = registry.getObjectsOfKind("geodesicModel/segment");
+  const intersections: GeodesicCrossingObject[] = [];
   const seenKeys = new Set<string>();
   const lastSegmentIndexByGeodesic = new Map<string, number>();
   const segmentsByCellId = new Map<string, GeodesicSegmentObject[]>();
@@ -176,7 +176,7 @@ function findGeodesicIntersections(registry: RuntimeObjectRegistry): readonly Ge
         }
 
         seenKeys.add(key);
-        intersections.push(createGeodesicIntersectionObject({
+        intersections.push(createGeodesicCrossingObject({
           id: createGeodesicIntersectionId(left.cellId, geodesicIds, intersection.point),
           cellId: left.cellId,
           balloonPoint: {
@@ -216,10 +216,10 @@ function crossingIsAtGeodesicAnchor(
 }
 
 function assignGeodesicIntersectionIdentities(
-  intersections: readonly GeodesicIntersectionObject[],
-  previousById: ReadonlyMap<string, GeodesicIntersectionObject>,
-): readonly GeodesicIntersectionObject[] {
-  const previousByKey = new Map<string, GeodesicIntersectionObject[]>();
+  intersections: readonly GeodesicCrossingObject[],
+  previousById: ReadonlyMap<string, GeodesicCrossingObject>,
+): readonly GeodesicCrossingObject[] {
+  const previousByKey = new Map<string, GeodesicCrossingObject[]>();
   for (const previous of previousById.values()) {
     const key = identityMatchKey(previous);
     const list = previousByKey.get(key);
@@ -249,17 +249,17 @@ function assignGeodesicIntersectionIdentities(
 }
 
 // Previous markers can only be matched by a fresh marker of the same cell and geodesic pair.
-function identityMatchKey(intersection: GeodesicIntersectionObject): string {
+function identityMatchKey(intersection: GeodesicCrossingObject): string {
   return `${intersection.cellId}|${intersection.geodesicIds[0]}|${intersection.geodesicIds[1]}`;
 }
 
 // Matches a fresh marker to the nearest unused previous marker (from the list of the same cell and geodesic pair) within `vertexContinuityToleranceMeters`.
 function findContinuityMatchedIntersection(
-  intersection: GeodesicIntersectionObject,
-  candidates: readonly GeodesicIntersectionObject[],
+  intersection: GeodesicCrossingObject,
+  candidates: readonly GeodesicCrossingObject[],
   usedPreviousIds: ReadonlySet<string>,
-): GeodesicIntersectionObject | undefined {
-  let best: { readonly object: GeodesicIntersectionObject; readonly distance: number } | undefined;
+): GeodesicCrossingObject | undefined {
+  let best: { readonly object: GeodesicCrossingObject; readonly distance: number } | undefined;
   for (const previous of candidates) {
     if (usedPreviousIds.has(previous.id)) {
       continue;
@@ -275,7 +275,7 @@ function findContinuityMatchedIntersection(
 
   return best?.object;
 }
-function distanceBetweenIntersectionTargets(left: GeodesicIntersectionObject, right: GeodesicIntersectionObject): number {
+function distanceBetweenIntersectionTargets(left: GeodesicCrossingObject, right: GeodesicCrossingObject): number {
   const leftPoint = left.aimStickyTarget?.localPoint ?? left.localPose.translation;
   const rightPoint = right.aimStickyTarget?.localPoint ?? right.localPose.translation;
   return Math.sqrt(distanceSquaredVec3(leftPoint, rightPoint));
@@ -286,12 +286,12 @@ function createGeodesicIntersectionId(
   geodesicIds: readonly [string, string],
   point: Vec3,
 ): string {
-  return `geodesic-intersection:${sanitizeIdPart(
+  return `geodesicModel/crossing:${sanitizeIdPart(
     `${cellId}:${geodesicIds.join(":")}:${point.x.toFixed(5)}:${point.y.toFixed(5)}`,
   )}`;
 }
 
-function getGeodesicIntersectionMemory(registry: RuntimeObjectRegistry): Map<string, GeodesicIntersectionObject> {
+function getGeodesicIntersectionMemory(registry: RuntimeObjectRegistry): Map<string, GeodesicCrossingObject> {
   let memory = geodesicIntersectionMemoryByRegistry.get(registry);
   if (!memory) {
     memory = new Map();
@@ -301,17 +301,17 @@ function getGeodesicIntersectionMemory(registry: RuntimeObjectRegistry): Map<str
   return memory;
 }
 
-function createGeodesicIntersectionObject(options: {
+function createGeodesicCrossingObject(options: {
   readonly id: string;
   readonly cellId: string;
   readonly balloonPoint: Vec3;
   readonly targetPoint: Vec3;
   readonly geodesicIds: readonly [string, string];
   readonly segmentIds: readonly [string, string];
-}): GeodesicIntersectionObject {
+}): GeodesicCrossingObject {
   return {
     id: options.id,
-    kind: "geodesic-intersection",
+    kind: "geodesicModel/crossing",
     cellId: options.cellId,
     localPose: yawRigidTransform3(0, options.balloonPoint),
     aimStickyTarget: {

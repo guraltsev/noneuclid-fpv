@@ -157,7 +157,7 @@ describe("releasing a carried emitter of a locked geodesic", () => {
 
     const released = registry.get("cannon-b");
     expect(released).toMatchObject({ kind: "geodesic-cannon", cellId: "b" });
-    expect(registry.get("g-a")).toMatchObject({ kind: "geodesic-interval" });
+    expect(registry.get("g-a")).toMatchObject({ kind: "geodesicModel/arc" });
     expect(isGeodesicLocked(registry, "g-a")).toBe(true);
     expect(getGeodesicConnection(registry, "g-a")).toEqual({
       outgoingEmitterId: "cannon-a",
@@ -179,7 +179,7 @@ describe("releasing a carried emitter of a locked geodesic", () => {
 
     // The hand was on the bottom face, so the emitter ends there and the geodesic no longer visits back.
     expect(registry.get("cannon-b")).toMatchObject({ kind: "geodesic-cannon", cellId: "bottom" });
-    expect(registry.get("g-a")).toMatchObject({ kind: "geodesic-interval" });
+    expect(registry.get("g-a")).toMatchObject({ kind: "geodesicModel/arc" });
     expect(isGeodesicLocked(registry, "g-a")).toBe(true);
     expect(getGeodesicConnection(registry, "g-a")).toMatchObject({ state: "connected" });
   });
@@ -194,7 +194,7 @@ describe("releasing a carried emitter of a locked geodesic", () => {
     tools.finishGeodesicCannonCarry();
 
     expect(registry.get("cannon-b")).toMatchObject({ kind: "geodesic-cannon", cellId: "top" });
-    expect(registry.get("g-a")).toMatchObject({ kind: "geodesic-interval" });
+    expect(registry.get("g-a")).toMatchObject({ kind: "geodesicModel/arc" });
     expect(isGeodesicLocked(registry, "g-a")).toBe(true);
     expect(getGeodesicConnection(registry, "g-a")).toMatchObject({ state: "connected" });
   });
@@ -215,7 +215,7 @@ describe("releasing a carried emitter of a locked geodesic", () => {
     tools.finishGeodesicCannonCarry();
 
     expect(cellsSeen.size).toBeGreaterThan(1);
-    expect(registry.get("g-a")).toMatchObject({ kind: "geodesic-interval" });
+    expect(registry.get("g-a")).toMatchObject({ kind: "geodesicModel/arc" });
   });
 
   it("turns an emitter with the face it is carried onto, its launch yaw following", () => {

@@ -225,7 +225,7 @@ export function createAimFeedback(deps: AimFeedbackDeps): AimFeedback {
     const target = activeAimRay ? deps.resolveCurrentAimTarget(activeAimRay) : undefined;
     const usableTarget = deps.targetIsWithinInteractionRange(target) ? target : undefined;
     const center = protractor.center ??
-      (usableTarget?.object?.kind === "geodesic-cannon" || usableTarget?.object?.kind === "geodesic-intersection"
+      (usableTarget?.object?.kind === "geodesic-cannon" || usableTarget?.object?.kind === "geodesicModel/crossing"
         ? resolveProtractorCenterSelection(runtimeObjectRegistry, usableTarget.object)
         : undefined);
     if (!center) {
@@ -262,7 +262,7 @@ export function createAimFeedback(deps: AimFeedbackDeps): AimFeedback {
     target: AimTarget | undefined,
     center: ProtractorCenterSelection,
   ): ProtractorDirectedGeodesic | undefined {
-    if (target?.object?.kind === "geodesic-segment") {
+    if (target?.object?.kind === "geodesicModel/segment") {
       const selected = resolveProtractorDirectedGeodesicSelection({
         center,
         segment: target.object,

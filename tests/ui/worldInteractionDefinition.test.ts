@@ -129,7 +129,7 @@ function baseObjectFields(id: string, kind: RuntimeWorldObject["kind"], label: s
 
 function segment(): RuntimeWorldObject {
   return {
-    ...baseObject("geodesic-segment", "Geodesic G1"),
+    ...baseObject("geodesicModel/segment", "Geodesic G1"),
     geodesicId: "g-a",
     segmentIndex: 0,
     start: { x: 0, y: 0, z: 0 },

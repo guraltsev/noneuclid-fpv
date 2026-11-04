@@ -11,7 +11,7 @@ import { walkDevelopedSegment } from "../../cell-complex/segmentWalk";
 import { transformPoint3 } from "../../math/rigidTransform3";
 import { vec3 } from "../../math/vec3";
 import type { RuntimeObjectRegistry, RuntimeWorldObject } from "../runtimeObjectRegistry";
-import { createCurveShorteningPairObject, createFreeGeodesicEndObject, createGeodesicIntervalObject, type CurveShorteningPairObject, GEODESIC_MIN_LENGTH_METERS, type GeodesicEndpointSelection, type GeodesicEndRole, type GeodesicIntervalObject, type GeodesicPortalTraversal, type GeodesicSegmentObject, getGeodesicCannonEmitterPoint, getOppositeEndRole, reduceAdjacentInversePortalTraversals, type TraceGeodesicSegmentResult } from "./objects";
+import { createCurveShorteningPairObject, createGeodesicVertexObject, createGeodesicArcObject, type CurveShorteningPairObject, GEODESIC_MIN_LENGTH_METERS, type GeodesicEndpointSelection, type GeodesicEndRole, type GeodesicArcObject, type GeodesicPortalTraversal, type GeodesicSegmentObject, getGeodesicCannonEmitterPoint, getOppositeEndRole, reduceAdjacentInversePortalTraversals, type TraceGeodesicSegmentResult } from "./objects";
 import { canObjectAttachGeodesics } from "./anchors";
 import { getPortalWordBetweenEndpointRoles, reverseGeodesicPortalWord, samePortalWord } from "./portalWord";
 import { requestGeodesicIntersectionUpdate, withDeferredGeodesicIntersections } from "./intersections";
@@ -52,7 +52,7 @@ export interface AdvanceCurveShorteningPairsRequest {
  *
  * Preconditions: `first` and `second` are different `(geodesicId, role)` pairs (the two roles of ONE interval are allowed: a loop
  * based at the emitter); both attachments currently point at `detachedEmitterId`; every affected interval exists and is locked
- * (pinned at both ends); the first anchor of the detached roles is the emitter. Effects on success: a `FreeGeodesicEndObject` is created at the emitter's beam point (so the geometry does
+ * (pinned at both ends); the first anchor of the detached roles is the emitter. Effects on success: a `GeodesicVertexObject` is created at the emitter's beam point (so the geometry does
  * not change at detach time), the selected roles are re-attached to it, the affected intervals become `"moving"`, their segments are
  * rebuilt from the stored portal word (the homotopy class is preserved), and a `CurveShorteningPairObject` is added. Returns that pair;
  * the next `advanceCurveShorteningPairs` ticks shorten it.
@@ -83,7 +83,7 @@ function tieAndDetachGeodesicEndpointsNow(
 
   const firstInterval = request.registry.get(request.first.geodesicId);
   const secondInterval = request.registry.get(request.second.geodesicId);
-  if (firstInterval?.kind !== "geodesic-interval" || secondInterval?.kind !== "geodesic-interval") {
+  if (firstInterval?.kind !== "geodesicModel/arc" || secondInterval?.kind !== "geodesicModel/arc") {
     return undefined;
   }
   // Distinct intervals only: when both selections name the same interval (start and end of a loop) it is rewired and rebuilt once.
@@ -100,7 +100,7 @@ function tieAndDetachGeodesicEndpointsNow(
 
   // The shared free end is born exactly at the emitter's beam point, so the two endpoint roles (which already coincide there) move
   // from the emitter to the free end without any visible change; the first shortening tick then slides it away.
-  const freeEnd = createFreeGeodesicEndObject({
+  const freeEnd = createGeodesicVertexObject({
     id: request.createFreeEndId(),
     cellId: detached.cellId,
     point: getGeodesicCannonEmitterPoint(detached),
@@ -113,7 +113,7 @@ function tieAndDetachGeodesicEndpointsNow(
   for (const interval of affected) {
     // Re-wire only the selected roles; each interval keeps its portalWord and the other end's anchor. For a loop, both `start` and
     // `end` of the same interval end up on the free end.
-    const next: GeodesicIntervalObject = {
+    const next: GeodesicArcObject = {
       ...interval,
       motionState: "moving",
       start: interval.id === request.first.geodesicId && request.first.role === "start" ||
@@ -230,7 +230,7 @@ function flowPair(request: AdvanceCurveShorteningPairsRequest, pairId: string, s
     if (current?.kind !== "curve-shortening-pair" || current.state !== "moving") {
       break;
     }
-    if (registry.get(vertexId)?.kind !== "free-geodesic-end") {
+    if (registry.get(vertexId)?.kind !== "geodesicModel/vertex") {
       // The vertex is gone (an arc was deleted by someone else): nothing sensible is left of this curve.
       changed.push(...finishPairWithoutVertex(registry, current, vertexId));
       continue;
@@ -268,7 +268,7 @@ function flowVertex(
 ): VertexFlowOutcome {
   const { world, registry } = request;
   const vertex = registry.get(vertexId);
-  if (vertex?.kind !== "free-geodesic-end") {
+  if (vertex?.kind !== "geodesicModel/vertex") {
     return { changedIds: [] };
   }
   const ends = incidentArcEnds(registry, vertexId);
@@ -316,10 +316,10 @@ function tangentAwayFromVertex(
   registry: RuntimeObjectRegistry,
   end: ArcEnd,
   candidates: ReadonlyMap<string, RuntimeWorldObject> | undefined,
-  intervalOverrides?: ReadonlyMap<string, GeodesicIntervalObject>,
+  intervalOverrides?: ReadonlyMap<string, GeodesicArcObject>,
 ): ArcTangent | undefined {
   const interval = intervalOverrides?.get(end.intervalId) ?? registry.get(end.intervalId);
-  if (interval?.kind !== "geodesic-interval") {
+  if (interval?.kind !== "geodesicModel/arc") {
     return undefined;
   }
   const lifted = liftGeodesicEndpointWithAnchors({
@@ -341,7 +341,7 @@ function tangentAwayFromVertex(
 // Both endpoint roles of every moving interval attached to the vertex (a loop on the vertex has two).
 function incidentArcEnds(registry: RuntimeObjectRegistry, vertexId: string): readonly ArcEnd[] {
   const ends: ArcEnd[] = [];
-  for (const interval of registry.getObjectsOfKind("geodesic-interval")) {
+  for (const interval of registry.getObjectsOfKind("geodesicModel/arc")) {
     for (const role of ["start", "end"] as const) {
       if (interval[role].anchorObjectId === vertexId) {
         ends.push({ intervalId: interval.id, role });
@@ -356,7 +356,7 @@ function totalLengthOfArcs(registry: RuntimeObjectRegistry, ends: readonly ArcEn
     .reduce((total, id) => total + getGeodesicTotalLengthMeters(registry, id), 0);
 }
 
-function movedVertex(vertex: Extract<RuntimeWorldObject, { readonly kind: "free-geodesic-end" }>, cellId: string, x: number, y: number) {
+function movedVertex(vertex: Extract<RuntimeWorldObject, { readonly kind: "geodesicModel/vertex" }>, cellId: string, x: number, y: number) {
   return {
     ...vertex,
     cellId,
@@ -370,7 +370,7 @@ function movedVertex(vertex: Extract<RuntimeWorldObject, { readonly kind: "free-
 function lineSearchStepMeters(
   world: CompiledCellComplex,
   registry: RuntimeObjectRegistry,
-  vertex: Extract<RuntimeWorldObject, { readonly kind: "free-geodesic-end" }>,
+  vertex: Extract<RuntimeWorldObject, { readonly kind: "geodesicModel/vertex" }>,
   ends: readonly ArcEnd[],
   direction: { readonly x: number; readonly y: number },
   budgetMeters: number,
@@ -411,8 +411,8 @@ function lineSearchStepMeters(
 }
 
 interface MovedVertex {
-  readonly vertex: Extract<RuntimeWorldObject, { readonly kind: "free-geodesic-end" }>;
-  readonly intervals: readonly { readonly interval: GeodesicIntervalObject; readonly traces: readonly TraceGeodesicSegmentResult[] }[];
+  readonly vertex: Extract<RuntimeWorldObject, { readonly kind: "geodesicModel/vertex" }>;
+  readonly intervals: readonly { readonly interval: GeodesicArcObject; readonly traces: readonly TraceGeodesicSegmentResult[] }[];
 }
 
 // Tries one step: walks the vertex through the world, updates the words of the arcs by the portals it crossed, previews both arcs and
@@ -420,7 +420,7 @@ interface MovedVertex {
 function tryMoveVertex(
   world: CompiledCellComplex,
   registry: RuntimeObjectRegistry,
-  vertex: Extract<RuntimeWorldObject, { readonly kind: "free-geodesic-end" }>,
+  vertex: Extract<RuntimeWorldObject, { readonly kind: "geodesicModel/vertex" }>,
   ends: readonly ArcEnd[],
   direction: { readonly x: number; readonly y: number },
   stepMeters: number,
@@ -447,16 +447,16 @@ function tryMoveVertex(
   }));
   const next = movedVertex(vertex, lastPiece.cellId, local.x, local.y);
 
-  const updated = new Map<string, GeodesicIntervalObject>();
+  const updated = new Map<string, GeodesicArcObject>();
   for (const end of ends) {
     const interval = updated.get(end.intervalId) ?? registry.get(end.intervalId);
-    if (interval?.kind !== "geodesic-interval") {
+    if (interval?.kind !== "geodesicModel/arc") {
       return undefined;
     }
     updated.set(end.intervalId, withVertexCrossings(interval, end.role, crossings, lastPiece.cellId));
   }
   const candidates = new Map<string, RuntimeWorldObject>([[vertex.id, next]]);
-  const intervals: { interval: GeodesicIntervalObject; traces: readonly TraceGeodesicSegmentResult[] }[] = [];
+  const intervals: { interval: GeodesicArcObject; traces: readonly TraceGeodesicSegmentResult[] }[] = [];
   let lengthAfter = 0;
   for (const interval of updated.values()) {
     const preview = previewRebuildGeodesicInterval({ world, registry, interval, candidateAnchorsById: candidates });
@@ -475,11 +475,11 @@ function tryMoveVertex(
 // The interval after its `role` end moved over the portals `crossings` into `newCellId`: the word is extended at the end or prefixed
 // (inverted) at the start, then freely reduced; a moved start also moves the interval's start cell.
 function withVertexCrossings(
-  interval: GeodesicIntervalObject,
+  interval: GeodesicArcObject,
   role: GeodesicEndRole,
   crossings: readonly GeodesicPortalTraversal[],
   newCellId: string,
-): GeodesicIntervalObject {
+): GeodesicArcObject {
   if (crossings.length === 0) {
     return role === "start" ? { ...interval, cellId: newCellId, startCellId: newCellId } : interval;
   }
@@ -535,7 +535,7 @@ function mergeVertexOrFail(
   const [firstEnd, secondEnd] = ends;
   const firstInterval = registry.get(firstEnd.intervalId);
   const secondInterval = registry.get(secondEnd.intervalId);
-  if (firstInterval?.kind !== "geodesic-interval" || secondInterval?.kind !== "geodesic-interval") {
+  if (firstInterval?.kind !== "geodesicModel/arc" || secondInterval?.kind !== "geodesicModel/arc") {
     return { changedIds: markUnresolved(request, pair, "missing-interval") };
   }
   const remainingVertexIds = pair.vertexIds.filter((id) => id !== vertexId);
@@ -578,7 +578,7 @@ function mergeVertexOrFail(
   const mergedId = [firstInterval.id, secondInterval.id].sort()[0];
   const removedId = mergedId === firstInterval.id ? secondInterval.id : firstInterval.id;
   const stillMoving = remainingVertexIds.includes(anchorA.id) || remainingVertexIds.includes(anchorB.id);
-  const merged = createGeodesicIntervalObject({
+  const merged = createGeodesicArcObject({
     id: mergedId,
     startAnchorObjectId: anchorA.id,
     endAnchorObjectId: anchorB.id,
@@ -641,11 +641,11 @@ function mergeVertexOrFail(
 // only stable, locked (emitter-to-emitter) intervals are candidates.
 function findEquivalentStableInterval(
   registry: RuntimeObjectRegistry,
-  candidate: GeodesicIntervalObject,
+  candidate: GeodesicArcObject,
   excludedIds: readonly string[],
-): GeodesicIntervalObject | undefined {
+): GeodesicArcObject | undefined {
   const reversedCandidateWord = reverseGeodesicPortalWord(candidate.portalWord);
-  return registry.getObjectsOfKind("geodesic-interval").find((object) =>
+  return registry.getObjectsOfKind("geodesicModel/arc").find((object) =>
     object.motionState === "stable" &&
     isGeodesicLocked(registry, object.id) &&
     !excludedIds.includes(object.id) &&
@@ -664,8 +664,8 @@ function findEquivalentStableInterval(
 
 
 // De-duplicates intervals by id (a loop pair names the same interval twice), keeping the last occurrence.
-function uniqueIntervals(intervals: readonly GeodesicIntervalObject[]): readonly GeodesicIntervalObject[] {
-  const byId = new Map<string, GeodesicIntervalObject>();
+function uniqueIntervals(intervals: readonly GeodesicArcObject[]): readonly GeodesicArcObject[] {
+  const byId = new Map<string, GeodesicArcObject>();
   for (const interval of intervals) {
     byId.set(interval.id, interval);
   }
@@ -676,11 +676,11 @@ function uniqueIntervals(intervals: readonly GeodesicIntervalObject[]): readonly
 // Rollback helper: puts back saved interval objects (re-adding any that were deleted) together with their saved segment chains.
 function restoreGeodesicIntervalsAndSegments(
   registry: RuntimeObjectRegistry,
-  intervals: readonly GeodesicIntervalObject[],
+  intervals: readonly GeodesicArcObject[],
   segmentsByGeodesicId: ReadonlyMap<string, readonly GeodesicSegmentObject[]>,
 ): void {
   for (const interval of intervals) {
-    if (registry.get(interval.id)?.kind === "geodesic-interval") {
+    if (registry.get(interval.id)?.kind === "geodesicModel/arc") {
       registry.update(interval);
     } else {
       registry.add(interval);

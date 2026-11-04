@@ -147,7 +147,7 @@ const helpBodyByTopic: Readonly<Record<string, Readonly<Record<InputMode, string
     desktop: "Creates and edits geodesic rays from this point. Right click to open its menu.",
     xr: "Creates and edits geodesic rays from this point. Use side trigger to open its menu.",
   },
-  "geodesic-segment": {
+  "geodesicModel/segment": {
     desktop: "A locally straight ray segment. Left click with the active tool to extend, measure, or select it.",
     xr: "A locally straight ray segment. Use trigger with the active tool to extend, measure, or select it.",
   },
