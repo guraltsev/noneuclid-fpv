@@ -17,7 +17,6 @@ import {
   arcTangentsAtVertex,
   commitVertexMove,
   lengthOfArcs,
-  lengthSlopeAtVertex,
   previewVertexMove,
   previewVertexRemoval,
   removeVertex,
@@ -261,7 +260,15 @@ function lineSearchStepMeters(
   }
   const origin = vertex.localPose.translation;
   const slope = (t: number): number | undefined => {
-    return lengthSlopeAtVertex(world, registry, vertexId, ends, direction, { x: origin.x + direction.x * t, y: origin.y + direction.y * t });
+    const tangents = arcTangentsAtVertex(world, registry, vertexId, ends, { x: origin.x + direction.x * t, y: origin.y + direction.y * t });
+    if (!tangents) {
+      return undefined;
+    }
+    let total = 0;
+    for (const tangent of tangents) {
+      total -= direction.x * tangent.x + direction.y * tangent.y;
+    }
+    return total;
   };
   const atBudget = slope(budgetMeters);
   if (atBudget === undefined) {
