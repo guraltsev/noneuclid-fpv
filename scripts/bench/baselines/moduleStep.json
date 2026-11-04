@@ -1,0 +1,8 @@
+{
+  "host": "Leibniz",
+  "recordedOn": "2026-11-04",
+  "idleMicroseconds": 0.220799999999997,
+  "flowMicroseconds": 17.027166666666837,
+  "flowDependentsMicroseconds": 28.738416666666733,
+  "idleBytesPerStep": 743.63
+}
