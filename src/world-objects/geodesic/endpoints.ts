@@ -302,12 +302,27 @@ export function isVertexSharedWithOtherArc(registry: RuntimeObjectRegistry, anch
   return false;
 }
 
-/** The arc has an end on a vertex that another arc end shares. A closed loop on one vertex is not tied; an id that is not an arc is not tied. */
+/** The arc has an end on a vertex that another arc end shares. A closed loop on one vertex is not tied; an id that is not an arc is not tied. One allocation-free scan of the arcs. */
 export function isTied(registry: RuntimeObjectRegistry, arcId: string): boolean {
   const arc = registry.get(arcId);
-  return arc?.kind === "geodesicModel/arc" &&
-    (isVertexSharedWithOtherArc(registry, arc.start.anchorObjectId, arcId) ||
-      isVertexSharedWithOtherArc(registry, arc.end.anchorObjectId, arcId));
+  if (arc?.kind !== "geodesicModel/arc") {
+    return false;
+  }
+  const startIsVertex = registry.get(arc.start.anchorObjectId)?.kind === "geodesicModel/vertex";
+  const endIsVertex = registry.get(arc.end.anchorObjectId)?.kind === "geodesicModel/vertex";
+  if (!startIsVertex && !endIsVertex) {
+    return false;
+  }
+  const arcs = registry.getObjectsOfKind("geodesicModel/arc");
+  for (let index = 0; index < arcs.length; index += 1) {
+    const other = arcs[index]!;
+    if (other.id === arcId) continue;
+    const otherStart = other.start.anchorObjectId;
+    const otherEnd = other.end.anchorObjectId;
+    if (startIsVertex && (otherStart === arc.start.anchorObjectId || otherEnd === arc.start.anchorObjectId)) return true;
+    if (endIsVertex && (otherStart === arc.end.anchorObjectId || otherEnd === arc.end.anchorObjectId)) return true;
+  }
+  return false;
 }
 
 /** The arc's last rebuild failed during a carry, so it still shows its old path. */

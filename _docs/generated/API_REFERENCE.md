@@ -933,6 +933,7 @@ Operations on the vertices of a piecewise-geodesic curve (design 013 section 13.
 | interface | `VertexMovePreview` | The result of {@link previewVertexMove}: the new vertex record and the realized arcs, opaque to callers. |
 | type | `VertexRemovalPreview` | What removing a vertex would give: a merged arc, a taut loop, a collapsed curve, or blocked. |
 | function | `arcTangentsAtVertex` | Tangents of the arcs at the vertex; with `displacedTo`, as if the vertex stood at that point of its own cell (no portal walk). |
+| function | `lengthSlopeAtVertex` | The derivative of the total length of the arcs at the vertex along `direction`, with the vertex displaced to `displacedTo` of its own cell: minus the sum of the dot products of `direction` with the tangents. |
 | function | `lengthOfArcs` | Total length (meters) of the distinct arcs among `arcs`. |
 | function | `previewVertexMove` | Walks the vertex `lengthMeters` along `direction` (vertex cell frame) through portals, updates the words of the arcs by the portals crossed and realizes each arc as the geodesic chord of its class. |
 | function | `commitVertexMove` | Applies a {@link previewVertexMove}: the vertex, the arcs with their new words and their realized segments. |
