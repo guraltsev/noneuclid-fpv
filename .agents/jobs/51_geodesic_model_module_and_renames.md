@@ -1,6 +1,6 @@
 # Job 51 - Create the geodesic model module, with its renames and end nodes
 
-Status: in progress.
+Status: done, needs review on 2026-11-03.
 Resolves: part of issue [84](../../_issues/84_behaviors_are_hard_wired_into_the_shell_and_need_a_plugin_system.md) (requirements 2, 5, 6).
 
 ## Goal
@@ -85,3 +85,38 @@ vertex, so they are not locked, and today lifting that emitter deletes them.
 ## Done when
 
 - The greps above are empty, a tied curve survives a carry in the app, and all checks are green.
+
+## Report
+
+### Done
+- Commit `eccd27c` (renames only; `npm test` green on it with no assertion value changed): `geodesic-interval`, `free-geodesic-end`, `geodesic-segment`, `geodesic-intersection` became `geodesicModel/arc`, `geodesicModel/vertex`, `geodesicModel/segment`, `geodesicModel/crossing`; types `GeodesicArcObject`, `GeodesicVertexObject`, `GeodesicCrossingObject` with `createGeodesicArcObject`, `createGeodesicVertexObject`, `isGeodesicVertexObject`, `createGeodesicCrossingObject`; the crossing id prefix `geodesic-intersection:` became `geodesicModel/crossing:`; the `objects.ts` header and `_docs/MATHEMATICAL_MODEL.md` define arc, vertex, crossing ("formerly ..."). The grep of step 1 is empty.
+- Commit `35befce` (steps 2-4): `world-objects/geodesic/vertices.ts` (`arcTangentsAtVertex`, `lengthOfArcs`, `previewVertexMove`, `commitVertexMove`, `previewVertexRemoval`, `removeVertex`, `tieAtNewVertex`); `curveShortening.ts` rewritten on it (the legacy flow; its tests are unchanged except for `motionState`). `motionState` deleted; `isTied`, `isStale`, `arcsAtVertex`, `arcsOfCurve`, `tiedVertexCount`, `forEachTiedVertex` in `endpoints.ts`; `isGeodesicLocked` is `arcConnectsEmitters`, `collectLockedIncidentGeodesicIdsForEmitter` is `collectConnectingArcIdsForEmitter`, new `arcFollowsEmitter` and `collectFollowingArcIdsForEmitter` in `lifecycle.ts`. The four places of the 13.1 table use `arcFollowsEmitter`; tying, aim, rotate and the deformation policy keep `arcConnectsEmitters`. A forbidden-zone chord and a failed rebuild at release remove the whole curve; any other failed rebuild during a carry sets the transient `stale: true`, cleared by the next successful rebuild (`commitRealizedTraces`); `carryEnd.ts` never regrows a tied arc. The legacy flow skips a vertex with a stale arc. `tests/world-objects/geodesic/tiedCarry.test.ts`: lift keeps a tied curve and still deletes a plain shot geodesic; carry moves the end node within a cell and through a portal (words and lengths checked independently); a forbidden-zone chord removes the whole curve; a stale mark, then removal at release.
+- Commit `97190ef` (step 5): `src/modules/geodesicModel/` (`api.ts`, `module.ts`, `index.ts`), listed in `createDefaultWorldModules`; `moduleOwnedCoreKinds` in `engine/coreIds.ts` and `ComposeOptions.moduleOwnedCoreKinds`, so the module may declare the four kinds that still sit in the core union (composition rule 5); the naming check of section 10 in `docs:check` (`moduleNameViolations` in `scripts/docs/lib.mjs`, tests in `tests/project/moduleNames.test.ts`); `tests/modules/geodesicModel.contract.test.ts` (every item of the job's list, plus the carry module carrying a tied curve through the engine); one composition test for owned kinds.
+- `legacyWorldWriters` is unchanged.
+
+### Deviations
+- Id families (`"geodesic"`, `curve-shortening:...`, `free-end:...`) are NOT renamed, by coordinator order (an earlier review: do not change id families of existing ids). The design table lists them for job 51. The crossing id prefix is renamed only because the job's grep forbids `geodesic-intersection` anywhere.
+- `arcsAtVertex` lives in `endpoints.ts`, not `vertices.ts` (13.1): `isTied` and `arcsOfCurve` need it, and `segments.ts` (display state) needs `isTied`, so putting it in `vertices.ts` would make an import cycle. `vertices.ts` imports it.
+- `GeodesicModelOptions { tieTool }`, the client part (`client.ts`) and `publicApi.geodesicModel` of 13.1 are not built: the tie tool id `geodesicModel/tie` and the client factory belong to job 54, so `geodesicModel/tieAndDetach` has no `requiresTool` yet (composition rule 12 would reject an undefined tool id, and `RuntimeToolId` has no such id).
+- The tie command does not create the legacy `CurveShorteningPairObject`: a curve tied through the command does not flow until job 53 (the app's tie tool still calls `tieAndDetachGeodesicEndpoints`, which creates the pair).
+- `findEquivalentStableInterval` became `findEquivalentConnectingArc` (private, in `vertices.ts`): "stable" is "connects emitters". It runs when the merged arc connects emitters, which is exactly when the old code ran it (`pair.vertexIds` holds one vertex, so `stillMoving` was always false at removal).
+- `previewVertexMove` does not refuse a move that lengthens the arcs (the flow checks `lengthAfterMeters` against `before + tolerance` itself, same arithmetic as before). It also returns `undefined` when a listed arc end is not on the vertex.
+- Test edits for `motionState`, in `tests/world-objects/geodesic/curveShortening.test.ts`, `tests/world-objects/geodesic/intersections.test.ts` and `tests/fixtures/world-objects/geodesic.ts`: the `motionState: "moving" | "stable"` constructor arguments are removed; assertions `toMatchObject({ motionState: "moving" })` became `expect(isTied(registry, id)).toBe(true)` (`g-lm`, `g-mr`, `g1`, the 30-tick case, the unresolved case), and `motionState: "stable"` became `isTied(...)` false (`g1` after the pair is gone, the slow and fast runs) or was dropped from a `toMatchObject` that still checks the anchors (loop, torus pair, seam merge). One assertion changed meaning: a flowing closed free loop `g-loop` had `motionState: "moving"` and `connectionState` containing `"moving"`; it now has `isTied` false and `connectionState` containing `"open"` (the accepted change of the job). The `isGeodesicLocked` and `collectLockedIncident...` identifiers in tests were renamed with no value change.
+- Debug dumps: the `motionState` key of `dump_all_geodesics` intervals became `tied` (a boolean); the `locked` key keeps its name.
+
+### Uncertain
+- `_docs/MATHEMATICAL_MODEL.md` still uses "locked", "moving"/"stable" interval and "free vertex" prose in the curve-shortening sections; the job names only the renames for that document, so I did not rewrite them.
+- `collectConnectingArcIdsForEmitter` is used only by a test (`geodesicRebuildOutcomes.test.ts`) now that its src call sites use the following variant; the job says to rename it, so I kept it. The maintainer's stale-code rule may want it deleted and that test changed.
+- The carry module still lists the geodesic kinds in `writesCoreKinds` and writes arcs through the world-objects facade, not through `geodesicModel` (the carry commit callback is not a dispatch). Moving it onto the module belongs to the emitter module (section 16).
+- `tiedVertexCount` is O(1) per registry version through a `WeakMap` cache keyed by the registry object and `getVersion()`; the first call after a write scans the arcs once. `isTied` costs O(arcs) per call (display path only).
+- An arc that connects emitters is also marked `stale: true` when its live rebuild fails during a carry (it used to be kept silently); an existing test that compares such an arc after a failed live rebuild still passes, but a client doing a whole-object `toEqual` on it would see the field.
+- The bench passed (`check: ok`) after waiting; the first run right after the full test suite failed on `flow` and `flow+dependents` (machine hot), as the coordinator predicted.
+
+### Not done
+- The manual check "a tied curve survives a carry in the app" was not done in a browser (no CDP session with focus emulation was set up). It is covered by `tests/world-objects/geodesic/tiedCarry.test.ts` and by the engine test with the carry module in `geodesicModel.contract.test.ts`; `npm run smoke -- --world cube,torus-moduli` and `npm run test:release` pass.
+- `GeodesicModelOptions`, `client.ts`, the tie tool and `publicApi.geodesicModel` (job 54).
+
+### Checks
+- Baseline before changes: `npm run typecheck` ok, `npm test` 158 files / 1332 tests ok.
+- After the final change: `npm run typecheck` ok; `npm test` 161 files / 1360 tests ok; `npm run docs:check` ok (new "module names" check); `npm run build` ok; `npm run smoke -- --world cube,torus-moduli` SMOKE OK (2 pages); `npm run bench -- moduleStep --check` check: ok on the second run (flow 18.2 us/step, flow+dependents 31.0 us/step; the first run, right after the suite, failed on timing); `npm run test:release` 7 files / 15 tests ok.
+- Greps: `grep -rn "geodesic-interval\|free-geodesic-end\|\"geodesic-segment\"\|geodesic-intersection" src tests` empty; `grep -rn "motionState\|isGeodesicLocked" src tests` empty; "The vertex count never grows" is not in `geodesicModel/api.ts`.
