@@ -27,3 +27,10 @@ test:report: unit 155 files / 1206 tests, process 3 / 18, release 7 / 11, hygien
 
 ## Job 51 notes
 Start 3938cdd. Bench `--check` red on timing in three runs (flow 19.4-23.4, flow+dependents 36.9-41.7 us/step); job 56's A/B settles it. Tests after: 162 files / 1362 tests. Full Report in `_done/51_...md`.
+
+## Job 56 notes
+Start ddf4350; commits c1f2771, cea3e52. Review: fresh agent, no finding on 1-9; item 10: bench exits early after --record-counters, many-arcs timing runs in every timing round (slower --check). Counter baseline: 122 arc scans in flow (job sample said 121).
+`bench:ab -- ee65c50` exit 0 (medians base flow 19.27 / flow+dep 33.01; head 18.34 / 33.88 us/step): job 51's timing is cleared, no regression.
+`--check` itself still exits 3 on timing alone (flow+dependents ~37 us); by rule not red. Scratch-scan proof: exit 1, "geodesicModel/arc scans 242 > 122". Counter runs byte-identical.
+One full `test:release` run had a single failed test (not identified; output lost); reruns of appCommands.release and of the whole release tier passed 15/15. Treated as the known flake.
+Tests after: 162 files / 1364 tests.
