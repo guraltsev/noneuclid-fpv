@@ -17,7 +17,7 @@ import {
   tieAndDetachGeodesicEndpoints,
   type CurveShorteningNotice,
 } from "../../../src/world-objects/geodesic/curveShortening";
-import { isGeodesicLocked } from "../../../src/world-objects/geodesic/lifecycle";
+import { arcConnectsEmitters } from "../../../src/world-objects/geodesic/lifecycle";
 import {
   createCurveShorteningPairObject,
   createGeodesicVertexObject,
@@ -26,7 +26,7 @@ import {
   geodesicRayBeamHeightMeters,
   type GeodesicSegmentObject,
 } from "../../../src/world-objects/geodesic/objects";
-import { getGeodesicEndpointAttachmentsForAnchor } from "../../../src/world-objects/geodesic/endpoints";
+import { getGeodesicEndpointAttachmentsForAnchor, isTied } from "../../../src/world-objects/geodesic/endpoints";
 import { getGeodesicSegments } from "../../../src/world-objects/geodesic/segments";
 import { rebuildDerivedGeodesicSegments } from "../../../src/world-objects/geodesic/intervals";
 import { rebuildConnectedGeodesicBetweenEmitters } from "../../../src/world-objects/geodesic/cannon";
@@ -84,7 +84,6 @@ function createChainScenario(start: { x: number; y: number }, end: { x: number; 
       startAnchorObjectId: anchors[index],
       endAnchorObjectId: anchors[index + 1],
       startCellId: "a",
-      motionState: "moving",
     }));
     expect(rebuildDerivedGeodesicSegments({ world, registry, geodesicId: `g${index}` })).toBeTruthy();
   }
@@ -125,8 +124,10 @@ describe("geodesic cannon world objects: tie and detach", () => {
       { geodesicId: "g-loop", role: "start", anchorObjectId: "free-loop" },
       { geodesicId: "g-loop", role: "end", anchorObjectId: "free-loop" },
     ]);
-    expect(registry.get("g-loop")).toMatchObject({ kind: "geodesicModel/arc", motionState: "moving" });
-    expect(getGeodesicSegments(registry, "g-loop").map((segment) => segment.connectionState)).toContain("moving");
+    expect(registry.get("g-loop")).toMatchObject({ kind: "geodesicModel/arc" });
+    // A closed loop on one vertex is not tied, so it shows as open (design 013 section 13.1).
+    expect(isTied(registry, "g-loop")).toBe(false);
+    expect(getGeodesicSegments(registry, "g-loop").map((segment) => segment.connectionState)).toContain("open");
   });
 
   it("tying two locked intervals at one emitter creates two moving intervals and a pair", () => {
@@ -139,8 +140,8 @@ describe("geodesic cannon world objects: tie and detach", () => {
     registry.add(createGeodesicArcObject({ id: "g-mr", startAnchorObjectId: "middle", endAnchorObjectId: "right", startCellId: "a" }));
     rebuildConnectedGeodesicBetweenEmitters({ world, registry, geodesicId: "g-lm" });
     rebuildConnectedGeodesicBetweenEmitters({ world, registry, geodesicId: "g-mr" });
-    expect(isGeodesicLocked(registry, "g-lm")).toBe(true);
-    expect(isGeodesicLocked(registry, "g-mr")).toBe(true);
+    expect(arcConnectsEmitters(registry, "g-lm")).toBe(true);
+    expect(arcConnectsEmitters(registry, "g-mr")).toBe(true);
 
     const pair = tieAndDetachGeodesicEndpoints({
       world,
@@ -154,8 +155,10 @@ describe("geodesic cannon world objects: tie and detach", () => {
 
     expect(pair).toMatchObject({ id: "pair", state: "moving", vertexIds: ["free"] });
     expect(registry.getAll().filter((object) => object.kind === "curve-shortening-pair")).toHaveLength(1);
-    expect(registry.get("g-lm")).toMatchObject({ motionState: "moving", end: { anchorObjectId: "free" } });
-    expect(registry.get("g-mr")).toMatchObject({ motionState: "moving", start: { anchorObjectId: "free" } });
+    expect(registry.get("g-lm")).toMatchObject({ end: { anchorObjectId: "free" } });
+    expect(registry.get("g-mr")).toMatchObject({ start: { anchorObjectId: "free" } });
+    expect(isTied(registry, "g-lm")).toBe(true);
+    expect(isTied(registry, "g-mr")).toBe(true);
     expect(registry.get("free")).toMatchObject({ kind: "geodesicModel/vertex", cellId: "a", localPose: { translation: { x: 0, y: 1 } } });
     expect(totalGeodesicLength(registry, "g-lm")).toBeCloseTo(Math.hypot(2, 1), 9);
   });
@@ -170,7 +173,7 @@ describe("curve shortening flow of a two-arc pair", () => {
 
     expect(changed).toEqual(expect.arrayContaining(["g1", "g2"]));
     expect(registry.get("pair")).toMatchObject({ state: "moving" });
-    expect(registry.get("g1")).toMatchObject({ motionState: "moving" });
+    expect(isTied(registry, "g1")).toBe(true);
     const free = registry.get("free");
     const moved = Math.hypot((free?.localPose.translation.x ?? 0) - 0, (free?.localPose.translation.y ?? 0) - 2);
     expect(moved).toBeGreaterThan(0);
@@ -187,8 +190,9 @@ describe("curve shortening flow of a two-arc pair", () => {
     expect(registry.get("pair")).toBeUndefined();
     expect(registry.get("free")).toBeUndefined();
     expect(registry.get("g2")).toBeUndefined();
-    expect(registry.get("g1")).toMatchObject({ motionState: "stable", start: { anchorObjectId: "e1" }, end: { anchorObjectId: "e2" } });
-    expect(isGeodesicLocked(registry, "g1")).toBe(true);
+    expect(registry.get("g1")).toMatchObject({ start: { anchorObjectId: "e1" }, end: { anchorObjectId: "e2" } });
+    expect(isTied(registry, "g1")).toBe(false);
+    expect(arcConnectsEmitters(registry, "g1")).toBe(true);
     expect(totalGeodesicLength(registry, "g1")).toBeCloseTo(4, 2);
     expect(maxSideViolation(world, registry)).toBeLessThan(1e-6);
   });
@@ -201,8 +205,8 @@ describe("curve shortening flow of a two-arc pair", () => {
     runCurveShorteningUntilPairGone(fast.world, fast.registry, { pairId: "pair", geodesicIds: ["g1", "g2"], deltaSeconds: frame60Hz / 4, maxTicks: 16000 });
 
     expect(totalGeodesicLength(slow.registry, "g1")).toBeCloseTo(totalGeodesicLength(fast.registry, "g1"), 2);
-    expect(slow.registry.get("g1")).toMatchObject({ motionState: "stable" });
-    expect(fast.registry.get("g1")).toMatchObject({ motionState: "stable" });
+    expect(isTied(slow.registry, "g1")).toBe(false);
+    expect(isTied(fast.registry, "g1")).toBe(false);
   });
 
   it("is a single frame's worth of motion per tick whatever the frame time is", () => {
@@ -232,12 +236,11 @@ describe("curve shortening flow of a two-arc pair", () => {
     expect(registry.get("free")).toBeUndefined();
     expect(registry.get("g2")).toBeUndefined();
     expect(registry.get("g1")).toMatchObject({
-      motionState: "stable",
       start: { anchorObjectId: "e1" },
       end: { anchorObjectId: "e1" },
       portalWord: [createCarryPortalTraversal(world, "torus-room", "right-left")],
     });
-    expect(isGeodesicLocked(registry, "g1")).toBe(true);
+    expect(arcConnectsEmitters(registry, "g1")).toBe(true);
     expect(totalGeodesicLength(registry, "g1")).toBeCloseTo(15, 2);
     expect(maxSideViolation(world, registry)).toBeLessThan(1e-6);
   });
@@ -284,7 +287,6 @@ describe("curve shortening flow of a curve with many vertices", () => {
     expect(registry.getObjectsOfKind("geodesicModel/vertex")).toHaveLength(0);
     expect(registry.getObjectsOfKind("geodesicModel/arc")).toHaveLength(1);
     expect(registry.getObjectsOfKind("geodesicModel/arc")[0]).toMatchObject({
-      motionState: "stable",
       start: { anchorObjectId: "e1" },
       end: { anchorObjectId: "e2" },
     });
@@ -301,7 +303,7 @@ describe("curve shortening flow of a curve with many vertices", () => {
 
     expect(registry.get("pair")).toMatchObject({ state: "moving" });
     for (const interval of registry.getObjectsOfKind("geodesicModel/arc")) {
-      expect(interval.motionState).toBe("moving");
+      expect(isTied(registry, interval.id)).toBe(true);
     }
   });
 });
@@ -315,7 +317,6 @@ describe("curve shortening flow of loops", () => {
       startAnchorObjectId: "free-loop",
       endAnchorObjectId: "free-loop",
       startCellId: cellId,
-      motionState: "moving",
       portalWord: word,
     }));
     expect(rebuildDerivedGeodesicSegments({ world, registry, geodesicId: "g-loop" })).toBeTruthy();
@@ -331,7 +332,7 @@ describe("curve shortening flow of loops", () => {
 
     expect(changed).toEqual(expect.arrayContaining(["g-loop", "pair-loop"]));
     expect(registry.get("pair-loop")).toBeUndefined();
-    expect(registry.get("g-loop")).toMatchObject({ motionState: "stable", start: { anchorObjectId: "free-loop" }, end: { anchorObjectId: "free-loop" } });
+    expect(registry.get("g-loop")).toMatchObject({ start: { anchorObjectId: "free-loop" }, end: { anchorObjectId: "free-loop" } });
     expect(totalGeodesicLength(registry, "g-loop")).toBeCloseTo(15, 6);
   });
 
@@ -422,7 +423,6 @@ describe("curve shortening flow across portals and around junction disks", () =>
         endAnchorObjectId: arc.to,
         startCellId: "torus-room",
         portalWord: arc.word,
-        motionState: "moving",
       }));
       expect(rebuildDerivedGeodesicSegments({ world, registry, geodesicId: arc.id })).toBeTruthy();
     }
@@ -445,7 +445,6 @@ describe("curve shortening flow across portals and around junction disks", () =>
     expect(registry.get("pair")).toBeUndefined();
     expect(registry.getObjectsOfKind("geodesicModel/arc")).toHaveLength(1);
     expect(registry.getObjectsOfKind("geodesicModel/arc")[0]).toMatchObject({
-      motionState: "stable",
       start: { anchorObjectId: "e1" },
       end: { anchorObjectId: "e2" },
       portalWord: [seam],
@@ -462,14 +461,13 @@ describe("curve shortening flow that would need a wrap vertex", () => {
     registry.add(createGeodesicCannonObject({ id: "e1", cellId: "a", localPose: yawRigidTransform3(0, { x: 4, y: 0.1, z: 0 }) }));
     registry.add(createGeodesicCannonObject({ id: "e2", cellId: "b", localPose: yawRigidTransform3(0, { x: 2, y: 0.1, z: 0 }) }));
     registry.add(createGeodesicVertexObject({ id: "F", cellId: "a", point: { x: 4.5, y: 2.5, z: beamZ } }));
-    registry.add(createGeodesicArcObject({ id: "g1", startAnchorObjectId: "e1", endAnchorObjectId: "F", startCellId: "a", motionState: "moving" }));
+    registry.add(createGeodesicArcObject({ id: "g1", startAnchorObjectId: "e1", endAnchorObjectId: "F", startCellId: "a" }));
     registry.add(createGeodesicArcObject({
       id: "g2",
       startAnchorObjectId: "F",
       endAnchorObjectId: "e2",
       startCellId: "a",
       portalWord: [createCarryPortalTraversal(world, "a", "ab")],
-      motionState: "moving",
     }));
     expect(rebuildDerivedGeodesicSegments({ world, registry, geodesicId: "g1" })).toBeTruthy();
     expect(rebuildDerivedGeodesicSegments({ world, registry, geodesicId: "g2" })).toBeTruthy();
@@ -488,6 +486,6 @@ describe("curve shortening flow that would need a wrap vertex", () => {
     expect(registry.get("pair")).toMatchObject({ state: "unresolved" });
     expect(notices).toHaveLength(1);
     expect(notices[0]).toMatchObject({ kind: "unresolved" });
-    expect(registry.getObjectsOfKind("geodesicModel/arc").every((interval) => interval.motionState === "moving")).toBe(true);
+    expect(registry.getObjectsOfKind("geodesicModel/arc").every((interval) => isTied(registry, interval.id))).toBe(true);
   });
 });

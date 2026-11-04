@@ -232,18 +232,152 @@ export function portalWordMatchesEndpointCellsWithAnchors(input: {
   );
 }
 
-// "Aimable free": a stable interval with exactly one emitter endpoint and one free-end endpoint that no other attachment shares.
-/** True for a stable interval with one emitter endpoint and one free end that no other geodesic uses. */
+// "Aimable free": an arc with exactly one emitter endpoint and one free-end endpoint that no other attachment shares.
+/** True for an arc with one emitter endpoint and one vertex that no other arc end uses (a plain shot geodesic). */
 export function isAimableFreeGeodesic(registry: RuntimeObjectRegistry, interval: GeodesicArcObject): boolean {
-  if (interval.motionState !== "stable") {
-    return false;
-  }
   const start = registry.get(interval.start.anchorObjectId);
   const end = registry.get(interval.end.anchorObjectId);
   const hasOneEmitter = (start?.kind === "geodesic-cannon") !== (end?.kind === "geodesic-cannon");
   const freeEnd = start?.kind === "geodesicModel/vertex" ? start : end?.kind === "geodesicModel/vertex" ? end : undefined;
   return hasOneEmitter && freeEnd !== undefined &&
     getGeodesicEndpointAttachmentsForAnchor(registry, freeEnd.id).length === 1;
+}
+
+// ---- Curves: end nodes, shared vertices and tied arcs ----
+
+/** An arc end: one endpoint role of an arc. */
+export interface ArcEnd {
+  readonly arcId: string;
+  readonly role: GeodesicEndRole;
+}
+
+/** Both endpoint roles attached to the vertex (a loop on it contributes two), in registry insertion order. */
+export function arcsAtVertex(registry: RuntimeObjectRegistry, vertexId: string): readonly ArcEnd[] {
+  const ends: ArcEnd[] = [];
+  for (const arc of registry.getObjectsOfKind("geodesicModel/arc")) {
+    for (const role of ["start", "end"] as const) {
+      if (arc[role].anchorObjectId === vertexId) {
+        ends.push({ arcId: arc.id, role });
+      }
+    }
+  }
+  return ends;
+}
+
+// A vertex is shared (tied) when two or more arc ends are attached to it. One scan of the arcs per registry version.
+interface TiedVertexIndex {
+  readonly version: number;
+  readonly vertexIds: readonly string[];
+  readonly ids: ReadonlySet<string>;
+}
+
+const tiedVertexIndexByRegistry = new WeakMap<RuntimeObjectRegistry, TiedVertexIndex>();
+
+function tiedVertexIndex(registry: RuntimeObjectRegistry): TiedVertexIndex {
+  const version = registry.getVersion();
+  const cached = tiedVertexIndexByRegistry.get(registry);
+  if (cached?.version === version) {
+    return cached;
+  }
+  const counts = new Map<string, number>();
+  for (const arc of registry.getObjectsOfKind("geodesicModel/arc")) {
+    for (const role of ["start", "end"] as const) {
+      const anchorId = arc[role].anchorObjectId;
+      counts.set(anchorId, (counts.get(anchorId) ?? 0) + 1);
+    }
+  }
+  const vertexIds: string[] = [];
+  for (const vertex of registry.getObjectsOfKind("geodesicModel/vertex")) {
+    if ((counts.get(vertex.id) ?? 0) >= 2) {
+      vertexIds.push(vertex.id);
+    }
+  }
+  const index: TiedVertexIndex = { version, vertexIds, ids: new Set(vertexIds) };
+  tiedVertexIndexByRegistry.set(registry, index);
+  return index;
+}
+
+/** Number of vertices with two or more arc ends (closed loops included). */
+export function tiedVertexCount(registry: RuntimeObjectRegistry): number {
+  return tiedVertexIndex(registry).vertexIds.length;
+}
+
+/** Visits the vertices with two or more arc ends in registry insertion order. */
+export function forEachTiedVertex(registry: RuntimeObjectRegistry, visit: (vertexId: string) => void): void {
+  for (const vertexId of tiedVertexIndex(registry).vertexIds) {
+    visit(vertexId);
+  }
+}
+
+/** True when the anchor is a vertex shared with an end of some arc other than `arcId`. */
+export function isVertexSharedWithOtherArc(registry: RuntimeObjectRegistry, anchorObjectId: string, arcId: string): boolean {
+  return tiedVertexIndex(registry).ids.has(anchorObjectId) &&
+    getGeodesicEndpointAttachmentsForAnchor(registry, anchorObjectId).some((attachment) => attachment.geodesicId !== arcId);
+}
+
+/** The arc has an end on a vertex that another arc end shares. A closed loop on one vertex is not tied; an id that is not an arc is not tied. */
+export function isTied(registry: RuntimeObjectRegistry, arcId: string): boolean {
+  const arc = registry.get(arcId);
+  return arc?.kind === "geodesicModel/arc" &&
+    (isVertexSharedWithOtherArc(registry, arc.start.anchorObjectId, arcId) ||
+      isVertexSharedWithOtherArc(registry, arc.end.anchorObjectId, arcId));
+}
+
+/** The arc's last rebuild failed during a carry, so it still shows its old path. */
+export function isStale(registry: RuntimeObjectRegistry, arcId: string): boolean {
+  const arc = registry.get(arcId);
+  return arc?.kind === "geodesicModel/arc" && arc.stale === true;
+}
+
+/** Every arc of the curve through the vertex, walked over shared vertices, in discovery order. Empty for an id that is not a vertex. */
+export function arcsOfCurve(registry: RuntimeObjectRegistry, vertexId: string): readonly string[] {
+  if (registry.get(vertexId)?.kind !== "geodesicModel/vertex") {
+    return [];
+  }
+  const found: string[] = [];
+  const seen = new Set<string>();
+  const visitedVertices = new Set<string>();
+  const queue = [vertexId];
+  for (let next = 0; next < queue.length; next += 1) {
+    const current = queue[next]!;
+    if (visitedVertices.has(current)) {
+      continue;
+    }
+    visitedVertices.add(current);
+    for (const end of arcsAtVertex(registry, current)) {
+      if (seen.has(end.arcId)) {
+        continue;
+      }
+      seen.add(end.arcId);
+      found.push(end.arcId);
+      const arc = registry.get(end.arcId);
+      if (arc?.kind !== "geodesicModel/arc") {
+        continue;
+      }
+      for (const role of ["start", "end"] as const) {
+        const anchorId = arc[role].anchorObjectId;
+        if (registry.get(anchorId)?.kind === "geodesicModel/vertex") {
+          queue.push(anchorId);
+        }
+      }
+    }
+  }
+  return found;
+}
+
+/** The arcs of the curve an arc belongs to: the arc itself and, through each vertex end, `arcsOfCurve`. Empty for an id that is not an arc. */
+export function arcsOfCurveContaining(registry: RuntimeObjectRegistry, arcId: string): readonly string[] {
+  const arc = registry.get(arcId);
+  if (arc?.kind !== "geodesicModel/arc") {
+    return [];
+  }
+  const ids = new Set<string>([arcId]);
+  for (const role of ["start", "end"] as const) {
+    for (const id of arcsOfCurve(registry, arc[role].anchorObjectId)) {
+      ids.add(id);
+    }
+  }
+  return [...ids];
 }
 
 /** Removes free-end anchors that no interval attaches to any more. */

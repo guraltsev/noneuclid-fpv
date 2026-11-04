@@ -14,7 +14,7 @@ import {
   formatWorldFocusMessageTextForLegacyFallback,
 } from "../../ui/worldInteractionDefinition";
 import { canExtendGeodesicSegment } from "../../world-objects/geodesic/objects";
-import { isGeodesicLocked } from "../../world-objects/geodesic/lifecycle";
+import { arcConnectsEmitters } from "../../world-objects/geodesic/lifecycle";
 import { type RuntimeObjectRegistry, type RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
 import { AimTarget } from "../../interaction/aimTarget";
 import { resolveAimTargets as defaultResolveAimTargets } from "./aimTarget";
@@ -315,7 +315,7 @@ export function createAimInteraction(deps: AimInteractionDeps) {
       selectedTool: deps.session.get().menuState.selectedTool,
       canExtendGeodesic: object.kind === "geodesicModel/segment" &&
         canExtendGeodesicSegment(object) &&
-        !isGeodesicLocked(runtimeObjectRegistry, object.geodesicId),
+        !arcConnectsEmitters(runtimeObjectRegistry, object.geodesicId),
     });
   }
 

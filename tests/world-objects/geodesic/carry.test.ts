@@ -22,7 +22,7 @@ import {
   geodesicRayBeamStartOffsetMeters,
 } from "../../../src/world-objects/geodesic/objects";
 import { collectGeodesicPortalWord, getGeodesicSegments } from "../../../src/world-objects/geodesic/segments";
-import { getGeodesicConnection, isGeodesicLocked } from "../../../src/world-objects/geodesic/lifecycle";
+import { getGeodesicConnection, arcConnectsEmitters } from "../../../src/world-objects/geodesic/lifecycle";
 import { liftGeodesicEndpoint } from "../../../src/world-objects/geodesic/endpoints";
 import { rebuildConnectedGeodesicBetweenEmitters, shootGeodesic } from "../../../src/world-objects/geodesic/cannon";
 import {
@@ -83,7 +83,7 @@ describe("carrying a geodesic across a portal", () => {
 
     expect(rebuilt.length).toBeGreaterThan(0);
     expect(collectGeodesicPortalWord(registry, "g-a")).toEqual([]);
-    expect(isGeodesicLocked(registry, "g-a")).toBe(true);
+    expect(arcConnectsEmitters(registry, "g-a")).toBe(true);
   });
 
   it("rebuilds locked emitter-to-emitter geodesics after an endpoint moves across a portal", () => {
@@ -134,7 +134,7 @@ describe("carrying a geodesic across a portal", () => {
     });
     expect(totalGeodesicLength(registry, "g-a")).toBeCloseTo(Math.hypot(2, 0.5) - geodesicRayBeamStartOffsetMeters);
     expect(getCannonGeodesicYaw(registry, "cannon-a", "g-a")).toBeCloseTo(expectedYaw);
-    expect(isGeodesicLocked(registry, "g-a")).toBe(true);
+    expect(arcConnectsEmitters(registry, "g-a")).toBe(true);
   });
 
   it("keeps the portal clone while carrying a locked endpoint in a wrapping cell", () => {
@@ -229,7 +229,7 @@ describe("carrying a geodesic across a portal", () => {
     const sourceYaw = Math.atan2(rebuilt[0]?.direction.y ?? 0, rebuilt[0]?.direction.x ?? 1);
     expect(getCannonPoseYaw(registry, "cannon-a")).toBeCloseTo(sourceYaw);
     expect(getCannonPoseYaw(registry, "cannon-b")).toBeCloseTo(normalizeYaw(sourceYaw + Math.PI));
-    expect(isGeodesicLocked(registry, "g-a")).toBe(true);
+    expect(arcConnectsEmitters(registry, "g-a")).toBe(true);
   });
 
   it("keeps a carried endpoint connected when it crosses back through the portal", () => {
@@ -281,7 +281,7 @@ describe("carrying a geodesic across a portal", () => {
       incomingEmitterId: "cannon-b",
       state: "connected",
     });
-    expect(isGeodesicLocked(registry, "g-a")).toBe(true);
+    expect(arcConnectsEmitters(registry, "g-a")).toBe(true);
     expect(collectGeodesicPortalWord(registry, "g-a")).toEqual([]);
   });
 
@@ -322,7 +322,7 @@ describe("carrying a geodesic across a portal", () => {
 
     expect(rebuilt.length).toBeGreaterThan(0);
     expect(collectGeodesicPortalWord(registry, "g-a")).toEqual([]);
-    expect(isGeodesicLocked(registry, "g-a")).toBe(true);
+    expect(arcConnectsEmitters(registry, "g-a")).toBe(true);
   });
 
   it("keeps a carried endpoint connected after the final drop rebuild", () => {
@@ -373,7 +373,7 @@ describe("carrying a geodesic across a portal", () => {
       carriedPortalWord: carryWord,
     });
     expect(liveRebuilt.length).toBeGreaterThan(0);
-    expect(isGeodesicLocked(registry, "g-a")).toBe(true);
+    expect(arcConnectsEmitters(registry, "g-a")).toBe(true);
 
     const dropRebuilt = rebuildConnectedGeodesicBetweenEmitters({
       world,
@@ -391,7 +391,7 @@ describe("carrying a geodesic across a portal", () => {
     });
     expect(getCannonGeodesicIds(registry, "cannon-a")).toEqual(["g-a"]);
     expect(getCannonGeodesicIds(registry, "cannon-b")).toEqual(["g-a"]);
-    expect(isGeodesicLocked(registry, "g-a")).toBe(true);
+    expect(arcConnectsEmitters(registry, "g-a")).toBe(true);
     expect(collectGeodesicPortalWord(registry, "g-a")).toEqual(carryWord);
   });
 });
@@ -444,7 +444,7 @@ describe("carrying a geodesic within one cell", () => {
       targetCellId: "torus-room",
       targetPortalId: "left-right",
     }]);
-    expect(isGeodesicLocked(registry, "g-a")).toBe(true);
+    expect(arcConnectsEmitters(registry, "g-a")).toBe(true);
   });
 
   it("keeps the portal word unchanged during same-cell fixed-face carry without player traversal", () => {
@@ -484,7 +484,7 @@ describe("carrying a geodesic within one cell", () => {
 
     expect(rebuilt.length).toBeGreaterThan(0);
     expect(collectGeodesicPortalWord(registry, "g-a")).toEqual([]);
-    expect(isGeodesicLocked(registry, "g-a")).toBe(true);
+    expect(arcConnectsEmitters(registry, "g-a")).toBe(true);
   });
 });
 
@@ -529,7 +529,7 @@ describe("updating a locked interval's portal word from carried traversal", () =
     expect(nextWord).toEqual([]);
     expect(rebuilt.length).toBeGreaterThan(0);
     expect(collectGeodesicPortalWord(registry, "g-a")).toEqual([]);
-    expect(isGeodesicLocked(registry, "g-a")).toBe(true);
+    expect(arcConnectsEmitters(registry, "g-a")).toBe(true);
   });
 
   it("normalizes an out-of-cell carried emitter through one portal before the final rebuild", () => {
@@ -587,7 +587,7 @@ describe("updating a locked interval's portal word from carried traversal", () =
       terminal: { kind: "emitter-hit", emitterId: "cannon-b" },
       connectionState: "connected",
     });
-    expect(isGeodesicLocked(registry, "g-a")).toBe(true);
+    expect(arcConnectsEmitters(registry, "g-a")).toBe(true);
   });
 });
 

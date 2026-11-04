@@ -6,7 +6,7 @@
 import type { CompiledCellComplex } from "../cell-complex/compileCellComplex";
 import type { Vec3 } from "../math/vec3";
 import { pruneMissingGeodesicIntersectionObjects } from "../world-objects/geodesic/intersections";
-import { isGeodesicLocked, removeGeodesic } from "../world-objects/geodesic/lifecycle";
+import { arcConnectsEmitters, removeGeodesic } from "../world-objects/geodesic/lifecycle";
 import { rebuildConnectedGeodesicBetweenEmitters } from "../world-objects/geodesic/cannon";
 import { refreshMeasuredGeodesicLengthObject } from "../world-objects/measureLengthTool";
 import { type MeasuredGeodesicLengthObject } from "../world-objects/toolObjects";
@@ -113,7 +113,7 @@ export function applyGeometryCommitComputedObjectPolicy(
 function collectLockedGeodesicIds(registry: RuntimeObjectRegistry): Set<string> {
   return new Set(
     [...collectAllGeodesicIds(registry)]
-      .filter((geodesicId) => isGeodesicLocked(registry, geodesicId)),
+      .filter((geodesicId) => arcConnectsEmitters(registry, geodesicId)),
   );
 }
 

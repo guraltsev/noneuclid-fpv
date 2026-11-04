@@ -46,7 +46,7 @@ import {
 } from "../../world-objects/geodesic/endpoints";
 import { getGeodesicSegments } from "../../world-objects/geodesic/segments";
 import {
-  isGeodesicLocked,
+  arcConnectsEmitters,
   removeGeodesic,
   removeUnlockedGeodesicsFromCannon,
 } from "../../world-objects/geodesic/lifecycle";
@@ -423,7 +423,7 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
     }
 
     const geodesicId = resolveCannonGeodesicId(runtimeObjectRegistry, cannon, requestedGeodesicId, deps.session.get().cannonToolState.activeGeodesicId);
-    if (geodesicId && isGeodesicLocked(runtimeObjectRegistry, geodesicId)) {
+    if (geodesicId && arcConnectsEmitters(runtimeObjectRegistry, geodesicId)) {
       syncDesktopPalette();
       return;
     }
@@ -450,7 +450,7 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
     }
 
     const geodesicId = resolveCannonGeodesicId(runtimeObjectRegistry, cannon, requestedGeodesicId, deps.session.get().cannonToolState.activeGeodesicId);
-    if (geodesicId && isGeodesicLocked(runtimeObjectRegistry, geodesicId)) {
+    if (geodesicId && arcConnectsEmitters(runtimeObjectRegistry, geodesicId)) {
       syncDesktopPalette();
       return;
     }
@@ -579,7 +579,7 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
 
   function canTieAndDetachGeodesicsFromCannon(cannonId: string): boolean {
     return getGeodesicEndpointAttachmentsForAnchor(runtimeObjectRegistry, cannonId)
-      .filter((attachment) => isGeodesicLocked(runtimeObjectRegistry, attachment.geodesicId))
+      .filter((attachment) => arcConnectsEmitters(runtimeObjectRegistry, attachment.geodesicId))
       .length >= 2;
   }
 
@@ -637,7 +637,7 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
 
   function resolveTieAndDetachEndpointFromAim(ray: RootAimRay, cannonId: string): GeodesicEndpointSelection | undefined {
     const selectable = getGeodesicEndpointAttachmentsForAnchor(runtimeObjectRegistry, cannonId)
-      .filter((attachment) => isGeodesicLocked(runtimeObjectRegistry, attachment.geodesicId));
+      .filter((attachment) => arcConnectsEmitters(runtimeObjectRegistry, attachment.geodesicId));
     for (const target of resolveCurrentAimTargets(ray)) {
       if (!targetIsWithinInteractionRange(target)) {
         continue;
@@ -1007,7 +1007,7 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
   }
 
   function getLockedGeodesicIds(geodesicIds: readonly string[]): readonly string[] {
-    return geodesicIds.filter((geodesicId) => isGeodesicLocked(runtimeObjectRegistry, geodesicId));
+    return geodesicIds.filter((geodesicId) => arcConnectsEmitters(runtimeObjectRegistry, geodesicId));
   }
 
   function freezeXrHeadHeightDuringGeodesicCannonRotation(headLocalMeters: Vec3 | undefined): Vec3 | undefined {

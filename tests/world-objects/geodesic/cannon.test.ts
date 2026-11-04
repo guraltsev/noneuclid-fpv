@@ -31,7 +31,7 @@ import {
   shootGeodesic,
 } from "../../../src/world-objects/geodesic/cannon";
 import { getGeodesicEndpointAttachmentsForAnchor } from "../../../src/world-objects/geodesic/endpoints";
-import { getGeodesicConnection, isGeodesicLocked, removeGeodesic } from "../../../src/world-objects/geodesic/lifecycle";
+import { getGeodesicConnection, arcConnectsEmitters, removeGeodesic } from "../../../src/world-objects/geodesic/lifecycle";
 import { yawRigidTransform3 } from "../../../src/math/rigidTransform3";
 import {
   totalGeodesicLength,
@@ -72,9 +72,9 @@ describe("geodesic cannon world objects: cannon", () => {
       label: "Geodesic G1",
       rangeMeters: 6,
     });
-    expect(isGeodesicLocked(registry, "g-a")).toBe(true);
+    expect(arcConnectsEmitters(registry, "g-a")).toBe(true);
     const continuationId = "g-a:continuation:cannon-b";
-    expect(isGeodesicLocked(registry, continuationId)).toBe(false);
+    expect(arcConnectsEmitters(registry, continuationId)).toBe(false);
     expect(getGeodesicEndpointAttachmentsForAnchor(registry, "cannon-b").map((attachment) => attachment.geodesicId).sort())
       .toEqual(["g-a", continuationId]);
     expect(getCannonGeodesicYaw(registry, "cannon-b", "g-a")).toBeCloseTo(Math.PI);
@@ -255,7 +255,7 @@ describe("geodesic cannon world objects: cannon", () => {
       state: "connected",
     });
     expect(getCannonGeodesicIds(registry, "cannon-a")).toEqual(["g-a"]);
-    expect(isGeodesicLocked(registry, "g-a")).toBe(true);
+    expect(arcConnectsEmitters(registry, "g-a")).toBe(true);
     expect(getGeodesicEndpointAttachmentsForAnchor(registry, "cannon-a").map((attachment) => attachment.role).sort())
       .toEqual(["end", "start"]);
   });
@@ -287,7 +287,7 @@ describe("geodesic cannon world objects: cannon", () => {
 
     expect(getGeodesicTail(registry, "g-a")?.terminal.kind).toBe("open");
     expect(totalGeodesicLength(registry, "g-a")).toBeCloseTo(4);
-    expect(isGeodesicLocked(registry, "g-a")).toBe(false);
+    expect(arcConnectsEmitters(registry, "g-a")).toBe(false);
     expect(getGeodesicConnection(registry, "g-a")).toEqual({
       outgoingEmitterId: "cannon-a",
       state: "open",
@@ -315,7 +315,7 @@ describe("geodesic cannon world objects: cannon", () => {
 
     expect(first.terminal.kind).toBe("open");
     expect(second?.terminal).toEqual({ kind: "emitter-hit", emitterId: "cannon-b" });
-    expect(isGeodesicLocked(registry, "g-a")).toBe(true);
+    expect(arcConnectsEmitters(registry, "g-a")).toBe(true);
   });
 
   it("deleting a connected geodesic removes association from both emitters", () => {
