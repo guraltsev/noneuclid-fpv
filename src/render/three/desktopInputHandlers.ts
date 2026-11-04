@@ -9,7 +9,7 @@
 import * as THREE from "three";
 import type { RuntimeInputFrame } from "../../interaction/inputFrame";
 import type { AppConfig } from "../../glue/appConfig";
-import type { AppSession } from "../../runtime/appSession";
+import type { ClientSession } from "../../runtime/clientSession";
 import { createPaletteDefinitionCache } from "../../ui/paletteDefinition";
 import type { XrHeadWorldPose } from "./carriedGeodesicCannon";
 import type { DesktopControls } from "./desktopControls";
@@ -24,7 +24,7 @@ import type { XrScenePaletteInput } from "./xrScenePaletteInput";
 
 /** Dependencies of {@link createDesktopInputHandlers}. */
 export interface DesktopInputHandlersDeps {
-  readonly session: AppSession;
+  readonly session: ClientSession;
   /** Builds the palette definition cache; the cache is owned by the handlers. */
   readonly appConfig: AppConfig;
   readonly camera: THREE.PerspectiveCamera;

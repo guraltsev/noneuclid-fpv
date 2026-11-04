@@ -7,6 +7,7 @@
  * shell creates and disposes. `enterVr` never rejects: errors set the state to "failed" with the message. Restarts go through
  * `xrSessionRestart.ts`. Positions are meters; the head pose aliases module-level scratch objects and is valid until the next call.
  */
+import { readLocalPlayerPose, type WorldEngine } from "../../engine/worldEngine";
 import * as THREE from "three";
 import {
   createXrSessionState,
@@ -16,7 +17,7 @@ import {
   type XrSessionState,
 } from "../../interaction/xrSessionState";
 import type { PlayerPose } from "../../movement/playerPose";
-import type { AppSession } from "../../runtime/appSession";
+import type { ClientSession } from "../../runtime/clientSession";
 import type { RuntimeInputFrame } from "../../interaction/inputFrame";
 import type { XrHeadWorldPose } from "./carriedGeodesicCannon";
 import { createInitialXrDebugState } from "./frameDiagnostics";
@@ -66,7 +67,9 @@ export interface XrSessionControllerDeps {
   readonly navigator: XrNavigatorLike;
   readonly secureContext: boolean;
   /** Read for the player pose in the debug readout. */
-  readonly session: AppSession;
+  readonly session: ClientSession;
+  /** The world engine; the player's pose is read from it. */
+  readonly engine: WorldEngine;
   readonly initialPlayerPose: PlayerPose;
   readonly xr: XrRendererLike;
   readonly xrRig: {
@@ -117,7 +120,7 @@ export function createXrSessionController(deps: XrSessionControllerDeps): XrSess
   }
 
   function syncDebugState(source: RuntimeInputFrame["source"], moveResult?: XrDebugMoveResult): void {
-    const pose = deps.session.get().playerPose;
+    const pose = readLocalPlayerPose(deps.engine);
     const presenting = deps.xr.isPresenting;
     debugState = {
       secureContext: sessionState.secureContext,

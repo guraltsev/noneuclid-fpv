@@ -9,7 +9,7 @@
 import * as THREE from "three";
 import { type CompiledCellComplex } from "../../cell-complex/compileCellComplex";
 import { addVec3, scaleVec3 } from "../../math/vec3";
-import type { AppSession } from "../../runtime/appSession";
+import type { ClientSession } from "../../runtime/clientSession";
 import { getEmitterGeodesicIds } from "../../world-objects/geodesic/endpoints";
 import { collectGeodesicPortalWord, getGeodesicSegments } from "../../world-objects/geodesic/segments";
 import { getGeodesicConnection, isGeodesicLocked } from "../../world-objects/geodesic/lifecycle";
@@ -49,7 +49,7 @@ export interface GeodesicDebugDumpsDeps {
   /** Getter for the active compiled world (it can be replaced at runtime). */
   getWorld(): CompiledCellComplex;
   /** The shell session; only the menu state's selected tool is reported. */
-  readonly session: AppSession;
+  readonly session: ClientSession;
   /** Getter for the id of the cell currently rendered as visible, if any. */
   getVisibleCellId(): string | undefined;
   /** Getter for the most recent portal crossing by the player or carried emitter, if any. */

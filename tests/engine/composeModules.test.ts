@@ -91,7 +91,7 @@ describe("composeModules", () => {
     expect(problems).toEqual(["module two: the derive tick two/watch subscribes to one/thing, which no module it requires declares"]);
   });
 
-  it("lets a derive tick subscribe to a core kind and to a kind of a module it requires, transitively", () => {
+  it("lets a derive tick subscribe to a core kind and to a transitively required kind", () => {
     const tokenOne = defineModuleToken<unknown>("one");
     const tokenTwo = defineModuleToken<unknown>("two");
     const watch: ModuleTick = { id: "three/watch", phase: "derive", writes: [], subscribes: ["geo-mouse", "one/thing"], run: () => undefined };
@@ -140,7 +140,7 @@ describe("composeModules", () => {
     ]);
   });
 
-  it("rejects a requiresTool that names a tool no module defines, and accepts a core tool and a module tool", () => {
+  it("rejects a requiresTool no module defines, and accepts core and module tools", () => {
     const run = () => ({ ok: true as const });
     const unknown = problemsOf([fake("one", { commands: { "one/go": { run, requiresTool: "one/nothing" } } })]);
     expect(unknown).toEqual(["module one: the command one/go requires the tool one/nothing, which no module in the experience defines"]);

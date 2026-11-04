@@ -11,11 +11,13 @@ import { createScenePaletteCommands } from "../../src/render/three/scenePaletteC
 
 function createHarness() {
   const dispatched: RuntimeCommand[] = [];
+  const toolRequests: string[] = [];
   const commands = createScenePaletteCommands({
     dispatch: (command) => dispatched.push(command),
+    requestTool: (toolId) => toolRequests.push(toolId),
     reloadConfirmationWindowMs: 2000,
   });
-  return { commands, dispatched };
+  return { commands, dispatched, toolRequests };
 }
 
 describe("createScenePaletteCommands", () => {
@@ -28,16 +30,14 @@ describe("createScenePaletteCommands", () => {
     expect(dispatched).toEqual([{ kind: "open-menu" }, { kind: "cancel-menu-and-tool" }]);
   });
 
-  it("selects a world and a tool by id", () => {
-    const { commands, dispatched } = createHarness();
+  it("selects a world by id and asks the world for a tool instead of selecting it", () => {
+    const { commands, dispatched, toolRequests } = createHarness();
 
     commands.onWorldSelected("torus");
     commands.onToolSelected("protractor");
 
-    expect(dispatched).toEqual([
-      { kind: "select-world", worldId: "torus" },
-      { kind: "select-tool", toolId: "protractor" },
-    ]);
+    expect(dispatched).toEqual([{ kind: "select-world", worldId: "torus" }]);
+    expect(toolRequests).toEqual(["protractor"]);
   });
 
   it("presses reload with the clock time and the confirmation window", () => {

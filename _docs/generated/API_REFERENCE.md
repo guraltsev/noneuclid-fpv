@@ -1358,6 +1358,130 @@ Pure model of the immersive-VR session lifecycle shown in the UI and debug state
 | function | `detectXrSessionState` | Probes WebXR support and returns the initial state: "insecure-context" if not secure, "unsupported" if `navigator.xr` is missing or reports no immersive-vr support, "available" if supported, or "failed" (with a readable… |
 | function | `transitionXrSessionState` | Returns the state for `status`, keeping `secureContext` and `immersiveVrSupported` from `state` (support is cleared only when moving to "unsupported"). |
 
+## `engine`
+
+### `engine/composeModules.ts`
+
+Composition of an experience's modules, once at engine creation (design 013 section 9.2).
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| class | `ModuleCompositionError` | Every composition problem at once. |
+| const | `contributedNamePattern` | The pattern every contributed name follows: "<moduleId>/<noun>" (design 013 section 10). |
+| interface | `ComposedHandler` | One command handler as the engine stores it. |
+| interface | `ComposedModule` | A created module and the facts the engine needs about it. |
+| interface | `ComposedExperience` | The result of composition. |
+| interface | `ComposeOptions` | What composition needs of the engine. |
+| function | `composeModules` | Checks, orders and creates the modules; throws a {@link ModuleCompositionError} listing every problem. |
+
+### `engine/coreIds.ts`
+
+The names the engine knows without any module: the object kinds of the registry's core union and the tool ids of the core tools.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| const | `coreObjectKinds` | Kinds of the core union of the registry. |
+| const | `coreToolIds` | Ids of the tools the shell defines itself. |
+
+### `engine/ids.ts`
+
+Engine-allocated object ids: "<family>:<serial>" with one counter per family, never reused (design 013 section 5.1; no `Date.now()`).
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| function | `createEngineIdSource` | Creates an id source; `isTaken` says whether an id is already in use. |
+
+### `engine/moduleTicks.ts`
+
+The simulate and derive passes over the composed modules (design 013 sections 5.2 and 6.4).
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| type | `MutableStepContext` | The step context as the runner writes it. |
+| interface | `TickRunnerDeps` | What the runner reads of the engine. |
+| interface | `TickRunner` | The passes of one engine. |
+| function | `createTickRunner` | Builds the runner for `modules`, which are already in topological order. |
+
+### `engine/moduleTypes.ts`
+
+The types of the world engine and of its modules (design 013 sections 5 and 9): commands and their results, participants, the read view, tokens, module definitions and the contexts the engine hands to handlers and ticks.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| type | `PlainData` | Data that survives a structured clone: what commands, results, events and control slots carry. |
+| interface | `EngineCommandBase` | A command: plain data with a namespaced kind (`"world/requestTool"`, `"geodesicModel/tieAndDetach"`). |
+| interface | `EngineEventBase` | An event: plain data with a namespaced kind. |
+| interface | `WorldRequestToolCommand` | The engine's own command: ask whether this participant may switch to a tool (design 013 section 8.1). |
+| interface | `WorldToolRevokedEvent` | Emitted when a tool that was open to a participant no longer is; a client with that tool selected leaves it and shows `message`. |
+| type | `CommandResult` | The answer to a command: accepted (with an optional value) or refused with a stable code and a sentence for people. |
+| type | `CommandTicket` | What `submit` returns: pass it to `resultOf` after the step that applied the command. |
+| type | `ParticipantBody` | Where a participant is: the same record as the player pose (cell, cell-local position, yaw, pitch). |
+| interface | `ParticipantRecord` | Someone acting in the world. |
+| interface | `WorldReadView` | The read-only world state clients use between steps. |
+| interface | `EngineIdSource` | "<family>:<serial>" for core families, "<moduleId>/<family>:<serial>" for a module's (design 013 section 10), serials from the engine. |
+| type | `ToolGate` | A module's answer for one participant and tool; undefined means "no objection". |
+| interface | `WorldEngine` | The world engine: owner of world state, which it changes only in `step` (design 013 section 5.1). |
+| interface | `ModuleToken` | A typed name for an exported module API. |
+| function | `defineModuleToken` | Creates a token. |
+| type | `CommandHandlers` | One handler per command kind; the mapped type makes the set exhaustive. |
+| type | `ModulePhase` | The two kinds of per-step work: simulate ticks change the world, derive ticks recompute what follows from the journal. |
+| interface | `ObjectKindDeclaration` | An object kind a module declares. |
+| interface | `ModuleTick` | Per-step work of a module, in a phase. |
+| interface | `ModuleDefinition` | The world part of a module. |
+| interface | `ModuleInstance` | What a module's `create` returns. |
+| type | `AnyModuleDefinition` | Any module, whatever its command and API types. |
+| interface | `ModuleCreateContext` | What a module's `create` receives. |
+| interface | `StepContext` | One object, reused every step: never keep it across steps. |
+| interface | `CommandContext` | What a command handler receives. |
+
+### `engine/participants.ts`
+
+Participants and control slots of the world engine (design 013 sections 5.1 and 5.4).
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| const | `localParticipantId` | Id of the participant the local device plays. |
+| const | `localDeviceId` | Owner id of participants the local device controls. |
+| function | `createLocalPlayerParticipant` | Creates the record of the local player. |
+| interface | `ParticipantTable` | The participants of one engine. |
+| function | `createParticipantTable` | Creates the table holding `initial`; `deviceId` is the device this engine serves. |
+| interface | `ControlSlots` | The control slots of one engine, keyed by participant and slot name. |
+| function | `createControlSlots` | Creates an empty slot table. |
+
+### `engine/toolGates.ts`
+
+Tool gates and the confirmation protocol's world side (design 013 section 8).
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `ToolRefusal` | Why a tool is refused. |
+| interface | `RevokedTool` | A tool newly refused to a participant. |
+| interface | `ToolGates` | The gates of one engine. |
+| interface | `ToolGatesOptions` | Options of {@link createToolGates}. |
+| function | `createToolGates` | Creates the gates. |
+
+### `engine/worldEngine.ts`
+
+The world engine (design 013 section 5): the owner of world state, which changes only inside `step`, from queued commands and control slots.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `WorldEngineOptions` | What the engine is built from. |
+| function | `createWorldEngine` | Creates the engine; throws a `ModuleCompositionError` when the module list is invalid. |
+| function | `readLocalPlayerPose` | The pose of the local player: where this device's body is in the world. |
+| function | `publishLocalPlayerPose` | Publishes the local player's body (direct write D1, design 013 section 5.7); the local device owns it, so a refusal is a bug. |
+
+### `engine/writeGuard.ts`
+
+Who is acting: a stack of module frames, and the write guard built on it (design 013 section 9.6).
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `ModuleFrames` | The stack of frames. |
+| function | `createModuleFrames` | Creates an empty stack. |
+| function | `guardRegistry` | The registry as modules see it with the guard on: every write is checked against the active frame first. |
+| function | `runFunctionsInFrame` | A copy of `target` whose functions run inside a frame of `moduleId` (with `writableKinds`); other properties are kept. |
+
 ## `runtime`
 
 ### `runtime/apiCall.ts`
@@ -1381,20 +1505,6 @@ The one command path: applyRuntimeCommand(session, command) changes the session 
 | function | `applyRuntimeCommand` | Applies `command` to the session and returns the effects the host runs, in order. |
 | function | `reduceRuntimeCommand` | Pure reducer: the next session state and the ordered effects for one command. |
 
-### `runtime/appSession.ts`
-
-The shell-side session: the one record that holds the mutable state of a running world, and the cell that owns it.
-
-| Kind | Name | Summary |
-| --- | --- | --- |
-| type | `ObjectIdFamily` | Families of runtime objects whose ids carry a serial number from the session. |
-| interface | `CarryRecord` | Who is being carried, and whether the object has reached the hand yet. |
-| interface | `AppSessionState` | Mutable state of one running world, as one plain record. |
-| interface | `AppSession` | Owner of the current AppSessionState. |
-| function | `createAppSession` | Creates a session holding `initial`. |
-| const | `initialObjectIdSerials` | Serial numbers all start at zero. |
-| function | `takeObjectIdSerial` | Returns the next unused serial number of an object id family and advances the counter; the caller formats the id. |
-
 ### `runtime/appState.ts`
 
 Defines AppState, the initial immutable bundle of compiled world, player body and player pose that main.ts hands to the renderer, and the factory that builds it.
@@ -1403,6 +1513,18 @@ Defines AppState, the initial immutable bundle of compiled world, player body an
 | --- | --- | --- |
 | interface | `AppState` | Initial application state for one world run: compiled world, player body and player pose. |
 | function | `createInitialAppState` | Creates the AppState for a compiled world, placing the player at world.startingPosition (yaw and pitch default to 0) or at the default pose in cells[0]; throws if the world has no cells. |
+
+### `runtime/clientSession.ts`
+
+The client session: the one record that holds how one person is interacting with a running world (menu, selected tool, tool picks, debug and comfort settings), and the cell that owns it.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `CarryRecord` | Who is being carried, and whether the object has reached the hand yet. |
+| interface | `PendingToolRequest` | A request to switch to a tool that the world has not answered yet (design 013 section 8.1): the old tool stays active until `world/requestTool` is accepted. |
+| interface | `ClientSessionState` | Mutable state of one client of a running world, as one plain record. |
+| interface | `ClientSession` | Owner of the current ClientSessionState. |
+| function | `createClientSession` | Creates a session holding `initial`. |
 
 ### `runtime/publicApi.ts`
 
@@ -2693,7 +2815,7 @@ Lighting rig for the stylized (non-physical) look of the scene.
 
 ### `render/three/scenePaletteCommands.ts`
 
-What the scene palette's buttons do: one callback per palette action, each dispatching the command that action stands for.
+What the scene palette's buttons do: one callback per palette action, each dispatching the command that action stands for (selecting a tool is a request to the world instead).
 
 | Kind | Name | Summary |
 | --- | --- | --- |
@@ -2858,6 +2980,16 @@ Conversion between the simulation's world frame and the Three.js scene frame.
 | function | `worldYawRadiansToThree` | Returns a world yaw (radians about +z, counter-clockwise seen from above) as the equivalent rotation about Three's +y axis, which is numerically identical. |
 | function | `rigidTransformToThreeMatrix` | Converts a world-frame rigid transform into the equivalent Three.js `Matrix4` (basis-changed by B * M * B^-1). |
 | function | `applyWorldRigidTransform` | Sets an object's position and quaternion from a world-frame rigid transform (converted to Three axes); scale is left untouched. |
+
+### `render/three/worldClient.ts`
+
+The shell's side of its conversation with the world engine (design 013 sections 5.3, 5.5 and 8.1): the tool-switch protocol, the generic event sink and the `api.world` namespace.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `WorldClientDeps` | What the world client needs from the shell. |
+| interface | `WorldClient` | Handle returned by {@link createWorldClient}. |
+| function | `createWorldClient` | Creates the world client over the shell's engine, session and command path. |
 
 ### `render/three/worldResultBadge.ts`
 

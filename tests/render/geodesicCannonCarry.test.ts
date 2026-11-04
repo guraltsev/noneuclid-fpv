@@ -25,10 +25,12 @@
  * The checks: the geodesic is still locked, still joins both emitters and ends in the emitter's cell, and the emitter
  * lives in the cell it is in. The geodesic-level rules are in `tests/world-objects/geodesic/carry.test.ts`.
  */
+import { publishLocalPlayerPose, readLocalPlayerPose } from "../../src/engine/worldEngine";
+import { createTestEngine } from "../support/engine";
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import { applyRuntimeCommand } from "../../src/runtime/applyRuntimeCommand";
-import { createTestAppSession } from "../support/appSession";
+import { createTestClientSession } from "../support/clientSession";
 import { transformPoint3, yawRigidTransform3 } from "../../src/math/rigidTransform3";
 import { createGeodesicCannonObject } from "../../src/world-objects/geodesic/objects";
 import { shootGeodesic } from "../../src/world-objects/geodesic/cannon";
@@ -49,7 +51,8 @@ function createHarness(
   registry: RuntimeObjectRegistry,
   startPose: PlayerPose,
 ) {
-  const session = createTestAppSession({ playerPose: startPose });
+  const session = createTestClientSession();
+  const engine = createTestEngine({ registry, playerPose: startPose });
   const nothing = (): void => {};
   // Where the aim ray hits, in the player's frame; none by default.
   const aim: { rootPoint?: { x: number; y: number; z: number } } = {};
@@ -59,6 +62,7 @@ function createHarness(
     runtimeObjectRegistry: registry,
     getWorld: () => world,
     session,
+    engine,
     dispatch: (command) => {
       applyRuntimeCommand(session, command);
     },
@@ -81,13 +85,10 @@ function createHarness(
 
   // The player stands in `cellId` at (x, y); how they got there does not matter to the tools.
   function walkInto(cellId: string, x: number, y: number): void {
-    applyRuntimeCommand(session, {
-      kind: "set-player-pose",
-      pose: { ...session.get().playerPose, cellId, position: { x, y, z: 0 } },
-    });
+    publishLocalPlayerPose(engine, { ...readLocalPlayerPose(engine), cellId, position: { x, y, z: 0 } });
   }
 
-  return { world, registry, tools, walkInto, session, aim };
+  return { world, registry, tools, walkInto, session, engine, aim };
 }
 
 function setup() {

@@ -6,11 +6,11 @@ import type { TutorialPageSpec } from "../cell-complex/specs";
 import type { DebugSettings } from "../glue/debugSettings";
 import type { PortalPanelModeId } from "../glue/portalPanelMode";
 import type { RuntimeDebugOverlayItemId, RuntimeToolId } from "../glue/toolIds";
-import type { PlayerPose } from "../movement/playerPose";
 import type { GeodesicCannonToolState } from "../world-objects/geodesic/cannonToolState";
 import type { ProtractorToolState } from "../world-objects/protractorTool";
 import type { PlacedFlagType } from "../world-objects/toolObjects";
 import type { RuntimeMenuConsoleLogLevelId } from "./runtimeMenuState";
+import type { PendingToolRequest } from "./clientSession";
 
 /** Payload of the cannon actions page. */
 export interface ShowGeodesicCannonActionsPayload {
@@ -70,10 +70,13 @@ export type RuntimeCommand =
   | { readonly kind: "choose-place-flag-type"; readonly flagType: PlacedFlagType }
   | { readonly kind: "set-editing-flag"; readonly flagId: string | undefined }
   | { readonly kind: "set-editing-sign-message"; readonly message: string }
-  // Tool and player state written by the tools and the frame loop.
+  // Tool state written by the tools and the frame loop.
   | { readonly kind: "set-cannon-tool-state"; readonly state: GeodesicCannonToolState }
   | { readonly kind: "set-protractor-tool-state"; readonly state: ProtractorToolState }
-  | { readonly kind: "set-player-pose"; readonly pose: PlayerPose }
+  /** A module's client tool state (picks, prompts); `undefined` clears it. Design 013 section 9.3. */
+  | { readonly kind: "set-module-tool-state"; readonly moduleId: string; readonly state: unknown }
+  /** The tool request the world has not answered yet (design 013 section 8.1), or undefined once it has. */
+  | { readonly kind: "set-pending-tool-request"; readonly request: PendingToolRequest | undefined }
   // Carrying. The record lives only while the carry tool is selected; leaving that tool by any command drops it.
   /** Pickup: the carry tool holds `objectId`. Ignored when the session already carries that object. */
   | { readonly kind: "begin-carry"; readonly objectId: string }

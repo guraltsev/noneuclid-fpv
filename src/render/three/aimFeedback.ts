@@ -6,9 +6,10 @@
  * the id of the object whose help the player pinned. Menu, tool and protractor selection state are read from the session.
  * The tooltip, cross marker and help lens handles are created and disposed by the shell. Everything is hidden while a menu is open.
  */
+import { readLocalPlayerPose, type WorldEngine } from "../../engine/worldEngine";
 import * as THREE from "three";
 import type { AimTarget } from "../../interaction/aimTarget";
-import type { AppSession } from "../../runtime/appSession";
+import type { ClientSession } from "../../runtime/clientSession";
 import { createHelpLensDefinition } from "../../ui/helpLensDefinition";
 import type { RuntimeObjectRegistry, RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
 import {
@@ -34,7 +35,9 @@ export interface AimFeedbackDeps {
   /** Main camera; the help lens panel is placed from it. */
   readonly camera: THREE.Camera;
   /** The shell session; menu, tool and protractor state are read from it. */
-  readonly session: AppSession;
+  readonly session: ClientSession;
+  /** The world engine; the player's pose is read from it. */
+  readonly engine: WorldEngine;
   /** Registry of runtime objects; read to find the nearest auto-help object and to read emitters. */
   readonly runtimeObjectRegistry: RuntimeObjectRegistry;
   /** Cell root groups; the protractor drawing is parented into the root of its cell. */
@@ -90,7 +93,7 @@ export interface AimFeedback {
 
 /** Creates the aim feedback and adds its controller ray (hidden) to the scene. */
 export function createAimFeedback(deps: AimFeedbackDeps): AimFeedback {
-  const { scene, camera, session, runtimeObjectRegistry, cellMeshes, floatingObjectTooltip, aimCrossMarker, helpLensRenderer } = deps;
+  const { scene, camera, session, engine, runtimeObjectRegistry, cellMeshes, floatingObjectTooltip, aimCrossMarker, helpLensRenderer } = deps;
 
   const aimControllerRayPositions = new Float32Array(6);
   const aimControllerRayGeometry = new THREE.BufferGeometry();
@@ -373,15 +376,15 @@ export function createAimFeedback(deps: AimFeedbackDeps): AimFeedback {
 
   function findAutomaticHelpObject(): RuntimeWorldObject | undefined {
     let best: { readonly object: RuntimeWorldObject; readonly distanceSquared: number } | undefined;
-    for (const object of runtimeObjectRegistry.getObjectsInCell(session.get().playerPose.cellId)) {
+    for (const object of runtimeObjectRegistry.getObjectsInCell(readLocalPlayerPose(engine).cellId)) {
       const rangeMeters = object.autoDisplayHelpRangeMeters;
       if (!object.displayHelpMessage || rangeMeters === undefined) {
         continue;
       }
 
-      const dx = object.localPose.translation.x - session.get().playerPose.position.x;
-      const dy = object.localPose.translation.y - session.get().playerPose.position.y;
-      const dz = object.localPose.translation.z - session.get().playerPose.position.z;
+      const dx = object.localPose.translation.x - readLocalPlayerPose(engine).position.x;
+      const dy = object.localPose.translation.y - readLocalPlayerPose(engine).position.y;
+      const dz = object.localPose.translation.z - readLocalPlayerPose(engine).position.z;
       const distanceSquared = dx * dx + dy * dy + dz * dz;
       if (distanceSquared > rangeMeters * rangeMeters) {
         continue;

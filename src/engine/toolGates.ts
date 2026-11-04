@@ -17,6 +17,7 @@ export interface RevokedTool extends ToolRefusal {
   readonly toolId: RuntimeToolId;
 }
 
+/** The gates of one engine. */
 export interface ToolGates {
   /** True for a core tool id or a module's. */
   isKnownTool(toolId: string): boolean;

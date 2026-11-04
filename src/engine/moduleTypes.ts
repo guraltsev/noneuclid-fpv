@@ -135,6 +135,7 @@ export type CommandHandlers<C extends EngineCommandBase> = {
   };
 };
 
+/** The two kinds of per-step work: simulate ticks change the world, derive ticks recompute what follows from the journal. */
 export type ModulePhase = "simulate" | "derive";
 
 /** An object kind a module declares. Exactly one module declares each kind. */
@@ -200,6 +201,7 @@ export interface ModuleInstance<
 /** Any module, whatever its command and API types. */
 export type AnyModuleDefinition = ModuleDefinition<unknown, never, EngineEventBase, unknown>;
 
+/** What a module's `create` receives. */
 export interface ModuleCreateContext {
   /** Returns the provider's `api`; throws unless the token is in this module's `requires`. */
   require<A>(token: ModuleToken<A, unknown>): A;
@@ -227,6 +229,7 @@ export interface StepContext {
   readonly ids: EngineIdSource;
 }
 
+/** What a command handler receives. */
 export interface CommandContext {
   /** The issuing participant, or "world" for a dispatched command. */
   readonly participantId: string;

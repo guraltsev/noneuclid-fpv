@@ -8,8 +8,7 @@
  * portal instances, tool feedback and diagnostics for the new world).
  * Positions are cell-local meters and yaws are radians. Runs on the frame loop only, before input is read.
  */
-import type { AppSession } from "../../runtime/appSession";
-import type { RuntimeCommand } from "../../runtime/runtimeCommands";
+import { publishLocalPlayerPose, readLocalPlayerPose, type WorldEngine } from "../../engine/worldEngine";
 import {
   getWorldDeformationFamilyOrThrow,
   type WorldDeformationFamilyRegistry,
@@ -47,8 +46,8 @@ export interface GeometryCommitDeps {
   readonly maxVisiblePaths: number;
   readonly familyRegistry: WorldDeformationFamilyRegistry;
   readonly geometrySession: { pollReadySnapshot(): WorldGeometrySnapshot | undefined };
-  readonly session: AppSession;
-  readonly dispatch: (command: RuntimeCommand) => void;
+  /** The world engine: the player's pose is read from it and the mapped pose is published to it. */
+  readonly engine: WorldEngine;
   readonly runtimeObjectRegistry: RuntimeObjectRegistry;
   readonly objectHost: Pick<ObjectHost, "transformGeometry">;
   /** The player's collision body at a pose. */
@@ -77,7 +76,7 @@ export interface GeometryCommit {
 
 /** Creates the geometry commit; see the module comment. */
 export function createGeometryCommit(deps: GeometryCommitDeps): GeometryCommit {
-  const { session, runtimeObjectRegistry } = deps;
+  const { engine, runtimeObjectRegistry } = deps;
   let activeBundle = createActiveWorldBundle(deps.initialSnapshot, deps.maxVisiblePaths);
 
   function commit(snapshot: WorldGeometrySnapshot): void {
@@ -93,7 +92,7 @@ export function createGeometryCommit(deps: GeometryCommitDeps): GeometryCommit {
     // Order matters: the player and objects are mapped using the previous world's cell ids, then the bundle
     // is swapped so later readers (active()) see the new world.
     const player = transformPlayerPoseForGeometryCommit(
-      session.get().playerPose,
+      readLocalPlayerPose(engine),
       mapByCellId,
       snapshot.world,
       deps.createPlayerCollisionState,
@@ -104,7 +103,7 @@ export function createGeometryCommit(deps: GeometryCommitDeps): GeometryCommit {
       if (!player.foundLegalPose) {
         console.warn("Deformation commit: no legal player pose found; keeping the mapped pose.");
       }
-      deps.dispatch({ kind: "set-player-pose", pose: player.pose });
+      publishLocalPlayerPose(engine, player.pose);
     }
 
     deps.objectHost.transformGeometry(mapByCellId, snapshot.world);
@@ -130,8 +129,8 @@ export function createGeometryCommit(deps: GeometryCommitDeps): GeometryCommit {
     applyGeometryCommitComputedObjectPolicy({
       world: snapshot.world,
       registry: runtimeObjectRegistry,
-      playerCellId: session.get().playerPose.cellId,
-      playerPoint: session.get().playerPose.position,
+      playerCellId: readLocalPlayerPose(engine).cellId,
+      playerPoint: readLocalPlayerPose(engine).position,
       callbacks: deps.computedObjectCallbacks,
     });
 

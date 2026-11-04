@@ -5,7 +5,7 @@
  * geometry-computer action, applying debug or comfort state, asking the host to restart the app, editing a sign. This module only
  * routes: each case calls the handle that does the work, or dispatches a follow-up command. It owns the reload-confirmation timer.
  */
-import type { AppSession } from "../../runtime/appSession";
+import type { ClientSession } from "../../runtime/clientSession";
 import type { RuntimeCommand, RuntimeEffect } from "../../runtime/runtimeCommands";
 
 /** Callbacks the host passed to the app for restarts and URL copying. */
@@ -18,7 +18,7 @@ export interface RuntimeEffectHostCallbacks {
 
 /** Dependencies of {@link createRuntimeEffects}. */
 export interface RuntimeEffectsDeps {
-  readonly session: AppSession;
+  readonly session: ClientSession;
   /** The one command path; follow-up commands go through it. */
   dispatch(command: RuntimeCommand): void;
   readonly host: RuntimeEffectHostCallbacks;

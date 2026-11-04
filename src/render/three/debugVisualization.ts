@@ -3,7 +3,7 @@
  * Static groups are rebuilt from scratch on each sync (old groups are removed and disposed) and parented to the cell mesh root, so they share the cell-local frame (meters; x right, y forward, z up mapped to Three.js via worldAxes). Visibility depends on the active debug level and options from glue/debugOptions.
  * Callers must invoke the sync functions after the world, objects, or debug options change; the frame uses `syncSelectableHitboxDebugIfChanged`, which rebuilds the hitbox groups only when the registry version, cell roots, world or debug settings changed.
  */
-import type { AppSession } from "../../runtime/appSession";
+import type { ClientSession } from "../../runtime/clientSession";
 import * as THREE from "three";
 import { type CompiledCellComplex } from "../../cell-complex/compileCellComplex";
 import { type DebugLevelId } from "../../diagnostics/debugLevels";
@@ -35,7 +35,7 @@ export interface DebugVisualizationDeps {
   /** Getter: active compiled world whose cells are iterated. */
   getWorld(): CompiledCellComplex;
   /** The shell session: player pose, debug settings and the cannon tool state are read from it. */
-  readonly session: AppSession;
+  readonly session: ClientSession;
 }
 
 /**

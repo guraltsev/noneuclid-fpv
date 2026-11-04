@@ -7,9 +7,9 @@
  * follow-up syncs (palette, portal instances, hitbox debug, dependent measurements and protractor angles).
  * Poses and distances are cell-local (meters; x right, y forward, z up) with yaws in radians
  * counter-clockwise from +x; Three.js-space values only appear for aim rays.
- * Ids of new cannons and geodesics embed `Date.now()` plus a per-factory counter.
+ * Ids of new cannons and geodesics come from the engine.
  */
-import { takeObjectIdSerial } from "../../runtime/appSession";
+import { readLocalPlayerPose, type WorldEngine } from "../../engine/worldEngine";
 import type { FocusedRuntimeObject } from "./rootAimRay";
 import * as THREE from "three";
 import { type CompiledCellComplex } from "../../cell-complex/compileCellComplex";
@@ -24,7 +24,7 @@ import {
 } from "../../math/rigidTransform3";
 import { type Vec3, normalizeVec3 } from "../../math/vec3";
 import { getDynamicObjectCollisionBounds } from "../../movement/collision";
-import type { AppSession } from "../../runtime/appSession";
+import type { ClientSession } from "../../runtime/clientSession";
 import type { RuntimeCommand } from "../../runtime/runtimeCommands";
 import { type GeodesicEndpointSelection } from "../../world-objects/geodesic/objects";
 import type { GeodesicCannonToolState } from "../../world-objects/geodesic/cannonToolState";
@@ -95,7 +95,9 @@ export interface GeodesicCannonToolsDeps {
   /** Getter for the active compiled world. */
   getWorld(): CompiledCellComplex;
   /** The shell session; the menu state (selected tool, open menu) is read from it. */
-  readonly session: AppSession;
+  readonly session: ClientSession;
+  /** The world engine: the player's pose and the ids of new objects. */
+  readonly engine: WorldEngine;
   /** Runs a command through the shell's one command path (menu changes go through it, never by assignment). */
   dispatch(command: RuntimeCommand): void;
   /** Resolves the single best aim target for a ray. */
@@ -207,8 +209,8 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
         cellId: target.object.cellId,
         vertexPoint: target.object.aimStickyTarget?.localPoint ?? target.localPoint,
         aimYawRadians,
-        id: `geodesic-cannon:${Date.now()}:${takeObjectIdSerial(deps.session, "geodesic-cannon")}`,
-        createContinuationGeodesicId: () => `geodesic:${Date.now()}:${takeObjectIdSerial(deps.session, "geodesic")}`,
+        id: deps.engine.ids.next("geodesic-cannon"),
+        createContinuationGeodesicId: () => deps.engine.ids.next("geodesic"),
       });
       if (!result.placed || !result.object) {
         return;
@@ -248,7 +250,7 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
         segmentId: target.object.id,
         distanceAlongSegmentMeters,
         aimYawRadians,
-        id: `geodesic-cannon:${Date.now()}:${takeObjectIdSerial(deps.session, "geodesic-cannon")}`,
+        id: deps.engine.ids.next("geodesic-cannon"),
       });
       if (!result.placed || !result.object) {
         return;
@@ -287,13 +289,13 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
       cellId: target.cellId,
       floorPoint: target.localPoint,
       aimYawRadians,
-      id: `geodesic-cannon:${Date.now()}:${takeObjectIdSerial(deps.session, "geodesic-cannon")}`,
+      id: deps.engine.ids.next("geodesic-cannon"),
     });
     if (!result.placed || !result.object) {
       return;
     }
 
-    const geodesicId = `geodesic:${Date.now()}:${takeObjectIdSerial(deps.session, "geodesic")}`;
+    const geodesicId = deps.engine.ids.next("geodesic");
     shootGeodesic({
       world: deps.getWorld(),
       registry: runtimeObjectRegistry,
@@ -360,7 +362,7 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
       return;
     }
 
-    const geodesicId = `geodesic:${Date.now()}:${takeObjectIdSerial(deps.session, "geodesic")}`;
+    const geodesicId = deps.engine.ids.next("geodesic");
     // The new geodesic leaves in a random direction in [-pi, pi); the registry cannon is not rotated, only this copy.
     const aimYawRadians = Math.random() * Math.PI * 2 - Math.PI;
     const cannonForNewGeodesic = {
@@ -651,8 +653,8 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
       detachedEmitterId: cannonId,
       first: selectedEndpoints[0],
       second: selectedEndpoints[1],
-      createPairId: () => `curve-shortening:${Date.now()}:${takeObjectIdSerial(deps.session, "geodesic")}`,
-      createFreeEndId: () => `free-end:${Date.now()}:${takeObjectIdSerial(deps.session, "geodesic")}`,
+      createPairId: () => deps.engine.ids.next("geodesic"),
+      createFreeEndId: () => deps.engine.ids.next("geodesic"),
     });
     if (!pair) {
       syncDesktopPalette();
@@ -726,7 +728,7 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
 
     // The emitter is held at the hand, which may be on another face than the player or behind a wall. Where the hand is comes
     // from the carry contract; the emitter then glides toward it in displacement steps, and the contract decides how it reacts.
-    const playerPose = deps.session.get().playerPose;
+    const playerPose = readLocalPlayerPose(deps.engine);
     const hand = locateCarrierTarget(deps.getWorld(), playerPose, anchor);
     if (!hand) {
       return;
@@ -907,7 +909,7 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
   function resolveCannonAppearanceFromPlayer(
     cannon: Extract<RuntimeWorldObject, { readonly kind: "geodesic-cannon" }>,
   ): { readonly playerFrameFromCell: RigidTransform3 } | undefined {
-    const player = deps.session.get().playerPose;
+    const player = readLocalPlayerPose(deps.engine);
     let playerFrameFromCell = identityRigidTransform3;
     if (player.cellId !== cannon.cellId) {
       const route = findNearestImageRoute(

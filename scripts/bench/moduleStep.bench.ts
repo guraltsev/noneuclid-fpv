@@ -14,6 +14,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { createLocalPlayerParticipant, createWorldEngine, type WorldEngine } from "../../src/engine/worldEngine";
+import { createDefaultPlayerPose } from "../../src/movement/playerPose";
 import type { CompiledCellComplex } from "../../src/cell-complex/compileCellComplex";
 import { advanceCurveShorteningPairs } from "../../src/world-objects/geodesic/curveShortening";
 import { pruneMissingGeodesicIntersectionObjects } from "../../src/world-objects/geodesic/intersections";
@@ -41,6 +43,8 @@ const playerPoint = { x: 0, y: 0, z: 0 };
 interface Scene {
   readonly world: CompiledCellComplex;
   readonly registry: RuntimeObjectRegistry;
+  /** The idle scene steps an engine with an empty module list after the legacy sequence (the cost of the bare engine, design 013 job 49). */
+  readonly engine?: WorldEngine;
 }
 
 interface Results {
@@ -145,7 +149,12 @@ function createIdleScene(): Scene {
   const emitter = registry.get("e") as GeodesicCannonObject;
   addAngle(registry, emitter, "angle-0", { geodesicId: "loop-0", endRole: "start" }, { geodesicId: "loop-1", endRole: "start" });
   addAngle(registry, emitter, "angle-1", { geodesicId: "loop-2", endRole: "start" }, { geodesicId: "loop-3", endRole: "start" });
-  return { world, registry };
+  const engine = createWorldEngine({
+    registry,
+    getWorld: () => world,
+    participants: [createLocalPlayerParticipant(createDefaultPlayerPose("torus-room"))],
+  });
+  return { world, registry, engine };
 }
 
 function createFlowScene(withDependents: boolean): Scene {
@@ -179,7 +188,7 @@ function addAngle(registry: RuntimeObjectRegistry, emitter: GeodesicCannonObject
 
 // ---- the legacy driver --------------------------------------------------------------------------------------
 
-/** Today's objects-phase sequence: the flow, then the follow-ups for the geodesics it returned, then pruning. */
+/** Today's objects-phase sequence: the flow, then the follow-ups for the geodesics it returned, then pruning; on a scene with an engine, then the engine's step and endFrame. */
 function legacyStep(scene: Scene): void {
   const { world, registry } = scene;
   const straightened = advanceCurveShorteningPairs({ world, registry, deltaSeconds });
@@ -199,6 +208,11 @@ function legacyStep(scene: Scene): void {
   }
   if (straightened.length > 0) {
     pruneMissingGeodesicIntersectionObjects(registry);
+  }
+  // The frame's engine calls: a step, then the end-of-frame clearing.
+  if (scene.engine) {
+    scene.engine.step(deltaSeconds);
+    scene.engine.endFrame();
   }
 }
 

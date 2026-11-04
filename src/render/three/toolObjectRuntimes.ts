@@ -9,7 +9,8 @@
  * poses are cell-local (meters, radians). Removing a registry object does not itself dispose its runtime,
  * so each removal path here pairs the two.
  */
-import type { AppSession } from "../../runtime/appSession";
+import { readLocalPlayerPose, type WorldEngine } from "../../engine/worldEngine";
+import type { ClientSession } from "../../runtime/clientSession";
 import type { RuntimeCommand } from "../../runtime/runtimeCommands";
 import * as THREE from "three";
 import { type CompiledCellComplex } from "../../cell-complex/compileCellComplex";
@@ -55,7 +56,9 @@ export interface ToolObjectRuntimesDeps {
   /** Getter for the active compiled world, used to re-measure lengths against geodesic parts seen through portals. */
   getWorld(): CompiledCellComplex;
   /** The shell session: player pose, debug settings and the cannon tool state are read from it. */
-  readonly session: AppSession;
+  readonly session: ClientSession;
+  /** The world engine; the player's pose is read from it. */
+  readonly engine: WorldEngine;
   /** Runs a command through the shell's one command path. */
   dispatch(command: RuntimeCommand): void;
   /** Removes the in-scene protractor preview feedback. */
@@ -249,8 +252,8 @@ export function createToolObjectRuntimes(deps: ToolObjectRuntimesDeps) {
       registry: runtimeObjectRegistry,
       world: deps.getWorld(),
       measurement: object,
-      playerCellId: deps.session.get().playerPose.cellId,
-      playerPoint: deps.session.get().playerPose.position,
+      playerCellId: readLocalPlayerPose(deps.engine).cellId,
+      playerPoint: readLocalPlayerPose(deps.engine).position,
     });
     if (!refreshed) {
       runtimeObjectRegistry.remove(object.id);

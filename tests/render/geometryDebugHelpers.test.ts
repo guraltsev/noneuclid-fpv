@@ -9,7 +9,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { WorldGeometrySession } from "../../src/runtime/worldGeometrySession";
 import type { WindowWithGeometryDebugHelpers } from "../../src/render/three/appDebugHelpers";
 import { createGeometryDebugHelpers } from "../../src/render/three/geometryDebugHelpers";
-import { createTestAppSession } from "../support/appSession";
+import { createTestClientSession } from "../support/clientSession";
 
 const stubWindow: Partial<WindowWithGeometryDebugHelpers> = {};
 
@@ -21,7 +21,7 @@ function createHarness(kind: "torus-skew" | "none") {
     setTarget,
     cancel: vi.fn(),
   } as unknown as WorldGeometrySession;
-  const helpers = createGeometryDebugHelpers({ session: createTestAppSession(), geometrySession });
+  const helpers = createGeometryDebugHelpers({ session: createTestClientSession(), geometrySession });
   return { helpers, setTarget };
 }
 

@@ -11,13 +11,7 @@ import { describe, expect, it } from "vitest";
 import { defaultAppConfig, type AppConfig } from "../../src/glue/appConfig";
 import { applyRuntimeCommand, reduceRuntimeCommand } from "../../src/runtime/applyRuntimeCommand";
 import { defaultVrComfortOptions } from "../../src/glue/vrComfortOptions";
-import { createDefaultPlayerPose } from "../../src/movement/playerPose";
-import {
-  createAppSession,
-  initialObjectIdSerials,
-  takeObjectIdSerial,
-  type AppSessionState,
-} from "../../src/runtime/appSession";
+import { createClientSession, type ClientSessionState } from "../../src/runtime/clientSession";
 import type { RuntimeCommand, RuntimeEffect } from "../../src/runtime/runtimeCommands";
 import {
   createRuntimeMenuState,
@@ -35,22 +29,22 @@ const pages = [
   { title: "Two", body: "second" },
 ];
 
-function stateWith(menu?: Partial<RuntimeMenuState>, appConfig: AppConfig = defaultAppConfig): AppSessionState {
+function stateWith(menu?: Partial<RuntimeMenuState>, appConfig: AppConfig = defaultAppConfig): ClientSessionState {
   return {
     menuState: { ...createRuntimeMenuState({ selectedWorldId: "cube" }), ...menu },
     appConfig,
     debugSettings: { debugLevel: "off", portalPanelMode: "none", debugOptions: [] },
     showCellPathRendersInstances: false,
     vrComfortOptions: defaultVrComfortOptions,
-    playerPose: createDefaultPlayerPose("room-a"),
     cannonToolState: {},
     carry: undefined,
     protractorToolState: {},
-    objectIdSerials: initialObjectIdSerials,
+    moduleToolState: {},
+    pendingToolRequest: undefined,
   };
 }
 
-function reduce(command: RuntimeCommand, state: AppSessionState = stateWith()) {
+function reduce(command: RuntimeCommand, state: ClientSessionState = stateWith()) {
   return reduceRuntimeCommand(state, command);
 }
 
@@ -93,7 +87,7 @@ describe("applyRuntimeCommand: host actions", () => {
   });
 
   it("applies a command to the session and returns the effects", () => {
-    const session = createAppSession(stateWith());
+    const session = createClientSession(stateWith());
 
     const effects = applyRuntimeCommand(session, { kind: "open-menu" });
 
@@ -469,26 +463,29 @@ describe("applyRuntimeCommand: tool and player state", () => {
     expect(result.effects).toEqual([]);
   });
 
-  it("replaces the player pose", () => {
-    const pose = { ...createDefaultPlayerPose("room-b"), yawRadians: 1 };
-    const result = reduce({ kind: "set-player-pose", pose });
+  it("sets and clears one module's client tool state without touching the others", () => {
+    const first = reduce({ kind: "set-module-tool-state", moduleId: "geodesicModel", state: { picks: [] } });
+    const second = reduce({ kind: "set-module-tool-state", moduleId: "other", state: 1 }, first.state);
+    expect(second.state.moduleToolState).toEqual({ geodesicModel: { picks: [] }, other: 1 });
 
-    expect(result.state.playerPose).toBe(pose);
-    expect(result.effects).toEqual([]);
+    const cleared = reduce({ kind: "set-module-tool-state", moduleId: "geodesicModel", state: undefined }, second.state);
+    expect(cleared.state.moduleToolState).toEqual({ other: 1 });
+    expect(reduce({ kind: "set-module-tool-state", moduleId: "missing", state: undefined }, cleared.state).state).toBe(cleared.state);
+    expect(cleared.effects).toEqual([]);
   });
 
-  it("hands out increasing serial numbers per object id family", () => {
-    const session = createAppSession(stateWith());
+  it("records a pending tool request and clears it", () => {
+    const request = { toolId: "protractor" as const, ticket: 3 };
+    const pending = reduce({ kind: "set-pending-tool-request", request });
 
-    expect(takeObjectIdSerial(session, "placed-flag")).toBe(0);
-    expect(takeObjectIdSerial(session, "placed-flag")).toBe(1);
-    expect(takeObjectIdSerial(session, "geodesic")).toBe(0);
-    expect(session.get().objectIdSerials).toMatchObject({ "placed-flag": 2, geodesic: 1, "protractor-angle": 0 });
+    expect(pending.state.pendingToolRequest).toBe(request);
+    expect(reduce({ kind: "set-pending-tool-request", request }, pending.state).state).toBe(pending.state);
+    expect(reduce({ kind: "set-pending-tool-request", request: undefined }, pending.state).state.pendingToolRequest).toBeUndefined();
   });
 });
 
 describe("applyRuntimeCommand: carrying", () => {
-  const carrying = (objectId = "cannon-a"): AppSessionState =>
+  const carrying = (objectId = "cannon-a"): ClientSessionState =>
     reduce({ kind: "begin-carry", objectId }, reduce({ kind: "enter-tool-mode", toolId: "geodesic-cannon-carry" }).state).state;
 
   it("records the carried object on pickup while the carry tool is selected", () => {

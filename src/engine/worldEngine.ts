@@ -5,12 +5,13 @@
  */
 import type { CompiledCellComplex } from "../cell-complex/compileCellComplex";
 import type { RuntimeToolId } from "../glue/toolIds";
+import type { PlayerPose } from "../movement/playerPose";
 import type { RuntimeObjectRegistry } from "../world-objects/runtimeObjectRegistry";
 import { composeModules, contributedNamePattern, type ComposedHandler } from "./composeModules";
 import { coreObjectKinds, coreToolIds } from "./coreIds";
 import { createEngineIdSource } from "./ids";
 import { createTickRunner, type MutableStepContext } from "./moduleTicks";
-import { createControlSlots, createParticipantTable, localDeviceId } from "./participants";
+import { createControlSlots, createParticipantTable, localDeviceId, localParticipantId } from "./participants";
 import { createToolGates } from "./toolGates";
 import { createModuleFrames, guardRegistry, runFunctionsInFrame } from "./writeGuard";
 import type {
@@ -305,4 +306,19 @@ export function createWorldEngine(options: WorldEngineOptions): WorldEngine {
       ticks.resetCursors();
     },
   };
+}
+
+export type { WorldEngine } from "./moduleTypes";
+export { createLocalPlayerParticipant, localDeviceId, localParticipantId } from "./participants";
+
+/** The pose of the local player: where this device's body is in the world. */
+export function readLocalPlayerPose(engine: Pick<WorldEngine, "read">): PlayerPose {
+  const participant = engine.read.participant(localParticipantId);
+  if (participant === undefined) throw new Error("The engine has no local player.");
+  return participant.body;
+}
+
+/** Publishes the local player's body (direct write D1, design 013 section 5.7); the local device owns it, so a refusal is a bug. */
+export function publishLocalPlayerPose(engine: Pick<WorldEngine, "publishBody">, pose: PlayerPose): void {
+  if (!engine.publishBody(localParticipantId, pose)) throw new Error("The engine refused the local player's body.");
 }

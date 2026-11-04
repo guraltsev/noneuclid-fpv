@@ -12,7 +12,8 @@
  * (`carryHighlight.ts`) at the object's place and at its own portal ghosts, decided by the shape's reach, so it is whole on whichever side of a portal the viewer is.
  * It never touches the selectable-hitbox debug meshes.
  */
-import type { AppSession } from "../../runtime/appSession";
+import { readLocalPlayerPose, type WorldEngine } from "../../engine/worldEngine";
+import type { ClientSession } from "../../runtime/clientSession";
 import type * as THREE from "three";
 import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex";
 import type { RuntimeObjectRegistry, RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
@@ -83,7 +84,9 @@ export interface RuntimeObjectInstanceSyncDeps {
   readonly diagnostics: RuntimeObjectRenderArchetypeDiagnostics;
   getWorld(): CompiledCellComplex;
   /** The shell session: player pose, debug settings and the cannon tool state are read from it. */
-  readonly session: AppSession;
+  readonly session: ClientSession;
+  /** The world engine; the player's pose is read from it. */
+  readonly engine: WorldEngine;
   /** Builds a new archetype and installs whatever hooks the shell needs on its mesh. */
   buildArchetype(source: RuntimeObjectRenderSourceMesh, capacity: number): RuntimeObjectRenderArchetype;
 }
@@ -379,7 +382,7 @@ export function createRuntimeObjectInstanceSync(deps: RuntimeObjectInstanceSyncD
     }
 
     const roverKeys = archetypeKeysByPrefix.get(rover.archetypeKeyPrefix) ?? noKeys;
-    const placement = rover.placement(deps.session.get().playerPose);
+    const placement = rover.placement(readLocalPlayerPose(deps.engine));
 
     if (roverKeys.length === 0) {
       return { partId: placement.id, source: "player-rover", archetypeKeys: roverKeys, exemption: "nothing-drawn", records: () => [] };

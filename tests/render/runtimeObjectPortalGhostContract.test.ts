@@ -8,6 +8,7 @@
  * The table of kinds is keyed by every `kind` of `RuntimeWorldObject`, so adding a kind to the union fails typecheck until the kind is listed
  * here with an object to test, or with the reason it needs no ghosts. That is what stops the same gap from being found one kind at a time.
  */
+import { createTestEngine } from "../support/engine";
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
@@ -40,7 +41,7 @@ import {
 } from "../../src/world-objects/runtimeObjectRegistry";
 import type { MeasuredGeodesicLengthObject, ProtractorAngleObject } from "../../src/world-objects/toolObjects";
 import { readGlbBounds } from "../support/glbBounds";
-import { createTestAppSession } from "../support/appSession";
+import { createTestClientSession } from "../support/clientSession";
 import { createFakePreparedAssets } from "../support/preparedAssets";
 import type { PlayerPose } from "../../src/movement/playerPose";
 
@@ -192,7 +193,8 @@ function setup(
     maxVisiblePaths: 4,
     diagnostics: createRuntimeObjectRenderArchetypeDiagnostics(),
     getWorld: () => world,
-    session: createTestAppSession(player.pose ? { playerPose: player.pose } : {}),
+    session: createTestClientSession(),
+    engine: createTestEngine(player.pose ? { playerPose: player.pose } : {}),
     buildArchetype: (source, capacity) => buildRuntimeObjectRenderArchetype(source, capacity, undefined),
   });
   return { registry, sync, renderArchetypesByKey };

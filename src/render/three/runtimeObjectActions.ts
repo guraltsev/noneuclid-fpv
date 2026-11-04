@@ -3,16 +3,17 @@
  * the protractor, the primary interaction and context menu of the focused object, going home, resetting the world, and the
  * debug pose helpers.
  *
- * It owns no state: menu, tool, serial and pose state are read from the session and changed by commands through `dispatch`;
+ * It owns no state: menu and tool state are read from the session, the pose from the engine and changed by commands through `dispatch`;
  * the registry and the tool-object runtimes are mutated directly. Poses are cell-local meters; yaws are radians about +z
- * (the debug helpers take degrees). Ids of new objects embed `Date.now()` plus a per-kind session serial.
+ * (the debug helpers take degrees). Ids of new objects come from the engine.
  */
+import { publishLocalPlayerPose, readLocalPlayerPose, type WorldEngine } from "../../engine/worldEngine";
 import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex";
 import { isRuntimeToolEnabled, type AppConfig } from "../../glue/appConfig";
 import { yawRigidTransform3 } from "../../math/rigidTransform3";
 import type { PlayerPose } from "../../movement/playerPose";
 import type { AimTarget } from "../../interaction/aimTarget";
-import { takeObjectIdSerial, type AppSession } from "../../runtime/appSession";
+import type { ClientSession } from "../../runtime/clientSession";
 import { getEmitterGeodesicIds } from "../../world-objects/geodesic/endpoints";
 import type { RuntimeCommand, ShowGeometryComputerActionsPayload } from "../../runtime/runtimeCommands";
 import { createMeasuredGeodesicLengthObject } from "../../world-objects/measureLengthTool";
@@ -42,7 +43,9 @@ import type * as THREE from "three";
 /** Dependencies of the runtime-object actions, supplied by createThreeApp's shell. */
 export interface RuntimeObjectActionsDeps {
   /** The shell session; menu, tool, serial and pose state are read from it. */
-  readonly session: AppSession;
+  readonly session: ClientSession;
+  /** The world engine: the player's pose, the object ids and the pose writes of reset and teleport. */
+  readonly engine: WorldEngine;
   /** Runs a command through the shell's one command path. */
   dispatch(command: RuntimeCommand): void;
   /** Registry of runtime objects; mutated directly. */
@@ -156,6 +159,7 @@ export interface RuntimeObjectActions {
 export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): RuntimeObjectActions {
   const {
     session,
+    engine,
     runtimeObjectRegistry,
     getWorld: activeWorld,
     appConfig,
@@ -260,7 +264,7 @@ export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): Runt
       eyePosition: target.localEyePosition,
       floorPoint: target.localPoint,
       flagType: currentMenuState().placeFlagOptions.flagType,
-      id: `placed-flag:${Date.now()}:${takeObjectIdSerial(session, "placed-flag")}`,
+      id: engine.ids.next("placed-flag"),
     });
 
     if (result.placed && result.object) {
@@ -286,12 +290,12 @@ export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): Runt
       object.kind === "measured-geodesic-length" && object.geodesicId === geodesicId
     );
     const measurement = createMeasuredGeodesicLengthObject({
-      id: existing?.id ?? `measured-geodesic-length:${Date.now()}:${takeObjectIdSerial(session, "measured-geodesic-length")}`,
+      id: existing?.id ?? engine.ids.next("measured-geodesic-length"),
       registry: runtimeObjectRegistry,
       world: activeWorld(),
       geodesicId,
-      playerCellId: session.get().playerPose.cellId,
-      playerPoint: session.get().playerPose.position,
+      playerCellId: readLocalPlayerPose(engine).cellId,
+      playerPoint: readLocalPlayerPose(engine).position,
       label: getGeodesicDisplayName(geodesicId),
       fallbackSegment: target.object,
     });
@@ -323,7 +327,7 @@ export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): Runt
           ...deps.initialPlayerPose,
           cellId: fallbackCell?.id ?? deps.initialPlayerPose.cellId,
         };
-    dispatchRuntimeCommand({ kind: "set-player-pose", pose: homePose });
+    publishLocalPlayerPose(engine, homePose);
     xrRig.reset();
   }
 
@@ -339,7 +343,7 @@ export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): Runt
   }
 
   function debugPlayerPose(): PlayerPoseDebugDump {
-    const pose = session.get().playerPose;
+    const pose = readLocalPlayerPose(engine);
     const round = (value: number): number => Math.round(value * 1e6) / 1e6;
     return {
       cellId: pose.cellId,
@@ -356,15 +360,12 @@ export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): Runt
     if (![x, y, yawDegrees, pitchDegrees ?? 0].every(Number.isFinite)) {
       throw new Error("setPlayerPose needs finite numbers");
     }
-    const current = session.get().playerPose;
-    dispatchRuntimeCommand({
-      kind: "set-player-pose",
-      pose: {
-        cellId,
-        position: { x, y, z: 0 },
-        yawRadians: (yawDegrees * Math.PI) / 180,
-        pitchRadians: pitchDegrees === undefined ? current.pitchRadians : (pitchDegrees * Math.PI) / 180,
-      },
+    const current = readLocalPlayerPose(engine);
+    publishLocalPlayerPose(engine, {
+      cellId,
+      position: { x, y, z: 0 },
+      yawRadians: (yawDegrees * Math.PI) / 180,
+      pitchRadians: pitchDegrees === undefined ? current.pitchRadians : (pitchDegrees * Math.PI) / 180,
     });
     return debugPlayerPose();
   }
@@ -431,7 +432,7 @@ export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): Runt
     }
 
     const angle = createProtractorAngleObject({
-      id: `protractor-angle:${Date.now()}:${takeObjectIdSerial(session, "protractor-angle")}`,
+      id: engine.ids.next("protractor-angle"),
       center: protractor.center,
       first: protractor.first,
       second: selected,

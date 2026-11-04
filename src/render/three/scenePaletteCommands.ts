@@ -1,9 +1,10 @@
 /**
- * What the scene palette's buttons do: one callback per palette action, each dispatching the command that action stands for.
+ * What the scene palette's buttons do: one callback per palette action, each dispatching the command that action stands for (selecting a tool is a request to the world instead).
  *
  * The palette controller knows nothing of commands; this table is the only place that maps its callbacks to the command path.
  * The module keeps no state.
  */
+import type { RuntimeToolId } from "../../glue/toolIds";
 import type { RuntimeCommand } from "../../runtime/runtimeCommands";
 import type { ScenePaletteControllerOptions } from "./scenePaletteController";
 
@@ -11,6 +12,8 @@ import type { ScenePaletteControllerOptions } from "./scenePaletteController";
 export interface ScenePaletteCommandsDeps {
   /** The one command path. */
   dispatch(command: RuntimeCommand): void;
+  /** Asks the world whether a tool may be selected; the tool is selected when the world accepts (design 013 section 8.1). */
+  requestTool(toolId: RuntimeToolId): void;
   /** How long after the first press of "reload" a second press confirms it, milliseconds. */
   readonly reloadConfirmationWindowMs: number;
 }
@@ -33,7 +36,7 @@ export type ScenePaletteCommands = Pick<
 
 /** Creates the palette's action callbacks over `dispatch`. */
 export function createScenePaletteCommands(deps: ScenePaletteCommandsDeps): ScenePaletteCommands {
-  const { dispatch, reloadConfirmationWindowMs } = deps;
+  const { dispatch, requestTool, reloadConfirmationWindowMs } = deps;
   return {
     onOpenRequested() {
       dispatch({ kind: "open-menu" });
@@ -93,7 +96,7 @@ export function createScenePaletteCommands(deps: ScenePaletteCommandsDeps): Scen
       dispatch({ kind: "copy-url-with-options" });
     },
     onToolSelected(toolId) {
-      dispatch({ kind: "select-tool", toolId });
+      requestTool(toolId);
     },
     onPlaceFlagOptionsRequested() {
       dispatch({ kind: "show-place-flag-options" });

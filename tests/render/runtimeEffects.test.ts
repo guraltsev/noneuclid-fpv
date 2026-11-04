@@ -8,7 +8,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { RuntimeCommand } from "../../src/runtime/runtimeCommands";
 import { createRuntimeEffects, type RuntimeEffectsDeps } from "../../src/render/three/runtimeEffects";
-import { createTestAppSession } from "../support/appSession";
+import { createTestClientSession } from "../support/clientSession";
 
 function createHarness() {
   const dispatched: RuntimeCommand[] = [];
@@ -23,7 +23,7 @@ function createHarness() {
   };
   const noop = vi.fn();
   const deps: RuntimeEffectsDeps = {
-    session: createTestAppSession(),
+    session: createTestClientSession(),
     dispatch: (command) => dispatched.push(command),
     host: { onWorldChangeRequested: calls.onWorldChangeRequested },
     syncDesktopPalette: calls.syncDesktopPalette,

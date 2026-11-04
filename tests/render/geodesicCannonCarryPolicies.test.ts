@@ -9,13 +9,14 @@
  * - the emitter glides to the hand at no more than the speed cap when the tool is told how much time passed.
  * `tests/render/geodesicCannonCarry.test.ts` keeps the release, re-homing, glow and yaw behaviour.
  */
+import { createTestEngine } from "../support/engine";
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import { type CompiledCellComplex } from "../../src/cell-complex/compileCellComplex";
 import { yawRigidTransform3 } from "../../src/math/rigidTransform3";
 import { createDefaultPlayerPose, type PlayerPose } from "../../src/movement/playerPose";
 import { applyRuntimeCommand } from "../../src/runtime/applyRuntimeCommand";
-import { createTestAppSession } from "../support/appSession";
+import { createTestClientSession } from "../support/clientSession";
 import { handCarryLeashMeters } from "../../src/interaction/handCarry";
 import { carryMaxSpeedMetersPerSecond } from "../../src/world-objects/carry";
 import { shootGeodesic } from "../../src/world-objects/geodesic/cannon";
@@ -28,7 +29,8 @@ import { worldPointToThree } from "../../src/render/three/worldAxes";
 import { compileLargePortalWorld } from "../fixtures/world-objects/geodesic";
 
 function createHarness(world: CompiledCellComplex, registry: RuntimeObjectRegistry, playerPose: PlayerPose) {
-  const session = createTestAppSession({ playerPose });
+  const session = createTestClientSession();
+  const engine = createTestEngine({ registry, playerPose });
   const nothing = (): void => {};
   const tools = createGeodesicCannonTools({
     renderer: { xr: { isPresenting: false } } as unknown as THREE.WebGLRenderer,
@@ -36,6 +38,7 @@ function createHarness(world: CompiledCellComplex, registry: RuntimeObjectRegist
     runtimeObjectRegistry: registry,
     getWorld: () => world,
     session,
+    engine,
     dispatch: (command) => {
       applyRuntimeCommand(session, command);
     },

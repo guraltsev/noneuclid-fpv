@@ -12,6 +12,7 @@
  * bindings, so its classes cannot be swapped for counting subclasses outside a module-mocking test runner (Vitest's
  * `vi.mock`, which only works inside a running Vitest worker, not a plain script).
  */
+import { createTestEngine } from "../../tests/support/engine";
 import * as THREE from "three";
 import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
 import type { CellComplexSpec } from "../../src/cell-complex/specs";
@@ -29,7 +30,7 @@ import {
 } from "../../src/render/three/runtimeObjectRenderArchetypes";
 import { worldPointToThree } from "../../src/render/three/worldAxes";
 import { createXrPortalEyeRenderRootTarget, resolveXrPortalEyeRenderRoot } from "../../src/render/three/xrPortalEye";
-import { createTestAppSession } from "../../tests/support/appSession";
+import { createTestClientSession } from "../../tests/support/clientSession";
 
 const iterationsPerTrial = 20_000;
 const trials = 7;
@@ -109,7 +110,8 @@ function geodesicEmitterLabelCase(): () => void {
     runtimeObjectRegistry: { getAll: () => [] } as never,
     geodesicEmitterLabelsByKey: new Map(),
     getWorld: () => ({ cellsById: new Map() }) as never,
-    session: createTestAppSession({ playerPose: { cellId: "a", position: { x: 0, y: 0, z: 0 }, yawRadians: 0 } as never }),
+    session: createTestClientSession(),
+    engine: createTestEngine({ playerPose: { cellId: "a", position: { x: 0, y: 0, z: 0 }, yawRadians: 0 } as never }),
     getRegistryVersion: () => 0,
   });
 

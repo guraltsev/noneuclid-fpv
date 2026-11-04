@@ -61,12 +61,14 @@
  * Distances are meters and angles radians. Cell-local coordinates are x right, y forward, z up; the Three.js
  * scene uses its own axes, converted by `worldAxes` helpers (for example `rigidTransformToThreeMatrix`).
  */
+import { createWorldClient } from "./worldClient";
+import { createLocalPlayerParticipant, createWorldEngine, publishLocalPlayerPose, readLocalPlayerPose } from "../../engine/worldEngine";
 import * as THREE from "three";
 import { reversePainterSortStable } from "@pmndrs/uikit";
 import { type AppState } from "../../runtime/appState";
 import { type CellComplexSpec } from "../../cell-complex/specs";
 import { buildStaticallyCulledPortalPathTables } from "../../cell-complex/staticPortalPathCull";
-import { type AppConfig, defaultAppConfig } from "../../glue/appConfig";
+import { type AppConfig, defaultAppConfig, isRuntimeToolEnabled } from "../../glue/appConfig";
 import { type DebugLevelId } from "../../diagnostics/debugLevels";
 import { type DebugOptionId, hasActiveDebugOption } from "../../glue/debugOptions";
 import { type DebugSettings } from "../../glue/debugSettings";
@@ -77,7 +79,7 @@ import { simpleCollisionCylinder } from "../../movement/dynamicObject";
 import { movePlayer } from "../../movement/movePlayer";
 import { DEFAULT_PLAYER_EYE_HEIGHT_METERS } from "../../movement/playerBody";
 import { type PlayerPose, playerPoseToDynamicObject } from "../../movement/playerPose";
-import { createAppSession, initialObjectIdSerials } from "../../runtime/appSession";
+import { createClientSession } from "../../runtime/clientSession";
 import { applyRuntimeCommand } from "../../runtime/applyRuntimeCommand";
 import { type RuntimeCommand } from "../../runtime/runtimeCommands";
 import { createDebugSettingsFromRuntimeMenuState, createRuntimeMenuState } from "../../runtime/runtimeMenuState";
@@ -313,18 +315,18 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   const clock = new THREE.Clock();
   /** Longest simulation step per frame, in seconds; longer wall-clock gaps (hidden tab, debugger pause) are treated as this long. */
   const maxSimulationStepSeconds = 0.1;
-  // The authoritative player pose (cell id, cell-local position in meters, yaw in radians) is session.playerPose.
-  // Written only in renderFrame (movement), geometryCommit and the reset/teleport helpers,
-  // through the set-player-pose command; factories read it from the session.
+  // The authoritative player pose (cell id, cell-local position in meters, yaw in radians) is the body of the engine's
+  // "local" participant. Written only in renderFrame (movement), geometryCommit and the reset/teleport helpers,
+  // through publishLocalPlayerPose (direct write D1); factories read it with readLocalPlayerPose(engine).
   // Incremented once per rendered frame; keys the per-frame aim-ray cache.
   let aimFrameSerial = 0;
   // Debug settings mirror: seeded from options, replaced by applyDebugSettings (menu or updateDebugSettings).
   let smoothedFrameRateFps: number | undefined;
   let smoothedFramePerformance: FramePerformanceRenderState | undefined;
   let latestWebGlRenderInfo: WebGlRenderInfoState | undefined;
-  // The session: the one record of shell state that commands change (appSession.ts). The menu state (page,
+  // The session: the one record of shell state that commands change (clientSession.ts). The menu state (page,
   // selected tool, debug toggles) is replaced only by applyRuntimeCommand; read it with currentMenuState().
-  const session = createAppSession({
+  const session = createClientSession({
     menuState: createRuntimeMenuState({
       selectedWorldId: options.selectedWorldId,
       selectedAppConfigName: options.appConfigName,
@@ -349,11 +351,33 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       options.debugOptions,
       "portal-path-overlay-instances",
     ),
-    playerPose: appState.playerPose,
     cannonToolState: {},
     carry: undefined,
     protractorToolState: {},
-    objectIdSerials: initialObjectIdSerials,
+    moduleToolState: {},
+    pendingToolRequest: undefined,
+  });
+  // The world: the registry of world objects and the engine that owns it (design 013). The shell is a client of the
+  // engine: it publishes the player's body, submits commands, steps the world once per frame and reads it back.
+  const runtimeObjectRegistry = createRuntimeObjectRegistry();
+  const engine = createWorldEngine({
+    registry: runtimeObjectRegistry,
+    // The active world is replaced by a geometry commit; `activeWorld` exists only after the geometry-commit factory below.
+    getWorld: () => activeWorld(),
+    participants: [createLocalPlayerParticipant(appState.playerPose)],
+    isToolEnabled: (toolId) => isRuntimeToolEnabled(appConfig, toolId),
+    writeGuard: hasActiveDebugOption(options.debugLevel, options.debugOptions, "module-write-guard"),
+  });
+  // The tool-switch protocol, the generic event sink and api.world. There is no on-screen message system yet, so
+  // the world's sentences go to the console and the diagnostics, always (not only in debug mode).
+  const worldClient = createWorldClient({
+    engine,
+    session,
+    dispatch: (command) => dispatchRuntimeCommand(command),
+    showMessage(message, detail) {
+      console.info(`[noneuclid] ${message}`);
+      runtimeDiagnostics().recordDebugEvent(message, detail);
+    },
   });
   // Disposal bookkeeping: `disposed` makes dispose() idempotent.
   let disposed = false;
@@ -370,13 +394,13 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   const desktopScenePaletteInput = createDesktopScenePaletteInput();
   const xrScenePaletteInput = createXrScenePaletteInput();
   const xrControllerHandModels = createXrControllerHandModels(scene);
-  const runtimeObjectRegistry = createRuntimeObjectRegistry();
   const objectHost = createObjectHost();
   const aimCrossMarker = createAimCrossMarker(scene);
   const floatingObjectTooltip = createFloatingObjectTooltip(document.body);
   const helpLensRenderer = createHelpLensRenderer(document.body, scene);
   const xrEntryUi = createXrEntryUi(container, () => void xrSession.enterVr());
   const xrSession = createXrSessionController({
+    engine,
     entryUi: xrEntryUi,
     navigator,
     secureContext: window.isSecureContext,
@@ -409,7 +433,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     scene,
     getCamera: () => camera,
     session,
-    ...createScenePaletteCommands({ dispatch: dispatchRuntimeCommand, reloadConfirmationWindowMs }),
+    ...createScenePaletteCommands({ dispatch: dispatchRuntimeCommand, requestTool: (toolId) => worldClient.requestTool(toolId), reloadConfirmationWindowMs }),
   });
 
   // One Three.js group per cell id (cell-local frame), rebuilt by rebuildCellMeshes. Only the group of the
@@ -463,8 +487,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     maxVisiblePaths,
     familyRegistry: deformationFamilyRegistry,
     geometrySession,
-    session,
-    dispatch: dispatchRuntimeCommand,
+    engine,
     runtimeObjectRegistry,
     objectHost,
     createPlayerCollisionState,
@@ -521,6 +544,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   // Brings runtime-object instances up to date from the frame snapshot; called once per frame, at setup and from
   // applyDebugSettings only. Everything else requests a sync (the flags below).
   const runtimeObjectInstanceSync = createRuntimeObjectInstanceSync({
+    engine,
     registry: runtimeObjectRegistry,
     runtimeObjectRootsById,
     renderSourcesByKey: runtimeObjectRenderSourcesByKey,
@@ -557,6 +581,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     return portalFrame.frameSnapshot(aimFrameSerial);
   }
   const portalFrame = createPortalFramePass({
+    engine,
     scene,
     camera,
     renderer,
@@ -572,7 +597,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   // Inputs of the last per-frame refreshMeasuredGeodesicLengths run (version -1: never run).
   const measuredLengthsRefreshed = { version: -1, cellId: "", x: Number.NaN, y: Number.NaN, z: Number.NaN };
   // Id of the cell whose group in cellMeshes is currently visible; updated by updateVisibleCell.
-  let visibleCellId: string | undefined = session.get().playerPose.cellId;
+  let visibleCellId: string | undefined = readLocalPlayerPose(engine).cellId;
 
   const {
     dumpGeodesicCreatures,
@@ -622,6 +647,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
 
   const { updateGeodesicEmitterLabels, getGeodesicDisplayName, getGeodesicLabelsById } =
     createGeodesicEmitterLabelController({
+      engine,
       scene,
       camera,
       runtimeObjectRegistry,
@@ -649,6 +675,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     getWorldFocusMessageDefinition,
     invalidateAimCache,
   } = createAimInteraction({
+    engine,
     camera,
     renderer,
     xrRig,
@@ -660,6 +687,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
 
 
   const aimFeedback = createAimFeedback({
+    engine,
     scene,
     camera,
     session,
@@ -697,6 +725,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     refreshProtractorAnglesForGeodesic,
     refreshProtractorAnglesForGeodesics,
   } = createToolObjectRuntimes({
+    engine,
     assets: options.assets,
     runtimeObjectRegistry,
     cellMeshes,
@@ -736,6 +765,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     freezeXrHeadHeightDuringGeodesicCannonRotation,
     resetGeodesicCannonRotationTracking,
   } = createGeodesicCannonTools({
+    engine,
     renderer,
     controls,
     runtimeObjectRegistry,
@@ -776,6 +806,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     debugSetPlayerPose,
     debugPlaceObjectAt,
   } = createRuntimeObjectActions({
+    engine,
     session,
     dispatch: dispatchRuntimeCommand,
     runtimeObjectRegistry,
@@ -890,7 +921,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     live: () => ({
       debugLevel: session.get().debugSettings.debugLevel,
       debugOptions: session.get().debugSettings.debugOptions,
-      playerPose: session.get().playerPose,
+      playerPose: readLocalPlayerPose(engine),
       latestVisibleResult: portalFrame.latestVisibleResult(),
       portalInstanceDebugRenderer: portalFrame.instanceDebugRenderer(),
       portalInstanceRenderState: portalFrame.instanceRenderState(),
@@ -918,6 +949,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   });
   installRenderInspectionApi(runtimeObjectInstanceSync.inspection);
   geometryDebugHelpers.installIfAvailable();
+  setApiNamespace("world", worldClient.api);
   setApiNamespace("view", {
     screenshot() {
       if (renderer.xr.isPresenting) {
@@ -982,7 +1014,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
 
   // Places the camera from playerPose (desktop mode) and updates the scene lighting to follow it.
   function applyDesktopCameraPose(): void {
-    xrRig.syncDesktopCamera(session.get().playerPose);
+    xrRig.syncDesktopCamera(readLocalPlayerPose(engine));
     updateStylizedSceneLighting(sceneLighting, camera);
   }
 
@@ -996,22 +1028,22 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     scene,
     camera,
     cellMeshes,
-    activeCellId: session.get().playerPose.cellId,
+    activeCellId: readLocalPlayerPose(engine).cellId,
     warmupViewsByCellId: geometryCommit.active().warmupViewsByCellId,
   });
   runtimeDiagnostics().recordWarmup("startup", performance.now() - warmupStartMs);
 
   // Shows only the mesh group of the player's current cell; cheap no-op when the cell did not change.
   function updateVisibleCell(): void {
-    if (visibleCellId === session.get().playerPose.cellId) {
+    if (visibleCellId === readLocalPlayerPose(engine).cellId) {
       return;
     }
 
     for (const [cellId, cellMesh] of cellMeshes) {
-      cellMesh.visible = cellId === session.get().playerPose.cellId;
+      cellMesh.visible = cellId === readLocalPlayerPose(engine).cellId;
     }
 
-    visibleCellId = session.get().playerPose.cellId;
+    visibleCellId = readLocalPlayerPose(engine).cellId;
   }
 
   // Window resize handler: updates camera aspect and renderer size.
@@ -1040,8 +1072,8 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
         }
       },
     );
-    // Nothing reads the change journal yet; clear it so it does not grow. Job 49 replaces this with engine.endFrame().
-    runtimeObjectRegistry.changes.clear();
+    // Journals, events and command results have been read by now (label runtimes and the UI ran inside the frame).
+    engine.endFrame();
   }
 
   // Reports a contained frame or phase error once per distinct message, to the console and runtime diagnostics.
@@ -1112,7 +1144,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     resetGeodesicCannonRotationTracking({ rotating: rotatingGeodesicCannon, aiming: aimingGeodesicCannon });
     const frameAfterInputMs = performance.now();
     const frameBeforeMoveMs = frameAfterInputMs;
-    const previousCellId = session.get().playerPose.cellId;
+    const previousCellId = readLocalPlayerPose(engine).cellId;
     let moveResult: ReturnType<typeof movePlayer> | undefined;
 
     // Phase 2: movement. A reset request skips movement entirely (moveResult stays undefined).
@@ -1121,12 +1153,12 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       resetRuntimeWorld();
     } else {
       const yawDeltaRadians = xrActive
-        ? xrRig.resolveCameraYawRadians(headLocalYawRadians) - session.get().playerPose.yawRadians + frame.yawDeltaRadians
+        ? xrRig.resolveCameraYawRadians(headLocalYawRadians) - readLocalPlayerPose(engine).yawRadians + frame.yawDeltaRadians
         : frame.yawDeltaRadians;
       const playerYawDeltaRadians = rotatingGeodesicCannon ? 0 : yawDeltaRadians;
       moveResult = movePlayer({
         world: activeWorld(),
-        pose: session.get().playerPose,
+        pose: readLocalPlayerPose(engine),
         body: appState.playerBody,
         localDisplacement: rotatingGeodesicCannon ? { x: 0, y: 0, z: 0 } : frame.localDisplacement,
         yawDeltaRadians: playerYawDeltaRadians,
@@ -1134,22 +1166,22 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
         coordinateFrame: "global",
         bodiesInCell: playerBlockingBodiesInCell,
       });
-      dispatchRuntimeCommand({ kind: "set-player-pose", pose: moveResult.pose });
+      publishLocalPlayerPose(engine, moveResult.pose);
       recordCellTransition(previousCellId, moveResult);
 
       // XR only: apply the player's physical (room-scale) head displacement as a second move, so walking in
       // the room also crosses portals and collides; the rig then accepts or rejects that physical move.
       if (xrActive && !rotatingGeodesicCannon) {
-        const beforePhysicalCellId = session.get().playerPose.cellId;
-        const physicalReferenceSpaceYawRadians = session.get().playerPose.yawRadians - (headLocalYawRadians ?? 0);
+        const beforePhysicalCellId = readLocalPlayerPose(engine).cellId;
+        const physicalReferenceSpaceYawRadians = readLocalPlayerPose(engine).yawRadians - (headLocalYawRadians ?? 0);
         const physicalFrame = xrRig.consumePhysicalInput(
           effectiveHeadLocalMeters,
-          session.get().playerPose.yawRadians,
+          readLocalPlayerPose(engine).yawRadians,
           physicalReferenceSpaceYawRadians,
         );
         const physicalMoveResult = movePlayer({
           world: activeWorld(),
-          pose: session.get().playerPose,
+          pose: readLocalPlayerPose(engine),
           body: appState.playerBody,
           localDisplacement: physicalFrame.localDisplacement,
           yawDeltaRadians: 0,
@@ -1158,7 +1190,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
           bodiesInCell: playerBlockingBodiesInCell,
         });
         const runtimeCollisionPhysicalMoveResult = physicalMoveResult;
-        dispatchRuntimeCommand({ kind: "set-player-pose", pose: runtimeCollisionPhysicalMoveResult.pose });
+        publishLocalPlayerPose(engine, runtimeCollisionPhysicalMoveResult.pose);
         xrRig.acceptPhysicalMove(runtimeCollisionPhysicalMoveResult, effectiveHeadLocalMeters);
         moveResult = runtimeCollisionPhysicalMoveResult.blocked || runtimeCollisionPhysicalMoveResult.crossedPortal
           ? runtimeCollisionPhysicalMoveResult
@@ -1169,7 +1201,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
 
     // Pose the camera/rig from the new playerPose first, so aim rays and carried objects use this frame's view.
     if (xrActive) {
-      xrRig.syncXrRig(session.get().playerPose, effectiveHeadLocalMeters, headLocalYawRadians);
+      xrRig.syncXrRig(readLocalPlayerPose(engine), effectiveHeadLocalMeters, headLocalYawRadians);
     } else {
       applyDesktopCameraPose();
     }
@@ -1234,7 +1266,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     const frameBeforeObjectsMs = frameAfterMoveMs;
     // Simulation of non-player objects (timed separately as objectsMs): creatures treat the player as an
     // obstacle; geodesics under curve shortening advance and dependent measurements are refreshed.
-    const playerObstacle = createPlayerCollisionState(session.get().playerPose);
+    const playerObstacle = createPlayerCollisionState(readLocalPlayerPose(engine));
 
     // Each object is its own contained phase: one failing creature must not stop the others or the frame.
     for (const runtime of dynamicObjectRuntimes) {
@@ -1247,6 +1279,11 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     for (const runtime of placedFlagRuntimes.values()) {
       runtime.syncParent(cellMeshes);
     }
+    // The world engine's step: queued commands, then (as modules arrive) their ticks. Contained like any phase.
+    frameErrorGuard.runPhase("world engine", () => {
+      engine.step(frame.resetRequested ? 0 : deltaSeconds);
+      worldClient.afterStep();
+    });
     let straightenedGeodesicIds: readonly string[] = [];
     frameErrorGuard.runPhase("curve shortening", () => {
       straightenedGeodesicIds = advanceCurveShorteningPairs({
@@ -1271,18 +1308,18 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     // Skipped while nothing it reads changed: registry contents, the player's cell and exact position.
     if (
       runtimeObjectRegistry.getVersion() !== measuredLengthsRefreshed.version ||
-      session.get().playerPose.cellId !== measuredLengthsRefreshed.cellId ||
-      session.get().playerPose.position.x !== measuredLengthsRefreshed.x ||
-      session.get().playerPose.position.y !== measuredLengthsRefreshed.y ||
-      session.get().playerPose.position.z !== measuredLengthsRefreshed.z
+      readLocalPlayerPose(engine).cellId !== measuredLengthsRefreshed.cellId ||
+      readLocalPlayerPose(engine).position.x !== measuredLengthsRefreshed.x ||
+      readLocalPlayerPose(engine).position.y !== measuredLengthsRefreshed.y ||
+      readLocalPlayerPose(engine).position.z !== measuredLengthsRefreshed.z
     ) {
       refreshMeasuredGeodesicLengths();
       // Stored after the run: the refresh itself may update the registry.
       measuredLengthsRefreshed.version = runtimeObjectRegistry.getVersion();
-      measuredLengthsRefreshed.cellId = session.get().playerPose.cellId;
-      measuredLengthsRefreshed.x = session.get().playerPose.position.x;
-      measuredLengthsRefreshed.y = session.get().playerPose.position.y;
-      measuredLengthsRefreshed.z = session.get().playerPose.position.z;
+      measuredLengthsRefreshed.cellId = readLocalPlayerPose(engine).cellId;
+      measuredLengthsRefreshed.x = readLocalPlayerPose(engine).position.x;
+      measuredLengthsRefreshed.y = readLocalPlayerPose(engine).position.y;
+      measuredLengthsRefreshed.z = readLocalPlayerPose(engine).position.z;
     }
     const frameAfterObjectsMs = performance.now();
     const frameBeforeCameraMs = frameAfterObjectsMs;
@@ -1293,7 +1330,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     if (xrActive) {
       // The rig is synced a second time (also done after movement) so the culling cameras below derive from
       // the pose as it stands after the tool phase.
-      xrRig.syncXrRig(session.get().playerPose, effectiveHeadLocalMeters, headLocalYawRadians);
+      xrRig.syncXrRig(readLocalPlayerPose(engine), effectiveHeadLocalMeters, headLocalYawRadians);
       portalCullingCamera.copy(camera, false);
       xrRig.syncXrCullingCamera(portalCullingCamera, xrViewerPose);
       const xrEyeCameras = xrRig.syncXrViewCullingCameras(portalCullingEyeCameras, xrViewerPose);
@@ -1369,7 +1406,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     };
     smoothedFramePerformance = smoothFramePerformance(smoothedFramePerformance, framePerformance);
     latestWebGlRenderInfo = captureWebGlRenderInfo(renderer);
-    runtimeDiagnostics().recordFrame(session.get().playerPose.cellId, {
+    runtimeDiagnostics().recordFrame(readLocalPlayerPose(engine).cellId, {
       totalMs: framePerformance.totalMs,
       moveMs: framePerformance.moveMs,
       renderMs: framePerformance.renderMs,
@@ -1595,6 +1632,8 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       uninstallRenderInspectionApi();
       uninstallGeometryDebugHelpers();
       setApiNamespace("view", undefined);
+      setApiNamespace("world", undefined);
+      worldClient.dispose();
       geometrySession.dispose();
       debugOverlay.dispose();
       scene.remove(xrDebugPanel.object);
@@ -1607,10 +1646,10 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   };
 
   function recordCellTransition(previousCellId: string, moveResult: ReturnType<typeof movePlayer>): void {
-    if (session.get().playerPose.cellId !== previousCellId) {
+    if (readLocalPlayerPose(engine).cellId !== previousCellId) {
         runtimeDiagnostics().recordCellEntered(
           previousCellId,
-          session.get().playerPose.cellId,
+          readLocalPlayerPose(engine).cellId,
           moveResult.crossings.at(-1)?.portalId ?? moveResult.crossedPortalId ?? "unknown-portal",
         );
       portalDebugRuntime.syncRootCell();
@@ -1622,7 +1661,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   function rebuildCellMeshes(): void {
     // The hitbox debug groups hang under the cell roots disposed below, so the gated hitbox sync must rebuild.
     cellRootsGeneration += 1;
-    const currentlyVisibleCellId = visibleCellId ?? session.get().playerPose.cellId;
+    const currentlyVisibleCellId = visibleCellId ?? readLocalPlayerPose(engine).cellId;
 
     portalFrame.disposeArchetypes();
     for (const runtime of dynamicObjectRuntimes) {

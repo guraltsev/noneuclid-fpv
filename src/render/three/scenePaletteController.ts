@@ -7,7 +7,7 @@
  */
 import * as THREE from "three";
 import type { PortalPanelModeId } from "../../glue/portalPanelMode";
-import type { AppSession } from "../../runtime/appSession";
+import type { ClientSession } from "../../runtime/clientSession";
 import type { RuntimeMenuConsoleLogLevelId } from "../../runtime/runtimeMenuState";
 import type { RuntimeDebugOverlayItemId, RuntimeToolId } from "../../glue/toolIds";
 import type { PaletteDefinition } from "../../ui/paletteDefinition";
@@ -33,7 +33,7 @@ export interface ScenePaletteControllerOptions {
   /** Getter (not a value) for the active camera, since the shell swaps cameras between desktop and XR; used for pointer event origin by scenePointers.ts. */
   readonly getCamera: () => THREE.PerspectiveCamera | THREE.OrthographicCamera;
   /** The shell session; its menu state's isOpen is read every frame so visibility and hit testing follow it. */
-  readonly session: AppSession;
+  readonly session: ClientSession;
   /** Called on the rising edge of the menu toggle while the palette is closed. */
   readonly onOpenRequested: () => void;
   /** Called on the menu toggle rising edge while open, and by the header close action. */

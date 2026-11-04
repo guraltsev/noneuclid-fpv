@@ -166,7 +166,7 @@ describe("commands and results", () => {
     expect(engine.read.participantChanges.length).toBe(0);
   });
 
-  it("allocates ids by family from engine counters, skipping taken ids, and prefixes a module's ids with its id", () => {
+  it("allocates ids by family, skipping taken ones, and prefixes a module's ids with its id", () => {
     const registry = createTestEngine().registry;
     registry.add(thing("geodesic:1", "geo-mouse"));
     const engine = createTestEngine({
@@ -252,7 +252,7 @@ describe("the step order and the derive pass", () => {
     expect(runs).toBe(1);
   });
 
-  it("wakes a derive tick only on a subscribed write or when it wants to, and hands it the unseen journal range", () => {
+  it("wakes a derive tick on a subscribed write or when it wants to, with the unseen range", () => {
     const registry = createTestEngine().registry;
     const ranges: [number, number][] = [];
     let wants = false;
@@ -307,7 +307,7 @@ describe("the step order and the derive pass", () => {
     expect(ranges).toEqual([[0, 1], [0, 1]]);
   });
 
-  it("runs a module's event handlers before its derive ticks, over the events since their own cursor", () => {
+  it("runs a module's event handlers before its derive ticks, from their own cursor", () => {
     const log: string[] = [];
     const tokenA = defineModuleToken<unknown>("a");
     const engine = createTestEngine({
@@ -492,7 +492,7 @@ describe("the access rule", () => {
     expect(engine.registry.get("spawned")).toBeDefined();
   });
 
-  it("returns a dispatched command's result synchronously and journals its writes in the same step", () => {
+  it("returns a dispatched result synchronously and journals its writes in the same step", () => {
     const registry = createTestEngine().registry;
     const tokenA = defineModuleToken<unknown>("a");
     const seen: { result?: CommandResult; length?: number } = {};
@@ -530,7 +530,7 @@ describe("the access rule", () => {
     expect(results).toEqual([ok]);
   });
 
-  it("throws when a module dispatches the command of a module it does not require, or nests past 8", () => {
+  it("throws on a dispatch outside requires and on nesting past 8", () => {
     const depths: number[] = [];
     let depth = 0;
     const engine = createTestEngine({

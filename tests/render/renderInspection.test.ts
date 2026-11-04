@@ -4,6 +4,7 @@
  * player's avatar, whose records skip the root path and hide near a camera. The tests ask the five questions of the public API namespace `render`: which
  * record sources produced what, which records exist, what the ghost rule decided, which instances were written, and why a record was or was not drawn.
  */
+import { createTestEngine } from "../support/engine";
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
@@ -31,7 +32,7 @@ import type { RuntimeObjectRenderSourceMesh } from "../../src/render/three/runti
 import type { VisiblePortalPath } from "../../src/render/three/visiblePortalPaths";
 import type { RuntimeCreatureObject } from "../../src/world-objects/runtimeObjectBase";
 import { createRuntimeObjectRegistry } from "../../src/world-objects/runtimeObjectRegistry";
-import { createTestAppSession } from "../support/appSession";
+import { createTestClientSession } from "../support/clientSession";
 
 const squareRoomBase = [
   { x: -1, y: -1 },
@@ -108,7 +109,8 @@ function setup() {
     maxVisiblePaths: 4,
     diagnostics: createRuntimeObjectRenderArchetypeDiagnostics(),
     getWorld: () => world,
-    session: createTestAppSession({ playerPose: { cellId: "room-b", position: { x: 0.5, y: 0, z: 0 }, yawRadians: 0 } as unknown as PlayerPose }),
+    session: createTestClientSession(),
+    engine: createTestEngine({ playerPose: { cellId: "room-b", position: { x: 0.5, y: 0, z: 0 }, yawRadians: 0 } as unknown as PlayerPose }),
     buildArchetype: (source, capacity) => buildRuntimeObjectRenderArchetype(source, capacity, undefined),
   });
   return { world, sync, context: sync.inspection };

@@ -6,7 +6,8 @@
  * in the cell-local xy plane). Labels are created lazily, recreated when their text changes, and
  * removed and disposed when their cannon or geodesic disappears. The label map is owned by the caller.
  */
-import type { AppSession } from "../../runtime/appSession";
+import { readLocalPlayerPose, type WorldEngine } from "../../engine/worldEngine";
+import type { ClientSession } from "../../runtime/clientSession";
 import * as THREE from "three";
 import { type CompiledCellComplex } from "../../cell-complex/compileCellComplex";
 import { findNearestImageRoute } from "../../cell-complex/portalRoute";
@@ -53,7 +54,9 @@ export interface GeodesicEmitterLabelControllerDeps {
   /** Getter for the active compiled world, used to find where a cannon on another face appears from the player. */
   getWorld(): CompiledCellComplex;
   /** The shell session: player pose, debug settings and the cannon tool state are read from it. */
-  readonly session: AppSession;
+  readonly session: ClientSession;
+  /** The world engine; the player's pose is read from it. */
+  readonly engine: WorldEngine;
   /** Current registry version; the create/remove sweep runs only when it differs from the last sweep's. */
   getRegistryVersion(): number;
 }
@@ -134,7 +137,7 @@ export function createGeodesicEmitterLabelController(deps: GeodesicEmitterLabelC
   function resolveCannonAppearance(
     cannon: Extract<RuntimeWorldObject, { readonly kind: "geodesic-cannon" }>,
   ): { readonly distanceMeters: number; readonly playerFrameFromCell?: RigidTransform3 } | undefined {
-    const player = deps.session.get().playerPose;
+    const player = readLocalPlayerPose(deps.engine);
     if (cannon.cellId === player.cellId) {
       return {
         distanceMeters: Math.hypot(

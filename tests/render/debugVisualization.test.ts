@@ -5,7 +5,7 @@
  * group's contents to tell.
  */
 import * as THREE from "three";
-import { createTestAppSession } from "../support/appSession";
+import { createTestClientSession } from "../support/clientSession";
 import { describe, expect, it } from "vitest";
 import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
 import type { CellComplexSpec } from "../../src/cell-complex/specs";
@@ -68,7 +68,7 @@ describe("syncSelectableHitboxDebugIfChanged", () => {
       selectableHitboxDebugGroupsByCellId: groups,
       aimCollisionOutlineDebugGroupsByCellId: new Map(),
       getWorld: () => world,
-      session: createTestAppSession({ debugSettings: { debugLevel: "basic", portalPanelMode: "none", debugOptions: options } }),
+      session: createTestClientSession({ debugSettings: { debugLevel: "basic", portalPanelMode: "none", debugOptions: options } }),
     });
     const key = (forced = false, cellRootsGeneration = 0) => ({
       registryVersion: registry.getVersion(),

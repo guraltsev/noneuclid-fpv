@@ -1,23 +1,21 @@
 /**
- * The shell-side session: the one record that holds the mutable state of a running world, and the cell that owns it.
+ * The client session: the one record that holds how one person is interacting with a running world (menu, selected tool, tool picks, debug and comfort settings), and the cell that owns it.
+ * World state is not here: the player's body, the object ids and the world's objects belong to the world engine (src/engine, design 013 section 4). The session is never replayed or sent anywhere.
  * State is a plain immutable record that is replaced by a new value through update(fn); there are no events, no subscriptions and no framework.
  * The reducer applyRuntimeCommand (applyRuntimeCommand.ts) is the only code that changes it; the rendering shell and its factories read the record on demand.
- * Every field of AppSessionState carries a one-line comment saying whether it is real state, cheap derived or expensive derived (design 012, P7 commitment 3).
+ * Every field of ClientSessionState carries a one-line comment saying whether it is real state, cheap derived or expensive derived (design 012, P7 commitment 3).
  */
 import type { AppConfig } from "../glue/appConfig";
 import type { DebugSettings } from "../glue/debugSettings";
+import type { RuntimeToolId } from "../glue/toolIds";
 import type { VrComfortOptions } from "../glue/vrComfortOptions";
-import type { PlayerPose } from "../movement/playerPose";
 import type { GeodesicCannonToolState } from "../world-objects/geodesic/cannonToolState";
 import type { ProtractorToolState } from "../world-objects/protractorTool";
 import type { RuntimeMenuState } from "./runtimeMenuState";
 
-/** Families of runtime objects whose ids carry a serial number from the session. */
-export type ObjectIdFamily = "placed-flag" | "measured-geodesic-length" | "protractor-angle" | "geodesic-cannon" | "geodesic";
-
 /**
  * Who is being carried, and whether the object has reached the hand yet. Where the hand holds the object is derived each frame from the
- * carrier's aim. One record means one carrier; the carry contract (world-objects/carry.ts) itself keeps no such table.
+ * carrier's aim. One record means one carrier; the carry contract (world-objects/carry.ts) itself keeps no such table. It moves to the world as an attachment in job 50.
  */
 export interface CarryRecord {
   readonly objectId: string;
@@ -26,9 +24,18 @@ export interface CarryRecord {
 }
 
 /**
- * Mutable state of one running world, as one plain record. Replace it, never edit it in place.
+ * A request to switch to a tool that the world has not answered yet (design 013 section 8.1): the old tool stays active until `world/requestTool` is accepted.
  */
-export interface AppSessionState {
+export interface PendingToolRequest {
+  readonly toolId: RuntimeToolId;
+  /** The engine ticket of the `world/requestTool` command. */
+  readonly ticket: number;
+}
+
+/**
+ * Mutable state of one client of a running world, as one plain record. Replace it, never edit it in place.
+ */
+export interface ClientSessionState {
   /** Real state: menu page, selected tool, debug toggles and sign/help payloads. */
   readonly menuState: RuntimeMenuState;
   /** Real state, fixed for the run: which menu sections and tools the app configuration enables; commands for a disabled section are ignored. */
@@ -39,32 +46,32 @@ export interface AppSessionState {
   readonly showCellPathRendersInstances: boolean;
   /** Real state: the VR comfort options in force; the anti-nausea flag follows the menu. */
   readonly vrComfortOptions: VrComfortOptions;
-  /** Real state: the player's cell and cell-local pose. */
-  readonly playerPose: PlayerPose;
   /** Real state: which cannon and geodesic the emitter tools work on and the tie-and-detach picks; empty when idle. */
   readonly cannonToolState: GeodesicCannonToolState;
   /** Real state: the object the carry tool holds, or undefined; it exists only while the carry tool is the selected tool. */
   readonly carry: CarryRecord | undefined;
   /** Real state: the protractor tool's picks; empty when idle. */
   readonly protractorToolState: ProtractorToolState;
-  /** Real state: next serial number per object id family; only ever increases. */
-  readonly objectIdSerials: Readonly<Record<ObjectIdFamily, number>>;
+  /** Real state: the client tool state of each module's tools, by module id; absent while that module's tool is idle. */
+  readonly moduleToolState: Readonly<Record<string, unknown>>;
+  /** Real state: the tool the person asked for that the world has not confirmed yet, or undefined. */
+  readonly pendingToolRequest: PendingToolRequest | undefined;
 }
 
 /**
- * Owner of the current AppSessionState.
+ * Owner of the current ClientSessionState.
  */
-export interface AppSession {
+export interface ClientSession {
   /** Returns the current state record; the same object until the next update. */
-  get(): AppSessionState;
+  get(): ClientSessionState;
   /** Replaces the state by fn(current). A function returning its argument leaves the record (and its identity) unchanged. */
-  update(fn: (state: AppSessionState) => AppSessionState): void;
+  update(fn: (state: ClientSessionState) => ClientSessionState): void;
 }
 
 /**
  * Creates a session holding `initial`.
  */
-export function createAppSession(initial: AppSessionState): AppSession {
+export function createClientSession(initial: ClientSessionState): ClientSession {
   let state = initial;
 
   return {
@@ -75,25 +82,4 @@ export function createAppSession(initial: AppSessionState): AppSession {
       state = fn(state);
     },
   };
-}
-
-/** Serial numbers all start at zero. */
-export const initialObjectIdSerials: Readonly<Record<ObjectIdFamily, number>> = {
-  "placed-flag": 0,
-  "measured-geodesic-length": 0,
-  "protractor-angle": 0,
-  "geodesic-cannon": 0,
-  geodesic: 0,
-};
-
-/**
- * Returns the next unused serial number of an object id family and advances the counter; the caller formats the id.
- */
-export function takeObjectIdSerial(session: AppSession, family: ObjectIdFamily): number {
-  const serial = session.get().objectIdSerials[family];
-  session.update((state) => ({
-    ...state,
-    objectIdSerials: { ...state.objectIdSerials, [family]: serial + 1 },
-  }));
-  return serial;
 }
