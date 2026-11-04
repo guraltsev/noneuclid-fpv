@@ -248,8 +248,8 @@ export interface GeodesicSegmentObject extends RuntimeWorldObjectBase {
   readonly lengthMeters: number;
   /** What stops this segment; `portal-hit` means the geodesic continues in the next segment. */
   readonly terminal: GeodesicSegmentTerminal;
-  /** Display state of the owning geodesic: `"connected"` (pinned anchors at both ends), `"open"`, or `"moving"` for a curve-shortening interval in motion (see `resolveDerivedSegmentConnectionState`). */
-  readonly connectionState?: "open" | "connected" | "moving";
+  /** Display state of the owning geodesic: `"connected"` (both ends of the arc on emitters) or `"open"` (see `resolveDerivedSegmentConnectionState`). */
+  readonly connectionState?: "open" | "connected";
   /** UI-only highlight for a half chosen in the tie-and-detach flow. */
   readonly highlightState?: "tie-detach-selected";
 }

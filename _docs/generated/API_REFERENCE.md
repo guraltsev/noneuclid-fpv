@@ -2244,7 +2244,6 @@ Render sources and per-frame render records for geodesic cannons, geodesic segme
 | --- | --- | --- |
 | const | `geodesicSegmentArchetypeKey` | Archetype of an ordinary (unconnected) geodesic segment ribbon. |
 | const | `geodesicSegmentConnectedArchetypeKey` | Archetype of a geodesic segment that is connected (tied) to others; amber ribbon. |
-| const | `geodesicSegmentMovingArchetypeKey` | Archetype of a segment currently being straightened; orange ribbon. |
 | const | `geodesicSegmentTieDetachSelectedArchetypeKey` | Archetype of a segment selected for tie detachment; green ribbon. |
 | const | `geodesicRayPostArchetypePrefix` | Archetype-key prefix (followed by `:<mesh>`) for the cannon post meshes. |
 | const | `geodesicRayHeadArchetypePrefix` | Archetype-key prefix (followed by `:<mesh>`) for the per-geodesic cannon head (lightsaber) meshes. |

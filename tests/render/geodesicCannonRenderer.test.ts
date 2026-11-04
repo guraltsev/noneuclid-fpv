@@ -2,7 +2,7 @@
  * Geodesic cannon renderer (src/render/three/geodesicCannonRenderer.ts): render sources and per-frame render
  * records for geodesic cannons, segments and intersections, drawn through the instanced runtime-object pipeline.
  * A segment's record matrix scales a unit-length ribbon to the segment's length; its archetype is chosen by
- * state, highest priority first: tie-detach selection, moving, connected, default. A cannon's ray-emitter
+ * state, highest priority first: tie-detach selection, connected, default. A cannon's ray-emitter
  * records include one post, one head per geodesic attached to it, and no head records when none is attached. Assets that fail to preload fall back to simple procedural stand-ins, so source creation never throws.
  */
 import * as THREE from "three";
@@ -17,7 +17,6 @@ import {
   geodesicRayHeadArchetypePrefix,
   geodesicRayPostArchetypePrefix,
   geodesicSegmentConnectedArchetypeKey,
-  geodesicSegmentMovingArchetypeKey,
   geodesicSegmentTieDetachSelectedArchetypeKey,
   geodesicSegmentArchetypeKey,
 } from "../../src/render/three/geodesicCannonRenderer";
@@ -49,14 +48,6 @@ describe("geodesic cannon renderer", () => {
     }));
 
     expect(records[0].archetypeKey).toBe(geodesicSegmentConnectedArchetypeKey);
-  });
-
-  it("publishes moving geodesic segments with the orange archetype", () => {
-    const records = collectGeodesicRuntimeRenderRecords(createRuntimeObjectRegistry(), createSegment({
-      connectionState: "moving",
-    }));
-
-    expect(records[0].archetypeKey).toBe(geodesicSegmentMovingArchetypeKey);
   });
 
   it("publishes tie-detach selected geodesic segments with the selection archetype", () => {

@@ -338,10 +338,6 @@ function resolveObjectAimTargets(
       continue;
     }
 
-    if (object.kind === "geodesicModel/segment" && object.connectionState === "moving") {
-      continue;
-    }
-
     let hit = intersectAimObject(registry, object, ray.origin, ray.direction, ignoredGeodesicIds);
     if (hit && hit.distance < window.tMin - hitWindowToleranceMeters && window.tMin > 0) {
       // The nearest surface lies before this cell copy (the proxy pokes across the entry portal); the part of the proxy

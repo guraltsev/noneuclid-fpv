@@ -538,4 +538,3 @@ rather than discovered.
   derives its yaw from its velocity as $\operatorname{atan2}(-v_x,v_y)$, so it walks along $v$. Geodesic cannon and
   protractor yaws are direction angles along $(\cos\psi,\sin\psi)$.
 - **Curve shortening.** The flow does not insert vertices: a curve that needs a wrap around a forbidden-zone disk stays `unresolved`.
-  The segments of a moving interval carry the display state `"moving"` (drawn in the moving colour).
