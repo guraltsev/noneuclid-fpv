@@ -67,8 +67,6 @@ export interface ComposedExperience {
 /** What composition needs of the engine. */
 export interface ComposeOptions {
   readonly coreObjectKinds: readonly string[];
-  /** Core kinds that a module may declare as its own (`moduleOwnedCoreKinds`). */
-  readonly moduleOwnedCoreKinds?: readonly string[];
   readonly coreToolIds: readonly string[];
   readonly objects: RuntimeObjectRegistry;
   readonly getWorld: () => CompiledCellComplex;
@@ -219,11 +217,10 @@ function findCycle(remaining: readonly AnyModuleDefinition[], dependencies: Read
 function checkDefinitions(definitions: readonly AnyModuleDefinition[], options: ComposeOptions, problems: string[]): void {
   const declaredBy = new Map<string, string>();
   const core = new Set(options.coreObjectKinds);
-  const owned = new Set(options.moduleOwnedCoreKinds ?? []);
   for (const definition of definitions) {
     for (const declaration of definition.objectKinds) {
       const other = declaredBy.get(declaration.kind);
-      if (core.has(declaration.kind) && !owned.has(declaration.kind)) {
+      if (core.has(declaration.kind)) {
         problems.push(`module ${definition.id} declares the object kind ${declaration.kind}, which is a core kind`);
       } else if (other !== undefined) {
         problems.push(`the object kind ${declaration.kind} is declared twice, by ${other} and by ${definition.id}`);

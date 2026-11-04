@@ -70,13 +70,6 @@ describe("composeModules", () => {
     expect(core).toContain("module one declares the object kind geo-mouse, which is a core kind");
   });
 
-  it("accepts a module declaring a core kind that a module owns, but only once", () => {
-    const arc = { kind: "geodesicModel/arc", label: "real" as const, persistence: "saved" as const };
-    expect(() => createTestEngine({ modules: [fake("geodesicModel", { objectKinds: [arc] })] })).not.toThrow();
-    const twice = problemsOf([fake("geodesicModel", { objectKinds: [arc] }), fake("other", { objectKinds: [arc] })]);
-    expect(twice).toContain("the object kind geodesicModel/arc is declared twice, by geodesicModel and by other");
-  });
-
   it("rejects a writesCoreKinds entry that is not a core kind", () => {
     expect(problemsOf([fake("one", { writesCoreKinds: ["one/thing"] })])).toContain("module one lists one/thing in writesCoreKinds, which is not a core kind");
   });

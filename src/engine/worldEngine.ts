@@ -8,7 +8,7 @@ import type { RuntimeToolId } from "../glue/toolIds";
 import type { PlayerPose } from "../movement/playerPose";
 import type { RuntimeObjectRegistry } from "../world-objects/runtimeObjectRegistry";
 import { composeModules, contributedNamePattern, writableKindsOf, type ComposedHandler } from "./composeModules";
-import { coreObjectKinds, coreToolIds, moduleOwnedCoreKinds } from "./coreIds";
+import { coreObjectKinds, coreToolIds } from "./coreIds";
 import { createEngineIdSource } from "./ids";
 import { createTickRunner, type MutableStepContext } from "./moduleTicks";
 import { createControlSlots, createParticipantTable, localDeviceId, localParticipantId } from "./participants";
@@ -80,7 +80,6 @@ export function createWorldEngine(options: WorldEngineOptions): WorldEngine {
   const declaredKindsOf = new Map(definitions.map((definition) => [definition.id, writableKindsOf(definition)]));
   const experience = composeModules(definitions, {
     coreObjectKinds,
-    moduleOwnedCoreKinds,
     coreToolIds,
     objects: moduleObjects,
     getWorld: options.getWorld,
