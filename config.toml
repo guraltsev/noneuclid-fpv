@@ -1,0 +1,68 @@
+[brief]
+enabled = true
+trigger = "first_prompt"        # first_prompt | session_start | both
+after_compaction = true
+max_items = 5
+token_budget = 350
+max_summary_tokens = 80
+
+[retrieval]
+keyword = "bm25"
+embedding_model = "BAAI/bge-small-en-v1.5"
+embedding_enabled = true
+fusion = "rrf"
+min_quality = "auto"            # "auto" or a minimum fused score; tune on real data
+small_model_select = false      # true: a small model picks the relevant notes among the top 20 of the brief (needs a grader)
+
+[capture]
+agent_write = true
+session_extract = true
+extract_status = "candidate"
+
+[session_job]
+triggers = ["SessionEnd", "PreCompact"]
+chunk_bytes = 33554432
+digest_max_tokens = 40000
+grade_only_if_reads_or_signals = true
+
+[grader]
+runtime = "auto"                # auto | claude | codex | off ("api" is not supported yet; "off": no grading)
+model = "small"                 # resolved per runtime
+timeout_seconds = 300
+
+[git]
+branch = "knowledge"            # read by init only: the branch and worktree are fixed before this file can be read
+worktree = ".agents/knowledge.d"
+auto_commit = true              # must stay true
+auto_push = false               # must stay false
+lock_timeout_seconds = 10.0     # how long a command waits for another one that holds the knowledge lock
+
+[maintenance]
+auto_add_tags = false           # each curator action has its own switch, all off
+auto_rewrite_summary = false
+auto_link_related = false
+auto_mark_stale = false
+auto_archive = false
+auto_promote_candidates = false
+minimum_independent_sessions = 5
+weak_summary_max_read_rate = 0.2
+useful_min_share = 0.6
+repeated_min_sessions = 2
+overbroad_max_useful_share = 0.3
+archive_min_false_positive_share = 0.8
+candidate_idle_days = 60
+max_notes_per_run = 5
+
+[experiment]
+holdout_fraction = 0.0
+
+[privacy]
+store_prompt_excerpt = false
+redact_secrets = true
+
+[pricing]                       # empty: the report compares in tokens. To get a USD estimate, add one table per model name:
+# [pricing."<model name as the transcripts and the report show it>"]
+# input = <USD per million tokens>
+# output = <USD per million tokens>
+# cache_read = <USD per million tokens>
+# cache_write = <USD per million tokens>
