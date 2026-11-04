@@ -140,7 +140,7 @@ lower numbers of jobs 18, 24, 30, 34 and 35.
 | [00](00_coordinate_jobs_48_55.md) | Coordinate jobs 48-55 (world engine, clients and modules): order, gates, fresh-context reviews, batch report | queued | [84](../../_issues/84_behaviors_are_hard_wired_into_the_shell_and_need_a_plugin_system.md) |  |
 | [48](_done/48_module_bench_change_journal_layers.md) | Record the performance baseline, add the change journal, and add the engine and module layers | done, needs review | - |  |
 | [49](_done/49_world_engine_and_client_session.md) | Build the world engine and split the client session from it | done, needs review | - |  |
-| [50](50_carry_as_world_attachment.md) | Make carrying a world attachment | queued | - |  |
+| [50](_done/50_carry_as_world_attachment.md) | Make carrying a world attachment | done, needs review | - |  |
 | [51](51_geodesic_model_module_and_renames.md) | Create the geodesic model module, with its renames and end nodes | queued | - |  |
 | [52](52_derived_state_through_the_journal.md) | Derive crossings, lengths and angles from the change journal | queued | - |  |
 | [53](53_curve_shortening_module.md) | Move curve shortening into a module with no lifecycle | queued | - |  |
