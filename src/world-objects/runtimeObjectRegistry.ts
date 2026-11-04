@@ -5,6 +5,7 @@
  * Invariants: ids are unique registry-wide; the by-cell index always matches each object's current `cellId`; objects are treated as immutable values and changed by `update` with a replacement; `getVersion` increases by one per content change (add, update, remove of an existing id, moveToCell, owner publish).
  * For objects with an owner (creatures, the marmot, collidable static assets) the registry is a read model: only the owner's publisher (from `claimOwnership`) may replace the record; `update`, `moveToCell` and `remove` throw for owned ids.
  * Query results (`getAll`, the per-cell queries) are cached and frozen: the same array is returned until a change touches it, a later change returns a new array, and callers must never mutate one.
+ * Every write is also recorded in `changes`, the change journal (see runtimeObjectChangeJournal.ts); the frame owner clears it.
  * Bulk fragments (bullets, stars and other particles) must not go through the registry per particle; per-tick immutable replacement allocates too much.
  */
 import type { RigidTransform3 } from "../math/rigidTransform3";
@@ -22,6 +23,7 @@ import type { MeasuredGeodesicLengthObject } from "./toolObjects";
 import type { PlacedFlagObject } from "./toolObjects";
 import type { ProtractorAngleObject } from "./toolObjects";
 import { userObjectClass } from "./objectMetadata";
+import { ChangeOp, createRuntimeObjectChangeJournal, type RuntimeObjectChangeJournal } from "./runtimeObjectChangeJournal";
 import type { RuntimeCreatureObject, RuntimeWorldObjectBase } from "./runtimeObjectBase";
 
 /**
@@ -85,9 +87,21 @@ export interface RuntimeObjectRegistry {
   getAll(): readonly RuntimeWorldObject[];
   /** Objects of one kind, in insertion order (a fresh array). */
   getObjectsOfKind<K extends RuntimeWorldObject["kind"]>(kind: K): readonly (RuntimeWorldObject & { readonly kind: K })[];
+  /** Number of objects of one kind: the size of the per-kind id set. No allocation. */
+  countOfKind(kind: RuntimeWorldObject["kind"]): number;
+  /** Every write since the last `changes.clear()`, in order; the registry only appends to it. */
+  readonly changes: RuntimeObjectChangeJournal;
   /** The derived segments whose `geodesicId` is `geodesicId`, unsorted (a fresh array). */
   getSegmentsOfGeodesic(geodesicId: string): readonly GeodesicSegmentObject[];
 }
+
+/**
+ * The read-only face of the registry (design 013 section 6.1): everything except the writes `add`, `update`, `remove`, `claimOwnership`, `releaseOwnership` and `moveToCell`. A type only; the object is the same registry, so clients that receive the reader cannot write by type.
+ */
+export type RuntimeObjectReader = Omit<
+  RuntimeObjectRegistry,
+  "add" | "update" | "remove" | "claimOwnership" | "releaseOwnership" | "moveToCell"
+>;
 
 /**
  * Creates a registry, optionally pre-populated with `initialObjects`.
@@ -150,6 +164,7 @@ export function createRuntimeObjectRegistry(
     }
   }
 
+  const changes = createRuntimeObjectChangeJournal();
   const ownedIds = new Set<string>();
   let version = 0;
 
@@ -200,6 +215,7 @@ export function createRuntimeObjectRegistry(
 
     objectsById.set(next.id, next);
     version += 1;
+    changes.record(ChangeOp.Updated, next);
     invalidateQueries(previous.cellId, next.cellId);
   }
 
@@ -216,6 +232,7 @@ export function createRuntimeObjectRegistry(
       objectsById.set(object.id, object);
       indexObject(object);
       indexKinds(object);
+      changes.record(ChangeOp.Added, object);
       invalidateQueries(object.cellId);
     },
     update(object) {
@@ -244,6 +261,7 @@ export function createRuntimeObjectRegistry(
       unindexKinds(object);
       objectsById.delete(id);
       version += 1;
+      changes.record(ChangeOp.Removed, object);
       invalidateQueries(object.cellId);
     },
     claimOwnership(id) {
@@ -332,6 +350,10 @@ export function createRuntimeObjectRegistry(
         .map((id) => objectsById.get(id))
         .filter((object): object is RuntimeWorldObject & { readonly kind: K } => object !== undefined);
     },
+    countOfKind(kind) {
+      return objectIdsByKind.get(kind)?.size ?? 0;
+    },
+    changes,
     getSegmentsOfGeodesic(geodesicId) {
       return [...(segmentIdsByGeodesicId.get(geodesicId) ?? [])]
         .map((id) => objectsById.get(id))

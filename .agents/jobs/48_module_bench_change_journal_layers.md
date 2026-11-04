@@ -1,6 +1,6 @@
 # Job 48 - Record the performance baseline, add the change journal, and add the engine and module layers
 
-Status: queued.
+Status: in progress.
 Resolves: part of issue [84](../../_issues/84_behaviors_are_hard_wired_into_the_shell_and_need_a_plugin_system.md) (requirement 3).
 
 ## Goal

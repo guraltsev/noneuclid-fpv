@@ -1040,6 +1040,8 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
         }
       },
     );
+    // Nothing reads the change journal yet; clear it so it does not grow. Job 49 replaces this with engine.endFrame().
+    runtimeObjectRegistry.changes.clear();
   }
 
   // Reports a contained frame or phase error once per distinct message, to the console and runtime diagnostics.
