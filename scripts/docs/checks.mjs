@@ -6,7 +6,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import { importCycles, moduleImportRuleViolations, newLayerViolations, packageImportViolations, repoRoot, scanProject, toPosix } from "./lib.mjs";
+import { importCycles, moduleImportRuleViolations, newLayerViolations, scanModuleNameViolations, packageImportViolations, repoRoot, scanProject, toPosix } from "./lib.mjs";
 import { renderApiReference, renderArchitectureReference } from "./render.mjs";
 
 export const generatedFiles = {
@@ -56,6 +56,10 @@ export function checkLayering(modules) {
 
 export function checkModuleImportRules(modules) {
   return moduleImportRuleViolations(modules).map((v) => `src/${v.from} imports src/${v.to}; ${v.reason}`);
+}
+
+export function checkModuleNames() {
+  return scanModuleNameViolations().map((v) => `src/${v.path}: "${v.name}": ${v.reason}.`);
 }
 
 export function checkPackageImports(modules) {
@@ -116,6 +120,7 @@ export function runAllChecks() {
       "exported JSDoc": checkExportDocs(modules),
       "layering": checkLayering(modules),
       "module import rules": checkModuleImportRules(modules),
+      "module names": checkModuleNames(),
       "npm imports": checkPackageImports(modules),
       "import cycles": checkImportCycles(modules),
       "generated documents": checkGeneratedFresh(modules),

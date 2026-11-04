@@ -37,5 +37,11 @@ const coreToolIdTable: Record<RuntimeToolId, true> = {
 /** Kinds of the core union of the registry. */
 export const coreObjectKinds: readonly string[] = Object.keys(coreObjectKindTable);
 
+/**
+ * Kinds of the registry's core union that a module declares as its own (design 013 section 13.1): the geodesic model keeps their declaring files in `world-objects/geodesic/objects.ts` and in the core union in this wave, and its `objectKinds` lists them.
+ * Composition accepts a declaration of exactly these kinds (rule 5); any other declaration of a core kind is still a problem.
+ */
+export const moduleOwnedCoreKinds: readonly string[] = ["geodesicModel/arc", "geodesicModel/vertex", "geodesicModel/segment", "geodesicModel/crossing"];
+
 /** Ids of the tools the shell defines itself. */
 export const coreToolIds: readonly RuntimeToolId[] = Object.keys(coreToolIdTable) as RuntimeToolId[];

@@ -4,8 +4,9 @@
  */
 import type { AnyModuleDefinition } from "../engine/moduleTypes";
 import { carryModule } from "../modules/carry";
+import { geodesicModelModule } from "../modules/geodesicModel";
 
 /** The world modules of the default experience. */
 export function createDefaultWorldModules(): readonly AnyModuleDefinition[] {
-  return [carryModule()];
+  return [geodesicModelModule(), carryModule()];
 }

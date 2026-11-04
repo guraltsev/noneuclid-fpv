@@ -802,7 +802,6 @@ Queries whether an arc connects emitters or follows one, and removal of geodesic
 | function | `arcFollowsEmitter` | The arc follows the emitter when it has an end on it and either connects emitters or its other end is a shared vertex (a tied arc). |
 | function | `collectConnectingArcIdsForEmitter` | Lists the ids of arcs that connect emitters (see `arcConnectsEmitters`) and have an end on the emitter. |
 | function | `collectFollowingArcIdsForEmitter` | Lists the ids of arcs that follow the emitter (see `arcFollowsEmitter`), in registry order. |
-| function | `removeCurveOfArc` | Removes every arc of the curve the arc belongs to (the arc alone when it is not tied), with its derived objects and the vertices left without an arc. |
 | function | `removeGeodesic` | Removes a geodesic and its derived objects (an interval via `removeGeodesicIntervalAndDerivedObjects`; any other id only has stale segments and emitter cache entries removed), then refreshes intersections. |
 | function | `removeUnlockedGeodesicsFromCannon` | Removes every geodesic of the cannon that does not follow it (a plain shot geodesic with an unshared free end) and returns the removed ids (empty if the id is not a cannon). |
 
@@ -1423,6 +1422,7 @@ The names the engine knows without any module: the object kinds of the registry'
 | Kind | Name | Summary |
 | --- | --- | --- |
 | const | `coreObjectKinds` | Kinds of the core union of the registry. |
+| const | `moduleOwnedCoreKinds` | Kinds of the registry's core union that a module declares as its own (design 013 section 13.1): the geodesic model keeps their declaring files in `world-objects/geodesic/objects.ts` and in the core union in this wave, a… |
 | const | `coreToolIds` | Ids of the tools the shell defines itself. |
 
 ### `engine/ids.ts`
@@ -1562,6 +1562,44 @@ The carry module (design 013 section 7): who carries what is world state.
 | --- | --- | --- |
 | type | `CarryModuleDefinition` | The module as the engine's list takes it. |
 | function | `carryModule` | Creates the carry module. |
+
+### `modules/geodesicModel/api.ts`
+
+The geodesic model's public face (design 013 sections 12.1 and 13.1): its token, the read-only queries clients and dependents share, the operations only dependents hold, and the plain-data shapes of its commands and events.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `ArcEnd` | An arc end at a vertex: one endpoint role of an arc. |
+| interface | `ArcTangent` | Unit tangent of an arc at a vertex, pointing away from it, in the vertex's cell frame, with the arc's chord length. |
+| interface | `GeodesicEndpointRef` | An endpoint role of an arc, named by the arc, the role and the anchor it is attached to (plain data, so that a command can carry it). |
+| interface | `GeodesicModelQueries` | What clients and dependents receive: reads only, which never change the registry. |
+| interface | `VertexMovePreview` | The result of `previewVertexMove`. |
+| type | `VertexRemovalPreview` | What removing a vertex would give: a merged arc, a taut loop, a collapsed curve, or blocked. |
+| interface | `GeodesicModelApi` | For dependents only: the hot route M1, M2 of design 013 section 5.7. |
+| const | `geodesicModelToken` | The geodesic model's token: `provides` of the module, `requires` of the modules that act on its curves. |
+| interface | `GeodesicTieAndDetachCommand` | Detaches two endpoint roles from an emitter and ties them at a new shared vertex, born at the emitter's beam point (the geometry does not change). |
+| interface | `GeodesicHighlightEndpointCommand` | Tool highlight of one endpoint's half of a geodesic (the segments' `highlightState`); transient. |
+| interface | `GeodesicRemoveVertexCommand` | Module-only. |
+| interface | `GeodesicRemoveCurveCommand` | Module-only. |
+| type | `GeodesicModelCommand` | Every command of the module. |
+| interface | `GeodesicVertexTiedEvent` | Two endpoint roles were tied at a new vertex. |
+| type | `GeodesicModelEvent` | Every event of the module. |
+| const | `geodesicModelRefusals` | The refusal codes of the module's commands. |
+
+### `modules/geodesicModel/index.ts`
+
+The geodesic model module's world factory (design 013 section 12.1).
+
+_No exports._
+
+### `modules/geodesicModel/module.ts`
+
+The geodesic model module (design 013 section 13.1): piecewise geodesics on the glued complex as a world module.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| type | `GeodesicModelModuleDefinition` | The module as the engine's list takes it. |
+| function | `geodesicModelModule` | Creates the geodesic model module. |
 
 ## `runtime`
 

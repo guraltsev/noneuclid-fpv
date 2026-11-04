@@ -5,7 +5,6 @@ import type { RuntimeObjectRegistry } from "../runtimeObjectRegistry";
 import type { GeodesicEmitterAttachment } from "./objects";
 import { requestGeodesicIntersectionUpdate, withDeferredGeodesicIntersections } from "./intersections";
 import {
-  arcsOfCurveContaining,
   getEmitterGeodesicIds,
   isVertexSharedWithOtherArc,
 } from "./endpoints";
@@ -90,17 +89,6 @@ export function collectFollowingArcIdsForEmitter(
 ): readonly string[] {
   return getEmitterGeodesicIds(registry, emitterId)
     .filter((arcId) => arcFollowsEmitter(registry, arcId, emitterId));
-}
-
-/** Removes every arc of the curve the arc belongs to (the arc alone when it is not tied), with its derived objects and the vertices left without an arc. Returns the removed arc ids. */
-export function removeCurveOfArc(registry: RuntimeObjectRegistry, arcId: string): readonly string[] {
-  return withDeferredGeodesicIntersections(registry, () => {
-    const arcIds = arcsOfCurveContaining(registry, arcId);
-    for (const id of arcIds) {
-      removeGeodesic(registry, id);
-    }
-    return arcIds;
-  });
 }
 
 // ---- Removal ----

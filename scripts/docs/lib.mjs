@@ -552,3 +552,67 @@ export function newLayerViolations(modules) {
   const baseline = new Set(loadLayeringBaseline());
   return layerViolations(modules).filter((v) => !baseline.has(`${v.from} -> ${v.to}`));
 }
+
+/** The contributed-name pattern of design 013 section 10: `<moduleId>/<noun>`, both camelCase. */
+const contributedNamePattern = /^[a-z][A-Za-z0-9]*\/[a-z][A-Za-z0-9]*$/;
+
+/** A string that looks like a namespaced name (one slash between two identifier-like parts), whatever its case. */
+const namespacedLooking = /^[A-Za-z][A-Za-z0-9]*\/[A-Za-z0-9_-]+$/;
+
+function propertyNameText(name) {
+  return name && (ts.isIdentifier(name) || ts.isStringLiteral(name)) ? name.text : undefined;
+}
+
+/**
+ * Violations of the naming rule of design 013 section 10 in the files under `src/modules/`: `{ path, name, reason }`.
+ * `files` is a list of `{ path, text }` with `path` relative to `src/`. Checked: every namespaced-looking string literal must
+ * match `<moduleId>/<noun>`; and the names a module contributes (the `kind` and `id` of a declaration, the keys of a command
+ * handler map, the elements of `toolIds`) must start with the module's own directory name, with `world/` and the modules
+ * whose `api.ts` the file imports also allowed (a module may name what it uses).
+ */
+export function moduleNameViolations(files) {
+  const violations = [];
+  for (const file of files) {
+    const match = /^modules\/([^/]+)\//.exec(file.path);
+    if (!match) continue;
+    const moduleId = match[1];
+    const allowedPrefixes = new Set([moduleId, "world"]);
+    for (const imported of file.text.matchAll(/from\s+["']\.\.\/([A-Za-z0-9]+)\/api["']/g)) allowedPrefixes.add(imported[1]);
+    const sourceFile = ts.createSourceFile(file.path, file.text, ts.ScriptTarget.ES2022, true);
+    const report = (name, reason) => violations.push({ path: file.path, name, reason });
+    const checkContributed = (name) => {
+      if (!namespacedLooking.test(name) && !name.includes("/")) {
+        report(name, `a name a module contributes must be "${moduleId}/<noun>"`);
+        return;
+      }
+      if (!allowedPrefixes.has(name.split("/")[0])) report(name, `a name a module contributes must start with "${moduleId}/"`);
+    };
+    const visit = (node) => {
+      if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) return;
+      if (ts.isStringLiteral(node) && namespacedLooking.test(node.text) && !contributedNamePattern.test(node.text)) {
+        report(node.text, "a namespaced name must match <moduleId>/<noun>, both camelCase");
+      }
+      if (ts.isPropertyAssignment(node) || ts.isPropertySignature(node)) {
+        const key = propertyNameText(node.name);
+        const value = ts.isPropertyAssignment(node) ? node.initializer : node.type && ts.isLiteralTypeNode(node.type) ? node.type.literal : undefined;
+        if ((key === "kind" || key === "id") && value && ts.isStringLiteral(value) && value.text.includes("/")) checkContributed(value.text);
+        else if (ts.isPropertyAssignment(node) && ts.isStringLiteral(node.name) && node.name.text.includes("/")) checkContributed(node.name.text);
+        else if (key === "toolIds" && ts.isPropertyAssignment(node) && ts.isArrayLiteralExpression(node.initializer)) {
+          for (const element of node.initializer.elements) if (ts.isStringLiteral(element)) checkContributed(element.text);
+        }
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(sourceFile);
+  }
+  return violations;
+}
+
+/** Reads the files under `src/modules/` and returns their {@link moduleNameViolations}. */
+export function scanModuleNameViolations() {
+  const files = listSourceFiles(path.join(srcRoot, "modules")).map((file) => ({
+    path: toPosix(path.relative(srcRoot, file)),
+    text: fs.readFileSync(file, "utf8"),
+  }));
+  return moduleNameViolations(files);
+}
