@@ -13,9 +13,9 @@
 import { describe, expect, it } from "vitest";
 import { createRuntimeObjectRegistry } from "../../../src/world-objects/runtimeObjectRegistry";
 import {
-  createGeodesicVertexObject,
+  createFreeGeodesicEndObject,
   createGeodesicCannonObject,
-  createGeodesicArcObject,
+  createGeodesicIntervalObject,
   geodesicRayBeamHeightMeters,
   getGeodesicSegmentEnd,
   intersectionTolerance,
@@ -50,7 +50,7 @@ describe("geodesic cannon world objects: intersections", () => {
     expect(getGeodesicTail(registry, "g-a")?.segmentIndex).toBe(1);
     expect(getGeodesicSegments(registry, "g-a")).toHaveLength(2);
     removeGeodesic(registry, "g-a");
-    expect(registry.getAll().filter((object) => object.kind === "geodesicModel/segment")).toHaveLength(0);
+    expect(registry.getAll().filter((object) => object.kind === "geodesic-segment")).toHaveLength(0);
     expect(registry.get("cannon-a")?.kind).toBe("geodesic-cannon");
   });
 
@@ -66,12 +66,12 @@ describe("geodesic cannon world objects: intersections", () => {
         cellId: "a",
         localPose: yawRigidTransform3(Math.PI, { x: 1, y: 0, z: 0 }),
       }),
-      createGeodesicVertexObject({
+      createFreeGeodesicEndObject({
         id: "free-a",
         cellId: "a",
         point: { x: 0.5, y: 0, z: geodesicRayBeamHeightMeters },
       }),
-      createGeodesicArcObject({
+      createGeodesicIntervalObject({
         id: "g-a",
         startAnchorObjectId: "cannon-a",
         endAnchorObjectId: "cannon-b",
@@ -93,12 +93,12 @@ describe("geodesic cannon world objects: intersections", () => {
         cellId: "a",
         localPose: yawRigidTransform3(0, { x: 0, y: 0, z: 0 }),
       }),
-      createGeodesicVertexObject({
+      createFreeGeodesicEndObject({
         id: "free-a",
         cellId: "a",
         point: { x: 1, y: 0, z: geodesicRayBeamHeightMeters },
       }),
-      createGeodesicArcObject({
+      createGeodesicIntervalObject({
         id: "g-a",
         startAnchorObjectId: "cannon-a",
         endAnchorObjectId: "free-a",
@@ -133,7 +133,7 @@ describe("geodesic cannon world objects: intersections", () => {
     const [vertex] = updateGeodesicIntersectionObjects(registry);
 
     expect(vertex).toMatchObject({
-      kind: "geodesicModel/crossing",
+      kind: "geodesic-intersection",
       cellId: "a",
       tooltip: { label: "vertex", rangeMeters: 3 },
       geodesicIds: ["g-a", "g-b"],
@@ -141,7 +141,7 @@ describe("geodesic cannon world objects: intersections", () => {
     });
     expect(vertex.localPose.translation).toEqual({ x: 1, y: 1, z: geodesicRayBeamHeightMeters + 0.25 });
     expect(vertex.aimStickyTarget?.localPoint).toEqual({ x: 1, y: 1, z: geodesicRayBeamHeightMeters });
-    expect(registry.getAll().filter((object) => object.kind === "geodesicModel/crossing")).toHaveLength(1);
+    expect(registry.getAll().filter((object) => object.kind === "geodesic-intersection")).toHaveLength(1);
   });
 
   it("creates a vertex balloon where geodesics intersect at an unrelated emitter", () => {
@@ -170,7 +170,7 @@ describe("geodesic cannon world objects: intersections", () => {
     const vertices = updateGeodesicIntersectionObjects(registry);
 
     expect(vertices).toHaveLength(1);
-    expect(registry.getAll().filter((object) => object.kind === "geodesicModel/crossing")).toHaveLength(1);
+    expect(registry.getAll().filter((object) => object.kind === "geodesic-intersection")).toHaveLength(1);
   });
 
   it("keeps vertex identity while a geodesic pair intersection moves continuously", () => {
@@ -304,7 +304,7 @@ describe("geodesic cannon world objects: intersections", () => {
 
     removeGeodesic(registry, "g-a");
 
-    expect(registry.getAll().filter((object) => object.kind === "geodesicModel/crossing")).toHaveLength(0);
+    expect(registry.getAll().filter((object) => object.kind === "geodesic-intersection")).toHaveLength(0);
   });
 
   it("reports a crossing between two segments of one geodesic that are two apart", () => {
@@ -399,7 +399,7 @@ describe("geodesic cannon world objects: intersections", () => {
       describeMarker(marker.cellId, marker.geodesicIds, marker.aimStickyTarget!.localPoint)
     ));
     expect(actual.size).toBe(markers.length);
-    expect(allPairsIntersectionKeys(registry.getObjectsOfKind("geodesicModel/segment"), describeMarker)).toEqual(actual);
+    expect(allPairsIntersectionKeys(registry.getObjectsOfKind("geodesic-segment"), describeMarker)).toEqual(actual);
   });
 });
 

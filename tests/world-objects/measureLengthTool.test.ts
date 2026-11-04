@@ -121,7 +121,7 @@ describe("measure length tool objects", () => {
 function createSegment(overrides: Partial<GeodesicSegmentObject> = {}): GeodesicSegmentObject {
   return {
     id: "segment-a",
-    kind: "geodesicModel/segment",
+    kind: "geodesic-segment",
     cellId: "cell-a",
     localPose: yawRigidTransform3(0, { x: 0, y: 0, z: 1.08 }),
     portalRenderable: true,

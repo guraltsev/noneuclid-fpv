@@ -24,7 +24,7 @@ import {
 import { createFakePreparedAssets } from "../support/preparedAssets";
 import type {
   GeodesicCannonObject,
-  GeodesicCrossingObject,
+  GeodesicIntersectionObject,
   GeodesicSegmentObject,
 } from "../../src/world-objects/geodesic/objects";
 import { yawRigidTransform3 } from "../../src/math/rigidTransform3";
@@ -150,7 +150,7 @@ describe("geodesic cannon renderer", () => {
 function createSegment(overrides: Partial<GeodesicSegmentObject> = {}): GeodesicSegmentObject {
   return {
     id: "segment-a",
-    kind: "geodesicModel/segment",
+    kind: "geodesic-segment",
     cellId: "cell-a",
     localPose: yawRigidTransform3(0, { x: 0, y: 0, z: 0.32 }),
     portalRenderable: true,
@@ -210,10 +210,10 @@ function createPreparedRayAssets() {
   });
 }
 
-function createIntersection(overrides: Partial<GeodesicCrossingObject> = {}): GeodesicCrossingObject {
+function createIntersection(overrides: Partial<GeodesicIntersectionObject> = {}): GeodesicIntersectionObject {
   return {
     id: "vertex-a",
-    kind: "geodesicModel/crossing",
+    kind: "geodesic-intersection",
     cellId: "cell-a",
     localPose: yawRigidTransform3(0, { x: 1, y: 1, z: 1.08 }),
     portalRenderable: true,

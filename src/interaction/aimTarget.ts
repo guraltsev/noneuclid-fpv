@@ -308,7 +308,7 @@ function intersectAimObject(
   // Pick the proxy shape by object kind: protractor label box, geodesic capsule, cannon cylinder+sphere+handles, collision cylinder, else a small sphere at the pose.
   return object.kind === "protractor-angle"
     ? intersectRayWithProtractorAngleLabelHitbox(object, origin, direction)
-    : object.kind === "geodesicModel/segment"
+    : object.kind === "geodesic-segment"
     ? intersectRayWithSelectableSegment(object, origin, direction)
     : object.kind === "geodesic-cannon"
       ? intersectRayWithGeodesicEmitterAimCylinder(registry, origin, direction, object, ignoredGeodesicIds)
@@ -334,11 +334,11 @@ function resolveObjectAimTargets(
       continue;
     }
 
-    if (object.kind === "geodesicModel/segment" && ignoredGeodesicIds.has(object.geodesicId)) {
+    if (object.kind === "geodesic-segment" && ignoredGeodesicIds.has(object.geodesicId)) {
       continue;
     }
 
-    if (object.kind === "geodesicModel/segment" && object.connectionState === "moving") {
+    if (object.kind === "geodesic-segment" && object.connectionState === "moving") {
       continue;
     }
 
@@ -414,7 +414,7 @@ function isGeodesicVsEmitterChoice(left: AimTarget, right: AimTarget): boolean {
 }
 
 function isGeodesicAimObjectKind(kind: RuntimeWorldObject["kind"] | undefined): boolean {
-  return kind === "geodesicModel/segment" || kind === "geodesicModel/crossing";
+  return kind === "geodesic-segment" || kind === "geodesic-intersection";
 }
 
 // Higher is preferred: protractor 5, cannon 4, geodesic intersection 3, geodesic segment 1, everything else (floor, plain objects) 0.
@@ -423,11 +423,11 @@ function getAimTargetPriority(target: AimTarget): number {
     return 5;
   }
 
-  if (target.object?.kind === "geodesicModel/crossing") {
+  if (target.object?.kind === "geodesic-intersection") {
     return 3;
   }
 
-  if (target.object?.kind === "geodesicModel/segment") {
+  if (target.object?.kind === "geodesic-segment") {
     return 1;
   }
 
@@ -440,7 +440,7 @@ function getAimTargetPriority(target: AimTarget): number {
 
 // Capsule hit for a geodesic segment with the aimed distance clamped to the segment and the aim point snapped to the centerline.
 function intersectRayWithSelectableSegment(
-  segment: Extract<RuntimeWorldObject, { readonly kind: "geodesicModel/segment" }>,
+  segment: Extract<RuntimeWorldObject, { readonly kind: "geodesic-segment" }>,
   rayOrigin: Vec3,
   rayDirection: Vec3,
 ): ObjectAimHit | undefined {

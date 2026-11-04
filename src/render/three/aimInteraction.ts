@@ -313,7 +313,7 @@ export function createAimInteraction(deps: AimInteractionDeps) {
     return createWorldFocusMessageDefinition({
       object,
       selectedTool: deps.session.get().menuState.selectedTool,
-      canExtendGeodesic: object.kind === "geodesicModel/segment" &&
+      canExtendGeodesic: object.kind === "geodesic-segment" &&
         canExtendGeodesicSegment(object) &&
         !isGeodesicLocked(runtimeObjectRegistry, object.geodesicId),
     });

@@ -13,7 +13,7 @@ import * as THREE from "three";
 import {
   geodesicRayBeamHeightMeters,
   type GeodesicCannonObject,
-  type GeodesicCrossingObject,
+  type GeodesicIntersectionObject,
   type GeodesicSegmentObject,
 } from "../../world-objects/geodesic/objects";
 import { yawRigidTransform3, type RigidTransform3 } from "../../math/rigidTransform3";
@@ -37,7 +37,7 @@ export const geodesicRayPostArchetypePrefix = "geodesic-ray:post";
 /** Archetype-key prefix (followed by `:<mesh>`) for the per-geodesic cannon head (lightsaber) meshes. */
 export const geodesicRayHeadArchetypePrefix = "geodesic-ray:head";
 /** Archetype-key prefix (followed by `:<mesh>`) for the intersection balloon meshes. */
-export const geodesicIntersectionArchetypePrefix = "geodesicModel/crossing:balloon";
+export const geodesicIntersectionArchetypePrefix = "geodesic-intersection:balloon";
 /** glTF asset paths (relative to the public asset root) needed by the geodesic renderer. */
 export const geodesicRayAssetPaths = {
   post: "flashlight/Post.glb",
@@ -110,7 +110,7 @@ export interface GeodesicBodyPlacement {
  */
 export function collectGeodesicBodyPlacements(
   registry: RuntimeObjectRegistry,
-  object: GeodesicCannonObject | GeodesicSegmentObject | GeodesicCrossingObject,
+  object: GeodesicCannonObject | GeodesicSegmentObject | GeodesicIntersectionObject,
   geodesicArchetypeKeys: readonly string[] = [],
 ): readonly GeodesicBodyPlacement[] {
   const keysWithPrefix = (prefix: string): readonly string[] => geodesicArchetypeKeys.filter((key) => key.startsWith(`${prefix}:`));
@@ -127,7 +127,7 @@ export function collectGeodesicBodyPlacements(
         archetypeKeys: headKeys,
       });
     }
-  } else if (object.kind === "geodesicModel/crossing") {
+  } else if (object.kind === "geodesic-intersection") {
     placements.push({ objectId: object.id, cellId: object.cellId, localPose: object.localPose, archetypeKeys: keysWithPrefix(geodesicIntersectionArchetypePrefix) });
   }
 
@@ -146,10 +146,10 @@ export function collectGeodesicBodyPlacements(
  */
 export function collectGeodesicRuntimeRenderRecords(
   registry: RuntimeObjectRegistry,
-  object: GeodesicCannonObject | GeodesicSegmentObject | GeodesicCrossingObject,
+  object: GeodesicCannonObject | GeodesicSegmentObject | GeodesicIntersectionObject,
   geodesicArchetypeKeys: readonly string[] = [],
 ): readonly RuntimeObjectRenderRecord[] {
-  if (object.kind === "geodesic-cannon" || object.kind === "geodesicModel/crossing") {
+  if (object.kind === "geodesic-cannon" || object.kind === "geodesic-intersection") {
     return collectGeodesicBodyPlacements(registry, object, geodesicArchetypeKeys).flatMap((placement) => {
       const localMatrix = rigidTransformToThreeMatrix(placement.localPose);
       return placement.archetypeKeys.map((archetypeKey) => ({
@@ -297,15 +297,15 @@ function createIntersectionBalloonSources(
   assets: PreparedWorldAssets | undefined,
 ): readonly RuntimeObjectRenderSourceMesh[] {
   const root = new THREE.Group();
-  root.name = "geodesicModel/crossing-balloon-source";
+  root.name = "geodesic-intersection-balloon-source";
   const balloon = assets?.instantiateGltf(geodesicRayAssetPaths.balloon)?.scene ?? createFallbackBalloon();
-  balloon.name = "asset:geodesicModel/crossing-balloon";
+  balloon.name = "asset:geodesic-intersection-balloon";
   balloon.scale.setScalar(geodesicIntersectionBalloonScale);
   root.add(balloon);
   root.updateMatrixWorld(true);
 
   return collectRuntimeObjectRenderSourceMeshes(
-    "geodesicModel/crossing:balloon-source",
+    "geodesic-intersection:balloon-source",
     root,
     geodesicIntersectionArchetypePrefix,
   );

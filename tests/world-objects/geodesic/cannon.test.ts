@@ -14,7 +14,7 @@ import { describe, expect, it } from "vitest";
 import { createRuntimeObjectRegistry } from "../../../src/world-objects/runtimeObjectRegistry";
 import {
   createGeodesicCannonObject,
-  createGeodesicArcObject,
+  createGeodesicIntervalObject,
   geodesicRayBeamHeightMeters,
   minGeodesicSegmentLengthMeters,
 } from "../../../src/world-objects/geodesic/objects";
@@ -331,7 +331,7 @@ describe("geodesic cannon world objects: cannon", () => {
       cellId: "a",
       localPose: yawRigidTransform3(Math.PI, { x: 1, y: 0, z: 0 }),
     }));
-    registry.add(createGeodesicArcObject({
+    registry.add(createGeodesicIntervalObject({
       id: "g-a",
       startAnchorObjectId: "cannon-a",
       endAnchorObjectId: "cannon-b",

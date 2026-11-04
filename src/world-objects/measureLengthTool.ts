@@ -1,6 +1,6 @@
 /**
  * Measured-length tool: persistent "geodesic length = N m" labels attached to a geodesic.
- * A geodesic (GeodesicArcObject) is rendered as a chain of straight GeodesicSegmentObjects, one run per cell it passes through, joined at portals; the measured length is the sum of `lengthMeters` over all registry segments with that `geodesicId`, i.e. the true intrinsic length along the geodesic through portals, not a Euclidean distance within one cell.
+ * A geodesic (GeodesicIntervalObject) is rendered as a chain of straight GeodesicSegmentObjects, one run per cell it passes through, joined at portals; the measured length is the sum of `lengthMeters` over all registry segments with that `geodesicId`, i.e. the true intrinsic length along the geodesic through portals, not a Euclidean distance within one cell.
  * The label object is placed in the cell-local frame (meters) at the point of the segment, in the player's current cell, nearest to the player, and is refreshed as the geodesic is extended, rebuilt or the player moves.
  */
 import type { CompiledCellComplex } from "../cell-complex/compileCellComplex";
@@ -160,7 +160,7 @@ function findClosestGeodesicSegment(
   point: Vec3,
 ): { readonly segment: GeodesicSegmentObject; readonly playerPoint: Vec3 } | undefined {
   const segments = registry.getAll().filter((object): object is GeodesicSegmentObject =>
-    object.kind === "geodesicModel/segment" && object.geodesicId === geodesicId
+    object.kind === "geodesic-segment" && object.geodesicId === geodesicId
   );
   const images = world
     ? enumerateCellImages(world, cellId, closestSegmentMaxHops)
@@ -186,7 +186,7 @@ function findClosestGeodesicSegment(
 function getGeodesicTotalLengthMeters(registry: RuntimeObjectRegistry, geodesicId: string): number {
   return registry.getAll()
     .filter((object): object is GeodesicSegmentObject =>
-      object.kind === "geodesicModel/segment" && object.geodesicId === geodesicId
+      object.kind === "geodesic-segment" && object.geodesicId === geodesicId
     )
     .reduce((total, segment) => total + segment.lengthMeters, 0);
 }

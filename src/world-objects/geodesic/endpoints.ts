@@ -4,7 +4,7 @@
 import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex";
 import { transformPoint3 } from "../../math/rigidTransform3";
 import type { RuntimeObjectRegistry, RuntimeWorldObject } from "../runtimeObjectRegistry";
-import { type GeodesicEndpointAttachment, type GeodesicEndpointSelection, type GeodesicEndRole, type GeodesicArcObject, type GeodesicPortalTraversal, type LiftedGeodesicEndpoint } from "./objects";
+import { type GeodesicEndpointAttachment, type GeodesicEndpointSelection, type GeodesicEndRole, type GeodesicIntervalObject, type GeodesicPortalTraversal, type LiftedGeodesicEndpoint } from "./objects";
 import { canObjectAttachGeodesics, getAnchorBeamPoint } from "./anchors";
 import { reverseGeodesicPortalWord } from "./portalWord";
 import { inversePortalTransform } from "./development";
@@ -20,7 +20,7 @@ export function getGeodesicEndpointAttachmentsForAnchor(
   registry: RuntimeObjectRegistry,
   anchorObjectId: string,
 ): readonly GeodesicEndpointAttachment[] {
-  return registry.getObjectsOfKind("geodesicModel/arc")
+  return registry.getObjectsOfKind("geodesic-interval")
     .flatMap((interval) => [interval.start, interval.end])
     .filter((attachment) => attachment.anchorObjectId === anchorObjectId);
 }
@@ -37,13 +37,13 @@ export function replaceGeodesicEndpointAttachment(
   geodesicId: string,
   endRole: GeodesicEndRole,
   nextAnchorObjectId: string,
-): GeodesicArcObject | undefined {
+): GeodesicIntervalObject | undefined {
   const interval = registry.get(geodesicId);
-  if (interval?.kind !== "geodesicModel/arc" || !canObjectAttachGeodesics(registry.get(nextAnchorObjectId))) {
+  if (interval?.kind !== "geodesic-interval" || !canObjectAttachGeodesics(registry.get(nextAnchorObjectId))) {
     return undefined;
   }
 
-  const next: GeodesicArcObject = {
+  const next: GeodesicIntervalObject = {
     ...interval,
     [endRole]: {
       geodesicId,
@@ -62,7 +62,7 @@ export function getGeodesicPortalWord(
   geodesicId: string,
 ): readonly GeodesicPortalTraversal[] | undefined {
   const interval = registry.get(geodesicId);
-  return interval?.kind === "geodesicModel/arc" ? interval.portalWord : undefined;
+  return interval?.kind === "geodesic-interval" ? interval.portalWord : undefined;
 }
 
 /**
@@ -82,7 +82,7 @@ export function getGeodesicPortalWord(
 export function liftGeodesicEndpoint(input: {
   readonly world: CompiledCellComplex;
   readonly registry: RuntimeObjectRegistry;
-  readonly interval: GeodesicArcObject;
+  readonly interval: GeodesicIntervalObject;
   readonly sourceRole: GeodesicEndRole;
 }): LiftedGeodesicEndpoint | undefined {
   const sourceAttachment = input.interval[input.sourceRole];
@@ -135,7 +135,7 @@ export function liftGeodesicEndpoint(input: {
 export function liftGeodesicEndpointWithAnchors(input: {
   readonly world: CompiledCellComplex;
   readonly registry: RuntimeObjectRegistry;
-  readonly interval: GeodesicArcObject;
+  readonly interval: GeodesicIntervalObject;
   readonly sourceRole: GeodesicEndRole;
   readonly candidateAnchorsById?: ReadonlyMap<string, RuntimeWorldObject>;
 }): LiftedGeodesicEndpoint | undefined {
@@ -189,17 +189,17 @@ export function resolveGeodesicEndpointSelectionFromSegmentHit(
   segmentId: string,
 ): GeodesicEndpointSelection | undefined {
   const segment = registry.get(segmentId);
-  if (segment?.kind !== "geodesicModel/segment" || !segment.halfRole) {
+  if (segment?.kind !== "geodesic-segment" || !segment.halfRole) {
     return undefined;
   }
   const interval = registry.get(segment.geodesicId);
-  return interval?.kind === "geodesicModel/arc" ? interval[segment.halfRole] : undefined;
+  return interval?.kind === "geodesic-interval" ? interval[segment.halfRole] : undefined;
 }
 
 /** True when the interval's portal word leads from the start anchor's cell to the end anchor's cell. */
 export function portalWordMatchesCurrentEndpointCells(
   registry: RuntimeObjectRegistry,
-  interval: GeodesicArcObject,
+  interval: GeodesicIntervalObject,
   word: readonly GeodesicPortalTraversal[],
 ): boolean {
   return portalWordMatchesEndpointCellsWithAnchors({ registry, interval, word });
@@ -210,7 +210,7 @@ export function portalWordMatchesCurrentEndpointCells(
 /** Like `portalWordMatchesCurrentEndpointCells`, with candidate anchors that may differ from the registry. */
 export function portalWordMatchesEndpointCellsWithAnchors(input: {
   readonly registry: RuntimeObjectRegistry;
-  readonly interval: GeodesicArcObject;
+  readonly interval: GeodesicIntervalObject;
   readonly word: readonly GeodesicPortalTraversal[];
   readonly candidateAnchorsById?: ReadonlyMap<string, RuntimeWorldObject>;
 }): boolean {
@@ -234,21 +234,21 @@ export function portalWordMatchesEndpointCellsWithAnchors(input: {
 
 // "Aimable free": a stable interval with exactly one emitter endpoint and one free-end endpoint that no other attachment shares.
 /** True for a stable interval with one emitter endpoint and one free end that no other geodesic uses. */
-export function isAimableFreeGeodesic(registry: RuntimeObjectRegistry, interval: GeodesicArcObject): boolean {
+export function isAimableFreeGeodesic(registry: RuntimeObjectRegistry, interval: GeodesicIntervalObject): boolean {
   if (interval.motionState !== "stable") {
     return false;
   }
   const start = registry.get(interval.start.anchorObjectId);
   const end = registry.get(interval.end.anchorObjectId);
   const hasOneEmitter = (start?.kind === "geodesic-cannon") !== (end?.kind === "geodesic-cannon");
-  const freeEnd = start?.kind === "geodesicModel/vertex" ? start : end?.kind === "geodesicModel/vertex" ? end : undefined;
+  const freeEnd = start?.kind === "free-geodesic-end" ? start : end?.kind === "free-geodesic-end" ? end : undefined;
   return hasOneEmitter && freeEnd !== undefined &&
     getGeodesicEndpointAttachmentsForAnchor(registry, freeEnd.id).length === 1;
 }
 
 /** Removes free-end anchors that no interval attaches to any more. */
 export function removeUnusedFreeGeodesicEnds(registry: RuntimeObjectRegistry): void {
-  for (const object of registry.getObjectsOfKind("geodesicModel/vertex")) {
+  for (const object of registry.getObjectsOfKind("free-geodesic-end")) {
     if (getGeodesicEndpointAttachmentsForAnchor(registry, object.id).length === 0) {
       registry.remove(object.id);
     }

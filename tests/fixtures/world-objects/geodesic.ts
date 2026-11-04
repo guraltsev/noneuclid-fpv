@@ -12,9 +12,9 @@ import {
 } from "../../../src/world-objects/geodesic/curveShortening";
 import {
   createCurveShorteningPairObject,
-  createGeodesicVertexObject,
+  createFreeGeodesicEndObject,
   createGeodesicCannonObject,
-  createGeodesicArcObject,
+  createGeodesicIntervalObject,
   geodesicRayBeamHeightMeters,
   type GeodesicSegmentObject,
 } from "../../../src/world-objects/geodesic/objects";
@@ -28,7 +28,7 @@ import { walkDevelopedSegment } from "../../../src/cell-complex/segmentWalk";
 export function createSegment(overrides: Partial<GeodesicSegmentObject> = {}): GeodesicSegmentObject {
   return {
     id: "g-a:segment:0",
-    kind: "geodesicModel/segment",
+    kind: "geodesic-segment",
     cellId: "a",
     localPose: yawRigidTransform3(0, { x: 0, y: 0, z: geodesicRayBeamHeightMeters }),
     portalRenderable: true,
@@ -93,12 +93,12 @@ export function addGeodesicLeavingEmitter(
   }
   const start = { x: cannon.localPose.translation.x, y: cannon.localPose.translation.y, z: cannon.localPose.translation.z + geodesicRayBeamHeightMeters };
   const direction = { x: Math.cos(yawRadians), y: Math.sin(yawRadians), z: 0 };
-  registry.add(createGeodesicVertexObject({
+  registry.add(createFreeGeodesicEndObject({
     id: `${geodesicId}:free-end`,
     cellId: cannon.cellId,
     point: { x: start.x + direction.x, y: start.y + direction.y, z: start.z },
   }));
-  registry.add(createGeodesicArcObject({
+  registry.add(createGeodesicIntervalObject({
     id: geodesicId,
     startAnchorObjectId: cannonId,
     endAnchorObjectId: `${geodesicId}:free-end`,
@@ -374,10 +374,10 @@ export function runCurveShorteningUntilPairGone(
   let previous = total();
   let ticks = 0;
   while (ticks < options.maxTicks && registry.get(options.pairId)) {
-    const verticesBefore = registry.getObjectsOfKind("geodesicModel/vertex").length;
+    const verticesBefore = registry.getObjectsOfKind("free-geodesic-end").length;
     advanceCurveShorteningPairs({ world, registry, deltaSeconds: options.deltaSeconds });
     ticks += 1;
-    expect(registry.getObjectsOfKind("geodesicModel/vertex").length).toBeLessThanOrEqual(verticesBefore);
+    expect(registry.getObjectsOfKind("free-geodesic-end").length).toBeLessThanOrEqual(verticesBefore);
     if (registry.get(options.pairId)) {
       const next = total();
       expect(next).toBeLessThanOrEqual(previous + 1e-9);
@@ -394,8 +394,8 @@ export function createTorusTiedPairScenario() {
   const registry = createRuntimeObjectRegistry();
   registry.add(createGeodesicCannonObject({ id: "e1", cellId: "torus-room", localPose: yawRigidTransform3(0, { x: -3, y: 0, z: 0 }) }));
   registry.add(createGeodesicCannonObject({ id: "e2", cellId: "torus-room", localPose: yawRigidTransform3(0, { x: 3, y: 2, z: 0 }) }));
-  registry.add(createGeodesicArcObject({ id: "g1", startAnchorObjectId: "e1", endAnchorObjectId: "e2", startCellId: "torus-room" }));
-  registry.add(createGeodesicArcObject({
+  registry.add(createGeodesicIntervalObject({ id: "g1", startAnchorObjectId: "e1", endAnchorObjectId: "e2", startCellId: "torus-room" }));
+  registry.add(createGeodesicIntervalObject({
     id: "g2",
     startAnchorObjectId: "e2",
     endAnchorObjectId: "e1",
@@ -422,9 +422,9 @@ export function createSymmetricPairScenario(halfWidth: number, height: number) {
   const registry = createRuntimeObjectRegistry();
   registry.add(createGeodesicCannonObject({ id: "e1", cellId: "a", localPose: yawRigidTransform3(0, { x: -halfWidth, y: 0, z: 0 }) }));
   registry.add(createGeodesicCannonObject({ id: "e2", cellId: "a", localPose: yawRigidTransform3(0, { x: halfWidth, y: 0, z: 0 }) }));
-  registry.add(createGeodesicVertexObject({ id: "free", cellId: "a", point: { x: 0, y: height, z: geodesicRayBeamHeightMeters } }));
-  registry.add(createGeodesicArcObject({ id: "g1", startAnchorObjectId: "e1", endAnchorObjectId: "free", startCellId: "a", motionState: "moving" }));
-  registry.add(createGeodesicArcObject({ id: "g2", startAnchorObjectId: "free", endAnchorObjectId: "e2", startCellId: "a", motionState: "moving" }));
+  registry.add(createFreeGeodesicEndObject({ id: "free", cellId: "a", point: { x: 0, y: height, z: geodesicRayBeamHeightMeters } }));
+  registry.add(createGeodesicIntervalObject({ id: "g1", startAnchorObjectId: "e1", endAnchorObjectId: "free", startCellId: "a", motionState: "moving" }));
+  registry.add(createGeodesicIntervalObject({ id: "g2", startAnchorObjectId: "free", endAnchorObjectId: "e2", startCellId: "a", motionState: "moving" }));
   rebuildDerivedGeodesicSegments({ world, registry, geodesicId: "g1" });
   rebuildDerivedGeodesicSegments({ world, registry, geodesicId: "g2" });
   registry.add(createCurveShorteningPairObject({ id: "pair", vertexIds: ["free"], cellId: "a" }));
@@ -461,7 +461,7 @@ export function createTorusLoopBenchmarkScene() {
       targetCellId: crossing.targetCellId,
       targetPortalId: crossing.targetPortalId,
     }));
-    registry.add(createGeodesicArcObject({
+    registry.add(createGeodesicIntervalObject({
       id: `loop-${j}`,
       startAnchorObjectId: "e",
       endAnchorObjectId: "e",

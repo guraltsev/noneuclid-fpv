@@ -217,7 +217,7 @@ describe("runtimeObjectRegistry", () => {
 
     registry.remove("s1");
     expect(registry.getSegmentsOfGeodesic("g2").map((object) => object.id)).toEqual(["s3"]);
-    expect(registry.getObjectsOfKind("geodesicModel/segment").map((object) => object.id).sort()).toEqual(["s2", "s3"]);
+    expect(registry.getObjectsOfKind("geodesic-segment").map((object) => object.id).sort()).toEqual(["s2", "s3"]);
 
     registry.moveToCell("e1", "b");
     registry.moveToCell("s2", "b");

@@ -15,10 +15,10 @@ import { buildForbiddenZoneWireframe } from "./debugCollisionWireframes";
 /** Type guard: true for runtime objects rendered by the geodesic renderer (cannon, segment or intersection). */
 export function isGeodesicRuntimeRenderObject(
   object: RuntimeWorldObject,
-): object is Extract<RuntimeWorldObject, { readonly kind: "geodesic-cannon" | "geodesicModel/segment" | "geodesicModel/crossing" }> {
+): object is Extract<RuntimeWorldObject, { readonly kind: "geodesic-cannon" | "geodesic-segment" | "geodesic-intersection" }> {
   return object.kind === "geodesic-cannon" ||
-    object.kind === "geodesicModel/segment" ||
-    object.kind === "geodesicModel/crossing";
+    object.kind === "geodesic-segment" ||
+    object.kind === "geodesic-intersection";
 }
 
 /** Turns off frustum culling for root and every descendant, so portal-clipped content is never culled by the camera frustum. */

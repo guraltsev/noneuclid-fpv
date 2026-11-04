@@ -281,7 +281,7 @@ export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): Runt
 
     const target = resolveCurrentAimTarget(ray);
     logVerboseAimClick(target);
-    if (!targetIsWithinInteractionRange(target) || target?.object?.kind !== "geodesicModel/segment") {
+    if (!targetIsWithinInteractionRange(target) || target?.object?.kind !== "geodesic-segment") {
       return;
     }
 
@@ -402,7 +402,7 @@ export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): Runt
     }
 
     if (!protractor.center) {
-      if (target?.object?.kind !== "geodesic-cannon" && target?.object?.kind !== "geodesicModel/crossing") {
+      if (target?.object?.kind !== "geodesic-cannon" && target?.object?.kind !== "geodesic-intersection") {
         return;
       }
 
@@ -484,7 +484,7 @@ export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): Runt
     switch (target?.object?.kind) {
       case "asset":
         return tryOpenFocusedQuestionHelp(target.object);
-      case "geodesicModel/segment":
+      case "geodesic-segment":
         return tryExtendFocusedGeodesicFromAim(ray);
       case "measured-geodesic-length":
         return tryRemoveFocusedMeasuredGeodesicLength(ray);

@@ -103,13 +103,13 @@ export function createWorldFocusMessageDefinition(
         actions: [contextAction("open-object-menu", "Emitter menu")],
         helpTopicId: "geodesic-emitter",
       });
-    case "geodesicModel/segment":
+    case "geodesic-segment":
       return withObjectHelp(options.object, {
         title,
         actions: getGeodesicSegmentActions(options),
-        helpTopicId: "geodesicModel/segment",
+        helpTopicId: "geodesic-segment",
       });
-    case "geodesicModel/crossing":
+    case "geodesic-intersection":
       return withObjectHelp(options.object, {
         title,
         actions: options.selectedTool === "protractor"

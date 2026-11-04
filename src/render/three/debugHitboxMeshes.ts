@@ -128,7 +128,7 @@ export function buildGeodesicEmitterAimCollisionOutlineDebugMesh(
  * The capsule has radius geodesicSegmentAimRadiusMeters and runs from the segment start along its direction for its length (at least 1 mm).
  */
 export function buildGeodesicSegmentSelectableHitboxDebugMesh(
-  object: Extract<RuntimeWorldObject, { readonly kind: "geodesicModel/segment" }>,
+  object: Extract<RuntimeWorldObject, { readonly kind: "geodesic-segment" }>,
 ): THREE.Group {
   const group = new THREE.Group();
   group.name = "selectable-hitbox:geodesic-segment";
@@ -184,7 +184,7 @@ export function buildGeodesicSegmentSelectableHitboxDebugMesh(
 
 /** Builds the wireframe counterpart of the segment hitbox: a capsule (cylinder plus two sphere caps) of geodesicSegmentAimRadiusMeters along the segment. */
 export function buildGeodesicSegmentAimCollisionOutlineDebugMesh(
-  object: Extract<RuntimeWorldObject, { readonly kind: "geodesicModel/segment" }>,
+  object: Extract<RuntimeWorldObject, { readonly kind: "geodesic-segment" }>,
 ): THREE.Group {
   const group = new THREE.Group();
   group.name = "aim-collision-outline:geodesic-segment";
@@ -270,7 +270,7 @@ export function buildSelectableHitboxDebugMesh(object: RuntimeWorldObject): THRE
     return undefined;
   }
 
-  if (object.kind === "geodesicModel/segment") {
+  if (object.kind === "geodesic-segment") {
     return buildGeodesicSegmentSelectableHitboxDebugMesh(object);
   }
 
@@ -296,7 +296,7 @@ export function buildAimCollisionOutlineDebugMesh(object: RuntimeWorldObject): T
     return undefined;
   }
 
-  if (object.kind === "geodesicModel/segment") {
+  if (object.kind === "geodesic-segment") {
     return buildGeodesicSegmentAimCollisionOutlineDebugMesh(object);
   }
 

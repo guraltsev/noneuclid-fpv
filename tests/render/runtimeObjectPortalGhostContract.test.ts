@@ -32,7 +32,7 @@ import {
 import type { RuntimeObjectRenderSourceMesh } from "../../src/render/three/runtimeObjectRenderRecords";
 import type { VisiblePortalPath } from "../../src/render/three/visiblePortalPaths";
 import { createGeodesicCannonObject } from "../../src/world-objects/geodesic/objects";
-import type { GeodesicCrossingObject } from "../../src/world-objects/geodesic/objects";
+import type { GeodesicIntersectionObject } from "../../src/world-objects/geodesic/objects";
 import { createPlacedFlagObject } from "../../src/world-objects/placedFlags";
 import {
   createRuntimeObjectRegistry,
@@ -77,10 +77,10 @@ const kinds: Record<Kind, KindCase> = {
       activeGeodesicId: "g1",
     }),
   },
-  "geodesicModel/crossing": {
-    object: (cellId, x, y): GeodesicCrossingObject => ({
+  "geodesic-intersection": {
+    object: (cellId, x, y): GeodesicIntersectionObject => ({
       id: "subject",
-      kind: "geodesicModel/crossing",
+      kind: "geodesic-intersection",
       cellId,
       localPose: standing(x, y),
       portalRenderable: true,
@@ -116,11 +116,11 @@ const kinds: Record<Kind, KindCase> = {
       radiusMeters: 0.3,
     }),
   },
-  "geodesicModel/segment": {
+  "geodesic-segment": {
     exempt: "a segment is computed per cell and continues as the next segment of the geodesic in the next cell; ghosting it would draw it twice",
   },
-  "geodesicModel/arc": { exempt: notDrawn },
-  "geodesicModel/vertex": { exempt: notDrawn },
+  "geodesic-interval": { exempt: notDrawn },
+  "free-geodesic-end": { exempt: notDrawn },
   "curve-shortening-pair": { exempt: notDrawn },
 };
 
@@ -339,8 +339,8 @@ const poseAt = (x: number): PlayerPose => ({ cellId: "room-b", position: { x, y:
 /** What each source of the sync's records is checked by. A new source must be listed in `runtimeObjectRecordSources` and then here. */
 const sourceChecks: Record<RuntimeObjectRecordSource, { readonly coveredBy: string } | { readonly exempt: keyof typeof portalGhostExemptions }> = {
   "runtime-objects": { coveredBy: "the per-kind tests above" },
-  "geodesic-body-parts": { coveredBy: "the geodesic-cannon and geodesicModel/crossing kinds above" },
-  "geodesic-segments": { exempt: "geodesicModel/segment" },
+  "geodesic-body-parts": { coveredBy: "the geodesic-cannon and geodesic-intersection kinds above" },
+  "geodesic-segments": { exempt: "geodesic-segment" },
   "carry-highlight": { coveredBy: "tests/render/carryHighlight.test.ts (a shape across a portal is drawn on both sides)" },
   "player-rover": { coveredBy: "the player rover tests below" },
 };

@@ -23,7 +23,7 @@ import {
 import {
   geodesicRayBeamHeightMeters,
   type GeodesicCannonObject,
-  type GeodesicCrossingObject,
+  type GeodesicIntersectionObject,
   type GeodesicSegmentObject,
 } from "../../src/world-objects/geodesic/objects";
 import { updateGeodesicIntersectionObjects } from "../../src/world-objects/geodesic/intersections";
@@ -292,10 +292,10 @@ describe("protractor tool objects", () => {
   });
 });
 
-function createIntersection(overrides: Partial<GeodesicCrossingObject> = {}): GeodesicCrossingObject {
+function createIntersection(overrides: Partial<GeodesicIntersectionObject> = {}): GeodesicIntersectionObject {
   return {
     id: "vertex-a",
-    kind: "geodesicModel/crossing",
+    kind: "geodesic-intersection",
     cellId: "cell-a",
     localPose: yawRigidTransform3(0, { x: 0, y: 0, z: 1.33 }),
     aimStickyTarget: { localPoint: { x: 0, y: 0, z: 1.08 } },
@@ -321,7 +321,7 @@ function createEmitter(overrides: Partial<GeodesicCannonObject> = {}): GeodesicC
 function createSegment(overrides: Partial<GeodesicSegmentObject> = {}): GeodesicSegmentObject {
   return {
     id: "segment-a",
-    kind: "geodesicModel/segment",
+    kind: "geodesic-segment",
     cellId: "cell-a",
     localPose: yawRigidTransform3(0, { x: -1, y: 0, z: 1.08 }),
     portalRenderable: true,

@@ -796,7 +796,7 @@ Queries whether a geodesic is locked or connected, and removal of geodesics and 
 
 ### `world-objects/geodesic/objects.ts`
 
-Geodesic emitters ("cannons"), geodesic arcs and curve shortening on a glued cell complex.
+Geodesic emitters ("cannons"), geodesic intervals and curve shortening on a glued cell complex.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
@@ -808,13 +808,13 @@ Geodesic emitters ("cannons"), geodesic arcs and curve shortening on a glued cel
 | type | `GeodesicHalfRole` | Which half of an interval a derived segment belongs to (split at the midpoint of the total length). |
 | interface | `GeodesicEndpointAttachment` | Attachment of one endpoint role of one geodesic interval to an anchor object (emitter or free end). |
 | interface | `GeodesicEndpointSelection` | An endpoint attachment picked by the user (typically from a segment hit) as input to tie-and-detach. |
-| interface | `GeodesicVertexObject` | An invisible, non-colliding anchor object marking a geodesic endpoint that is not on an emitter. |
-| interface | `GeodesicArcObject` | The authoritative description of one geodesic: two endpoint attachments plus the portal word joining them. |
+| interface | `FreeGeodesicEndObject` | An invisible, non-colliding anchor object marking a geodesic endpoint that is not on an emitter. |
+| interface | `GeodesicIntervalObject` | The authoritative description of one geodesic: two endpoint attachments plus the portal word joining them. |
 | interface | `CurveShorteningPairObject` | Bookkeeping object owning one curve-shortening process: a piecewise-geodesic curve whose free vertices relax under the curve shortening flow. |
 | interface | `LiftedGeodesicEndpoint` | An interval's far endpoint pulled back into the cell of a chosen source endpoint (the "development" of the interval). |
 | interface | `GeodesicTraceBuildResult` | Outcome of rebuilding an interval's derived geometry: the interval, its new segments, and how the trace ended. |
 | interface | `GeodesicSegmentObject` | A derived, per-cell straight piece of a geodesic: a ray inside one cell from `start` along `direction` for `lengthMeters`. |
-| interface | `GeodesicCrossingObject` | A computed marker where two distinct geodesics' segments cross in the same cell. |
+| interface | `GeodesicIntersectionObject` | A computed marker where two distinct geodesics' segments cross in the same cell. |
 | type | `GeodesicSegmentTerminal` | How a single per-cell segment ends. |
 | interface | `CreateGeodesicCannonOptions` | Construction options for `createGeodesicCannonObject`; omitted optional fields get the defaults documented there. |
 | interface | `TraceGeodesicSegmentResult` | One traced piece: the cell, the (normalized) ray used, the length actually travelled, and why it stopped. |
@@ -830,10 +830,10 @@ Geodesic emitters ("cannons"), geodesic arcs and curve shortening on a glued cel
 | const | `minGeodesicSegmentLengthMeters` | Smallest segment/continuation length (meters) worth creating when splitting or building free geodesics. |
 | const | `emitterConnectionToleranceMeters` | Perpendicular distance (meters) within which a ray counts as hitting an emitter; equal to the cannon collision radius. |
 | function | `createGeodesicCannonObject` | Builds a geodesic emitter object from options, filling defaults. |
-| function | `isGeodesicSegmentObject` | Type guard: true when the object is a `GeodesicSegmentObject` (`kind === "geodesicModel/segment"`). |
-| function | `isGeodesicVertexObject` | Type guard: true when the object is a `GeodesicVertexObject`. |
-| function | `createGeodesicVertexObject` | Builds a free-end anchor at `point` (cell-local meters, including its beam height in z) in cell `cellId`. |
-| function | `createGeodesicArcObject` | Builds a geodesic interval from two anchor ids, a start cell and an optional portal word. |
+| function | `isGeodesicSegmentObject` | Type guard: true when the object is a `GeodesicSegmentObject` (`kind === "geodesic-segment"`). |
+| function | `isFreeGeodesicEndObject` | Type guard: true when the object is a `FreeGeodesicEndObject`. |
+| function | `createFreeGeodesicEndObject` | Builds a free-end anchor at `point` (cell-local meters, including its beam height in z) in cell `cellId`. |
+| function | `createGeodesicIntervalObject` | Builds a geodesic interval from two anchor ids, a start cell and an optional portal word. |
 | function | `createCurveShorteningPairObject` | Builds a curve-shortening pair object (see `CurveShorteningPairObject`); `state` defaults to `"moving"`. |
 | function | `getGeodesicSegmentEnd` | Returns the segment's end point, `start + direction * lengthMeters`, in the segment's cell frame (meters). |
 | function | `canExtendGeodesicSegment` | True unless the segment ended at a wall, forbidden zone or emitter (those terminals cannot be continued). |

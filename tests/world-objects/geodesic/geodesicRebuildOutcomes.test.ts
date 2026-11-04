@@ -23,9 +23,9 @@ import { getGeodesicSegments } from "../../../src/world-objects/geodesic/segment
 import { createRuntimeObjectRegistry } from "../../../src/world-objects/runtimeObjectRegistry";
 import { realizeIntervalChord } from "../../../src/world-objects/geodesic/intervals";
 import {
-  createGeodesicVertexObject,
+  createFreeGeodesicEndObject,
   createGeodesicCannonObject,
-  createGeodesicArcObject,
+  createGeodesicIntervalObject,
   geodesicRayBeamHeightMeters,
 } from "../../../src/world-objects/geodesic/objects";
 import { compileLargePortalWorld, compileLargeWorld, createTorusLoopBenchmarkScene } from "../../fixtures/world-objects/geodesic";
@@ -64,7 +64,7 @@ describe("geodesic rebuild outcomes", () => {
     const registry = createRuntimeObjectRegistry();
     registry.add(createGeodesicCannonObject({ id: "cannon-a", cellId: "a", localPose: yawRigidTransform3(0, { x: 1, y: 2.5, z: 0 }) }));
     registry.add(createGeodesicCannonObject({ id: "cannon-b", cellId: "a", localPose: yawRigidTransform3(Math.PI, { x: 5, y: 0, z: 0 }) }));
-    registry.add(createGeodesicArcObject({
+    registry.add(createGeodesicIntervalObject({
       id: "g-a",
       startAnchorObjectId: "cannon-a",
       endAnchorObjectId: "cannon-b",
@@ -89,7 +89,7 @@ describe("geodesic rebuild outcomes", () => {
     const registry = createRuntimeObjectRegistry();
     registry.add(createGeodesicCannonObject({ id: "cannon-a", cellId: "a", localPose: yawRigidTransform3(0, { x: 1, y: 2.5, z: 0 }) }));
     registry.add(createGeodesicCannonObject({ id: "cannon-b", cellId: "b", localPose: yawRigidTransform3(Math.PI, { x: 1, y: 2.5, z: 0 }) }));
-    registry.add(createGeodesicArcObject({
+    registry.add(createGeodesicIntervalObject({
       id: "g-a",
       startAnchorObjectId: "cannon-a",
       endAnchorObjectId: "cannon-b",
@@ -113,7 +113,7 @@ describe("geodesic rebuild outcomes", () => {
     });
 
     expect(rebuilt).toEqual([]);
-    expect(registry.get("g-a")?.kind).toBe("geodesicModel/arc");
+    expect(registry.get("g-a")?.kind).toBe("geodesic-interval");
   });
 
   it("classifies a straight chord as feasible, wall-blocked, or too short to realize", () => {
@@ -123,8 +123,8 @@ describe("geodesic rebuild outcomes", () => {
     const realize = (freeEndPoint: { x: number; y: number }) => {
       registry.remove("tip");
       registry.remove("g-tip");
-      registry.add(createGeodesicVertexObject({ id: "tip", cellId: "a", point: { ...freeEndPoint, z: geodesicRayBeamHeightMeters } }));
-      const interval = createGeodesicArcObject({ id: "g-tip", startAnchorObjectId: "cannon-a", endAnchorObjectId: "tip", startCellId: "a" });
+      registry.add(createFreeGeodesicEndObject({ id: "tip", cellId: "a", point: { ...freeEndPoint, z: geodesicRayBeamHeightMeters } }));
+      const interval = createGeodesicIntervalObject({ id: "g-tip", startAnchorObjectId: "cannon-a", endAnchorObjectId: "tip", startCellId: "a" });
       registry.add(interval);
       return realizeIntervalChord({ world, registry, interval });
     };
@@ -139,7 +139,7 @@ describe("geodesic rebuild outcomes", () => {
     const registry = createRuntimeObjectRegistry();
     registry.add(createGeodesicCannonObject({ id: "cannon-a", cellId: "a", localPose: yawRigidTransform3(0, { x: 1, y: 2.5, z: 0 }) }));
     registry.add(createGeodesicCannonObject({ id: "cannon-b", cellId: "a", localPose: yawRigidTransform3(Math.PI, { x: 5, y: 0, z: 0 }) }));
-    const interval = createGeodesicArcObject({ id: "g-a", startAnchorObjectId: "cannon-a", endAnchorObjectId: "cannon-b", startCellId: "a" });
+    const interval = createGeodesicIntervalObject({ id: "g-a", startAnchorObjectId: "cannon-a", endAnchorObjectId: "cannon-b", startCellId: "a" });
     registry.add(interval);
 
     const realization = realizeIntervalChord({ world, registry, interval });
@@ -158,7 +158,7 @@ describe("geodesic rebuild outcomes", () => {
         removeGeodesic(registry, "loop-1");
       })
     );
-    const markers = registry.getObjectsOfKind("geodesicModel/crossing");
+    const markers = registry.getObjectsOfKind("geodesic-intersection");
     expect(markers.some((marker) => marker.geodesicIds.some((id) => id === "loop-0" || id === "loop-1"))).toBe(false);
     expect(markers.some((marker) => marker.geodesicIds.includes("loop-2"))).toBe(true);
 
@@ -168,7 +168,7 @@ describe("geodesic rebuild outcomes", () => {
         throw new Error("boom");
       })
     ).toThrow("boom");
-    expect(registry.getObjectsOfKind("geodesicModel/crossing").some((marker) =>
+    expect(registry.getObjectsOfKind("geodesic-intersection").some((marker) =>
       marker.geodesicIds.includes("loop-2")
     )).toBe(false);
   });

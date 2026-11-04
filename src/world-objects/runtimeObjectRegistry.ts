@@ -12,11 +12,11 @@ import type { RigidTransform3 } from "../math/rigidTransform3";
 import type { AssetObjectSpec } from "../cell-complex/specs";
 import { yawRigidTransform3 } from "../math/rigidTransform3";
 import type {
-  GeodesicVertexObject,
+  FreeGeodesicEndObject,
   CurveShorteningPairObject,
   GeodesicCannonObject,
-  GeodesicCrossingObject,
-  GeodesicArcObject,
+  GeodesicIntersectionObject,
+  GeodesicIntervalObject,
   GeodesicSegmentObject,
 } from "./geodesic/objects";
 import type { MeasuredGeodesicLengthObject } from "./toolObjects";
@@ -44,11 +44,11 @@ export type RuntimeWorldObject =
   | RuntimeStaticAssetObject
   | PlacedFlagObject
   | GeodesicCannonObject
-  | GeodesicArcObject
-  | GeodesicVertexObject
+  | GeodesicIntervalObject
+  | FreeGeodesicEndObject
   | CurveShorteningPairObject
   | GeodesicSegmentObject
-  | GeodesicCrossingObject
+  | GeodesicIntersectionObject
   | MeasuredGeodesicLengthObject
   | ProtractorAngleObject;
 
@@ -152,14 +152,14 @@ export function createRuntimeObjectRegistry(
 
   function indexKinds(object: RuntimeWorldObject): void {
     addToIndex(objectIdsByKind, object.kind, object.id);
-    if (object.kind === "geodesicModel/segment") {
+    if (object.kind === "geodesic-segment") {
       addToIndex(segmentIdsByGeodesicId, object.geodesicId, object.id);
     }
   }
 
   function unindexKinds(object: RuntimeWorldObject): void {
     removeFromIndex(objectIdsByKind, object.kind, object.id);
-    if (object.kind === "geodesicModel/segment") {
+    if (object.kind === "geodesic-segment") {
       removeFromIndex(segmentIdsByGeodesicId, object.geodesicId, object.id);
     }
   }
@@ -206,8 +206,8 @@ export function createRuntimeObjectRegistry(
       indexObject(next);
     }
 
-    const previousGeodesicId = previous.kind === "geodesicModel/segment" ? previous.geodesicId : undefined;
-    const nextGeodesicId = next.kind === "geodesicModel/segment" ? next.geodesicId : undefined;
+    const previousGeodesicId = previous.kind === "geodesic-segment" ? previous.geodesicId : undefined;
+    const nextGeodesicId = next.kind === "geodesic-segment" ? next.geodesicId : undefined;
     if (previous.kind !== next.kind || previousGeodesicId !== nextGeodesicId) {
       unindexKinds(previous);
       indexKinds(next);
@@ -357,7 +357,7 @@ export function createRuntimeObjectRegistry(
     getSegmentsOfGeodesic(geodesicId) {
       return [...(segmentIdsByGeodesicId.get(geodesicId) ?? [])]
         .map((id) => objectsById.get(id))
-        .filter((object): object is GeodesicSegmentObject => object?.kind === "geodesicModel/segment");
+        .filter((object): object is GeodesicSegmentObject => object?.kind === "geodesic-segment");
     },
   };
 

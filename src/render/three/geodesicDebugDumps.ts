@@ -154,19 +154,19 @@ export function createGeodesicDebugDumps(deps: GeodesicDebugDumpsDeps) {
     const objects = runtimeObjectRegistry.getAll();
     const geodesicIds = [...collectKnownGeodesicIds()].sort();
     const segments = objects
-      .filter((object): object is Extract<RuntimeWorldObject, { readonly kind: "geodesicModel/segment" }> =>
-        object.kind === "geodesicModel/segment"
+      .filter((object): object is Extract<RuntimeWorldObject, { readonly kind: "geodesic-segment" }> =>
+        object.kind === "geodesic-segment"
       )
       .sort((left, right) =>
         left.geodesicId.localeCompare(right.geodesicId) || left.segmentIndex - right.segmentIndex
       );
     const intervals = objects
-      .filter((object): object is Extract<RuntimeWorldObject, { readonly kind: "geodesicModel/arc" }> =>
-        object.kind === "geodesicModel/arc"
+      .filter((object): object is Extract<RuntimeWorldObject, { readonly kind: "geodesic-interval" }> =>
+        object.kind === "geodesic-interval"
       )
       .sort((left, right) => left.id.localeCompare(right.id));
     const anchors = objects
-      .filter((object) => object.kind === "geodesic-cannon" || object.kind === "geodesicModel/vertex")
+      .filter((object) => object.kind === "geodesic-cannon" || object.kind === "free-geodesic-end")
       .sort((left, right) => left.id.localeCompare(right.id));
     const curveShorteningPairs = objects
       .filter((object): object is Extract<RuntimeWorldObject, { readonly kind: "curve-shortening-pair" }> =>
@@ -218,8 +218,8 @@ export function createGeodesicDebugDumps(deps: GeodesicDebugDumpsDeps) {
         cellId: anchor.cellId,
         point: formatVec3(anchor.kind === "geodesic-cannon" ? getGeodesicDebugAnchorPoint(anchor) : anchor.localPose.translation),
         attachedEndpoints: objects
-          .filter((object): object is Extract<RuntimeWorldObject, { readonly kind: "geodesicModel/arc" }> =>
-            object.kind === "geodesicModel/arc"
+          .filter((object): object is Extract<RuntimeWorldObject, { readonly kind: "geodesic-interval" }> =>
+            object.kind === "geodesic-interval"
           )
           .flatMap((interval) => [interval.start, interval.end])
           .filter((endpoint) => endpoint.anchorObjectId === anchor.id)
@@ -294,9 +294,9 @@ export function createGeodesicDebugDumps(deps: GeodesicDebugDumpsDeps) {
   function collectKnownGeodesicIds(): readonly string[] {
     const ids = new Set<string>();
     for (const object of runtimeObjectRegistry.getAll()) {
-      if (object.kind === "geodesicModel/segment") {
+      if (object.kind === "geodesic-segment") {
         ids.add(object.geodesicId);
-      } else if (object.kind === "geodesicModel/arc") {
+      } else if (object.kind === "geodesic-interval") {
         ids.add(object.id);
       }
     }
@@ -316,7 +316,7 @@ export function createGeodesicDebugDumps(deps: GeodesicDebugDumpsDeps) {
 
     const target = deps.resolveCameraAimTarget();
     const object = target?.object;
-    if (object?.kind === "geodesicModel/segment") {
+    if (object?.kind === "geodesic-segment") {
       return object.geodesicId;
     }
     if (object?.kind === "geodesic-cannon") {
