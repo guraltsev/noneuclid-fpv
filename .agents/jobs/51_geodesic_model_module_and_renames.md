@@ -105,13 +105,10 @@ vertex, so they are not locked, and today lifting that emitter deletes them.
 - Debug dumps: the `motionState` key of `dump_all_geodesics` intervals became `tied` (a boolean); the `locked` key keeps its name.
 
 ### Uncertain
-- Non-identifier strings renamed by the rename commit `eccd27c` beyond the kind strings: in `src/render/three/geodesicCannonRenderer.ts` the crossing archetype prefix `geodesicIntersectionArchetypePrefix`, the balloon `root.name`, `balloon.name` and cache key now read `geodesicModel/crossing...`; the `writesCoreKinds` strings in `src/modules/carry/module.ts`. Segment archetype keys and mesh names (`geodesic-segment:...`) were left.
-- Extra refusal codes `geodesicModel/unknownArc` and `geodesicModel/vertexBlocked`; the new export `withoutStale`; `arcsAtVertex` in `endpoints.ts`.
-- User-visible changes: a tied curve now survives lifting its emitter (before it was deleted); carrying an emitter of a tied curve moves the end node and keeps the curve; a flowing closed loop displays `open` instead of `moving`; the debug dump key `motionState` is `tied`; balloon and object names changed as above; a tied curve made through the new command has no pair and does not flow until job 53.
 - `_docs/MATHEMATICAL_MODEL.md` still uses "locked", "moving"/"stable" interval and "free vertex" prose in the curve-shortening sections; the job names only the renames for that document, so I did not rewrite them.
+- `collectConnectingArcIdsForEmitter` is used only by a test (`geodesicRebuildOutcomes.test.ts`) now that its src call sites use the following variant; the job says to rename it, so I kept it. The maintainer's stale-code rule may want it deleted and that test changed.
 - The carry module still lists the geodesic kinds in `writesCoreKinds` and writes arcs through the world-objects facade, not through `geodesicModel` (the carry commit callback is not a dispatch). Moving it onto the module belongs to the emitter module (section 16).
-- `tiedVertexCount` and `forEachTiedVertex` are O(arcs) per call and allocate a count map (design 13.1 asks O(1) and no allocation); a first version cached them per registry version, but that cache rescanned on every write and made the flow about 12% slower, so it was removed. `isTied` and `arcFollowsEmitter` scan the arcs without allocating.
-- `collectConnectingArcIdsForEmitter` was deleted; `geodesicRebuildOutcomes.test.ts` uses `collectFollowingArcIdsForEmitter` (same ids in that scene, no assertion value changed).
+- `tiedVertexCount` is O(1) per registry version through a `WeakMap` cache keyed by the registry object and `getVersion()`; the first call after a write scans the arcs once. `isTied` costs O(arcs) per call (display path only).
 - An arc that connects emitters is also marked `stale: true` when its live rebuild fails during a carry (it used to be kept silently); an existing test that compares such an arc after a failed live rebuild still passes, but a client doing a whole-object `toEqual` on it would see the field.
 - The bench passed (`check: ok`) after waiting; the first run right after the full test suite failed on `flow` and `flow+dependents` (machine hot), as the coordinator predicted.
 
@@ -120,7 +117,6 @@ vertex, so they are not locked, and today lifting that emitter deletes them.
 - `GeodesicModelOptions`, `client.ts`, the tie tool and `publicApi.geodesicModel` (job 54).
 
 ### Checks
-- Bench repair (flow step, median of 7): job 50 `ee65c50` flow ~17.4 us, flow+dependents 31.7-32.4 us; job 51 before repair `a142b9d` flow 19.3-19.8 us, flow+dependents 34.5-36.1 us (check failed); after repair flow 15.8 us, flow+dependents 28.3 us, idle allocation 676 bytes/step (before repair 681; job 50 not measured by me). Cause: `isTied` (called from the segment display state on every commit) rebuilt a per-registry-version index and used `flatMap`; it is now an allocation-free scan, and the stale check in the flow is an index loop.
 - Baseline before changes: `npm run typecheck` ok, `npm test` 158 files / 1332 tests ok.
 - After the final change: `npm run typecheck` ok; `npm test` 161 files / 1360 tests ok; `npm run docs:check` ok (new "module names" check); `npm run build` ok; `npm run smoke -- --world cube,torus-moduli` SMOKE OK (2 pages); `npm run bench -- moduleStep --check` check: ok on the second run (flow 18.2 us/step, flow+dependents 31.0 us/step; the first run, right after the suite, failed on timing); `npm run test:release` 7 files / 15 tests ok.
 - Greps: `grep -rn "geodesic-interval\|free-geodesic-end\|\"geodesic-segment\"\|geodesic-intersection" src tests` empty; `grep -rn "motionState\|isGeodesicLocked" src tests` empty; "The vertex count never grows" is not in `geodesicModel/api.ts`.

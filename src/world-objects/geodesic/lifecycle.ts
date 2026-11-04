@@ -73,6 +73,15 @@ export function arcFollowsEmitter(registry: RuntimeObjectRegistry, arcId: string
   return isVertexSharedWithOtherArc(registry, startOnEmitter ? arc.end.anchorObjectId : arc.start.anchorObjectId, arcId);
 }
 
+/** Lists the ids of arcs that connect emitters (see `arcConnectsEmitters`) and have an end on the emitter. */
+export function collectConnectingArcIdsForEmitter(
+  registry: RuntimeObjectRegistry,
+  emitterId: string,
+): readonly string[] {
+  return getEmitterGeodesicIds(registry, emitterId)
+    .filter((arcId) => arcConnectsEmitters(registry, arcId));
+}
+
 /** Lists the ids of arcs that follow the emitter (see `arcFollowsEmitter`), in registry order. */
 export function collectFollowingArcIdsForEmitter(
   registry: RuntimeObjectRegistry,
