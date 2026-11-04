@@ -31,13 +31,12 @@
  * from `end` uses `reverseGeodesicPortalWord`. A chord shorter than `GEODESIC_MIN_LENGTH_METERS` is degenerate. Free ends (not on emitters) are
  * "free" because shooting (`shootGeodesic`) fixes the word by tracing the ray first and then recording what it crossed.
  *
- * ## End nodes, interior vertices and tied arcs
- * An arc that CONNECTS EMITTERS (`arcConnectsEmitters`: both ends on emitters) is a geodesic of its own. A curve's END NODES are the arc ends on
- * an emitter; its INTERIOR VERTICES are `geodesicModel/vertex` objects shared by two or more arc ends. An arc is TIED (`isTied`) when it has an
- * end on such a vertex. An arc FOLLOWS an emitter (`arcFollowsEmitter`) when it has an end on it and connects emitters or is tied: carrying the
- * emitter keeps the arc and updates its word by the portal the emitter crossed (both ends of a loop on that emitter move, so its word is
- * conjugated: `w -> p^-1 w p`) (`rebuildLockedGeodesicFromEndpointsAndPortalWord`). An arc with an emitter and an unshared free end
+ * ## Locked and moving intervals
+ * An interval whose both endpoints are pinned anchors (emitters or polygon corners) is LOCKED (`isGeodesicLocked`): carrying an emitter keeps the interval and updates its
+ * word by the portal the emitter crossed (both ends of a loop on that emitter move, so its word is conjugated: `w -> p^-1 w p`)
+ * (`rebuildLockedGeodesicFromEndpointsAndPortalWord`). An interval with an emitter and a free end
  * is an aimable free geodesic (`aimFreeGeodesicFromEndpoint`, `extendGeodesic`, split by `splitGeodesicIntervalAtSegmentHit`).
+ * `motionState: "moving"` marks intervals owned by a curve-shortening pair; `"stable"` is everything else.
  *
  * ## Curve shortening (issue 31/32)
  * `tieAndDetachGeodesicEndpoints` detaches two endpoint roles (possibly the two roles of one loop) from an emitter and ties them to one
@@ -167,8 +166,8 @@ export interface GeodesicArcObject extends RuntimeWorldObjectBase {
   readonly startCellId: string;
   /** Ordered `start` -> `end` list of portals crossed; it fixes the homotopy class of the geodesic (empty when both ends are in one cell and the path stays inside it). */
   readonly portalWord: readonly GeodesicPortalTraversal[];
-  /** Transient: set while the last rebuild of this arc failed during a carry, so it still shows its old path; the next successful rebuild clears it (`isStale`). */
-  readonly stale?: true;
+  /** `"moving"` while the interval belongs to a curve-shortening pair and is being retraced each tick; `"stable"` otherwise. */
+  readonly motionState: "stable" | "moving";
 }
 
 /**
@@ -449,20 +448,10 @@ export function createGeodesicVertexObject(input: {
   };
 }
 
-/** The arc without its transient `stale` mark (the arc itself when it has none). */
-export function withoutStale(arc: GeodesicArcObject): GeodesicArcObject {
-  if (arc.stale === undefined) {
-    return arc;
-  }
-  const { stale, ...rest } = arc;
-  void stale;
-  return rest;
-}
-
 /**
  * Builds a geodesic interval from two anchor ids, a start cell and an optional portal word.
  *
- * Defaults: empty `portalWord`. The word is freely reduced (adjacent inverse traversals cancel). Does not validate that the word matches the anchors' cells and
+ * Defaults: empty `portalWord`, `motionState: "stable"`. The word is freely reduced (adjacent inverse traversals cancel). Does not validate that the word matches the anchors' cells and
  * does not generate segments; call `rebuildDerivedGeodesicSegments` afterwards. Pure; the caller adds it to the registry.
  */
 export function createGeodesicArcObject(input: {
@@ -471,6 +460,7 @@ export function createGeodesicArcObject(input: {
   readonly endAnchorObjectId: string;
   readonly startCellId: string;
   readonly portalWord?: readonly GeodesicPortalTraversal[];
+  readonly motionState?: "stable" | "moving";
 }): GeodesicArcObject {
   return {
     id: input.id,
@@ -480,6 +470,7 @@ export function createGeodesicArcObject(input: {
     portalRenderable: false,
     startCellId: input.startCellId,
     portalWord: reduceAdjacentInversePortalTraversals(input.portalWord ?? []),
+    motionState: input.motionState ?? "stable",
     start: {
       geodesicId: input.id,
       role: "start",

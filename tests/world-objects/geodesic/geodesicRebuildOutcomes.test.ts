@@ -18,7 +18,7 @@ import {
   updateGeodesicIntersectionObjects,
   withDeferredGeodesicIntersections,
 } from "../../../src/world-objects/geodesic/intersections";
-import { collectConnectingArcIdsForEmitter, removeGeodesic } from "../../../src/world-objects/geodesic/lifecycle";
+import { collectLockedIncidentGeodesicIdsForEmitter, removeGeodesic } from "../../../src/world-objects/geodesic/lifecycle";
 import { getGeodesicSegments } from "../../../src/world-objects/geodesic/segments";
 import { createRuntimeObjectRegistry } from "../../../src/world-objects/runtimeObjectRegistry";
 import { realizeIntervalChord } from "../../../src/world-objects/geodesic/intervals";
@@ -40,7 +40,7 @@ describe("geodesic rebuild outcomes", () => {
     registry.update({ ...before, localPose: yawRigidTransform3(0, { x: -1.95, y: 1.95, z: 0 }) });
 
     withDeferredGeodesicIntersections(registry, () => {
-      for (const id of collectConnectingArcIdsForEmitter(registry, "e")) {
+      for (const id of collectLockedIncidentGeodesicIdsForEmitter(registry, "e")) {
         rebuildConnectedGeodesicBetweenEmitters({
           world,
           registry,

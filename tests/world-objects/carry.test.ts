@@ -28,7 +28,7 @@ import {
   type CarryMove,
 } from "../../src/world-objects/carry";
 import { shootGeodesic, moveEmitterAlongRoute } from "../../src/world-objects/geodesic/cannon";
-import { arcConnectsEmitters } from "../../src/world-objects/geodesic/lifecycle";
+import { isGeodesicLocked } from "../../src/world-objects/geodesic/lifecycle";
 import { createGeodesicCannonObject, emitterConnectionToleranceMeters } from "../../src/world-objects/geodesic/objects";
 import { collectGeodesicPortalWord } from "../../src/world-objects/geodesic/segments";
 import { createRuntimeObjectRegistry } from "../../src/world-objects/runtimeObjectRegistry";
@@ -389,7 +389,7 @@ describe("pickup", () => {
       throw new Error("Expected the source emitter.");
     }
     shootGeodesic({ world, registry, cannon: source, geodesicId: "g-a", maxLengthMeters: 12 });
-    expect(arcConnectsEmitters(registry, "g-a")).toBe(true);
+    expect(isGeodesicLocked(registry, "g-a")).toBe(true);
 
     // Stores each move the way the tool does and checks that the locked geodesic's word still chains to the emitter's cell.
     const commit = (move: CarryMove): boolean => {
@@ -443,7 +443,7 @@ describe("pickup", () => {
     expect(end).toBe("arrived");
     expect(frames).toBeGreaterThan(5);
     expect(registry.get("cannon-b")).toMatchObject({ kind: "geodesic-cannon", cellId: "top" });
-    expect(arcConnectsEmitters(registry, "g-a")).toBe(true);
+    expect(isGeodesicLocked(registry, "g-a")).toBe(true);
   });
 
   it("keeps the geodesic chained across two faces and turns the emitter with them", () => {
@@ -458,6 +458,6 @@ describe("pickup", () => {
     expect(advance.end).toBe("arrived");
     expect(registry.get("cannon-b")?.cellId).toBe("bottom");
     expect(Math.cos(placeOf().yawRadians - (startYaw - Math.PI / 2))).toBeCloseTo(1, 6);
-    expect(arcConnectsEmitters(registry, "g-a")).toBe(true);
+    expect(isGeodesicLocked(registry, "g-a")).toBe(true);
   });
 });

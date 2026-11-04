@@ -10,9 +10,9 @@ import * as THREE from "three";
 import { type CompiledCellComplex } from "../../cell-complex/compileCellComplex";
 import { addVec3, scaleVec3 } from "../../math/vec3";
 import type { ClientSession } from "../../runtime/clientSession";
-import { getEmitterGeodesicIds, isTied } from "../../world-objects/geodesic/endpoints";
+import { getEmitterGeodesicIds } from "../../world-objects/geodesic/endpoints";
 import { collectGeodesicPortalWord, getGeodesicSegments } from "../../world-objects/geodesic/segments";
-import { getGeodesicConnection, arcConnectsEmitters } from "../../world-objects/geodesic/lifecycle";
+import { getGeodesicConnection, isGeodesicLocked } from "../../world-objects/geodesic/lifecycle";
 import { type GeodesicMarmotRuntime } from "./creatures/geodesicMarmotView";
 import { type RuntimeObjectRegistry, type RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
 import { type SimpleGeoCreatureRuntime } from "./creatures/simpleGeoCreatureView";
@@ -108,7 +108,7 @@ export function createGeodesicDebugDumps(deps: GeodesicDebugDumpsDeps) {
     const start = segments[0]?.start;
     const dump: GeodesicPathDebugDump = {
       geodesicId,
-      locked: arcConnectsEmitters(runtimeObjectRegistry, geodesicId),
+      locked: isGeodesicLocked(runtimeObjectRegistry, geodesicId),
       connection: getGeodesicConnection(runtimeObjectRegistry, geodesicId),
       startCellId: segments[0]?.cellId,
       start: start ? formatVec3(start) : undefined,
@@ -134,7 +134,7 @@ export function createGeodesicDebugDumps(deps: GeodesicDebugDumpsDeps) {
 
   function dumpLockedGeodesicWords(): readonly GeodesicWordDebugDump[] {
     const geodesicIds = collectKnownGeodesicIds()
-      .filter((geodesicId) => arcConnectsEmitters(runtimeObjectRegistry, geodesicId))
+      .filter((geodesicId) => isGeodesicLocked(runtimeObjectRegistry, geodesicId))
       .sort();
     const dumps = geodesicIds.map(createGeodesicWordDebugDump);
     console.info("[noneuclid] locked geodesic words", dumps);
@@ -186,13 +186,13 @@ export function createGeodesicDebugDumps(deps: GeodesicDebugDumpsDeps) {
           id: interval.id,
           cellId: interval.cellId,
           startCellId: interval.startCellId,
-          tied: isTied(runtimeObjectRegistry, interval.id),
+          motionState: interval.motionState,
           start: describeEndpointAttachment(interval.start),
           end: describeEndpointAttachment(interval.end),
           portalWordText: formatGeodesicPortalWord(interval.portalWord),
           portalWord: interval.portalWord,
           connection: getGeodesicConnection(runtimeObjectRegistry, interval.id),
-          locked: arcConnectsEmitters(runtimeObjectRegistry, interval.id),
+          locked: isGeodesicLocked(runtimeObjectRegistry, interval.id),
           segmentCount: intervalSegments.length,
           totalSegmentLengthMeters: roundedMeters(totalGeodesicLengthFromDebugSegments(intervalSegments)),
           segmentCells: [...new Set(intervalSegments.map((segment) => segment.cellId))],
@@ -241,7 +241,7 @@ export function createGeodesicDebugDumps(deps: GeodesicDebugDumpsDeps) {
     console.info("[noneuclid] copyable all geodesics dump\n" + JSON.stringify(dump, null, 2));
     console.table(dump.intervals.map((interval) => ({
       id: interval.id,
-      tied: interval.tied,
+      motionState: interval.motionState,
       start: `${interval.start.anchorObjectId}@${interval.start.anchorCellId}`,
       end: `${interval.end.anchorObjectId}@${interval.end.anchorCellId}`,
       word: interval.portalWordText,
@@ -275,7 +275,7 @@ export function createGeodesicDebugDumps(deps: GeodesicDebugDumpsDeps) {
     const start = segments[0]?.start;
     return {
       geodesicId,
-      locked: arcConnectsEmitters(runtimeObjectRegistry, geodesicId),
+      locked: isGeodesicLocked(runtimeObjectRegistry, geodesicId),
       connection: getGeodesicConnection(runtimeObjectRegistry, geodesicId),
       startCellId: segments[0]?.cellId,
       start: start ? formatVec3(start) : undefined,

@@ -19,7 +19,6 @@ import {
 import { requestGeodesicIntersectionUpdate, withDeferredGeodesicIntersections } from "./intersections";
 import {
   getGeodesicPortalWord,
-  isTied,
   removeUnusedFreeGeodesicEnds,
 } from "./endpoints";
 
@@ -289,8 +288,8 @@ export function buildDerivedSegmentsFromTraces(input: {
   return splitSegments;
 }
 
-// Display state of a geodesic's segments: `"moving"` for a tied arc, `"connected"` for an arc that connects emitters,
-// else `"open"`. An id that is not an interval is `"open"`.
+// Display state of a geodesic's segments: `"moving"` for a moving interval, `"connected"` for a stable interval pinned at
+// both ends, else `"open"`. An id that is not an interval is `"open"`.
 function resolveDerivedSegmentConnectionState(
   registry: RuntimeObjectRegistry,
   geodesicId: string,
@@ -299,7 +298,7 @@ function resolveDerivedSegmentConnectionState(
   if (interval?.kind !== "geodesicModel/arc") {
     return "open";
   }
-  if (isTied(registry, geodesicId)) {
+  if (interval.motionState === "moving") {
     return "moving";
   }
   const start = registry.get(interval.start.anchorObjectId);

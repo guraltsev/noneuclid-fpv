@@ -76,6 +76,7 @@ describe("geodesic cannon world objects: intersections", () => {
         startAnchorObjectId: "cannon-a",
         endAnchorObjectId: "cannon-b",
         startCellId: "a",
+        motionState: "stable",
       }),
     ]);
 
@@ -102,6 +103,7 @@ describe("geodesic cannon world objects: intersections", () => {
         startAnchorObjectId: "cannon-a",
         endAnchorObjectId: "free-a",
         startCellId: "a",
+        motionState: "stable",
       }),
     ]);
 

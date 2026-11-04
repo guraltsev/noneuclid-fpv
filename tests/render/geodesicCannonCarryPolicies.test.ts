@@ -22,7 +22,7 @@ import { createTestClientSession } from "../support/clientSession";
 import { handCarryLeashMeters } from "../../src/interaction/handCarry";
 import { carryMaxSpeedMetersPerSecond } from "../../src/world-objects/carry";
 import { shootGeodesic } from "../../src/world-objects/geodesic/cannon";
-import { arcConnectsEmitters } from "../../src/world-objects/geodesic/lifecycle";
+import { isGeodesicLocked } from "../../src/world-objects/geodesic/lifecycle";
 import { createGeodesicCannonObject, emitterConnectionToleranceMeters } from "../../src/world-objects/geodesic/objects";
 import { createRuntimeObjectRegistry, type RuntimeObjectRegistry } from "../../src/world-objects/runtimeObjectRegistry";
 import { createGeodesicCannonTools } from "../../src/render/three/geodesicCannonTools";
@@ -102,7 +102,7 @@ describe("the carry tool applies the agreed policies", () => {
     expect(emitter).toMatchObject({ kind: "geodesic-cannon", cellId: "a" });
     expect(emitter?.localPose.translation.y).toBeGreaterThan(4.9);
     expect(emitter?.localPose.translation.y).toBeLessThan(5);
-    expect(arcConnectsEmitters(registry, "g-a")).toBe(true);
+    expect(isGeodesicLocked(registry, "g-a")).toBe(true);
   });
 
   it("stops the emitter at a junction's zone, still carried, when a step would sweep it", () => {
@@ -210,7 +210,7 @@ describe("the carry tool applies the agreed policies", () => {
       expect(selectedTool()).toBe("none");
       const emitter = registry.get("cannon-b");
       expect(emitter).toMatchObject({ kind: "geodesic-cannon" });
-      expect(arcConnectsEmitters(registry, "g-a")).toBe(true);
+      expect(isGeodesicLocked(registry, "g-a")).toBe(true);
       const travelled = Math.hypot((emitter?.cellId === "b" ? 5 : 0) + (emitter?.localPose.translation.x ?? 0) - 6, (emitter?.localPose.translation.y ?? 0) - 2.5);
       expect(travelled).toBeLessThanOrEqual(carryMaxSpeedMetersPerSecond * frameSeconds + 1e-6);
     });
@@ -256,6 +256,6 @@ describe("the carry tool applies the agreed policies", () => {
 
     expect(frames).toBeGreaterThan(3);
     expect(registry.get("cannon-b")).toMatchObject({ cellId: "a" });
-    expect(arcConnectsEmitters(registry, "g-a")).toBe(true);
+    expect(isGeodesicLocked(registry, "g-a")).toBe(true);
   });
 });

@@ -31,7 +31,7 @@ import {
 } from "./objects";
 import { findNearestEmitterHitOnTrace, traceGeodesicSegment } from "./trace";
 import { requestGeodesicIntersectionUpdate, withDeferredGeodesicIntersections } from "./intersections";
-import { arcsOfCurveContaining, isAimableFreeGeodesic, isTied } from "./endpoints";
+import { isAimableFreeGeodesic } from "./endpoints";
 import {
   canConnectGeodesicSegmentAtDistance,
   distanceAlongSegment,
@@ -43,7 +43,7 @@ import {
   totalGeodesicLengthFromSegments,
   totalLengthThroughSegment,
 } from "./segments";
-import { arcConnectsEmitters, arcFollowsEmitter, collectFollowingArcIdsForEmitter, removeGeodesic } from "./lifecycle";
+import { collectLockedIncidentGeodesicIdsForEmitter, isGeodesicLocked, removeGeodesic } from "./lifecycle";
 import {
   aimFreeGeodesicFromEndpoint,
   rebuildLockedGeodesicFromEndpointsAndPortalWordDetailed,
@@ -330,7 +330,7 @@ function extendGeodesicNow(input: ExtendGeodesicInput): GeodesicSegmentObject | 
  * but may throw via `shootGeodesic` if the shot yields nothing.
  */
 export function rebuildGeodesicToLength(input: RebuildGeodesicToLengthInput): readonly GeodesicSegmentObject[] {
-  if (!input.rebuildLocked && arcConnectsEmitters(input.registry, input.geodesicId)) {
+  if (!input.rebuildLocked && isGeodesicLocked(input.registry, input.geodesicId)) {
     return getGeodesicSegments(input.registry, input.geodesicId);
   }
 
@@ -517,14 +517,9 @@ function rebuildConnectedGeodesicBetweenEmittersNow(
 ): readonly GeodesicSegmentObject[] {
   const interval = request.registry.get(request.geodesicId);
   if (interval?.kind === "geodesicModel/arc") {
-    const follows = request.carriedEmitterId === undefined
-      ? arcConnectsEmitters(request.registry, request.geodesicId)
-      : arcFollowsEmitter(request.registry, request.geodesicId, request.carriedEmitterId);
-    if (!follows) {
+    if (!isGeodesicLocked(request.registry, request.geodesicId)) {
       return getGeodesicSegments(request.registry, request.geodesicId);
     }
-    // A tied arc takes its whole curve with it when it has to go; the curve is read before the rebuild, which may delete a degenerate arc.
-    const curveArcIds = isTied(request.registry, request.geodesicId) ? arcsOfCurveContaining(request.registry, request.geodesicId) : [request.geodesicId];
     const { realization, result } = rebuildLockedGeodesicFromEndpointsAndPortalWordDetailed({
       world: request.world,
       registry: request.registry,
@@ -537,18 +532,15 @@ function rebuildConnectedGeodesicBetweenEmittersNow(
     });
     if (!result) {
       // The chord was traced once; a forbidden-zone hit deletes the geodesic even when a failed live carry would otherwise keep it.
-      if (realization?.kind === "zone" || !request.preserveGeodesicOnRebuildFailure) {
-        for (const arcId of curveArcIds) {
-          removeGeodesic(request.registry, arcId);
-        }
+      if (realization?.kind === "zone") {
+        removeGeodesic(request.registry, request.geodesicId);
         return [];
       }
-      // Any other failure during a carry: the arc keeps its old path and is marked stale until a rebuild succeeds.
-      const kept = request.registry.get(request.geodesicId);
-      if (kept?.kind === "geodesicModel/arc" && kept.stale !== true) {
-        request.registry.update({ ...kept, stale: true });
+      if (request.preserveGeodesicOnRebuildFailure) {
+        return getGeodesicSegments(request.registry, request.geodesicId);
       }
-      return getGeodesicSegments(request.registry, request.geodesicId);
+      removeGeodesic(request.registry, request.geodesicId);
+      return [];
     }
     return result.segments;
   }
@@ -592,7 +584,7 @@ export function moveEmitterAlongRoute(input: MoveEmitterAlongRouteInput): MoveEm
     return { moved: false, brokenGeodesicIds: [] };
   }
 
-  const lockedGeodesics = collectFollowingArcIdsForEmitter(input.registry, emitter.id)
+  const lockedGeodesics = collectLockedIncidentGeodesicIdsForEmitter(input.registry, emitter.id)
     .map((geodesicId) => input.registry.get(geodesicId))
     .filter((geodesic): geodesic is NonNullable<typeof geodesic> => geodesic !== undefined);
   const first = input.route[0];

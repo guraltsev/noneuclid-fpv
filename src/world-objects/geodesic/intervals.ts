@@ -5,7 +5,7 @@ import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex"
 import { transformPoint3, yawRigidTransform3 } from "../../math/rigidTransform3";
 import { addVec3, distanceSquaredVec3, scaleVec3, type Vec3 } from "../../math/vec3";
 import type { RuntimeObjectRegistry, RuntimeWorldObject } from "../runtimeObjectRegistry";
-import { createGeodesicArcObject, directionFromYaw, emitterConnectionToleranceMeters, type GeodesicVertexObject, GEODESIC_MIN_LENGTH_METERS, type GeodesicCannonObject, type GeodesicCarryPortalTransition, type GeodesicEndRole, type GeodesicArcObject, type GeodesicPortalTraversal, type GeodesicTraceBuildResult, getGeodesicCannonEmitterPoint, getOppositeEndRole, intersectionTolerance, isGeodesicVertexObject, type LiftedGeodesicEndpoint, minGeodesicSegmentLengthMeters, type TraceGeodesicSegmentResult, withoutStale } from "./objects";
+import { createGeodesicArcObject, directionFromYaw, emitterConnectionToleranceMeters, type GeodesicVertexObject, GEODESIC_MIN_LENGTH_METERS, type GeodesicCannonObject, type GeodesicCarryPortalTransition, type GeodesicEndRole, type GeodesicArcObject, type GeodesicPortalTraversal, type GeodesicTraceBuildResult, getGeodesicCannonEmitterPoint, getOppositeEndRole, intersectionTolerance, isGeodesicVertexObject, type LiftedGeodesicEndpoint, minGeodesicSegmentLengthMeters, type TraceGeodesicSegmentResult } from "./objects";
 import { canObjectAttachGeodesics } from "./anchors";
 import { applyAnchorCrossingTraversals, collectPortalWordFromTraces, portalTraversalFromCarryTransition, portalWordAfterAnchorCrossing, samePortalWord } from "./portalWord";
 import { reduceAdjacentInversePortalTraversals } from "./objects";
@@ -199,14 +199,9 @@ function commitRealizedTraces(
   traces: readonly TraceGeodesicSegmentResult[],
 ): GeodesicTraceBuildResult {
   const realizedTraces = withAnchoredTargetTerminal(registry, interval, traces);
-  // A successful rebuild clears the transient `stale` mark of a failed one during a carry.
-  const stored = registry.get(interval.id);
-  if (stored?.kind === "geodesicModel/arc" && stored.stale !== undefined) {
-    registry.update(withoutStale(stored));
-  }
   const segments = replaceDerivedSegmentsFromTraces({ registry, geodesicId: interval.id, traces: realizedTraces });
   return {
-    interval: withoutStale(interval),
+    interval,
     segments,
     terminal: traceTerminalToBuildTerminalForInterval(interval, realizedTraces.at(-1), registry),
   };
@@ -467,6 +462,7 @@ function splitGeodesicIntervalAtSegmentHitNow(input: Parameters<typeof splitGeod
       startAnchorObjectId: placed.id,
       endAnchorObjectId: freeEnd.id,
       startCellId: placed.cellId,
+      motionState: "stable",
     }));
   }
   // Shorten the original interval: its free role now attaches to the placed emitter, and its portal word becomes the prefix word.

@@ -423,8 +423,8 @@ export function createSymmetricPairScenario(halfWidth: number, height: number) {
   registry.add(createGeodesicCannonObject({ id: "e1", cellId: "a", localPose: yawRigidTransform3(0, { x: -halfWidth, y: 0, z: 0 }) }));
   registry.add(createGeodesicCannonObject({ id: "e2", cellId: "a", localPose: yawRigidTransform3(0, { x: halfWidth, y: 0, z: 0 }) }));
   registry.add(createGeodesicVertexObject({ id: "free", cellId: "a", point: { x: 0, y: height, z: geodesicRayBeamHeightMeters } }));
-  registry.add(createGeodesicArcObject({ id: "g1", startAnchorObjectId: "e1", endAnchorObjectId: "free", startCellId: "a" }));
-  registry.add(createGeodesicArcObject({ id: "g2", startAnchorObjectId: "free", endAnchorObjectId: "e2", startCellId: "a" }));
+  registry.add(createGeodesicArcObject({ id: "g1", startAnchorObjectId: "e1", endAnchorObjectId: "free", startCellId: "a", motionState: "moving" }));
+  registry.add(createGeodesicArcObject({ id: "g2", startAnchorObjectId: "free", endAnchorObjectId: "e2", startCellId: "a", motionState: "moving" }));
   rebuildDerivedGeodesicSegments({ world, registry, geodesicId: "g1" });
   rebuildDerivedGeodesicSegments({ world, registry, geodesicId: "g2" });
   registry.add(createCurveShorteningPairObject({ id: "pair", vertexIds: ["free"], cellId: "a" }));

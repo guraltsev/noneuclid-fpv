@@ -38,7 +38,7 @@ import { transformPoint3, yawRigidTransform3 } from "../../src/math/rigidTransfo
 import { createGeodesicCannonObject } from "../../src/world-objects/geodesic/objects";
 import { shootGeodesic } from "../../src/world-objects/geodesic/cannon";
 import { getGeodesicSegments } from "../../src/world-objects/geodesic/segments";
-import { getGeodesicConnection, arcConnectsEmitters } from "../../src/world-objects/geodesic/lifecycle";
+import { getGeodesicConnection, isGeodesicLocked } from "../../src/world-objects/geodesic/lifecycle";
 import { createRuntimeObjectRegistry, type RuntimeObjectRegistry } from "../../src/world-objects/runtimeObjectRegistry";
 import { cube } from "../../src/authoring/exampleWorlds";
 import { compileCellComplex, type CompiledCellComplex } from "../../src/cell-complex/compileCellComplex";
@@ -146,7 +146,7 @@ function handAt(x: number, y: number): RootAimRay {
 describe("releasing a carried emitter of a locked geodesic", () => {
   it("keeps the geodesic when the emitter is let go beyond a portal of the player's cell", () => {
     const { registry, tools } = setup();
-    expect(arcConnectsEmitters(registry, "g-a")).toBe(true);
+    expect(isGeodesicLocked(registry, "g-a")).toBe(true);
 
     tools.startGeodesicCannonCarry("cannon-b");
     // The player stands in cell a; the hand is past a's portal at x = 5, so the emitter sits in b at (0.8, 3).
@@ -158,7 +158,7 @@ describe("releasing a carried emitter of a locked geodesic", () => {
     const released = registry.get("cannon-b");
     expect(released).toMatchObject({ kind: "geodesic-cannon", cellId: "b" });
     expect(registry.get("g-a")).toMatchObject({ kind: "geodesicModel/arc" });
-    expect(arcConnectsEmitters(registry, "g-a")).toBe(true);
+    expect(isGeodesicLocked(registry, "g-a")).toBe(true);
     expect(getGeodesicConnection(registry, "g-a")).toEqual({
       outgoingEmitterId: "cannon-a",
       incomingEmitterId: "cannon-b",
@@ -180,7 +180,7 @@ describe("releasing a carried emitter of a locked geodesic", () => {
     // The hand was on the bottom face, so the emitter ends there and the geodesic no longer visits back.
     expect(registry.get("cannon-b")).toMatchObject({ kind: "geodesic-cannon", cellId: "bottom" });
     expect(registry.get("g-a")).toMatchObject({ kind: "geodesicModel/arc" });
-    expect(arcConnectsEmitters(registry, "g-a")).toBe(true);
+    expect(isGeodesicLocked(registry, "g-a")).toBe(true);
     expect(getGeodesicConnection(registry, "g-a")).toMatchObject({ state: "connected" });
   });
 
@@ -195,7 +195,7 @@ describe("releasing a carried emitter of a locked geodesic", () => {
 
     expect(registry.get("cannon-b")).toMatchObject({ kind: "geodesic-cannon", cellId: "top" });
     expect(registry.get("g-a")).toMatchObject({ kind: "geodesicModel/arc" });
-    expect(arcConnectsEmitters(registry, "g-a")).toBe(true);
+    expect(isGeodesicLocked(registry, "g-a")).toBe(true);
     expect(getGeodesicConnection(registry, "g-a")).toMatchObject({ state: "connected" });
   });
 
@@ -238,7 +238,7 @@ describe("releasing a carried emitter of a locked geodesic", () => {
     expect(emitter.cellId).toBe("bottom");
     expect(Math.cos(poseYaw - faceTurn)).toBeCloseTo(1, 6);
     expect(Math.cos(emitter.aimYawRadians - poseYaw)).toBeCloseTo(1, 6);
-    expect(arcConnectsEmitters(registry, "g-a")).toBe(true);
+    expect(isGeodesicLocked(registry, "g-a")).toBe(true);
   });
 });
 
