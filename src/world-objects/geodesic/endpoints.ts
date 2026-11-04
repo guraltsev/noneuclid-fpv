@@ -264,55 +264,42 @@ export function arcsAtVertex(registry: RuntimeObjectRegistry, vertexId: string):
   return ends;
 }
 
-// A vertex is shared (tied) when two or more arc ends are attached to it. One scan of the arcs per registry version.
-interface TiedVertexIndex {
-  readonly version: number;
-  readonly vertexIds: readonly string[];
-  readonly ids: ReadonlySet<string>;
-}
-
-const tiedVertexIndexByRegistry = new WeakMap<RuntimeObjectRegistry, TiedVertexIndex>();
-
-function tiedVertexIndex(registry: RuntimeObjectRegistry): TiedVertexIndex {
-  const version = registry.getVersion();
-  const cached = tiedVertexIndexByRegistry.get(registry);
-  if (cached?.version === version) {
-    return cached;
-  }
+/** Visits the vertices with two or more arc ends in registry insertion order. One scan of the arcs per call (not a hot path). */
+export function forEachTiedVertex(registry: RuntimeObjectRegistry, visit: (vertexId: string) => void): void {
   const counts = new Map<string, number>();
   for (const arc of registry.getObjectsOfKind("geodesicModel/arc")) {
-    for (const role of ["start", "end"] as const) {
-      const anchorId = arc[role].anchorObjectId;
-      counts.set(anchorId, (counts.get(anchorId) ?? 0) + 1);
-    }
+    counts.set(arc.start.anchorObjectId, (counts.get(arc.start.anchorObjectId) ?? 0) + 1);
+    counts.set(arc.end.anchorObjectId, (counts.get(arc.end.anchorObjectId) ?? 0) + 1);
   }
-  const vertexIds: string[] = [];
   for (const vertex of registry.getObjectsOfKind("geodesicModel/vertex")) {
     if ((counts.get(vertex.id) ?? 0) >= 2) {
-      vertexIds.push(vertex.id);
+      visit(vertex.id);
     }
   }
-  const index: TiedVertexIndex = { version, vertexIds, ids: new Set(vertexIds) };
-  tiedVertexIndexByRegistry.set(registry, index);
-  return index;
 }
 
-/** Number of vertices with two or more arc ends (closed loops included). */
+/** Number of vertices with two or more arc ends (closed loops included). One scan of the arcs per call. */
 export function tiedVertexCount(registry: RuntimeObjectRegistry): number {
-  return tiedVertexIndex(registry).vertexIds.length;
+  let count = 0;
+  forEachTiedVertex(registry, () => {
+    count += 1;
+  });
+  return count;
 }
 
-/** Visits the vertices with two or more arc ends in registry insertion order. */
-export function forEachTiedVertex(registry: RuntimeObjectRegistry, visit: (vertexId: string) => void): void {
-  for (const vertexId of tiedVertexIndex(registry).vertexIds) {
-    visit(vertexId);
-  }
-}
-
-/** True when the anchor is a vertex shared with an end of some arc other than `arcId`. */
+/** True when the anchor is a vertex shared with an end of some arc other than `arcId`. Allocation-free scan: the display path calls it for every rebuilt arc. */
 export function isVertexSharedWithOtherArc(registry: RuntimeObjectRegistry, anchorObjectId: string, arcId: string): boolean {
-  return tiedVertexIndex(registry).ids.has(anchorObjectId) &&
-    getGeodesicEndpointAttachmentsForAnchor(registry, anchorObjectId).some((attachment) => attachment.geodesicId !== arcId);
+  if (registry.get(anchorObjectId)?.kind !== "geodesicModel/vertex") {
+    return false;
+  }
+  const arcs = registry.getObjectsOfKind("geodesicModel/arc");
+  for (let index = 0; index < arcs.length; index += 1) {
+    const other = arcs[index]!;
+    if (other.id !== arcId && (other.start.anchorObjectId === anchorObjectId || other.end.anchorObjectId === anchorObjectId)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /** The arc has an end on a vertex that another arc end shares. A closed loop on one vertex is not tied; an id that is not an arc is not tied. */

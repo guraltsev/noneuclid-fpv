@@ -42,9 +42,9 @@ export interface GeodesicModelQueries {
   connectsEmitters(arcId: string): boolean;
   /** The arc has an end on a tied vertex (what `motionState: "moving"` used to say, for display). A closed loop on one vertex is not tied. */
   isTied(arcId: string): boolean;
-  /** Vertices with two arc ends, closed loops included. */
+  /** Vertices with two or more arc ends, closed loops included. One scan of the arcs per call, O(arcs); not for a per-step path. */
   tiedVertexCount(): number;
-  /** Visits them in registry insertion order. */
+  /** Visits them in registry insertion order. One scan of the arcs per call (allocates a count map), O(arcs); not for a per-step path. */
   forEachTiedVertex(fn: (vertexId: string) => void): void;
   /** Every arc of the curve through this vertex, walked over shared vertices. */
   arcsOfCurve(vertexId: string): readonly string[];

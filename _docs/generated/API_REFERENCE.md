@@ -749,8 +749,8 @@ Endpoint attachments of geodesic intervals: lookup by anchor, re-attachment, lif
 | function | `isAimableFreeGeodesic` | True for an arc with one emitter endpoint and one vertex that no other arc end uses (a plain shot geodesic). |
 | interface | `ArcEnd` | An arc end: one endpoint role of an arc. |
 | function | `arcsAtVertex` | Both endpoint roles attached to the vertex (a loop on it contributes two), in registry insertion order. |
-| function | `tiedVertexCount` | Number of vertices with two or more arc ends (closed loops included). |
 | function | `forEachTiedVertex` | Visits the vertices with two or more arc ends in registry insertion order. |
+| function | `tiedVertexCount` | Number of vertices with two or more arc ends (closed loops included). |
 | function | `isVertexSharedWithOtherArc` | True when the anchor is a vertex shared with an end of some arc other than `arcId`. |
 | function | `isTied` | The arc has an end on a vertex that another arc end shares. |
 | function | `isStale` | The arc's last rebuild failed during a carry, so it still shows its old path. |
@@ -800,7 +800,6 @@ Queries whether an arc connects emitters or follows one, and removal of geodesic
 | function | `getGeodesicConnection` | Describes how an interval geodesic attaches to emitters. |
 | function | `arcConnectsEmitters` | True when both ends of the arc are on emitters: a geodesic with no interior vertex. |
 | function | `arcFollowsEmitter` | The arc follows the emitter when it has an end on it and either connects emitters or its other end is a shared vertex (a tied arc). |
-| function | `collectConnectingArcIdsForEmitter` | Lists the ids of arcs that connect emitters (see `arcConnectsEmitters`) and have an end on the emitter. |
 | function | `collectFollowingArcIdsForEmitter` | Lists the ids of arcs that follow the emitter (see `arcFollowsEmitter`), in registry order. |
 | function | `removeGeodesic` | Removes a geodesic and its derived objects (an interval via `removeGeodesicIntervalAndDerivedObjects`; any other id only has stale segments and emitter cache entries removed), then refreshes intersections. |
 | function | `removeUnlockedGeodesicsFromCannon` | Removes every geodesic of the cannon that does not follow it (a plain shot geodesic with an unshared free end) and returns the removed ids (empty if the id is not a cannon). |

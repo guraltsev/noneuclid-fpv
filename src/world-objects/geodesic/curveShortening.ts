@@ -204,8 +204,10 @@ function flowVertex(
     return { changedIds: markUnresolved(request, pair, `vertex-valence-${ends.length}`) };
   }
   // An arc whose last rebuild failed during a carry still shows its old path; the vertex waits for a good one.
-  if (ends.some((end) => isStale(registry, end.arcId))) {
-    return { changedIds: [] };
+  for (let index = 0; index < ends.length; index += 1) {
+    if (isStale(registry, ends[index]!.arcId)) {
+      return { changedIds: [] };
+    }
   }
   const tangents = arcTangentsAtVertex(world, registry, vertexId, ends);
   if (!tangents) {
