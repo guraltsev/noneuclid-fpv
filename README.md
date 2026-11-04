@@ -16,11 +16,11 @@ build an explanation.
 
 These activities open in a browser from the project's own GitHub Pages site.
 
-- [Activity 1: cube-world exploration](https://guraltsev.github.io/noneuclid-fpv/?config=001)
-- [Activity 2: tetrahedron-world exploration](https://guraltsev.github.io/noneuclid-fpv/?config=002)
-- [Activity 3: flat torus](https://guraltsev.github.io/noneuclid-fpv/?config=003)
-- [Activity 4: genus-2 torus](https://guraltsev.github.io/noneuclid-fpv/?config=004)
-- [Activity 5: torus moduli](https://guraltsev.github.io/noneuclid-fpv/?config=005)
+- [Activity 1: cube-world exploration](https://guraltsev.github.io/noneuclid-fpv/main/?config=001)
+- [Activity 2: tetrahedron-world exploration](https://guraltsev.github.io/noneuclid-fpv/main/?config=002)
+- [Activity 3: flat torus](https://guraltsev.github.io/noneuclid-fpv/main/?config=003)
+- [Activity 4: genus-2 torus](https://guraltsev.github.io/noneuclid-fpv/main/?config=004)
+- [Activity 5: torus moduli](https://guraltsev.github.io/noneuclid-fpv/main/?config=005)
 
 ### Unrestricted mode (teachers and developers)
 
