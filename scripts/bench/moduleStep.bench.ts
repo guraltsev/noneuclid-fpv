@@ -52,6 +52,7 @@ interface Results {
   readonly flowMicroseconds: number;
   readonly flowDependentsMicroseconds: number;
   readonly idleBytesPerStep: number;
+  readonly bareEngineBytesPerStep: number;
 }
 
 const args = (process.env.BENCH_ARGS ?? "").split(/\s+/).filter(Boolean);
@@ -80,6 +81,7 @@ function main(): void {
     flowMicroseconds: pick(...rounds.map((r) => r.flowMicroseconds)),
     flowDependentsMicroseconds: pick(...rounds.map((r) => r.flowDependentsMicroseconds)),
     idleBytesPerStep: pick(...rounds.map((r) => r.idleBytesPerStep)),
+    bareEngineBytesPerStep: pick(...rounds.map((r) => r.bareEngineBytesPerStep)),
   };
 
   console.info(`\nmodule step (host ${os.hostname()}, ${trials} trials, median)`);
@@ -87,6 +89,7 @@ function main(): void {
   console.info(`flow              ${results.flowMicroseconds.toFixed(2)} us/step`);
   console.info(`flow+dependents   ${results.flowDependentsMicroseconds.toFixed(2)} us/step`);
   console.info(`idle allocation   ${results.idleBytesPerStep.toFixed(1)} bytes/step`);
+  console.info(`bare engine alloc ${results.bareEngineBytesPerStep.toFixed(1)} bytes/step`);
 
   if (record) {
     fs.mkdirSync(path.dirname(baselinePath), { recursive: true });
@@ -111,6 +114,7 @@ function baselineFailures(results: Results): string[] {
   if (results.flowDependentsMicroseconds > baseline.flowDependentsMicroseconds * 1.05 + 2) failures.push("flow+dependents step time");
   if (results.flowMicroseconds > baseline.flowMicroseconds * 1.1) failures.push("flow step time");
   if (results.idleBytesPerStep > baseline.idleBytesPerStep * 1.05 + allocationSlackBytesPerStep) failures.push("idle allocation");
+  if (results.bareEngineBytesPerStep > allocationSlackBytesPerStep) failures.push("bare engine allocation");
   return failures;
 }
 
@@ -254,11 +258,30 @@ function measureIdleBytesPerStep(gc: () => void): number {
   return Math.max(0, after - before) / idleAllocationSteps;
 }
 
+/** Bytes allocated per `step` plus `endFrame` of an engine with no modules and no commands (the bare engine on its own). */
+function measureBareEngineBytesPerStep(gc: () => void): number {
+  const { world, registry } = createIdleScene();
+  const engine = createWorldEngine({ registry, getWorld: () => world, participants: [createLocalPlayerParticipant(createDefaultPlayerPose("torus-room"))] });
+  for (let i = 0; i < 200; i += 1) {
+    engine.step(deltaSeconds);
+    engine.endFrame();
+  }
+  gc();
+  const before = process.memoryUsage().heapUsed;
+  for (let i = 0; i < idleAllocationSteps; i += 1) {
+    engine.step(deltaSeconds);
+    engine.endFrame();
+  }
+  const after = process.memoryUsage().heapUsed;
+  return Math.max(0, after - before) / idleAllocationSteps;
+}
+
 function measureRound(gc: () => void): Results {
   return {
     idleMicroseconds: median(Array.from({ length: trials }, () => timeIdle())),
     flowMicroseconds: median(Array.from({ length: trials }, () => timeFlow(false))),
     flowDependentsMicroseconds: median(Array.from({ length: trials }, () => timeFlow(true))),
     idleBytesPerStep: measureIdleBytesPerStep(gc),
+    bareEngineBytesPerStep: measureBareEngineBytesPerStep(gc),
   };
 }

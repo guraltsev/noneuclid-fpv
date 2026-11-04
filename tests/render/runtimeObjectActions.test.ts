@@ -153,8 +153,16 @@ describe("createRuntimeObjectActions", () => {
   it("cancels an open menu before teleporting home", () => {
     const menuState = { ...createRuntimeMenuState({ selectedWorldId: "test" }), isOpen: true };
     const { actions, commands, engine } = createHarness(undefined, { menuState });
+    const publish = engine.publishBody.bind(engine);
+    const commandsWhenPublished: number[] = [];
+    engine.publishBody = (participantId, body) => {
+      commandsWhenPublished.push(commands.length);
+      return publish(participantId, body);
+    };
 
     actions.teleportPlayerHome();
+
+    expect(commandsWhenPublished).toEqual([1]);
 
     expect(commands.map((command) => command.kind)).toEqual(["cancel-menu-and-tool"]);
     expect(readLocalPlayerPose(engine).position).toEqual({ x: 1, y: 2, z: 0 });

@@ -653,8 +653,8 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
       detachedEmitterId: cannonId,
       first: selectedEndpoints[0],
       second: selectedEndpoints[1],
-      createPairId: () => deps.engine.ids.next("geodesic"),
-      createFreeEndId: () => deps.engine.ids.next("geodesic"),
+      createPairId: () => deps.engine.ids.next("curve-shortening"),
+      createFreeEndId: () => deps.engine.ids.next("free-end"),
     });
     if (!pair) {
       syncDesktopPalette();
