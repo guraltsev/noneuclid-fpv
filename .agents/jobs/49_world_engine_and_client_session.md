@@ -1,6 +1,6 @@
 # Job 49 - Build the world engine and split the client session from it
 
-Status: in progress.
+Status: done, needs review on 2026-11-03.
 Resolves: part of issue [84](../../_issues/84_behaviors_are_hard_wired_into_the_shell_and_need_a_plugin_system.md) (requirements 1, 2, 3, 5).
 
 ## Goal
@@ -85,3 +85,36 @@ Job 48.
 - `grep -rn "playerPose\|objectIdSerials" src/runtime src/render` finds no session field.
 - A disabled tool is refused with its message in the app and in tests.
 - All checks above are green.
+
+## Report
+
+### Done
+- `src/engine/` (commit 9bb697b): `moduleTypes.ts` (section 9.1 types, `WorldEngine`, `WorldRequestToolCommand`, `WorldToolRevokedEvent`), `worldEngine.ts` (`createWorldEngine`, `readLocalPlayerPose`, `publishLocalPlayerPose`), `composeModules.ts` (all twelve rules of 9.2, topological order, one `ModuleCompositionError` listing every problem), `moduleTicks.ts` (simulate and derive passes, cursors, `wants`/`subscribes` wake rules, `onEvents`), `participants.ts` (participant table, participant journal, control slots), `toolGates.ts` (configuration gate, module gates, revocation), `ids.ts`, `writeGuard.ts` (frame stack, guarded registry, `queries` and `api` frames), `coreIds.ts` (typed tables of core kinds and tool ids).
+- The split (commit b3c83d2): `appSession.ts` is now `clientSession.ts` (`ClientSessionState`, `ClientSession`, `createClientSession`); it lost `playerPose`, `objectIdSerials`, `ObjectIdFamily`, `takeObjectIdSerial`, and gained `moduleToolState` and `pendingToolRequest`. Commands `set-player-pose` removed; `set-module-tool-state` and `set-pending-tool-request` added. The shell creates the engine right after the session, reads the pose with `readLocalPlayerPose(engine)`, writes it with `publishLocalPlayerPose` (D1), takes ids from `engine.ids`, calls `engine.step` after the creature loop (own error-guarded phase) and `engine.endFrame()` at the end of `renderFrame` (replacing job 48's journal clear). New `src/render/three/worldClient.ts`: the tool-request protocol (`requestTool`, settle after the step, message on refusal, revoked tool ends the selected tool), the generic event sink (every event with a `message` goes to the console and `recordDebugEvent`), and `api.world` (`submit`, `participants`). The palette (desktop and VR share it) asks `world/requestTool` instead of dispatching `select-tool`. Debug option `module-write-guard` switches the write guard on in the app.
+- Bench: the idle scene now runs the legacy sequence plus `engine.step` and `engine.endFrame` on an empty-module engine. Baseline file untouched.
+- Tests added: `tests/engine/composeModules.test.ts` (16), `tests/engine/worldEngine.test.ts` (26), `tests/render/worldClient.test.ts` (6), `tests/app/worldEngine.release.test.ts` (1), `tests/support/engine.ts` (shared fake). Docs: `_docs/ARCHITECTURE.md` updated, generated references regenerated.
+
+### Deviations
+- `publishBody(participantId, body)` has no caller parameter and returns a boolean. Ownership is the engine's `deviceId` option: the engine publishes only for participants whose `ownerId` equals its device (default `"local-device"`), and returns `false` for any other. The design left "the owner" unspecified.
+- Interfaces beyond 5.1: `WorldEngine.ids` (legacy writers still create objects and need ids), `WorldReadView.participants()`. `ParticipantRecord` is `{ id, kind, ownerId, body }`; `attachments` and `capabilities` are not there yet (no user). `ModuleInstance` has no `publicApi`, `transformGeometry` or `reset`, and `ModuleDefinition` no hook for them: nothing uses them until later jobs, and the repository rule is to delete unreachable code.
+- Object ids no longer contain `Date.now()`: they are `<family>:<serial>` from the engine (a taken id is skipped). The families keep their old names (`placed-flag`, `geodesic`, `geodesic-cannon`, `curve-shortening`, `free-end`, ...).
+- Existing tests changed: `tests/runtime/applyRuntimeCommand.test.ts` (the `set-player-pose` and serial-number tests are replaced by tests for `set-module-tool-state` and `set-pending-tool-request`; ids are tested in the engine tests), `tests/render/scenePaletteCommands.test.ts` (a tool selection is now a tool request, not a `select-tool` dispatch), `tests/render/runtimeObjectActions.test.ts` (reset and teleport are asserted on the engine's pose instead of a `set-player-pose` command), `tests/render/geometryCommit.test.ts` (the pose is read from and published to an engine; the deps lost `session` and `dispatch`). All other render tests only pass an engine from `createTestEngine` where the pose used to come from the session; `createTestAppSession` is now `createTestClientSession` (`tests/support/clientSession.ts`).
+- `GeometryCommitDeps` lost `session` and `dispatch` (nothing else used them).
+
+### Uncertain
+- The refusal message is shown by the shell's message hook, which today logs to the console and `runtimeDiagnostics`; there is no on-screen message system (same as the existing curve-shortening notices). The "pending" state is stored in the session, but the palette shows no spinner. Confirm that a console message is enough until a UI exists.
+- Only the palette's tool buttons go through `world/requestTool`. The object-page actions (`start-cannon-carry`, `-tie-and-detach`, `-rotation`, `-aim`) and `enter-tool-mode` still enter their tools directly, as before; the job names the palette and VR (which share the palette). A later job (54, tools from modules) should route them.
+- `moduleToolState` is cleared only through `set-module-tool-state`; clearing it when a tool ends needs `ownerModuleId` (job 54).
+- The step is placed right after the creature loop and before the legacy curve-shortening phase; the event sink assumes one `step` per frame (events are cleared by `endFrame`).
+- A throwing command handler is stored as `world/internalError` and rethrown after the step completes, so the shell's phase guard reports it; ticks propagate immediately. Design 5.3 only says "reported as internalError".
+- `module-write-guard` is not in the runtime-mutable debug options, so toggling it needs a reload.
+- The app was checked with the smoke run (`cube`, `torus-moduli`), the whole release tier (including the new `api.world` scenario) and the engine/client unit tests; I did not click a tool in a headset or a desktop browser by hand.
+- Bench: the idle allocation line prints 640.7 bytes/step (the legacy driver's own, as in the baseline); I did not separately measure the empty engine step's allocation, which the code keeps at zero by construction (no per-step closures or arrays).
+
+### Not done
+- Nothing from the job's steps. Not touched, as instructed: moving the job to `_done/`, the queue table and the batch report.
+
+### Checks
+- Baseline before changes: `npm run typecheck` ok, `npm test` 154 files / 1274 tests passed.
+- After: `npm run typecheck` ok; `npm test` 157 files / 1322 tests passed; `npm run docs:check` all ok (after `npm run docs:generate`); `npm run build` then `npm run smoke -- --world cube,torus-moduli` SMOKE OK (2 pages); `npm run bench -- moduleStep --check` check: ok (idle 0.10 us, flow about 16 us, flow+dependents about 30 us); `npm run test:release` 6 files / 13 tests passed, plus the new `worldEngine.release.test.ts` (1 test) passed.
+- `grep -rn "playerPose\|objectIdSerials" src/runtime src/render` finds only unrelated names (debug dump callbacks, `appState.playerPose` as the initial pose, local variables), no session field.
