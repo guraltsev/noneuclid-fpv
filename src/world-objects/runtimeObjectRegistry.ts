@@ -5,7 +5,7 @@
  * Invariants: ids are unique registry-wide; the by-cell index always matches each object's current `cellId`; objects are treated as immutable values and changed by `update` with a replacement; `getVersion` increases by one per content change (add, update, remove of an existing id, moveToCell, owner publish).
  * For objects with an owner (creatures, the marmot, collidable static assets) the registry is a read model: only the owner's publisher (from `claimOwnership`) may replace the record; `update`, `moveToCell` and `remove` throw for owned ids.
  * Query results (`getAll`, the per-cell queries) are cached and frozen: the same array is returned until a change touches it, a later change returns a new array, and callers must never mutate one.
- * Every write is also recorded in `changes`, the change journal (see runtimeObjectChangeJournal.ts); the frame owner clears it.
+ * Every write is also recorded in `changes`, the change journal (see runtimeObjectChangeJournal.ts); the frame owner clears it at the frame end, which only moves the frame start: earlier entries stay readable by sequence number through `changes.ring`.
  * Bulk fragments (bullets, stars and other particles) must not go through the registry per particle; per-tick immutable replacement allocates too much.
  */
 import type { RigidTransform3 } from "../math/rigidTransform3";
@@ -91,7 +91,7 @@ export interface RuntimeObjectRegistry {
   getKindScanCounts(): Readonly<Record<string, number>>;
   /** Number of objects of one kind: the size of the per-kind id set. No allocation. */
   countOfKind(kind: RuntimeWorldObject["kind"]): number;
-  /** Every write since the last `changes.clear()`, in order; the registry only appends to it. */
+  /** Every write since the last `changes.clear()`, in order, and (through `changes.ring`) earlier ones by sequence number; the registry only appends to it. A replacement that changes the kind is recorded as a `Removed` then an `Added`. */
   readonly changes: RuntimeObjectChangeJournal<RuntimeWorldObject>;
   /** The derived segments whose `geodesicId` is `geodesicId`, unsorted (a fresh array). */
   getSegmentsOfGeodesic(geodesicId: string): readonly GeodesicSegmentObject[];
@@ -218,7 +218,12 @@ export function createRuntimeObjectRegistry(
 
     objectsById.set(next.id, next);
     version += 1;
-    changes.record(ChangeOp.Updated, next);
+    if (previous.kind !== next.kind) {
+      changes.record(ChangeOp.Removed, previous, previous);
+      changes.record(ChangeOp.Added, next);
+    } else {
+      changes.record(ChangeOp.Updated, next, previous);
+    }
     invalidateQueries(previous.cellId, next.cellId);
   }
 
@@ -264,7 +269,7 @@ export function createRuntimeObjectRegistry(
       unindexKinds(object);
       objectsById.delete(id);
       version += 1;
-      changes.record(ChangeOp.Removed, object);
+      changes.record(ChangeOp.Removed, object, object);
       invalidateQueries(object.cellId);
     },
     claimOwnership(id) {

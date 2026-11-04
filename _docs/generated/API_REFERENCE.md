@@ -1058,15 +1058,19 @@ The fields every object in the runtime object registry shares, and the projectio
 
 ### `world-objects/runtimeObjectChangeJournal.ts`
 
-Change journal of the runtime object registry: every registry write since the last `clear`, in order (design 013 section 6.2).
+Change journal of the runtime object registry (design 013 section 6.2) over a change ring with absolute sequence numbers (design 014 section 3.1).
 
 | Kind | Name | Summary |
 | --- | --- | --- |
 | interface | `JournalRecord` | What the journal needs of a record. |
 | enum | `ChangeOp` | What a journal entry records. |
-| interface | `RuntimeObjectChangeJournal` | Every registry write since the last clear, in order. |
+| interface | `ChangeRing` | Every entry ever recorded, addressed by absolute sequence number, for as long as it is retained. |
+| interface | `ChangeRingStore` | The ring with its writing side. |
+| const | `defaultChangeRingCapacity` | The default capacity of a ring. |
+| function | `createChangeRing` | Creates an empty ring. |
+| interface | `RuntimeObjectChangeJournal` | Every registry write since the last clear, in order, as a view of the ring. |
 | interface | `RuntimeObjectChangeRecorder` | The registry's side of the journal: the read interface plus `record`. |
-| function | `createRuntimeObjectChangeJournal` | Creates an empty journal. |
+| function | `createRuntimeObjectChangeJournal` | Creates an empty journal over a new ring of `capacity` (a power of two; default 8192). |
 
 ### `world-objects/runtimeObjectRegistry.ts`
 

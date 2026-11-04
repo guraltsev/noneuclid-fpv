@@ -1,8 +1,9 @@
 /**
  * The bodies, simulate and derive passes over the composed modules (design 013 sections 5.2 and 6.4).
- * Bodies ticks (step phase 3) and simulate ticks (phase 4) run in module order, each unless its `isIdle` says so. In the derive pass each module first runs its `onEvents` handlers over the events since its own cursor, then its derive ticks; a derive tick wakes when `wants` is true or when the journal holds a write of a subscribed kind at or after its cursor, reads the range `[cursor, length)`, and then moves its cursor to the journal length.
- * Cursors live here and are reset by `resetCursors` (the engine's `endFrame`, when the journal is cleared). An idle pass allocates nothing.
+ * Bodies ticks (step phase 3) and simulate ticks (phase 4) run in module order, each unless its `isIdle` says so. In the derive pass each module first runs its `onEvents` handlers over the events since its own cursor, then its derive ticks; a derive tick wakes when `wants` is true or when the ring holds a write of a subscribed kind at or after its cursor, reads the sequence range `[cursor, headSeq)`, and then moves its cursor to `headSeq`; a tick that does not wake moves its cursor to `headSeq` too, since it had nothing to read and must not hold the ring back.
+ * Cursors are absolute sequence numbers of the change ring and live here. Derive cursors survive `endFrame` (which only moves the journal's frame start); event cursors are reset by `resetEventCursors`, because `endFrame` clears the events. `lowestCursor` tells the engine how far back the ring must be retained. An idle pass allocates nothing.
  */
+import type { JournalRecord, RuntimeObjectChangeJournal } from "../world-objects/runtimeObjectChangeJournal";
 import type { ComposedModule } from "./composeModules";
 import type { ModuleFrames } from "./writeGuard";
 import type { EngineEventBase, ModuleTick, StepContext } from "./moduleTypes";
@@ -19,7 +20,7 @@ export type MutableStepContext = Omit<StepContext, "deltaSeconds" | "stepIndex" 
 export interface TickRunnerDeps {
   readonly frames: ModuleFrames;
   readonly context: MutableStepContext;
-  readonly journal: { readonly length: number; lastIndexOfKind(kind: string): number };
+  readonly journal: Pick<RuntimeObjectChangeJournal<JournalRecord>, "ring" | "frameStartSeq">;
   /** The events of the steps since the last `endFrame`; the runner reads it live. */
   readonly events: readonly EngineEventBase[];
 }
@@ -30,7 +31,10 @@ export interface TickRunner {
   runBodies(): void;
   runSimulate(): void;
   runDerive(): void;
-  resetCursors(): void;
+  /** Starts the event cursors again; `endFrame` clears the events. Derive cursors are not touched. */
+  resetEventCursors(): void;
+  /** The lowest derive cursor, or `Number.POSITIVE_INFINITY` with no derive ticks. */
+  lowestCursor(): number;
 }
 
 interface DeriveEntry {
@@ -51,12 +55,13 @@ interface ModuleRuntime {
 /** Builds the runner for `modules`, which are already in topological order. */
 export function createTickRunner(modules: readonly ComposedModule[], deps: TickRunnerDeps): TickRunner {
   const { frames, context, journal, events } = deps;
+  const ring = journal.ring;
   const runtimes: ModuleRuntime[] = modules.map((module) => ({
     moduleId: module.definition.id,
     writable: module.writableKinds,
     bodies: module.instance.ticks.filter((tick) => tick.phase === "bodies"),
     simulate: module.instance.ticks.filter((tick) => tick.phase === "simulate"),
-    derive: module.instance.ticks.filter((tick) => tick.phase === "derive").map((tick) => ({ tick, cursor: 0 })),
+    derive: module.instance.ticks.filter((tick) => tick.phase === "derive").map((tick) => ({ tick, cursor: ring.baseSeq })),
     onEvents: module.instance.onEvents,
     eventCursor: 0,
   }));
@@ -68,8 +73,8 @@ export function createTickRunner(modules: readonly ComposedModule[], deps: TickR
       if (ticks.length === 0) continue;
       frames.push(runtime.moduleId, runtime.writable);
       try {
-        context.changesFrom = 0;
-        context.changesTo = journal.length;
+        context.changesFrom = journal.frameStartSeq;
+        context.changesTo = ring.headSeq;
         for (let t = 0; t < ticks.length; t += 1) {
           const tick = ticks[t]!;
           if (tick.isIdle?.(context)) continue;
@@ -99,11 +104,15 @@ export function createTickRunner(modules: readonly ComposedModule[], deps: TickR
         }
       }
     },
-    resetCursors() {
+    resetEventCursors() {
+      for (const runtime of runtimes) runtime.eventCursor = 0;
+    },
+    lowestCursor() {
+      let lowest = Number.POSITIVE_INFINITY;
       for (const runtime of runtimes) {
-        runtime.eventCursor = 0;
-        for (const entry of runtime.derive) entry.cursor = 0;
+        for (const entry of runtime.derive) if (entry.cursor < lowest) lowest = entry.cursor;
       }
+      return lowest;
     },
   };
 
@@ -111,8 +120,8 @@ export function createTickRunner(modules: readonly ComposedModule[], deps: TickR
     const handlers = runtime.onEvents;
     const end = events.length;
     if (handlers !== undefined) {
-      context.changesFrom = 0;
-      context.changesTo = journal.length;
+      context.changesFrom = journal.frameStartSeq;
+      context.changesTo = ring.headSeq;
       for (let i = runtime.eventCursor; i < end; i += 1) {
         const event = events[i]!;
         handlers[event.kind]?.(event, context);
@@ -124,10 +133,13 @@ export function createTickRunner(modules: readonly ComposedModule[], deps: TickR
   function runDeriveTick(entry: DeriveEntry): void {
     const tick = entry.tick;
     context.changesFrom = entry.cursor;
-    context.changesTo = journal.length;
-    if (!isWoken(tick, entry.cursor)) return;
+    context.changesTo = ring.headSeq;
+    if (!isWoken(tick, entry.cursor)) {
+      entry.cursor = ring.headSeq;
+      return;
+    }
     tick.run(context);
-    entry.cursor = journal.length;
+    entry.cursor = ring.headSeq;
   }
 
   function isWoken(tick: ModuleTick, cursor: number): boolean {
@@ -135,7 +147,7 @@ export function createTickRunner(modules: readonly ComposedModule[], deps: TickR
     const subscribes = tick.subscribes;
     if (subscribes === undefined) return false;
     for (let i = 0; i < subscribes.length; i += 1) {
-      if (journal.lastIndexOfKind(subscribes[i]!) >= cursor) return true;
+      if (ring.lastSeqOfKind(subscribes[i]!) >= cursor) return true;
     }
     return false;
   }

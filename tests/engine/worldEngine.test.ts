@@ -276,18 +276,18 @@ describe("the step order and the derive pass", () => {
 
     registry.add(thing("t1", "a/thing"));
     engine.step(0);
-    expect(ranges).toEqual([[0, 2]]);
+    expect(ranges).toEqual([[1, 2]]);
 
     engine.step(0);
-    expect(ranges).toEqual([[0, 2]]);
+    expect(ranges).toEqual([[1, 2]]);
 
     wants = true;
     registry.add(thing("o2", "a/other"));
     engine.step(0);
-    expect(ranges).toEqual([[0, 2], [2, 3]]);
+    expect(ranges).toEqual([[1, 2], [2, 3]]);
   });
 
-  it("starts every cursor again after endFrame clears the journal", () => {
+  it("keeps each cursor across endFrame", () => {
     const registry = createTestEngine().registry;
     const ranges: [number, number][] = [];
     const engine = createTestEngine({
@@ -304,7 +304,89 @@ describe("the step order and the derive pass", () => {
     engine.endFrame();
     registry.add(thing("t2", "a/thing"));
     engine.step(0);
-    expect(ranges).toEqual([[0, 1], [0, 1]]);
+    expect(ranges).toEqual([[0, 1], [1, 2]]);
+  });
+
+  it("reads a write made between step and endFrame in the next derive pass", () => {
+    const registry = createTestEngine().registry;
+    const ranges: [number, number][] = [];
+    const seen: string[] = [];
+    const engine = createTestEngine({
+      registry,
+      modules: [
+        fake("a", {
+          kinds: ["a/thing"],
+          ticks: [
+            {
+              id: "a/watch",
+              phase: "derive",
+              writes: [],
+              subscribes: ["a/thing"],
+              run: (ctx) => {
+                ranges.push([ctx.changesFrom, ctx.changesTo]);
+                for (let seq = ctx.changesFrom; seq < ctx.changesTo; seq += 1) seen.push(ctx.objects.changes.ring.objectAt(seq).id);
+              },
+            },
+          ],
+        }),
+      ],
+    });
+    engine.step(0);
+    registry.add(thing("late", "a/thing"));
+    engine.endFrame();
+    expect(registry.changes.length).toBe(0);
+    engine.step(0);
+    expect(ranges).toEqual([[0, 1]]);
+    expect(seen).toEqual(["late"]);
+  });
+
+  it("reads its next entry after sleeping through more writes than the ring holds", () => {
+    const registry = createTestEngine().registry;
+    const ranges: [number, number][] = [];
+    const engine = createTestEngine({
+      registry,
+      modules: [
+        fake("a", {
+          kinds: ["a/thing", "a/other"],
+          ticks: [{ id: "a/watch", phase: "derive", writes: [], subscribes: ["a/thing"], run: (ctx) => void ranges.push([ctx.changesFrom, ctx.changesTo]) }],
+        }),
+      ],
+    });
+    for (let i = 0; i < 8192 + 5; i += 1) {
+      registry.add(thing(`o${i}`, "a/other"));
+      if (i % 1000 === 0) engine.step(0);
+      if (i % 500 === 0) engine.endFrame();
+    }
+    registry.add(thing("t", "a/thing"));
+    engine.step(0);
+    expect(registry.changes.ring.baseSeq).toBeGreaterThan(0);
+    expect(ranges).toHaveLength(1);
+    const [from, to] = ranges[0]!;
+    expect(to - from).toBeLessThan(1000);
+    expect(registry.changes.ring.idAt(to - 1)).toBe("t");
+  });
+
+  it("does not move a derive cursor at endFrame and leaves the frame view empty", () => {
+    const registry = createTestEngine().registry;
+    const ranges: [number, number][] = [];
+    const engine = createTestEngine({
+      registry,
+      modules: [
+        fake("a", {
+          kinds: ["a/thing"],
+          ticks: [{ id: "a/watch", phase: "derive", writes: [], subscribes: ["a/thing"], wants: () => true, run: (ctx) => void ranges.push([ctx.changesFrom, ctx.changesTo]) }],
+        }),
+      ],
+    });
+    registry.add(thing("t1", "a/thing"));
+    engine.step(0);
+    registry.add(thing("t2", "a/thing"));
+    engine.endFrame();
+    expect(registry.changes.length).toBe(0);
+    engine.step(0);
+    engine.endFrame();
+    expect(ranges).toEqual([[0, 1], [1, 2]]);
+    expect(registry.changes.length).toBe(0);
   });
 
   it("runs a module's event handlers before its derive ticks, from their own cursor", () => {

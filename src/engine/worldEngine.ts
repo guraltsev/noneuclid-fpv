@@ -1,6 +1,6 @@
 /**
  * The world engine (design 013 section 5): the owner of world state, which changes only inside `step`, from queued commands and control slots.
- * It holds the participants, the engine-allocated ids, the composed modules and their step order, the events and the command results; the registry of world objects stays where it is and the engine owns the clearing of its change journal. Clients (the shell, tests, scripts) use the `WorldEngine` interface of moduleTypes.ts only.
+ * It holds the participants, the engine-allocated ids, the composed modules and their step order, the events and the command results; the registry of world objects stays where it is and the engine owns the frame end of its change journal: `endFrame` moves the journal's frame start (it erases no entry) and sets how far back the ring is retained, from the lowest derive cursor. Clients (the shell, tests, scripts) use the `WorldEngine` interface of moduleTypes.ts only.
  * One step: apply queued commands, sample control slots, bodies ticks (phase 3: attachments follow their carriers; locomotion joins later), simulate ticks, derive pass, tool-capability revocations, (deformation: empty until it moves in). Everything crossing the interface is plain data, and `read` hands out the engine's own records by reference.
  */
 import type { CompiledCellComplex } from "../cell-complex/compileCellComplex";
@@ -309,7 +309,8 @@ export function createWorldEngine(options: WorldEngineOptions): WorldEngine {
       participants.journal.clear();
       events.length = 0;
       if (results.size > 0) results.clear();
-      ticks.resetCursors();
+      ticks.resetEventCursors();
+      registry.changes.retainFrom(Math.min(registry.changes.frameStartSeq, ticks.lowestCursor()));
     },
   };
 }

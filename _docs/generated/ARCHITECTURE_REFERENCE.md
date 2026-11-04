@@ -5,7 +5,7 @@
 
 This reference is produced from the source code. For the *meaning* of the modules — the mathematical model they implement — read [../MATHEMATICAL_MODEL.md](../MATHEMATICAL_MODEL.md) and [../ARCHITECTURE.md](../ARCHITECTURE.md). For every exported symbol see [API_REFERENCE.md](API_REFERENCE.md).
 
-**249 modules, 52,064 lines** under `src/`.
+**249 modules, 52,184 lines** under `src/`.
 
 ## Layers
 
@@ -19,11 +19,11 @@ A module belongs to the layer named by its first path segment under `src/`. "May
 | `visibility` | 2 | 1,036 | `math`, `cell-complex` | Per-frame portal visibility: funnel clipping of portal-path tables against a camera. Pure; no renderer. |
 | `movement` | 10 | 1,645 | `math`, `cell-complex` | Player body, collision, movement and portal crossing in compiled cell complexes. |
 | `world-assets` | 1 | 201 | `cell-complex` | Floor-texture and asset descriptors. |
-| `world-objects` | 35 | 9,295 | `math`, `cell-complex`, `diagnostics`, `movement`, `world-assets` | Placeable runtime objects: registry, geodesic emitters, measurement tools, flags, creature behaviors. |
+| `world-objects` | 35 | 9,402 | `math`, `cell-complex`, `diagnostics`, `movement`, `world-assets` | Placeable runtime objects: registry, geodesic emitters, measurement tools, flags, creature behaviors. |
 | `authoring` | 5 | 671 | `math`, `cell-complex`, `examples`, `world-assets`, `world-objects` | World builder DSL, world-script compiler, validation and world catalog. |
 | `glue` | 11 | 1,012 | `math`, `cell-complex`, `diagnostics`, `authoring` | Launch options, debug settings, tool ids, asset URLs, app configuration. |
 | `interaction` | 5 | 1,564 | `math`, `cell-complex`, `movement`, `world-objects`, `glue` | Renderer-free interaction logic: input frames, aim picking, VR locomotion, XR session state, carried-object portal transitions. |
-| `engine` | 9 | 1,437 | `math`, `cell-complex`, `diagnostics`, `movement`, `world-objects`, `glue`, `interaction` | The world engine core (design 013): step order, command queue, participants, module composition and ticks. Imports no module. |
+| `engine` | 9 | 1,450 | `math`, `cell-complex`, `diagnostics`, `movement`, `world-objects`, `glue`, `interaction` | The world engine core (design 013): step order, command queue, participants, module composition and ticks. Imports no module. |
 | `modules` | 6 | 637 | `math`, `cell-complex`, `diagnostics`, `movement`, `world-objects`, `glue`, `interaction`, `engine` | World modules (design 013): each owns a slice of world behaviour and exposes a typed api.ts to the others. |
 | `runtime` | 14 | 2,638 | `math`, `cell-complex`, `diagnostics`, `movement`, `world-objects`, `authoring`, `glue`, `engine`, `modules` | Application state, runtime menu state, command dispatch, geometry session/worker, server channel and public API. |
 | `ui` | 6 | 1,320 | `math`, `cell-complex`, `world-objects`, `authoring`, `glue`, `engine`, `modules`, `runtime` | Renderer-neutral palette, help, tooltip and input-intent definitions. |
@@ -60,7 +60,7 @@ flowchart LR
   engine -->|3| cell_complex
   engine -->|5| glue
   engine -->|2| movement
-  engine -->|7| world_objects
+  engine -->|8| world_objects
   glue -->|2| authoring
   glue -->|3| diagnostics
   interaction -->|3| cell_complex
@@ -225,8 +225,8 @@ None: every import respects the intended layering.
 | `world-objects/placedFlags.ts` | 198 | Placed flags (signs): player-placed wooden signs carrying a short text label. | `cell-complex/compileCellComplex`, `math/rigidTransform3`, `math/vec3`, `movement/collision`, `movement/dynamicObject`, `world-objects/runtimeObjectBase`, `world-objects/runtimeObjectRegistry`, `world-objects/toolObjects` |
 | `world-objects/protractorTool.ts` | 516 | Protractor tool: persistent angle measurements between two geodesic directions at a common vertex. | `math/rigidTransform3`, `math/vec3`, `world-objects/geodesic/endpoints`, `world-objects/geodesic/intersections`, `world-objects/geodesic/objects`, `world-objects/geodesic/segments`, `world-objects/runtimeObjectRegistry`, `world-objects/toolObjects` |
 | `world-objects/runtimeObjectBase.ts` | 92 | The fields every object in the runtime object registry shares, and the projection of such an object onto the movement/collision state. | `cell-complex/specs`, `math/rigidTransform3`, `movement/dynamicObject` |
-| `world-objects/runtimeObjectChangeJournal.ts` | 79 | Change journal of the runtime object registry: every registry write since the last `clear`, in order (design 013 section 6.2). | — |
-| `world-objects/runtimeObjectRegistry.ts` | 450 | Runtime object registry: the per-cell, id-indexed store of every live (non-terrain) object in the world. | `cell-complex/specs`, `math/rigidTransform3`, `world-objects/geodesic/objects`, `world-objects/objectMetadata`, `world-objects/runtimeObjectBase`, `world-objects/runtimeObjectChangeJournal`, `world-objects/toolObjects` |
+| `world-objects/runtimeObjectChangeJournal.ts` | 181 | Change journal of the runtime object registry (design 013 section 6.2) over a change ring with absolute sequence numbers (design 014 section 3.1). | — |
+| `world-objects/runtimeObjectRegistry.ts` | 455 | Runtime object registry: the per-cell, id-indexed store of every live (non-terrain) object in the world. | `cell-complex/specs`, `math/rigidTransform3`, `world-objects/geodesic/objects`, `world-objects/objectMetadata`, `world-objects/runtimeObjectBase`, `world-objects/runtimeObjectChangeJournal`, `world-objects/toolObjects` |
 | `world-objects/simpleGeoCreature.ts` | 190 | Simple geodesic creatures: the mouse and the butterfly, autonomous walkers that follow straight lines (geodesics) through the cell complex. | `cell-complex/specs`, `math/rigidTransform3`, `math/vec3`, `world-objects/runtimeObjectBase`, `world-objects/staticAssets` |
 | `world-objects/staticAssets.ts` | 99 | Static asset authoring helper: converts author-facing parameters for a glTF decoration into an AssetObjectSpec. | `cell-complex/specs` |
 | `world-objects/toolObjects.ts` | 97 | Registry record types of the results of the player's tools: placed flags (signs), geodesic length labels and protractor angles. | `math/vec3`, `world-objects/geodesic/objects`, `world-objects/runtimeObjectBase` |
@@ -275,11 +275,11 @@ None: every import respects the intended layering.
 | `engine/composeModules.ts` | 325 | Composition of an experience's modules, once at engine creation (design 013 section 9.2). | `cell-complex/compileCellComplex`, `engine/moduleTypes`, `glue/toolIds`, `world-objects/runtimeObjectRegistry` |
 | `engine/coreIds.ts` | 48 | The names the engine knows without any module: the object kinds of the registry's core union and the tool ids of the core tools. | `glue/toolIds`, `world-objects/runtimeObjectRegistry` |
 | `engine/ids.ts` | 23 | Engine-allocated object ids: "<family>:<serial>" with one counter per family, never reused (design 013 section 5.1; no `Date.now()`). | `engine/moduleTypes` |
-| `engine/moduleTicks.ts` | 143 | The bodies, simulate and derive passes over the composed modules (design 013 sections 5.2 and 6.4). | `engine/composeModules`, `engine/moduleTypes`, `engine/writeGuard` |
+| `engine/moduleTicks.ts` | 155 | The bodies, simulate and derive passes over the composed modules (design 013 sections 5.2 and 6.4). | `engine/composeModules`, `engine/moduleTypes`, `engine/writeGuard`, `world-objects/runtimeObjectChangeJournal` |
 | `engine/moduleTypes.ts` | 282 | The types of the world engine and of its modules (design 013 sections 5 and 9): commands and their results, participants, the read view, tokens, module definitions and the contexts the engine hands to handlers and ticks. | `cell-complex/compileCellComplex`, `glue/toolIds`, `movement/playerPose`, `world-objects/runtimeObjectChangeJournal`, `world-objects/runtimeObjectRegistry` |
 | `engine/participants.ts` | 107 | Participants and control slots of the world engine (design 013 sections 5.1 and 5.4). | `engine/moduleTypes`, `world-objects/runtimeObjectChangeJournal` |
 | `engine/toolGates.ts` | 84 | Tool gates and the confirmation protocol's world side (design 013 section 8). | `engine/moduleTypes`, `glue/toolIds` |
-| `engine/worldEngine.ts` | 331 | The world engine (design 013 section 5): the owner of world state, which changes only inside `step`, from queued commands and control slots. | `cell-complex/compileCellComplex`, `engine/composeModules`, `engine/coreIds`, `engine/ids`, `engine/moduleTicks`, `engine/moduleTypes`, `engine/participants`, `engine/toolGates`, `engine/writeGuard`, `glue/toolIds`, `movement/playerPose`, `world-objects/runtimeObjectRegistry` |
+| `engine/worldEngine.ts` | 332 | The world engine (design 013 section 5): the owner of world state, which changes only inside `step`, from queued commands and control slots. | `cell-complex/compileCellComplex`, `engine/composeModules`, `engine/coreIds`, `engine/ids`, `engine/moduleTicks`, `engine/moduleTypes`, `engine/participants`, `engine/toolGates`, `engine/writeGuard`, `glue/toolIds`, `movement/playerPose`, `world-objects/runtimeObjectRegistry` |
 | `engine/writeGuard.ts` | 94 | Who is acting: a stack of module frames, and the write guard built on it (design 013 section 9.6). | `world-objects/runtimeObjectRegistry` |
 
 ### `modules`

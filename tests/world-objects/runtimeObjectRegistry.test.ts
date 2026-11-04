@@ -13,6 +13,7 @@ import { describe, expect, it } from "vitest";
 import { identityRigidTransform3 } from "../../src/math/rigidTransform3";
 import { simpleCollisionCylinder } from "../../src/movement/dynamicObject";
 import { createRuntimeObjectRegistry, createRuntimeStaticAssetObject } from "../../src/world-objects/runtimeObjectRegistry";
+import { ChangeOp } from "../../src/world-objects/runtimeObjectChangeJournal";
 import { type RuntimeCreatureObject } from "../../src/world-objects/runtimeObjectBase";
 import type { GeodesicCannonObject } from "../../src/world-objects/geodesic/objects";
 import { createSegment } from "../fixtures/world-objects/geodesic";
@@ -61,6 +62,27 @@ describe("runtimeObjectRegistry", () => {
     registry.add(emitter("e2", "a"));
     registry.getAll();
     expect(registry.getKindScanCounts()).toEqual({ "*": 2 });
+  });
+
+  it("records a kind change as Removed then Added, and the record before an update", () => {
+    const registry = createRuntimeObjectRegistry();
+    const first = creature("x", "a");
+    registry.add(first);
+    const moved = { ...first, cellId: "b" };
+    registry.update(moved);
+    const turned = emitter("x", "b");
+    registry.update(turned);
+    registry.remove("x");
+
+    const ring = registry.changes.ring;
+    expect([0, 1, 2, 3, 4].map((seq) => ring.opAt(seq))).toEqual([ChangeOp.Added, ChangeOp.Updated, ChangeOp.Removed, ChangeOp.Added, ChangeOp.Removed]);
+    expect([0, 1, 2, 3, 4].map((seq) => ring.kindAt(seq))).toEqual(["geo-mouse", "geo-mouse", "geo-mouse", "geodesic-cannon", "geodesic-cannon"]);
+    expect(ring.beforeAt(0)).toBeUndefined();
+    expect(ring.beforeAt(1)).toBe(first);
+    expect(ring.objectAt(2)).toBe(moved);
+    expect(ring.objectAt(3)).toBe(turned);
+    expect(ring.beforeAt(3)).toBeUndefined();
+    expect(ring.beforeAt(4)).toBe(turned);
   });
 
   it("adds objects by id and indexes them under their cell", () => {

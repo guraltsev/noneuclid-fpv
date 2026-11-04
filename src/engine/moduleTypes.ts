@@ -245,7 +245,7 @@ export interface StepContext {
   readonly objects: RuntimeObjectRegistry;
   readonly deltaSeconds: number;
   readonly stepIndex: number;
-  /** The journal range this tick has not seen. */
+  /** The range of change-ring sequence numbers this tick has not seen: read entry `seq` through `ctx.objects.changes.ring` (`objectAt(seq)`, `beforeAt(seq)`). Sequence numbers, not frame indices. */
   readonly changesFrom: number;
   readonly changesTo: number;
   participant(id: string): ParticipantRecord | undefined;
