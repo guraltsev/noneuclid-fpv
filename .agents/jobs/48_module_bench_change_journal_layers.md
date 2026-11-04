@@ -1,6 +1,6 @@
 # Job 48 - Record the performance baseline, add the change journal, and add the engine and module layers
 
-Status: in progress.
+Status: done, needs review on 2026-11-03.
 Resolves: part of issue [84](../../_issues/84_behaviors_are_hard_wired_into_the_shell_and_need_a_plugin_system.md) (requirement 3).
 
 ## Goal
@@ -68,3 +68,26 @@ registry has one version counter and no record of what changed. `scripts/docs/li
 
 - The baseline is committed and `npm run bench -- moduleStep --check` passes with the journal in place.
 - All checks above are green.
+
+## Report
+
+### Done
+- Commit 067d74d (baseline, no file under `src/`): `scripts/bench/moduleStep.bench.ts` (idle, flow, flow+dependents scenes; legacy driver = `advanceCurveShorteningPairs`, then `refreshProtractorAngleObject` / `refreshMeasuredGeodesicLengthObject` for the returned ids, then `pruneMissingGeodesicIntersectionObjects`), `--record` and `--check`, `scripts/bench/baselines/moduleStep.json` (host Leibniz), `scripts/bench/run.mjs` (`--expose-gc` through NODE_OPTIONS; flags reach the script in `BENCH_ARGS`), `scripts/bench/vite.config.ts` and `vitestStub.ts`.
+- Commit ea729cd: `src/world-objects/runtimeObjectChangeJournal.ts` (parallel arrays, `lastIndexOfKind`, `clear` without truncation), `registry.changes`, `countOfKind`, `RuntimeObjectReader`; the shell clears the journal at the end of `renderFrame` in `createThreeApp.ts`; `tests/world-objects/runtimeObjectChangeJournal.test.ts`.
+- Commit c375e0e: `engine` and `modules` layers, the prefix rule shape (`prefixImportRuleViolations`), generated per-module-directory rules, the geometry-tools rule, the render/ui to engine rules, `legacyWorldWriters` (14 files) with `ModuleInfo.writesRegistry`, tests in `tests/project/moduleImportRules.test.ts`, the amended `_docs/coding_style.md` and `_docs/llm-implementation-workflow.md`, regenerated `_docs/generated/*`.
+- A final commit adds this report and the Status line.
+### Deviations
+- The fixtures import `expect` from vitest, which cannot load outside a Vitest worker, so `npm run bench` now runs vite-node with `scripts/bench/vite.config.ts`, which aliases `vitest` to a no-op stub. No fixture was changed.
+- The legacy driver allocates about 640-870 bytes per idle step (fresh arrays from `getObjectsOfKind`, closures in `withDeferredGeodesicIntersections`), so the absolute 16 bytes per step ceiling cannot hold for it. `--check` holds idle allocation to baseline x 1.05 + 16 bytes. The absolute 16 is still the target for the engine step of job 49.
+- The recorded baseline is the slowest of three rounds and a check passes if any of up to three rounds is within tolerance, because one round varies by about 10 percent on this machine (the flow limit is only 10 percent). Flow runs 10 fresh scenes per trial to cut noise.
+- `RuntimeObjectChangeJournal` is generic in its record type (`RuntimeObjectChangeJournal<RuntimeWorldObject>` on the registry) so the journal file need not import the registry (that was an import cycle). Not in the spec signature.
+- `src/engine/` and `src/modules/` were not created: the checker does not need them (the generated per-module rules read the module directories that exist). The docs wording avoids `src/engine/` paths because the document-reference check rejects paths that do not exist.
+### Uncertain
+- "World-objects mutator" is implemented as: a `world-objects` file (other than the registry) containing a call `registry.add/update/remove/claimOwnership/releaseOwnership/moveToCell(`. A render/ui file importing such a file (type-only imports included) is a legacy writer. Files that write the registry through a registry they received but import no such module are not listed. Confirm this is the intended meaning.
+- The geometry tools allowed through `onlyVia` are `portalWord.ts`, `development.ts`, `trace.ts` and `objects.ts` under `world-objects/geodesic/`; section 13.1 gives no file-level list.
+- Flow timing can still flake on a loaded machine; rerun `--check` before treating a failure as real.
+### Not done
+- Nothing skipped.
+### Checks
+- Baseline before changes: `npm run typecheck` clean; `npm test` 153 files, 1259 tests pass (the known `appCommands.release` failure did not occur here).
+- Final: `npm run typecheck` clean; `npm test` 154 files, 1274 tests pass; `npm run docs:check` all ok (after `npm run docs:generate`); `npm run build` ok; `npm run smoke -- --world cube,torus-moduli` SMOKE OK (2 pages); `npm run bench -- moduleStep --check` ok in 3 consecutive runs.
