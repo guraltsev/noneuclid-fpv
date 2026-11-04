@@ -410,7 +410,7 @@ describe("tool requests and gates", () => {
 describe("the access rule", () => {
   it("refuses publishBody for a participant another device owns", () => {
     const registry = createTestEngine().registry;
-    const ana = { id: "ana", kind: "remote-player" as const, ownerId: "device-ana", body: createDefaultPlayerPose("room-a") };
+    const ana = { id: "ana", kind: "remote-player" as const, ownerId: "device-ana", body: createDefaultPlayerPose("room-a"), attachments: [] };
     const engine = createWorldEngine({ registry, getWorld: () => ({}) as never, participants: [createLocalPlayerParticipant(createDefaultPlayerPose("room-a")), ana] });
     expect(engine.publishBody("ana", createDefaultPlayerPose("room-b"))).toBe(false);
     expect(engine.publishBody("nobody", createDefaultPlayerPose("room-b"))).toBe(false);
@@ -550,5 +550,56 @@ describe("the access rule", () => {
     loopEngine.submit("local", { kind: "a/loop" });
     expect(() => loopEngine.step(0)).toThrow(/nests deeper than 8/);
     expect(depths.length).toBe(9);
+  });
+});
+
+describe("attachments and the bodies phase", () => {
+  it("runs bodies ticks after the control slots are sampled and before the simulate ticks", () => {
+    const order: string[] = [];
+    const engine = createTestEngine({
+      modules: [
+        fake("a", {
+          ticks: [
+            { id: "a/sim", phase: "simulate", writes: [], run: () => void order.push("simulate") },
+            { id: "a/body", phase: "bodies", writes: [], run: () => void order.push("bodies") },
+          ],
+        }),
+      ],
+    });
+    engine.step(1 / 60);
+    expect(order).toEqual(["bodies", "simulate"]);
+  });
+
+  it("replaces attachments through the context, journals it, and keeps them over a body write", () => {
+    const attachment = { kind: "a/hold", objectId: "x", arrived: false };
+    const engine = createTestEngine({
+      modules: [fake("a", { commands: { "a/hold": { run: (_command, ctx) => (ctx.setAttachments(ctx.participantId, [attachment]), ok) } } })],
+    });
+    engine.submit("local", { kind: "a/hold" });
+    engine.step(0);
+
+    expect(engine.read.participant("local")?.attachments).toEqual([attachment]);
+    expect(engine.read.participantChanges.length).toBe(1);
+    engine.publishBody("local", { ...createDefaultPlayerPose("room-a"), yawRadians: 1 });
+    expect(engine.read.participant("local")?.attachments).toEqual([attachment]);
+  });
+
+  it("lets a module write a core kind only if it lists it in writesCoreKinds", () => {
+    const flag = thing("flag-1", "placed-flag");
+    const engineFor = (writesCoreKinds?: readonly string[]) =>
+      createTestEngine({
+        modules: [{ ...fake("a", { commands: { "a/add": { run: (_command, ctx) => (ctx.objects.add(flag), ok) } } }), writesCoreKinds }],
+      });
+
+    const refusing = engineFor();
+    const refused = refusing.submit("local", { kind: "a/add" });
+    expect(() => refusing.step(0)).toThrow(/does not declare/);
+    expect(refusing.resultOf(refused)).toMatchObject({ ok: false, refusal: { code: "world/internalError" } });
+
+    const allowing = engineFor(["placed-flag"]);
+    const accepted = allowing.submit("local", { kind: "a/add" });
+    allowing.step(0);
+    expect(allowing.resultOf(accepted)).toEqual({ ok: true });
+    expect(allowing.registry.get("flag-1")).toBeDefined();
   });
 });

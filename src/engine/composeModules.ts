@@ -46,6 +46,8 @@ export interface ComposedModule {
   readonly instance: ModuleInstance<unknown, never, EngineEventBase, unknown>;
   /** Kinds this module declares. */
   readonly declaredKinds: ReadonlySet<string>;
+  /** Kinds the write guard lets this module write: the declared kinds and its `writesCoreKinds`. */
+  readonly writableKinds: ReadonlySet<string>;
   /** Ids of the modules whose tokens this module requires, directly. */
   readonly requiredModuleIds: ReadonlySet<string>;
 }
@@ -116,6 +118,7 @@ export function composeModules(definitions: readonly AnyModuleDefinition[], opti
       definition,
       instance,
       declaredKinds: new Set(definition.objectKinds.map((declaration) => declaration.kind)),
+      writableKinds: writableKindsOf(definition),
       requiredModuleIds: new Set(definition.requires.flatMap((token) => providerOfToken.get(token.id)?.id ?? [])),
     });
   }
@@ -132,6 +135,11 @@ export function composeModules(definitions: readonly AnyModuleDefinition[], opti
     if (module.definition.provides) providers.set(module.definition.provides.id, module);
   }
   return { modules, handlers, providers, moduleToolIds };
+}
+
+/** The kinds the write guard lets a module write. */
+export function writableKindsOf(definition: AnyModuleDefinition): ReadonlySet<string> {
+  return new Set([...definition.objectKinds.map((declaration) => declaration.kind), ...(definition.writesCoreKinds ?? [])]);
 }
 
 /** Topological order of `requires`, ties broken by list order; undefined (with a problem) when a token has no provider or the modules form a cycle. Records rules 1 to 4. */
@@ -219,6 +227,9 @@ function checkDefinitions(definitions: readonly AnyModuleDefinition[], options: 
       }
       declaredBy.set(declaration.kind, definition.id);
       checkName(definition.id, "object kind", declaration.kind, problems);
+    }
+    for (const kind of definition.writesCoreKinds ?? []) {
+      if (!core.has(kind)) problems.push(`module ${definition.id} lists ${kind} in writesCoreKinds, which is not a core kind`);
     }
     for (const toolId of definition.toolIds ?? []) {
       checkName(definition.id, "tool id", toolId, problems);

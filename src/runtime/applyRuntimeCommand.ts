@@ -65,17 +65,8 @@ export function applyRuntimeCommand(session: ClientSession, command: RuntimeComm
 
 /**
  * Pure reducer: the next session state and the ordered effects for one command. Returns the same state object when the command changes nothing.
- * The carry record exists only while the carry tool is the selected tool: any command that leaves that tool drops the record.
  */
 export function reduceRuntimeCommand(state: ClientSessionState, command: RuntimeCommand): RuntimeCommandResult {
-  const result = reduceCommand(state, command);
-  if (result.state.carry && result.state.menuState.selectedTool !== "geodesic-cannon-carry") {
-    return { state: { ...result.state, carry: undefined }, effects: result.effects };
-  }
-  return result;
-}
-
-function reduceCommand(state: ClientSessionState, command: RuntimeCommand): RuntimeCommandResult {
   const menu = state.menuState;
   const config = state.appConfig;
   const toolEnabled = (toolId: RuntimeToolId): boolean => isRuntimeToolEnabled(config, toolId);
@@ -251,15 +242,6 @@ function reduceCommand(state: ClientSessionState, command: RuntimeCommand): Runt
     }
     case "set-pending-tool-request":
       return command.request === state.pendingToolRequest ? nothing : { state: { ...state, pendingToolRequest: command.request }, effects: [] };
-    case "begin-carry":
-      // A second pickup of the object already carried changes nothing. (Outside the carry tool the wrapper drops the record again.)
-      return state.carry?.objectId === command.objectId
-        ? nothing
-        : { state: { ...state, carry: { objectId: command.objectId, arrived: false } }, effects: [] };
-    case "carry-arrived":
-      return state.carry && !state.carry.arrived ? { state: { ...state, carry: { ...state.carry, arrived: true } }, effects: [] } : nothing;
-    case "end-carry":
-      return state.carry ? { state: { ...state, carry: undefined }, effects: [] } : nothing;
     case "adopt-debug-settings": {
       const seeded = createRuntimeMenuState({
         selectedWorldId: menu.selectedWorldId,

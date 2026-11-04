@@ -337,8 +337,9 @@ export const moduleImportRules = [
       "world-objects/geodesic/trace.ts",
       "world-objects/geodesic/objects.ts",
     ],
-    exceptFromPrefixes: ["modules/geodesicModel/"],
-    reason: "modules reach the piecewise-geodesic implementation only through the geodesicModel module, except for its stateless geometry tools (design 013 section 13.1)",
+    // The carry module runs the emitter's carry contract (moveEmitterAlongRoute and the rebuild of carryEnd.ts), which stays in world-objects code until the emitter module (design 013 sections 7 and 16).
+    exceptFromPrefixes: ["modules/geodesicModel/", "modules/carry/"],
+    reason: "modules reach the piecewise-geodesic implementation only through the geodesicModel module, except for its stateless geometry tools (design 013 section 13.1); the carry module also runs the emitter's carry contract until the emitter module exists",
   },
   {
     fromPrefix: "render/",

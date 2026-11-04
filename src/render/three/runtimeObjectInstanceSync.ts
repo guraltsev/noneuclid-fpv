@@ -12,7 +12,9 @@
  * (`carryHighlight.ts`) at the object's place and at its own portal ghosts, decided by the shape's reach, so it is whole on whichever side of a portal the viewer is.
  * It never touches the selectable-hitbox debug meshes.
  */
-import { readLocalPlayerPose, type WorldEngine } from "../../engine/worldEngine";
+import { localParticipantId, readLocalPlayerPose, type WorldEngine } from "../../engine/worldEngine";
+import { participantAttachment } from "../../engine/moduleTypes";
+import { carryAttachmentKind } from "../../modules/carry/api";
 import type { ClientSession } from "../../runtime/clientSession";
 import type * as THREE from "three";
 import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex";
@@ -250,7 +252,7 @@ export function createRuntimeObjectInstanceSync(deps: RuntimeObjectInstanceSyncD
     };
 
     // The highlight shape exists as an archetype only while something is carried.
-    const carriedId = deps.session.get().carry?.objectId;
+    const carriedId = participantAttachment(deps.engine.read.participant(localParticipantId), carryAttachmentKind)?.objectId;
     if (carriedId !== undefined && objects.some((object) => object.id === carriedId)) {
       addSource(carryHighlightSource);
     }
@@ -419,7 +421,7 @@ export function createRuntimeObjectInstanceSync(deps: RuntimeObjectInstanceSyncD
     const seenIds = new Set<string>();
     const groups: PortalGhostedRecords[] = [];
     const groupSources: RuntimeObjectRecordSource[] = [];
-    const carriedId = deps.session.get().carry?.objectId;
+    const carriedId = participantAttachment(deps.engine.read.participant(localParticipantId), carryAttachmentKind)?.objectId;
     let carriedObject: RuntimeWorldObject | undefined;
 
     for (const object of objects) {

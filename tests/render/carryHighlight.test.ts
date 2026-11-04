@@ -162,10 +162,8 @@ function setupSync(carriedId: string | undefined) {
     maxVisiblePaths: 4,
     diagnostics: createRuntimeObjectRenderArchetypeDiagnostics(),
     getWorld: () => world,
-    session: createTestClientSession({
-      carry: carriedId === undefined ? undefined : { objectId: carriedId, arrived: true },
-    }),
-    engine: createTestEngine({ playerPose: { cellId: "room-b", position: { x: 0, y: 0, z: 0 }, yawRadians: 0 } as unknown as PlayerPose }),
+    session: createTestClientSession(),
+    engine: createTestEngine({ playerPose: { cellId: "room-b", position: { x: 0, y: 0, z: 0 }, yawRadians: 0 } as unknown as PlayerPose, carrying: carriedId }),
     buildArchetype: (source, capacity) => buildRuntimeObjectRenderArchetype(source, capacity, undefined),
   });
   return { sync, renderArchetypesByKey, object };
@@ -238,8 +236,8 @@ describe("the highlight of a carried geodesic emitter", () => {
       maxVisiblePaths: 4,
       diagnostics: createRuntimeObjectRenderArchetypeDiagnostics(),
       getWorld: () => world,
-      session: createTestClientSession({ carry: { objectId: "cannon-b", arrived: true } }),
-      engine: createTestEngine(),
+      session: createTestClientSession(),
+      engine: createTestEngine({ carrying: "cannon-b" }),
       buildArchetype: (source, capacity) => buildRuntimeObjectRenderArchetype(source, capacity, undefined),
     });
     const shift = new THREE.Matrix4().makeTranslation(-2, 0, 0);
@@ -285,8 +283,8 @@ describe("the highlight of a carried emitter that stands at a portal", () => {
       maxVisiblePaths: 4,
       diagnostics: createRuntimeObjectRenderArchetypeDiagnostics(),
       getWorld: () => world,
-      session: createTestClientSession({ carry: { objectId: "cannon-b", arrived: true } }),
-      engine: createTestEngine(),
+      session: createTestClientSession(),
+      engine: createTestEngine({ carrying: "cannon-b" }),
       buildArchetype: (source, capacity) => buildRuntimeObjectRenderArchetype(source, capacity, undefined),
     });
     // room-b's frame seen from room-a: room-b's west wall (x = -1) is room-a's east wall (x = 1).

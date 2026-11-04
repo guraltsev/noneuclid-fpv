@@ -70,6 +70,10 @@ describe("composeModules", () => {
     expect(core).toContain("module one declares the object kind geo-mouse, which is a core kind");
   });
 
+  it("rejects a writesCoreKinds entry that is not a core kind", () => {
+    expect(problemsOf([fake("one", { writesCoreKinds: ["one/thing"] })])).toContain("module one lists one/thing in writesCoreKinds, which is not a core kind");
+  });
+
   it("rejects two handlers for one command kind and two modules defining one tool id", () => {
     const run = () => ({ ok: true as const });
     const commands = { "one/go": { run } };

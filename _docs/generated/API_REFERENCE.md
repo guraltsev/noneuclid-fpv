@@ -930,6 +930,14 @@ Help-hub copy shared by the authoring layer (world tutorial text) and the ui lay
 | --- | --- | --- |
 | const | `helpHubHomeGuidance` | Help-hub hint telling a stuck player to use the tool menu's Home button to return to the starting place. |
 
+### `world-objects/interactionRange.ts`
+
+How far a person may be from a runtime object to interact with it: the one number the aim system (to focus and pick up) and the carry module (to refuse a pickup out of reach) both read.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| function | `getRuntimeObjectInteractionRangeMeters` | Returns the maximum interaction distance in meters for an object: tooltip range, else interactable range, else 2.5. |
+
 ### `world-objects/library.ts`
 
 World object library: the catalogue of named, ready-to-place objects available to world scripts (tree, house, bench, geo_mouse, geodesic_marmot, ...).
@@ -1373,6 +1381,7 @@ Composition of an experience's modules, once at engine creation (design 013 sect
 | interface | `ComposedExperience` | The result of composition. |
 | interface | `ComposeOptions` | What composition needs of the engine. |
 | function | `composeModules` | Checks, orders and creates the modules; throws a {@link ModuleCompositionError} listing every problem. |
+| function | `writableKindsOf` | The kinds the write guard lets a module write. |
 
 ### `engine/coreIds.ts`
 
@@ -1393,7 +1402,7 @@ Engine-allocated object ids: "<family>:<serial>" with one counter per family, ne
 
 ### `engine/moduleTicks.ts`
 
-The simulate and derive passes over the composed modules (design 013 sections 5.2 and 6.4).
+The bodies, simulate and derive passes over the composed modules (design 013 sections 5.2 and 6.4).
 
 | Kind | Name | Summary |
 | --- | --- | --- |
@@ -1416,6 +1425,8 @@ The types of the world engine and of its modules (design 013 sections 5 and 9): 
 | type | `CommandResult` | The answer to a command: accepted (with an optional value) or refused with a stable code and a sentence for people. |
 | type | `CommandTicket` | What `submit` returns: pass it to `resultOf` after the step that applied the command. |
 | type | `ParticipantBody` | Where a participant is: the same record as the player pose (cell, cell-local position, yaw, pitch). |
+| interface | `ParticipantAttachment` | A relation the world holds between a participant and an object (design 013 section 7). |
+| function | `participantAttachment` | The attachment of `kind` that `participant` holds, or undefined. |
 | interface | `ParticipantRecord` | Someone acting in the world. |
 | interface | `WorldReadView` | The read-only world state clients use between steps. |
 | interface | `EngineIdSource` | "<family>:<serial>" for core families, "<moduleId>/<family>:<serial>" for a module's (design 013 section 10), serials from the engine. |
@@ -1424,7 +1435,7 @@ The types of the world engine and of its modules (design 013 sections 5 and 9): 
 | interface | `ModuleToken` | A typed name for an exported module API. |
 | function | `defineModuleToken` | Creates a token. |
 | type | `CommandHandlers` | One handler per command kind; the mapped type makes the set exhaustive. |
-| type | `ModulePhase` | The two kinds of per-step work: simulate ticks change the world, derive ticks recompute what follows from the journal. |
+| type | `ModulePhase` | The kinds of per-step work: bodies ticks (step phase 3) move what follows a participant, simulate ticks change the world, derive ticks recompute what follows from the journal. |
 | interface | `ObjectKindDeclaration` | An object kind a module declares. |
 | interface | `ModuleTick` | Per-step work of a module, in a phase. |
 | interface | `ModuleDefinition` | The world part of a module. |
@@ -1482,6 +1493,43 @@ Who is acting: a stack of module frames, and the write guard built on it (design
 | function | `guardRegistry` | The registry as modules see it with the guard on: every write is checked against the active frame first. |
 | function | `runFunctionsInFrame` | A copy of `target` whose functions run inside a frame of `moduleId` (with `writableKinds`); other properties are kept. |
 
+## `modules`
+
+### `modules/carry/api.ts`
+
+The carry module's public face (design 013 sections 7 and 12.1): the names of its commands, events and control slot, and their plain-data shapes.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| const | `carryAttachmentKind` | The kind of the attachment a carry holds on a participant. |
+| const | `carryOffsetSlot` | The control slot a carrier sets each frame: where the hand is and how far the carried object may fall behind it. |
+| type | `CarryOffset` | Value of the `carry/offset` slot, plain data. |
+| interface | `CarryAttachCommand` | Picks an object up. |
+| interface | `CarryDetachCommand` | Puts down what the issuing participant carries (a detach only, design 012 P4); the final rebuild of the emitter's geodesics runs. |
+| interface | `CarryDropCommand` | Module-only: the carry ends by the carry rules themselves (the hand's leash). |
+| type | `CarryCommand` | Every command of the module. |
+| type | `CarryDropReason` | Why the world ended a carry: the hand's leash released the object (too far, or unreachable), or the object no longer exists. |
+| interface | `CarryMovedEvent` | The carried object moved this step; the geodesics it anchors were rebuilt, so what depends on them needs a refresh. |
+| interface | `CarryReleasedEvent` | A carry ended, however it ended (detach or drop): the final rebuild ran. |
+| interface | `CarryDroppedEvent` | The world ended the carry (design 013 section 7); the client leaves its carry tool. |
+| type | `CarryEvent` | Every event of the module. |
+| const | `carryRefusals` | Refusal codes of `carry/attach`. |
+
+### `modules/carry/index.ts`
+
+The carry module's world factory (design 013 section 12.1).
+
+_No exports._
+
+### `modules/carry/module.ts`
+
+The carry module (design 013 section 7): who carries what is world state.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| type | `CarryModuleDefinition` | The module as the engine's list takes it. |
+| function | `carryModule` | Creates the carry module. |
+
 ## `runtime`
 
 ### `runtime/apiCall.ts`
@@ -1520,11 +1568,18 @@ The client session: the one record that holds how one person is interacting with
 
 | Kind | Name | Summary |
 | --- | --- | --- |
-| interface | `CarryRecord` | Who is being carried, and whether the object has reached the hand yet. |
 | interface | `PendingToolRequest` | A request to switch to a tool that the world has not answered yet (design 013 section 8.1): the old tool stays active until `world/requestTool` is accepted. |
 | interface | `ClientSessionState` | Mutable state of one client of a running world, as one plain record. |
 | interface | `ClientSession` | Owner of the current ClientSessionState. |
 | function | `createClientSession` | Creates a session holding `initial`. |
+
+### `runtime/experience.ts`
+
+The default experience (design 013 section 12.1): the world modules the app composes into its engine, in list order.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| function | `createDefaultWorldModules` | The world modules of the default experience. |
 
 ### `runtime/publicApi.ts`
 
@@ -2686,7 +2741,6 @@ Aim-ray value type and pure aim helpers shared by desktop and XR interaction cod
 | function | `intersectRootRayWithFloor` | Intersects a Three.js-frame ray with the floor plane z = 0 of the world frame. |
 | function | `getAimForwardVector` | Returns the ray's direction in world axes, or `undefined` if no ray is given. |
 | function | `createAimTargetCycleSignature` | Builds a string identifying an ordered list of aim targets (object id, geodesic emitter id, portal hop count) so callers can detect when the set under the ray changed and reset target cycling. |
-| function | `getRuntimeObjectInteractionRangeMeters` | Returns the maximum interaction distance in meters for an object: tooltip range, else interactable range, else 2.5. |
 | interface | `FocusedRuntimeObject` | The interactable object the aim ray currently rests on. |
 
 ### `render/three/runtimeEffects.ts`

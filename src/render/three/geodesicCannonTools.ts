@@ -9,7 +9,18 @@
  * counter-clockwise from +x; Three.js-space values only appear for aim rays.
  * Ids of new cannons and geodesics come from the engine.
  */
-import { readLocalPlayerPose, type WorldEngine } from "../../engine/worldEngine";
+import { localParticipantId, readLocalPlayerPose, type WorldEngine } from "../../engine/worldEngine";
+import { participantAttachment, type CommandTicket, type EngineEventBase } from "../../engine/moduleTypes";
+import {
+  carryAttachmentKind,
+  carryOffsetSlot,
+  type CarryAttachCommand,
+  type CarryDetachCommand,
+  type CarryDroppedEvent,
+  type CarryMovedEvent,
+  type CarryOffset,
+  type CarryReleasedEvent,
+} from "../../modules/carry/api";
 import type { FocusedRuntimeObject } from "./rootAimRay";
 import * as THREE from "three";
 import { type CompiledCellComplex } from "../../cell-complex/compileCellComplex";
@@ -23,7 +34,6 @@ import {
   yawRigidTransform3,
 } from "../../math/rigidTransform3";
 import { type Vec3, normalizeVec3 } from "../../math/vec3";
-import { getDynamicObjectCollisionBounds } from "../../movement/collision";
 import type { ClientSession } from "../../runtime/clientSession";
 import type { RuntimeCommand } from "../../runtime/runtimeCommands";
 import { type GeodesicEndpointSelection } from "../../world-objects/geodesic/objects";
@@ -46,14 +56,12 @@ import {
   placeGeodesicCannonAtFloorPoint,
   placeGeodesicCannonAtGeodesicVertex,
   placeGeodesicCannonOnGeodesic,
-  moveEmitterAlongRoute,
   rebuildGeodesicToLength,
   shootGeodesic,
 } from "../../world-objects/geodesic/cannon";
 import { type RuntimeObjectRegistry, type RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
-import { runtimeObjectToDynamicObjectState } from "../../world-objects/runtimeObjectBase";
 import { AimTarget } from "../../interaction/aimTarget";
-import { decideHandCarry, handCarryArrived, handCarryLeashMeters } from "../../interaction/handCarry";
+import { handCarryLeashMeters } from "../../interaction/handCarry";
 import {
   carriedGeodesicEmitterDesktopDistanceMeters,
   getDistanceAlongGeodesicSegment,
@@ -64,8 +72,6 @@ import {
 } from "./carriedGeodesicCannon";
 import { createDesktopControls } from "./desktopControls";
 import { resolveGeodesicCannonAimYawFromAbsolutePoints } from "./geodesicCannonAimTarget";
-import { carryMaxSpeedMetersPerSecond, carryTowardTarget, locateCarrierTarget } from "../../world-objects/carry";
-import { rebuildEmitterGeodesics, releaseCarriedEmitter } from "../../world-objects/geodesic/carryEnd";
 import {
   RootAimRay,
   getAimForwardVector,
@@ -168,6 +174,8 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
   } = deps;
   let geodesicCannonRotationHeadHeightMeters: number | undefined;
   let geodesicCannonRotationTargetLengthMeters: number | undefined;
+  // The ticket of the pickup the tool submitted and the world has not answered yet.
+  let pendingAttachTicket: CommandTicket | undefined;
 
   /** Forgets the frozen head height and target length once the matching tool mode has ended. */
   function resetGeodesicCannonRotationTracking(mode: { readonly rotating: boolean; readonly aiming: boolean }): void {
@@ -478,7 +486,14 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
       ? getGeodesicTotalLengthMeters(geodesicId)
       : undefined;
     deps.dispatch({ kind: "enter-tool-mode", toolId: "geodesic-cannon-carry" });
-    deps.dispatch({ kind: "begin-carry", objectId: cannon.id });
+    // The pickup is the world's to accept: the tool waits for the answer (afterWorldStep) and leaves the carry tool when it is refused.
+    const attach: CarryAttachCommand = {
+      kind: "carry/attach",
+      objectId: cannon.id,
+      ...(geodesicId === undefined ? {} : { activeGeodesicId: geodesicId }),
+      ...(geodesicCannonRotationTargetLengthMeters === undefined ? {} : { rotationTargetLengthMeters: geodesicCannonRotationTargetLengthMeters }),
+    };
+    pendingAttachTicket = deps.engine.submit(localParticipantId, attach);
     syncDesktopPalette();
     if (!renderer.xr.isPresenting) {
       void controls.requestPointerLock();
@@ -504,28 +519,25 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
       return false;
     }
 
-    const cannonId = deps.session.get().carry?.objectId;
-    const cannon = cannonId ? runtimeObjectRegistry.get(cannonId) : undefined;
-    if (cannon?.kind === "geodesic-cannon") {
-      // The emitter decides what stopping a carry means for its geodesics; the tool refreshes what it draws.
-      const release = releaseCarriedEmitter({
-        world: deps.getWorld(),
-        registry: runtimeObjectRegistry,
-        emitterId: cannon.id,
-        activeGeodesicId: deps.session.get().cannonToolState.activeGeodesicId,
-        rotationTargetLengthMeters: geodesicCannonRotationTargetLengthMeters,
-      });
-      refreshAfterEmitterRebuild(cannon.id, release);
-      removeProtractorAnglesForMissingVertices(release.prunedIntersectionIds);
-      syncRuntimeObjectPortalInstances();
-      syncSelectableHitboxDebug();
-    }
+    // Putting down is a detach. The emitter decides what stopping a carry means for its geodesics (the world runs the final rebuild in its next
+    // step) and the tool then refreshes what it draws (afterWorldStep).
+    const detach: CarryDetachCommand = { kind: "carry/detach" };
+    deps.engine.submit(localParticipantId, detach);
+    leaveCarryTool();
+    return true;
+  }
+
+  // The tool's own end of a carry: its state, the selection and the palette. Nothing of the world.
+  function leaveCarryTool(): void {
+    pendingAttachTicket = undefined;
     deps.dispatch({ kind: "set-cannon-tool-state", state: {} });
     geodesicCannonRotationTargetLengthMeters = undefined;
-    deps.dispatch({ kind: "end-carry" });
     deps.dispatch({ kind: "clear-selected-tool" });
     syncDesktopPalette();
-    return true;
+  }
+
+  function localCarry() {
+    return participantAttachment(deps.engine.read.participant(localParticipantId), carryAttachmentKind);
   }
 
   function deleteGeodesicFromCannon(cannonId: string, geodesicId: string): void {
@@ -708,13 +720,20 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
     return cannon?.kind === "geodesic-cannon" ? cannon : undefined;
   }
 
-  function updateCarriedGeodesicCannonPose(xrActive: boolean, activeAimRay: RootAimRay | undefined, deltaSeconds?: number): void {
+  // _deltaSeconds is the frame time the shell also passes to the world step, which is what limits the glide; it is accepted so callers
+  // keep one signature for all per-frame updaters.
+  function updateCarriedGeodesicCannonPose(xrActive: boolean, activeAimRay: RootAimRay | undefined, _deltaSeconds?: number): void {
+    const carry = localCarry();
     if (deps.session.get().menuState.selectedTool !== "geodesic-cannon-carry") {
+      // The carry tool was left some other way (another tool, the menu): the world is told the object is put down.
+      if (carry !== undefined) {
+        const detach: CarryDetachCommand = { kind: "carry/detach" };
+        deps.engine.submit(localParticipantId, detach);
+      }
       return;
     }
 
-    const cannonId = deps.session.get().carry?.objectId;
-    const cannon = cannonId ? runtimeObjectRegistry.get(cannonId) : undefined;
+    const cannon = carry ? runtimeObjectRegistry.get(carry.objectId) : undefined;
     if (cannon?.kind !== "geodesic-cannon") {
       return;
     }
@@ -726,81 +745,86 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
       return;
     }
 
-    // The emitter is held at the hand, which may be on another face than the player or behind a wall. Where the hand is comes
-    // from the carry contract; the emitter then glides toward it in displacement steps, and the contract decides how it reacts.
-    const playerPose = readLocalPlayerPose(deps.engine);
-    const hand = locateCarrierTarget(deps.getWorld(), playerPose, anchor);
-    if (!hand) {
-      return;
-    }
-    const emitterBody = getDynamicObjectCollisionBounds(runtimeObjectToDynamicObjectState(cannon));
-    const advance = carryTowardTarget({
-      world: deps.getWorld(),
-      object: {
-        cellId: cannon.cellId,
-        position: cannon.localPose.translation,
-        yawRadians: cannon.aimYawRadians,
-        radiusMeters: emitterBody?.radius,
-      },
-      target: { cellId: hand.cellId, point: { x: hand.point.x, y: hand.point.y, z: 0 } },
-      maxTravelMeters: deltaSeconds === undefined ? undefined : carryMaxSpeedMetersPerSecond * deltaSeconds,
-      commit: (move) => {
-        const placed = {
-          ...cannon,
-          cellId: move.placement.cellId,
-          localPose: yawRigidTransform3(move.placement.yawRadians, move.placement.position),
-        };
-        const moved = moveEmitterAlongRoute({
-          registry: runtimeObjectRegistry,
-          emitterId: cannon.id,
-          cellId: placed.cellId,
-          localPose: placed.localPose,
-          route: move.route,
-        });
-        if (!moved.moved) {
-          // The move cannot be reconciled with the portal words of the emitter's geodesics, so the emitter stays where it was.
-          console.warn(`Carried emitter "${cannon.id}" stays: no route to "${placed.cellId}" fits the portal word of ${moved.brokenGeodesicIds.join(", ")}.`);
+    // The emitter is held at the hand, which may be on another face than the player or behind a wall. The hand place goes to the world as a
+    // control slot; the carry module moves the emitter toward it each step. Whether the hand goes on holding the emitter is the hand policy
+    // (handCarry.ts): the loose leash goes along, the world applies the policy and tells the tool when it lets go (carry/dropped).
+    const offset: CarryOffset = {
+      x: anchor.x,
+      y: anchor.y,
+      leashMeters: handCarryLeashMeters({
+        pickupRangeMeters: getRuntimeObjectInteractionRangeMeters(cannon),
+        handReachMeters: xrActive ? 0 : carriedGeodesicEmitterDesktopDistanceMeters,
+      }),
+    };
+    deps.engine.setControl(localParticipantId, carryOffsetSlot, offset);
+  }
+
+  /**
+   * Call after every world step: settles the pickup the tool asked for and draws again what the world carry changed. A refused pickup, or a carry the world ended
+   * (the hand let go), leaves the carry tool.
+   */
+  function afterWorldStep(): void {
+    if (pendingAttachTicket !== undefined) {
+      const result = deps.engine.resultOf(pendingAttachTicket);
+      if (result !== undefined) {
+        pendingAttachTicket = undefined;
+        if (!result.ok) {
+          console.info(`[noneuclid] ${result.refusal.message}`);
+          if (deps.session.get().menuState.selectedTool === "geodesic-cannon-carry") {
+            leaveCarryTool();
+          }
         }
-        return moved.moved;
-      },
-    });
-    if (advance.steps > 0) {
-      const rebuild = rebuildEmitterGeodesics({
-        world: deps.getWorld(),
-        registry: runtimeObjectRegistry,
-        emitterId: cannon.id,
-        activeGeodesicId: deps.session.get().cannonToolState.activeGeodesicId,
-        rotationTargetLengthMeters: geodesicCannonRotationTargetLengthMeters,
-        preserveGeodesicOnRebuildFailure: true,
-      });
-      refreshAfterEmitterRebuild(cannon.id, rebuild);
-      syncRuntimeObjectPortalInstances();
-      syncSelectableHitboxDebug();
+      }
     }
-    // Whether the hand goes on holding the emitter is the hand's policy (a wall or a zone never ends a carry): it lets go of what is too far.
-    // The leash is loose while the emitter still glides to the hand and tight once it has been at the hand (the first frame it is, the session is told).
-    const arrived = deps.session.get().carry?.arrived === true || handCarryArrived(advance.remaining);
-    if (arrived && deps.session.get().carry?.arrived === false) {
-      deps.dispatch({ kind: "carry-arrived" });
-    }
-    const glidingLeashMeters = handCarryLeashMeters({
-      pickupRangeMeters: getRuntimeObjectInteractionRangeMeters(cannon),
-      handReachMeters: xrActive ? 0 : carriedGeodesicEmitterDesktopDistanceMeters,
-    });
-    if (decideHandCarry(advance.remaining, arrived ? "held" : "gliding", glidingLeashMeters) === "release") {
-      finishGeodesicCannonCarry();
+    deps.engine.forEachEvent(handleCarryEvent);
+  }
+
+  function handleCarryEvent(event: EngineEventBase): void {
+    switch (event.kind) {
+      case "carry/moved": {
+        const moved = event as CarryMovedEvent;
+        if (moved.participantId !== localParticipantId) return;
+        refreshAfterEmitterRebuild(moved.objectId, moved);
+        syncRuntimeObjectPortalInstances();
+        syncSelectableHitboxDebug();
+        return;
+      }
+      case "carry/released": {
+        const released = event as CarryReleasedEvent;
+        if (released.participantId !== localParticipantId) return;
+        // The tool has left (or is leaving) the carry tool, so the regrown active geodesic is not selected again.
+        refreshOverlaysOfGeodesics(released.rebuiltGeodesicIds);
+        removeProtractorAnglesForMissingVertices(released.prunedIntersectionIds);
+        syncRuntimeObjectPortalInstances();
+        syncSelectableHitboxDebug();
+        return;
+      }
+      case "carry/dropped": {
+        const dropped = event as CarryDroppedEvent;
+        if (dropped.participantId !== localParticipantId) return;
+        if (deps.session.get().menuState.selectedTool === "geodesic-cannon-carry") {
+          leaveCarryTool();
+        }
+        return;
+      }
+      default:
+        return;
     }
   }
+
   // Draws again what depends on the geodesics an emitter just rebuilt: measured lengths, protractor angles and, when the emitter's plain
   // active geodesic was regrown, the cannon tool's selection of it. What was rebuilt is the emitter's rule (geodesic/carryEnd.ts).
+  function refreshOverlaysOfGeodesics(geodesicIds: readonly string[]): void {
+    for (const geodesicId of geodesicIds) {
+      refreshMeasuredGeodesicLengthsForGeodesic(geodesicId);
+    }
+    refreshProtractorAnglesForGeodesics(geodesicIds);
+  }
   function refreshAfterEmitterRebuild(
     cannonId: string,
     rebuild: { readonly rebuiltGeodesicIds: readonly string[]; readonly regrownActiveGeodesicId?: string },
   ): void {
-    for (const geodesicId of rebuild.rebuiltGeodesicIds) {
-      refreshMeasuredGeodesicLengthsForGeodesic(geodesicId);
-    }
-    refreshProtractorAnglesForGeodesics(rebuild.rebuiltGeodesicIds);
+    refreshOverlaysOfGeodesics(rebuild.rebuiltGeodesicIds);
     if (rebuild.regrownActiveGeodesicId) {
       deps.dispatch({ kind: "set-cannon-tool-state", state: {
         selectedCannonId: cannonId,
@@ -1014,6 +1038,7 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
     trySelectTieAndDetachGeodesicFromAim,
     syncTieAndDetachSelectionHighlights,
     updateCarriedGeodesicCannonPose,
+    afterWorldStep,
     updateActiveGeodesicCannonRotation,
     updateActiveGeodesicCannonAim,
     getGeodesicTotalLengthMeters,

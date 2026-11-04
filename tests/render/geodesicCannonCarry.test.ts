@@ -27,6 +27,8 @@
  */
 import { publishLocalPlayerPose, readLocalPlayerPose } from "../../src/engine/worldEngine";
 import { createTestEngine } from "../support/engine";
+import { driveCarryTools } from "../support/carryTools";
+import { createDefaultWorldModules } from "../../src/runtime/experience";
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import { applyRuntimeCommand } from "../../src/runtime/applyRuntimeCommand";
@@ -52,11 +54,11 @@ function createHarness(
   startPose: PlayerPose,
 ) {
   const session = createTestClientSession();
-  const engine = createTestEngine({ registry, playerPose: startPose });
+  const engine = createTestEngine({ registry, playerPose: startPose, getWorld: () => world, modules: createDefaultWorldModules() });
   const nothing = (): void => {};
   // Where the aim ray hits, in the player's frame; none by default.
   const aim: { rootPoint?: { x: number; y: number; z: number } } = {};
-  const tools = createGeodesicCannonTools({
+  const rawTools = createGeodesicCannonTools({
     renderer: { xr: { isPresenting: false } } as unknown as THREE.WebGLRenderer,
     controls: { requestPointerLock: () => Promise.resolve() } as never,
     runtimeObjectRegistry: registry,
@@ -82,6 +84,8 @@ function createHarness(
     refreshProtractorAnglesForGeodesic: nothing,
     refreshProtractorAnglesForGeodesics: nothing,
   });
+  // The shell steps the world after the tools have run; the harness steps it after each carry call.
+  const tools = driveCarryTools(rawTools, engine);
 
   // The player stands in `cellId` at (x, y); how they got there does not matter to the tools.
   function walkInto(cellId: string, x: number, y: number): void {
@@ -180,12 +184,12 @@ describe("releasing a carried emitter of a locked geodesic", () => {
   });
 
   it("keeps the geodesic when an emitter on another face is picked up and let go", () => {
-    // The emitter is on the right face; the player stands on the top face, which is next to it.
-    const { registry, tools } = setupCube("top", 0, 0);
+    // The emitter is on the right face, within the player's reach; the hand is on the top face, past the right face's wall at y = 7.5.
+    const { registry, tools } = setupCube("right", -2.4, -3);
 
     tools.startGeodesicCannonCarry("cannon-b");
-    tools.updateCarriedGeodesicCannonPose(true, handAt(1, 1));
-    tools.updateCarriedGeodesicCannonPose(true, handAt(1.5, 1.2));
+    tools.updateCarriedGeodesicCannonPose(true, handAt(-2.4, 8));
+    tools.updateCarriedGeodesicCannonPose(true, handAt(-2.4, 8.3));
     tools.finishGeodesicCannonCarry();
 
     expect(registry.get("cannon-b")).toMatchObject({ kind: "geodesic-cannon", cellId: "top" });
@@ -195,7 +199,7 @@ describe("releasing a carried emitter of a locked geodesic", () => {
   });
 
   it("keeps the geodesic ending in the emitter's cell at every step of a drag across two faces", () => {
-    const { registry, tools } = setupCube("right", 0, 0);
+    const { registry, tools } = setupCube("right", -2.4, -3);
     tools.startGeodesicCannonCarry("cannon-b");
 
     const cellsSeen = new Set<string>();

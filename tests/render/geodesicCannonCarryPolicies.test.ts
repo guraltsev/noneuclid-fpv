@@ -10,6 +10,8 @@
  * `tests/render/geodesicCannonCarry.test.ts` keeps the release, re-homing, glow and yaw behaviour.
  */
 import { createTestEngine } from "../support/engine";
+import { driveCarryTools } from "../support/carryTools";
+import { createDefaultWorldModules } from "../../src/runtime/experience";
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import { type CompiledCellComplex } from "../../src/cell-complex/compileCellComplex";
@@ -30,9 +32,9 @@ import { compileLargePortalWorld } from "../fixtures/world-objects/geodesic";
 
 function createHarness(world: CompiledCellComplex, registry: RuntimeObjectRegistry, playerPose: PlayerPose) {
   const session = createTestClientSession();
-  const engine = createTestEngine({ registry, playerPose });
+  const engine = createTestEngine({ registry, playerPose, getWorld: () => world, modules: createDefaultWorldModules() });
   const nothing = (): void => {};
-  const tools = createGeodesicCannonTools({
+  const rawTools = createGeodesicCannonTools({
     renderer: { xr: { isPresenting: false } } as unknown as THREE.WebGLRenderer,
     controls: { requestPointerLock: () => Promise.resolve() } as never,
     runtimeObjectRegistry: registry,
@@ -58,6 +60,8 @@ function createHarness(world: CompiledCellComplex, registry: RuntimeObjectRegist
     refreshProtractorAnglesForGeodesic: nothing,
     refreshProtractorAnglesForGeodesics: nothing,
   });
+  // The shell steps the world after the tools have run; the harness steps it after each carry call.
+  const tools = driveCarryTools(rawTools, engine);
 
   return { tools, selectedTool: () => session.get().menuState.selectedTool };
 }
@@ -107,7 +111,7 @@ describe("the carry tool applies the agreed policies", () => {
     const world = compileLargePortalWorld();
     const registry = createRuntimeObjectRegistry();
     registry.add(createGeodesicCannonObject({ id: "lamp", cellId: "b", localPose: yawRigidTransform3(0, { x: 1.6, y: 4.7, z: 0 }) }));
-    const { tools, selectedTool } = createHarness(world, registry, { ...createDefaultPlayerPose("a"), position: { x: 3.5, y: 2.5, z: 0 } });
+    const { tools, selectedTool } = createHarness(world, registry, { ...createDefaultPlayerPose("a"), position: { x: 4.5, y: 3.5, z: 0 } });
     const stopX = Math.sqrt((0.15 + emitterConnectionToleranceMeters) ** 2 - 0.3 ** 2);
 
     tools.startGeodesicCannonCarry("lamp");

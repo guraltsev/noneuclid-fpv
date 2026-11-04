@@ -54,6 +54,29 @@ export type CommandTicket = number;
 /** Where a participant is: the same record as the player pose (cell, cell-local position, yaw, pitch). */
 export type ParticipantBody = PlayerPose;
 
+/**
+ * A relation the world holds between a participant and an object (design 013 section 7). Today only carrying (`kind` "carry"); the module that owns the kind changes it, through the contexts' `setAttachments`.
+ * `arrived` is part of the relation because it changes how the object moves: false while the object still glides to the carrier, true from the first frame it is at the carrier.
+ * The two optional fields are what the carry module needs to rebuild the object's geodesics: the geodesic the carrier works on and the length a regrown one should have.
+ */
+export interface ParticipantAttachment {
+  readonly kind: string;
+  readonly objectId: string;
+  readonly arrived: boolean;
+  readonly activeGeodesicId?: string;
+  readonly rotationTargetLengthMeters?: number;
+}
+
+/** The attachment of `kind` that `participant` holds, or undefined. */
+export function participantAttachment(participant: ParticipantRecord | undefined, kind: string): ParticipantAttachment | undefined {
+  const attachments = participant?.attachments;
+  if (attachments === undefined) return undefined;
+  for (let i = 0; i < attachments.length; i += 1) {
+    if (attachments[i]!.kind === kind) return attachments[i];
+  }
+  return undefined;
+}
+
 /** Someone acting in the world. Bodies are written by the device that owns the participant (`publishBody`). Records are immutable; a change replaces the record. */
 export interface ParticipantRecord {
   readonly id: string;
@@ -61,6 +84,8 @@ export interface ParticipantRecord {
   /** The device that may publish this participant's body. */
   readonly ownerId: string;
   readonly body: ParticipantBody;
+  /** What the participant holds in the world; changed by the module owning the attachment kind, never by the client. */
+  readonly attachments: readonly ParticipantAttachment[];
 }
 
 /** The read-only world state clients use between steps. Handed out by reference; valid until the next step (design 013 section 6.5). */
@@ -135,8 +160,8 @@ export type CommandHandlers<C extends EngineCommandBase> = {
   };
 };
 
-/** The two kinds of per-step work: simulate ticks change the world, derive ticks recompute what follows from the journal. */
-export type ModulePhase = "simulate" | "derive";
+/** The kinds of per-step work: bodies ticks (step phase 3) move what follows a participant, simulate ticks change the world, derive ticks recompute what follows from the journal. */
+export type ModulePhase = "bodies" | "simulate" | "derive";
 
 /** An object kind a module declares. Exactly one module declares each kind. */
 export interface ObjectKindDeclaration {
@@ -156,7 +181,7 @@ export interface ModuleTick {
   readonly subscribes?: readonly string[];
   /** Derive only: wakes the tick without a journal entry. Must not allocate. */
   readonly wants?: (ctx: StepContext) => boolean;
-  /** Simulate only: true skips the tick this step. Must not allocate. */
+  /** Bodies and simulate only: true skips the tick this step. Must not allocate. */
   readonly isIdle?: (ctx: StepContext) => boolean;
   readonly run: (ctx: StepContext) => void;
 }
@@ -173,6 +198,10 @@ export interface ModuleDefinition<
   readonly provides?: ModuleToken<Api, Queries>;
   readonly requires: readonly ModuleToken<unknown, unknown>[];
   readonly objectKinds: readonly ObjectKindDeclaration[];
+  /**
+   * Kinds of the core union that this module also writes, because the module that will own them does not exist yet (the geodesic kinds until `geodesicModel`, design 013 job 51). Only the write guard reads it; it empties as the owners arrive.
+   */
+  readonly writesCoreKinds?: readonly string[];
   /** Tool ids this module defines; the engine knows them for gating. */
   readonly toolIds?: readonly RuntimeToolId[];
   readonly create: (ctx: ModuleCreateContext) => ModuleInstance<Api, Cmd, Evt, Queries>;
@@ -220,6 +249,10 @@ export interface StepContext {
   readonly changesFrom: number;
   readonly changesTo: number;
   participant(id: string): ParticipantRecord | undefined;
+  /** Calls `fn` for every participant, in creation order, without allocating. */
+  forEachParticipant(fn: (participant: ParticipantRecord) => void): void;
+  /** Replaces the attachments of a participant (a journal entry of the participant journal). */
+  setAttachments(participantId: string, attachments: readonly ParticipantAttachment[]): void;
   control(participantId: string, slot: string): PlainData | undefined;
   emit(event: EngineEventBase): void;
   /** Runs a command now, inside the step, as actor "world" (design 013 section 5.7). */
@@ -237,6 +270,10 @@ export interface CommandContext {
   readonly objects: RuntimeObjectRegistry;
   readonly ids: EngineIdSource;
   participant(id: string): ParticipantRecord | undefined;
+  /** Calls `fn` for every participant, in creation order, without allocating. */
+  forEachParticipant(fn: (participant: ParticipantRecord) => void): void;
+  /** Replaces the attachments of a participant (a journal entry of the participant journal). */
+  setAttachments(participantId: string, attachments: readonly ParticipantAttachment[]): void;
   emit(event: EngineEventBase): void;
   dispatch(command: EngineCommandBase): CommandResult;
   openControl(participantId: string, slot: string): void;

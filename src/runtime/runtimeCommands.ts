@@ -77,13 +77,6 @@ export type RuntimeCommand =
   | { readonly kind: "set-module-tool-state"; readonly moduleId: string; readonly state: unknown }
   /** The tool request the world has not answered yet (design 013 section 8.1), or undefined once it has. */
   | { readonly kind: "set-pending-tool-request"; readonly request: PendingToolRequest | undefined }
-  // Carrying. The record lives only while the carry tool is selected; leaving that tool by any command drops it.
-  /** Pickup: the carry tool holds `objectId`. Ignored when the session already carries that object. */
-  | { readonly kind: "begin-carry"; readonly objectId: string }
-  /** Release: the carry tool no longer holds anything (the tool selection is left alone). */
-  | { readonly kind: "end-carry" }
-  /** The carried object is at the hand for the first time since the pickup; the hand's tight leash applies from now on. Ignored when nothing is carried or the object had arrived. */
-  | { readonly kind: "carry-arrived" }
   // World, config, reload.
   | { readonly kind: "select-world"; readonly worldId: string }
   | { readonly kind: "select-config"; readonly configName: string }

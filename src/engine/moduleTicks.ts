@@ -1,6 +1,6 @@
 /**
- * The simulate and derive passes over the composed modules (design 013 sections 5.2 and 6.4).
- * Simulate ticks run in module order, each unless its `isIdle` says so. In the derive pass each module first runs its `onEvents` handlers over the events since its own cursor, then its derive ticks; a derive tick wakes when `wants` is true or when the journal holds a write of a subscribed kind at or after its cursor, reads the range `[cursor, length)`, and then moves its cursor to the journal length.
+ * The bodies, simulate and derive passes over the composed modules (design 013 sections 5.2 and 6.4).
+ * Bodies ticks (step phase 3) and simulate ticks (phase 4) run in module order, each unless its `isIdle` says so. In the derive pass each module first runs its `onEvents` handlers over the events since its own cursor, then its derive ticks; a derive tick wakes when `wants` is true or when the journal holds a write of a subscribed kind at or after its cursor, reads the range `[cursor, length)`, and then moves its cursor to the journal length.
  * Cursors live here and are reset by `resetCursors` (the engine's `endFrame`, when the journal is cleared). An idle pass allocates nothing.
  */
 import type { ComposedModule } from "./composeModules";
@@ -26,6 +26,8 @@ export interface TickRunnerDeps {
 
 /** The passes of one engine. */
 export interface TickRunner {
+  /** Step phase 3: ticks that move what follows a participant. */
+  runBodies(): void;
   runSimulate(): void;
   runDerive(): void;
   resetCursors(): void;
@@ -39,6 +41,7 @@ interface DeriveEntry {
 interface ModuleRuntime {
   readonly moduleId: string;
   readonly writable: ReadonlySet<string>;
+  readonly bodies: readonly ModuleTick[];
   readonly simulate: readonly ModuleTick[];
   readonly derive: readonly DeriveEntry[];
   readonly onEvents: ComposedModule["instance"]["onEvents"];
@@ -50,32 +53,37 @@ export function createTickRunner(modules: readonly ComposedModule[], deps: TickR
   const { frames, context, journal, events } = deps;
   const runtimes: ModuleRuntime[] = modules.map((module) => ({
     moduleId: module.definition.id,
-    writable: module.declaredKinds,
+    writable: module.writableKinds,
+    bodies: module.instance.ticks.filter((tick) => tick.phase === "bodies"),
     simulate: module.instance.ticks.filter((tick) => tick.phase === "simulate"),
     derive: module.instance.ticks.filter((tick) => tick.phase === "derive").map((tick) => ({ tick, cursor: 0 })),
     onEvents: module.instance.onEvents,
     eventCursor: 0,
   }));
 
-  return {
-    runSimulate() {
-      for (let m = 0; m < runtimes.length; m += 1) {
-        const runtime = runtimes[m]!;
-        if (runtime.simulate.length === 0) continue;
-        frames.push(runtime.moduleId, runtime.writable);
-        try {
-          context.changesFrom = 0;
-          context.changesTo = journal.length;
-          for (let t = 0; t < runtime.simulate.length; t += 1) {
-            const tick = runtime.simulate[t]!;
-            if (tick.isIdle?.(context)) continue;
-            tick.run(context);
-          }
-        } finally {
-          frames.pop();
+  function runIdleable(phase: "bodies" | "simulate"): void {
+    for (let m = 0; m < runtimes.length; m += 1) {
+      const runtime = runtimes[m]!;
+      const ticks = phase === "bodies" ? runtime.bodies : runtime.simulate;
+      if (ticks.length === 0) continue;
+      frames.push(runtime.moduleId, runtime.writable);
+      try {
+        context.changesFrom = 0;
+        context.changesTo = journal.length;
+        for (let t = 0; t < ticks.length; t += 1) {
+          const tick = ticks[t]!;
+          if (tick.isIdle?.(context)) continue;
+          tick.run(context);
         }
+      } finally {
+        frames.pop();
       }
-    },
+    }
+  }
+
+  return {
+    runBodies: () => runIdleable("bodies"),
+    runSimulate: () => runIdleable("simulate"),
     runDerive() {
       for (let m = 0; m < runtimes.length; m += 1) {
         const runtime = runtimes[m]!;

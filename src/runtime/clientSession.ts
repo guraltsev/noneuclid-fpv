@@ -1,6 +1,6 @@
 /**
  * The client session: the one record that holds how one person is interacting with a running world (menu, selected tool, tool picks, debug and comfort settings), and the cell that owns it.
- * World state is not here: the player's body, the object ids and the world's objects belong to the world engine (src/engine, design 013 section 4). The session is never replayed or sent anywhere.
+ * World state is not here: the player's body, what the player carries, the object ids and the world's objects belong to the world engine (src/engine, design 013 section 4). The session is never replayed or sent anywhere.
  * State is a plain immutable record that is replaced by a new value through update(fn); there are no events, no subscriptions and no framework.
  * The reducer applyRuntimeCommand (applyRuntimeCommand.ts) is the only code that changes it; the rendering shell and its factories read the record on demand.
  * Every field of ClientSessionState carries a one-line comment saying whether it is real state, cheap derived or expensive derived (design 012, P7 commitment 3).
@@ -12,16 +12,6 @@ import type { VrComfortOptions } from "../glue/vrComfortOptions";
 import type { GeodesicCannonToolState } from "../world-objects/geodesic/cannonToolState";
 import type { ProtractorToolState } from "../world-objects/protractorTool";
 import type { RuntimeMenuState } from "./runtimeMenuState";
-
-/**
- * Who is being carried, and whether the object has reached the hand yet. Where the hand holds the object is derived each frame from the
- * carrier's aim. One record means one carrier; the carry contract (world-objects/carry.ts) itself keeps no such table. It moves to the world as an attachment in job 50.
- */
-export interface CarryRecord {
-  readonly objectId: string;
-  /** False while the object still glides to the hand after the pickup (the hand's loose leash applies); true from the first frame it is at the hand (the tight leash applies). */
-  readonly arrived: boolean;
-}
 
 /**
  * A request to switch to a tool that the world has not answered yet (design 013 section 8.1): the old tool stays active until `world/requestTool` is accepted.
@@ -48,8 +38,6 @@ export interface ClientSessionState {
   readonly vrComfortOptions: VrComfortOptions;
   /** Real state: which cannon and geodesic the emitter tools work on and the tie-and-detach picks; empty when idle. */
   readonly cannonToolState: GeodesicCannonToolState;
-  /** Real state: the object the carry tool holds, or undefined; it exists only while the carry tool is the selected tool. */
-  readonly carry: CarryRecord | undefined;
   /** Real state: the protractor tool's picks; empty when idle. */
   readonly protractorToolState: ProtractorToolState;
   /** Real state: the client tool state of each module's tools, by module id; absent while that module's tool is idle. */

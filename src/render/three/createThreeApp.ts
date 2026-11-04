@@ -62,6 +62,7 @@
  * scene uses its own axes, converted by `worldAxes` helpers (for example `rigidTransformToThreeMatrix`).
  */
 import { createWorldClient } from "./worldClient";
+import { createDefaultWorldModules } from "../../runtime/experience";
 import { createLocalPlayerParticipant, createWorldEngine, publishLocalPlayerPose, readLocalPlayerPose } from "../../engine/worldEngine";
 import * as THREE from "three";
 import { reversePainterSortStable } from "@pmndrs/uikit";
@@ -352,7 +353,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       "portal-path-overlay-instances",
     ),
     cannonToolState: {},
-    carry: undefined,
     protractorToolState: {},
     moduleToolState: {},
     pendingToolRequest: undefined,
@@ -365,6 +365,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     // The active world is replaced by a geometry commit; `activeWorld` exists only after the geometry-commit factory below.
     getWorld: () => activeWorld(),
     participants: [createLocalPlayerParticipant(appState.playerPose)],
+    modules: createDefaultWorldModules(),
     isToolEnabled: (toolId) => isRuntimeToolEnabled(appConfig, toolId),
     writeGuard: hasActiveDebugOption(options.debugLevel, options.debugOptions, "module-write-guard"),
   });
@@ -759,6 +760,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     trySelectTieAndDetachGeodesicFromAim,
     syncTieAndDetachSelectionHighlights,
     updateCarriedGeodesicCannonPose,
+    afterWorldStep: afterCarryWorldStep,
     updateActiveGeodesicCannonRotation,
     updateActiveGeodesicCannonAim,
     getLockedGeodesicIds,
@@ -1283,6 +1285,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     frameErrorGuard.runPhase("world engine", () => {
       engine.step(frame.resetRequested ? 0 : deltaSeconds);
       worldClient.afterStep();
+      afterCarryWorldStep();
     });
     let straightenedGeodesicIds: readonly string[] = [];
     frameErrorGuard.runPhase("curve shortening", () => {

@@ -1,13 +1,13 @@
 /**
  * The world engine (design 013 section 5): the owner of world state, which changes only inside `step`, from queued commands and control slots.
  * It holds the participants, the engine-allocated ids, the composed modules and their step order, the events and the command results; the registry of world objects stays where it is and the engine owns the clearing of its change journal. Clients (the shell, tests, scripts) use the `WorldEngine` interface of moduleTypes.ts only.
- * One step: apply queued commands, sample control slots, (bodies: empty until locomotion moves in), simulate ticks, derive pass, tool-capability revocations, (deformation: empty until it moves in). Everything crossing the interface is plain data, and `read` hands out the engine's own records by reference.
+ * One step: apply queued commands, sample control slots, bodies ticks (phase 3: attachments follow their carriers; locomotion joins later), simulate ticks, derive pass, tool-capability revocations, (deformation: empty until it moves in). Everything crossing the interface is plain data, and `read` hands out the engine's own records by reference.
  */
 import type { CompiledCellComplex } from "../cell-complex/compileCellComplex";
 import type { RuntimeToolId } from "../glue/toolIds";
 import type { PlayerPose } from "../movement/playerPose";
 import type { RuntimeObjectRegistry } from "../world-objects/runtimeObjectRegistry";
-import { composeModules, contributedNamePattern, type ComposedHandler } from "./composeModules";
+import { composeModules, contributedNamePattern, writableKindsOf, type ComposedHandler } from "./composeModules";
 import { coreObjectKinds, coreToolIds } from "./coreIds";
 import { createEngineIdSource } from "./ids";
 import { createTickRunner, type MutableStepContext } from "./moduleTicks";
@@ -77,7 +77,7 @@ export function createWorldEngine(options: WorldEngineOptions): WorldEngine {
     },
   };
 
-  const declaredKindsOf = new Map(definitions.map((definition) => [definition.id, new Set(definition.objectKinds.map((declaration) => declaration.kind))]));
+  const declaredKindsOf = new Map(definitions.map((definition) => [definition.id, writableKindsOf(definition)]));
   const experience = composeModules(definitions, {
     coreObjectKinds,
     coreToolIds,
@@ -182,6 +182,8 @@ export function createWorldEngine(options: WorldEngineOptions): WorldEngine {
     changesFrom: 0,
     changesTo: 0,
     participant: (id) => participants.get(id),
+    forEachParticipant: (fn) => participants.forEach(fn),
+    setAttachments: (participantId, attachments) => void participants.setAttachments(participantId, attachments),
     control: (participantId, slot) => controls.get(participantId, slot),
     emit,
     dispatch: dispatchFromModule,
@@ -199,6 +201,8 @@ export function createWorldEngine(options: WorldEngineOptions): WorldEngine {
     objects: moduleObjects,
     ids: activeIds,
     participant: (id) => participants.get(id),
+    forEachParticipant: (fn) => participants.forEach(fn),
+    setAttachments: (participantId, attachments) => void participants.setAttachments(participantId, attachments),
     emit,
     dispatch: dispatchFromModule,
     openControl(participantId, slot) {
@@ -279,6 +283,7 @@ export function createWorldEngine(options: WorldEngineOptions): WorldEngine {
       firstError = undefined;
       applyQueuedCommands();
       controls.sample();
+      ticks.runBodies();
       ticks.runSimulate();
       ticks.runDerive();
       reportRevocations();
