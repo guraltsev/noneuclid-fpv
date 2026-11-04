@@ -245,7 +245,7 @@ export interface AllGeodesicsDebugDump {
     readonly id: string;
     readonly cellId: string;
     readonly startCellId: string;
-    readonly motionState: string;
+    readonly tied: boolean;
     readonly start: EndpointDebugDump;
     readonly end: EndpointDebugDump;
     readonly portalWordText: string;

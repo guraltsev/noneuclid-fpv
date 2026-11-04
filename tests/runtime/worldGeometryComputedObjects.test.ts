@@ -18,7 +18,7 @@ import { applyGeometryCommitComputedObjectPolicy } from "../../src/runtime/world
 import { createGeodesicCannonObject, geodesicRayBeamHeightMeters } from "../../src/world-objects/geodesic/objects";
 import { getEmitterGeodesicIds } from "../../src/world-objects/geodesic/endpoints";
 import { getGeodesicSegments, getGeodesicTail } from "../../src/world-objects/geodesic/segments";
-import { isGeodesicLocked } from "../../src/world-objects/geodesic/lifecycle";
+import { arcConnectsEmitters } from "../../src/world-objects/geodesic/lifecycle";
 import { shootGeodesic } from "../../src/world-objects/geodesic/cannon";
 import { createMeasuredGeodesicLengthObject } from "../../src/world-objects/measureLengthTool";
 import { createProtractorAngleObject, protractorAngleRadiusMeters, resolveProtractorCenterSelection, resolveProtractorDirectedGeodesicSelection, resolveProtractorEmitterGeodesicSelection } from "../../src/world-objects/protractorTool";
@@ -62,7 +62,7 @@ describe("world geometry computed object policy", () => {
       },
     });
 
-    expect(isGeodesicLocked(registry, "g-open")).toBe(false);
+    expect(arcConnectsEmitters(registry, "g-open")).toBe(false);
     expect(result.removedGeodesicIds).toContain("g-open");
     expect(result.removedMeasuredGeodesicLengthIds).toEqual(["measure-open"]);
     expect(result.removedProtractorAngleIds).toEqual(["angle-open"]);
@@ -112,8 +112,8 @@ describe("world geometry computed object policy", () => {
     expect(result.refreshedProtractorAngleIds).toContain("angle-incoming");
     expect(syncedMeasurements).toContain("measure-g-a");
     expect(syncedAngles).toContain("angle-incoming");
-    expect(isGeodesicLocked(registry, "g-a")).toBe(true);
-    expect(isGeodesicLocked(registry, "g-b")).toBe(true);
+    expect(arcConnectsEmitters(registry, "g-a")).toBe(true);
+    expect(arcConnectsEmitters(registry, "g-b")).toBe(true);
     expect(getGeodesicTail(registry, "g-a")?.terminal).toEqual({ kind: "emitter-hit", emitterId: "cannon-b" });
     const refreshedMeasurement = registry.get("measure-g-a");
     expect(refreshedMeasurement?.kind).toBe("measured-geodesic-length");

@@ -4,7 +4,7 @@
 import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex";
 import { transformPoint3 } from "../../math/rigidTransform3";
 import type { RuntimeObjectRegistry, RuntimeWorldObject } from "../runtimeObjectRegistry";
-import { type GeodesicEndpointAttachment, type GeodesicEndpointSelection, type GeodesicEndRole, type GeodesicIntervalObject, type GeodesicPortalTraversal, type LiftedGeodesicEndpoint } from "./objects";
+import { type GeodesicEndpointAttachment, type GeodesicEndpointSelection, type GeodesicEndRole, type GeodesicArcObject, type GeodesicPortalTraversal, type LiftedGeodesicEndpoint } from "./objects";
 import { canObjectAttachGeodesics, getAnchorBeamPoint } from "./anchors";
 import { reverseGeodesicPortalWord } from "./portalWord";
 import { inversePortalTransform } from "./development";
@@ -20,7 +20,7 @@ export function getGeodesicEndpointAttachmentsForAnchor(
   registry: RuntimeObjectRegistry,
   anchorObjectId: string,
 ): readonly GeodesicEndpointAttachment[] {
-  return registry.getObjectsOfKind("geodesic-interval")
+  return registry.getObjectsOfKind("geodesicModel/arc")
     .flatMap((interval) => [interval.start, interval.end])
     .filter((attachment) => attachment.anchorObjectId === anchorObjectId);
 }
@@ -37,13 +37,13 @@ export function replaceGeodesicEndpointAttachment(
   geodesicId: string,
   endRole: GeodesicEndRole,
   nextAnchorObjectId: string,
-): GeodesicIntervalObject | undefined {
+): GeodesicArcObject | undefined {
   const interval = registry.get(geodesicId);
-  if (interval?.kind !== "geodesic-interval" || !canObjectAttachGeodesics(registry.get(nextAnchorObjectId))) {
+  if (interval?.kind !== "geodesicModel/arc" || !canObjectAttachGeodesics(registry.get(nextAnchorObjectId))) {
     return undefined;
   }
 
-  const next: GeodesicIntervalObject = {
+  const next: GeodesicArcObject = {
     ...interval,
     [endRole]: {
       geodesicId,
@@ -62,7 +62,7 @@ export function getGeodesicPortalWord(
   geodesicId: string,
 ): readonly GeodesicPortalTraversal[] | undefined {
   const interval = registry.get(geodesicId);
-  return interval?.kind === "geodesic-interval" ? interval.portalWord : undefined;
+  return interval?.kind === "geodesicModel/arc" ? interval.portalWord : undefined;
 }
 
 /**
@@ -82,7 +82,7 @@ export function getGeodesicPortalWord(
 export function liftGeodesicEndpoint(input: {
   readonly world: CompiledCellComplex;
   readonly registry: RuntimeObjectRegistry;
-  readonly interval: GeodesicIntervalObject;
+  readonly interval: GeodesicArcObject;
   readonly sourceRole: GeodesicEndRole;
 }): LiftedGeodesicEndpoint | undefined {
   const sourceAttachment = input.interval[input.sourceRole];
@@ -135,7 +135,7 @@ export function liftGeodesicEndpoint(input: {
 export function liftGeodesicEndpointWithAnchors(input: {
   readonly world: CompiledCellComplex;
   readonly registry: RuntimeObjectRegistry;
-  readonly interval: GeodesicIntervalObject;
+  readonly interval: GeodesicArcObject;
   readonly sourceRole: GeodesicEndRole;
   readonly candidateAnchorsById?: ReadonlyMap<string, RuntimeWorldObject>;
 }): LiftedGeodesicEndpoint | undefined {
@@ -189,17 +189,17 @@ export function resolveGeodesicEndpointSelectionFromSegmentHit(
   segmentId: string,
 ): GeodesicEndpointSelection | undefined {
   const segment = registry.get(segmentId);
-  if (segment?.kind !== "geodesic-segment" || !segment.halfRole) {
+  if (segment?.kind !== "geodesicModel/segment" || !segment.halfRole) {
     return undefined;
   }
   const interval = registry.get(segment.geodesicId);
-  return interval?.kind === "geodesic-interval" ? interval[segment.halfRole] : undefined;
+  return interval?.kind === "geodesicModel/arc" ? interval[segment.halfRole] : undefined;
 }
 
 /** True when the interval's portal word leads from the start anchor's cell to the end anchor's cell. */
 export function portalWordMatchesCurrentEndpointCells(
   registry: RuntimeObjectRegistry,
-  interval: GeodesicIntervalObject,
+  interval: GeodesicArcObject,
   word: readonly GeodesicPortalTraversal[],
 ): boolean {
   return portalWordMatchesEndpointCellsWithAnchors({ registry, interval, word });
@@ -210,7 +210,7 @@ export function portalWordMatchesCurrentEndpointCells(
 /** Like `portalWordMatchesCurrentEndpointCells`, with candidate anchors that may differ from the registry. */
 export function portalWordMatchesEndpointCellsWithAnchors(input: {
   readonly registry: RuntimeObjectRegistry;
-  readonly interval: GeodesicIntervalObject;
+  readonly interval: GeodesicArcObject;
   readonly word: readonly GeodesicPortalTraversal[];
   readonly candidateAnchorsById?: ReadonlyMap<string, RuntimeWorldObject>;
 }): boolean {
@@ -232,23 +232,159 @@ export function portalWordMatchesEndpointCellsWithAnchors(input: {
   );
 }
 
-// "Aimable free": a stable interval with exactly one emitter endpoint and one free-end endpoint that no other attachment shares.
-/** True for a stable interval with one emitter endpoint and one free end that no other geodesic uses. */
-export function isAimableFreeGeodesic(registry: RuntimeObjectRegistry, interval: GeodesicIntervalObject): boolean {
-  if (interval.motionState !== "stable") {
-    return false;
-  }
+// "Aimable free": an arc with exactly one emitter endpoint and one free-end endpoint that no other attachment shares.
+/** True for an arc with one emitter endpoint and one vertex that no other arc end uses (a plain shot geodesic). */
+export function isAimableFreeGeodesic(registry: RuntimeObjectRegistry, interval: GeodesicArcObject): boolean {
   const start = registry.get(interval.start.anchorObjectId);
   const end = registry.get(interval.end.anchorObjectId);
   const hasOneEmitter = (start?.kind === "geodesic-cannon") !== (end?.kind === "geodesic-cannon");
-  const freeEnd = start?.kind === "free-geodesic-end" ? start : end?.kind === "free-geodesic-end" ? end : undefined;
+  const freeEnd = start?.kind === "geodesicModel/vertex" ? start : end?.kind === "geodesicModel/vertex" ? end : undefined;
   return hasOneEmitter && freeEnd !== undefined &&
     getGeodesicEndpointAttachmentsForAnchor(registry, freeEnd.id).length === 1;
 }
 
+// ---- Curves: end nodes, shared vertices and tied arcs ----
+
+/** An arc end: one endpoint role of an arc. */
+export interface ArcEnd {
+  readonly arcId: string;
+  readonly role: GeodesicEndRole;
+}
+
+/** Both endpoint roles attached to the vertex (a loop on it contributes two), in registry insertion order. */
+export function arcsAtVertex(registry: RuntimeObjectRegistry, vertexId: string): readonly ArcEnd[] {
+  const ends: ArcEnd[] = [];
+  for (const arc of registry.getObjectsOfKind("geodesicModel/arc")) {
+    for (const role of ["start", "end"] as const) {
+      if (arc[role].anchorObjectId === vertexId) {
+        ends.push({ arcId: arc.id, role });
+      }
+    }
+  }
+  return ends;
+}
+
+/** Visits the vertices with two or more arc ends in registry insertion order. One scan of the arcs per call (not a hot path). */
+export function forEachTiedVertex(registry: RuntimeObjectRegistry, visit: (vertexId: string) => void): void {
+  const counts = new Map<string, number>();
+  for (const arc of registry.getObjectsOfKind("geodesicModel/arc")) {
+    counts.set(arc.start.anchorObjectId, (counts.get(arc.start.anchorObjectId) ?? 0) + 1);
+    counts.set(arc.end.anchorObjectId, (counts.get(arc.end.anchorObjectId) ?? 0) + 1);
+  }
+  for (const vertex of registry.getObjectsOfKind("geodesicModel/vertex")) {
+    if ((counts.get(vertex.id) ?? 0) >= 2) {
+      visit(vertex.id);
+    }
+  }
+}
+
+/** Number of vertices with two or more arc ends (closed loops included). One scan of the arcs per call. */
+export function tiedVertexCount(registry: RuntimeObjectRegistry): number {
+  let count = 0;
+  forEachTiedVertex(registry, () => {
+    count += 1;
+  });
+  return count;
+}
+
+/** True when the anchor is a vertex shared with an end of some arc other than `arcId`. Allocation-free scan: the display path calls it for every rebuilt arc. */
+export function isVertexSharedWithOtherArc(registry: RuntimeObjectRegistry, anchorObjectId: string, arcId: string): boolean {
+  if (registry.get(anchorObjectId)?.kind !== "geodesicModel/vertex") {
+    return false;
+  }
+  const arcs = registry.getObjectsOfKind("geodesicModel/arc");
+  for (let index = 0; index < arcs.length; index += 1) {
+    const other = arcs[index]!;
+    if (other.id !== arcId && (other.start.anchorObjectId === anchorObjectId || other.end.anchorObjectId === anchorObjectId)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/** The arc has an end on a vertex that another arc end shares. A closed loop on one vertex is not tied; an id that is not an arc is not tied. One allocation-free scan of the arcs. */
+export function isTied(registry: RuntimeObjectRegistry, arcId: string): boolean {
+  const arc = registry.get(arcId);
+  if (arc?.kind !== "geodesicModel/arc") {
+    return false;
+  }
+  const startIsVertex = registry.get(arc.start.anchorObjectId)?.kind === "geodesicModel/vertex";
+  const endIsVertex = registry.get(arc.end.anchorObjectId)?.kind === "geodesicModel/vertex";
+  if (!startIsVertex && !endIsVertex) {
+    return false;
+  }
+  const arcs = registry.getObjectsOfKind("geodesicModel/arc");
+  for (let index = 0; index < arcs.length; index += 1) {
+    const other = arcs[index]!;
+    if (other.id === arcId) continue;
+    const otherStart = other.start.anchorObjectId;
+    const otherEnd = other.end.anchorObjectId;
+    if (startIsVertex && (otherStart === arc.start.anchorObjectId || otherEnd === arc.start.anchorObjectId)) return true;
+    if (endIsVertex && (otherStart === arc.end.anchorObjectId || otherEnd === arc.end.anchorObjectId)) return true;
+  }
+  return false;
+}
+
+/** The arc's last rebuild failed during a carry, so it still shows its old path. */
+export function isStale(registry: RuntimeObjectRegistry, arcId: string): boolean {
+  const arc = registry.get(arcId);
+  return arc?.kind === "geodesicModel/arc" && arc.stale === true;
+}
+
+/** Every arc of the curve through the vertex, walked over shared vertices, in discovery order. Empty for an id that is not a vertex. */
+export function arcsOfCurve(registry: RuntimeObjectRegistry, vertexId: string): readonly string[] {
+  if (registry.get(vertexId)?.kind !== "geodesicModel/vertex") {
+    return [];
+  }
+  const found: string[] = [];
+  const seen = new Set<string>();
+  const visitedVertices = new Set<string>();
+  const queue = [vertexId];
+  for (let next = 0; next < queue.length; next += 1) {
+    const current = queue[next]!;
+    if (visitedVertices.has(current)) {
+      continue;
+    }
+    visitedVertices.add(current);
+    for (const end of arcsAtVertex(registry, current)) {
+      if (seen.has(end.arcId)) {
+        continue;
+      }
+      seen.add(end.arcId);
+      found.push(end.arcId);
+      const arc = registry.get(end.arcId);
+      if (arc?.kind !== "geodesicModel/arc") {
+        continue;
+      }
+      for (const role of ["start", "end"] as const) {
+        const anchorId = arc[role].anchorObjectId;
+        if (registry.get(anchorId)?.kind === "geodesicModel/vertex") {
+          queue.push(anchorId);
+        }
+      }
+    }
+  }
+  return found;
+}
+
+/** The arcs of the curve an arc belongs to: the arc itself and, through each vertex end, `arcsOfCurve`. Empty for an id that is not an arc. */
+export function arcsOfCurveContaining(registry: RuntimeObjectRegistry, arcId: string): readonly string[] {
+  const arc = registry.get(arcId);
+  if (arc?.kind !== "geodesicModel/arc") {
+    return [];
+  }
+  const ids = new Set<string>([arcId]);
+  for (const role of ["start", "end"] as const) {
+    for (const id of arcsOfCurve(registry, arc[role].anchorObjectId)) {
+      ids.add(id);
+    }
+  }
+  return [...ids];
+}
+
 /** Removes free-end anchors that no interval attaches to any more. */
 export function removeUnusedFreeGeodesicEnds(registry: RuntimeObjectRegistry): void {
-  for (const object of registry.getObjectsOfKind("free-geodesic-end")) {
+  for (const object of registry.getObjectsOfKind("geodesicModel/vertex")) {
     if (getGeodesicEndpointAttachmentsForAnchor(registry, object.id).length === 0) {
       registry.remove(object.id);
     }

@@ -6,7 +6,7 @@
 import type { CompiledCellComplex } from "../cell-complex/compileCellComplex";
 import type { Vec3 } from "../math/vec3";
 import { pruneMissingGeodesicIntersectionObjects } from "../world-objects/geodesic/intersections";
-import { isGeodesicLocked, removeGeodesic } from "../world-objects/geodesic/lifecycle";
+import { arcConnectsEmitters, removeGeodesic } from "../world-objects/geodesic/lifecycle";
 import { rebuildConnectedGeodesicBetweenEmitters } from "../world-objects/geodesic/cannon";
 import { refreshMeasuredGeodesicLengthObject } from "../world-objects/measureLengthTool";
 import { type MeasuredGeodesicLengthObject } from "../world-objects/toolObjects";
@@ -113,16 +113,16 @@ export function applyGeometryCommitComputedObjectPolicy(
 function collectLockedGeodesicIds(registry: RuntimeObjectRegistry): Set<string> {
   return new Set(
     [...collectAllGeodesicIds(registry)]
-      .filter((geodesicId) => isGeodesicLocked(registry, geodesicId)),
+      .filter((geodesicId) => arcConnectsEmitters(registry, geodesicId)),
   );
 }
 
 function collectAllGeodesicIds(registry: RuntimeObjectRegistry): Set<string> {
   const geodesicIds = new Set<string>();
   for (const object of registry.getAll()) {
-    if (object.kind === "geodesic-interval") {
+    if (object.kind === "geodesicModel/arc") {
       geodesicIds.add(object.id);
-    } else if (object.kind === "geodesic-segment") {
+    } else if (object.kind === "geodesicModel/segment") {
       geodesicIds.add(object.geodesicId);
     } else if (object.kind === "measured-geodesic-length") {
       geodesicIds.add(object.geodesicId);

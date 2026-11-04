@@ -716,10 +716,10 @@ Curve shortening: tie-and-detach of two endpoint roles into a curve-shortening p
 
 | Kind | Name | Summary |
 | --- | --- | --- |
-| interface | `TieAndDetachGeodesicEndpointsRequest` | Request for `tieAndDetachGeodesicEndpoints`: detach two endpoint roles from one emitter and tie them at a new shared free end. |
+| interface | `TieAndDetachGeodesicEndpointsRequest` | Request for `tieAndDetachGeodesicEndpoints`: detach two endpoint roles from one emitter and tie them at a new shared vertex. |
 | interface | `AdvanceCurveShorteningPairsRequest` | Request for `advanceCurveShorteningPairs`: one tick of the curve shortening flow of every moving pair. |
-| function | `tieAndDetachGeodesicEndpoints` | Detaches two endpoint roles from one emitter and ties them to a new shared free end, starting a curve-shortening pair. |
-| const | `curveShorteningSpeedMetersPerSecond` | Speed (meters per second) at which a free vertex moves along its descent direction; the exact line search never overshoots the minimum. |
+| function | `tieAndDetachGeodesicEndpoints` | Detaches two endpoint roles from one emitter and ties them to a new shared vertex (`tieAtNewVertex`), starting a curve-shortening pair. |
+| const | `curveShorteningSpeedMetersPerSecond` | Speed (meters per second) at which a vertex moves along its descent direction; the exact line search never overshoots the minimum. |
 | const | `curveShorteningTautTurnRadians` | Turning angle (radians) below which a vertex counts as taut: its two arcs are one geodesic and the vertex is removed. |
 | function | `advanceCurveShorteningPairs` | Advances every moving curve-shortening curve by one tick of the curve shortening flow and returns the ids that changed. |
 | type | `CurveShorteningNotice` | A user-visible event of the curve shortening flow; the shell logs it (there is no on-screen message system yet). |
@@ -746,7 +746,16 @@ Endpoint attachments of geodesic intervals: lookup by anchor, re-attachment, lif
 | function | `resolveGeodesicEndpointSelectionFromSegmentHit` | Maps a clicked segment (by id) to the endpoint attachment of its half, or `undefined` if it is not a half-labelled segment of an existing interval. |
 | function | `portalWordMatchesCurrentEndpointCells` | True when the interval's portal word leads from the start anchor's cell to the end anchor's cell. |
 | function | `portalWordMatchesEndpointCellsWithAnchors` | Like `portalWordMatchesCurrentEndpointCells`, with candidate anchors that may differ from the registry. |
-| function | `isAimableFreeGeodesic` | True for a stable interval with one emitter endpoint and one free end that no other geodesic uses. |
+| function | `isAimableFreeGeodesic` | True for an arc with one emitter endpoint and one vertex that no other arc end uses (a plain shot geodesic). |
+| interface | `ArcEnd` | An arc end: one endpoint role of an arc. |
+| function | `arcsAtVertex` | Both endpoint roles attached to the vertex (a loop on it contributes two), in registry insertion order. |
+| function | `forEachTiedVertex` | Visits the vertices with two or more arc ends in registry insertion order. |
+| function | `tiedVertexCount` | Number of vertices with two or more arc ends (closed loops included). |
+| function | `isVertexSharedWithOtherArc` | True when the anchor is a vertex shared with an end of some arc other than `arcId`. |
+| function | `isTied` | The arc has an end on a vertex that another arc end shares. |
+| function | `isStale` | The arc's last rebuild failed during a carry, so it still shows its old path. |
+| function | `arcsOfCurve` | Every arc of the curve through the vertex, walked over shared vertices, in discovery order. |
+| function | `arcsOfCurveContaining` | The arcs of the curve an arc belongs to: the arc itself and, through each vertex end, `arcsOfCurve`. |
 | function | `removeUnusedFreeGeodesicEnds` | Removes free-end anchors that no interval attaches to any more. |
 | function | `getEmitterGeodesicIds` | Ids of the geodesics attached to an emitter (either end), each once, in registry order. |
 
@@ -784,19 +793,20 @@ Interval rebuilds: realizing an interval's lifted chord, aiming free geodesics, 
 
 ### `world-objects/geodesic/lifecycle.ts`
 
-Queries whether a geodesic is locked or connected, and removal of geodesics and cannons together with their derived objects.
+Queries whether an arc connects emitters or follows one, and removal of geodesics and cannons together with their derived objects.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
 | function | `getGeodesicConnection` | Describes how an interval geodesic attaches to emitters. |
-| function | `isGeodesicLocked` | True when both endpoints of the geodesic are pinned anchors, each an emitter (a "locked" geodesic that cannot be extended or aimed freely). |
-| function | `collectLockedIncidentGeodesicIdsForEmitter` | Lists the ids of locked geodesics (see `isGeodesicLocked`) that have an endpoint on the emitter. |
+| function | `arcConnectsEmitters` | True when both ends of the arc are on emitters: a geodesic with no interior vertex. |
+| function | `arcFollowsEmitter` | The arc follows the emitter when it has an end on it and either connects emitters or its other end is a shared vertex (a tied arc). |
+| function | `collectFollowingArcIdsForEmitter` | Lists the ids of arcs that follow the emitter (see `arcFollowsEmitter`), in registry order. |
 | function | `removeGeodesic` | Removes a geodesic and its derived objects (an interval via `removeGeodesicIntervalAndDerivedObjects`; any other id only has stale segments and emitter cache entries removed), then refreshes intersections. |
-| function | `removeUnlockedGeodesicsFromCannon` | Removes every non-locked geodesic listed on the cannon and returns the removed ids (empty if the id is not a cannon). |
+| function | `removeUnlockedGeodesicsFromCannon` | Removes every geodesic of the cannon that does not follow it (a plain shot geodesic with an unshared free end) and returns the removed ids (empty if the id is not a cannon). |
 
 ### `world-objects/geodesic/objects.ts`
 
-Geodesic emitters ("cannons"), geodesic intervals and curve shortening on a glued cell complex.
+Geodesic emitters ("cannons"), geodesic arcs and curve shortening on a glued cell complex.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
@@ -808,13 +818,13 @@ Geodesic emitters ("cannons"), geodesic intervals and curve shortening on a glue
 | type | `GeodesicHalfRole` | Which half of an interval a derived segment belongs to (split at the midpoint of the total length). |
 | interface | `GeodesicEndpointAttachment` | Attachment of one endpoint role of one geodesic interval to an anchor object (emitter or free end). |
 | interface | `GeodesicEndpointSelection` | An endpoint attachment picked by the user (typically from a segment hit) as input to tie-and-detach. |
-| interface | `FreeGeodesicEndObject` | An invisible, non-colliding anchor object marking a geodesic endpoint that is not on an emitter. |
-| interface | `GeodesicIntervalObject` | The authoritative description of one geodesic: two endpoint attachments plus the portal word joining them. |
+| interface | `GeodesicVertexObject` | An invisible, non-colliding anchor object marking a geodesic endpoint that is not on an emitter. |
+| interface | `GeodesicArcObject` | The authoritative description of one geodesic: two endpoint attachments plus the portal word joining them. |
 | interface | `CurveShorteningPairObject` | Bookkeeping object owning one curve-shortening process: a piecewise-geodesic curve whose free vertices relax under the curve shortening flow. |
 | interface | `LiftedGeodesicEndpoint` | An interval's far endpoint pulled back into the cell of a chosen source endpoint (the "development" of the interval). |
 | interface | `GeodesicTraceBuildResult` | Outcome of rebuilding an interval's derived geometry: the interval, its new segments, and how the trace ended. |
 | interface | `GeodesicSegmentObject` | A derived, per-cell straight piece of a geodesic: a ray inside one cell from `start` along `direction` for `lengthMeters`. |
-| interface | `GeodesicIntersectionObject` | A computed marker where two distinct geodesics' segments cross in the same cell. |
+| interface | `GeodesicCrossingObject` | A computed marker where two distinct geodesics' segments cross in the same cell. |
 | type | `GeodesicSegmentTerminal` | How a single per-cell segment ends. |
 | interface | `CreateGeodesicCannonOptions` | Construction options for `createGeodesicCannonObject`; omitted optional fields get the defaults documented there. |
 | interface | `TraceGeodesicSegmentResult` | One traced piece: the cell, the (normalized) ray used, the length actually travelled, and why it stopped. |
@@ -830,10 +840,11 @@ Geodesic emitters ("cannons"), geodesic intervals and curve shortening on a glue
 | const | `minGeodesicSegmentLengthMeters` | Smallest segment/continuation length (meters) worth creating when splitting or building free geodesics. |
 | const | `emitterConnectionToleranceMeters` | Perpendicular distance (meters) within which a ray counts as hitting an emitter; equal to the cannon collision radius. |
 | function | `createGeodesicCannonObject` | Builds a geodesic emitter object from options, filling defaults. |
-| function | `isGeodesicSegmentObject` | Type guard: true when the object is a `GeodesicSegmentObject` (`kind === "geodesic-segment"`). |
-| function | `isFreeGeodesicEndObject` | Type guard: true when the object is a `FreeGeodesicEndObject`. |
-| function | `createFreeGeodesicEndObject` | Builds a free-end anchor at `point` (cell-local meters, including its beam height in z) in cell `cellId`. |
-| function | `createGeodesicIntervalObject` | Builds a geodesic interval from two anchor ids, a start cell and an optional portal word. |
+| function | `isGeodesicSegmentObject` | Type guard: true when the object is a `GeodesicSegmentObject` (`kind === "geodesicModel/segment"`). |
+| function | `isGeodesicVertexObject` | Type guard: true when the object is a `GeodesicVertexObject`. |
+| function | `createGeodesicVertexObject` | Builds a free-end anchor at `point` (cell-local meters, including its beam height in z) in cell `cellId`. |
+| function | `withoutStale` | The arc without its transient `stale` mark (the arc itself when it has none). |
+| function | `createGeodesicArcObject` | Builds a geodesic interval from two anchor ids, a start cell and an optional portal word. |
 | function | `createCurveShorteningPairObject` | Builds a curve-shortening pair object (see `CurveShorteningPairObject`); `state` defaults to `"moving"`. |
 | function | `getGeodesicSegmentEnd` | Returns the segment's end point, `start + direction * lengthMeters`, in the segment's cell frame (meters). |
 | function | `canExtendGeodesicSegment` | True unless the segment ended at a wall, forbidden zone or emitter (those terminals cannot be continued). |
@@ -910,6 +921,27 @@ Tracing a horizontal geodesic ray through a compiled cell complex: the single-ce
 | function | `geodesicTerminalFromWalkPiece` | Converts one piece of a developed-segment walk into a segment terminal. |
 | function | `traceGeodesicPathForConnectionMode` | Traces a geodesic through the cell complex, restarting in the target cell at each portal hit. |
 | function | `traceTerminalToBuildTerminal` | Maps the terminal of a trace tail to the terminal of a build result. |
+
+### `world-objects/geodesic/vertices.ts`
+
+Operations on the vertices of a piecewise-geodesic curve (design 013 section 13.1): the arcs at a vertex, their tangents and length, moving a vertex (each incident arc keeps its homotopy class: its word changes exactly by the portals the vertex crosses), removing a vertex by merging its two arcs, and tying two endpoint roles of an emitter at a new vertex.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| const | `vertexTautTurnRadians` | Turning angle (radians) below which a vertex counts as taut: its two arcs are one geodesic and the vertex is removed. |
+| interface | `ArcTangent` | Unit tangent of an arc at a vertex, pointing away from it, in the vertex's cell frame, with the arc's chord length. |
+| interface | `VertexMovePreview` | The result of {@link previewVertexMove}: the new vertex record and the realized arcs, opaque to callers. |
+| type | `VertexRemovalPreview` | What removing a vertex would give: a merged arc, a taut loop, a collapsed curve, or blocked. |
+| function | `arcTangentsAtVertex` | Tangents of the arcs at the vertex; with `displacedTo`, as if the vertex stood at that point of its own cell (no portal walk). |
+| function | `lengthSlopeAtVertex` | The derivative of the total length of the arcs at the vertex along `direction`, with the vertex displaced to `displacedTo` of its own cell: minus the sum of the dot products of `direction` with the tangents. |
+| function | `lengthOfArcs` | Total length (meters) of the distinct arcs among `arcs`. |
+| function | `previewVertexMove` | Walks the vertex `lengthMeters` along `direction` (vertex cell frame) through portals, updates the words of the arcs by the portals crossed and realizes each arc as the geodesic chord of its class. |
+| function | `commitVertexMove` | Applies a {@link previewVertexMove}: the vertex, the arcs with their new words and their realized segments. |
+| function | `previewVertexRemoval` | What removing the vertex would give (writes nothing). |
+| function | `removeVertex` | Applies a {@link previewVertexRemoval} and returns the arc ids that changed or were removed (empty for `blocked`; the loop for `loopTaut`, which changes nothing). |
+| type | `TieAtNewVertexRefusal` | Why {@link tieAtNewVertex} changed nothing. |
+| type | `TieAtNewVertexResult` | Result of {@link tieAtNewVertex}. |
+| function | `tieAtNewVertex` | Detaches two endpoint roles from one emitter and ties them at a new vertex born at the emitter's beam point, so the geometry does not change at tie time. |
 
 ### `world-objects/geodesicMarmot.ts`
 
@@ -1390,6 +1422,7 @@ The names the engine knows without any module: the object kinds of the registry'
 | Kind | Name | Summary |
 | --- | --- | --- |
 | const | `coreObjectKinds` | Kinds of the core union of the registry. |
+| const | `moduleOwnedCoreKinds` | Kinds of the registry's core union that a module declares as its own (design 013 section 13.1): the geodesic model keeps their declaring files in `world-objects/geodesic/objects.ts` and in the core union in this wave, a… |
 | const | `coreToolIds` | Ids of the tools the shell defines itself. |
 
 ### `engine/ids.ts`
@@ -1529,6 +1562,44 @@ The carry module (design 013 section 7): who carries what is world state.
 | --- | --- | --- |
 | type | `CarryModuleDefinition` | The module as the engine's list takes it. |
 | function | `carryModule` | Creates the carry module. |
+
+### `modules/geodesicModel/api.ts`
+
+The geodesic model's public face (design 013 sections 12.1 and 13.1): its token, the read-only queries clients and dependents share, the operations only dependents hold, and the plain-data shapes of its commands and events.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `ArcEnd` | An arc end at a vertex: one endpoint role of an arc. |
+| interface | `ArcTangent` | Unit tangent of an arc at a vertex, pointing away from it, in the vertex's cell frame, with the arc's chord length. |
+| interface | `GeodesicEndpointRef` | An endpoint role of an arc, named by the arc, the role and the anchor it is attached to (plain data, so that a command can carry it). |
+| interface | `GeodesicModelQueries` | What clients and dependents receive: reads only, which never change the registry. |
+| interface | `VertexMovePreview` | The result of `previewVertexMove`. |
+| type | `VertexRemovalPreview` | What removing a vertex would give: a merged arc, a taut loop, a collapsed curve, or blocked. |
+| interface | `GeodesicModelApi` | For dependents only: the hot route M1, M2 of design 013 section 5.7. |
+| const | `geodesicModelToken` | The geodesic model's token: `provides` of the module, `requires` of the modules that act on its curves. |
+| interface | `GeodesicTieAndDetachCommand` | Detaches two endpoint roles from an emitter and ties them at a new shared vertex, born at the emitter's beam point (the geometry does not change). |
+| interface | `GeodesicHighlightEndpointCommand` | Tool highlight of one endpoint's half of a geodesic (the segments' `highlightState`); transient. |
+| interface | `GeodesicRemoveVertexCommand` | Module-only. |
+| interface | `GeodesicRemoveCurveCommand` | Module-only. |
+| type | `GeodesicModelCommand` | Every command of the module. |
+| interface | `GeodesicVertexTiedEvent` | Two endpoint roles were tied at a new vertex. |
+| type | `GeodesicModelEvent` | Every event of the module. |
+| const | `geodesicModelRefusals` | The refusal codes of the module's commands. |
+
+### `modules/geodesicModel/index.ts`
+
+The geodesic model module's world factory (design 013 section 12.1).
+
+_No exports._
+
+### `modules/geodesicModel/module.ts`
+
+The geodesic model module (design 013 section 13.1): piecewise geodesics on the glued complex as a world module.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| type | `GeodesicModelModuleDefinition` | The module as the engine's list takes it. |
+| function | `geodesicModelModule` | Creates the geodesic model module. |
 
 ## `runtime`
 

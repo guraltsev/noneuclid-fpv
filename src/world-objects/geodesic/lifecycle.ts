@@ -1,11 +1,12 @@
 /**
- * Queries whether a geodesic is locked or connected, and removal of geodesics and cannons together with their derived objects.
+ * Queries whether an arc connects emitters or follows one, and removal of geodesics and cannons together with their derived objects.
  */
 import type { RuntimeObjectRegistry } from "../runtimeObjectRegistry";
 import type { GeodesicEmitterAttachment } from "./objects";
 import { requestGeodesicIntersectionUpdate, withDeferredGeodesicIntersections } from "./intersections";
 import {
   getEmitterGeodesicIds,
+  isVertexSharedWithOtherArc,
 } from "./endpoints";
 import { removeGeodesicIntervalAndDerivedObjects, removeGeodesicSegments } from "./segments";
 
@@ -21,7 +22,7 @@ export function getGeodesicConnection(
   geodesicId: string,
 ): GeodesicEmitterAttachment | undefined {
   const interval = registry.get(geodesicId);
-  if (interval?.kind === "geodesic-interval") {
+  if (interval?.kind === "geodesicModel/arc") {
     const start = registry.get(interval.start.anchorObjectId);
     const end = registry.get(interval.end.anchorObjectId);
     if (start?.kind === "geodesic-cannon") {
@@ -41,29 +42,44 @@ export function getGeodesicConnection(
   return undefined;
 }
 
-// Emitters are pinned anchors; a free end is not.
-function isPinnedAnchorKind(kind: string | undefined): boolean {
-  return kind === "geodesic-cannon";
+/**
+ * True when both ends of the arc are on emitters: a geodesic with no interior vertex. This is a fact about the ends, not a state.
+ * An id that is not an arc never connects emitters.
+ */
+export function arcConnectsEmitters(registry: RuntimeObjectRegistry, arcId: string): boolean {
+  const arc = registry.get(arcId);
+  return arc?.kind === "geodesicModel/arc" &&
+    registry.get(arc.start.anchorObjectId)?.kind === "geodesic-cannon" &&
+    registry.get(arc.end.anchorObjectId)?.kind === "geodesic-cannon";
 }
 
 /**
- * True when both endpoints of the geodesic are pinned anchors, each an emitter (a "locked" geodesic that cannot be extended or aimed freely).
- * An id that is not an interval is never locked.
+ * The arc follows the emitter when it has an end on it and either connects emitters or its other end is a shared vertex (a tied arc).
+ * Carrying the emitter keeps such an arc; a plain shot geodesic (an unshared free end) does not follow and is removed when the emitter is lifted.
  */
-export function isGeodesicLocked(registry: RuntimeObjectRegistry, geodesicId: string): boolean {
-  const interval = registry.get(geodesicId);
-  return interval?.kind === "geodesic-interval" &&
-    isPinnedAnchorKind(registry.get(interval.start.anchorObjectId)?.kind) &&
-    isPinnedAnchorKind(registry.get(interval.end.anchorObjectId)?.kind);
+export function arcFollowsEmitter(registry: RuntimeObjectRegistry, arcId: string, emitterId: string): boolean {
+  const arc = registry.get(arcId);
+  if (arc?.kind !== "geodesicModel/arc") {
+    return false;
+  }
+  const startOnEmitter = arc.start.anchorObjectId === emitterId;
+  const endOnEmitter = arc.end.anchorObjectId === emitterId;
+  if (!startOnEmitter && !endOnEmitter) {
+    return false;
+  }
+  if (arcConnectsEmitters(registry, arcId)) {
+    return true;
+  }
+  return isVertexSharedWithOtherArc(registry, startOnEmitter ? arc.end.anchorObjectId : arc.start.anchorObjectId, arcId);
 }
 
-/** Lists the ids of locked geodesics (see `isGeodesicLocked`) that have an endpoint on the emitter. */
-export function collectLockedIncidentGeodesicIdsForEmitter(
+/** Lists the ids of arcs that follow the emitter (see `arcFollowsEmitter`), in registry order. */
+export function collectFollowingArcIdsForEmitter(
   registry: RuntimeObjectRegistry,
   emitterId: string,
 ): readonly string[] {
   return getEmitterGeodesicIds(registry, emitterId)
-    .filter((geodesicId) => isGeodesicLocked(registry, geodesicId));
+    .filter((arcId) => arcFollowsEmitter(registry, arcId, emitterId));
 }
 
 // ---- Removal ----
@@ -74,7 +90,7 @@ export function removeGeodesic(registry: RuntimeObjectRegistry, geodesicId: stri
 }
 
 function removeGeodesicNow(registry: RuntimeObjectRegistry, geodesicId: string): void {
-  if (registry.get(geodesicId)?.kind === "geodesic-interval") {
+  if (registry.get(geodesicId)?.kind === "geodesicModel/arc") {
     removeGeodesicIntervalAndDerivedObjects(registry, geodesicId);
     return;
   }
@@ -82,7 +98,7 @@ function removeGeodesicNow(registry: RuntimeObjectRegistry, geodesicId: string):
   requestGeodesicIntersectionUpdate(registry);
 }
 
-/** Removes every non-locked geodesic listed on the cannon and returns the removed ids (empty if the id is not a cannon). */
+/** Removes every geodesic of the cannon that does not follow it (a plain shot geodesic with an unshared free end) and returns the removed ids (empty if the id is not a cannon). Arcs that connect emitters and tied arcs stay. */
 export function removeUnlockedGeodesicsFromCannon(
   registry: RuntimeObjectRegistry,
   cannonId: string,
@@ -101,7 +117,7 @@ function removeUnlockedGeodesicsFromCannonNow(
 
   const removed: string[] = [];
   for (const geodesicId of getEmitterGeodesicIds(registry, cannonId)) {
-    if (isGeodesicLocked(registry, geodesicId)) {
+    if (arcFollowsEmitter(registry, geodesicId, cannonId)) {
       continue;
     }
 

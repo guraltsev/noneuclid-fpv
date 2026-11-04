@@ -9,8 +9,8 @@ import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex"
 import type { RuntimeObjectRegistry } from "../runtimeObjectRegistry";
 import { rebuildConnectedGeodesicBetweenEmitters, rebuildGeodesicToLength } from "./cannon";
 import { pruneMissingGeodesicIntersectionObjects, withDeferredGeodesicIntersections } from "./intersections";
-import { getEmitterGeodesicIds } from "./endpoints";
-import { collectLockedIncidentGeodesicIdsForEmitter, isGeodesicLocked } from "./lifecycle";
+import { getEmitterGeodesicIds, isTied } from "./endpoints";
+import { arcFollowsEmitter, collectFollowingArcIdsForEmitter } from "./lifecycle";
 import { collectGeodesicPortalWord, getGeodesicSegments, resolveEmitterLaunchYaw } from "./segments";
 
 /** What a rebuild of an emitter's geodesics touched. */
@@ -43,7 +43,7 @@ export function rebuildEmitterGeodesics(input: {
   }
 
   const geodesicId = input.activeGeodesicId ?? getEmitterGeodesicIds(registry, cannon.id)[0];
-  const lockedIncidentGeodesicIds = collectLockedIncidentGeodesicIdsForEmitter(registry, cannon.id);
+  const lockedIncidentGeodesicIds = collectFollowingArcIdsForEmitter(registry, cannon.id);
   if (lockedIncidentGeodesicIds.length === 0 && !geodesicId) {
     return { rebuiltGeodesicIds: [] };
   }
@@ -68,11 +68,12 @@ export function rebuildEmitterGeodesics(input: {
     });
     return { rebuiltGeodesicIds: lockedIncidentGeodesicIds };
   }
-  if (geodesicId && isGeodesicLocked(registry, geodesicId)) {
+  if (geodesicId && arcFollowsEmitter(registry, geodesicId, cannon.id)) {
     rebuildLocked(geodesicId);
     return { rebuiltGeodesicIds: [geodesicId] };
   }
-  if (geodesicId) {
+  // A tied arc is never regrown: its curve is not a ray from the emitter.
+  if (geodesicId && !isTied(registry, geodesicId)) {
     rebuildGeodesicToLength({
       world,
       registry,

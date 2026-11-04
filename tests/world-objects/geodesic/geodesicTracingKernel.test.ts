@@ -17,7 +17,7 @@ import { compileCellComplex } from "../../../src/cell-complex/compileCellComplex
 import { invertRigidTransform3, transformPoint3, yawRigidTransform3 } from "../../../src/math/rigidTransform3";
 import {
   createGeodesicCannonObject,
-  createGeodesicIntervalObject,
+  createGeodesicArcObject,
   geodesicRayBeamHeightMeters,
   getGeodesicSegmentEnd,
   type GeodesicSegmentObject,
@@ -100,7 +100,7 @@ describe("geodesic tracing on the kernel", () => {
       targetPortalId: portal.targetPortalId,
     };
     const word = Array.from({ length: 10 }, () => traversal);
-    registry.add(createGeodesicIntervalObject({
+    registry.add(createGeodesicArcObject({
       id: "g-wrap",
       startAnchorObjectId: "cannon-a",
       endAnchorObjectId: "cannon-b",
