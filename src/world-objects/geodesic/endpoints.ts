@@ -287,7 +287,7 @@ export function tiedVertexCount(registry: RuntimeObjectRegistry): number {
   return count;
 }
 
-/** True when the anchor is a vertex shared with an end of some arc other than `arcId`. Allocation-free scan: the display path calls it for every rebuilt arc. */
+/** True when the anchor is a vertex shared with an end of some arc other than `arcId`. Allocation-free scan: called by the carry paths. */
 export function isVertexSharedWithOtherArc(registry: RuntimeObjectRegistry, anchorObjectId: string, arcId: string): boolean {
   if (registry.get(anchorObjectId)?.kind !== "geodesicModel/vertex") {
     return false;

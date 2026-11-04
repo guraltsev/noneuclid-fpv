@@ -1,6 +1,6 @@
 # Job 51 - Restore the geodesic model module and abolish the "moving" state
 
-Status: in progress.
+Status: done, needs review on 2026-11-04.
 Resolves: part of issue [84](../../_issues/84_behaviors_are_hard_wired_into_the_shell_and_need_a_plugin_system.md) (requirements 2, 5, 6), part of issue [86](../../_issues/86_derived_state_is_recomputed_by_scanning_the_world.md).
 
 ## Goal

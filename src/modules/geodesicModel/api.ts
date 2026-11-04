@@ -40,7 +40,7 @@ export interface GeodesicModelQueries {
   lengthOfArcs(arcs: readonly ArcEnd[]): number;
   /** Both ends on emitters: a geodesic with no interior vertex. */
   connectsEmitters(arcId: string): boolean;
-  /** The arc has an end on a tied vertex (what `motionState: "moving"` used to say, for display). A closed loop on one vertex is not tied. */
+  /** The arc has an end on a tied vertex (a tied arc is drawn open). A closed loop on one vertex is not tied. */
   isTied(arcId: string): boolean;
   /** Vertices with two or more arc ends, closed loops included. One scan of the arcs per call, O(arcs); not for a per-step path. */
   tiedVertexCount(): number;
