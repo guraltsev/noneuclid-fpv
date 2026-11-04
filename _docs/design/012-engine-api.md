@@ -340,6 +340,12 @@ sum of displacements is not the path; a merged step can change the homotopy clas
 minus the object's current place so that drift corrects itself; picking up is a separate "attach here" message. This is
 job 47.
 
+**Agreed (maintainer, 2026-11-03), refining the above:** world state is distinct from client state. The menu and the
+selected tool are **client** state and stay in the shell's session; tools send commands, and before switching to a tool
+the client asks the world, which may refuse (a confirmation protocol). Lasting relations between a participant and an
+object, such as who carries what, are **world** state, so the carry record moves from the shell session to the world.
+Designed in [013, sections 4, 7 and 8](013-world-engine-clients-and-modules.md).
+
 ### P4. Modal tools as per-participant tool sessions
 
 Carry, rotate and aim become sessions with begin, update, commit and cancel. Begin, commit and cancel are commands;
@@ -745,6 +751,12 @@ core never needs editing. No runtime plugin loading. The instruments are a modul
 public module interface; needing a back door means the module interface is wrong. *Alternatives:* one closed union in
 the core; a dynamic plugin registry.
 
+**Designed in [013](013-world-engine-clients-and-modules.md)** (2026-11-03, issue 84), together with the split between
+world state and client state (one design, maintainer): the world engine (state, step, commands, control slots, read
+view, change journal), clients and the confirmation protocol for tools, the module interface and its checks, naming,
+persistence rules, and the first modules (`geodesicModel`, `curveShortening`, `carry`, `geodesicMeasurements`) with jobs
+48 to 55.
+
 ## 5. Open questions
 
 - **Multiplayer**: if P5 is not adopted, the model is open; in any case: what is shared vs client-local state, latency
@@ -969,3 +981,6 @@ cleanups) and job 46 (one state holder and one command path; **Agreed 2026-11-01
 | 2026-10-31 | Status update (maintainer): S0 and S1 are implemented (jobs 39 and 40, done, awaiting review). The server allows real-time debugging and testing. Still open from S1: the `docs:check` plain-data rule. S3 (scenario scripts) can start. |
 | 2026-10-31 | Agreed: the channel uses WebSocket (the `ws` package on the server), not Server-Sent Events plus POST, because S2 and S4 need frequent messages in both directions. |
 | 2026-11-01 | Agreed (maintainer): the state holder is shell-side, not engine state, and `RuntimeMenuState` is not split for now (P3 revised). An object declares what it can do (an emitter "can be carried") and the meaning of each ability is a defined contract in the world-objects layer (jobs 46 and 47). Revises the placement of the P4 carry attachment: its rules are the object's contract; the holder of the current carry is the shell session. |
+| 2026-11-03 | P17 refined by design 013 (issue 84). Agreed there: piecewise-geodesic geometry and the curve shortening flow are separate modules; ordering by fixed phases, then dependencies; performance enforced by a bench check in job acceptance. |
+| 2026-11-03 | Design 013 revised (maintainer): the first module is a geodesic model built on geometry tools such as homotopy; tying belongs to the model; the flow is a dependent module that claims tied vertices. |
+| 2026-11-03 | Agreed (maintainer): the world/client split and the module system are one design, in 013 (renamed "World engine, clients and modules"). P3 refined: menu and selected tool are client state, tools send commands with a confirmation protocol, lasting relations such as carry are world state. P7: the engine runs on the main thread, worker-ready; the Quest prototype comes later. |

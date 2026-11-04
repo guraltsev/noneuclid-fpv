@@ -1,10 +1,16 @@
 # 84 - Behaviors are hard-wired into the shell; the engine needs a designed plugin system for them
 
-Status: open. Needs a design before any job (see `## What the design must settle`).
+Status: open. Design drafted in [013](../_docs/design/013-world-engine-clients-and-modules.md) (2026-11-03); job files
+written. The module system is designed together with the split between world state and client
+state (maintainer, 2026-11-03).
 
 Priority: P2 (blocks every planned variation of geodesic behavior; no user-visible defect today).
 
-Jobs: none yet.
+Jobs: [48 to 55](../.agents/jobs/README.md), specified in design 013, section 15.
+
+Correction (2026-11-03): `free-geodesic-end` and the interval `motionState` are not owned by the flow; every shot
+geodesic uses a free end. In design 013 a curve has no lifecycle, so `curve-shortening-pair` and `motionState` are deleted
+(section 13.2).
 
 ## Problem
 
@@ -75,7 +81,7 @@ points below, and nothing implements it yet.
 
 Move tie/untie and the curve shortening flow (pair, free end, tool, system, notices) into one `geodesicDynamics` module as the
 first module on the new interface. It exercises requirements 1, 2, 4 and 5 and has an obvious second implementation (the stick-at-
-corner flow). Its present behavior is described in `_docs/MATHEMATICAL_MODEL.md` and `.agents/knowledge/curve-shortening-flow.md`.
+corner flow). Its present behavior is described in `_docs/MATHEMATICAL_MODEL.md`.
 
 ## Evidence
 
