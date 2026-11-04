@@ -1,6 +1,6 @@
 # Job 55 - Add the "destroy" policy for blocked curves
 
-Status: queued.
+Status: skipped on 2026-11-03: needs job 54.
 Resolves: issue [84](../../_issues/84_behaviors_are_hard_wired_into_the_shell_and_need_a_plugin_system.md), with jobs 48 to 54.
 
 ## Goal

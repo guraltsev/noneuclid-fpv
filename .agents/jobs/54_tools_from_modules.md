@@ -1,6 +1,6 @@
 # Job 54 - Build tools from module descriptors
 
-Status: queued.
+Status: skipped on 2026-11-03: needs job 53.
 Resolves: part of issue [84](../../_issues/84_behaviors_are_hard_wired_into_the_shell_and_need_a_plugin_system.md) (requirements 1, 6).
 
 ## Goal

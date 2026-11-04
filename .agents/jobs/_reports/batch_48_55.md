@@ -1,7 +1,7 @@
 # Batch report: jobs 48-55 (world engine, clients and modules)
 
-Coordinator: [00_coordinate_jobs_48_55](../00_coordinate_jobs_48_55.md).
-Branch: batch-48-55. Batch start: ffde730. Batch end: (pending).
+Coordinator: [00_coordinate_jobs_48_55](../_done/00_coordinate_jobs_48_55.md).
+Branch: batch-48-55. Batch start: ffde730. Batch end: see git log (job 51 reverted; jobs 52-55 skipped).
 
 ## Start state
 - Worktree `../noneuclid-batch-48-55`, branch `batch-48-55` from `design/012-engine-api` (ffde730), tree clean.
@@ -10,12 +10,20 @@ Branch: batch-48-55. Batch start: ffde730. Batch end: (pending).
 - test:report: unit 150 files/1136 tests, process 3/18, release 6/9; test lines/src lines 30821/51363; hygiene baseline 0.
 - createThreeApp.ts: 1739 lines.
 
+## Outcome
+Batch stopped after job 51: jobs 48-50 done (needs review), job 51 reverted for a bench regression, jobs 52-55 skipped. Issue 84 stays open.
+
 ## Summary
 | Job | Result | Commits | Review |
 | --- | --- | --- | --- |
 | 48 | needs review | 067d74d, ea729cd, c375e0e, 2aa6739 | fresh agent; 1 finding (toolObjectRuntimes.ts missing from legacyWorldWriters) + recorded deviations |
 | 49 | needs review | 9bb697b, b3c83d2, 9cc6299, 0171312 | fresh agent; findings 1 (id families, order check) repaired; rest recorded |
 | 50 | needs review | af0e892, faf0e6d | fresh agent; test-coverage gap and unrecorded deviations repaired; behaviour changes recorded |
+| 51 | **FAILED (reverted)** | eccd27c, 35befce, 97190ef, a142b9d, 35e19b6, 869024b; reverted by f6cb09c, fa583ec, 85983d6 and the revert of the rest | fresh agent: no wrong assertions, flagged allocation in the flow step, many unrecorded changes (all recorded in the partial report) |
+| 52 | skipped: needs job 51 | - | - |
+| 53 | skipped: needs job 52 | - | - |
+| 54 | skipped: needs job 53 | - | - |
+| 55 | skipped: needs job 54 | - | - |
 
 ## Indicators
 | Indicator | Start | After each job, 48 to 55 |
@@ -24,6 +32,9 @@ Branch: batch-48-55. Batch start: ffde730. Batch end: (pending).
 | Lines in createThreeApp.ts | 1739 | 48: 1741; 49: 1780; 50: 1783 |
 | Lines in `legacyWorldWriters` | (see job 48) | |
 | Test files / tests (unit, process, release) | 150/1136, 3/18, 6/9 | 48: 151/1151, 3/18, 6/9; 49: 154/1199, 3/18, 7/10; 50: 155/1206, 3/18, 7/11 |
+
+## Final run (batch end)
+typecheck ok; `npm test` 155 files / 1332 tests; `npm run test:release` 7 files / 15 tests; docs:check ok; `bench moduleStep --check` ok (idle 0.12 us, flow 17.9 us, flow+dependents 31.3 us, 680 B idle via the legacy driver); test:report: unit 155/1206, process 3/18, release 7/11; createThreeApp.ts 1783 lines.
 
 ## Job 48
 Report: see `_done/48_module_bench_change_journal_layers.md`. Baseline commit 067d74d changes nothing under src/. Journal, RuntimeObjectReader, engine/modules layers, legacyWorldWriters (14 files) added.
@@ -43,15 +54,17 @@ Behaviour changes (recorded, not authorized by the job): second pickup refused (
 Deviations from 013: no junction drop (junction zone is a wall since job 47; drop reasons are leash / missing); bodies phase, writesCoreKinds and carry/drop are additions; `modules/carry/` is exempted in docs rule from "reach geodesic only through the geodesic model"; legacyWorldWriters could not shrink.
 Not done: release scenario and in-app manual check of carrying through a portal (public API cannot place an emitter; job 45 blocked).
 ## Job 51
-## Job 52
-## Job 53
-## Job 54
-## Job 55
+**Why it failed.** The bench gate `npm run bench -- moduleStep --check` stayed red after two repair rounds. The first review found a real regression: at a142b9d, flow was 19.3-19.8 us and flow+dependents 34.5-36.1 us (baseline 17.03 / 28.74, limits +10%), failing 5/5, while job 50's commit ee65c50 passed under the same conditions (flow ~17.4, flow+dependents 29.8-32.4). Repairs (allocation-free `isTied`, no closure in the stale check, array-free line-search slope) brought flow back to job 50's level, but an A/B run of 869024b against ee65c50 (3 alternating runs each, 30 s cooldowns) gave flow+dependents 32.9 / 33.2 / 33.3 us for 869024b (FAILED 3/3) against 31.8 / 31.4 / 29.8 us for ee65c50 (ok 3/3): a consistent ~5% cost, about 1.5 us per step, that the job's author could not locate. Per the coordinator rule (red after one repair attempt: revert, mark skipped, stop), the commits eccd27c..869024b were reverted with `git revert` (history kept). After the revert the tree is identical to ee65c50 and green (1332 unit tests, bench ok).
+What was done is in `_reports/job_51_partial_report.md` (the job's own Report as it stood at the end, including all deviations). Everything else passed at 869024b: typecheck, 1360 unit tests, docs:check, smoke, 15 release tests; the rename commit eccd27c passed `npm test` alone (1332 tests, same count, no assertion values changed).
+**Recommendation to the maintainer:** the regression is small and at the tolerance edge (flow+dependents limit is +10% of a baseline that was itself the slowest of 3 rounds on a noisy machine). Re-apply the commits (`git revert` the reverts, or cherry-pick eccd27c..869024b) and either accept ~5% on flow+dependents with a re-recorded baseline, or find the remaining cost; the suspect is the end-node/stale logic per vertex in the flow step or the measured-length/protractor refresh in the bench's legacyStep. Jobs 52-55 were not started.
+## Job 52 to 55
+Skipped (stop rule: each job needs the one before). Their files stay in `.agents/jobs/` with `Status: skipped`.
 
 ## Manual checks for the maintainer
 - Job 50: carry an emitter through a portal in the app (pick up, drag across faces, release, leash release, leave tool by another route); not done, no API to place an emitter.
 
 ## Questions for the maintainer
+- Job 51 (reverted): accept the ~5% flow+dependents cost (re-record the bench baseline) and re-apply eccd27c..869024b? Or should the 10% flow+dependents tolerance be widened/measured with more rounds first? The bench flakes on this machine even on unchanged code (job 48, 49, 50 also saw spurious failures right after heavy runs).
 - Job 50: accept the invented reach limit (pickup range + 0.67 m) and "second pickup refused"? Both changed user-visible carry behaviour and forced test position changes.
 - Bench flow+dependents tolerance (10%) sits at the machine's noise floor (30.3-33.3 us vs limit ~31.6 us); `--check` flakes when the machine is hot. Widen it or add rounds?
 - Job 48: is "legacy writer" meant to include files that call registry writers directly (e.g. toolObjectRuntimes.ts), not only files importing a world-objects mutator? Confirm the 14-file list and the geometry-tool allow-list (portalWord, development, trace, objects).

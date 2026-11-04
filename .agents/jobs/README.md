@@ -137,12 +137,12 @@ lower numbers of jobs 18, 24, 30, 34 and 35.
 | [45](45_api_functions_for_scenarios.md) | API functions that scenarios need, and the checks they convert | blocked on the maintainer (012) | - |  |
 | [46](_done/46_shell_session_and_command_path.md) | One shell-side state holder and one command path | done, needs review | - | 77 |
 | [47](_done/47_carry_contract.md) | The carry contract: an emitter that can be carried reacts to a stream of displacement steps | done, needs review | - |  |
-| [00](00_coordinate_jobs_48_55.md) | Coordinate jobs 48-55 (world engine, clients and modules): order, gates, fresh-context reviews, batch report | queued | [84](../../_issues/84_behaviors_are_hard_wired_into_the_shell_and_need_a_plugin_system.md) |  |
+| [00](_done/00_coordinate_jobs_48_55.md) | Coordinate jobs 48-55 (world engine, clients and modules): order, gates, fresh-context reviews, batch report | done, needs review | [84](../../_issues/84_behaviors_are_hard_wired_into_the_shell_and_need_a_plugin_system.md) |  |
 | [48](_done/48_module_bench_change_journal_layers.md) | Record the performance baseline, add the change journal, and add the engine and module layers | done, needs review | - |  |
 | [49](_done/49_world_engine_and_client_session.md) | Build the world engine and split the client session from it | done, needs review | - |  |
 | [50](_done/50_carry_as_world_attachment.md) | Make carrying a world attachment | done, needs review | - |  |
-| [51](51_geodesic_model_module_and_renames.md) | Create the geodesic model module, with its renames and end nodes | queued | - |  |
-| [52](52_derived_state_through_the_journal.md) | Derive crossings, lengths and angles from the change journal | queued | - |  |
-| [53](53_curve_shortening_module.md) | Move curve shortening into a module with no lifecycle | queued | - |  |
-| [54](54_tools_from_modules.md) | Build tools from module descriptors | queued | - |  |
-| [55](55_destroy_policy.md) | Add the "destroy" policy for blocked curves | queued | [84](../../_issues/84_behaviors_are_hard_wired_into_the_shell_and_need_a_plugin_system.md) |  |
+| [51](51_geodesic_model_module_and_renames.md) | Create the geodesic model module, with its renames and end nodes | skipped on 2026-11-03: could not be made green; see batch report | - |  |
+| [52](52_derived_state_through_the_journal.md) | Derive crossings, lengths and angles from the change journal | skipped on 2026-11-03: needs job 51 | - |  |
+| [53](53_curve_shortening_module.md) | Move curve shortening into a module with no lifecycle | skipped on 2026-11-03: needs job 52 | - |  |
+| [54](54_tools_from_modules.md) | Build tools from module descriptors | skipped on 2026-11-03: needs job 53 | - |  |
+| [55](55_destroy_policy.md) | Add the "destroy" policy for blocked curves | skipped on 2026-11-03: needs job 54 | [84](../../_issues/84_behaviors_are_hard_wired_into_the_shell_and_need_a_plugin_system.md) |  |

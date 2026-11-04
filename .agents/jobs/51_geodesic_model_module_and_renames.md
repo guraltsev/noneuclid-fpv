@@ -1,6 +1,6 @@
 # Job 51 - Create the geodesic model module, with its renames and end nodes
 
-Status: queued.
+Status: skipped on 2026-11-03: could not be made green; see batch report.
 Resolves: part of issue [84](../../_issues/84_behaviors_are_hard_wired_into_the_shell_and_need_a_plugin_system.md) (requirements 2, 5, 6).
 
 ## Goal
@@ -85,3 +85,7 @@ vertex, so they are not locked, and today lifting that emitter deletes them.
 ## Done when
 
 - The greps above are empty, a tied curve survives a carry in the app, and all checks are green.
+
+## Report
+
+See [job_51_partial_report.md](_reports/job_51_partial_report.md) (the work was reverted; commits eccd27c..869024b stay in history and can be re-applied).

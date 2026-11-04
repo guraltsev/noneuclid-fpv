@@ -1,6 +1,6 @@
 # Job 00 - Coordinate jobs 48-55 (world engine, clients and modules)
 
-Status: queued.
+Status: done, needs review on 2026-11-03.
 Coordinates: jobs [48](48_module_bench_change_journal_layers.md), [49](49_world_engine_and_client_session.md),
 [50](50_carry_as_world_attachment.md), [51](51_geodesic_model_module_and_renames.md),
 [52](52_derived_state_through_the_journal.md), [53](53_curve_shortening_module.md), [54](54_tools_from_modules.md) and
