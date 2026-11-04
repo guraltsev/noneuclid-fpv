@@ -947,6 +947,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     dumpLockedGeodesicWords: dumpLockedGeodesicWords,
     placeObjectAt: debugPlaceObjectAt,
     playerPose: debugPlayerPose,
+    kindScans: () => runtimeObjectRegistry.getKindScanCounts(),
     setPlayerPose: debugSetPlayerPose,
   });
   installRenderInspectionApi(runtimeObjectInstanceSync.inspection);
@@ -1491,6 +1492,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       dumpLockedGeodesicWords: dumpLockedGeodesicWords,
       placeObjectAt: debugPlaceObjectAt,
       playerPose: debugPlayerPose,
+      kindScans: () => runtimeObjectRegistry.getKindScanCounts(),
       setPlayerPose: debugSetPlayerPose,
     });
     geometryDebugHelpers.installIfAvailable();

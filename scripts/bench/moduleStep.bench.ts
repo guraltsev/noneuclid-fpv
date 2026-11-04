@@ -1,11 +1,13 @@
 /**
  * Per-step cost of the curve shortening flow and its dependents (measured lengths, protractor angles), driven the way
- * the frame loop drives them today ("the legacy driver"). Three scenes: idle (no flow), flow, flow plus dependents.
- * Design 013 section 15, job 48. A benchmark, not a test (_docs/tests.md section 4.7).
+ * the frame loop drives them today ("the legacy driver"). Timed scenes: idle (no flow), flow, flow plus dependents, and
+ * many arcs (timing printed, no limit). Counted scenes (exact, host independent): flow, flow+dependents, manyArcs.
+ * Design 013 section 15, job 48; design 014 section 5, job 56. A benchmark, not a test (_docs/tests.md section 4.7).
  *
- *   npm run bench -- moduleStep            print the table
- *   npm run bench -- moduleStep --record   write scripts/bench/baselines/moduleStep.json (this host only)
- *   npm run bench -- moduleStep --check    exit 1 when a scene is slower than its baseline (see `checkBaseline`)
+ *   npm run bench -- moduleStep                      print the tables
+ *   npm run bench -- moduleStep --record             write scripts/bench/baselines/moduleStep.json (this host only; never re-record in a job)
+ *   npm run bench -- moduleStep --record-counters    write scripts/bench/baselines/moduleStepCounters.json
+ *   npm run bench -- moduleStep --check              exit 1 when a counter rose, 3 when only timing is over its limit, else 0
  *
  * Needs `--expose-gc`, which `scripts/bench/run.mjs` passes through NODE_OPTIONS. Arguments reach this script in the
  * BENCH_ARGS environment variable.
@@ -28,7 +30,7 @@ import {
 } from "../../src/world-objects/protractorTool";
 import type { GeodesicCannonObject } from "../../src/world-objects/geodesic/objects";
 import type { RuntimeObjectRegistry } from "../../src/world-objects/runtimeObjectRegistry";
-import { createTorusLoopBenchmarkScene, createTorusTiedPairScenario } from "../../tests/fixtures/world-objects/geodesic";
+import { createManyArcsFlowScenario, createTorusLoopBenchmarkScene, createTorusTiedPairScenario } from "../../tests/fixtures/world-objects/geodesic";
 
 const deltaSeconds = 1 / 90;
 const maxFlowSteps = 600;
@@ -39,6 +41,7 @@ const idleAllocationSteps = 20_000;
 /** The design asks for at most 16 bytes per idle step. The legacy driver itself allocates more (a fresh array per kind query), so the check holds it to its own baseline plus this slack; the absolute 16 is the target for the engine step. */
 const allocationSlackBytesPerStep = 16;
 const playerPoint = { x: 0, y: 0, z: 0 };
+const manyArcsExtraArcs = 32;
 
 interface Scene {
   readonly world: CompiledCellComplex;
@@ -51,12 +54,23 @@ interface Results {
   readonly idleMicroseconds: number;
   readonly flowMicroseconds: number;
   readonly flowDependentsMicroseconds: number;
+  readonly manyArcsMicroseconds: number;
   readonly idleBytesPerStep: number;
   readonly bareEngineBytesPerStep: number;
 }
 
 const args = (process.env.BENCH_ARGS ?? "").split(/\s+/).filter(Boolean);
-const baselinePath = path.join(path.dirname(fileURLToPath(import.meta.url)), "baselines", "moduleStep.json");
+const baselineDir = path.join(path.dirname(fileURLToPath(import.meta.url)), "baselines");
+const baselinePath = path.join(baselineDir, "moduleStep.json");
+const countersPath = path.join(baselineDir, "moduleStepCounters.json");
+
+/** What one run of a flow to its end costs in operations: steps taken, registry writes, and kind scans by kind. */
+interface SceneCounters {
+  readonly steps: number;
+  readonly writes: number;
+  readonly scans: Readonly<Record<string, number>>;
+}
+type CounterSet = Record<"flow" | "flow+dependents" | "manyArcs", SceneCounters>;
 
 main();
 
@@ -65,6 +79,24 @@ function main(): void {
   if (!gc) {
     console.error("moduleStep needs --expose-gc; run it with `npm run bench -- moduleStep`.");
     process.exit(2);
+  }
+
+  // Counters are exact: measured once, compared first, and they decide the exit code before any clock is read.
+  const counters = measureAllCounters();
+  printCounters(counters);
+  if (args.includes("--record-counters")) {
+    fs.mkdirSync(baselineDir, { recursive: true });
+    fs.writeFileSync(countersPath, `${JSON.stringify(counters, null, 2)}\n`);
+    console.info(`recorded ${countersPath}`);
+    return;
+  }
+  if (args.includes("--check")) {
+    const counterFailures = counterBaselineFailures(counters);
+    if (counterFailures.length > 0) {
+      for (const failure of counterFailures) console.error(failure);
+      console.error("check: FAILED (counters)");
+      process.exit(1);
+    }
   }
 
   // Machine noise is about 10%, so a recorded baseline is the slowest of three rounds and a check passes on the
@@ -80,6 +112,7 @@ function main(): void {
     idleMicroseconds: pick(...rounds.map((r) => r.idleMicroseconds)),
     flowMicroseconds: pick(...rounds.map((r) => r.flowMicroseconds)),
     flowDependentsMicroseconds: pick(...rounds.map((r) => r.flowDependentsMicroseconds)),
+    manyArcsMicroseconds: pick(...rounds.map((r) => r.manyArcsMicroseconds)),
     idleBytesPerStep: pick(...rounds.map((r) => r.idleBytesPerStep)),
     bareEngineBytesPerStep: pick(...rounds.map((r) => r.bareEngineBytesPerStep)),
   };
@@ -88,6 +121,7 @@ function main(): void {
   console.info(`idle              ${results.idleMicroseconds.toFixed(2)} us/step`);
   console.info(`flow              ${results.flowMicroseconds.toFixed(2)} us/step`);
   console.info(`flow+dependents   ${results.flowDependentsMicroseconds.toFixed(2)} us/step`);
+  console.info(`many arcs (no limit) ${results.manyArcsMicroseconds.toFixed(2)} us/step`);
   console.info(`idle allocation   ${results.idleBytesPerStep.toFixed(1)} bytes/step`);
   console.info(`bare engine alloc ${results.bareEngineBytesPerStep.toFixed(1)} bytes/step`);
 
@@ -118,7 +152,7 @@ function baselineFailures(results: Results): string[] {
   return failures;
 }
 
-/** Exit code: 1 when a limit is broken on the recorded host or no baseline exists; on another host a broken limit only warns. */
+/** Exit code: 1 when no baseline exists, 3 when a timing limit is broken on the recorded host (counters passed already); on another host a broken limit only warns. */
 function checkBaseline(results: Results): number {
   const baseline = readBaseline();
   if (!baseline) {
@@ -135,7 +169,38 @@ function checkBaseline(results: Results): number {
     return 0;
   }
   console.error(`check: FAILED (${failures.join(", ")})`);
-  return 1;
+  console.error("check: timing over limit; settle it with npm run bench:ab -- <start commit>");
+  return 3;
+}
+
+/** One line per broken counter: steps must be equal, writes and each scan count at most the baseline (a scan key missing from the baseline counts as 0). */
+function counterBaselineFailures(counters: CounterSet): string[] {
+  if (!fs.existsSync(countersPath)) return [`no counter baseline at ${countersPath}; run with --record-counters first.`];
+  const baseline = JSON.parse(fs.readFileSync(countersPath, "utf8")) as Partial<CounterSet>;
+  const failures: string[] = [];
+  for (const scene of Object.keys(counters) as (keyof CounterSet)[]) {
+    const now = counters[scene];
+    const was = baseline[scene];
+    if (!was) {
+      failures.push(`${scene}: no baseline`);
+      continue;
+    }
+    if (now.steps !== was.steps) failures.push(`${scene}: steps ${now.steps} != ${was.steps}`);
+    if (now.writes > was.writes) failures.push(`${scene}: writes ${now.writes} > ${was.writes}`);
+    for (const [kind, count] of Object.entries(now.scans)) {
+      const limit = was.scans[kind] ?? 0;
+      if (count > limit) failures.push(`${scene}: ${kind} scans ${count} > ${limit}`);
+    }
+  }
+  return failures;
+}
+
+function printCounters(counters: CounterSet): void {
+  console.info("\ncounters (exact; one flow run to its end)");
+  for (const [scene, c] of Object.entries(counters)) {
+    const scans = Object.entries(c.scans).map(([kind, count]) => `${kind}=${count}`).join(" ");
+    console.info(`  [${scene}] steps ${c.steps}, writes ${c.writes}, scans: ${scans || "none"}`);
+  }
 }
 
 function median(values: readonly number[]): number {
@@ -159,6 +224,11 @@ function createIdleScene(): Scene {
     participants: [createLocalPlayerParticipant(createDefaultPlayerPose("torus-room"))],
   });
   return { world, registry, engine };
+}
+
+function createManyArcsScene(): Scene {
+  const { world, registry } = createManyArcsFlowScenario(manyArcsExtraArcs);
+  return { world, registry };
 }
 
 function createFlowScene(withDependents: boolean): Scene {
@@ -230,22 +300,49 @@ function timeIdle(): number {
   return ((performance.now() - start) * 1000) / idleTimingSteps;
 }
 
-/** Mean microseconds per step over `flowRepeats` fresh runs of the flow, each until no pair is left or `maxFlowSteps` steps (scene construction is not timed). */
-function timeFlow(withDependents: boolean): number {
+/** Steps `scene` until no pair is left or `maxFlowSteps` steps; returns the steps taken. The loop condition uses `countOfKind`, so the driver does not count itself as a scan. */
+function runFlow(scene: Scene): number {
+  let runSteps = 0;
+  while (runSteps < maxFlowSteps && scene.registry.countOfKind("curve-shortening-pair") > 0) {
+    legacyStep(scene);
+    runSteps += 1;
+  }
+  return runSteps;
+}
+
+/** Mean microseconds per step over `flowRepeats` fresh runs of the flow (scene construction is not timed). */
+function timeFlow(createScene: () => Scene): number {
   let steps = 0;
   let milliseconds = 0;
   for (let repeat = 0; repeat < flowRepeats; repeat += 1) {
-    const scene = createFlowScene(withDependents);
-    let runSteps = 0;
+    const scene = createScene();
     const start = performance.now();
-    while (runSteps < maxFlowSteps && scene.registry.getObjectsOfKind("curve-shortening-pair").length > 0) {
-      legacyStep(scene);
-      runSteps += 1;
-    }
+    steps += runFlow(scene);
     milliseconds += performance.now() - start;
-    steps += runSteps;
   }
   return (milliseconds * 1000) / Math.max(steps, 1);
+}
+
+/** Steps, registry writes and kind scans of one flow run to its end, each as the difference from before the run (these scenes have no engine, so the journal is never cleared). */
+function measureCounters(scene: Scene): SceneCounters {
+  const writesBefore = scene.registry.changes.length;
+  const scansBefore = scene.registry.getKindScanCounts();
+  const steps = runFlow(scene);
+  const scansAfter = scene.registry.getKindScanCounts();
+  const scans: Record<string, number> = {};
+  for (const kind of Object.keys(scansAfter).sort()) {
+    const difference = scansAfter[kind]! - (scansBefore[kind] ?? 0);
+    if (difference > 0) scans[kind] = difference;
+  }
+  return { steps, writes: scene.registry.changes.length - writesBefore, scans };
+}
+
+function measureAllCounters(): CounterSet {
+  return {
+    flow: measureCounters(createFlowScene(false)),
+    "flow+dependents": measureCounters(createFlowScene(true)),
+    manyArcs: measureCounters(createManyArcsScene()),
+  };
 }
 
 function measureIdleBytesPerStep(gc: () => void): number {
@@ -279,8 +376,9 @@ function measureBareEngineBytesPerStep(gc: () => void): number {
 function measureRound(gc: () => void): Results {
   return {
     idleMicroseconds: median(Array.from({ length: trials }, () => timeIdle())),
-    flowMicroseconds: median(Array.from({ length: trials }, () => timeFlow(false))),
-    flowDependentsMicroseconds: median(Array.from({ length: trials }, () => timeFlow(true))),
+    flowMicroseconds: median(Array.from({ length: trials }, () => timeFlow(() => createFlowScene(false)))),
+    flowDependentsMicroseconds: median(Array.from({ length: trials }, () => timeFlow(() => createFlowScene(true)))),
+    manyArcsMicroseconds: median(Array.from({ length: trials }, () => timeFlow(createManyArcsScene))),
     idleBytesPerStep: measureIdleBytesPerStep(gc),
     bareEngineBytesPerStep: measureBareEngineBytesPerStep(gc),
   };

@@ -416,6 +416,20 @@ export function createTorusTiedPairScenario() {
   return { world, registry };
 }
 
+// The tied pair of createTorusTiedPairScenario plus `extraArcs` plain arcs between their own emitter pairs. The extra arcs do not flow and may cross; the scene is for counting scans.
+export function createManyArcsFlowScenario(extraArcs: number) {
+  const scenario = createTorusTiedPairScenario();
+  const { world, registry } = scenario;
+  for (let i = 0; i < extraArcs; i += 1) {
+    const y = -6 + (12 * (i + 0.5)) / Math.max(extraArcs, 1);
+    registry.add(createGeodesicCannonObject({ id: `x${i}a`, cellId: "torus-room", localPose: yawRigidTransform3(0, { x: -5, y, z: 0 }) }));
+    registry.add(createGeodesicCannonObject({ id: `x${i}b`, cellId: "torus-room", localPose: yawRigidTransform3(0, { x: 5, y: -y * 0.5, z: 0 }) }));
+    registry.add(createGeodesicArcObject({ id: `xg${i}`, startAnchorObjectId: `x${i}a`, endAnchorObjectId: `x${i}b`, startCellId: "torus-room" }));
+    rebuildConnectedGeodesicBetweenEmitters({ world, registry, geodesicId: `xg${i}` });
+  }
+  return scenario;
+}
+
 // A two-arc pair in the 6 m single cell: emitters at (-halfWidth, 0) and (halfWidth, 0), free end at (0, height).
 export function createSymmetricPairScenario(halfWidth: number, height: number) {
   const world = compileLargeWorld();

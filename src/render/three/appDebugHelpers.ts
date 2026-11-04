@@ -96,6 +96,8 @@ export interface GeneralDebugHelpers {
   placeObjectAt(id: string, cellId: string, x: number, y: number, yawDegrees: number): boolean;
   /** The player's pose: cell, cell-local feet position (meters) and view angles in degrees. */
   playerPose(): PlayerPoseDebugDump;
+  /** How often each kind was scanned to build a list so far (`"*"` counts whole-registry rebuilds); a fresh object. */
+  kindScans(): Readonly<Record<string, number>>;
   /** Puts the player at `cellId`, cell-local (x, y) meters on the floor, with the given yaw and pitch in degrees (pitch keeps its value when omitted); throws for an unknown cell or a non-finite number; returns the pose set. */
   setPlayerPose(cellId: string, x: number, y: number, yawDegrees: number, pitchDegrees?: number): PlayerPoseDebugDump;
 }
@@ -120,6 +122,7 @@ export interface GeneralDebugHelperCallbacks {
   readonly dumpLockedGeodesicWords: () => readonly GeodesicWordDebugDump[];
   readonly placeObjectAt: (id: string, cellId: string, x: number, y: number, yawDegrees: number) => boolean;
   readonly playerPose: () => PlayerPoseDebugDump;
+  readonly kindScans: () => Readonly<Record<string, number>>;
   readonly setPlayerPose: (cellId: string, x: number, y: number, yawDegrees: number, pitchDegrees?: number) => PlayerPoseDebugDump;
 }
 
@@ -330,6 +333,7 @@ export function installGeneralDebugHelpers(callbacks: GeneralDebugHelperCallback
     DumpLockedGeodesicWords: callbacks.dumpLockedGeodesicWords,
     placeObjectAt: callbacks.placeObjectAt,
     playerPose: callbacks.playerPose,
+    kindScans: callbacks.kindScans,
     setPlayerPose: callbacks.setPlayerPose,
   };
 
@@ -347,6 +351,7 @@ export function installGeneralDebugHelpers(callbacks: GeneralDebugHelperCallback
     dumpLockedGeodesicWords: callbacks.dumpLockedGeodesicWords,
     placeObjectAt: callbacks.placeObjectAt,
     playerPose: callbacks.playerPose,
+    kindScans: callbacks.kindScans,
     setPlayerPose: callbacks.setPlayerPose,
   });
 }

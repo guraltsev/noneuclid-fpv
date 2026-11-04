@@ -87,6 +87,8 @@ export interface RuntimeObjectRegistry {
   getAll(): readonly RuntimeWorldObject[];
   /** Objects of one kind, in insertion order (a fresh array). */
   getObjectsOfKind<K extends RuntimeWorldObject["kind"]>(kind: K): readonly (RuntimeWorldObject & { readonly kind: K })[];
+  /** Kind scans so far, keyed by kind (`"*"` for `getAll` rebuilds): how often a kind was walked to build a list. A fresh object; for the bench and `debug.kindScans()`. */
+  getKindScanCounts(): Readonly<Record<string, number>>;
   /** Number of objects of one kind: the size of the per-kind id set. No allocation. */
   countOfKind(kind: RuntimeWorldObject["kind"]): number;
   /** Every write since the last `changes.clear()`, in order; the registry only appends to it. */
@@ -166,6 +168,7 @@ export function createRuntimeObjectRegistry(
 
   const changes = createRuntimeObjectChangeJournal<RuntimeWorldObject>();
   const ownedIds = new Set<string>();
+  const kindScanCounts = new Map<string, number>();
   let version = 0;
 
   // Query caches: each array is built on first request, frozen, and shared until a change touches it.
@@ -343,12 +346,20 @@ export function createRuntimeObjectRegistry(
       ));
     },
     getAll() {
-      return (allObjects ??= Object.freeze([...objectsById.values()]));
+      if (!allObjects) {
+        kindScanCounts.set("*", (kindScanCounts.get("*") ?? 0) + 1);
+        allObjects = Object.freeze([...objectsById.values()]);
+      }
+      return allObjects;
     },
     getObjectsOfKind<K extends RuntimeWorldObject["kind"]>(kind: K) {
+      kindScanCounts.set(kind, (kindScanCounts.get(kind) ?? 0) + 1);
       return [...(objectIdsByKind.get(kind) ?? [])]
         .map((id) => objectsById.get(id))
         .filter((object): object is RuntimeWorldObject & { readonly kind: K } => object !== undefined);
+    },
+    getKindScanCounts() {
+      return Object.fromEntries(kindScanCounts);
     },
     countOfKind(kind) {
       return objectIdsByKind.get(kind)?.size ?? 0;

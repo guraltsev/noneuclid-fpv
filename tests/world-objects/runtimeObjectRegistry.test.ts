@@ -42,6 +42,27 @@ function emitter(id: string, cellId: string, extra: Partial<GeodesicCannonObject
 }
 
 describe("runtimeObjectRegistry", () => {
+  it("counts one kind scan per getObjectsOfKind call, under its kind", () => {
+    const registry = createRuntimeObjectRegistry([emitter("e1", "a")]);
+
+    expect(registry.getKindScanCounts()).toEqual({});
+    registry.getObjectsOfKind("geodesic-cannon");
+    expect(registry.getKindScanCounts()).toEqual({ "geodesic-cannon": 1 });
+    registry.countOfKind("geodesic-cannon");
+    expect(registry.getKindScanCounts()).toEqual({ "geodesic-cannon": 1 });
+  });
+
+  it("counts a getAll rebuild once, not the cached return, and again after a write", () => {
+    const registry = createRuntimeObjectRegistry([emitter("e1", "a")]);
+
+    registry.getAll();
+    registry.getAll();
+    expect(registry.getKindScanCounts()).toEqual({ "*": 1 });
+    registry.add(emitter("e2", "a"));
+    registry.getAll();
+    expect(registry.getKindScanCounts()).toEqual({ "*": 2 });
+  });
+
   it("adds objects by id and indexes them under their cell", () => {
     const registry = createRuntimeObjectRegistry();
     const object = creature("mouse-a", "cell-a");

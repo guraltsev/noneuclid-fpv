@@ -15,6 +15,7 @@
     "test:report": "node scripts/tests/cli.mjs report",
     "test:coverage": "vitest run --project unit --coverage",
     "bench": "node scripts/bench/run.mjs",
+    "bench:ab": "node scripts/bench/abCompare.mjs",
     "build": "tsc --noEmit && vite build",
     "build:pages": "node scripts/build-pages.mjs",
     "preview": "vite preview",
