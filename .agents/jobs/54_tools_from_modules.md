@@ -1,6 +1,6 @@
 # Job 54 - Build tools from module descriptors
 
-Status: skipped on 2026-11-03: needs job 53.
+Status: queued.
 Resolves: part of issue [84](../../_issues/84_behaviors_are_hard_wired_into_the_shell_and_need_a_plugin_system.md) (requirements 1, 6).
 
 ## Goal
@@ -14,7 +14,6 @@ Job 53.
 
 ## Before you start
 
-- Own worktree and branch (`git worktree add ../noneuclid-job54 -b job-54 <branch with job 53>`).
 - Read design 013: sections 8.3, 9.1, 13.1 (the tie tool), and job 54 in section 15.
 - Run `npm run typecheck` and `npm test` for a baseline.
 
@@ -34,7 +33,8 @@ test slipped through because no test drove the tool-level tie sequence.
   overlay exists.
 - The emitter page's action list becomes the object-action contributions for that kind:
   `{ actionId, label, iconId, enabled }`.
-- The tie tool is available when the emitter has at least two attachments on arcs that connect emitters.
+- The tie tool is available when the emitter has at least two attachments on arcs that connect emitters. The menu asks this per frame: read
+  `getGeodesicEndpointAttachmentsForAnchor` (the arc index), and do not scan.
 - `onResult`: success ends the tool; a refusal shows the message and keeps the tool with no picks.
 - `geodesicModel({ tieTool: false })`: no tool, no action, no tool id; `requiresTool` is dropped from the command, which stays
   for scripts.

@@ -1,7 +1,7 @@
 # Job 55 - Add the "destroy" policy for blocked curves
 
-Status: skipped on 2026-11-03: needs job 54.
-Resolves: issue [84](../../_issues/84_behaviors_are_hard_wired_into_the_shell_and_need_a_plugin_system.md), with jobs 48 to 54.
+Status: queued.
+Resolves: issue [84](../../_issues/84_behaviors_are_hard_wired_into_the_shell_and_need_a_plugin_system.md), with jobs 48 to 54; issue [86](../../_issues/86_derived_state_is_recomputed_by_scanning_the_world.md), with jobs 51 and 56 to 60.
 
 ## Goal
 
@@ -14,7 +14,6 @@ Job 54.
 
 ## Before you start
 
-- Own worktree and branch (`git worktree add ../noneuclid-job55 -b job-55 <branch with job 54>`).
 - Read design 013: sections 9.5, 13.2, and job 55 in section 15.
 - Run `npm run typecheck` and `npm test` for a baseline.
 
@@ -36,7 +35,7 @@ it in `blockedVertices` and emits `curveShortening/unresolved`.
 1. Add `"destroy"` to `policies.ts` and the event to `CurveShorteningEvent`.
 2. Set it in the default experience.
 3. Update `_docs/MATHEMATICAL_MODEL.md` section 7, and mark the 2026-11-02 row of 013 section 1 as implemented.
-4. Close issue 84 as the jobs README describes.
+4. Close issues 84 and 86 as the jobs README describes.
 
 ## Tests and checks
 
