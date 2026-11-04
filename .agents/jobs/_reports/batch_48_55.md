@@ -14,14 +14,15 @@ Branch: batch-48-55. Batch start: ffde730. Batch end: (pending).
 | Job | Result | Commits | Review |
 | --- | --- | --- | --- |
 | 48 | needs review | 067d74d, ea729cd, c375e0e, 2aa6739 | fresh agent; 1 finding (toolObjectRuntimes.ts missing from legacyWorldWriters) + recorded deviations |
+| 49 | needs review | 9bb697b, b3c83d2, 9cc6299, 0171312 | fresh agent; findings 1 (id families, order check) repaired; rest recorded |
 
 ## Indicators
 | Indicator | Start | After each job, 48 to 55 |
 | --- | --- | --- |
-| Bench: idle, flow, flow+dependents (median) and idle bytes per step | recorded baseline in job 48: 0.22 / 17.03 / 28.74 us, 743.6 B | 48: 0.05-0.06 / 15.7-17.1 / 31.3-31.9 us, 728 B (check ok x3) |
-| Lines in createThreeApp.ts | 1739 | 48: 1741 |
+| Bench: idle, flow, flow+dependents (median) and idle bytes per step | recorded baseline in job 48: 0.22 / 17.03 / 28.74 us, 743.6 B | 48: 0.05-0.06 / 15.7-17.1 / 31.3-31.9 us, 728 B (check ok x3); 49: 0.10 / 16.4-17.8 / 30.6-33.3 us, 640 B (check ok after cooldown; bare engine step+endFrame ~0.3 B) |
+| Lines in createThreeApp.ts | 1739 | 48: 1741; 49: 1780 |
 | Lines in `legacyWorldWriters` | (see job 48) | |
-| Test files / tests (unit, process, release) | 150/1136, 3/18, 6/9 | 48: 151/1151, 3/18, 6/9 |
+| Test files / tests (unit, process, release) | 150/1136, 3/18, 6/9 | 48: 151/1151, 3/18, 6/9; 49: 154/1199, 3/18, 7/10 |
 
 ## Job 48
 Report: see `_done/48_module_bench_change_journal_layers.md`. Baseline commit 067d74d changes nothing under src/. Journal, RuntimeObjectReader, engine/modules layers, legacyWorldWriters (14 files) added.
@@ -29,6 +30,10 @@ Gate-out: all green. One bench `--check` failed (flow and flow+dependents) when 
 Deviations (recorded by job): vitest stubbed for bench; idle-allocation limit is baseline*1.05+16 B (legacy driver allocates ~730 B/step, 16 B kept as target for job 49); baseline = slowest of 3 rounds and check passes if any of 3 rounds is within tolerance; journal generic in record type; src/engine and src/modules not created.
 Review findings: (a) `src/render/three/toolObjectRuntimes.ts` writes the registry directly (remove/update, lines ~199-343) but is not in `legacyWorldWriters`, because the detection rule only sees imports of world-objects mutator files. Not fixed (needs a rule change; the list may only shrink). (b) Unrecorded extras: `prefixImportRuleViolations`, `generatedModuleDirectoryRules`, `pathMatchesEntry`; a missing baseline makes `--check` exit 1; baseline `recordedOn` is 2026-11-04 (UTC).
 ## Job 49
+Report: `_done/49_world_engine_and_client_session.md`. Engine in src/engine/, appSession -> clientSession, local player = participant "local", palette asks `world/requestTool`, `api.world`, bench idle scene runs an empty engine step.
+Gate-out: all green. Bench `--check` fails on flow+dependents (32.7-33.3 us vs limit ~31.6) when run right after the release suite (machine hot); passes after a ~40 s cooldown (30.6-32.0 us). The tolerance sits at the machine's noise floor; consider a wider flow+dependents tolerance or more rounds.
+Review findings and outcome: (1) createPairId/createFreeEndId used ids.next("geodesic"), breaking the id families and the includes("free-end") fallback in intervals.ts:839 -> FIXED in 0171312. (2) "cancels an open menu before teleporting home" lost its order check -> RESTORED. (3) Recorded, not fixed: `enter-tool-mode` (geodesicCannonTools.ts 430/457/480/585) still bypasses world/requestTool; phases 3/7 are only comments; no geometryVersion on WorldReadView; api.world.submit validates only `kind`; write-guard option named module-write-guard; throwing handler skips afterStep; per-frame closure from runPhase; two journal records per publishBody in XR; ids/forEachEvent expose functions.
+Changed test assertions (all in Report): applyRuntimeCommand (player-pose and serial tests removed, moved to engine tests), scenePaletteCommands, runtimeObjectActions, geometryCommit; ~20 mechanical session->client-session/engine changes.
 ## Job 50
 ## Job 51
 ## Job 52
