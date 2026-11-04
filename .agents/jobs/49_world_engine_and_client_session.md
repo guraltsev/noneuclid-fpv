@@ -1,6 +1,6 @@
 # Job 49 - Build the world engine and split the client session from it
 
-Status: queued.
+Status: in progress.
 Resolves: part of issue [84](../../_issues/84_behaviors_are_hard_wired_into_the_shell_and_need_a_plugin_system.md) (requirements 1, 2, 3, 5).
 
 ## Goal
