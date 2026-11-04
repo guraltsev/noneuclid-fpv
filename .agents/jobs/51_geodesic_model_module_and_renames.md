@@ -1,6 +1,6 @@
 # Job 51 - Restore the geodesic model module and abolish the "moving" state
 
-Status: queued.
+Status: in progress.
 Resolves: part of issue [84](../../_issues/84_behaviors_are_hard_wired_into_the_shell_and_need_a_plugin_system.md) (requirements 2, 5, 6), part of issue [86](../../_issues/86_derived_state_is_recomputed_by_scanning_the_world.md).
 
 ## Goal
@@ -103,3 +103,24 @@ decides. A timing failure alone does not fail this job.
 
 The first attempt is in [job_51_partial_report.md](_reports/job_51_partial_report.md); its `### Deviations` and `### Uncertain` still
 apply to the restored code. Add this attempt's report below it, as the README describes.
+
+### Second attempt (restore and abolish "moving")
+
+#### Done
+- Commit 2a52924 re-applies `ee65c50..869024b` (without `.agents`) with `git apply --index`. `git diff --cached --stat 869024b` printed only `_docs/design/014-...md` and issue 86, which post-date 869024b; no source difference. Baseline after it: typecheck clean, 161 files, 1360 tests green.
+- Commit 64e14f1 (D2): `resolveDerivedSegmentConnectionState` returns `"open" | "connected"` (no `isTied`, import dropped); `connectionState?: "open" | "connected"`; the aim picker no longer skips segments; the renderer lost the moving archetype key, its source (colour 0xf59e0b) and branch; comments fixed; the MATHEMATICAL_MODEL.md sentence removed; generated docs regenerated.
+- Tests: removed the "moving ... orange archetype" renderer test; added an aim test for a tied arc's segment; created `tests/world-objects/geodesic/segments.test.ts` (tied arc is `"open"`, emitter-to-emitter arc is `"connected"`).
+
+#### Deviations
+- None to existing expectations beyond deleting the renderer test the job names (and the word "moving" in that test file's header comment).
+
+#### Uncertain
+- The job's first "Done when" grep matches archetype-key strings such as `"geodesic-segment:ribbon-cross"` and mesh names like `selectable-hitbox:geodesic-segment`, plus a comment in `src/interaction/aimTarget.ts`; none is an object kind. No object kind matches. The second grep also finds nothing in code, but `src/modules/geodesicModel/api.ts:43` has a comment mentioning `motionState: "moving"` (restored text; the grep for `motionState` in the job is strictly non-empty because of this one comment). I left it, as the steps do not name it.
+- `isTied` was left unoptimised as ordered. `pair.state === "moving"` is unchanged.
+
+#### Not done
+- Nothing skipped. The bench timing check is red (see Checks); job 56 decides.
+
+#### Checks
+- `npm run typecheck`: clean. `npm test`: 162 files, 1362 tests green (after `docs:generate`; before it, the documentation test reported the two stale generated files). `npm run docs:check`: all ok. `npm run smoke -- --world cube,torus-moduli`: SMOKE OK (2 pages). `npm run test:release`: 7 files, 15 tests green.
+- `npm run bench -- moduleStep --check`, three runs 60 s apart, all `check: FAILED (flow+dependents step time, flow step time)`: flow 19.42, 19.58, 23.40 us/step; flow+dependents 36.94, 38.09, 41.71 us/step; idle 0.13 to 0.15 us/step; idle allocation 640 bytes/step. Recorded, not fixed; the baseline was not re-recorded.
