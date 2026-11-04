@@ -1016,6 +1016,18 @@ The fields every object in the runtime object registry shares, and the projectio
 | interface | `RuntimeCreatureObject` | Registry record for an autonomous creature (geodesic marmot, mouse or butterfly). |
 | function | `runtimeObjectToDynamicObjectState` | Projects a runtime object onto the minimal movement/collision state (cell id, cell-local pose, collision cylinder). |
 
+### `world-objects/runtimeObjectChangeJournal.ts`
+
+Change journal of the runtime object registry: every registry write since the last `clear`, in order (design 013 section 6.2).
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `JournalRecord` | What the journal needs of a record. |
+| enum | `ChangeOp` | What a journal entry records. |
+| interface | `RuntimeObjectChangeJournal` | Every registry write since the last clear, in order. |
+| interface | `RuntimeObjectChangeRecorder` | The registry's side of the journal: the read interface plus `record`. |
+| function | `createRuntimeObjectChangeJournal` | Creates an empty journal. |
+
 ### `world-objects/runtimeObjectRegistry.ts`
 
 Runtime object registry: the per-cell, id-indexed store of every live (non-terrain) object in the world.
@@ -1025,6 +1037,7 @@ Runtime object registry: the per-cell, id-indexed store of every live (non-terra
 | interface | `RuntimeStaticAssetObject` | Registry record for a static glTF decoration or landmark placed in a cell. |
 | type | `RuntimeWorldObject` | Discriminated union (on `kind`) of every object type the registry can hold. |
 | interface | `RuntimeObjectRegistry` | Mutable id- and cell-indexed collection of runtime objects. |
+| type | `RuntimeObjectReader` | The read-only face of the registry (design 013 section 6.1): everything except the writes `add`, `update`, `remove`, `claimOwnership`, `releaseOwnership` and `moveToCell`. |
 | function | `createRuntimeObjectRegistry` | Creates a registry, optionally pre-populated with `initialObjects`. |
 | function | `createRuntimeStaticAssetObject` | Builds the registry record for an authored static asset placed in `cellId`. |
 

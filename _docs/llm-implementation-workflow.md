@@ -59,6 +59,12 @@ Do not introduce:
 
 Use plain functions and plain data until behavior requires more.
 
+The one exception is the engine and module layers of design 013
+(the `engine` and `modules` layers), the one sanctioned plugin layer. Do not add
+another plugin system, registry or event bus. Per-step module functions are
+called "ticks". Names a module contributes follow the naming rule of section 10
+of `_docs/design/013-world-engine-clients-and-modules.md`.
+
 ## Renderer discipline
 
 Renderer code may read compiled cells, movement results, and tool outputs.

@@ -55,13 +55,21 @@ export const layers = {
     description: "Renderer-free interaction logic: input frames, aim picking, VR locomotion, XR session state, carried-object portal transitions.",
     may: ["math", "cell-complex", "movement", "world-objects", "glue"],
   },
+  engine: {
+    description: "The world engine core (design 013): step order, command queue, participants, module composition and ticks. Imports no module.",
+    may: ["math", "cell-complex", "diagnostics", "movement", "world-objects", "glue", "interaction"],
+  },
+  modules: {
+    description: "World modules (design 013): each owns a slice of world behaviour and exposes a typed api.ts to the others.",
+    may: ["math", "cell-complex", "diagnostics", "movement", "world-objects", "glue", "interaction", "engine"],
+  },
   runtime: {
     description: "Application state, runtime menu state, command dispatch, geometry session/worker, server channel and public API.",
-    may: ["math", "cell-complex", "diagnostics", "movement", "world-objects", "authoring", "glue"],
+    may: ["math", "cell-complex", "diagnostics", "movement", "world-objects", "authoring", "glue", "engine", "modules"],
   },
   ui: {
     description: "Renderer-neutral palette, help, tooltip and input-intent definitions.",
-    may: ["math", "cell-complex", "world-objects", "authoring", "glue", "runtime"],
+    may: ["math", "cell-complex", "world-objects", "authoring", "glue", "engine", "modules", "runtime"],
   },
   render: { description: "Three.js / DOM / WebXR rendering and input adapters (the application shell).", may: ["*"] },
   root: { description: "Entry point.", may: ["*"] },
@@ -185,6 +193,9 @@ function resolveImport(fromRel, specifier, known) {
   return undefined;
 }
 
+/** A call of a registry write method: the mark of a world-objects module that mutates the world (`ModuleInfo.writesRegistry`). */
+const registryWritePattern = /[rR]egistry\??\.(add|update|remove|claimOwnership|releaseOwnership|moveToCell)\(/;
+
 /**
  * Scans all modules.
  * @returns {Map<string, ModuleInfo>} keyed by path relative to `src/`, with forward slashes.
@@ -237,6 +248,7 @@ export function scanProject() {
       lines: text.split("\n").length,
       header: headerComment(sourceFile),
       imports: [...imports].sort(),
+      writesRegistry: rel.startsWith("world-objects/") && rel !== "world-objects/runtimeObjectRegistry.ts" && registryWritePattern.test(text),
       packages: [...packages].sort(),
       exports,
       declared,
@@ -289,10 +301,16 @@ export function layerViolations(modules) {
 /**
  * Module-level import rules, for constraints that the layer table cannot express (it works per layer).
  *
- * Two shapes, with paths relative to `src/` using forward slashes:
+ * Three shapes, with paths relative to `src/` using forward slashes:
  * - `{ module, allowedImporters, reason }`: any module that imports `module` and is not listed is a violation.
  * - `{ module, mayImportOnly, reason }`: any import of `module` whose path does not start with one of the prefixes
  *   (or equal a listed file) is a violation.
+ * - `{ fromPrefix, toPrefix, onlyVia, exceptFromPrefixes?, reason }`: an import from a file under `fromPrefix` of a file
+ *   under `toPrefix` is a violation unless the target is in `onlyVia` (entries ending in `/` are prefixes) or the
+ *   importer is under an `exceptFromPrefixes` entry.
+ *
+ * {@link moduleImportRuleViolations} also applies the rules generated from the directories of `src/modules/` and the
+ * legacy-writer rule (design 013 section 12.2).
  */
 export const moduleImportRules = [
   {
@@ -310,7 +328,92 @@ export const moduleImportRules = [
     mayImportOnly: ["math/", "cell-complex/", "movement/", "world-objects/geodesic/objects.ts", "world-objects/geodesic/perfCounters.ts", "world-objects/runtimeObjectRegistry.ts"],
     reason: "tracing may only use math, cell-complex, movement, the geodesic object types, the performance counters and the registry type",
   },
+  {
+    fromPrefix: "modules/",
+    toPrefix: "world-objects/geodesic/",
+    onlyVia: [
+      "world-objects/geodesic/portalWord.ts",
+      "world-objects/geodesic/development.ts",
+      "world-objects/geodesic/trace.ts",
+      "world-objects/geodesic/objects.ts",
+    ],
+    exceptFromPrefixes: ["modules/geodesicModel/"],
+    reason: "modules reach the piecewise-geodesic implementation only through the geodesicModel module, except for its stateless geometry tools (design 013 section 13.1)",
+  },
+  {
+    fromPrefix: "render/",
+    toPrefix: "engine/",
+    onlyVia: ["engine/worldEngine.ts", "engine/moduleTypes.ts"],
+    reason: "clients use the engine's public face only: worldEngine.ts and moduleTypes.ts",
+  },
+  {
+    fromPrefix: "ui/",
+    toPrefix: "engine/",
+    onlyVia: ["engine/worldEngine.ts", "engine/moduleTypes.ts"],
+    reason: "clients use the engine's public face only: worldEngine.ts and moduleTypes.ts",
+  },
 ];
+
+/**
+ * The render and ui files that import a world-objects module which writes the registry (`ModuleInfo.writesRegistry`),
+ * as of design 013 (job 48). New behaviour reaches the world through the engine (section 5.7); any other render or ui
+ * file that imports such a module breaks the rule below. The list may only shrink:
+ * `tests/project/moduleImportRules.test.ts` compares it with a committed copy.
+ */
+export const legacyWorldWriters = [
+  "render/three/carriedGeodesicCannon.ts",
+  "render/three/createThreeApp.ts",
+  "render/three/creatures/geodesicMarmotView.ts",
+  "render/three/creatures/simpleGeoCreatureView.ts",
+  "render/three/geodesicCannonRenderer.ts",
+  "render/three/geodesicCannonTools.ts",
+  "render/three/geodesicDebugDumps.ts",
+  "render/three/geodesicEmitterLabelController.ts",
+  "render/three/geodesicEmitterLabels.ts",
+  "render/three/geometryCommit.ts",
+  "render/three/placedFlagRenderer.ts",
+  "render/three/preloadWorldAssets.ts",
+  "render/three/runtimeObjectActions.ts",
+  "ui/paletteDefinition.ts",
+];
+
+/** The rules generated from the directories of `src/modules/`: another module reaches module `X` only through `modules/X/api.ts`. */
+function generatedModuleDirectoryRules(modules) {
+  const directories = new Set();
+  for (const modulePath of modules.keys()) {
+    const match = /^modules\/([^/]+)\//.exec(modulePath);
+    if (match) directories.add(match[1]);
+  }
+  return [...directories].sort().map((name) => ({
+    fromPrefix: "modules/",
+    toPrefix: `modules/${name}/`,
+    onlyVia: [`modules/${name}/api.ts`],
+    exceptFromPrefixes: [`modules/${name}/`],
+    reason: `module ${name} is reached only through modules/${name}/api.ts`,
+  }));
+}
+
+function pathMatchesEntry(modulePath, entry) {
+  return modulePath === entry || (entry.endsWith("/") && modulePath.startsWith(entry));
+}
+
+/** Violations of the `{ fromPrefix, toPrefix, onlyVia, exceptFromPrefixes?, reason }` rules among `rules` (rules of the other shapes are skipped). */
+export function prefixImportRuleViolations(modules, rules) {
+  const violations = [];
+  for (const rule of rules) {
+    if (!rule.fromPrefix) continue;
+    for (const mod of modules.values()) {
+      if (!mod.path.startsWith(rule.fromPrefix)) continue;
+      if (rule.exceptFromPrefixes?.some((prefix) => mod.path.startsWith(prefix))) continue;
+      for (const dep of mod.imports) {
+        if (!dep.startsWith(rule.toPrefix)) continue;
+        if (rule.onlyVia.some((allowed) => pathMatchesEntry(dep, allowed))) continue;
+        violations.push({ from: mod.path, to: dep, reason: rule.reason });
+      }
+    }
+  }
+  return violations;
+}
 
 /** Violations of {@link moduleImportRules}: `{ from, to, reason }` for every import that breaks a rule. */
 export function moduleImportRuleViolations(modules) {
@@ -327,9 +430,22 @@ export function moduleImportRuleViolations(modules) {
       const mod = modules.get(rule.module);
       if (!mod) continue;
       for (const dep of mod.imports) {
-        if (rule.mayImportOnly.some((allowed) => dep === allowed || (allowed.endsWith("/") && dep.startsWith(allowed)))) continue;
+        if (rule.mayImportOnly.some((allowed) => pathMatchesEntry(dep, allowed))) continue;
         violations.push({ from: mod.path, to: dep, reason: rule.reason });
       }
+    }
+  }
+  violations.push(...prefixImportRuleViolations(modules, [...moduleImportRules, ...generatedModuleDirectoryRules(modules)]));
+  for (const mod of modules.values()) {
+    if (!mod.path.startsWith("render/") && !mod.path.startsWith("ui/")) continue;
+    if (legacyWorldWriters.includes(mod.path)) continue;
+    for (const dep of mod.imports) {
+      if (!modules.get(dep)?.writesRegistry) continue;
+      violations.push({
+        from: mod.path,
+        to: dep,
+        reason: "render and ui files change the world through the engine, not by importing a world-objects mutator; only the files in legacyWorldWriters (scripts/docs/lib.mjs) still do",
+      });
     }
   }
   return violations;

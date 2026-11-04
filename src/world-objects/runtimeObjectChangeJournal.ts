@@ -3,7 +3,11 @@
  * The registry records one entry per `add`, per replacement (`update`, `moveToCell` and owner publishers) and per `remove`; the journal only observes, nothing is written through it. Readers (views, label runtimes, derived-state passes) scan it after a step and the frame owner clears it.
  * Storage is four parallel arrays overwritten in place with a `length` counter: it allocates only while it grows past its largest size, and `clear` resets the counter and the per-kind marks without truncating anything.
  */
-import type { RuntimeWorldObject } from "./runtimeObjectRegistry";
+/** What the journal needs of a record. It is generic over the record type (the registry uses `RuntimeWorldObject`) so that this file does not import the registry, which imports it. */
+export interface JournalRecord {
+  readonly id: string;
+  readonly kind: string;
+}
 
 /** What a journal entry records. */
 export const enum ChangeOp {
@@ -13,29 +17,29 @@ export const enum ChangeOp {
 }
 
 /** Every registry write since the last clear, in order. Reused: it allocates only while growing past its largest size. */
-export interface RuntimeObjectChangeJournal {
+export interface RuntimeObjectChangeJournal<T extends JournalRecord> {
   readonly length: number;
   opAt(index: number): ChangeOp;
   idAt(index: number): string;
   kindAt(index: number): string;
   /** The record after the write; for Removed, the record that was removed. */
-  objectAt(index: number): RuntimeWorldObject;
+  objectAt(index: number): T;
   /** Highest index holding this kind, or -1 if none since the last clear. O(1), no allocation. */
   lastIndexOfKind(kind: string): number;
   clear(): void;
 }
 
 /** The registry's side of the journal: the read interface plus `record`. Not part of the public reader type. */
-export interface RuntimeObjectChangeRecorder extends RuntimeObjectChangeJournal {
-  record(op: ChangeOp, object: RuntimeWorldObject): void;
+export interface RuntimeObjectChangeRecorder<T extends JournalRecord> extends RuntimeObjectChangeJournal<T> {
+  record(op: ChangeOp, object: T): void;
 }
 
 /** Creates an empty journal. */
-export function createRuntimeObjectChangeJournal(): RuntimeObjectChangeRecorder {
+export function createRuntimeObjectChangeJournal<T extends JournalRecord>(): RuntimeObjectChangeRecorder<T> {
   const ops: ChangeOp[] = [];
   const ids: string[] = [];
   const kinds: string[] = [];
-  const objects: RuntimeWorldObject[] = [];
+  const objects: T[] = [];
   const lastIndexByKind = new Map<string, number>();
   // Kinds marked since the last clear, so that `clear` resets only those.
   const touchedKinds: string[] = [];

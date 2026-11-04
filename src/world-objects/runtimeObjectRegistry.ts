@@ -90,7 +90,7 @@ export interface RuntimeObjectRegistry {
   /** Number of objects of one kind: the size of the per-kind id set. No allocation. */
   countOfKind(kind: RuntimeWorldObject["kind"]): number;
   /** Every write since the last `changes.clear()`, in order; the registry only appends to it. */
-  readonly changes: RuntimeObjectChangeJournal;
+  readonly changes: RuntimeObjectChangeJournal<RuntimeWorldObject>;
   /** The derived segments whose `geodesicId` is `geodesicId`, unsorted (a fresh array). */
   getSegmentsOfGeodesic(geodesicId: string): readonly GeodesicSegmentObject[];
 }
@@ -164,7 +164,7 @@ export function createRuntimeObjectRegistry(
     }
   }
 
-  const changes = createRuntimeObjectChangeJournal();
+  const changes = createRuntimeObjectChangeJournal<RuntimeWorldObject>();
   const ownedIds = new Set<string>();
   let version = 0;
 

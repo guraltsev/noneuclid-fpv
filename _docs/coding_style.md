@@ -12,6 +12,13 @@ Avoid enterprise architecture. Do not introduce service classes, registries,
 managers, factories, dependency-injection containers, or generic plugin layers
 unless the current behavior truly requires them.
 
+The one sanctioned plugin layer is the engine and module layers of design 013
+(the `engine` and `modules` layers): do not add another plugin system, registry
+or event bus. A function a module runs once per simulation step is called a
+"tick". Names a module contributes follow the naming rule of section 10 of
+`_docs/design/013-world-engine-clients-and-modules.md`
+(`<moduleId>/<noun>`).
+
 A class is justified only when it owns meaningful persistent state, invariants,
 or a natural object interface. Do not use classes as namespaces.
 
