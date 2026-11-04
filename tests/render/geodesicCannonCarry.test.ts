@@ -26,6 +26,7 @@
  * lives in the cell it is in. The geodesic-level rules are in `tests/world-objects/geodesic/carry.test.ts`.
  */
 import { publishLocalPlayerPose, readLocalPlayerPose } from "../../src/engine/worldEngine";
+import { participantAttachment } from "../../src/engine/moduleTypes";
 import { createTestEngine } from "../support/engine";
 import { driveCarryTools } from "../support/carryTools";
 import { createDefaultWorldModules } from "../../src/runtime/experience";
@@ -238,6 +239,35 @@ describe("releasing a carried emitter of a locked geodesic", () => {
     expect(Math.cos(poseYaw - faceTurn)).toBeCloseTo(1, 6);
     expect(Math.cos(emitter.aimYawRadians - poseYaw)).toBeCloseTo(1, 6);
     expect(isGeodesicLocked(registry, "g-a")).toBe(true);
+  });
+});
+
+describe("leaving the carry tool puts the emitter down in the world", () => {
+  const leavers = [
+    ["clearing the selected tool", { kind: "clear-selected-tool" }],
+    ["selecting another tool", { kind: "select-tool", toolId: "protractor" }],
+    ["cancelling the menu and tool", { kind: "cancel-menu-and-tool" }],
+  ] as const;
+
+  it.each(leavers)("detaches after %s", (_name, command) => {
+    const { engine, session, tools } = setupCube("right", -2.4, -3);
+    tools.startGeodesicCannonCarry("cannon-b");
+    expect(participantAttachment(engine.read.participant("local"), "carry")?.objectId).toBe("cannon-b");
+
+    applyRuntimeCommand(session, command);
+    tools.updateCarriedGeodesicCannonPose(true, handAt(-2.4, -3));
+
+    expect(participantAttachment(engine.read.participant("local"), "carry")).toBeUndefined();
+  });
+
+  it("leaves the tool when the world refuses the pickup", () => {
+    const { engine, session, tools } = setupCube("right", -2.4, -3);
+    engine.publishBody("local", { ...readLocalPlayerPose(engine), cellId: "top", position: { x: 0, y: 0, z: 0 } });
+
+    tools.startGeodesicCannonCarry("cannon-b");
+
+    expect(session.get().menuState.selectedTool).toBe("none");
+    expect(participantAttachment(engine.read.participant("local"), "carry")).toBeUndefined();
   });
 });
 

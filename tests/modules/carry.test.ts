@@ -120,6 +120,28 @@ describe("carry/attach and carry/detach", () => {
     expect(run("local", { kind: "carry/attach", objectId: "cannon-a" })).toMatchObject({ ok: false, refusal: { code: "carry/alreadyCarried" } });
   });
 
+  it("changes nothing for a repeated pickup of the same object or a detach of nothing", () => {
+    const { engine, run } = setup();
+
+    expect(run("local", { kind: "carry/detach" })).toEqual({ ok: true });
+    run("local", { kind: "carry/attach", objectId: "cannon-b" });
+    const held = engine.read.participant("local");
+    expect(run("local", { kind: "carry/attach", objectId: "cannon-b" })).toEqual({ ok: true });
+    expect(engine.read.participant("local")).toBe(held);
+  });
+
+  it("starts a pickup after a release as not arrived", () => {
+    const { engine, run, hand, step } = setup();
+    run("local", { kind: "carry/attach", objectId: "cannon-b" });
+    hand(4.6, 2.5);
+    step(1);
+    expect(participantAttachment(engine.read.participant("local"), "carry")?.arrived).toBe(true);
+
+    run("local", { kind: "carry/detach" });
+    run("local", { kind: "carry/attach", objectId: "cannon-a" });
+    expect(participantAttachment(engine.read.participant("local"), "carry")).toMatchObject({ objectId: "cannon-a", arrived: false });
+  });
+
   it("keeps the module-only drop away from clients", () => {
     const { run } = setup();
 
@@ -177,6 +199,11 @@ describe("the carry move in step phase 3", () => {
     step(1);
 
     expect(participantAttachment(engine.read.participant("local"), "carry")).toMatchObject({ objectId: "cannon-b", arrived: true });
+
+    // The arrival is recorded once: later steps at the hand write no attachment again.
+    const record = engine.read.participant("local");
+    step(1);
+    expect(engine.read.participant("local")).toBe(record);
   });
 });
 
