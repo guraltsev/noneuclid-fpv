@@ -4,7 +4,7 @@ Status: open.
 
 Priority: P3 (no save format exists yet; fix the declaration before one does). Found 2026-11-05.
 
-Jobs: the measurement tools module (design 013 section 16).
+Jobs: [66](../.agents/jobs/66_measurement_tools_and_flags.md).
 
 ## Problem
 

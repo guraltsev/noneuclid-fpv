@@ -4,7 +4,7 @@ Status: open.
 
 Priority: P2 (correctness; a refused pickup destroys geodesics). Found 2026-11-05.
 
-Jobs: the `geodesicEmitters` module (design 013 section 16).
+Jobs: [64](../.agents/jobs/64_emitter_edits_and_length.md).
 
 ## Problem
 

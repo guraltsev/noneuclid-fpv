@@ -4,7 +4,7 @@ Status: open.
 
 Priority: P3 (tooling; the migration's progress measure is wrong). Found 2026-11-05.
 
-Jobs: none yet. Best fixed before the `geodesicEmitters` module, which is meant to shrink the list.
+Jobs: [62](../.agents/jobs/62_client_write_check.md).
 
 ## Problem
 
