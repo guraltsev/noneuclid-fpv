@@ -556,8 +556,6 @@ export function rebuildLockedGeodesicFromEndpointsAndPortalWordDetailed(
     ...input,
     allowUnexpectedPortalWord: input.allowOutOfBoundsCarriedEndpoint,
   });
-  if (rebuilt.result) {
-  }
   return rebuilt;
 }
 

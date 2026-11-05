@@ -5,7 +5,7 @@
 
 This reference is produced from the source code. For the *meaning* of the modules — the mathematical model they implement — read [../MATHEMATICAL_MODEL.md](../MATHEMATICAL_MODEL.md) and [../ARCHITECTURE.md](../ARCHITECTURE.md). For every exported symbol see [API_REFERENCE.md](API_REFERENCE.md).
 
-**253 modules, 52,181 lines** under `src/`.
+**253 modules, 52,179 lines** under `src/`.
 
 ## Layers
 
@@ -19,7 +19,7 @@ A module belongs to the layer named by its first path segment under `src/`. "May
 | `visibility` | 2 | 1,036 | `math`, `cell-complex` | Per-frame portal visibility: funnel clipping of portal-path tables against a camera. Pure; no renderer. |
 | `movement` | 10 | 1,645 | `math`, `cell-complex` | Player body, collision, movement and portal crossing in compiled cell complexes. |
 | `world-assets` | 1 | 201 | `cell-complex` | Floor-texture and asset descriptors. |
-| `world-objects` | 37 | 9,476 | `math`, `cell-complex`, `diagnostics`, `movement`, `world-assets` | Placeable runtime objects: registry, geodesic emitters, measurement tools, flags, creature behaviors. |
+| `world-objects` | 37 | 9,474 | `math`, `cell-complex`, `diagnostics`, `movement`, `world-assets` | Placeable runtime objects: registry, geodesic emitters, measurement tools, flags, creature behaviors. |
 | `authoring` | 5 | 671 | `math`, `cell-complex`, `examples`, `world-assets`, `world-objects` | World builder DSL, world-script compiler, validation and world catalog. |
 | `glue` | 11 | 1,017 | `math`, `cell-complex`, `diagnostics`, `authoring` | Launch options, debug settings, tool ids, asset URLs, app configuration. |
 | `interaction` | 5 | 1,564 | `math`, `cell-complex`, `movement`, `world-objects`, `glue` | Renderer-free interaction logic: input frames, aim picking, VR locomotion, XR session state, carried-object portal transitions. |
@@ -209,7 +209,7 @@ None: every import respects the intended layering.
 | `world-objects/geodesic/development.ts` | 21 | Development of portal words: inverse portal transforms, cached per compiled portal (a compiled world is immutable, so a WeakMap keyed by portal is always valid); pure. | `cell-complex/specs`, `math/rigidTransform3` |
 | `world-objects/geodesic/endpoints.ts` | 372 | Endpoint attachments of geodesic intervals: lookup by anchor, re-attachment, lifting the far endpoint into the source cell, word-against-cell-chain checks, and emitter cache cleanup. | `cell-complex/compileCellComplex`, `math/rigidTransform3`, `world-objects/geodesic/anchors`, `world-objects/geodesic/arcIndex`, `world-objects/geodesic/development`, `world-objects/geodesic/objects`, `world-objects/geodesic/portalWord`, `world-objects/runtimeObjectRegistry` |
 | `world-objects/geodesic/intersections.ts` | 351 | Geodesic intersection markers: crossings of segments in the same cell, stable marker identities between updates, and the per-registry marker memory. | `math/rigidTransform3`, `math/vec2`, `math/vec3`, `world-objects/geodesic/objects`, `world-objects/geodesic/perfCounters`, `world-objects/runtimeObjectRegistry` |
-| `world-objects/geodesic/intervals.ts` | 878 | Interval rebuilds: realizing an interval's lifted chord, aiming free geodesics, splitting at a segment hit, rebuilding locked intervals after a carried anchor moved, and side-effect-free previews. | `cell-complex/compileCellComplex`, `math/rigidTransform3`, `math/vec3`, `world-objects/geodesic/anchors`, `world-objects/geodesic/endpoints`, `world-objects/geodesic/objects`, `world-objects/geodesic/portalWord`, `world-objects/geodesic/segments`, `world-objects/geodesic/trace`, `world-objects/runtimeObjectRegistry` |
+| `world-objects/geodesic/intervals.ts` | 876 | Interval rebuilds: realizing an interval's lifted chord, aiming free geodesics, splitting at a segment hit, rebuilding locked intervals after a carried anchor moved, and side-effect-free previews. | `cell-complex/compileCellComplex`, `math/rigidTransform3`, `math/vec3`, `world-objects/geodesic/anchors`, `world-objects/geodesic/endpoints`, `world-objects/geodesic/objects`, `world-objects/geodesic/portalWord`, `world-objects/geodesic/segments`, `world-objects/geodesic/trace`, `world-objects/runtimeObjectRegistry` |
 | `world-objects/geodesic/lifecycle.ts` | 118 | Queries whether an arc connects emitters or follows one, and removal of geodesics and cannons together with their derived objects. | `world-objects/geodesic/endpoints`, `world-objects/geodesic/objects`, `world-objects/geodesic/segments`, `world-objects/runtimeObjectRegistry` |
 | `world-objects/geodesic/objects.ts` | 600 | Geodesic emitters ("cannons"), geodesic arcs and curve shortening on a glued cell complex. | `math/rigidTransform3`, `math/vec3`, `movement/dynamicObject`, `world-objects/carryHighlightShape`, `world-objects/runtimeObjectBase` |
 | `world-objects/geodesic/perfCounters.ts` | 14 | Counters of the expensive geodesic operations, read by the performance tests. | — |
