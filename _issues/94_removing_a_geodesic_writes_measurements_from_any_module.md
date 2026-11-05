@@ -26,3 +26,5 @@ The measurement ticks already delete their own records when a refresh finds noth
   expect them gone at once change accordingly.
 - No module lists another module's kinds in order to delete them. Job 64 removes `writesCoreKinds` from carry, so this must be settled there.
 - A test of a flow that collapses a measured curve, with the guard on.
+
+- Job 64 (2026-11-05): done, needs review; see the Report in [the job](../.agents/jobs/_done/64_emitter_edits_and_length.md). Manual checks are not done, so this stays open.
