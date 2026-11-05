@@ -91,7 +91,6 @@ import {
 } from "../../runtime/worldGeometryDeformationFamilies";
 import { type WorldGeometrySnapshot, createWorldGeometrySession } from "../../runtime/worldGeometrySession";
 import { advanceCurveShorteningPairs } from "../../world-objects/geodesic/curveShortening";
-import { pruneMissingGeodesicIntersectionObjects } from "../../world-objects/geodesic/intersections";
 import { isGeodesicMarmotObjectSpec } from "../../world-objects/geodesicMarmot";
 import { type GeodesicMarmotRuntime, createGeodesicMarmotRuntime } from "./creatures/geodesicMarmotView";
 import { derivedStatsOf, setDerivedVerification } from "../../world-objects/derived";
@@ -500,9 +499,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     syncPlacedFlagRuntime: (flag) => syncPlacedFlagRuntime(flag),
     computedObjectCallbacks: {
       removeMeasuredGeodesicLength: (objectId) => removeMeasuredGeodesicLengthRuntime(objectId),
-      syncMeasuredGeodesicLength: (object) => syncMeasuredGeodesicLengthRuntime(object),
       removeProtractorAngle: (objectId) => removeProtractorAngleRuntime(objectId),
-      syncProtractorAngle: (object) => syncProtractorAngleRuntime(object),
     },
     afterSwap: () => finishGeometryCommit(),
   });
@@ -598,8 +595,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     enablePortalClipDistances,
     disablePortalClipDistances,
   });
-  // Inputs of the last per-frame refreshMeasuredGeodesicLengths run (version -1: never run).
-  const measuredLengthsRefreshed = { version: -1, cellId: "", x: Number.NaN, y: Number.NaN, z: Number.NaN };
   // Id of the cell whose group in cellMeshes is currently visible; updated by updateVisibleCell.
   let visibleCellId: string | undefined = readLocalPlayerPose(engine).cellId;
 
@@ -721,15 +716,11 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     removePlacedFlags,
     removeMeasuredGeodesicLengths,
     removeMeasuredGeodesicLengthsForGeodesic,
-    refreshMeasuredGeodesicLengths,
-    refreshMeasuredGeodesicLengthsForGeodesic,
     removeProtractorAngles,
     removeProtractorAnglesForGeodesic,
     removeProtractorAnglesForMissingVertices,
-    refreshProtractorAnglesForGeodesic,
-    refreshProtractorAnglesForGeodesics,
+    syncLabelRuntimesFromJournal,
   } = createToolObjectRuntimes({
-    engine,
     assets: options.assets,
     runtimeObjectRegistry,
     cellMeshes,
@@ -740,7 +731,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     runtimeObjectRenderSourcesByKey,
     runtimeObjectRenderArchetypesByKey,
     runtimeObjectRenderRoot,
-    getWorld: activeWorld,
     session,
     dispatch: dispatchRuntimeCommand,
     clearProtractorToolFeedback,
@@ -786,12 +776,9 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     syncDesktopPalette,
     syncRuntimeObjectPortalInstances: requestRuntimeObjectInstanceSync,
     syncSelectableHitboxDebug: requestSelectableHitboxDebugSync,
-    refreshMeasuredGeodesicLengthsForGeodesic,
     removeMeasuredGeodesicLengthsForGeodesic,
     removeProtractorAnglesForGeodesic,
     removeProtractorAnglesForMissingVertices,
-    refreshProtractorAnglesForGeodesic,
-    refreshProtractorAnglesForGeodesics,
   });
 
   const {
@@ -1292,9 +1279,8 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       worldClient.afterStep();
       afterCarryWorldStep();
     });
-    let straightenedGeodesicIds: readonly string[] = [];
     frameErrorGuard.runPhase("curve shortening", () => {
-      straightenedGeodesicIds = advanceCurveShorteningPairs({
+      advanceCurveShorteningPairs({
         world: activeWorld(),
         registry: runtimeObjectRegistry,
         deltaSeconds: frame.resetRequested ? 0 : deltaSeconds,
@@ -1305,30 +1291,8 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
         },
       });
     });
-    for (const geodesicId of straightenedGeodesicIds) {
-      refreshProtractorAnglesForGeodesic(geodesicId);
-      refreshMeasuredGeodesicLengthsForGeodesic(geodesicId);
-    }
-    if (straightenedGeodesicIds.length > 0) {
-      removeProtractorAnglesForMissingVertices(pruneMissingGeodesicIntersectionObjects(runtimeObjectRegistry));
-      requestSelectableHitboxDebugSync();
-    }
-    // Skipped while nothing it reads changed: registry contents, the player's cell and exact position.
-    if (
-      runtimeObjectRegistry.getVersion() !== measuredLengthsRefreshed.version ||
-      readLocalPlayerPose(engine).cellId !== measuredLengthsRefreshed.cellId ||
-      readLocalPlayerPose(engine).position.x !== measuredLengthsRefreshed.x ||
-      readLocalPlayerPose(engine).position.y !== measuredLengthsRefreshed.y ||
-      readLocalPlayerPose(engine).position.z !== measuredLengthsRefreshed.z
-    ) {
-      refreshMeasuredGeodesicLengths();
-      // Stored after the run: the refresh itself may update the registry.
-      measuredLengthsRefreshed.version = runtimeObjectRegistry.getVersion();
-      measuredLengthsRefreshed.cellId = readLocalPlayerPose(engine).cellId;
-      measuredLengthsRefreshed.x = readLocalPlayerPose(engine).position.x;
-      measuredLengthsRefreshed.y = readLocalPlayerPose(engine).position.y;
-      measuredLengthsRefreshed.z = readLocalPlayerPose(engine).position.z;
-    }
+    // Crossings, lengths and angles follow from what changed: the engine's derive pass wrote them, and the label runtimes read them from the journal.
+    frameErrorGuard.runPhase("label runtimes", syncLabelRuntimesFromJournal);
     const frameAfterObjectsMs = performance.now();
     const frameBeforeCameraMs = frameAfterObjectsMs;
 

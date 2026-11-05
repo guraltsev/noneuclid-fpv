@@ -306,7 +306,7 @@ function intersectAimObject(
 ): ObjectAimHit | undefined {
   const bounds = getDynamicObjectCollisionBounds(runtimeObjectToDynamicObjectState(object));
   // Pick the proxy shape by object kind: protractor label box, geodesic capsule, cannon cylinder+sphere+handles, collision cylinder, else a small sphere at the pose.
-  return object.kind === "protractor-angle"
+  return object.kind === "geodesicMeasurements/angle"
     ? intersectRayWithProtractorAngleLabelHitbox(object, origin, direction)
     : object.kind === "geodesicModel/segment"
     ? intersectRayWithSelectableSegment(object, origin, direction)
@@ -330,7 +330,7 @@ function resolveObjectAimTargets(
   const hits: AimTarget[] = [];
 
   for (const object of registry.getObjectsInCell(cell.id)) {
-    if (object.kind === "protractor-angle" && !object.portalRenderable) {
+    if (object.kind === "geodesicMeasurements/angle" && !object.portalRenderable) {
       continue;
     }
 
@@ -358,7 +358,7 @@ function resolveObjectAimTargets(
 
     const localPoint = hit.point ?? pointOnRay(ray.origin, ray.direction, hit.distance);
     // Sticky targets (saved aim points) override the raw hit, except protractor labels prefer the live hitbox centre.
-    const targetLocalPoint = object.kind === "protractor-angle"
+    const targetLocalPoint = object.kind === "geodesicMeasurements/angle"
       ? hit.targetPoint ?? object.aimStickyTarget?.localPoint ?? localPoint
       : object.aimStickyTarget?.localPoint ?? hit.targetPoint ?? localPoint;
     hits.push({
@@ -415,7 +415,7 @@ function isGeodesicAimObjectKind(kind: RuntimeWorldObject["kind"] | undefined): 
 
 // Higher is preferred: protractor 5, cannon 4, geodesic intersection 3, geodesic segment 1, everything else (floor, plain objects) 0.
 function getAimTargetPriority(target: AimTarget): number {
-  if (target.object?.kind === "protractor-angle") {
+  if (target.object?.kind === "geodesicMeasurements/angle") {
     return 5;
   }
 
@@ -799,7 +799,7 @@ function intersectRayWithVerticalCylinder(
 
 // Label hitbox is a yawed box (half-extents from width/depth/height); the aim target is the box centre.
 function intersectRayWithProtractorAngleLabelHitbox(
-  angle: Extract<RuntimeWorldObject, { readonly kind: "protractor-angle" }>,
+  angle: Extract<RuntimeWorldObject, { readonly kind: "geodesicMeasurements/angle" }>,
   origin: Vec3,
   direction: Vec3,
 ): ObjectAimHit | undefined {

@@ -124,18 +124,12 @@ export interface GeodesicCannonToolsDeps {
   syncRuntimeObjectPortalInstances(): void;
   /** Requests a refresh of the selectable-hitbox debug wireframes after registry changes; the frame performs it. */
   syncSelectableHitboxDebug(): void;
-  /** Recomputes measured lengths attached to a geodesic. */
-  refreshMeasuredGeodesicLengthsForGeodesic(geodesicId: string): void;
   /** Deletes measured lengths attached to a geodesic. */
   removeMeasuredGeodesicLengthsForGeodesic(geodesicId: string): void;
   /** Deletes protractor angles that use a geodesic as a leg. */
   removeProtractorAnglesForGeodesic(geodesicId: string): void;
   /** Deletes protractor angles centered on intersection vertices that no longer exist. */
   removeProtractorAnglesForMissingVertices(vertexIds: readonly string[]): void;
-  /** Recomputes protractor angles that use a geodesic. */
-  refreshProtractorAnglesForGeodesic(geodesicId: string): void;
-  /** Recomputes protractor angles that use any of the geodesics. */
-  refreshProtractorAnglesForGeodesics(geodesicIds: readonly string[]): void;
 }
 
 /**
@@ -165,12 +159,9 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
     syncDesktopPalette,
     syncRuntimeObjectPortalInstances,
     syncSelectableHitboxDebug,
-    refreshMeasuredGeodesicLengthsForGeodesic,
     removeMeasuredGeodesicLengthsForGeodesic,
     removeProtractorAnglesForGeodesic,
     removeProtractorAnglesForMissingVertices,
-    refreshProtractorAnglesForGeodesic,
-    refreshProtractorAnglesForGeodesics,
   } = deps;
   let geodesicCannonRotationHeadHeightMeters: number | undefined;
   let geodesicCannonRotationTargetLengthMeters: number | undefined;
@@ -349,7 +340,6 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
       selectedCannonId: deps.session.get().cannonToolState.selectedCannonId,
       activeGeodesicId: geodesicId,
     } });
-    refreshMeasuredGeodesicLengthsForGeodesic(geodesicId);
     syncRuntimeObjectPortalInstances();
     syncSelectableHitboxDebug();
     return true;
@@ -793,7 +783,6 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
         const released = event as CarryReleasedEvent;
         if (released.participantId !== localParticipantId) return;
         // The tool has left (or is leaving) the carry tool, so the regrown active geodesic is not selected again.
-        refreshOverlaysOfGeodesics(released.rebuiltGeodesicIds);
         removeProtractorAnglesForMissingVertices(released.prunedIntersectionIds);
         syncRuntimeObjectPortalInstances();
         syncSelectableHitboxDebug();
@@ -812,19 +801,11 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
     }
   }
 
-  // Draws again what depends on the geodesics an emitter just rebuilt: measured lengths, protractor angles and, when the emitter's plain
-  // active geodesic was regrown, the cannon tool's selection of it. What was rebuilt is the emitter's rule (geodesic/carryEnd.ts).
-  function refreshOverlaysOfGeodesics(geodesicIds: readonly string[]): void {
-    for (const geodesicId of geodesicIds) {
-      refreshMeasuredGeodesicLengthsForGeodesic(geodesicId);
-    }
-    refreshProtractorAnglesForGeodesics(geodesicIds);
-  }
+  // Selects again the emitter's plain active geodesic when it was regrown. What was rebuilt is the emitter's rule (geodesic/carryEnd.ts).
   function refreshAfterEmitterRebuild(
     cannonId: string,
     rebuild: { readonly rebuiltGeodesicIds: readonly string[]; readonly regrownActiveGeodesicId?: string },
   ): void {
-    refreshOverlaysOfGeodesics(rebuild.rebuiltGeodesicIds);
     if (rebuild.regrownActiveGeodesicId) {
       deps.dispatch({ kind: "set-cannon-tool-state", state: {
         selectedCannonId: cannonId,
@@ -993,8 +974,6 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
       breakOnForbiddenZone: options.breakOnForbiddenZone,
       rebuildLocked: true,
     });
-    refreshProtractorAnglesForGeodesic(geodesicId);
-    refreshMeasuredGeodesicLengthsForGeodesic(geodesicId);
     deps.dispatch({ kind: "set-cannon-tool-state", state: {
       selectedCannonId: cannon.id,
       activeGeodesicId: geodesicId,

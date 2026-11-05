@@ -116,7 +116,7 @@ function createMeasuredGeodesicLengthObjectAtSegment(options: {
 
   return withMeasuredGeodesicLengthTooltip({
     id: options.id,
-    kind: "measured-geodesic-length",
+    kind: "geodesicMeasurements/length",
     cellId: options.segment.cellId,
     localPose: yawRigidTransform3(yawRadians, labelPoint),
     aimStickyTarget: {

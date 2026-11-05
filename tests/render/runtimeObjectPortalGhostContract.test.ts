@@ -88,10 +88,10 @@ const kinds: Record<Kind, KindCase> = {
       segmentIds: ["g1:segment:0", "g2:segment:0"],
     }),
   },
-  "measured-geodesic-length": {
+  "geodesicMeasurements/length": {
     object: (cellId, x, y): MeasuredGeodesicLengthObject => ({
       id: "subject",
-      kind: "measured-geodesic-length",
+      kind: "geodesicMeasurements/length",
       cellId,
       localPose: standing(x, y),
       portalRenderable: true,
@@ -100,10 +100,10 @@ const kinds: Record<Kind, KindCase> = {
       labelPoint: { x, y, z: 0 },
     }),
   },
-  "protractor-angle": {
+  "geodesicMeasurements/angle": {
     object: (cellId, x, y): ProtractorAngleObject => ({
       id: "subject",
-      kind: "protractor-angle",
+      kind: "geodesicMeasurements/angle",
       cellId,
       localPose: standing(x, y),
       portalRenderable: true,

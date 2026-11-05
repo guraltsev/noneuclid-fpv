@@ -287,7 +287,7 @@ export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): Runt
 
     const geodesicId = target.object.geodesicId;
     const existing = runtimeObjectRegistry.getAll().find((object) =>
-      object.kind === "measured-geodesic-length" && object.geodesicId === geodesicId
+      object.kind === "geodesicMeasurements/length" && object.geodesicId === geodesicId
     );
     const measurement = createMeasuredGeodesicLengthObject({
       id: existing?.id ?? engine.ids.next("measured-geodesic-length"),
@@ -447,7 +447,7 @@ export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): Runt
 
   function tryRemoveFocusedProtractorAngle(ray?: RootAimRay): boolean {
     const focused = findFocusedRuntimeObject(ray);
-    if (focused?.object.kind !== "protractor-angle") {
+    if (focused?.object.kind !== "geodesicMeasurements/angle") {
       return false;
     }
 
@@ -460,7 +460,7 @@ export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): Runt
 
   function tryRemoveFocusedMeasuredGeodesicLength(ray?: RootAimRay): boolean {
     const focused = findFocusedRuntimeObject(ray);
-    if (focused?.object.kind !== "measured-geodesic-length") {
+    if (focused?.object.kind !== "geodesicMeasurements/length") {
       return false;
     }
 
@@ -486,9 +486,9 @@ export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): Runt
         return tryOpenFocusedQuestionHelp(target.object);
       case "geodesicModel/segment":
         return tryExtendFocusedGeodesicFromAim(ray);
-      case "measured-geodesic-length":
+      case "geodesicMeasurements/length":
         return tryRemoveFocusedMeasuredGeodesicLength(ray);
-      case "protractor-angle":
+      case "geodesicMeasurements/angle":
         return tryRemoveFocusedProtractorAngle(ray);
       default:
         return false;

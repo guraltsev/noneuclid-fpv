@@ -82,7 +82,7 @@ export function buildSphereAimCollisionOutlineDebugMesh(
  * Uses the object's stored labelHitbox, or derives one from the angle geometry when absent. The box is yawed about the vertical axis by the hitbox yaw (radians). The caller-supplied material is used directly, not cloned.
  */
 export function buildProtractorAngleLabelBoxDebugMesh(
-  object: Extract<RuntimeWorldObject, { readonly kind: "protractor-angle" }>,
+  object: Extract<RuntimeWorldObject, { readonly kind: "geodesicMeasurements/angle" }>,
   name: string,
   material: THREE.Material,
   renderOrder: number,
@@ -274,7 +274,7 @@ export function buildSelectableHitboxDebugMesh(object: RuntimeWorldObject): THRE
     return buildGeodesicSegmentSelectableHitboxDebugMesh(object);
   }
 
-  if (object.kind === "protractor-angle") {
+  if (object.kind === "geodesicMeasurements/angle") {
     return buildProtractorAngleLabelBoxDebugMesh(
       object,
       "selectable-hitbox:protractor-angle-label",
@@ -305,7 +305,7 @@ export function buildAimCollisionOutlineDebugMesh(object: RuntimeWorldObject): T
     return bounds ? buildGeodesicEmitterAimCollisionOutlineDebugMesh(object, bounds) : undefined;
   }
 
-  if (object.kind === "protractor-angle") {
+  if (object.kind === "geodesicMeasurements/angle") {
     return buildProtractorAngleLabelBoxDebugMesh(
       object,
       "aim-collision-outline:protractor-angle-label",

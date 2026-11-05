@@ -53,12 +53,9 @@ function createHarness(world: CompiledCellComplex, registry: RuntimeObjectRegist
     syncDesktopPalette: nothing,
     syncRuntimeObjectPortalInstances: nothing,
     syncSelectableHitboxDebug: nothing,
-    refreshMeasuredGeodesicLengthsForGeodesic: nothing,
     removeMeasuredGeodesicLengthsForGeodesic: nothing,
     removeProtractorAnglesForGeodesic: nothing,
     removeProtractorAnglesForMissingVertices: nothing,
-    refreshProtractorAnglesForGeodesic: nothing,
-    refreshProtractorAnglesForGeodesics: nothing,
   });
   // The shell steps the world after the tools have run; the harness steps it after each carry call.
   const tools = driveCarryTools(rawTools, engine);

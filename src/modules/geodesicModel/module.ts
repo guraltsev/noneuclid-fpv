@@ -4,10 +4,10 @@
  *
  * The module declares the four geodesic kinds (arc, vertex, segment, crossing), provides the token `geodesicModel` with the queries clients and dependents
  * read and the hot operations only dependents hold (`previewVertexMove`, `commitVertexMove`, `previewVertexRemoval`), and handles the commands `tieAndDetach`,
- * `highlightEndpoint`, and the module-only `removeVertex` and `removeCurve`. It has no tick of its own: crossings move into a derive tick in design job 52, and the
+ * `highlightEndpoint`, and the module-only `removeVertex` and `removeCurve`. Its one tick, `crossings`, is a derive tick that recomputes the crossing markers when segments change. The
  * tie tool arrives with job 54, so the tie command carries no `requiresTool` yet. Each command is atomic: on refusal nothing changes.
  */
-import type { CommandContext, CommandHandlers, CommandResult, ModuleDefinition, ObjectKindDeclaration } from "../../engine/moduleTypes";
+import type { CommandContext, CommandHandlers, CommandResult, ModuleDefinition, ModuleTick, ObjectKindDeclaration } from "../../engine/moduleTypes";
 import {
   arcsAtVertex,
   arcsOfCurve,
@@ -17,7 +17,7 @@ import {
   tiedVertexCount,
 } from "../../world-objects/geodesic/endpoints";
 import { arcConnectsEmitters, removeGeodesic } from "../../world-objects/geodesic/lifecycle";
-import { withDeferredGeodesicIntersections } from "../../world-objects/geodesic/intersections";
+import { pruneMissingGeodesicIntersectionObjects, updateGeodesicIntersectionObjects } from "../../world-objects/geodesic/intersections";
 import { getGeodesicSegments } from "../../world-objects/geodesic/segments";
 import {
   arcTangentsAtVertex,
@@ -102,11 +102,24 @@ function removeCurve(command: GeodesicRemoveCurveCommand, ctx: CommandContext): 
   if (!command.arcIds.every((arcId) => ctx.objects.get(arcId)?.kind === "geodesicModel/arc")) {
     return refuse(geodesicModelRefusals.unknownArc, "One of the arcs does not exist.");
   }
-  withDeferredGeodesicIntersections(ctx.objects, () => {
-    for (const arcId of command.arcIds) removeGeodesic(ctx.objects, arcId);
-  });
+  for (const arcId of command.arcIds) removeGeodesic(ctx.objects, arcId);
   return { ok: true, value: { arcIds: command.arcIds } };
 }
+
+/**
+ * Crossing markers follow the segments: every pass that sees a segment written recomputes them all (the call removes and adds every marker, so it writes whenever it wakes).
+ * The identity memory then forgets the markers that did not come back, so a marker keeps its id only across the pass that moves it.
+ */
+const crossingsTick: ModuleTick = {
+  id: "geodesicModel/crossings",
+  phase: "derive",
+  writes: ["geodesicModel/crossing"],
+  subscribes: ["geodesicModel/segment"],
+  run(ctx) {
+    updateGeodesicIntersectionObjects(ctx.objects);
+    pruneMissingGeodesicIntersectionObjects(ctx.objects);
+  },
+};
 
 /**
  * Creates the geodesic model module.
@@ -143,7 +156,7 @@ export function geodesicModelModule(): GeodesicModelModuleDefinition {
         "geodesicModel/removeVertex": { run: removeVertexCommand, moduleOnly: true },
         "geodesicModel/removeCurve": { run: removeCurve, moduleOnly: true },
       };
-      return { api, queries, commands, ticks: [] };
+      return { api, queries, commands, ticks: [crossingsTick] };
     },
   };
 }

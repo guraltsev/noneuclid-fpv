@@ -3,7 +3,6 @@
  */
 import type { RuntimeObjectRegistry } from "../runtimeObjectRegistry";
 import type { GeodesicEmitterAttachment } from "./objects";
-import { requestGeodesicIntersectionUpdate, withDeferredGeodesicIntersections } from "./intersections";
 import {
   getEmitterGeodesicIds,
   isVertexSharedWithOtherArc,
@@ -86,27 +85,15 @@ export function collectFollowingArcIdsForEmitter(
 
 /** Removes a geodesic and its derived objects (an interval via `removeGeodesicIntervalAndDerivedObjects`; any other id only has stale segments and emitter cache entries removed), then refreshes intersections. */
 export function removeGeodesic(registry: RuntimeObjectRegistry, geodesicId: string): void {
-  withDeferredGeodesicIntersections(registry, () => removeGeodesicNow(registry, geodesicId));
-}
-
-function removeGeodesicNow(registry: RuntimeObjectRegistry, geodesicId: string): void {
   if (registry.get(geodesicId)?.kind === "geodesicModel/arc") {
     removeGeodesicIntervalAndDerivedObjects(registry, geodesicId);
     return;
   }
   removeGeodesicSegments(registry, geodesicId);
-  requestGeodesicIntersectionUpdate(registry);
 }
 
 /** Removes every geodesic of the cannon that does not follow it (a plain shot geodesic with an unshared free end) and returns the removed ids (empty if the id is not a cannon). Arcs that connect emitters and tied arcs stay. */
 export function removeUnlockedGeodesicsFromCannon(
-  registry: RuntimeObjectRegistry,
-  cannonId: string,
-): readonly string[] {
-  return withDeferredGeodesicIntersections(registry, () => removeUnlockedGeodesicsFromCannonNow(registry, cannonId));
-}
-
-function removeUnlockedGeodesicsFromCannonNow(
   registry: RuntimeObjectRegistry,
   cannonId: string,
 ): readonly string[] {

@@ -27,7 +27,6 @@ import {
 } from "./objects";
 import { canObjectAttachGeodesics } from "./anchors";
 import { getPortalWordBetweenEndpointRoles, reverseGeodesicPortalWord, samePortalWord } from "./portalWord";
-import { requestGeodesicIntersectionUpdate, withDeferredGeodesicIntersections } from "./intersections";
 import {
   liftGeodesicEndpointWithAnchors,
   removeUnusedFreeGeodesicEnds,
@@ -281,13 +280,11 @@ export function previewVertexMove(
 /** Applies a {@link previewVertexMove}: the vertex, the arcs with their new words and their realized segments. */
 export function commitVertexMove(registry: RuntimeObjectRegistry, preview: VertexMovePreview): void {
   const moved = preview.internal as MovePreviewInternal;
-  withDeferredGeodesicIntersections(registry, () => {
-    registry.update(moved.vertex);
-    for (const { arc, traces } of moved.arcs) {
-      registry.update(arc);
-      replaceDerivedSegmentsFromTraces({ registry, geodesicId: arc.id, traces });
-    }
-  });
+  registry.update(moved.vertex);
+  for (const { arc, traces } of moved.arcs) {
+    registry.update(arc);
+    replaceDerivedSegmentsFromTraces({ registry, geodesicId: arc.id, traces });
+  }
 }
 
 // Finds an arc that is the same geodesic as `candidate` among the arcs that connect emitters: same two endpoint anchors and the same portal word, read in
@@ -408,10 +405,6 @@ export function previewVertexRemoval(
  * changes nothing). A `merge` overwrites the arc with the smaller id and removes the other, then the vertex; a duplicate merge removes both arcs.
  */
 export function removeVertex(registry: RuntimeObjectRegistry, vertexId: string, preview: VertexRemovalPreview): readonly string[] {
-  return withDeferredGeodesicIntersections(registry, () => removeVertexNow(registry, vertexId, preview));
-}
-
-function removeVertexNow(registry: RuntimeObjectRegistry, vertexId: string, preview: VertexRemovalPreview): readonly string[] {
   switch (preview.kind) {
     case "blocked":
       return [];
@@ -474,14 +467,6 @@ export function tieAtNewVertex(
     readonly createVertexId: () => string;
   },
 ): TieAtNewVertexResult {
-  return withDeferredGeodesicIntersections(registry, () => tieAtNewVertexNow(world, registry, request));
-}
-
-function tieAtNewVertexNow(
-  world: CompiledCellComplex,
-  registry: RuntimeObjectRegistry,
-  request: Parameters<typeof tieAtNewVertex>[2],
-): TieAtNewVertexResult {
   if (request.first.geodesicId === request.second.geodesicId && request.first.role === request.second.role) {
     return { ok: false, reason: "sameEndpoint" };
   }
@@ -536,11 +521,9 @@ function tieAtNewVertexNow(
       restoreArcsAndSegments(registry, affected, originalSegmentsByArcId);
       registry.remove(vertex.id);
       removeUnusedFreeGeodesicEnds(registry);
-      requestGeodesicIntersectionUpdate(registry);
       return { ok: false, reason: "rebuildFailed" };
     }
   }
-  requestGeodesicIntersectionUpdate(registry);
   return { ok: true, vertexId: vertex.id, arcIds: affected.map((arc) => arc.id) };
 }
 

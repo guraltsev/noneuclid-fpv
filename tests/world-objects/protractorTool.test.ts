@@ -96,7 +96,7 @@ describe("protractor tool objects", () => {
       second: { geodesicId: "g-b", segmentId: "segment-b", yawRadians: Math.PI / 2 },
     });
 
-    expect(angle.kind).toBe("protractor-angle");
+    expect(angle.kind).toBe("geodesicMeasurements/angle");
     expect(angle.radiusMeters).toBe(protractorAngleRadiusMeters);
     expect(angle.angleDegrees).toBeCloseTo(90);
     expect(angle.tooltip?.label).toBe("g-a ∠ g-b = 90°");

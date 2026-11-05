@@ -33,6 +33,7 @@ import { replaceGeodesicEndpointAttachment } from "../../../src/world-objects/ge
 import { removeGeodesic } from "../../../src/world-objects/geodesic/lifecycle";
 import { yawRigidTransform3 } from "../../../src/math/rigidTransform3";
 import { createSegment, compileWorld, createTorusLoopBenchmarkScene, getCannonGeodesicIds } from "../../fixtures/world-objects/geodesic";
+import { createDerivingTestEngine, runDerivePass } from "../../support/engine";
 
 describe("geodesic cannon world objects: intersections", () => {
   it("looks up tails and removes segment chains", () => {
@@ -299,8 +300,10 @@ describe("geodesic cannon world objects: intersections", () => {
       }),
     ]);
     updateGeodesicIntersectionObjects(registry);
+    const engine = createDerivingTestEngine(registry);
 
     removeGeodesic(registry, "g-a");
+    runDerivePass(engine);
 
     expect(registry.getAll().filter((object) => object.kind === "geodesicModel/crossing")).toHaveLength(0);
   });

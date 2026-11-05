@@ -208,7 +208,7 @@ export function createProtractorAngleObject(options: {
 
   return {
     id: options.id,
-    kind: "protractor-angle",
+    kind: "geodesicMeasurements/angle",
     cellId: options.center.cellId,
     localPose: yawRigidTransform3(options.first.yawRadians, options.center.point),
     aimStickyTarget: {

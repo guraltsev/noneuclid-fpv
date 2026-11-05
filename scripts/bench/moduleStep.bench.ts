@@ -20,11 +20,11 @@ import { createLocalPlayerParticipant, createWorldEngine, type WorldEngine } fro
 import { createDefaultPlayerPose } from "../../src/movement/playerPose";
 import type { CompiledCellComplex } from "../../src/cell-complex/compileCellComplex";
 import { advanceCurveShorteningPairs } from "../../src/world-objects/geodesic/curveShortening";
-import { pruneMissingGeodesicIntersectionObjects } from "../../src/world-objects/geodesic/intersections";
-import { createMeasuredGeodesicLengthObject, refreshMeasuredGeodesicLengthObject } from "../../src/world-objects/measureLengthTool";
+import { geodesicMeasurementsModule } from "../../src/modules/geodesicMeasurements";
+import { geodesicModelModule } from "../../src/modules/geodesicModel";
+import { createMeasuredGeodesicLengthObject } from "../../src/world-objects/measureLengthTool";
 import {
   createProtractorAngleObject,
-  refreshProtractorAngleObject,
   resolveProtractorCenterSelection,
   resolveProtractorEmitterGeodesicSelection,
 } from "../../src/world-objects/protractorTool";
@@ -245,12 +245,18 @@ function createManyArcsScene(): Scene {
 
 function createFlowScene(withDependents: boolean): Scene {
   const { world, registry } = createTorusTiedPairScenario();
-  if (withDependents) {
-    addLength(registry, world, "length-g1", "g1");
-    const emitter = registry.get("e1") as GeodesicCannonObject;
-    addAngle(registry, emitter, "angle-g", { geodesicId: "g1", endRole: "start" }, { geodesicId: "g2", endRole: "end" });
-  }
-  return { world, registry };
+  if (!withDependents) return { world, registry };
+  addLength(registry, world, "length-g1", "g1");
+  const emitter = registry.get("e1") as GeodesicCannonObject;
+  addAngle(registry, emitter, "angle-g", { geodesicId: "g1", endRole: "start" }, { geodesicId: "g2", endRole: "end" });
+  // The dependents are derived by the engine's derive pass: crossings, then lengths and angles.
+  const engine = createWorldEngine({
+    registry,
+    getWorld: () => world,
+    participants: [createLocalPlayerParticipant(createDefaultPlayerPose("torus-room"))],
+    modules: [geodesicModelModule(), geodesicMeasurementsModule()],
+  });
+  return { world, registry, engine };
 }
 
 function addLength(registry: RuntimeObjectRegistry, world: CompiledCellComplex, id: string, geodesicId: string): void {
@@ -274,27 +280,9 @@ function addAngle(registry: RuntimeObjectRegistry, emitter: GeodesicCannonObject
 
 // ---- the legacy driver --------------------------------------------------------------------------------------
 
-/** Today's objects-phase sequence: the flow, then the follow-ups for the geodesics it returned, then pruning; on a scene with an engine, then the engine's step and endFrame. */
+/** Today's objects-phase sequence: the flow; on a scene with an engine, then the engine's step (whose derive pass refreshes what depends on the flow's writes) and the end-of-frame clearing. */
 function legacyStep(scene: Scene): void {
-  const { world, registry } = scene;
-  const straightened = advanceCurveShorteningPairs({ world, registry, deltaSeconds });
-  for (const geodesicId of straightened) {
-    for (const angle of registry.getObjectsOfKind("protractor-angle")) {
-      if (angle.first.geodesicId !== geodesicId && angle.second.geodesicId !== geodesicId) continue;
-      const refreshed = refreshProtractorAngleObject({ registry, angle });
-      if (!refreshed) registry.remove(angle.id);
-      else registry.update(refreshed);
-    }
-    for (const length of registry.getObjectsOfKind("measured-geodesic-length")) {
-      if (length.geodesicId !== geodesicId) continue;
-      const refreshed = refreshMeasuredGeodesicLengthObject({ registry, world, measurement: length, playerCellId: "torus-room", playerPoint });
-      if (!refreshed) registry.remove(length.id);
-      else registry.update(refreshed);
-    }
-  }
-  if (straightened.length > 0) {
-    pruneMissingGeodesicIntersectionObjects(registry);
-  }
+  advanceCurveShorteningPairs({ world: scene.world, registry: scene.registry, deltaSeconds });
   // The frame's engine calls: a step, then the end-of-frame clearing.
   if (scene.engine) {
     scene.engine.step(deltaSeconds);
@@ -335,9 +323,9 @@ function timeFlow(createScene: () => Scene): number {
   return (milliseconds * 1000) / Math.max(steps, 1);
 }
 
-/** Steps, registry writes and kind scans of one flow run to its end, each as the difference from before the run (these scenes have no engine, so the journal is never cleared). */
+/** Steps, registry writes and kind scans of one flow run to its end, each as the difference from before the run (writes are ring sequence numbers, which `endFrame` does not reset). */
 function measureCounters(scene: Scene): SceneCounters {
-  const writesBefore = scene.registry.changes.length;
+  const writesBefore = scene.registry.changes.ring.headSeq;
   const scansBefore = scene.registry.getKindScanCounts();
   const steps = runFlow(scene);
   const scansAfter = scene.registry.getKindScanCounts();
@@ -346,7 +334,7 @@ function measureCounters(scene: Scene): SceneCounters {
     const difference = scansAfter[kind]! - (scansBefore[kind] ?? 0);
     if (difference > 0) scans[kind] = difference;
   }
-  return { steps, writes: scene.registry.changes.length - writesBefore, scans };
+  return { steps, writes: scene.registry.changes.ring.headSeq - writesBefore, scans };
 }
 
 function measureAllCounters(): CounterSet {

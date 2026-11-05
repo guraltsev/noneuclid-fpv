@@ -23,8 +23,11 @@ const geodesicAnchorCrossingToleranceMeters = 1e-6;
 /** Extra height (meters) above the beam at which an intersection marker is placed. */
 const geodesicIntersectionBalloonHeightOffsetMeters = 0.25;
 
-/** Per-registry memory of intersection markers so ids remain stable while two segments keep crossing. */
-const geodesicIntersectionMemoryByRegistry = new WeakMap<RuntimeObjectRegistry, Map<string, GeodesicCrossingObject>>();
+/**
+ * Per-registry memory of intersection markers so ids remain stable while two segments keep crossing.
+ * It is keyed by the registry's change journal, not by the registry object: with the module write guard on, a tick holds a copy of the registry that shares the journal.
+ */
+const geodesicIntersectionMemoryByRegistry = new WeakMap<object, Map<string, GeodesicCrossingObject>>();
 
 // ---- Intersections ----
 
@@ -57,45 +60,6 @@ export function updateGeodesicIntersectionObjects(registry: RuntimeObjectRegistr
   }
 
   return intersections;
-}
-
-/** Per-registry deferral state: how many scopes are open and whether a request arrived inside them. */
-const geodesicIntersectionDeferralByRegistry = new WeakMap<RuntimeObjectRegistry, { depth: number; dirty: boolean }>();
-
-/**
- * Marks the intersection markers stale and recomputes them now, unless a deferral scope is open for this registry
- * (see `withDeferredGeodesicIntersections`), in which case the recomputation happens once when the outermost scope exits.
- */
-export function requestGeodesicIntersectionUpdate(registry: RuntimeObjectRegistry): void {
-  const state = geodesicIntersectionDeferralByRegistry.get(registry);
-  if (state && state.depth > 0) {
-    state.dirty = true;
-    return;
-  }
-  updateGeodesicIntersectionObjects(registry);
-}
-
-/**
- * Runs `body`; every `requestGeodesicIntersectionUpdate` inside it (also from nested scopes) is coalesced into one
- * `updateGeodesicIntersectionObjects` when the outermost scope exits, also when `body` throws. Markers are therefore
- * current again whenever the outermost scope has returned, but may be stale inside it.
- */
-export function withDeferredGeodesicIntersections<T>(registry: RuntimeObjectRegistry, body: () => T): T {
-  let state = geodesicIntersectionDeferralByRegistry.get(registry);
-  if (!state) {
-    state = { depth: 0, dirty: false };
-    geodesicIntersectionDeferralByRegistry.set(registry, state);
-  }
-  state.depth += 1;
-  try {
-    return body();
-  } finally {
-    state.depth -= 1;
-    if (state.depth === 0 && state.dirty) {
-      state.dirty = false;
-      updateGeodesicIntersectionObjects(registry);
-    }
-  }
 }
 
 /** Returns the last known intersection marker with this id even if it has since disappeared from the registry, or `undefined`. */
@@ -292,10 +256,10 @@ function createGeodesicIntersectionId(
 }
 
 function getGeodesicIntersectionMemory(registry: RuntimeObjectRegistry): Map<string, GeodesicCrossingObject> {
-  let memory = geodesicIntersectionMemoryByRegistry.get(registry);
+  let memory = geodesicIntersectionMemoryByRegistry.get(registry.changes);
   if (!memory) {
     memory = new Map();
-    geodesicIntersectionMemoryByRegistry.set(registry, memory);
+    geodesicIntersectionMemoryByRegistry.set(registry.changes, memory);
   }
 
   return memory;

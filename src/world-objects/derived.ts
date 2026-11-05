@@ -175,7 +175,8 @@ export function derivedStatsOf(source: DerivedSource<JournalRecord>): readonly D
   return result;
 }
 
-function deepEqual(a: unknown, b: unknown): boolean {
+/** Structural equality of plain data (also maps and sets), the check of the cache fuzz and of the derive ticks that write a record only when it changed. */
+export function deepEqual(a: unknown, b: unknown): boolean {
   if (Object.is(a, b)) return true;
   if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) return false;
   if (Array.isArray(a)) {

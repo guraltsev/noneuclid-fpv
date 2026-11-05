@@ -129,8 +129,6 @@ export function createGeometryCommit(deps: GeometryCommitDeps): GeometryCommit {
     applyGeometryCommitComputedObjectPolicy({
       world: snapshot.world,
       registry: runtimeObjectRegistry,
-      playerCellId: readLocalPlayerPose(engine).cellId,
-      playerPoint: readLocalPlayerPose(engine).position,
       callbacks: deps.computedObjectCallbacks,
     });
 

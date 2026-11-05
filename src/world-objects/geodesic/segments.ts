@@ -16,7 +16,6 @@ import {
   sanitizeYaw,
   type TraceGeodesicSegmentResult,
 } from "./objects";
-import { requestGeodesicIntersectionUpdate, withDeferredGeodesicIntersections } from "./intersections";
 import {
   getGeodesicPortalWord,
   removeUnusedFreeGeodesicEnds,
@@ -33,25 +32,18 @@ export function removeGeodesicIntervalAndDerivedObjects(
   registry: RuntimeObjectRegistry,
   geodesicId: string,
 ): void {
-  withDeferredGeodesicIntersections(registry, () => removeGeodesicIntervalAndDerivedObjectsNow(registry, geodesicId));
-}
-
-function removeGeodesicIntervalAndDerivedObjectsNow(
-  registry: RuntimeObjectRegistry,
-  geodesicId: string,
-): void {
   removeGeodesicSegments(registry, geodesicId);
   const doomed: RuntimeWorldObject[] = [];
   const interval = registry.get(geodesicId);
   if (interval?.kind === "geodesicModel/arc") {
     doomed.push(interval);
   }
-  for (const object of registry.getObjectsOfKind("measured-geodesic-length")) {
+  for (const object of registry.getObjectsOfKind("geodesicMeasurements/length")) {
     if (object.geodesicId === geodesicId) {
       doomed.push(object);
     }
   }
-  for (const object of registry.getObjectsOfKind("protractor-angle")) {
+  for (const object of registry.getObjectsOfKind("geodesicMeasurements/angle")) {
     if (object.first.geodesicId === geodesicId || object.second.geodesicId === geodesicId) {
       doomed.push(object);
     }
@@ -65,7 +57,6 @@ function removeGeodesicIntervalAndDerivedObjectsNow(
     registry.remove(object.id);
   }
   removeUnusedFreeGeodesicEnds(registry);
-  requestGeodesicIntersectionUpdate(registry);
 }
 
 // ---- Derived-segment and connection queries ----
@@ -418,5 +409,4 @@ export function removeGeodesicSegments(registry: RuntimeObjectRegistry, geodesic
   for (const segment of getGeodesicSegments(registry, geodesicId)) {
     registry.remove(segment.id);
   }
-  requestGeodesicIntersectionUpdate(registry);
 }

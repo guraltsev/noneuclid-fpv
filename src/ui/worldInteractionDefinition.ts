@@ -117,13 +117,13 @@ export function createWorldFocusMessageDefinition(
           : [],
         helpTopicId: "geodesic-vertex",
       });
-    case "measured-geodesic-length":
+    case "geodesicMeasurements/length":
       return withObjectHelp(options.object, {
         title,
         actions: [primaryAction("remove-measurement", "Remove")],
         helpTopicId: "measured-length",
       });
-    case "protractor-angle":
+    case "geodesicMeasurements/angle":
       return withObjectHelp(options.object, {
         title,
         actions: [primaryAction("remove-angle", "Delete measurement")],

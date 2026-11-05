@@ -13,7 +13,6 @@ import type { RuntimeObjectRegistry } from "../runtimeObjectRegistry";
 import { createCurveShorteningPairObject, type CurveShorteningPairObject, type GeodesicEndpointSelection } from "./objects";
 import { arcsAtVertex, isStale } from "./endpoints";
 import type { ArcEnd } from "./arcIndex";
-import { withDeferredGeodesicIntersections, requestGeodesicIntersectionUpdate } from "./intersections";
 import {
   arcTangentsAtVertex,
   commitVertexMove,
@@ -57,12 +56,6 @@ export interface AdvanceCurveShorteningPairsRequest {
 export function tieAndDetachGeodesicEndpoints(
   request: TieAndDetachGeodesicEndpointsRequest,
 ): CurveShorteningPairObject | undefined {
-  return withDeferredGeodesicIntersections(request.registry, () => tieAndDetachGeodesicEndpointsNow(request));
-}
-
-function tieAndDetachGeodesicEndpointsNow(
-  request: TieAndDetachGeodesicEndpointsRequest,
-): CurveShorteningPairObject | undefined {
   const tied = tieAtNewVertex(request.world, request.registry, {
     detachedEmitterId: request.detachedEmitterId,
     first: request.first,
@@ -82,7 +75,6 @@ function tieAndDetachGeodesicEndpointsNow(
     cellId: vertex.cellId,
   });
   request.registry.add(pair);
-  requestGeodesicIntersectionUpdate(request.registry);
   return pair;
 }
 
@@ -123,13 +115,7 @@ const lengthIncreaseToleranceMeters = 1e-9;
  *
  * Returns the unique ids of the arcs that moved or merged, then removed ones, and the pair id when the pair ended. Notices go to `onNotice`.
  */
-export function advanceCurveShorteningPairs(
-  request: AdvanceCurveShorteningPairsRequest,
-): readonly string[] {
-  return withDeferredGeodesicIntersections(request.registry, () => advanceCurveShorteningPairsNow(request));
-}
-
-function advanceCurveShorteningPairsNow(request: AdvanceCurveShorteningPairsRequest): readonly string[] {
+export function advanceCurveShorteningPairs(request: AdvanceCurveShorteningPairsRequest): readonly string[] {
   if (!(request.deltaSeconds > 0)) {
     return [];
   }
@@ -140,9 +126,6 @@ function advanceCurveShorteningPairsNow(request: AdvanceCurveShorteningPairsRequ
       continue;
     }
     changed.push(...flowPair(request, pair.id, stepBudgetMeters));
-  }
-  if (changed.length > 0) {
-    requestGeodesicIntersectionUpdate(request.registry);
   }
   return [...new Set(changed)];
 }

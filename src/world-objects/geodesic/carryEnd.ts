@@ -8,7 +8,7 @@
 import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex";
 import type { RuntimeObjectRegistry } from "../runtimeObjectRegistry";
 import { rebuildConnectedGeodesicBetweenEmitters, rebuildGeodesicToLength } from "./cannon";
-import { pruneMissingGeodesicIntersectionObjects, withDeferredGeodesicIntersections } from "./intersections";
+import { pruneMissingGeodesicIntersectionObjects } from "./intersections";
 import { getEmitterGeodesicIds, isTied } from "./endpoints";
 import { arcFollowsEmitter, collectFollowingArcIdsForEmitter } from "./lifecycle";
 import { collectGeodesicPortalWord, getGeodesicSegments, resolveEmitterLaunchYaw } from "./segments";
@@ -60,12 +60,9 @@ export function rebuildEmitterGeodesics(input: {
   };
 
   if (lockedIncidentGeodesicIds.length > 0) {
-    // One scope per call: the intersection markers are recomputed once, after all incident geodesics are rebuilt.
-    withDeferredGeodesicIntersections(registry, () => {
-      for (const incidentGeodesicId of lockedIncidentGeodesicIds) {
-        rebuildLocked(incidentGeodesicId);
-      }
-    });
+    for (const incidentGeodesicId of lockedIncidentGeodesicIds) {
+      rebuildLocked(incidentGeodesicId);
+    }
     return { rebuiltGeodesicIds: lockedIncidentGeodesicIds };
   }
   if (geodesicId && arcFollowsEmitter(registry, geodesicId, cannon.id)) {

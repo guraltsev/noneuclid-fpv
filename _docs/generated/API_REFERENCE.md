@@ -669,6 +669,7 @@ The derived cache (design 014 section 4): a value defined by a full `compute` ov
 | function | `setDerivedVerification` | `derived-verify`: every `everyReads`th read also runs `compute` and throws when the two differ. |
 | function | `defineDerived` | Defines a cache. |
 | function | `derivedStatsOf` | The caches that exist on this source's ring, for the debug API. |
+| function | `deepEqual` | Structural equality of plain data (also maps and sets), the check of the cache fuzz and of the derive ticks that write a record only when it changed. |
 
 ### `world-objects/geodesic/anchors.ts`
 
@@ -791,8 +792,6 @@ Geodesic intersection markers: crossings of segments in the same cell, stable ma
 | Kind | Name | Summary |
 | --- | --- | --- |
 | function | `updateGeodesicIntersectionObjects` | Recomputes all intersection markers (where segments of two different geodesics cross in a cell) and returns them. |
-| function | `requestGeodesicIntersectionUpdate` | Marks the intersection markers stale and recomputes them now, unless a deferral scope is open for this registry (see `withDeferredGeodesicIntersections`), in which case the recomputation happens once when the outermost … |
-| function | `withDeferredGeodesicIntersections` | Runs `body`; every `requestGeodesicIntersectionUpdate` inside it (also from nested scopes) is coalesced into one `updateGeodesicIntersectionObjects` when the outermost scope exits, also when `body` throws. |
 | function | `getRememberedGeodesicIntersectionObject` | Returns the last known intersection marker with this id even if it has since disappeared from the registry, or `undefined`. |
 | function | `pruneMissingGeodesicIntersectionObjects` | Forgets remembered intersection markers that are no longer in the registry; returns the forgotten ids. |
 
@@ -1452,7 +1451,7 @@ The names the engine knows without any module: the object kinds of the registry'
 | Kind | Name | Summary |
 | --- | --- | --- |
 | const | `coreObjectKinds` | Kinds of the core union of the registry. |
-| const | `moduleOwnedCoreKinds` | Kinds of the registry's core union that a module declares as its own (design 013 section 13.1): the geodesic model keeps their declaring files in `world-objects/geodesic/objects.ts` and in the core union in this wave, a… |
+| const | `moduleOwnedCoreKinds` | Kinds of the registry's core union that a module declares as its own (design 013 section 13.1): the geodesic model and the geodesic measurements keep their declaring files in `world-objects/geodesic/objects.ts` and in t… |
 | const | `coreToolIds` | Ids of the tools the shell defines itself. |
 
 ### `engine/ids.ts`
@@ -1592,6 +1591,21 @@ The carry module (design 013 section 7): who carries what is world state.
 | --- | --- | --- |
 | type | `CarryModuleDefinition` | The module as the engine's list takes it. |
 | function | `carryModule` | Creates the carry module. |
+
+### `modules/geodesicMeasurements/index.ts`
+
+The geodesic measurements module's world factory (design 013 section 12.1): the length and angle labels as records derived from the geodesic model.
+
+_No exports._
+
+### `modules/geodesicMeasurements/module.ts`
+
+The geodesic measurements module (design 013 section 6.4, design 014 D9): the length labels and protractor angles the player's tools place, kept current by two derive ticks that read the change ring.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| type | `GeodesicMeasurementsModuleDefinition` | The module as the engine's list takes it. |
+| function | `geodesicMeasurementsModule` | Creates the geodesic measurements module. |
 
 ### `modules/geodesicModel/api.ts`
 
@@ -1766,10 +1780,10 @@ Policy for derived objects (geodesics, measured geodesic lengths, protractor ang
 
 | Kind | Name | Summary |
 | --- | --- | --- |
-| interface | `GeometryCommitComputedObjectPolicyCallbacks` | Optional renderer hooks invoked as the policy removes or updates dependent objects so visuals can follow. |
+| interface | `GeometryCommitComputedObjectPolicyCallbacks` | Optional renderer hooks invoked as the policy removes dependent objects so visuals can follow. |
 | interface | `ApplyGeometryCommitComputedObjectPolicyOptions` | Inputs for applying the post-commit policy. |
-| interface | `GeometryCommitComputedObjectPolicyResult` | Ids (deduplicated, in first-seen order) of the objects the policy removed, rebuilt, refreshed or pruned. |
-| function | `applyGeometryCommitComputedObjectPolicy` | Applies the post-commit policy to the registry (delete unlocked geodesics, re-solve locked ones, refresh dependent measurements and angles, prune stale intersections) and returns what changed. |
+| interface | `GeometryCommitComputedObjectPolicyResult` | Ids (deduplicated, in first-seen order) of the objects the policy removed, rebuilt or pruned. |
+| function | `applyGeometryCommitComputedObjectPolicy` | Applies the post-commit policy to the registry (delete unlocked geodesics, re-solve locked ones, prune stale intersections) and returns what changed. |
 
 ### `runtime/worldGeometryDeformationFamilies.ts`
 
@@ -3054,7 +3068,7 @@ Builds the per-eye visibility states of one stereo (XR) frame, as a pure functio
 
 ### `render/three/toolObjectRuntimes.ts`
 
-Scene-graph runtimes for placed flags, measured lengths, and protractor angles: sync, removal, and refresh.
+Scene-graph runtimes for placed flags, measured lengths, and protractor angles: sync and removal.
 
 | Kind | Name | Summary |
 | --- | --- | --- |

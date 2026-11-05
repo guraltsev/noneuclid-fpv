@@ -2,6 +2,8 @@
  * Shared test fake: a world engine over a registry, with the local player in "room-a" and the module write guard on (design 013 section 9.6: the guard is on in tests).
  */
 import type { CompiledCellComplex } from "../../src/cell-complex/compileCellComplex";
+import { geodesicMeasurementsModule } from "../../src/modules/geodesicMeasurements";
+import { geodesicModelModule } from "../../src/modules/geodesicModel";
 import { createLocalPlayerParticipant } from "../../src/engine/participants";
 import { createWorldEngine, type WorldEngineOptions } from "../../src/engine/worldEngine";
 import type { WorldEngine } from "../../src/engine/moduleTypes";
@@ -25,4 +27,14 @@ export function createTestEngine(options: TestEngineOptions = {}): WorldEngine &
     ...engineOptions,
   });
   return Object.assign(engine, { registry });
+}
+
+/** An engine over `registry` with the modules that derive state from the journal: the geodesic model (crossings) and the geodesic measurements (lengths, angles). */
+export function createDerivingTestEngine(registry: RuntimeObjectRegistry, options: TestEngineOptions = {}): WorldEngine & { readonly registry: RuntimeObjectRegistry } {
+  return createTestEngine({ registry, modules: [geodesicModelModule(), geodesicMeasurementsModule()], ...options });
+}
+
+/** Runs one derive pass: a zero-length step, which applies no command here and wakes every derive tick whose subscribed kinds were written since its last run. Tests that read crossings, lengths or angles right after a mutation call it first. */
+export function runDerivePass(engine: Pick<WorldEngine, "step">): void {
+  engine.step(0);
 }
