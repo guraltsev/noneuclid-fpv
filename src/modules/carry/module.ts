@@ -217,7 +217,7 @@ export function carryModule(): CarryModuleDefinition {
     id: "carry",
     requires: [],
     objectKinds: [],
-    // Until the emitter has its module (`geodesicEmitters`), the carry moves an emitter and rebuilds the geodesics it anchors itself. A rebuild that collapses
+    // Until job 64 the carry moves an emitter and rebuilds the geodesics it anchors itself. A rebuild that collapses
     // a connected geodesic deletes the geodesic's measurements too (issue 94).
     writesCoreKinds: ["geodesicEmitters/emitter", "geodesicModel/arc", "geodesicModel/vertex", "geodesicModel/segment", "geodesicModel/crossing", "geodesicMeasurements/length", "geodesicMeasurements/angle"],
     create: () => {
