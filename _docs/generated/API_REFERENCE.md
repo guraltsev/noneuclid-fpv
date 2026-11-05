@@ -1777,7 +1777,7 @@ The default experience (design 013 section 12.1): the world modules the app comp
 
 | Kind | Name | Summary |
 | --- | --- | --- |
-| const | `defaultSimulationClockOptions` | The time of the default experience (design 012 P8): ticks of \(1/90\) s, up to \(1/30\) s, taking at most a third of real time before they grow. |
+| const | `defaultSimulationClockOptions` | The time of the default experience (design 012 P8): ticks of \(1/90\) s, up to \(1/30\) s, taking at most a third of the last half second of real time before they grow. |
 | function | `createDefaultWorldModules` | The world modules of the default experience. |
 | function | `createDefaultClientModules` | The client parts of the default experience's modules (only the modules with tools have one). |
 

@@ -1,8 +1,8 @@
 /**
  * The simulation clock (design 012 P8, 013 section 6.5): turns elapsed real time into ticks of length \(h\). Pure: it reads no clock, the shell tells it how much time passed and what the last ticks cost.
  * \(h\) is the longest of three lengths, capped by `maxTickSeconds`: the configured `tickSeconds`, the steady frame period (ticks never run faster than the display), and what the ticks' cost asks for (ticks take at most
- * `tickBudgetShare` of real time). A frame has at most three ticks. When it needs more, \(h\) grows for that frame, up to `maxTickSeconds`; what still does not fit is dropped and reported, never paid back later.
- * The frame period and the tick cost are medians of the last few samples, so one odd frame moves neither. A frame's ticks are rounded to the nearest whole number: at \(h\) equal to the frame period, a frame slightly short
+ * `tickBudgetShare` of the last half second of real time). A frame has at most three ticks. When it needs more, \(h\) grows for that frame, up to `maxTickSeconds`; what still does not fit is dropped and reported, never paid back later.
+ * The frame period is a median of the last few samples and the ticks' share an average over the last half second, so one odd frame moves neither. A frame's ticks are rounded to the nearest whole number: at \(h\) equal to the frame period, a frame slightly short
  * of the period still gets its tick. The world then runs at most half a tick ahead of real time.
  */
 
@@ -12,7 +12,7 @@ export interface SimulationClockOptions {
   readonly tickSeconds: number;
   /** The longest tick, in seconds. */
   readonly maxTickSeconds: number;
-  /** The share of real time the ticks may take before \(h\) grows, between 0 and 1. */
+  /** The share of the last half second of real time the ticks may take before \(h\) grows, between 0 and 1. */
   readonly tickBudgetShare: number;
 }
 
@@ -43,6 +43,15 @@ const medianWindow = 10;
 /** How fast the length the ticks' cost asked for comes back once they fit, as a rate per second: from \(1/30\) to \(1/90\) s in about two seconds. */
 const loadRecoveryPerSecond = 0.5;
 
+/** How much real time the ticks' share of it is measured over, in seconds (maintainer, 2026-11-05). */
+const loadWindowSeconds = 0.5;
+
+/** How many frames the load window can hold: half a second up to 1000 Hz. Past that its oldest frames leave early. */
+const loadWindowFrames = 512;
+
+/** How far under their share the ticks must fall, as a part of it, before the tick length may come back. In between it holds, so a load sitting at the share does not move it up and down. */
+const loadHoldBand = 0.1;
+
 /** Shortest real time between two notices, in seconds. */
 const behindNoticeIntervalSeconds = 1;
 
@@ -68,23 +77,72 @@ function createRecentMedian() {
   };
 }
 
+/**
+ * What the ticks cost over the last {@link loadWindowSeconds} of real time: a ring of frames with running sums, so a frame costs one write and on average one eviction.
+ * A frame longer than the window stays alone in it, with what the ticks before it cost: a hidden tab reads as no load until the next half second has passed. Until half a second has passed the share is still taken of the whole
+ * window, so the first frames do not read as a load they have not sustained.
+ */
+function createRecentLoad() {
+  const elapsed = new Float64Array(loadWindowFrames);
+  const costs = new Float64Array(loadWindowFrames);
+  const ticks = new Float64Array(loadWindowFrames);
+  let oldest = 0;
+  let count = 0;
+  let elapsedSum = 0;
+  let costSum = 0;
+  let tickSum = 0;
+
+  function evictOldest(): void {
+    elapsedSum -= elapsed[oldest]!;
+    costSum -= costs[oldest]!;
+    tickSum -= ticks[oldest]!;
+    oldest = (oldest + 1) % loadWindowFrames;
+    count -= 1;
+  }
+
+  return {
+    push(elapsedSeconds: number, costSeconds: number, tickCount: number): void {
+      if (count === loadWindowFrames) evictOldest();
+      const slot = (oldest + count) % loadWindowFrames;
+      elapsed[slot] = elapsedSeconds;
+      costs[slot] = costSeconds;
+      ticks[slot] = tickCount;
+      count += 1;
+      elapsedSum += elapsedSeconds;
+      costSum += costSeconds;
+      tickSum += tickCount;
+      while (count > 1 && elapsedSum - elapsed[oldest]! >= loadWindowSeconds) evictOldest();
+    },
+    /** The part of the window the ticks took. */
+    share: (): number => costSum / Math.max(elapsedSum, loadWindowSeconds),
+    /** What one tick cost on average; 0 with no tick in the window. */
+    costPerTick: (): number => (tickSum > 0 ? costSum / tickSum : 0),
+  };
+}
+
 /** Creates a clock. */
 export function createSimulationClock(options: SimulationClockOptions): SimulationClock {
   const { tickSeconds, maxTickSeconds, tickBudgetShare } = options;
 
   const framePeriods = createRecentMedian();
-  const tickCosts = createRecentMedian();
+  const load = createRecentLoad();
   let accumulatedSeconds = 0;
   let ticksOfLastFrame = 0;
-  // The tick length the ticks' cost asks for; it jumps up with the cost and comes back slowly.
+  // The tick length the ticks' cost asks for: the one at which they take their share. It jumps up with the cost and comes back slowly.
   let loadTickSeconds = 0;
+  // How long the ticks have fitted under the hold band without a break; the tick length comes back only after a whole window of it.
+  let secondsFitting = 0;
   let unreportedBehindSeconds = 0;
   let secondsSinceNotice = behindNoticeIntervalSeconds;
 
   function steadyTickSeconds(framePeriodSeconds: number): number {
-    const costTickSeconds = tickCosts.median() / tickBudgetShare;
-    const recovered = loadTickSeconds * Math.exp(-loadRecoveryPerSecond * framePeriodSeconds);
-    loadTickSeconds = Math.min(maxTickSeconds, Math.max(costTickSeconds, recovered));
+    const share = load.share();
+    const costTickSeconds = load.costPerTick() / tickBudgetShare;
+    if (share > tickBudgetShare) loadTickSeconds = Math.min(maxTickSeconds, Math.max(costTickSeconds, loadTickSeconds));
+    secondsFitting = share < tickBudgetShare * (1 - loadHoldBand) ? secondsFitting + framePeriodSeconds : 0;
+    if (secondsFitting >= loadWindowSeconds) {
+      loadTickSeconds = Math.max(Math.min(costTickSeconds, loadTickSeconds), loadTickSeconds * Math.exp(-loadRecoveryPerSecond * framePeriodSeconds));
+    }
     return Math.min(maxTickSeconds, Math.max(tickSeconds, framePeriodSeconds, loadTickSeconds));
   }
 
@@ -97,7 +155,7 @@ export function createSimulationClock(options: SimulationClockOptions): Simulati
   return {
     advance(elapsedSeconds, lastTicksCostSeconds) {
       if (elapsedSeconds > 0) framePeriods.push(elapsedSeconds);
-      if (ticksOfLastFrame > 0) tickCosts.push(lastTicksCostSeconds / ticksOfLastFrame);
+      load.push(elapsedSeconds, lastTicksCostSeconds, ticksOfLastFrame);
       secondsSinceNotice += elapsedSeconds;
       accumulatedSeconds += elapsedSeconds;
 

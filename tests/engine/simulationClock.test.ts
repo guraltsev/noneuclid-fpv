@@ -1,7 +1,7 @@
 /**
  * `tests/engine/simulationClock.test.ts` - unit tier.
  *
- * The simulation clock of design 012 P8, on its own: how a steady display sets the tick length and the ticks per frame, that one odd frame moves nothing, how the cost of the ticks lengthens them and how they come back, the limit of
+ * The simulation clock of design 012 P8, on its own: how a steady display sets the tick length and the ticks per frame, that one odd frame moves nothing, how the ticks' share of the last half second lengthens them and how they come back, the limit of
  * three ticks per frame, what a hitch drops, and how often the notice of dropped time is due.
  */
 import { describe, expect, it } from "vitest";
@@ -26,6 +26,20 @@ function runFrames(clock: SimulationClock, period: number, frames: number, tickC
 }
 
 const lastOf = (advances: readonly ClockAdvance[]): ClockAdvance => advances[advances.length - 1]!;
+
+/** Runs `frames` frames of `period` seconds; `tickCost` gives the cost of each frame's ticks, one tick at most here, and `afterFrame` runs after every frame. Returns the tick lengths seen from frame `from` on. */
+function settledTickLengths(period: number, frames: number, from: number, tickCost: () => number, afterFrame: () => void = () => undefined): Set<number> {
+  const clock = newClock();
+  const lengths = new Set<number>();
+  let lastCost = 0;
+  for (let frame = 0; frame < frames; frame += 1) {
+    const advance = clock.advance(period, lastCost);
+    lastCost = advance.ticks > 0 ? advance.ticks * tickCost() : 0;
+    if (frame >= from) lengths.add(advance.tickSeconds);
+    afterFrame();
+  }
+  return lengths;
+}
 
 describe("a steady display", () => {
   it.each([60, 72, 90])("runs one tick in every frame at %i Hz, with the frame period as its length", (hertz) => {
@@ -111,7 +125,7 @@ describe("a steady display", () => {
 });
 
 describe("the cost of the ticks", () => {
-  it("leaves the tick alone while the ticks fit their share of the frame", () => {
+  it("leaves the tick alone while the ticks fit their share of real time", () => {
     const advances = runFrames(newClock(), 1 / 72, 100, 0.3 / 72);
 
     expect(lastOf(advances).tickSeconds).toBeCloseTo(1 / 72, 12);
@@ -124,6 +138,35 @@ describe("the cost of the ticks", () => {
     expect(lastOf(advances).tickSeconds).toBeCloseTo(tickCost * 3, 12);
     const ticks = advances.slice(-54).reduce((sum, advance) => sum + advance.ticks, 0);
     expect((ticks * tickCost) / (54 / 90)).toBeLessThanOrEqual(1 / 3 + 0.02);
+  });
+
+  it("raises the tick within half a second of a load going over the share", () => {
+    const clock = newClock();
+    runFrames(clock, 1 / 90, 90, 0.002);
+    expect(clock.advance(1 / 90, 0.002).tickSeconds).toBe(tick90);
+
+    const advances = runFrames(clock, 1 / 90, 45, 0.006);
+
+    expect(lastOf(advances).tickSeconds).toBeCloseTo(0.018, 2);
+    expect(lastOf(advances).tickSeconds).toBeGreaterThan(tick90);
+  });
+
+  it("does not read the first frames as a load they have not sustained", () => {
+    const advances = runFrames(newClock(), 1 / 90, 20, 0.006);
+
+    expect(lastOf(advances).tickSeconds).toBe(tick90);
+  });
+
+  it("measures the load again after a frame longer than the window", () => {
+    const clock = newClock();
+    const before = lastOf(runFrames(clock, 1 / 90, 200, 0.006)).tickSeconds;
+
+    clock.advance(100, 0.006);
+    const next = clock.advance(1 / 90, 0.006);
+    const after = lastOf(runFrames(clock, 1 / 90, 180, 0.006));
+
+    expect(next.tickSeconds).toBeCloseTo(before, 9);
+    expect(after.tickSeconds).toBeCloseTo(before, 3);
   });
 
   it("stops at the maximum tick and drops nothing while the frames keep up", () => {
@@ -143,21 +186,40 @@ describe("the cost of the ticks", () => {
   });
 
   it("keeps one tick length when the ticks alternate between two costs", () => {
-    const clock = newClock();
-    const lengths = new Set<number>();
-    let lastCost = 0;
     let ticksRun = 0;
-    for (let frame = 0; frame < 400; frame += 1) {
-      const advance = clock.advance(1 / 90, lastCost);
-      if (advance.ticks > 0) {
-        lastCost = ticksRun % 2 === 0 ? 0.006 : 0.008;
-        ticksRun += 1;
-      }
-      if (frame >= 200) lengths.add(advance.tickSeconds);
-    }
+    const lengths = settledTickLengths(1 / 90, 400, 200, () => {
+      ticksRun += 1;
+      return ticksRun % 2 === 0 ? 0.006 : 0.008;
+    });
 
     expect(lengths.size).toBe(1);
-    expect([...lengths][0]).toBeCloseTo(0.007 * 3, 9);
+    expect([...lengths][0]).toBeCloseTo(0.007 * 3, 3);
+  });
+
+  it.each([
+    ["below the share", 0.002, 0.003],
+    ["above the share", 0.006, 0.008],
+  ])("keeps one tick length when the cost follows the frame's parity, %s", (_name, even, odd) => {
+    for (const hertz of [90, 72, 60]) {
+      let frame = 0;
+      const lengths = settledTickLengths(1 / hertz, hertz * 60, hertz * 6, () => (frame % 2 === 0 ? even : odd), () => (frame += 1));
+
+      expect(lengths.size).toBe(1);
+    }
+  });
+
+  it.each([90, 72, 60])("does not chatter with a load sitting at the share at %i Hz", (hertz) => {
+    const atShare = 1 / (3 * hertz);
+    let frame = 0;
+    const parity = settledTickLengths(1 / hertz, 6000, 3000, () => (frame % 2 === 0 ? 0.86 : 1.14) * atShare, () => (frame += 1));
+    let seed = 777;
+    const noise = settledTickLengths(1 / hertz, 6000, 3000, () => {
+      seed = (seed * 1664525 + 1013904223) % 4294967296;
+      return (0.95 + (0.2 * seed) / 4294967296) * atShare;
+    });
+
+    expect(parity.size).toBe(1);
+    expect(noise.size).toBe(1);
   });
 
   it("does not count a frame with no tick as a cheap one", () => {

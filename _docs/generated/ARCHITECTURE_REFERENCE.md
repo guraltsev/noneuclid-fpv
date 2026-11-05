@@ -5,7 +5,7 @@
 
 This reference is produced from the source code. For the *meaning* of the modules — the mathematical model they implement — read [../MATHEMATICAL_MODEL.md](../MATHEMATICAL_MODEL.md) and [../ARCHITECTURE.md](../ARCHITECTURE.md). For every exported symbol see [API_REFERENCE.md](API_REFERENCE.md).
 
-**263 modules, 52,678 lines** under `src/`.
+**263 modules, 52,736 lines** under `src/`.
 
 ## Layers
 
@@ -23,7 +23,7 @@ A module belongs to the layer named by its first path segment under `src/`. "May
 | `authoring` | 5 | 671 | `math`, `cell-complex`, `examples`, `world-assets`, `world-objects` | World builder DSL, world-script compiler, validation and world catalog. |
 | `glue` | 11 | 1,025 | `math`, `cell-complex`, `diagnostics`, `authoring` | Launch options, debug settings, tool ids, asset URLs, app configuration. |
 | `interaction` | 5 | 1,564 | `math`, `cell-complex`, `movement`, `world-objects`, `glue` | Renderer-free interaction logic: input frames, aim picking, VR locomotion, XR session state, carried-object portal transitions. |
-| `engine` | 10 | 1,560 | `math`, `cell-complex`, `diagnostics`, `movement`, `world-objects`, `glue`, `interaction` | The world engine core (design 013): step order, command queue, participants, module composition and ticks. Imports no module. |
+| `engine` | 10 | 1,618 | `math`, `cell-complex`, `diagnostics`, `movement`, `world-objects`, `glue`, `interaction` | The world engine core (design 013): step order, command queue, participants, module composition and ticks. Imports no module. |
 | `modules` | 15 | 1,345 | `math`, `cell-complex`, `diagnostics`, `movement`, `world-objects`, `glue`, `interaction`, `engine` | World modules (design 013): each owns a slice of world behaviour and exposes a typed api.ts to the others. |
 | `runtime` | 16 | 2,709 | `math`, `cell-complex`, `diagnostics`, `movement`, `world-objects`, `authoring`, `glue`, `engine`, `modules` | Application state, runtime menu state, command dispatch, geometry session/worker, server channel and public API. |
 | `ui` | 6 | 1,274 | `math`, `cell-complex`, `world-objects`, `authoring`, `glue`, `engine`, `modules`, `runtime` | Renderer-neutral palette, help, tooltip and input-intent definitions. |
@@ -279,7 +279,7 @@ None: every import respects the intended layering.
 | `engine/moduleTicks.ts` | 128 | The bodies, simulate and derive passes over the composed modules (design 013 sections 5.2 and 6.4). | `engine/composeModules`, `engine/moduleTypes`, `engine/writeGuard`, `world-objects/runtimeObjectChangeJournal` |
 | `engine/moduleTypes.ts` | 374 | The types of the world engine and of its modules (design 013 sections 5 and 9): commands and their results, participants, the read view, tokens, module definitions and the contexts the engine hands to handlers and ticks. | `cell-complex/compileCellComplex`, `glue/toolIds`, `movement/playerPose`, `world-objects/runtimeObjectRegistry` |
 | `engine/participants.ts` | 88 | Participants and control slots of the world engine (design 013 sections 5.1 and 5.4). | `engine/moduleTypes` |
-| `engine/simulationClock.ts` | 124 | The simulation clock (design 012 P8, 013 section 6.5): turns elapsed real time into ticks of length \(h\). | — |
+| `engine/simulationClock.ts` | 182 | The simulation clock (design 012 P8, 013 section 6.5): turns elapsed real time into ticks of length \(h\). | — |
 | `engine/toolGates.ts` | 40 | Tool gates and the confirmation protocol's world side (design 013 section 8). | `glue/toolIds` |
 | `engine/worldEngine.ts` | 321 | The world engine (design 013 section 5): the owner of world state, which changes only inside `step`, from queued commands, and inside `applyControls`, from control slots. | `cell-complex/compileCellComplex`, `engine/composeModules`, `engine/coreIds`, `engine/ids`, `engine/moduleTicks`, `engine/moduleTypes`, `engine/participants`, `engine/simulationClock`, `engine/toolGates`, `engine/writeGuard`, `glue/toolIds`, `movement/playerPose`, `world-objects/runtimeObjectRegistry` |
 | `engine/writeGuard.ts` | 94 | Who is acting: a stack of module frames, and the write guard built on it (design 013 section 9.6). | `world-objects/runtimeObjectRegistry` |

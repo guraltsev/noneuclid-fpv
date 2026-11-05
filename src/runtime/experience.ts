@@ -9,7 +9,7 @@ import { geodesicMeasurementsModule } from "../modules/geodesicMeasurements";
 import { curveShorteningModule } from "../modules/curveShortening";
 import { geodesicModelClient, geodesicModelModule } from "../modules/geodesicModel";
 
-/** The time of the default experience (design 012 P8): ticks of \(1/90\) s, up to \(1/30\) s, taking at most a third of real time before they grow. The share is a starting value. */
+/** The time of the default experience (design 012 P8): ticks of \(1/90\) s, up to \(1/30\) s, taking at most a third of the last half second of real time before they grow. The share is a starting value. */
 export const defaultSimulationClockOptions: SimulationClockOptions = { tickSeconds: 1 / 90, maxTickSeconds: 1 / 30, tickBudgetShare: 1 / 3 };
 
 /** The world modules of the default experience. */
