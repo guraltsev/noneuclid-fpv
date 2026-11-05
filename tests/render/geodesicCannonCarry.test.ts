@@ -76,7 +76,6 @@ function createHarness(
     getGeodesicLabelsById: () => ({}),
     objectActionsFor: () => [],
     syncDesktopPalette: nothing,
-    syncRuntimeObjectPortalInstances: nothing,
     syncSelectableHitboxDebug: nothing,
     removeMeasuredGeodesicLengthsForGeodesic: nothing,
     removeProtractorAnglesForGeodesic: nothing,

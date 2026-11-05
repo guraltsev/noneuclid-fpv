@@ -135,7 +135,6 @@ export type RuntimeEffect =
   /** A tool was picked in the menu: drop the pending selections of the tools it does not use. */
   | { readonly kind: "switch-tool-session"; readonly toolId: RuntimeToolId }
   /** Re-sync runtime object instances. */
-  | { readonly kind: "sync-object-instances" }
   /** The menu's debug fields changed: re-apply the debug settings and report the launch options. */
   | { readonly kind: "apply-debug-state" }
   /** The comfort fields changed: update the comfort vignette and report the launch options. */

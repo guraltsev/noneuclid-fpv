@@ -11,8 +11,13 @@ export const unlimitedStepSeconds = 1000;
 
 type Tools = ReturnType<typeof createGeodesicCannonTools>;
 
+/** `Tools`, whose carry update also says how long the step behind it lasts. */
+type DrivenTools = Omit<Tools, "updateCarriedGeodesicCannonPose"> & {
+  updateCarriedGeodesicCannonPose(...args: [...Parameters<Tools["updateCarriedGeodesicCannonPose"]>, deltaSeconds?: number]): void;
+};
+
 /** `tools` with the carry operations followed by a world step; `engine` is the one the tools were built with. */
-export function driveCarryTools(tools: Tools, engine: WorldEngine): Tools {
+export function driveCarryTools(tools: Tools, engine: WorldEngine): DrivenTools {
   const settle = (seconds: number): void => {
     engine.step(seconds);
     tools.afterWorldStep();
@@ -25,7 +30,7 @@ export function driveCarryTools(tools: Tools, engine: WorldEngine): Tools {
       settle(0);
     },
     updateCarriedGeodesicCannonPose(xrActive, ray, deltaSeconds) {
-      tools.updateCarriedGeodesicCannonPose(xrActive, ray, deltaSeconds);
+      tools.updateCarriedGeodesicCannonPose(xrActive, ray);
       settle(deltaSeconds ?? unlimitedStepSeconds);
     },
     finishGeodesicCannonCarry() {

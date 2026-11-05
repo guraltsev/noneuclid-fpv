@@ -101,7 +101,6 @@ function createHarness(target: AimTarget | undefined, sessionOverrides: Partial<
     removeMeasuredGeodesicLengths: none,
     removeProtractorAngles: none,
     removeGeodesicRuntimeObjects: none,
-    syncRuntimeObjectPortalInstances: none,
     syncSelectableHitboxDebug: none,
     syncDesktopPalette: none,
     clearProtractorToolFeedback: none,

@@ -199,7 +199,7 @@ export interface ModuleDefinition<
   readonly requires: readonly ModuleToken<unknown, unknown>[];
   readonly objectKinds: readonly ObjectKindDeclaration[];
   /**
-   * Kinds of the core union that this module also writes, because the module that will own them does not exist yet (the geodesic kinds until `geodesicModel`, design 013 job 51). Only the write guard reads it; it empties as the owners arrive.
+   * Kinds of the core union that this module also writes, because the module that will own them does not exist yet (the emitter and geodesic kinds, until `geodesicEmitters`, design 013 job 51). Only the write guard reads it; it empties as the owners arrive.
    */
   readonly writesCoreKinds?: readonly string[];
   /** Tool ids this module defines; the engine knows them for gating. */

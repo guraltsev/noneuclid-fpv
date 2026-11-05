@@ -307,7 +307,6 @@ function cancelMenuAndTool(
   return withMenu(
     closeRuntimeMenu(setRuntimeMenuSelectedTool(menu, "none")),
     { kind: "end-tool-session" },
-    { kind: "sync-object-instances" },
     syncPalette,
   );
 }

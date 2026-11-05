@@ -14,7 +14,6 @@ function createHarness() {
   const calls = {
     syncDesktopPalette: vi.fn(),
     clearProtractorToolFeedback: vi.fn(),
-    requestRuntimeObjectInstanceSync: vi.fn(),
     requestAppRestart: vi.fn((restart: () => void) => restart()),
     addGeodesicToCannon: vi.fn(),
     startObjectAction: vi.fn(),
@@ -26,7 +25,6 @@ function createHarness() {
     host: { onWorldChangeRequested: calls.onWorldChangeRequested },
     syncDesktopPalette: calls.syncDesktopPalette,
     clearProtractorToolFeedback: calls.clearProtractorToolFeedback,
-    requestRuntimeObjectInstanceSync: calls.requestRuntimeObjectInstanceSync,
     applyMenuDebugState: noop,
     applyMenuComfortState: noop,
     requestAppRestart: calls.requestAppRestart,
@@ -51,14 +49,12 @@ afterEach(() => {
 });
 
 describe("createRuntimeEffects", () => {
-  it("syncs the palette and the object instances", () => {
+  it("syncs the palette", () => {
     const { effects, calls } = createHarness();
 
     effects.run({ kind: "sync-palette" });
-    effects.run({ kind: "sync-object-instances" });
 
     expect(calls.syncDesktopPalette).toHaveBeenCalledTimes(1);
-    expect(calls.requestRuntimeObjectInstanceSync).toHaveBeenCalledTimes(1);
   });
 
   it("clears both tool states and the feedback when a tool session ends", () => {

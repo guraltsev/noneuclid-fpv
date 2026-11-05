@@ -116,7 +116,6 @@ export interface GeodesicCannonToolsDeps {
   /** Re-syncs the desktop tool palette after tool or menu changes. */
   syncDesktopPalette(): void;
   /** Requests a sync of the instanced copies of runtime objects seen through portals after registry changes; the frame performs it. */
-  syncRuntimeObjectPortalInstances(): void;
   /** Requests a refresh of the selectable-hitbox debug wireframes after registry changes; the frame performs it. */
   syncSelectableHitboxDebug(): void;
   /** Deletes measured lengths attached to a geodesic. */
@@ -151,7 +150,6 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
     findFocusedRuntimeObject,
     getGeodesicLabelsById,
     syncDesktopPalette,
-    syncRuntimeObjectPortalInstances,
     syncSelectableHitboxDebug,
     removeMeasuredGeodesicLengthsForGeodesic,
     removeProtractorAnglesForGeodesic,
@@ -215,7 +213,6 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
       } });
       deps.dispatch({ kind: "clear-selected-tool" });
       syncDesktopPalette();
-      syncRuntimeObjectPortalInstances();
       syncSelectableHitboxDebug();
       return;
     }
@@ -255,7 +252,6 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
       } });
       deps.dispatch({ kind: "clear-selected-tool" });
       syncDesktopPalette();
-      syncRuntimeObjectPortalInstances();
       syncSelectableHitboxDebug();
       return;
     }
@@ -301,7 +297,6 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
     } });
     deps.dispatch({ kind: "clear-selected-tool" });
     syncDesktopPalette();
-    syncRuntimeObjectPortalInstances();
     syncSelectableHitboxDebug();
   }
 
@@ -334,7 +329,6 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
       selectedCannonId: deps.session.get().cannonToolState.selectedCannonId,
       activeGeodesicId: geodesicId,
     } });
-    syncRuntimeObjectPortalInstances();
     syncSelectableHitboxDebug();
     return true;
   }
@@ -391,7 +385,6 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
     }
 
     if (segment) {
-      syncRuntimeObjectPortalInstances();
       syncSelectableHitboxDebug();
     }
     syncDesktopPalette();
@@ -557,7 +550,6 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
       objectActions: deps.objectActionsFor("geodesic-cannon", updatedCannon.id),
     });
     syncDesktopPalette();
-    syncRuntimeObjectPortalInstances();
     syncSelectableHitboxDebug();
   }
 
@@ -571,7 +563,6 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
         removeMeasuredGeodesicLengthsForGeodesic(geodesicId);
       }
       removeProtractorAnglesForMissingVertices(pruneMissingGeodesicIntersectionObjects(runtimeObjectRegistry));
-      syncRuntimeObjectPortalInstances();
       syncSelectableHitboxDebug();
     }
 
@@ -579,9 +570,7 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
     return cannon?.kind === "geodesic-cannon" ? cannon : undefined;
   }
 
-  // _deltaSeconds is the frame time the shell also passes to the world step, which is what limits the glide; it is accepted so callers
-  // keep one signature for all per-frame updaters.
-  function updateCarriedGeodesicCannonPose(xrActive: boolean, activeAimRay: RootAimRay | undefined, _deltaSeconds?: number): void {
+  function updateCarriedGeodesicCannonPose(xrActive: boolean, activeAimRay: RootAimRay | undefined): void {
     const carry = localCarry();
     if (deps.session.get().menuState.selectedTool !== "geodesic-cannon-carry") {
       // The carry tool was left some other way (another tool, the menu): the world is told the object is put down.
@@ -644,7 +633,6 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
         const moved = event as CarryMovedEvent;
         if (moved.participantId !== localParticipantId) return;
         refreshAfterEmitterRebuild(moved.objectId, moved);
-        syncRuntimeObjectPortalInstances();
         syncSelectableHitboxDebug();
         return;
       }
@@ -653,7 +641,6 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
         if (released.participantId !== localParticipantId) return;
         // The tool has left (or is leaving) the carry tool, so the regrown active geodesic is not selected again.
         removeProtractorAnglesForMissingVertices(released.prunedIntersectionIds);
-        syncRuntimeObjectPortalInstances();
         syncSelectableHitboxDebug();
         return;
       }
@@ -707,7 +694,6 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
       };
       runtimeObjectRegistry.update(nextCannon);
       rebuildActiveGeodesicFromCannon(nextCannon, { connectEmitters: false });
-      syncRuntimeObjectPortalInstances();
       syncSelectableHitboxDebug();
     }
 
@@ -765,7 +751,6 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
         };
         runtimeObjectRegistry.update(nextCannon);
         rebuildActiveGeodesicFromCannon(nextCannon, { connectEmitters: false });
-        syncRuntimeObjectPortalInstances();
         syncSelectableHitboxDebug();
       }
     }
@@ -813,7 +798,6 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
   function finishActiveGeodesicCannonEdit(cannon: Extract<RuntimeWorldObject, { readonly kind: "geodesic-cannon" }>): void {
     rebuildActiveGeodesicFromCannon(cannon, { connectEmitters: true, snapToEmitter: true });
     removeProtractorAnglesForMissingVertices(pruneMissingGeodesicIntersectionObjects(runtimeObjectRegistry));
-    syncRuntimeObjectPortalInstances();
     syncSelectableHitboxDebug();
   }
 

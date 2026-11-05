@@ -3,7 +3,7 @@
  * With `u1`, `u2` the unit tangents of the vertex's two arc ends, pointing away from it: a vertex with a stale arc is skipped for this step; a vertex at rest (`|u1 + u2|` below the taut tolerance) always merges
  * away; any other vertex moves along `u1 + u2` by the step the speed law allows, capped by an exact line search, and a rejected step is halved up to eight times; a vertex that cannot move tries the merge, and if that is
  * refused the blocked policy applies. A taut closed loop keeps its vertex, as a base point, and goes quiet. The vertex count never grows: this algorithm inserts no vertex, so a curve that would need a wrap at a
- * forbidden-zone disk goes quiet as unresolved. The flow reads the geodesic model through `GeodesicModelApi` and changes the world only through its operations and the dispatched `geodesicModel/removeVertex`;
+ * forbidden-zone disk is blocked, and the default experience's policy destroys it. The flow reads the geodesic model through `GeodesicModelApi` and changes the world only through its operations and the dispatched `geodesicModel/removeVertex`;
  * it holds no world state, only the `quiet` memo it is given: the vertices with nothing to do, each with the reason.
  */
 import type { CommandResult, EngineCommandBase } from "../../engine/moduleTypes";
@@ -174,7 +174,7 @@ function blockVertex(deps: FlowDeps, vertexId: string, reason: string): void {
       const arcIds = deps.model.arcsOfCurve(vertexId);
       const removal: GeodesicRemoveCurveCommand = { kind: "geodesicModel/removeCurve", arcIds };
       if (!deps.dispatch(removal).ok) return;
-      deps.emit({ kind: "curveShortening/destroyed", arcIds, message: `The tied geodesic touched a forbidden-zone singularity and was removed (${reason}).` });
+      deps.emit({ kind: "curveShortening/destroyed", arcIds, message: `The tied geodesic could not shorten any further and was removed (${reason}).` });
       return;
     }
   }

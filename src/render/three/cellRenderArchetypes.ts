@@ -16,10 +16,7 @@ import type { FloorLatticeUvFrame } from "../../cell-complex/floorUv";
 import * as THREE from "three";
 import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex";
 import type { CompiledPrismCell } from "../../cell-complex/prismCells";
-import {
-  buildStaticallyCulledPortalPathTables,
-  type StaticPortalPathCullResult,
-} from "../../cell-complex/staticPortalPathCull";
+import type { StaticPortalPathCullResult } from "../../cell-complex/staticPortalPathCull";
 import type { DebugLevelId } from "../../diagnostics/debugLevels";
 import type { PortalPanelModeId } from "../../glue/portalPanelMode";
 import { buildCellMesh } from "./buildCellMesh";
@@ -192,22 +189,6 @@ export function deriveCellRenderArchetypeCapacities(
   }
 
   return capacities;
-}
-
-/** Builds the static path tables (depth `maxDepth`, immediate reversals skipped, 1e-6 m tolerance, 50 000 path cap per root) and derives per-cell capacities. This can be expensive for large worlds. */
-export function buildDefaultCellRenderArchetypeCapacities(
-  world: CompiledCellComplex,
-  maxDepth: number,
-  maxVisiblePaths?: number,
-): ReadonlyMap<string, number> {
-  const staticCull = buildStaticallyCulledPortalPathTables(world, {
-    maxDepth,
-    skipImmediateReverse: true,
-    toleranceMeters: 1e-6,
-    maxKeptPathsPerRoot: 50_000,
-  });
-
-  return deriveCellRenderArchetypeCapacities(world, staticCull, maxVisiblePaths);
 }
 
 /** Disposes the geometry and materials of the given archetypes. */

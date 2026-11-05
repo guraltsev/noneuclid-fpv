@@ -576,15 +576,10 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     },
   });
   // Portal-render values of the current frame, built once by the portal pass (see frameRenderSnapshot.ts).
-  // Event-driven requests; the frame performs the sync and clears the flags. Tools call these through their
-  // `syncRuntimeObjectPortalInstances` / `syncSelectableHitboxDebug` deps.
-  let runtimeObjectInstanceSyncRequested = false;
+  // An event-driven request; the frame performs the sync and clears the flag. Tools call it through their `syncSelectableHitboxDebug` dep.
   let selectableHitboxDebugSyncRequested = false;
   // Incremented whenever the cell root groups are rebuilt (the hitbox debug groups hang under them).
   let cellRootsGeneration = 0;
-  function requestRuntimeObjectInstanceSync(): void {
-    runtimeObjectInstanceSyncRequested = true;
-  }
   function requestSelectableHitboxDebugSync(): void {
     selectableHitboxDebugSyncRequested = true;
   }
@@ -745,7 +740,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     session,
     dispatch: dispatchRuntimeCommand,
     clearProtractorToolFeedback,
-    syncRuntimeObjectPortalInstances: requestRuntimeObjectInstanceSync,
     syncSelectableHitboxDebug: requestSelectableHitboxDebugSync,
   });
 
@@ -781,7 +775,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     getGeodesicLabelsById,
     objectActionsFor: (objectKind, objectId) => toolHost.objectActionsFor(objectKind, objectId),
     syncDesktopPalette,
-    syncRuntimeObjectPortalInstances: requestRuntimeObjectInstanceSync,
     syncSelectableHitboxDebug: requestSelectableHitboxDebugSync,
     removeMeasuredGeodesicLengthsForGeodesic,
     removeProtractorAnglesForGeodesic,
@@ -837,7 +830,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     removeMeasuredGeodesicLengths,
     removeProtractorAngles,
     removeGeodesicRuntimeObjects,
-    syncRuntimeObjectPortalInstances: requestRuntimeObjectInstanceSync,
     syncSelectableHitboxDebug: requestSelectableHitboxDebugSync,
     syncDesktopPalette,
     clearProtractorToolFeedback,
@@ -882,7 +874,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     showMessage: (message) => showWorldMessage(message, { code: "tool/message" }),
     syncDesktopPalette,
     syncWorldObjects() {
-      requestRuntimeObjectInstanceSync();
       requestSelectableHitboxDebugSync();
     },
   });
@@ -922,7 +913,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     host: options,
     syncDesktopPalette,
     clearProtractorToolFeedback,
-    requestRuntimeObjectInstanceSync,
     applyMenuDebugState,
     applyMenuComfortState,
     requestAppRestart: xrSession.requestAppRestart,
@@ -1050,7 +1040,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     cellRootsGeneration,
     forced: true,
   });
-  runtimeObjectInstanceSyncRequested = false;
   selectableHitboxDebugSyncRequested = false;
   disableFrustumCulling(scene);
   disableShadows(scene);
@@ -1250,7 +1239,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     }
     const xrHeadWorldPose = xrActive ? xrSession.resolveXrHeadWorldPose(xrViewerPose) : undefined;
     const activeAimRay = resolveActiveRootAimRay(xrActive, xrFrame, xrReferenceSpace);
-    updateCarriedGeodesicCannonPose(xrActive, activeAimRay, deltaSeconds);
+    updateCarriedGeodesicCannonPose(xrActive, activeAimRay);
     if (frame.helpRequested) {
       aimFeedback.requestHelpLensForFocusedObject(activeAimRay);
     }
@@ -1296,8 +1285,9 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       runtime.syncParent(cellMeshes);
     }
     // The world engine's step: queued commands, then (as modules arrive) their ticks. Contained like any phase.
-    frameErrorGuard.runPhase("world engine", () => {
-      engine.step(frame.resetRequested ? 0 : deltaSeconds);
+    frameErrorGuard.runPhase("world engine", () => engine.step(frame.resetRequested ? 0 : deltaSeconds));
+    // A separate phase: a step that rethrows a handler's error has still stored its results, which the client must read before `endFrame` clears them.
+    frameErrorGuard.runPhase("world client", () => {
       worldClient.afterStep();
       toolHost.afterStep();
       afterCarryWorldStep();
@@ -1342,10 +1332,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       cellRootsGeneration,
       forced: selectableHitboxDebugSyncRequested,
     });
-    // The instance sync runs every frame; the request flag is kept (and only cleared) so a later job can skip
-    // frames in which nothing asked for a sync.
-    void runtimeObjectInstanceSyncRequested;
-    runtimeObjectInstanceSyncRequested = false;
     selectableHitboxDebugSyncRequested = false;
     const frameAfterPortalMs = performance.now();
     const frameBeforeUiMs = frameAfterPortalMs;
@@ -1483,8 +1469,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     syncStaticObjectCollisionWireframes();
     runtimeObjectInstanceSync.sync(currentFrameSnapshot());
     syncSelectableHitboxDebug();
-    runtimeObjectInstanceSyncRequested = false;
-    selectableHitboxDebugSyncRequested = false;
+      selectableHitboxDebugSyncRequested = false;
     applyDesktopCameraPose();
     renderer.render(scene, camera);
   }
@@ -1741,7 +1726,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       }
     }
     dispatchRuntimeCommand({ kind: "set-cannon-tool-state", state: {} });
-    requestRuntimeObjectInstanceSync();
     requestSelectableHitboxDebugSync();
   }
 

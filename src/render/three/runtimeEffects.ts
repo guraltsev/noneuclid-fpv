@@ -22,7 +22,6 @@ export interface RuntimeEffectsDeps {
   readonly host: RuntimeEffectHostCallbacks;
   syncDesktopPalette(): void;
   clearProtractorToolFeedback(): void;
-  requestRuntimeObjectInstanceSync(): void;
   applyMenuDebugState(): void;
   applyMenuComfortState(): void;
   /** Ends an XR session if one is presenting, then runs the restart. */
@@ -70,9 +69,6 @@ export function createRuntimeEffects(deps: RuntimeEffectsDeps): RuntimeEffects {
           dispatch({ kind: "set-protractor-tool-state", state: {} });
           deps.clearProtractorToolFeedback();
         }
-        return;
-      case "sync-object-instances":
-        deps.requestRuntimeObjectInstanceSync();
         return;
       case "apply-debug-state":
         deps.applyMenuDebugState();

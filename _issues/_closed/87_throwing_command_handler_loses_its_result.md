@@ -1,10 +1,20 @@
 # 87 - A throwing command handler loses its result, and the client waits for ever
 
-Status: open.
+Status: closed on 2026-11-05.
 
 Priority: P2 (correctness; only reached through a bug in a handler, but then a tool request or an API promise never settles).
 
 Jobs: none; a small fix in the shell's frame.
+
+## Outcome
+
+The shell runs the step and the client's read as separate guarded phases, so a step that rethrows still has its results read before
+`endFrame`.
+
+## Closing evidence
+
+- `tests/render/worldClient.test.ts`: "answers a caller and a pending tool request when a handler throws". The test mirrors
+  the shell's two phases; the split itself is in `createThreeApp.ts`, which no unit test drives.
 
 ## Problem
 

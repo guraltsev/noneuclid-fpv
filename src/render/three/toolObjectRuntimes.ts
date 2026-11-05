@@ -55,7 +55,6 @@ export interface ToolObjectRuntimesDeps {
   /** Removes the in-scene protractor preview feedback. */
   clearProtractorToolFeedback(): void;
   /** Requests a sync of the instanced copies of runtime objects seen through portals; the frame performs it. */
-  syncRuntimeObjectPortalInstances(): void;
   /** Requests a refresh of the selectable-hitbox debug wireframes; the frame performs it. */
   syncSelectableHitboxDebug(): void;
 }
@@ -80,7 +79,6 @@ export function createToolObjectRuntimes(deps: ToolObjectRuntimesDeps) {
     runtimeObjectRenderArchetypesByKey,
     runtimeObjectRenderRoot,
     clearProtractorToolFeedback,
-    syncRuntimeObjectPortalInstances,
     syncSelectableHitboxDebug,
   } = deps;
 
@@ -98,7 +96,6 @@ export function createToolObjectRuntimes(deps: ToolObjectRuntimesDeps) {
 
     runtime.syncFromObject(flag);
     runtime.syncParent(cellMeshes);
-    syncRuntimeObjectPortalInstances();
   }
 
   function removePlacedFlagRuntime(flagId: string): void {
@@ -129,7 +126,6 @@ export function createToolObjectRuntimes(deps: ToolObjectRuntimesDeps) {
 
     runtime.syncFromObject(object);
     runtimeObjectRootsById.set(object.id, runtime.root);
-    syncRuntimeObjectPortalInstances();
   }
 
   function removeMeasuredGeodesicLengthRuntime(objectId: string): void {
@@ -158,7 +154,6 @@ export function createToolObjectRuntimes(deps: ToolObjectRuntimesDeps) {
 
     runtime.syncFromObject(object);
     runtimeObjectRootsById.set(object.id, runtime.root);
-    syncRuntimeObjectPortalInstances();
   }
 
   function removeProtractorAngleRuntime(objectId: string): void {
@@ -194,7 +189,6 @@ export function createToolObjectRuntimes(deps: ToolObjectRuntimesDeps) {
         removePlacedFlagRuntime(object.id);
       }
     }
-    syncRuntimeObjectPortalInstances();
   }
 
   function removeMeasuredGeodesicLengths(): void {
@@ -204,7 +198,6 @@ export function createToolObjectRuntimes(deps: ToolObjectRuntimesDeps) {
         removeMeasuredGeodesicLengthRuntime(object.id);
       }
     }
-    syncRuntimeObjectPortalInstances();
     syncSelectableHitboxDebug();
   }
 
@@ -226,7 +219,6 @@ export function createToolObjectRuntimes(deps: ToolObjectRuntimesDeps) {
     }
     deps.dispatch({ kind: "set-protractor-tool-state", state: {} });
     clearProtractorToolFeedback();
-    syncRuntimeObjectPortalInstances();
     syncSelectableHitboxDebug();
   }
 

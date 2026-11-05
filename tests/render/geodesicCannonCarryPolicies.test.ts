@@ -51,7 +51,6 @@ function createHarness(world: CompiledCellComplex, registry: RuntimeObjectRegist
     getGeodesicLabelsById: () => ({}),
     objectActionsFor: () => [],
     syncDesktopPalette: nothing,
-    syncRuntimeObjectPortalInstances: nothing,
     syncSelectableHitboxDebug: nothing,
     removeMeasuredGeodesicLengthsForGeodesic: nothing,
     removeProtractorAnglesForGeodesic: nothing,

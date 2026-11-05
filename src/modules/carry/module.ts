@@ -218,7 +218,7 @@ export function carryModule(): CarryModuleDefinition {
     id: "carry",
     requires: [],
     objectKinds: [],
-    // Until `geodesicModel` (job 51) owns the geodesic kinds, the carry moves an emitter and rebuilds the geodesics it anchors itself.
+    // Until the emitter has its module (`geodesicEmitters`), the carry moves an emitter and rebuilds the geodesics it anchors itself.
     writesCoreKinds: ["geodesic-cannon", "geodesicModel/arc", "geodesicModel/vertex", "geodesicModel/segment", "geodesicModel/crossing"],
     create: () => {
       // The step context for the callback below: set around one pass, so the callback is created once and a step allocates nothing for it.

@@ -64,9 +64,9 @@ export interface GeodesicModelQueries {
   connectsEmitters(arcId: string): boolean;
   /** The arc has an end on a tied vertex (a tied arc is drawn open). A closed loop on one vertex is not tied. */
   isTied(arcId: string): boolean;
-  /** Vertices with two or more arc ends, closed loops included. One scan of the arcs per call, O(arcs); not for a per-step path. */
+  /** Vertices with two or more arc ends, closed loops included. Read from the arc index. */
   tiedVertexCount(): number;
-  /** Visits them in registry insertion order. One scan of the arcs per call (allocates a count map), O(arcs); not for a per-step path. */
+  /** Visits them in registry insertion order. Read from the arc index. */
   forEachTiedVertex(fn: (vertexId: string) => void): void;
   /** The endpoint roles attached to the emitter whose arcs connect emitters: the ends a tie can use. Reads the arc index; not a scan. */
   tieableEnds(emitterId: string): readonly GeodesicEndpointRef[];

@@ -108,7 +108,6 @@ export interface RuntimeObjectActionsDeps {
   /** Drops every geodesic object and clears the cannon tool state (world reset). */
   removeGeodesicRuntimeObjects(): void;
   /** Requests a sync of the portal instances of runtime objects after registry changes; the frame performs it. */
-  syncRuntimeObjectPortalInstances(): void;
   /** Requests a refresh of the selectable-hitbox debug wireframes after registry changes; the frame performs it. */
   syncSelectableHitboxDebug(): void;
   /** Re-syncs the desktop tool palette after tool or menu changes. */
@@ -194,7 +193,6 @@ export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): Runt
     resolveProtractorDirectedSelectionFromAimTarget,
   } = deps;
   const dispatchRuntimeCommand = deps.dispatch;
-  const requestRuntimeObjectInstanceSync = deps.syncRuntimeObjectPortalInstances;
   const requestSelectableHitboxDebugSync = deps.syncSelectableHitboxDebug;
   const currentMenuState = () => session.get().menuState;
 
@@ -230,7 +228,6 @@ export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): Runt
     if (flag?.kind === "placed-flag") {
       runtimeObjectRegistry.remove(editState.flagId);
       removePlacedFlagRuntime(editState.flagId);
-      requestRuntimeObjectInstanceSync();
     }
     dispatchRuntimeCommand({ kind: "close-menu" });
   }
@@ -454,7 +451,6 @@ export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): Runt
 
     runtimeObjectRegistry.remove(focused.object.id);
     removeProtractorAngleRuntime(focused.object.id);
-    requestRuntimeObjectInstanceSync();
     requestSelectableHitboxDebugSync();
     return true;
   }
@@ -467,7 +463,6 @@ export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): Runt
 
     runtimeObjectRegistry.remove(focused.object.id);
     removeMeasuredGeodesicLengthRuntime(focused.object.id);
-    requestRuntimeObjectInstanceSync();
     requestSelectableHitboxDebugSync();
     return true;
   }

@@ -12,7 +12,6 @@ import {
   getGeodesicSegmentEnd,
   intersectionTolerance,
 } from "./objects";
-import { geodesicPerfCounters } from "./perfCounters";
 
 /** Maximum distance (meters) between two geodesic points for them to count as one vertex when placing at a vertex; deliberately generous. */
 const vertexContinuityToleranceMeters = 10;
@@ -35,9 +34,8 @@ const geodesicIntersectionMemoryByRegistry = new WeakMap<object, Map<string, Geo
  * Recomputes all intersection markers (where segments of two different geodesics cross in a cell) and returns them.
  *
  * Existing markers are removed and re-added with ids preserved when a new marker pairs the same two geodesics in the same cell within
- * `vertexContinuityToleranceMeters` of an earlier one (identity continuity, so UI selections survive a moving crossing). Every call
- * is a full O(n^2) scan of all segments (TODO(issue 70): use a spatial index or per-cell buckets). Crossings within `emitterConnectionToleranceMeters` of an emitter are suppressed. Previously seen
- * markers stay in the per-registry memory (see `getRememberedGeodesicIntersectionObject`).
+ * `vertexContinuityToleranceMeters` of an earlier one (identity continuity, so UI selections survive a moving crossing). Segments are compared
+ * per cell. Previously seen markers stay in the per-registry memory, which gives a marker back its id.
  */
 export function updateGeodesicIntersectionObjects(registry: RuntimeObjectRegistry): readonly GeodesicCrossingObject[] {
   const memory = getGeodesicIntersectionMemory(registry);
@@ -91,7 +89,6 @@ export function pruneMissingGeodesicIntersectionObjects(registry: RuntimeObjectR
 // cells never intersect here, even if they are adjacent through a portal: a crossing exactly on a portal side is reported once, in the
 // cell the geodesics enter (see `crossingIsAtGeodesicAnchor`).
 function findGeodesicIntersections(registry: RuntimeObjectRegistry): readonly GeodesicCrossingObject[] {
-  geodesicPerfCounters.intersectionPasses += 1;
   const segments = registry.getObjectsOfKind("geodesicModel/segment");
   const intersections: GeodesicCrossingObject[] = [];
   const seenKeys = new Set<string>();

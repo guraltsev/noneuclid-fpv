@@ -117,7 +117,7 @@ describe("applyRuntimeCommand: navigation", () => {
     const result = reduce({ kind: "cancel-menu-and-tool" }, stateWith({ isOpen: true, selectedTool: "protractor" }));
 
     expect(result.state.menuState).toMatchObject({ isOpen: false, selectedTool: "none" });
-    expect(result.effects).toEqual([{ kind: "end-tool-session" }, { kind: "sync-object-instances" }, sync]);
+    expect(result.effects).toEqual([{ kind: "end-tool-session" }, sync]);
   });
 
   it("cancels from a top-level page on the right action", () => {

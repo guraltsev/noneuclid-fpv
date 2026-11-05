@@ -864,15 +864,6 @@ Geodesic emitters ("cannons"), geodesic arcs and curve shortening on a glued cel
 | function | `sanitizeYaw` | Wraps an angle to (-pi, pi] via atan2(sin, cos); non-finite input becomes 0. |
 | function | `reduceAdjacentInversePortalTraversals` | Freely reduces a portal word by cancelling adjacent inverse traversals. |
 
-### `world-objects/geodesic/perfCounters.ts`
-
-Counters of the expensive geodesic operations, read by the performance tests.
-
-| Kind | Name | Summary |
-| --- | --- | --- |
-| const | `geodesicPerfCounters` | Number of intersection passes (`findGeodesicIntersections`) and chord traces (`traceGeodesicPathForConnectionMode`) since the last reset. |
-| function | `resetGeodesicPerfCounters` | Sets both counters to zero. |
-
 ### `world-objects/geodesic/portalWord.ts`
 
 Portal-word algebra of geodesic intervals: reversal, free reduction, comparison, role-aware sub-words and the update of a word when an anchor crosses a portal; pure, no registry access.
@@ -1663,6 +1654,7 @@ The geodesic measurements module (design 013 section 6.4, design 014 D9): the le
 | Kind | Name | Summary |
 | --- | --- | --- |
 | type | `GeodesicMeasurementsModuleDefinition` | The module as the engine's list takes it. |
+| interface | `GeodesicMeasurementsOptions` | How the module is configured. |
 | const | `lengthReadKinds` | The kinds a length label can read: the segments of its geodesic. |
 | const | `angleReadKinds` | The kinds an angle can read: its centre (a cannon or a crossing marker), the segments of its legs, and the arc index (arcs and vertices). |
 | function | `geodesicMeasurementsModule` | Creates the geodesic measurements module. |
@@ -2200,7 +2192,6 @@ Builds the instanced-mesh archetypes for the static geometry of every cell, one 
 | function | `buildCellRenderArchetypes` | Builds every cell's archetypes, with `count = 0` and frustum culling disabled (instance bounds are not tracked). |
 | function | `planCellRenderArchetypes` | Lists the archetypes `buildCellRenderArchetypes` would create (ids, kinds, capacities). |
 | function | `deriveCellRenderArchetypeCapacities` | Computes per-cell instance capacities from statically culled path tables. |
-| function | `buildDefaultCellRenderArchetypeCapacities` | Builds the static path tables (depth `maxDepth`, immediate reversals skipped, 1e-6 m tolerance, 50 000 path cap per root) and derives per-cell capacities. |
 | function | `disposeCellRenderArchetypes` | Disposes the geometry and materials of the given archetypes. |
 
 ### `render/three/createThreeApp.ts`

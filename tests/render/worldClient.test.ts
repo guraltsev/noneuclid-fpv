@@ -122,6 +122,40 @@ describe("api.world", () => {
     expect(() => submit({ nope: 1 })).toThrow(/string kind/);
   });
 
+  it("answers a caller and a pending tool request when a handler throws", async () => {
+    let armed = false;
+    const broken: AnyModuleDefinition = {
+      id: "broken",
+      requires: [],
+      objectKinds: [],
+      create: () => ({
+        api: {},
+        queries: {},
+        commands: { "broken/boom": { run: () => { throw new Error("boom"); } } },
+        ticks: [],
+        toolGates: [() => {
+          if (armed) throw new Error("gate");
+          return undefined;
+        }],
+      }),
+    };
+    const { engine, client, session, messages } = setup({ modules: [broken] });
+    const submit = client.api.submit as (command: unknown) => Promise<unknown>;
+
+    armed = true;
+    const pending = submit({ kind: "broken/boom" });
+    client.requestTool("measure-length");
+    // The shell's frame: the step and the client's read are separate guarded phases.
+    expect(() => engine.step(1 / 60)).toThrow("boom");
+    client.afterStep();
+    engine.endFrame();
+
+    expect(await pending).toMatchObject({ ok: false, refusal: { code: "world/internalError" } });
+    expect(session.get().pendingToolRequest).toBeUndefined();
+    expect(session.get().menuState.selectedTool).toBe("none");
+    expect(messages).toEqual(["The command failed inside the world."]);
+  });
+
   it("lists the participants", () => {
     const { client } = setup();
     const participants = (client.api.participants as () => { id: string; kind: string }[])();

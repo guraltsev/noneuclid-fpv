@@ -24,7 +24,6 @@ export type WorldInteractionActionId =
   | "carry-emitter"
   | "rotate-geodesic"
   | "aim-geodesic"
-  | "tie-detach-geodesics"
   | "delete-geodesic";
 
 /** One action offered on a focused object, with the input intent that triggers it. */

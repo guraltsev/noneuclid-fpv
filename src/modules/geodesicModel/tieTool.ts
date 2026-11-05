@@ -86,7 +86,7 @@ export function createTieToolDescriptor(): ToolDescriptor {
     ownerModuleId: moduleId,
     label: "Tie",
     helpTitle: "Tie and detach",
-    helpBody: "Selects two locked incident geodesics and rebuilds them as a detached path.",
+    helpBody: "Selects two geodesics that connect this emitter to another, and ties them into a detached curve.",
     helpRows: [{ input: "primary", label: "select geodesic" }],
     indicatorColor: "#f59e0b",
     iconId: "ray",

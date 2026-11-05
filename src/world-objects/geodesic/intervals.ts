@@ -485,8 +485,6 @@ export function splitGeodesicIntervalAtSegmentHit(input: {
     });
   }
   removeUnusedFreeGeodesicEnds(input.registry);
-  if (continuationId) {
-  }
   return [input.registry.get(input.geodesicId), continuationId ? input.registry.get(continuationId) : undefined]
     .filter((object): object is GeodesicArcObject => object?.kind === "geodesicModel/arc");
 }

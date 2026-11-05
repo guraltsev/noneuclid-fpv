@@ -313,7 +313,7 @@ a function of state. Any write of an arc that has the vertex at an end, before o
 
 **The vertex count never grows.** This algorithm only moves and removes vertices; it never inserts one (a later algorithm may). A curve whose taut shape would wrap a
 forbidden-zone disk at a portal junction (that would need new corner vertices on the disk boundary) is therefore not finished: the step toward
-the disk is rejected, the merge that would cut the corner is rejected too, and the vertex goes quiet as blocked, with a notice. Nothing is deleted because a path touches a disk. Apertures at vertices that are not portal endpoints, and in the end cells, are not
+the disk is rejected, the merge that would cut the corner is rejected too, and the vertex is blocked. The default experience then destroys the curve, with a notice; a better answer waits for a later algorithm. Under the `unresolve` policy the vertex goes quiet instead, and nothing is deleted because a path touches a disk. Apertures at vertices that are not portal endpoints, and in the end cells, are not
 modelled; the previews catch any hit there. Merging loses a bend: a merged arc cannot bend at that vertex again.
 
 **Limit.** The limit of the flow is the shortest path of the curve's homotopy class when no disk is in the way: for two emitters the straight
