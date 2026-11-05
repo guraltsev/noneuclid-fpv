@@ -33,7 +33,9 @@ import { rebuildDerivedGeodesicSegments } from "../../../src/world-objects/geode
 import { rebuildConnectedGeodesicBetweenEmitters } from "../../../src/world-objects/geodesic/cannon";
 import { yawRigidTransform3 } from "../../../src/math/rigidTransform3";
 import { expectSegmentsAreRealizedFromArcs } from "../../support/segmentOracle";
-import { createTestEngine, runFrame } from "../../support/engine";
+import { createSimulationClock } from "../../../src/engine/simulationClock";
+import { defaultSimulationClockOptions } from "../../../src/runtime/experience";
+import { createTestEngine, runClockFrame, runFrame } from "../../support/engine";
 import {
   compileLargeWorld,
   compileRotatedFreeLoopWorld,
@@ -261,15 +263,37 @@ describe("curve shortening flow of a two-arc curve", () => {
     expect(isTied(fast.registry, "g1")).toBe(false);
   });
 
-  it("is a single frame's worth of motion per step whatever the frame time is", () => {
+  it("takes a step's duration as given: a long step moves a vertex as far as its speed allows", () => {
     const { world, registry } = createSymmetricPairScenario(2, 2);
     const engine = createFlowTestEngine(world, registry);
 
-    stepFlow(engine, 5);
+    stepFlow(engine, 1);
 
     const free = registry.get("free");
     const moved = Math.hypot((free?.localPose.translation.x ?? 0) - 0, (free?.localPose.translation.y ?? 0) - 2);
-    expect(moved).toBeLessThanOrEqual(curveShorteningSpeedMetersPerSecond * 0.1 + 1e-9);
+    expect(moved).toBeGreaterThan(curveShorteningSpeedMetersPerSecond * 0.5);
+    expect(moved).toBeLessThanOrEqual(curveShorteningSpeedMetersPerSecond + 1e-9);
+  });
+
+  it("reaches rest in the same simulated time through the clock at 5 Hz and at 120 Hz", () => {
+    const simulatedSecondsToRest = (frameHertz: number): number => {
+      const { world, registry } = createSymmetricPairScenario(2, 2);
+      const engine = createFlowTestEngine(world, registry);
+      const flow = engine.query(curveDynamicsToken);
+      const clock = createSimulationClock(defaultSimulationClockOptions);
+      let simulated = 0;
+      for (let frame = 0; frame < 100000 && !flow.isAtRest(); frame += 1) {
+        const { ticks, tickSeconds } = runClockFrame(engine, clock, 1 / frameHertz);
+        simulated += ticks * tickSeconds;
+      }
+      expect(flow.isAtRest()).toBe(true);
+      return simulated;
+    };
+
+    const slow = simulatedSecondsToRest(5);
+    const fast = simulatedSecondsToRest(120);
+
+    expect(Math.abs(slow - fast) / fast).toBeLessThan(0.05);
   });
 
   it("does nothing for a non-positive frame time", () => {

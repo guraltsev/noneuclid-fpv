@@ -1471,6 +1471,7 @@ The types of the world engine and of its modules (design 013 sections 5 and 9): 
 | interface | `EngineCommandBase` | A command: plain data with a namespaced kind (`"world/requestTool"`, `"geodesicModel/tieAndDetach"`). |
 | interface | `EngineEventBase` | An event: plain data with a namespaced kind. |
 | interface | `WorldRequestToolCommand` | The engine's own command: ask whether this participant may switch to a tool (design 013 section 8.1). |
+| interface | `WorldBehindRealTimeEvent` | The notice that real time was dropped: the world could not keep up, even at the longest tick. |
 | type | `CommandResult` | The answer to a command: accepted (with an optional value) or refused with a stable code and a sentence for people. |
 | type | `CommandTicket` | What `submit` returns: pass it to `resultOf` after the step that applied the command. |
 | type | `ParticipantBody` | Where a participant is: the same record as the player pose (cell, cell-local position, yaw, pitch). |
@@ -1512,6 +1513,17 @@ Participants and control slots of the world engine (design 013 sections 5.1 and 
 | function | `createParticipantTable` | Creates the table holding `initial`. |
 | interface | `ControlSlots` | The control slots of one engine, keyed by participant and slot name. |
 | function | `createControlSlots` | Creates an empty slot table. |
+
+### `engine/simulationClock.ts`
+
+The simulation clock (design 012 P8, 013 section 6.5): turns elapsed real time into ticks of length \(h\).
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `SimulationClockOptions` | The clock's settings; they are options of the experience. |
+| interface | `ClockAdvance` | What one frame runs. |
+| interface | `SimulationClock` | Handle returned by {@link createSimulationClock}. |
+| function | `createSimulationClock` | Creates a clock; throws a `RangeError` on options that cannot work. |
 
 ### `engine/toolGates.ts`
 
@@ -1630,7 +1642,6 @@ The policies of the curve shortening flow (design 013 section 13.2): how far a v
 | --- | --- | --- |
 | type | `SpeedLaw` | Metres this vertex may move this step, before the line search caps it. |
 | const | `curveShorteningSpeedMetersPerSecond` | Speed (meters per second) at which a vertex moves along its descent direction; the exact line search never overshoots the minimum. |
-| const | `maxCurveShorteningDeltaSeconds` | Longest frame time (seconds) one step of the flow integrates; a stalled tab does not teleport a vertex. |
 | function | `speedLawNamed` | The speed law an option names. |
 
 ### `modules/geodesicMeasurements/index.ts`
@@ -1766,6 +1777,7 @@ The default experience (design 013 section 12.1): the world modules the app comp
 
 | Kind | Name | Summary |
 | --- | --- | --- |
+| const | `defaultSimulationClockOptions` | The time of the default experience (design 012 P8): ticks of \(1/90\) s, up to \(1/30\) s, taking at most a third of real time before they grow. |
 | function | `createDefaultWorldModules` | The world modules of the default experience. |
 | function | `createDefaultClientModules` | The client parts of the default experience's modules (only the modules with tools have one). |
 

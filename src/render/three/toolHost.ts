@@ -80,7 +80,7 @@ export interface ToolHost {
   toolStarted(toolId: RuntimeToolId, objectId: string | undefined): void;
   /** A tool ended, however it ended: runs its `onEnd` and clears its owner's tool state. */
   toolEnded(toolId: RuntimeToolId): void;
-  /** Call after every `engine.step`: hands the results of the commands tools submitted to the tools. */
+  /** Call once per frame, after the frame's last tick, also in a frame with no tick: hands the results of the commands tools submitted to the tools. */
   afterStep(): void;
 }
 

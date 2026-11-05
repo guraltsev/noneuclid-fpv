@@ -24,6 +24,7 @@ import type {
   EngineIdSource,
   ParticipantRecord,
   WorldEngine,
+  WorldBehindRealTimeEvent,
   WorldReadView,
   WorldRequestToolCommand,
 } from "./moduleTypes";
@@ -275,6 +276,14 @@ export function createWorldEngine(options: WorldEngineOptions): WorldEngine {
         throw error;
       }
     },
+    noticeBehindRealTime(seconds) {
+      const notice: WorldBehindRealTimeEvent = {
+        kind: "world/behindRealTime",
+        message: `The world could not keep up and skipped ${seconds.toFixed(2)} s of real time.`,
+        seconds,
+      };
+      emit(notice);
+    },
     read,
     ids: coreIds,
     resultOf: (ticket) => results.get(ticket),
@@ -296,6 +305,7 @@ export function createWorldEngine(options: WorldEngineOptions): WorldEngine {
 
 export type { WorldEngine } from "./moduleTypes";
 export { createLocalPlayerParticipant, localParticipantId } from "./participants";
+export { createSimulationClock, type SimulationClockOptions } from "./simulationClock";
 
 /** The pose of the local player: where this device's body is in the world. */
 export function readLocalPlayerPose(engine: Pick<WorldEngine, "read">): PlayerPose {

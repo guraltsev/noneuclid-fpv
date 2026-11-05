@@ -7,6 +7,7 @@ import { geodesicModelModule } from "../../src/modules/geodesicModel";
 import { createLocalPlayerParticipant } from "../../src/engine/participants";
 import { createWorldEngine, type WorldEngineOptions } from "../../src/engine/worldEngine";
 import type { WorldEngine } from "../../src/engine/moduleTypes";
+import type { ClockAdvance, SimulationClock } from "../../src/engine/simulationClock";
 import { createDefaultPlayerPose, type PlayerPose } from "../../src/movement/playerPose";
 import { createRuntimeObjectRegistry, type RuntimeObjectRegistry } from "../../src/world-objects/runtimeObjectRegistry";
 
@@ -38,6 +39,15 @@ export function createDerivingTestEngine(registry: RuntimeObjectRegistry, option
 export function runFrame(engine: Pick<WorldEngine, "applyControls" | "step">, seconds: number): void {
   engine.applyControls(seconds);
   engine.step(seconds);
+}
+
+/** One frame of `frameSeconds` as the shell runs it through the simulation clock: the fast channel, then the frame's ticks, none, one or several, then the end of the frame. Returns what the clock asked for. */
+export function runClockFrame(engine: Pick<WorldEngine, "applyControls" | "step" | "endFrame">, clock: SimulationClock, frameSeconds: number): ClockAdvance {
+  engine.applyControls(frameSeconds);
+  const advance = clock.advance(frameSeconds, 0);
+  for (let tick = 0; tick < advance.ticks; tick += 1) engine.step(advance.tickSeconds);
+  engine.endFrame();
+  return advance;
 }
 
 /** Runs one derive pass: a zero-length step, which applies no command here and wakes every derive tick whose subscribed kinds were written since its last run. Tests that read crossings, lengths or angles right after a mutation call it first. */

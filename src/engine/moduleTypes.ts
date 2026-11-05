@@ -34,6 +34,14 @@ export interface WorldRequestToolCommand extends EngineCommandBase {
   readonly toolId: RuntimeToolId;
 }
 
+/** The notice that real time was dropped: the world could not keep up, even at the longest tick. */
+export interface WorldBehindRealTimeEvent extends EngineEventBase {
+  readonly kind: "world/behindRealTime";
+  readonly message: string;
+  /** The real time dropped since the last notice. */
+  readonly seconds: number;
+}
+
 /** The answer to a command: accepted (with an optional value) or refused with a stable code and a sentence for people. */
 export type CommandResult =
   | { readonly ok: true; readonly value?: PlainData }
@@ -105,8 +113,10 @@ export interface WorldEngine<Cmd extends EngineCommandBase = EngineCommandBase> 
   publishBody(participantId: string, body: ParticipantBody): boolean;
   /** Once per frame, before the frame's steps: runs the bodies ticks on the control slots, so what follows a participant keeps up with the frame whether or not a tick falls in it. `seconds` is the frame time the participant's own body moved in. */
   applyControls(seconds: number): void;
-  /** Advances the world by `deltaSeconds` (0 is legal: it applies commands and derives). */
+  /** Advances the world by `deltaSeconds`, any non-negative duration (0 is legal: it applies commands and derives). The app's ticks come from the simulation clock, which keeps them within its maximum. */
   step(deltaSeconds: number): void;
+  /** Emits the `world/behindRealTime` notice: the simulation clock dropped `seconds` of real time. The shell calls it as the clock allows, at most once per second. */
+  noticeBehindRealTime(seconds: number): void;
   /** Read-only world state. */
   readonly read: WorldReadView;
   /** Allocates ids for legacy world writers that still create objects themselves. */

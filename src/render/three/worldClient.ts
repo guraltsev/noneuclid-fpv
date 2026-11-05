@@ -26,7 +26,7 @@ export interface WorldClientDeps {
 export interface WorldClient {
   /** Asks the world whether the local player may switch to `toolId`; the switch happens in `afterStep` on acceptance. `objectId` is the object the tool is started from, handed to `toolStarted`. */
   requestTool(toolId: RuntimeToolId, objectId?: string): void;
-  /** Call after every `engine.step`: settles the pending tool request, runs the event sink and answers waiting API callers. */
+  /** Call once per frame, after the frame's last tick, also in a frame with no tick: settles the pending tool request, runs the event sink and answers waiting API callers. */
   afterStep(): void;
   /** The `world` namespace of the public API: `submit(command)`, `participants()` and `stepIndex()`. */
   readonly api: ApiObject;

@@ -608,7 +608,7 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
   }
 
   /**
-   * Call after every world step: settles the pickup the tool asked for and draws again what the world carry changed. A refused pickup, or a carry the world ended
+   * Call once per frame, after the frame's last tick, also in a frame with no tick: settles the pickup the tool asked for and draws again what the world carry changed. A refused pickup, or a carry the world ended
    * (the hand let go), leaves the carry tool.
    */
   function afterWorldStep(): void {

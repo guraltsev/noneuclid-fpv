@@ -20,7 +20,9 @@ import { createGeodesicCannonObject } from "../../src/world-objects/geodesic/obj
 import { createRuntimeObjectRegistry, type RuntimeObjectRegistry } from "../../src/world-objects/runtimeObjectRegistry";
 import { getRuntimeObjectInteractionRangeMeters } from "../../src/world-objects/interactionRange";
 import { compileLargePortalWorld } from "../fixtures/world-objects/geodesic";
-import { createTestEngine, runFrame } from "../support/engine";
+import { createSimulationClock } from "../../src/engine/simulationClock";
+import { defaultSimulationClockOptions } from "../../src/runtime/experience";
+import { createTestEngine, runClockFrame, runFrame } from "../support/engine";
 
 const frameSeconds = 1 / 60;
 
@@ -66,6 +68,29 @@ function setup(options: { readonly participants?: readonly ParticipantRecord[]; 
   }
   return { world, registry, engine, events, run, step, hand };
 }
+
+describe("carrying on a display faster than the ticks", () => {
+  it("moves the carried emitter in every frame at 120 Hz, also in frames with no tick", () => {
+    const { engine, registry, run, hand } = setup();
+    run("local", { kind: "carry/attach", objectId: "cannon-b" });
+    hand(4.6, 2.5);
+    for (let frame = 0; frame < 60; frame += 1) runFrame(engine, frameSeconds);
+    engine.endFrame();
+
+    const clock = createSimulationClock(defaultSimulationClockOptions);
+    const emitterX = () => registry.get("cannon-b")!.localPose.translation.x;
+    let framesWithoutTick = 0;
+    for (let frame = 0; frame < 60; frame += 1) {
+      const before = emitterX();
+      hand(4.6 + 0.002 * (frame + 1), 2.5);
+      const { ticks } = runClockFrame(engine, clock, 1 / 120);
+      if (ticks === 0) framesWithoutTick += 1;
+      expect(emitterX()).toBeCloseTo(before + 0.002, 9);
+    }
+
+    expect(framesWithoutTick).toBeGreaterThan(10);
+  });
+});
 
 describe("carry/attach and carry/detach", () => {
   it("attaches the object to the participant, opens the offset slot and detaches again", () => {

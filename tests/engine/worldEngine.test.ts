@@ -135,6 +135,18 @@ describe("commands and results", () => {
     expect(engine.read.stepIndex).toBe(1);
   });
 
+  it("emits the notice of dropped time as an event with a message, until endFrame", () => {
+    const engine = createTestEngine();
+    engine.noticeBehindRealTime(0.25);
+
+    const events: unknown[] = [];
+    engine.forEachEvent((event) => events.push(event));
+    expect(events).toEqual([{ kind: "world/behindRealTime", message: "The world could not keep up and skipped 0.25 s of real time.", seconds: 0.25 }]);
+
+    engine.endFrame();
+    engine.forEachEvent(() => expect.unreachable());
+  });
+
   it("clears results, events and the journal at endFrame", () => {
     const registry = createTestEngine().registry;
     const engine = createTestEngine({

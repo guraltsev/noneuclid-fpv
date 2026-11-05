@@ -14,7 +14,7 @@
  *
  * ## Frame loop (`renderFrame`, driven by `renderer.setAnimationLoop`)
  * One call per animation frame, on the main thread, with no re-entrancy. In order:
- * 0. Bookkeeping: `clock.getDelta()` gives `deltaSeconds`; a finished background geometry deformation is
+ * 0. Bookkeeping: `clock.getDelta()` gives the elapsed real time and, capped, the frame time `deltaSeconds`; a finished background geometry deformation is
  *    committed first (`geometryCommit.commitReady` -> `geometryCommit.commit`), so the rest of the
  *    frame sees one consistent world.
  * 1. Input: `getXrInputFrame` or `getDesktopInputFrame` consume one `RuntimeInputFrame` (XR is used only when
@@ -23,7 +23,9 @@
  *    `bodiesInCell`; in XR a second `movePlayer` applies physical head motion
  *    (room-scale walking). The result replaces `playerPose` and may change `playerPose.cellId` by crossing a
  *    portal. Then the camera/XR rig is synced to the pose, the aim ray is resolved, and the selected tool
- *    handles the primary/carry/interact actions. Creatures and flags advance.
+ *    handles the primary/carry/interact actions. Creatures and flags advance on frame time. Then the world engine: `applyControls` with the frame time, once
+ *    per frame, then the ticks the simulation clock asks for from the elapsed real time: none, one or several `engine.step`. The client hooks that replay the
+ *    frame's events run once, after the last tick, also in a frame with no tick.
  * 3. Portal visibility: `updateVisibleCell` shows only the player's cell mesh, the culling cameras are placed
  *    (one per eye in stereo XR), and `computeVisiblePortalPaths` (inside `syncPortalInstances`)
  *    selects visible portal paths from the static per-root cull tables.
@@ -65,8 +67,8 @@ import type { EngineEventBase } from "../../engine/moduleTypes";
 import { createToolHost } from "./toolHost";
 import type { RootAimRay } from "./rootAimRay";
 import { createWorldClient } from "./worldClient";
-import { createDefaultClientModules, createDefaultWorldModules } from "../../runtime/experience";
-import { createLocalPlayerParticipant, createWorldEngine, publishLocalPlayerPose, readLocalPlayerPose } from "../../engine/worldEngine";
+import { createDefaultClientModules, createDefaultWorldModules, defaultSimulationClockOptions } from "../../runtime/experience";
+import { createLocalPlayerParticipant, createSimulationClock, createWorldEngine, publishLocalPlayerPose, readLocalPlayerPose } from "../../engine/worldEngine";
 import * as THREE from "three";
 import { reversePainterSortStable } from "@pmndrs/uikit";
 import { type AppState } from "../../runtime/appState";
@@ -316,8 +318,12 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   scene.add(xrRig.root);
   const vrComfortVignette = createVrComfortVignette(camera, options.vrComfortOptions);
   const clock = new THREE.Clock();
-  /** Longest simulation step per frame, in seconds; longer wall-clock gaps (hidden tab, debugger pause) are treated as this long. */
+  /** Longest frame time, in seconds, for what still runs on frames (the player, creatures, client tools, the fast channel); longer wall-clock gaps (hidden tab, debugger pause) are treated as this long. The world's ticks do not use it: their time comes from `simulationClock`. */
   const maxSimulationStepSeconds = 0.1;
+  // Turns elapsed real time into the world's ticks (design 012 P8).
+  const simulationClock = createSimulationClock(defaultSimulationClockOptions);
+  // How long the last frame's ticks took; the clock lengthens the ticks when they take too large a share of the frame.
+  let lastTicksCostSeconds = 0;
   // The authoritative player pose (cell id, cell-local position in meters, yaw in radians) is the body of the engine's
   // "local" participant. Written only in renderFrame (movement), geometryCommit and the reset/teleport helpers,
   // through publishLocalPlayerPose (direct write D1); factories read it with readLocalPlayerPose(engine).
@@ -1139,6 +1145,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     const frameStartMs = performance.now();
     // Phase 0: timing. deltaSeconds is the wall-clock time since the previous frame, capped so that a frame after the
     // tab was in the background does not fling creatures and the player far outside their cells in a single step.
+    // The world's ticks take the uncapped time, through the simulation clock.
     const wallClockDeltaSeconds = clock.getDelta();
     const deltaSeconds = Math.min(wallClockDeltaSeconds, maxSimulationStepSeconds);
     const frameRateFps = wallClockDeltaSeconds > 0 ? 1 / wallClockDeltaSeconds : undefined;
@@ -1284,13 +1291,22 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     for (const runtime of placedFlagRuntimes.values()) {
       runtime.syncParent(cellMeshes);
     }
-    // The world engine: the fast channel first (what follows a participant keeps up with this frame), then the step: queued commands and the modules' ticks. Contained like any phase.
+    // The world engine: the fast channel first (what follows a participant keeps up with this frame), then the frame's ticks: queued commands and the modules' ticks. A frame with no tick runs only the fast channel. Contained like any phase.
     frameErrorGuard.runPhase("world engine", () => {
-      const worldSeconds = frame.resetRequested ? 0 : deltaSeconds;
-      engine.applyControls(worldSeconds);
-      engine.step(worldSeconds);
+      if (frame.resetRequested) {
+        engine.applyControls(0);
+        engine.step(0);
+        return;
+      }
+      engine.applyControls(deltaSeconds);
+      const { ticks, tickSeconds } = simulationClock.advance(wallClockDeltaSeconds, lastTicksCostSeconds);
+      const behindSeconds = simulationClock.takeBehindNotice();
+      if (behindSeconds > 0) engine.noticeBehindRealTime(behindSeconds);
+      const ticksStartMs = performance.now();
+      for (let tick = 0; tick < ticks; tick += 1) engine.step(tickSeconds);
+      lastTicksCostSeconds = (performance.now() - ticksStartMs) / 1000;
     });
-    // A separate phase: a step that rethrows a handler's error has still stored its results, which the client must read before `endFrame` clears them.
+    // A separate phase, once per frame, after the last tick, also in a frame with no tick: these hooks replay every event since `endFrame`. A step that rethrows a handler's error has still stored its results, which the client must read before `endFrame` clears them.
     frameErrorGuard.runPhase("world client", () => {
       worldClient.afterStep();
       toolHost.afterStep();

@@ -10,11 +10,8 @@ export type SpeedLaw = (input: { readonly tangentSum: { readonly x: number; read
 /** Speed (meters per second) at which a vertex moves along its descent direction; the exact line search never overshoots the minimum. */
 export const curveShorteningSpeedMetersPerSecond = 1.5;
 
-/** Longest frame time (seconds) one step of the flow integrates; a stalled tab does not teleport a vertex. */
-export const maxCurveShorteningDeltaSeconds = 0.1;
-
-/** Today's step budget: the speed times the frame time, clamped to 0.1 s. */
-const constantSpeedLaw: SpeedLaw = ({ deltaSeconds }) => curveShorteningSpeedMetersPerSecond * Math.min(deltaSeconds, maxCurveShorteningDeltaSeconds);
+/** The step budget: the speed times the step's duration, as given; the simulation clock bounds the length of a tick. */
+const constantSpeedLaw: SpeedLaw = ({ deltaSeconds }) => curveShorteningSpeedMetersPerSecond * deltaSeconds;
 
 /** The speed law an option names. */
 export function speedLawNamed(name: SpeedLawName): SpeedLaw {
