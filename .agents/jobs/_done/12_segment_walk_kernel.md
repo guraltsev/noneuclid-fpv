@@ -2,8 +2,8 @@
 
 Status: done on 2026-10-29.
 Revised on 2026-10-29 for a less capable implementing model (design prototyped and checked on every example world).
-Resolves: the kernel part of issue [62](../../../_issues/62_segment_based_portal_traversal_and_swept_motion.md) and the
-"local atlas" part of issue [63](../../../_issues/63_collision_ignores_cells_a_straddling_body_overlaps.md). It closes no
+Resolves: the kernel part of issue [62](../../../_issues/_closed/62_segment_based_portal_traversal_and_swept_motion.md) and the
+"local atlas" part of issue [63](../../../_issues/_closed/63_collision_ignores_cells_a_straddling_body_overlaps.md). It closes no
 issue by itself; jobs 13, 15, 16 and 17 move the callers onto it and close the issues.
 
 ## Goal

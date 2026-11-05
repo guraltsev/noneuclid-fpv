@@ -1,18 +1,27 @@
 # 61 - Single-wall push-out lets bodies walk out of a room through any corner
 
-Status: open; re-verified 2026-10-28; fix designed 2026-10-29.
+Status: closed on 2026-11-05 (audit against the code; the tests below pass).
 
-- Implemented by job 13; needs review, see the Report in [job 13](../.agents/jobs/_done/13_swept_collide_and_slide.md).
+- Implemented by job 13; needs review, see the Report in [job 13](../../.agents/jobs/_done/13_swept_collide_and_slide.md).
 
 Priority: P1 (correctness). Extends the issue 41 bullet "wall sliding resolves only the first blocking side and does
 not re-test". The consequence is worse than "a corner can still violate a second wall": the body leaves the cell without
 any limit.
 
-Jobs: [13](../.agents/jobs/13_swept_collide_and_slide.md).
+Jobs: [13](../../.agents/jobs/13_swept_collide_and_slide.md).
+
+## Outcome
+
+Fixed by job 13: `moveDynamicObject` slides on `slideDisc`, so a body in a corner is stopped by both walls.
+
+## Closing evidence
+
+- `tests/movement/moveDynamicObject.test.ts`: "stops in all four corners of a walled room".
+- Random-polygon property test of `sweptCollision`.
 
 ## Status update 2026-10-29
 
-Design decided in [job 13](../.agents/jobs/13_swept_collide_and_slide.md) (not implemented yet):
+Design decided in [job 13](../../.agents/jobs/13_swept_collide_and_slide.md) (not implemented yet):
 
 - The wall response is the swept collide-and-slide of issue 62 (capsule time of impact, tangential slide, crease rule
   "a later contact whose normal opposes an earlier one stops the motion"), at most 4 iterations. The projection onto

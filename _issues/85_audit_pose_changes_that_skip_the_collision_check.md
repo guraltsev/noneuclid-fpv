@@ -6,6 +6,13 @@ Priority: P2 (one such defect froze a creature for good; others may exist, none 
 
 Jobs: none yet.
 
+## Status update 2026-11-05
+
+- From closed issue 63: `turnWithoutOverlap` and `depenetrateDynamicObject` use own-cell `testCellCollision`, so they miss a body in a
+  neighbouring cell. Only `moveDynamicObject` sees neighbours.
+- Test this before answering the design question below: `sweptCollision` says an overlapped obstacle is hit at \(s = 0\) only when
+  moving closer, while this issue says every step is rejected.
+
 ## Problem
 
 A body's collision cylinder is offset from its pose origin and the offset turns with the pose (`getDynamicObjectCollisionBounds`).
@@ -13,7 +20,7 @@ So a change of heading moves the cylinder, even when the origin stays put. `move
 heading was set after the step with no test, and a creature running along a face edge turned its cylinder into the forbidden zone
 of a cube corner. From an overlapping pose `moveDynamicObject` rejects every step, even one leading out, so the mouse froze for
 good (fixed 2026-11-02: `turnWithoutOverlap` plus a `depenetrateDynamicObject` backstop in `simpleGeoCreatureBehavior.ts`; note
-`.agents/knowledge/creature-stuck-in-zone.md`).
+the project-knowledge note on `creature-stuck-in-zone`).
 
 The same shape may exist elsewhere: any code that writes a pose without going through a collision-checked step.
 

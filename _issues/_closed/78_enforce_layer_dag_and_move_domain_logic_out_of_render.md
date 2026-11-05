@@ -1,11 +1,20 @@
 # 78 - The layer rule is not a DAG: five import cycles and domain logic in render/three
 
-Status: open; fixed by job 32 on 2026-10-31, pending the maintainer's review of the job's report.
+Status: closed on 2026-11-05 (audit against the code; the tests below pass).
 
 Priority: P2 (architecture / tooling). Complements the frozen-baseline list in issue 41 ("Layering debt") with checker
 gaps and a relocation plan.
 
-Jobs: [32](../.agents/jobs/_done/32_layer_dag.md) (done, needs review; see its Report for what differs from the plan).
+Jobs: [32](../../.agents/jobs/_done/32_layer_dag.md) (done, needs review; see its Report for what differs from the plan).
+
+## Outcome
+
+Fixed by job 32: the layer rule is a DAG, the baseline has no edges and no lower layer imports `three`. 24 three-free files remain under `render/three`, which the job accepted.
+
+## Closing evidence
+
+- `layering-baseline.json` has `edges: []`.
+- `tests/project/layering.test.ts`: "has no import cycles and no restricted npm import outside render".
 
 ## Status update 2026-10-28
 
@@ -68,7 +77,7 @@ shell needs".
 
 ## Fix
 
-Tracked as job [32](../.agents/jobs/_done/32_layer_dag.md). This issue is resolved when that job's acceptance criteria hold.
+Tracked as job [32](../../.agents/jobs/_done/32_layer_dag.md). This issue is resolved when that job's acceptance criteria hold.
 
 ## Merged from issue 41 (2026-10-28)
 

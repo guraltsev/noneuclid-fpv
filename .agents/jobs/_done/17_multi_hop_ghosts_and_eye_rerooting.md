@@ -3,7 +3,7 @@
 Status: done, needs review on 2026-10-29.
 Revised on 2026-10-29 for a less capable implementing model.
 Resolves: issue [73](../../_issues/73_portal_ghosts_and_xr_eye_rerooting_are_single_hop.md) and the "Ghosts" item of
-issue [63](../../_issues/63_collision_ignores_cells_a_straddling_body_overlaps.md).
+issue [63](../../_issues/_closed/63_collision_ignores_cells_a_straddling_body_overlaps.md).
 
 ## Goal
 

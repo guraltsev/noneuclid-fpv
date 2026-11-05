@@ -5,6 +5,10 @@ Former issue: 80 (converted to a job on 2026-10-28).
 
 Priority: P2 (tooling / performance); bundle items P3.
 
+## Status update 2026-11-05
+
+This text predates the engine wave; rewrite it before running it. All counts and top files are stale. `geodesicCannon.ts` is gone, and a Pages workflow and `check-dist-size.mjs` now exist. Engine and module code holds non-null assertions the proposed lint rule would refuse.
+
 ## Status update 2026-10-28
 
 Nothing in this issue has been implemented. Re-checked:

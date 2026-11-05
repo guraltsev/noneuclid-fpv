@@ -1,9 +1,13 @@
 # Job 45 - API functions that scenarios need, and the checks they convert
 
 Status: blocked on the maintainer: the functions below are a proposal, and the engine API's design is agreed in
-`_docs/design/012-engine-api.md` (see `.agents/knowledge/design-012-process.md`). Do not start until 012 records which of
+`_docs/design/012-engine-api.md` (see the project-knowledge note on `design-012-process`). Do not start until 012 records which of
 them are agreed, and in what form.
 Resolves: nothing fully. It converts class-B manual checks into scenarios.
+
+## Status update 2026-11-05
+
+This text predates the engine wave; rewrite it before running it. The engine split happened, so question 2 is obsolete. Rewrite this job after `geodesicEmitters`: it is the batch's way to create emitters and to turn manual checks into scenarios.
 
 ## Goal
 
@@ -35,7 +39,7 @@ functions. Grouped by what they would unlock:
 | `ui.paletteState()` | query | 26–28 | P3: menu state is client-local, so this is a client query, not an engine one |
 | `view.rendererInfo()` | query | 61, 62; the fake renderer's contract (job 44) | client-side, beside `view.screenshot` |
 | `debug.injectFrameError(n)` | command | 63 | test seam or legitimate debug command: to decide |
-| a debug option forcing the fragment-clip fallback | option | 40 | an optional-feature switch (`.agents/knowledge/optional-features-localized.md`) |
+| a debug option forcing the fragment-clip fallback | option | 40 | an optional-feature switch (the project-knowledge note on `optional-features-localized`) |
 
 Questions for the maintainer:
 1. Which of these are engine API (they survive the engine split), and which are client or debug calls?

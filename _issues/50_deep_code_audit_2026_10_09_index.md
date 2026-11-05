@@ -1,42 +1,18 @@
 ﻿# 50 - Deep code audit, 2026-10-09: index, cross-cutting themes, and order of work
 
-Status: open; re-verified 2026-10-28.
+Status: open; re-verified 2026-11-05.
 
 Priority: P1 (tracking issue). Close it when every issue listed below is closed or moved on.
 
-## Status update 2026-10-28
+## Status update 2026-11-05
 
-Every issue from 51 to 80 was re-checked against the current code. None is closed. Each open issue now has its own
-dated status section.
+Every open issue was checked against the code after the engine wave.
 
-- Partly fixed:
-  - 61: a blocked push-out now keeps the original pose, so bodies no longer escape through a corner. They stop short
-    instead of sliding, and a large step can still exit through a portal.
-  - 62: a crossing into a zone, floor or ceiling is now refused. The cube-vertex loss still reproduces.
-  - 69: a ray that starts inside a disk now hits at t = 0.
-  - 78: `VrComfortOptions` moved to `src/glue`, which removes two layer edges. All 5 import cycles remain.
-- Reproduced again: 62, 65 and 66. Issue 66 is still `moving` after 20,000 ticks at 240 Hz.
-- Unchanged: all the others.
-- Older issues touched by this audit:
-  - Closed on 2026-10-28: [17](_closed/17_stage_08_webxr_vr_locomotion_collision_and_controllers.md),
-    [29](_closed/29_live_torus_skew_geometry_deformation.md),
-    [31](_closed/31_geodesic_end_model_and_curve_shortening_rehaul.md),
-    [32](_closed/32_phase_f_curve_shortening_algorithm_note.md),
-    [33](_closed/33_repository_issue_and_risk_audit_2026_08_03.md) and
-    [35](_closed/35_remove_committed_shared_tls_private_key.md) (the owner discarded the certificate).
-  - Merged and closed on 2026-10-28:
-    - [21](_closed/21_vr_stereo_portal_visibility_union_and_hot_loop_allocation.md): traversal and allocation went
-      to 57; split-root defects, stereo counts and headset checks to 59; the in-headset debug readout to 20.
-    - [41](_closed/41_documentation_audit_findings.md): each open item went to the issue that owns its area (52, 56,
-      60, 62, 64, 66-68, 70, 74, 75, 20, 38 and 78). The `TODO(issue 41)` comments in the source were renamed to
-      match.
-  - Still open: 38.
-- Other merges on 2026-10-28:
-  - The module split proposed by both 70 and 76 now lives only in 76. 70 keeps the performance work.
-  - The marmot heading (64) and the heading transport after a deformation commit (53) cross-reference each other.
-    Both must use forward = RÂ·e_y.
-- The suggested order below still applies. Nothing from themes 1 (the shared segment-walk kernel) or 7 (frame
-  snapshots) has landed, and those two block most of 62, 69 and 71-73.
+- Closed today: 61, 62, 63, 69, 78.
+- Code done, a manual check left: 56, 57, 58, 59, 70, 71, 72, 73.
+- Partly done: 52 (job 18), 75, 82 (job 30). Open: 55 (job 30), 67 (status corrected, decision pending).
+- The themes below have landed, except where those issues say otherwise. The order of work is history; do not follow it.
+- Close this index when the manual checks are done: each remaining item has its own issue or job.
 
 ## Summary
 
@@ -75,9 +51,9 @@ to `src/cell-complex/validateCellComplexSpec.ts`.
 ### Movement and collision (61-65)
 | # | Pri | Title |
 | --- | --- | --- |
-| [61](61_wall_response_lets_bodies_escape_through_corners.md) | P1 | Single-wall push-out lets bodies walk out of a room through any corner (reproduced) |
-| [62](62_segment_based_portal_traversal_and_swept_motion.md) | P1 | Segment traversal plus swept collide-and-slide; bodies are lost past vertices (reproduced) |
-| [63](63_collision_ignores_cells_a_straddling_body_overlaps.md) | P2 | A body straddling a portal is not tested against the neighbor cell's obstacles |
+| [61](_closed/61_wall_response_lets_bodies_escape_through_corners.md) | P1 | Single-wall push-out lets bodies walk out of a room through any corner (reproduced) |
+| [62](_closed/62_segment_based_portal_traversal_and_swept_motion.md) | P1 | Segment traversal plus swept collide-and-slide; bodies are lost past vertices (reproduced) |
+| [63](_closed/63_collision_ignores_cells_a_straddling_body_overlaps.md) | P2 | A body straddling a portal is not tested against the neighbor cell's obstacles |
 | [64](_closed/64_mover_integration_bugs_xr_slide_marmot_heading_object_trap.md) | P2 | XR slide replay (~3 m/s glide), marmot heading mirrored, player trapped by objects |
 | [65](_closed/65_movement_numerics_boundary_hysteresis_and_pose_drift.md) | P3 | Boundary ping-pong, pose drift, mixed-unit tolerances |
 
@@ -87,7 +63,7 @@ to `src/cell-complex/validateCellComplexSpec.ts`.
 | [66](_closed/66_curve_shortening_stalls_at_high_frame_rate.md) | P1 | Curve shortening stalls above ~200 fps; near-fuse livelock |
 | [67](67_exact_curve_shortening_via_sleeve_funnel.md) | P1 | Exact taut-string solution via the sleeve/funnel algorithm replaces gradient descent |
 | [68](_closed/68_loop_endpoint_crossing_must_conjugate_portal_word.md) | P1 | Moving a loop's shared anchor across portal p must map w â†¦ pâ»Â¹wp (currently changes homotopy class) |
-| [69](69_geodesic_tracing_kernel_numerics.md) | P2 | Nudge drift kÂ·10â»â´ m, disk test from inside, missed self-intersections |
+| [69](_closed/69_geodesic_tracing_kernel_numerics.md) | P2 | Nudge drift kÂ·10â»â´ m, disk test from inside, missed self-intersections |
 | [70](70_geodesic_module_performance_and_split.md) | P2 | Rebuild cost (registry copies, repeated all-pairs intersections); the module split moved to 76 |
 
 ### Frame loop, aiming, objects (71-75)
@@ -104,7 +80,7 @@ to `src/cell-complex/validateCellComplexSpec.ts`.
 | --- | --- | --- |
 | [76](../.agents/jobs/25_split_geodesic_cannon_modules.md) | P1 | Concrete seams for `geodesicCannon.ts` (5,942 lines) and `geodesicCannonTools.ts` |
 | [77](../.agents/jobs/_done/31_app_shell_state_holder.md) | P2 | One state holder and one command path for `createThreeApp` |
-| [78](78_enforce_layer_dag_and_move_domain_logic_out_of_render.md) | P2 | Make the layer rule a real DAG; 5 import cycles; move domain logic out of `render/three` |
+| [78](_closed/78_enforce_layer_dag_and_move_domain_logic_out_of_render.md) | P2 | Make the layer rule a real DAG; 5 import cycles; move domain logic out of `render/three` |
 | [79](../.agents/jobs/11_property_tests_for_geometry_core.md) | P2 | Property-based invariants (fast-check) for the geometry core |
 | [80](../.agents/jobs/34_type_strictness_lint_bundle.md) | P2/P3 | `noUncheckedIndexedAccess` (353 errors), lint, bundle chunking (1.44 MB single chunk) |
 

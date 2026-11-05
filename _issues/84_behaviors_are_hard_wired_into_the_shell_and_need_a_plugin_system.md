@@ -1,8 +1,10 @@
 # 84 - Behaviors are hard-wired into the shell; the engine needs a designed plugin system for them
 
-Status: open. Design drafted in [013](../_docs/design/013-world-engine-clients-and-modules.md) (2026-11-03); job files
-written. The module system is designed together with the split between world state and client
-state (maintainer, 2026-11-03).
+Status: open; partly done (audit 2026-11-05). The flow, the geodesic model, measurements and carry are modules, and the shell names
+none of them. Still open: the emitters, flags, measurement tools and creatures write the world from the shell; `publicApi` on modules
+is not built, so the release scenarios of jobs 50, 53 and 54 do not exist; the manual checks of jobs 50, 54 and 55; the before and
+after measurement of requirement 3. The next batch (`geodesicEmitters`, then `publicApi`) carries most of this. Names in the
+text below such as `withDeferredGeodesicIntersections` and `advanceCurveShorteningPairs` are gone from the code.
 
 Priority: P2 (blocks every planned variation of geodesic behavior; no user-visible defect today).
 

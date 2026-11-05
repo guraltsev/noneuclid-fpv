@@ -1,6 +1,6 @@
 ﻿# Job 33 - Decompose runtime monoliths and retire legacy paths
 
-Status: done (branch `job-33`, not merged).
+Status: done on 2026-11-01 (merged).
 Former issue: 38 (converted to a job on 2026-10-28).
 
 Priority: P1 for geodesic correctness boundaries; P3 for dead UI cleanup.

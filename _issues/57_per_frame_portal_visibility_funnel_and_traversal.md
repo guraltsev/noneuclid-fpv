@@ -7,6 +7,10 @@ the concrete algorithmic replacement.
 
 Jobs: [21](../.agents/jobs/21_per_frame_visibility_funnel.md).
 
+## Status update 2026-11-05
+
+The manual check is the desktop grazing walk (no background lines), from job 21's Report. It is not M6, which is headset stereo.
+
 ## Status update 2026-10-29
 
 Re-checked at `0b468e1`: unchanged; `visiblePortalPaths.ts` line references below still hold. Stale references: the

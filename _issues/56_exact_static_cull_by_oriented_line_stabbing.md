@@ -7,6 +7,10 @@ item in issue 41. It does not file that defect again.
 
 Jobs: [20](../.agents/jobs/20_exact_static_cull.md).
 
+## Status update 2026-11-05
+
+The manual check is the desktop corner view at depth 10 against the previous build, from job 20's Report. It is not M6, which is headset stereo.
+
 ## Status update 2026-10-29
 
 Re-checked at `0b468e1`: unchanged, all `staticPortalPathCull.ts` line references below still hold. Stale references:

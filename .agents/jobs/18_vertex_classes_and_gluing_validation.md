@@ -4,6 +4,10 @@ Status: queued.
 Split from issue 52 on 2026-10-28: the defect stays in the issue, the design is here.
 Resolves: issue [52](../../_issues/52_compile_time_vertex_classes_and_gluing_validation.md).
 
+## Status update 2026-11-05
+
+This text predates the engine wave; rewrite it before running it. The nudge prerequisite is gone. New blocker: `trace.ts` turns a vertex-tie exit into `forbidden-zone-hit`, so dropping the zones at flat vertices would stop geodesics there; change that first. The link to job 12 is dead.
+
 ## Context
 
 The defect, evidence and current state are in issue [52](../../_issues/52_compile_time_vertex_classes_and_gluing_validation.md).

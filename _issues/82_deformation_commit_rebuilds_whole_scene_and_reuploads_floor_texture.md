@@ -7,6 +7,11 @@ covers the main-thread cost of *applying* each step, which is what makes the fra
 
 Jobs: [30](../.agents/jobs/30_deformation_rebuild_pipeline.md).
 
+## Status update 2026-11-05
+
+The floor half is fixed and decorations left the cell mesh. The full rebuild remains (`finishGeometryCommit`, then
+`rebuildCellMeshes`). The same texture fault on portal walls moved to issue [90](90_portal_wall_textures_pile_up_during_deformation.md).
+
 ## Status update 2026-10-29
 
 Job 10 fixed the floor texture repeat at 1, so a commit no longer creates a new configured texture; the scene rebuild remains (job 30).

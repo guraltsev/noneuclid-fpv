@@ -2,7 +2,7 @@
 
 Status: done, needs review on 2026-10-29.
 Revised on 2026-10-29 for a less capable implementing model.
-Resolves: issue [69](../../_issues/69_geodesic_tracing_kernel_numerics.md).
+Resolves: issue [69](../../_issues/_closed/69_geodesic_tracing_kernel_numerics.md).
 
 ## Goal
 

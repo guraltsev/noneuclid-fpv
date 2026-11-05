@@ -6,6 +6,10 @@ Former issue: 60 (converted to a job on 2026-10-28).
 Priority: P2 (design / performance / memory). The id inconsistencies already listed in issue 41 disappear under this
 design; they are not filed again here.
 
+## Status update 2026-11-05
+
+This text predates the engine wave; rewrite it before running it. Line references are stale. Its budget bias was fixed by job 20. It omits `portalDebugRuntime.ts` and job 21's per-path allocation handoff. `deriveCellRenderArchetypeCapacities` now takes `eyes`, and root groups already solve issue 59.
+
 ## Status update 2026-10-28
 
 Nothing in the proposal is implemented. Startup still builds every root's table synchronously

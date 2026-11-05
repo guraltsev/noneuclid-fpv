@@ -3,6 +3,10 @@
 Status: queued.
 Resolves: issue [55](../../_issues/55_live_deformation_rebuild_cost_and_se2_transforms.md), issue [82](../../_issues/82_deformation_commit_rebuilds_whole_scene_and_reuploads_floor_texture.md).
 
+## Status update 2026-11-05
+
+This text predates the engine wave; rewrite it before running it. Step 1's floor texture and the Mat3 removal are done, and decorations are no longer in cells. `commitWorldGeometrySnapshot` is now `geometryCommit.ts` plus `finishGeometryCommit`. Add issue 90. Rewrite this job with step phase 7 (design 013 section 5.2).
+
 ## Goal
 
 A deformation step costs a fraction of today's ~100 ms: rebuild only what changed, do not re-upload the floor

@@ -5,6 +5,10 @@ Former issue: 54 (converted to a job on 2026-10-28).
 
 Priority: P3 (design; it also improves rendering quality and makes the family generalize).
 
+## Status update 2026-11-05
+
+This text predates the engine wave; rewrite it before running it. The file moved to `src/cell-complex/deformations/` and the line references are stale. Re-marking must now pass through `geometryCommit` and the geodesic model module.
+
 ## Status update 2026-10-28
 
 Nothing in this issue is implemented. The family still uses the marked basis as the footprint

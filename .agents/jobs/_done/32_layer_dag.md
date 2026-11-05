@@ -2,11 +2,11 @@
 
 Status: done, needs review on 2026-10-31.
 Split from issue 78 on 2026-10-28: the defect stays in the issue, the design is here.
-Resolves: issue [78](../../_issues/78_enforce_layer_dag_and_move_domain_logic_out_of_render.md).
+Resolves: issue [78](../../_issues/_closed/78_enforce_layer_dag_and_move_domain_logic_out_of_render.md).
 
 ## Context
 
-The defect, evidence and current state are in issue [78](../../_issues/78_enforce_layer_dag_and_move_domain_logic_out_of_render.md).
+The defect, evidence and current state are in issue [78](../../_issues/_closed/78_enforce_layer_dag_and_move_domain_logic_out_of_render.md).
 
 ## Proposed change
 

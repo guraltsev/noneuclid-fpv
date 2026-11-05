@@ -1,22 +1,30 @@
 # 62 - Replace the anchor-point exit guess with segment traversal plus swept collide-and-slide
 
-Status: open; re-verified 2026-10-28; fix designed 2026-10-29.
+Status: closed on 2026-11-05 (audit against the code; the tests below pass).
 
-- Implemented by job 13; needs review, see the Report in [job 13](../.agents/jobs/_done/13_swept_collide_and_slide.md).
+- Implemented by job 13; needs review, see the Report in [job 13](../../.agents/jobs/_done/13_swept_collide_and_slide.md).
 
 - Kernel landed in job 12 (`segmentWalk.ts`, `developedDisk.ts`); callers move in job 13.
 
 Priority: P1 (correctness and robustness). This is a concrete design for the issue 41 items "a step that crosses a portal
 returns before floor/ceiling/forbidden-zone tests" and "`portalCrossingMode` ignored", plus new failures listed below.
 
-Jobs: [12](../.agents/jobs/12_segment_walk_kernel.md), [13](../.agents/jobs/13_swept_collide_and_slide.md).
+Jobs: [12](../../.agents/jobs/12_segment_walk_kernel.md), [13](../../.agents/jobs/13_swept_collide_and_slide.md).
+
+## Outcome
+
+Fixed by jobs 12 and 13: movement walks the segment through the kernel; `findMostProbablePortalExit` is gone.
+
+## Closing evidence
+
+- `tests/movement/moveDynamicObject.test.ts`: "keeps the anchor inside its cell walking through a cube vertex" and "gives the same final pose for one long move as for many short ones".
 
 ## Status update 2026-10-29
 
 - Item 5 (framerate dependence) is partly done: the per-frame simulation step is capped at 0.1 s
   (`maxSimulationStepSeconds`, commit `98a99af`). The slide itself is designed to be step-size independent.
-- Design decided in [job 12](../.agents/jobs/12_segment_walk_kernel.md) (kernel) and
-  [job 13](../.agents/jobs/13_swept_collide_and_slide.md) (mover); not implemented yet:
+- Design decided in [job 12](../../.agents/jobs/12_segment_walk_kernel.md) (kernel) and
+  [job 13](../../.agents/jobs/13_swept_collide_and_slide.md) (mover); not implemented yet:
   - The centre slides through obstacles collected in the start cell's developed frame (the developed disk of job 12);
     then the anchor's polyline is walked with the segment-walk kernel. This replaces the per-cell loop sketched in
     "Proposed change"; the result is the same for steps below 0.5 m and needs less code.

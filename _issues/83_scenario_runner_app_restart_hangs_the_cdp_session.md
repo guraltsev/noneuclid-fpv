@@ -58,7 +58,7 @@ restart call in several, with no fixed test or call it always lands on. The test
 `tests/app/appCommands.release.test.ts`) only waits 45 s before Vitest's own test timeout kills it.
 
 This was diagnosed at length while writing job 44 (`.agents/jobs/_done/44_api_scenario_runner_and_manual_checklist.md`
-and `.agents/knowledge/scenario-runner-browser-limits.md` have the full trail, so it does not need re-running):
+and the project-knowledge note on `scenario-runner-browser-limits` have the full trail, so it does not need re-running):
 
 - It happens running this one scenario file alone, with every other `release` file excluded and `--no-file-parallelism`
   already in effect, so it is not file-parallelism contention (that was a separate, already-fixed problem).
@@ -72,7 +72,7 @@ and `.agents/knowledge/scenario-runner-browser-limits.md` have the full trail, s
 - A plain Node script issuing the identical CDP calls directly, outside Vitest, did not reproduce it in several
   tries — something about running under a Vitest worker plays a part, not confirmed what.
 - Same *class* of flake already on record for `npm run smoke` across several worlds right after a build
-  (`.agents/knowledge/test-and-smoke-timing.md`): a rerun with no code change flips from a real failure to passing.
+  (the project-knowledge note on `test-and-smoke-timing`): a rerun with no code change flips from a real failure to passing.
   Best current guess is a resource/timing issue in this machine's headless, software-rendered (SwiftShader) browser
   while it disposes and rebuilds a full WebGL context under CDP, not a bug in the scenario runner or in `app.*`'s
   own implementation.
@@ -124,7 +124,7 @@ investigate, not yet tried:
   parked) 10 times in a row with no `--no-file-parallelism`-style global change, only normal retries a person
   would actually run.
 - If the investigation instead concludes this is an unfixable property of this machine's software-rendered browser
-  under CDP, record that conclusion here and in `.agents/knowledge/scenario-runner-browser-limits.md`, and decide
+  under CDP, record that conclusion here and in the project-knowledge note on `scenario-runner-browser-limits`, and decide
   whether to park the restart scenarios again (`tests/_temp/<ref>/`, kind `report`) or cover the behaviour a
   different way (for example, a `process`-tier test that drives the app's command path directly in Node without a
   real browser).

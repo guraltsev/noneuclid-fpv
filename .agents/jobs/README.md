@@ -102,10 +102,10 @@ lower numbers of jobs 18, 24, 30, 34 and 35.
 | [10](_done/10_floor_texture_in_lattice_coordinates.md) | Floor texture in lattice coordinates | done | [81](../../_issues/_closed/81_floor_texture_slides_under_objects_during_deformation.md) |  |
 | [00](_done/00_coordinate_jobs_11_17_36.md) | Coordinate jobs 11-17 and 36: order, gates, batch report | done, needs review | - |  |
 | [11](_done/11_property_tests_for_geometry_core.md) | Property-based tests for the geometry core | done, needs review | - | 79 |
-| [12](_done/12_segment_walk_kernel.md) | Shared segment-walk kernel and developed-disk atlas | done | [62](../../_issues/62_segment_based_portal_traversal_and_swept_motion.md) |  |
-| [13](_done/13_swept_collide_and_slide.md) | Swept collide-and-slide on the segment-walk kernel | done, needs review | [62](../../_issues/62_segment_based_portal_traversal_and_swept_motion.md), [61](../../_issues/61_wall_response_lets_bodies_escape_through_corners.md), [63](../../_issues/63_collision_ignores_cells_a_straddling_body_overlaps.md) |  |
+| [12](_done/12_segment_walk_kernel.md) | Shared segment-walk kernel and developed-disk atlas | done | [62](../../_issues/_closed/62_segment_based_portal_traversal_and_swept_motion.md) |  |
+| [13](_done/13_swept_collide_and_slide.md) | Swept collide-and-slide on the segment-walk kernel | done, needs review | [62](../../_issues/_closed/62_segment_based_portal_traversal_and_swept_motion.md), [61](../../_issues/_closed/61_wall_response_lets_bodies_escape_through_corners.md), [63](../../_issues/_closed/63_collision_ignores_cells_a_straddling_body_overlaps.md) |  |
 | [14](_done/14_movement_numerics.md) | Movement numerics: crossing at rest, pose drift, tolerances | done | [65](../../_issues/_closed/65_movement_numerics_boundary_hysteresis_and_pose_drift.md) |  |
-| [15](_done/15_geodesic_tracing_on_kernel.md) | Geodesic tracing on the segment-walk kernel | done, needs review | [69](../../_issues/69_geodesic_tracing_kernel_numerics.md) |  |
+| [15](_done/15_geodesic_tracing_on_kernel.md) | Geodesic tracing on the segment-walk kernel | done, needs review | [69](../../_issues/_closed/69_geodesic_tracing_kernel_numerics.md) |  |
 | [16](_done/16_aim_picking_by_portal_ray_walk.md) | Aim picking by portal ray walk | done, needs review | [72](../../_issues/72_aim_picking_uses_camera_clip_polygons_not_portal_ray_walk.md) |  |
 | [17](_done/17_multi_hop_ghosts_and_eye_rerooting.md) | Multi-hop portal ghosts and XR eye re-rooting | done, needs review | [73](../../_issues/73_portal_ghosts_and_xr_eye_rerooting_are_single_hop.md) |  |
 | [00](_done/00_coordinate_jobs_19_23_25_29_37.md) | Coordinate jobs 37, 38, 25-29 and 19-23 in four phases (phase commits and tags) | done, needs review | - |  |
@@ -123,8 +123,8 @@ lower numbers of jobs 18, 24, 30, 34 and 35.
 | [29](_done/29_frame_loop_allocation_and_draw_calls.md) | Frame-loop allocation and per-object draw calls | done, needs review | [75](../../_issues/75_frame_loop_allocation_and_per_object_draw_calls.md) |  |
 | [30](30_deformation_rebuild_pipeline.md) | Incremental deformation rebuild pipeline | queued | [55](../../_issues/55_live_deformation_rebuild_cost_and_se2_transforms.md), [82](../../_issues/82_deformation_commit_rebuilds_whole_scene_and_reuploads_floor_texture.md) |  |
 | [31](_done/31_app_shell_state_holder.md) | Shell cleanups: dead field, one portal sync, split the palette adapter | done, needs review | - | 77 |
-| [32](_done/32_layer_dag.md) | Make the layer rule a real DAG | done, needs review | [78](../../_issues/78_enforce_layer_dag_and_move_domain_logic_out_of_render.md) |  |
-| [33](33_decompose_runtime_monoliths.md) | Decompose runtime monoliths and retire legacy paths | done | - | 38 |
+| [32](_done/32_layer_dag.md) | Make the layer rule a real DAG | done, needs review | [78](../../_issues/_closed/78_enforce_layer_dag_and_move_domain_logic_out_of_render.md) |  |
+| [33](_done/33_decompose_runtime_monoliths.md) | Decompose runtime monoliths and retire legacy paths | done | - | 38 |
 | [34](34_type_strictness_lint_bundle.md) | Type strictness, linting and bundle configuration | queued | - | 80 |
 | [35](35_torus_family_as_teichmuller_space.md) | Treat the torus family as TeichmÃƒÆ’Ã‚Â¼ller space | queued | - | 54 |
 | [36](_done/36_creatures_detour_and_resume_geodesic.md) | Creatures detour around obstacles and resume their geodesic | done, needs review | - |  |

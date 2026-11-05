@@ -6,6 +6,10 @@ Priority: P2 (performance, with a correctness defect in single-view XR and on po
 
 Jobs: [28](../.agents/jobs/28_frame_snapshot_instance_sync.md).
 
+## Status update 2026-11-05
+
+The manual check is M7 (mono-XR flag re-root), not M10.
+
 ## Status update 2026-10-29
 
 Re-checked at `0b468e1`; line numbers below are stale (the second sync is now `createThreeApp.ts:1522`, the collections

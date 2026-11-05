@@ -1,6 +1,7 @@
 # 86 - Derived state is recomputed by scanning the world, and nothing guards it
 
-Status: open.
+Status: open; the code is done (jobs 56 to 60). What is left is the manual `derived-verify` session of job 59: run the app with the
+option on, carry an emitter, shoot a geodesic, tie two ends and let the flow merge them; no "differs from compute" error may appear.
 
 Priority: P1 (it stopped the batch of jobs 48-55, and it blocks jobs 52 to 55 and with them issue 84).
 

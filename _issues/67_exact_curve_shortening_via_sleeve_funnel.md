@@ -1,6 +1,10 @@
 # 67 - Curve shortening by gradient descent does not find the taut string
 
-Status: open; re-verified 2026-10-28. Implemented by job 26, which ended "done, needs review"; see the Report in `.agents/jobs/_done/26_exact_curve_shortening.md`.
+Status: open; awaiting the maintainer's decision. The earlier status, "implemented by job 26", is false: job 26's sleeve solver was
+removed on 2026-11-01 (commit fe5ec0a; the maintainer chose a flow of real state, with no vertex insertion). The flow in
+`src/modules/curveShortening/flow.ts` descends along \(u_1 + u_2\), and under the default policy a blocked curve is destroyed, so
+the defect below is now the chosen behaviour. Either close this issue as decided, or rewrite it as "stick at the corner", the
+replacement module of design 013 section 9.5.
 
 Priority: P1 (correctness + design). Supersedes the "Tick Geometry" and "Monotonicity" sections of issue 32 and
 resolves the issue-41 items "failed fusion leaves a stuck ready-to-fuse pair", "degenerate free loop never deleted"

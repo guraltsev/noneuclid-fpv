@@ -1,20 +1,29 @@
 # 63 - Bodies that straddle a portal are tested only against their own cell
 
-Status: open; re-verified 2026-10-28; fix designed 2026-10-29.
+Status: closed on 2026-11-05 (audit against the code; the tests below pass).
 
-- Implemented by job 13; needs review, see the Report in [job 13](../.agents/jobs/_done/13_swept_collide_and_slide.md).
+- Implemented by job 13; needs review, see the Report in [job 13](../../.agents/jobs/_done/13_swept_collide_and_slide.md).
 
 - Kernel landed in job 12 (`segmentWalk.ts`, `developedDisk.ts`); callers move in job 13.
 
 Priority: P2 (correctness). Category: design. The fix supplies the obstacle set used by issue 62.
 
-Jobs: [13](../.agents/jobs/13_swept_collide_and_slide.md).
+Jobs: [13](../../.agents/jobs/13_swept_collide_and_slide.md).
+
+## Outcome
+
+Fixed for moves by job 13: `moveDynamicObject` tests bodies in neighbouring cells through `developedObstacles`. The same gap in turns and depenetration, which use own-cell `testCellCollision`, moved to issue [85](../85_audit_pose_changes_that_skip_the_collision_check.md).
+
+## Closing evidence
+
+- `tests/movement/moveDynamicObject.test.ts`: describe "bodies across portals".
+- `tests/cell-complex/developedDisk.test.ts`: "tiles the disk exactly once".
 
 ## Status update 2026-10-29
 
-Design decided in [job 12](../.agents/jobs/12_segment_walk_kernel.md) (atlas) and
-[job 13](../.agents/jobs/13_swept_collide_and_slide.md) (obstacles); the ghost item is
-[job 17](../.agents/jobs/17_multi_hop_ghosts_and_eye_rerooting.md). Not implemented yet.
+Design decided in [job 12](../../.agents/jobs/12_segment_walk_kernel.md) (atlas) and
+[job 13](../../.agents/jobs/13_swept_collide_and_slide.md) (obstacles); the ghost item is
+[job 17](../../.agents/jobs/17_multi_hop_ghosts_and_eye_rerooting.md). Not implemented yet.
 
 - The local atlas is built as described, with wedges seen from the body centre. A prototype (2026-10-29) showed that
   the copies tile the disk exactly once in cube, icosahedron, torus-moduli, dodecahedron, genus-2 torus and tetrahedron,
@@ -110,5 +119,5 @@ the `[-r, L+r]` window with `dist(c, segment) < r`.
 - Atlas unit test: around each vertex of `icosahedron` and `cube`, the copies collected for `B(c, 0.25)` with
   `|c - v| = 0.4` have total clipped area `π·0.25²` (±1e-6).
 
-Status update 2026-10-29: the ghost item is implemented in [job 17](../.agents/jobs/_done/17_multi_hop_ghosts_and_eye_rerooting.md) (commit d96f09d).
+Status update 2026-10-29: the ghost item is implemented in [job 17](../../.agents/jobs/_done/17_multi_hop_ghosts_and_eye_rerooting.md) (commit d96f09d).
 

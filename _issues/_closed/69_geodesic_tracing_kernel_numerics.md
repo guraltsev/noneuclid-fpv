@@ -1,16 +1,25 @@
 # 69 - Geodesic tracing kernel: nudge drift, disk test with the start inside, missed intersections
 
-Status: open; re-verified 2026-10-28; fix designed 2026-10-29. Implemented by job 15, which ended "done, needs review"; see the Report in [job 15](../.agents/jobs/_done/15_geodesic_tracing_on_kernel.md).
+Status: closed on 2026-11-05 (audit against the code; the tests below pass).
 
 Priority: P2 (robustness / correctness).
 
-Jobs: [15](../.agents/jobs/_done/15_geodesic_tracing_on_kernel.md).
+Jobs: [15](../../.agents/jobs/_done/15_geodesic_tracing_on_kernel.md).
 
-Implemented by job 15, needs review: see the Report in [the job](../.agents/jobs/_done/15_geodesic_tracing_on_kernel.md).
+Implemented by job 15, needs review: see the Report in [the job](../../.agents/jobs/_done/15_geodesic_tracing_on_kernel.md).
+
+## Outcome
+
+Fixed by job 15: `trace.ts` walks with `walkDevelopedSegment`, so there is no nudge drift, and the disk test handles a start inside.
+
+## Closing evidence
+
+- `tests/world-objects/geodesic/geodesicTracingKernel.test.ts`: "rebuilds a locked interval whose end anchor is 1e-5 m from a portal side after ten wraps" and "hits at t = 0 from a start strictly inside".
+- `intersections.test.ts`: the two-apart and 0.2 m cases.
 
 ## Status update 2026-10-29
 
-Design decided in [job 15](../.agents/jobs/15_geodesic_tracing_on_kernel.md) (not implemented yet):
+Design decided in [job 15](../../.agents/jobs/15_geodesic_tracing_on_kernel.md) (not implemented yet):
 
 - The multi-cell trace walks the developed chord with `walkDevelopedSegment` (job 12) and then cuts it at the first
   zone or emitter hit; `targetStart` of a portal hit is the next piece's exact start. No end-point snapping (the job 12
