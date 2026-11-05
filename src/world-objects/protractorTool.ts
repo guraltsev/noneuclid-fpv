@@ -388,8 +388,7 @@ function resolveSegmentSelectionObject(
     return current;
   }
 
-  return registry.getAll()
-    .filter((object): object is GeodesicSegmentObject => object.kind === "geodesicModel/segment")
+  return registry.getSegmentsOfGeodesic(previous.geodesicId)
     .filter((segment) =>
       segment.geodesicId === previous.geodesicId &&
       (previous.endRole === undefined || segment.halfRole === previous.endRole) &&

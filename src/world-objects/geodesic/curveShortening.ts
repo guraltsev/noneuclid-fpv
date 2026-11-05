@@ -11,7 +11,8 @@
 import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex";
 import type { RuntimeObjectRegistry } from "../runtimeObjectRegistry";
 import { createCurveShorteningPairObject, type CurveShorteningPairObject, type GeodesicEndpointSelection } from "./objects";
-import { arcsAtVertex, isStale, type ArcEnd } from "./endpoints";
+import { arcsAtVertex, isStale } from "./endpoints";
+import type { ArcEnd } from "./arcIndex";
 import { withDeferredGeodesicIntersections, requestGeodesicIntersectionUpdate } from "./intersections";
 import {
   arcTangentsAtVertex,

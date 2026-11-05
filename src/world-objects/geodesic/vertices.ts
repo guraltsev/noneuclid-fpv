@@ -31,7 +31,6 @@ import { requestGeodesicIntersectionUpdate, withDeferredGeodesicIntersections } 
 import {
   liftGeodesicEndpointWithAnchors,
   removeUnusedFreeGeodesicEnds,
-  type ArcEnd,
 } from "./endpoints";
 import {
   getGeodesicSegments,
@@ -41,6 +40,7 @@ import {
   replaceDerivedSegmentsFromTraces,
 } from "./segments";
 import { arcConnectsEmitters } from "./lifecycle";
+import type { ArcEnd } from "./arcIndex";
 import { previewRebuildGeodesicInterval, rebuildDerivedGeodesicSegments } from "./intervals";
 
 /** Turning angle (radians) below which a vertex counts as taut: its two arcs are one geodesic and the vertex is removed. */

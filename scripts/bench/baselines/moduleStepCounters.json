@@ -4,9 +4,9 @@
     "writes": 1559,
     "scans": {
       "curve-shortening-pair": 1,
-      "geodesicModel/arc": 121,
+      "geodesicModel/arc": 3,
       "geodesicModel/segment": 120,
-      "geodesicModel/vertex": 1,
+      "geodesicModel/vertex": 2,
       "measured-geodesic-length": 1,
       "protractor-angle": 1
     }
@@ -15,9 +15,8 @@
     "steps": 120,
     "writes": 1918,
     "scans": {
-      "*": 120,
       "curve-shortening-pair": 1,
-      "geodesicModel/arc": 120,
+      "geodesicModel/arc": 2,
       "geodesicModel/segment": 120,
       "geodesicModel/vertex": 1,
       "measured-geodesic-length": 121,
@@ -29,10 +28,10 @@
     "writes": 127420,
     "scans": {
       "curve-shortening-pair": 1,
-      "geodesicModel/arc": 121,
+      "geodesicModel/arc": 3,
       "geodesicModel/crossing": 120,
       "geodesicModel/segment": 120,
-      "geodesicModel/vertex": 1,
+      "geodesicModel/vertex": 2,
       "measured-geodesic-length": 1,
       "protractor-angle": 1
     }

@@ -159,9 +159,7 @@ function findClosestGeodesicSegment(
   cellId: string,
   point: Vec3,
 ): { readonly segment: GeodesicSegmentObject; readonly playerPoint: Vec3 } | undefined {
-  const segments = registry.getAll().filter((object): object is GeodesicSegmentObject =>
-    object.kind === "geodesicModel/segment" && object.geodesicId === geodesicId
-  );
+  const segments = registry.getSegmentsOfGeodesic(geodesicId);
   const images = world
     ? enumerateCellImages(world, cellId, closestSegmentMaxHops)
     : [{ cellId, cellFromStart: identityRigidTransform3, hops: 0 }];
@@ -184,10 +182,7 @@ function findClosestGeodesicSegment(
 }
 
 function getGeodesicTotalLengthMeters(registry: RuntimeObjectRegistry, geodesicId: string): number {
-  return registry.getAll()
-    .filter((object): object is GeodesicSegmentObject =>
-      object.kind === "geodesicModel/segment" && object.geodesicId === geodesicId
-    )
+  return registry.getSegmentsOfGeodesic(geodesicId)
     .reduce((total, segment) => total + segment.lengthMeters, 0);
 }
 

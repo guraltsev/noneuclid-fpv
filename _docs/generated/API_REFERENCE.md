@@ -679,6 +679,18 @@ Anchors of geodesic intervals: which registry objects can hold an endpoint, and 
 | function | `canObjectAttachGeodesics` | True when the object may be the anchor of a geodesic interval endpoint. |
 | function | `getAnchorBeamPoint` | Beam-height point of an anchor object in its cell frame. |
 
+### `world-objects/geodesic/arcIndex.ts`
+
+The arc index (design 014 section 7.1): which arc ends sit on each anchor, built by one pass over the arcs and cached.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `ArcEnd` | An arc end: one endpoint role of an arc. |
+| interface | `ArcIndex` | The arc ends grouped by anchor. |
+| const | `noArcIndexEntries` | The shared answer for an anchor with no arc ends. |
+| const | `arcIndex` | Read with `arcIndex.read(registry)`. |
+| const | `computeArcIndex` | The index computed from scratch, for the oracle tests. |
+
 ### `world-objects/geodesic/cannon.ts`
 
 Emitter (cannon) operations: shooting, extending and re-aiming geodesics, connecting a geodesic to an emitter, rebuilding locked geodesics between emitters, and placing cannons on the floor, on a geodesic or at a geodesic vertex.
@@ -761,7 +773,6 @@ Endpoint attachments of geodesic intervals: lookup by anchor, re-attachment, lif
 | function | `portalWordMatchesCurrentEndpointCells` | True when the interval's portal word leads from the start anchor's cell to the end anchor's cell. |
 | function | `portalWordMatchesEndpointCellsWithAnchors` | Like `portalWordMatchesCurrentEndpointCells`, with candidate anchors that may differ from the registry. |
 | function | `isAimableFreeGeodesic` | True for an arc with one emitter endpoint and one vertex that no other arc end uses (a plain shot geodesic). |
-| interface | `ArcEnd` | An arc end: one endpoint role of an arc. |
 | function | `arcsAtVertex` | Both endpoint roles attached to the vertex (a loop on it contributes two), in registry insertion order. |
 | function | `forEachTiedVertex` | Visits the vertices with two or more arc ends in registry insertion order. |
 | function | `tiedVertexCount` | Number of vertices with two or more arc ends (closed loops included). |

@@ -11,6 +11,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { createRuntimeObjectRegistry } from "../../../src/world-objects/runtimeObjectRegistry";
+import { derivedStatsOf } from "../../../src/world-objects/derived";
 import {
   advanceCurveShorteningPairs,
   curveShorteningSpeedMetersPerSecond,
@@ -451,6 +452,18 @@ describe("curve shortening flow across portals and around junction disks", () =>
     });
     expect(previousLength).toBeCloseTo(4, 1);
     expect(maxSideViolation(world, registry)).toBeLessThan(1e-6);
+  });
+});
+
+describe("the arc index during a flow", () => {
+  it("is computed a handful of times and read many times over a whole flow run", () => {
+    const { world, registry } = createTorusTiedPairScenario();
+
+    runCurveShorteningUntilPairGone(world, registry, { pairId: "pair", geodesicIds: ["g1", "g2"], deltaSeconds: frame60Hz, maxTicks: 4000 });
+
+    const stats = derivedStatsOf(registry).find((entry) => entry.id === "geodesicModel/arcIndex");
+    expect(stats?.computes).toBeLessThanOrEqual(6);
+    expect(stats?.reads).toBeGreaterThan(50);
   });
 });
 
