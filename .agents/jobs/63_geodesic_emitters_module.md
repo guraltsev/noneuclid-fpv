@@ -125,7 +125,53 @@ How each deleted follow-up was verified:
   8. A config with emitters off: no emitter tool on the list.
   Quest 2: the same steps 1 to 5 with the trigger and the palette, and the wrist indicator shows the ray icon. Watch that a click on the floor still feels immediate at a low tick rate, since it is two commands, each waiting for a tick. Frame time should not change: nothing per-frame was added.
 
+### Repair round
+
+After a fresh review, on top of `0f5d439`: commit `c789b95`. It supersedes what is said above where they differ.
+
+Reproduced first, with tests that press during the wait; 10 failed on `0f5d439`, all pass now:
+- Add geodesic pressed twice: 3 arcs where 2 are right, and the second answer ended the tool. Delete pressed twice: a false refusal. A geodesic pressed twice: it grew twice.
+- Floor pressed again elsewhere: 2 emitters. Same spot: a false "An emitter cannot stand there." The new emitter pressed between the `place` and `shoot` answers: an extra geodesic.
+- The same second press through the real `toolHost`, the emitters' client and an engine: 2 emitters.
+- Answer ending the wrong tool: read by the reviewer, now run: the person switched to `place-flag` with the command in flight, and the answer left `none`.
+- A cut on a segment named the new arc `geodesicModel/arc:0:continuation:geodesicEmitters/emitter:1`. A refused `place` spent the serial, so the next emitter was `:1`.
+
+Fixes:
+- **`ToolContext.commandInFlight()`**, from the host's `pending` list, per tool. It costs less than a local flag, and jobs 64 and 66 can use it: an answer that submits the next command does so inside `afterStep`, so a `place` and `shoot` sequence never reads as idle. The press, Add, delete and extension all check it, so at most one answer is awaited and `pageEmitterId` cannot be taken by a second one.
+- **`endTool` ends only the tool whose context it is:** another selected tool, or none, is left alone. A page's refusal therefore no longer calls it: it calls `showObjectPage`, which shows the page as it now is, and closes the menu for an id that is no emitter. So a refused delete of an arc not on the emitter redraws the page instead of closing it.
+- **Every new arc id is `geodesicModel/arc:<n>`:** `placeGeodesicCannonOnGeodesic` takes `createContinuationGeodesicId`, and the contract test covers the segment case.
+- **`extend` reads through a new query, `emitterOfArc`** (over `getGeodesicConnection`), so the header of `module.ts` is true.
+- **`place` spends no id on a refusal:** the three placement functions take `createId`, called when the placement is certain, and the checks use a candidate with an empty id.
+
+Deleted as reachable only by tests, each checked:
+- The defaults of `createPaletteDefinition`: its one `src` caller passes all five arguments, so all four defaults went, not only `toolsById`; `tests/support/tools.ts#createTestPaletteDefinition` holds them.
+- The return value and `return []` guards of `splitGeodesicIntervalAtSegmentHit`, which now takes the records its one caller has checked. Two casts stand where the guards narrowed the types.
+- `?? defaultTraceLengthMeters` in `shootGeodesic` and `extendGeodesic`: every `src` caller passes a length.
+- Both `!removed.ok` branches: `removeCurve` refuses only an id that is no arc, and these ids come from the model.
+- `case "removed"` in `client.ts`: no client submits `remove`.
+- Kept: `if (!result.ok) throw` in `reserveArcId`. It is as unreachable, but it is what narrows the result; it was not on the list.
+
+Test changes in this round, none on geometry, motion or length:
+- 17 calls in `cannon.test.ts` and `trace.test.ts` now say `maxLengthMeters: 2`, the old default.
+- `cannon.test.ts`: `createId`, and a factory that keeps the old `g-a:continuation:cannon-b` id.
+- `segments.test.ts`: "gives the continuation of a split the next free number" asserts that both arcs exist in the registry, instead of the deleted return value.
+- `emitterTool.test.ts`: "closes the menu when the world refuses" became "shows the refusal and the page as it now is"; the closing is tested in `runtimeObjectActions.test.ts`.
+- Palette tests call `createTestPaletteDefinition`.
+
+Left out of the Report above:
+- `tests/support/tools.ts` lost the `useGeodesicCannon` dep.
+- The `writesCoreKinds` doc in `moduleTypes.ts` no longer says "it empties as the owners arrive", while the list grew by two modules. That sentence was no longer true. Job 64 settles it.
+- `toolHost.test.ts`: `objectSyncs toBe(1)` became a check on `log.palette`, because the dep it counted is deleted. The first version, `toBeGreaterThan`, was weaker than it needed to be; it is now `toBe(paletteBefore + 1)`, with the count taken after the press, so only the sync after the answer can raise it.
+- `shootGeodesic` can half-write if the trace comes back empty (it adds the free end and the arc, then throws). The reviewer did not reproduce it in 952 shots; it is not new, and it is left as is. `shoot` refuses lengths below the minimum first.
+- The records of a deleted arc's measurements are removed by `removeGeodesicIntervalAndDerivedObjects`, not by a derive tick, pending issue 94. So the Decision's "go where the derive ticks already do the work" holds for the shell's follow-ups only in the sense that they moved into the world.
+
+New in the design's terms, in addition to the list above: `ToolContext.commandInFlight`, query `emitterOfArc`.
+
+Checks of this round: `npm run typecheck` clean; `npm test` 174 files, 1559 tests passed; `npm run docs:check` ok; `npm run docs:writers` 8 files, 24 direct write calls, 9 mutator uses; `npm run build` and smoke on cube and torus-moduli OK (`createThreeApp.ts` is not changed in this round, but `toolHost.ts` is). Release tier and bench not run, as asked.
+
 ### Checks
+
+These are the first round's; the repair round's are in its section.
 
 - `npm run typecheck`: clean, before each commit and at the end.
 - `npm test`: 174 files, 1548 tests passed.
