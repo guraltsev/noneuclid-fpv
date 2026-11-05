@@ -14,7 +14,6 @@ const coreObjectKindTable: Record<RuntimeWorldObject["kind"], true> = {
   "geodesic-cannon": true,
   "geodesicModel/arc": true,
   "geodesicModel/vertex": true,
-  "curve-shortening-pair": true,
   "geodesicModel/segment": true,
   "geodesicModel/crossing": true,
   "geodesicMeasurements/length": true,

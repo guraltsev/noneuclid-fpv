@@ -5,9 +5,10 @@
 import type { AnyModuleDefinition } from "../engine/moduleTypes";
 import { carryModule } from "../modules/carry";
 import { geodesicMeasurementsModule } from "../modules/geodesicMeasurements";
+import { curveShorteningModule } from "../modules/curveShortening";
 import { geodesicModelModule } from "../modules/geodesicModel";
 
 /** The world modules of the default experience. */
 export function createDefaultWorldModules(): readonly AnyModuleDefinition[] {
-  return [geodesicModelModule(), geodesicMeasurementsModule(), carryModule()];
+  return [geodesicModelModule(), geodesicMeasurementsModule(), carryModule(), curveShorteningModule()];
 }

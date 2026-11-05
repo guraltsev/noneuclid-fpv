@@ -21,6 +21,7 @@ import {
   type CarryOffset,
   type CarryReleasedEvent,
 } from "../../modules/carry/api";
+import type { GeodesicTieAndDetachCommand } from "../../modules/geodesicModel/api";
 import type { FocusedRuntimeObject } from "./rootAimRay";
 import * as THREE from "three";
 import { type CompiledCellComplex } from "../../cell-complex/compileCellComplex";
@@ -50,7 +51,6 @@ import {
   removeGeodesic,
   removeUnlockedGeodesicsFromCannon,
 } from "../../world-objects/geodesic/lifecycle";
-import { tieAndDetachGeodesicEndpoints } from "../../world-objects/geodesic/curveShortening";
 import {
   extendGeodesic,
   placeGeodesicCannonAtFloorPoint,
@@ -167,6 +167,7 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
   let geodesicCannonRotationTargetLengthMeters: number | undefined;
   // The ticket of the pickup the tool submitted and the world has not answered yet.
   let pendingAttachTicket: CommandTicket | undefined;
+  let pendingTieTicket: CommandTicket | undefined;
 
   /** Forgets the frozen head height and target length once the matching tool mode has ended. */
   function resetGeodesicCannonRotationTracking(mode: { readonly rotating: boolean; readonly aiming: boolean }): void {
@@ -649,25 +650,21 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
 
   function tieAndDetachGeodesicsFromCannon(cannonId: string, selectedEndpoints: readonly [GeodesicEndpointSelection, GeodesicEndpointSelection]): void {
     syncTieAndDetachSelectionHighlights([]);
-    const pair = tieAndDetachGeodesicEndpoints({
-      world: deps.getWorld(),
-      registry: runtimeObjectRegistry,
-      detachedEmitterId: cannonId,
+    // The tie is the world's to accept: the tool waits for the answer (afterWorldStep). The first step of the flow runs in the step that applies the tie.
+    const tie: GeodesicTieAndDetachCommand = {
+      kind: "geodesicModel/tieAndDetach",
+      emitterId: cannonId,
       first: selectedEndpoints[0],
       second: selectedEndpoints[1],
-      createPairId: () => deps.engine.ids.next("curve-shortening"),
-      createFreeEndId: () => deps.engine.ids.next("free-end"),
-    });
-    if (!pair) {
-      syncDesktopPalette();
-      syncRuntimeObjectPortalInstances();
-      return;
-    }
+    };
+    pendingTieTicket = deps.engine.submit(localParticipantId, tie);
+  }
 
+  // The tool's own end of a tie, once the world accepted it: its state, the menu and the selection.
+  function finishTieAndDetach(): void {
     deps.dispatch({ kind: "set-cannon-tool-state", state: {} });
     deps.dispatch({ kind: "close-menu" });
     deps.dispatch({ kind: "clear-selected-tool" });
-    removeProtractorAnglesForMissingVertices(pruneMissingGeodesicIntersectionObjects(runtimeObjectRegistry));
     syncDesktopPalette();
     syncRuntimeObjectPortalInstances();
     syncSelectableHitboxDebug();
@@ -763,6 +760,20 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
           if (deps.session.get().menuState.selectedTool === "geodesic-cannon-carry") {
             leaveCarryTool();
           }
+        }
+      }
+    }
+    if (pendingTieTicket !== undefined) {
+      const result = deps.engine.resultOf(pendingTieTicket);
+      if (result !== undefined) {
+        pendingTieTicket = undefined;
+        if (result.ok) {
+          finishTieAndDetach();
+        } else {
+          // A refusal changes nothing: the tool stays as it was.
+          console.info(`[noneuclid] ${result.refusal.message}`);
+          syncDesktopPalette();
+          syncRuntimeObjectPortalInstances();
         }
       }
     }

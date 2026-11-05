@@ -156,35 +156,6 @@ export function arcTangentsAtVertex(
   return tangents;
 }
 
-/**
- * The derivative of the total length of the arcs at the vertex along `direction`, with the vertex displaced to `displacedTo` of its own cell:
- * minus the sum of the dot products of `direction` with the tangents. Same lifts as {@link arcTangentsAtVertex}, without the array (the line
- * search of the flow calls it dozens of times per step). `undefined` if the id is not a vertex or an arc cannot be lifted.
- */
-export function lengthSlopeAtVertex(
-  world: CompiledCellComplex,
-  registry: RuntimeObjectRegistry,
-  vertexId: string,
-  arcs: readonly ArcEnd[],
-  direction: { readonly x: number; readonly y: number },
-  displacedTo: { readonly x: number; readonly y: number },
-): number | undefined {
-  const vertex = vertexOf(registry, vertexId);
-  if (!vertex) {
-    return undefined;
-  }
-  const candidates = new Map<string, RuntimeWorldObject>([[vertex.id, movedVertex(vertex, vertex.cellId, displacedTo.x, displacedTo.y)]]);
-  let total = 0;
-  for (let index = 0; index < arcs.length; index += 1) {
-    const tangent = tangentAwayFromVertex(world, registry, arcs[index]!, candidates);
-    if (!tangent) {
-      return undefined;
-    }
-    total -= direction.x * tangent.x + direction.y * tangent.y;
-  }
-  return total;
-}
-
 /** Total length (meters) of the distinct arcs among `arcs`. */
 export function lengthOfArcs(registry: RuntimeObjectRegistry, arcs: readonly ArcEnd[]): number {
   return [...new Set(arcs.map(({ arcId }) => arcId))]

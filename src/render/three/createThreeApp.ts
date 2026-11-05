@@ -23,7 +23,7 @@
  *    `bodiesInCell`; in XR a second `movePlayer` applies physical head motion
  *    (room-scale walking). The result replaces `playerPose` and may change `playerPose.cellId` by crossing a
  *    portal. Then the camera/XR rig is synced to the pose, the aim ray is resolved, and the selected tool
- *    handles the primary/carry/interact actions. Creatures, flags and curve-shortening geodesics advance.
+ *    handles the primary/carry/interact actions. Creatures and flags advance.
  * 3. Portal visibility: `updateVisibleCell` shows only the player's cell mesh, the culling cameras are placed
  *    (one per eye in stereo XR), and `computeVisiblePortalPaths` (inside `syncPortalInstances`)
  *    selects visible portal paths from the static per-root cull tables.
@@ -90,7 +90,6 @@ import {
   createInitialWorldDeformationState,
 } from "../../runtime/worldGeometryDeformationFamilies";
 import { type WorldGeometrySnapshot, createWorldGeometrySession } from "../../runtime/worldGeometrySession";
-import { advanceCurveShorteningPairs } from "../../world-objects/geodesic/curveShortening";
 import { isGeodesicMarmotObjectSpec } from "../../world-objects/geodesicMarmot";
 import { type GeodesicMarmotRuntime, createGeodesicMarmotRuntime } from "./creatures/geodesicMarmotView";
 import { derivedStatsOf, setDerivedVerification } from "../../world-objects/derived";
@@ -1259,7 +1258,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     const frameAfterMoveMs = performance.now();
     const frameBeforeObjectsMs = frameAfterMoveMs;
     // Simulation of non-player objects (timed separately as objectsMs): creatures treat the player as an
-    // obstacle; geodesics under curve shortening advance and dependent measurements are refreshed.
+    // obstacle; the world engine's step advances the curves under curve shortening and refreshes what depends on them.
     const playerObstacle = createPlayerCollisionState(readLocalPlayerPose(engine));
 
     // Each object is its own contained phase: one failing creature must not stop the others or the frame.
@@ -1278,18 +1277,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       engine.step(frame.resetRequested ? 0 : deltaSeconds);
       worldClient.afterStep();
       afterCarryWorldStep();
-    });
-    frameErrorGuard.runPhase("curve shortening", () => {
-      advanceCurveShorteningPairs({
-        world: activeWorld(),
-        registry: runtimeObjectRegistry,
-        deltaSeconds: frame.resetRequested ? 0 : deltaSeconds,
-        // There is no on-screen message system yet: notices go to the console and the diagnostics, always (not only in debug mode).
-        onNotice: (notice) => {
-          console.info(`[noneuclid] ${notice.message}`);
-          runtimeDiagnostics().recordDebugEvent(notice.message, notice);
-        },
-      });
     });
     // Crossings, lengths and angles follow from what changed: the engine's derive pass wrote them, and the label runtimes read them from the journal.
     frameErrorGuard.runPhase("label runtimes", syncLabelRuntimesFromJournal);

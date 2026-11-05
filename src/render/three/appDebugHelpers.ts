@@ -239,7 +239,7 @@ export interface GeodesicWordDebugDump {
   }[];
 }
 
-/** Whole-world geodesic inventory: intervals, segments, anchors and curve-shortening pairs. */
+/** Whole-world geodesic inventory: intervals, segments and anchors (the vertices of a curve under the curve shortening flow are anchors). */
 export interface AllGeodesicsDebugDump {
   readonly worldId: string;
   readonly visibleCellId?: string;
@@ -285,12 +285,6 @@ export interface AllGeodesicsDebugDump {
     readonly cellId: string;
     readonly point: string;
     readonly attachedEndpoints: readonly string[];
-  }[];
-  /** State of the curve-shortening pairs and the current position of their free vertices. */
-  readonly curveShorteningPairs: readonly {
-    readonly id: string;
-    readonly state: string;
-    readonly vertices: readonly { readonly id: string; readonly cellId: string; readonly point: string }[];
   }[];
 }
 

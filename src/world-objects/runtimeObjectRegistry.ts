@@ -13,7 +13,6 @@ import type { AssetObjectSpec } from "../cell-complex/specs";
 import { yawRigidTransform3 } from "../math/rigidTransform3";
 import type {
   GeodesicVertexObject,
-  CurveShorteningPairObject,
   GeodesicCannonObject,
   GeodesicCrossingObject,
   GeodesicArcObject,
@@ -37,7 +36,7 @@ export interface RuntimeStaticAssetObject extends RuntimeWorldObjectBase {
 
 /**
  * Discriminated union (on `kind`) of every object type the registry can hold.
- * Includes creatures, static assets, placed signs, geodesic cannons/segments/intervals/free ends/curve-shortening pairs/intersections, and the persistent measurement results (length and protractor angle).
+ * Includes creatures, static assets, placed signs, geodesic cannons/segments/intervals/free ends/intersections, and the persistent measurement results (length and protractor angle).
  */
 export type RuntimeWorldObject =
   | RuntimeCreatureObject
@@ -46,7 +45,6 @@ export type RuntimeWorldObject =
   | GeodesicCannonObject
   | GeodesicArcObject
   | GeodesicVertexObject
-  | CurveShorteningPairObject
   | GeodesicSegmentObject
   | GeodesicCrossingObject
   | MeasuredGeodesicLengthObject

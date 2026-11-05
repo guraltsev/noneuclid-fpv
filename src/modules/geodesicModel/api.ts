@@ -10,6 +10,9 @@
 import { defineModuleToken } from "../../engine/moduleTypes";
 import type { EngineCommandBase, EngineEventBase } from "../../engine/moduleTypes";
 
+/** Turning angle (radians) below which a vertex counts as taut: its two arcs are one geodesic and the vertex may be removed. */
+export { vertexTautTurnRadians } from "../../world-objects/geodesic/vertices";
+
 /** An arc end at a vertex: one endpoint role of an arc. */
 export interface ArcEnd {
   readonly arcId: string;

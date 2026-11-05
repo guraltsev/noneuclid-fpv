@@ -6,12 +6,11 @@
 import { expect } from "vitest";
 import { compileCellComplex } from "../../../src/cell-complex/compileCellComplex";
 import { createRuntimeObjectRegistry } from "../../../src/world-objects/runtimeObjectRegistry";
+import { curveDynamicsToken } from "../../../src/modules/curveShortening/api";
+import { curveShorteningModule } from "../../../src/modules/curveShortening";
+import { geodesicModelModule } from "../../../src/modules/geodesicModel";
+import { tieAtNewVertex } from "../../../src/world-objects/geodesic/vertices";
 import {
-  advanceCurveShorteningPairs,
-  tieAndDetachGeodesicEndpoints,
-} from "../../../src/world-objects/geodesic/curveShortening";
-import {
-  createCurveShorteningPairObject,
   createGeodesicVertexObject,
   createGeodesicCannonObject,
   createGeodesicArcObject,
@@ -22,6 +21,7 @@ import { getEmitterGeodesicIds } from "../../../src/world-objects/geodesic/endpo
 import { getGeodesicSegments, resolveEmitterLaunchYaw } from "../../../src/world-objects/geodesic/segments";
 import { rebuildConnectedGeodesicBetweenEmitters } from "../../../src/world-objects/geodesic/cannon";
 import { rebuildDerivedGeodesicSegments } from "../../../src/world-objects/geodesic/intervals";
+import { createTestEngine } from "../../support/engine";
 import { yawRigidTransform3 } from "../../../src/math/rigidTransform3";
 import { walkDevelopedSegment } from "../../../src/cell-complex/segmentWalk";
 
@@ -364,21 +364,28 @@ export function compileRotatedFreeLoopWorld() {
   });
 }
 
-// Advances until the pair is gone or `maxTicks` is reached. Fails if the pair's total length ever grows by more than 1e-9 m, or if a tick adds a free vertex.
-export function runCurveShorteningUntilPairGone(
-  world: ReturnType<typeof compileCellComplex>,
-  registry: ReturnType<typeof createRuntimeObjectRegistry>,
-  options: { readonly pairId: string; readonly geodesicIds: readonly string[]; readonly deltaSeconds: number; readonly maxTicks: number },
+// An engine over `registry` whose modules are the geodesic model and the curve shortening flow, with the module write guard on.
+export function createFlowTestEngine(world: ReturnType<typeof compileCellComplex>, registry: ReturnType<typeof createRuntimeObjectRegistry>) {
+  return createTestEngine({ registry, getWorld: () => world, modules: [geodesicModelModule(), curveShorteningModule()] });
+}
+
+// Steps `engine` until the flow is at rest or `maxTicks` is reached. Fails if the total length of `geodesicIds` ever grows by more than 1e-9 m, or if a step adds a vertex.
+export function runCurveShorteningUntilAtRest(
+  engine: ReturnType<typeof createFlowTestEngine>,
+  options: { readonly geodesicIds: readonly string[]; readonly deltaSeconds: number; readonly maxTicks: number },
 ): number {
+  const { registry } = engine;
+  const flow = engine.query(curveDynamicsToken);
   const total = () => [...new Set(options.geodesicIds)].reduce((sum, id) => sum + totalGeodesicLength(registry, id), 0);
   let previous = total();
   let ticks = 0;
-  while (ticks < options.maxTicks && registry.get(options.pairId)) {
+  while (ticks < options.maxTicks && !flow.isAtRest()) {
     const verticesBefore = registry.getObjectsOfKind("geodesicModel/vertex").length;
-    advanceCurveShorteningPairs({ world, registry, deltaSeconds: options.deltaSeconds });
+    engine.step(options.deltaSeconds);
+    engine.endFrame();
     ticks += 1;
     expect(registry.getObjectsOfKind("geodesicModel/vertex").length).toBeLessThanOrEqual(verticesBefore);
-    if (registry.get(options.pairId)) {
+    if (!flow.isAtRest()) {
       const next = total();
       expect(next).toBeLessThanOrEqual(previous + 1e-9);
       previous = next;
@@ -387,9 +394,8 @@ export function runCurveShorteningUntilPairGone(
   return ticks;
 }
 
-// Two emitters on the 15 m torus, a straight arc E1 -> E2 and an arc E2 -> E1 that wraps once to the right,
-// tied and released at E2.
-export function createTorusTiedPairScenario() {
+// Two emitters on the 15 m torus, a straight arc E1 -> E2 and an arc E2 -> E1 that wraps once to the right, both locked to their emitters.
+export function createTorusLockedPairScenario() {
   const world = compileTorusLoopWorld();
   const registry = createRuntimeObjectRegistry();
   registry.add(createGeodesicCannonObject({ id: "e1", cellId: "torus-room", localPose: yawRigidTransform3(0, { x: -3, y: 0, z: 0 }) }));
@@ -404,19 +410,23 @@ export function createTorusTiedPairScenario() {
   }));
   rebuildConnectedGeodesicBetweenEmitters({ world, registry, geodesicId: "g1" });
   rebuildConnectedGeodesicBetweenEmitters({ world, registry, geodesicId: "g2" });
-  tieAndDetachGeodesicEndpoints({
-    world,
-    registry,
+  return { world, registry };
+}
+
+// The locked pair tied at E2.
+export function createTorusTiedPairScenario() {
+  const { world, registry } = createTorusLockedPairScenario();
+  // The tie is made outside any step, so a flow run starts with its first step (the command route is tested in tests/modules/).
+  tieAtNewVertex(world, registry, {
     detachedEmitterId: "e2",
     first: { geodesicId: "g1", role: "end", anchorObjectId: "e2" },
     second: { geodesicId: "g2", role: "start", anchorObjectId: "e2" },
-    createPairId: () => "pair",
-    createFreeEndId: () => "free",
+    createVertexId: () => "free",
   });
   return { world, registry };
 }
 
-// The tied pair of createTorusTiedPairScenario plus `extraArcs` plain arcs between their own emitter pairs. The extra arcs do not flow and may cross; the scene is for counting scans.
+// The tied curve of createTorusTiedPairScenario plus `extraArcs` plain arcs between their own emitter pairs. The extra arcs do not flow and may cross; the scene is for counting scans.
 export function createManyArcsFlowScenario(extraArcs: number) {
   const scenario = createTorusTiedPairScenario();
   const { world, registry } = scenario;
@@ -430,7 +440,7 @@ export function createManyArcsFlowScenario(extraArcs: number) {
   return scenario;
 }
 
-// A two-arc pair in the 6 m single cell: emitters at (-halfWidth, 0) and (halfWidth, 0), free end at (0, height).
+// A two-arc curve in the 6 m single cell: emitters at (-halfWidth, 0) and (halfWidth, 0), free end at (0, height).
 export function createSymmetricPairScenario(halfWidth: number, height: number) {
   const world = compileLargeWorld();
   const registry = createRuntimeObjectRegistry();
@@ -441,7 +451,6 @@ export function createSymmetricPairScenario(halfWidth: number, height: number) {
   registry.add(createGeodesicArcObject({ id: "g2", startAnchorObjectId: "free", endAnchorObjectId: "e2", startCellId: "a" }));
   rebuildDerivedGeodesicSegments({ world, registry, geodesicId: "g1" });
   rebuildDerivedGeodesicSegments({ world, registry, geodesicId: "g2" });
-  registry.add(createCurveShorteningPairObject({ id: "pair", vertexIds: ["free"], cellId: "a" }));
   return { world, registry };
 }
 

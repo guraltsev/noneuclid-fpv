@@ -168,11 +168,6 @@ export function createGeodesicDebugDumps(deps: GeodesicDebugDumpsDeps) {
     const anchors = objects
       .filter((object) => object.kind === "geodesic-cannon" || object.kind === "geodesicModel/vertex")
       .sort((left, right) => left.id.localeCompare(right.id));
-    const curveShorteningPairs = objects
-      .filter((object): object is Extract<RuntimeWorldObject, { readonly kind: "curve-shortening-pair" }> =>
-        object.kind === "curve-shortening-pair"
-      )
-      .sort((left, right) => left.id.localeCompare(right.id));
 
     const dump: AllGeodesicsDebugDump = {
       worldId: deps.worldId,
@@ -224,16 +219,6 @@ export function createGeodesicDebugDumps(deps: GeodesicDebugDumpsDeps) {
           .flatMap((interval) => [interval.start, interval.end])
           .filter((endpoint) => endpoint.anchorObjectId === anchor.id)
           .map(formatEndpointRef),
-      })),
-      curveShorteningPairs: curveShorteningPairs.map((pair) => ({
-        id: pair.id,
-        state: pair.state,
-        vertices: pair.vertexIds.map((vertexId) => {
-          const vertex = runtimeObjectRegistry.get(vertexId);
-          return vertex
-            ? { id: vertexId, cellId: vertex.cellId, point: formatVec3(vertex.localPose.translation) }
-            : { id: vertexId, cellId: "(missing)", point: "(missing)" };
-        }),
       })),
     };
 

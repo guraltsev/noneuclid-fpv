@@ -19,7 +19,6 @@
  *   labelled with a `halfRole` (the first half of the total length belongs to the `start` role, the second to `end`), so that a click
  *   on a segment resolves to an endpoint (`resolveGeodesicEndpointSelectionFromSegmentHit`).
  * - `GeodesicCrossingObject` (`geodesicModel/crossing`, formerly "geodesic intersection"): computed markers where segments of two different geodesics cross in a cell.
- * - `CurveShorteningPairObject`: bookkeeping of one shortening process (see below).
  *
  * ## Development: how a portal word fixes the geometry
  * Let the word read from `a` be `t_1 ... t_n`, with `T_i` the `transformToTarget` of the portal of `t_i`. The destination anchor `b`
@@ -40,25 +39,14 @@
  * is an aimable free geodesic (`aimFreeGeodesicFromEndpoint`, `extendGeodesic`, split by `splitGeodesicIntervalAtSegmentHit`).
  *
  * ## Curve shortening (issue 31/32)
- * `tieAndDetachGeodesicEndpoints` detaches two endpoint roles (possibly the two roles of one loop) from an emitter and ties them to one
- * shared free end F, creating a `CurveShorteningPairObject`, and the curve then relaxes under the curve shortening flow (`advanceCurveShorteningPairs`):
- * every free vertex moves each tick along the descent direction of the total length by an exact line search, its two arcs are re-realized as
+ * `geodesicModel/tieAndDetach` detaches two endpoint roles (possibly the two roles of one loop) from an emitter and ties them to one
+ * shared free end F; nothing else is recorded: a curve has no lifecycle. The curve then relaxes under the curve shortening flow of the `curveShortening` module:
+ * every tied vertex moves each step along the descent direction of the total length by an exact line search, its two arcs are re-realized as
  * geodesic chords of their portal words (the words change by the portals the vertex crosses), and a vertex whose turning angle is below the tolerance is
  * removed, merging its two arcs. The vertex count never grows and the length never grows. A single interval whose two roles share F is a free loop:
- * with a translation as holonomy it is already taut and becomes a stable loop, with a rotation (it encircles a cone point) it shrinks until it is
- * deleted with a notice. A curve that would need a wrap vertex at a forbidden-zone disk is left `"unresolved"`.
+ * with a translation as holonomy it is already taut and its vertex stays as a base point, with a rotation (it encircles a cone point) it shrinks until it is
+ * deleted with a notice. A curve that would need a wrap vertex at a forbidden-zone disk goes quiet as unresolved.
  *
- * ## Intersections and bookkeeping
- * `updateGeodesicIntersectionObjects` recomputes the crossing markers of all segments (same cell, different geodesics) and keeps marker ids
- * stable. An emitter stores no list of its geodesics: they are the intervals attached to it (`getEmitterGeodesicIds`).
- *
- * ## Constants
- * Meters unless stated. `GEODESIC_MIN_LENGTH_METERS` (0.15) minimum chord of a geodesic; `minGeodesicSegmentLengthMeters` (0.05) minimum
- * piece when splitting; `intersectionTolerance` (1e-7) numerical zero; `forbiddenZoneCircleToleranceMeters` (1e-9) band of the open-disk rule;
- * `emitterConnectionToleranceMeters` (0.3) capture radius around an emitter.
- *
- * The geodesic code is split over the modules of `src/world-objects/geodesic/`; this module holds the object types,
- * constants, constructors and small geometry helpers they share.
  */
 import type { SimpleCollisionCylinder } from "../../movement/dynamicObject";
 import type { CarryHighlightShape } from "../carryHighlightShape";
@@ -141,7 +129,7 @@ export interface GeodesicEndpointSelection extends GeodesicEndpointAttachment {}
  *
  * Its `localPose.translation` is the endpoint position in cell `cellId` (cell-local meters, including beam height in z).
  * It is deleted automatically once no interval refers to it (`removeUnusedFreeGeodesicEnds`). A shared free end (two
- * attached roles) is the moving vertex of a curve-shortening pair.
+ * attached roles) is a vertex of a curve under the curve shortening flow.
  */
 export interface GeodesicVertexObject extends RuntimeWorldObjectBase {
   readonly kind: "geodesicModel/vertex";
@@ -171,22 +159,6 @@ export interface GeodesicArcObject extends RuntimeWorldObjectBase {
   readonly geodesicNumber?: number;
   /** Transient: set while the last rebuild of this arc failed during a carry, so it still shows its old path; the next successful rebuild clears it (`isStale`). */
   readonly stale?: true;
-}
-
-/**
- * Bookkeeping object owning one curve-shortening process: a piecewise-geodesic curve whose free vertices relax under the curve shortening flow.
- *
- * `vertexIds` lists the ids of the `GeodesicVertexObject`s that are still vertices of the curve, in the order the flow visits them. The arcs are not stored:
- * they are the `"moving"` intervals that have a vertex of the list as an endpoint (each vertex has exactly two such endpoint roles; both belong to
- * one interval for a free loop). A vertex is removed from the list when the curve is taut there; the list never grows. The object is invisible; `cellId`
- * only mirrors the cell of the first vertex. A pair that could not go on has `state: "unresolved"`.
- */
-export interface CurveShorteningPairObject extends RuntimeWorldObjectBase {
-  readonly kind: "curve-shortening-pair";
-  /** Ids of the free vertices of the curve, in the order the flow visits them; shrinks, never grows. */
-  readonly vertexIds: readonly string[];
-  /** `"moving"` while the curve flows; `"unresolved"` after it was blocked (later ticks skip it). */
-  readonly state: "moving" | "unresolved";
 }
 
 /**
@@ -495,28 +467,6 @@ export function createGeodesicArcObject(input: {
       role: "end",
       anchorObjectId: input.endAnchorObjectId,
     },
-  };
-}
-
-/**
- * Builds a curve-shortening pair object (see `CurveShorteningPairObject`); `state` defaults to `"moving"`. `cellId` is the cell of the first vertex.
- *
- * Pure; the caller adds it to the registry.
- */
-export function createCurveShorteningPairObject(input: {
-  readonly id: string;
-  readonly vertexIds: readonly string[];
-  readonly cellId: string;
-  readonly state?: "moving" | "unresolved";
-}): CurveShorteningPairObject {
-  return {
-    id: input.id,
-    kind: "curve-shortening-pair",
-    cellId: input.cellId,
-    localPose: identityRigidTransform3,
-    portalRenderable: false,
-    vertexIds: input.vertexIds,
-    state: input.state ?? "moving",
   };
 }
 

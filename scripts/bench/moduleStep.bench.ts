@@ -1,8 +1,8 @@
 /**
- * Per-step cost of the curve shortening flow and its dependents (measured lengths, protractor angles), driven the way
- * the frame loop drives them today ("the legacy driver"). Timed scenes: idle (no flow), flow, flow plus dependents, and
- * many arcs (timing printed, no limit). Counted scenes (exact, host independent): flow, flow+dependents, manyArcs.
- * Design 013 section 15, job 48; design 014 section 5, job 56. A benchmark, not a test (_docs/tests.md section 4.7).
+ * Per-step cost of the curve shortening flow and its dependents (measured lengths, protractor angles), driven by the world engine
+ * the way the frame loop drives it: one `step` and one `endFrame` per frame. Timed scenes: idle (a bare engine), flow, flow plus dependents, and
+ * many arcs (timing printed, no limit). Counted scenes (exact, host independent): flow, flow+dependents, manyArcs. A flow runs until the curve shortening module reports `isAtRest`, or 600 steps.
+ * Design 013 section 15, jobs 48 and 53; design 014 section 5, job 56. A benchmark, not a test (_docs/tests.md section 4.7).
  *
  *   npm run bench -- moduleStep                      print the tables
  *   npm run bench -- moduleStep --record             write scripts/bench/baselines/moduleStep.json (this host only; never re-record in a job)
@@ -19,7 +19,8 @@ import { fileURLToPath } from "node:url";
 import { createLocalPlayerParticipant, createWorldEngine, type WorldEngine } from "../../src/engine/worldEngine";
 import { createDefaultPlayerPose } from "../../src/movement/playerPose";
 import type { CompiledCellComplex } from "../../src/cell-complex/compileCellComplex";
-import { advanceCurveShorteningPairs } from "../../src/world-objects/geodesic/curveShortening";
+import { curveDynamicsToken } from "../../src/modules/curveShortening/api";
+import { curveShorteningModule } from "../../src/modules/curveShortening";
 import { geodesicMeasurementsModule } from "../../src/modules/geodesicMeasurements";
 import { geodesicModelModule } from "../../src/modules/geodesicModel";
 import { createMeasuredGeodesicLengthObject } from "../../src/world-objects/measureLengthTool";
@@ -39,7 +40,7 @@ const trials = 7;
 const flowRepeats = 10;
 const idleTimingSteps = 2_000;
 const idleAllocationSteps = 20_000;
-/** The design asks for at most 16 bytes per idle step. The legacy driver itself allocates more (a fresh array per kind query), so the check holds it to its own baseline plus this slack; the absolute 16 is the target for the engine step. */
+/** The design asks for at most 16 bytes per idle step. The idle scene steps an engine with two ticks-free modules list (empty); the check holds it to its recorded baseline plus this slack. */
 const allocationSlackBytesPerStep = 16;
 const playerPoint = { x: 0, y: 0, z: 0 };
 const manyArcsExtraArcs = 32;
@@ -50,8 +51,8 @@ const cacheHitMaxBytesPerRead = 1;
 interface Scene {
   readonly world: CompiledCellComplex;
   readonly registry: RuntimeObjectRegistry;
-  /** The idle scene steps an engine with an empty module list after the legacy sequence (the cost of the bare engine, design 013 job 49). */
-  readonly engine?: WorldEngine;
+  /** The engine the scene steps. The idle scene has an empty module list (the cost of the bare engine, design 013 job 49). */
+  readonly engine: WorldEngine;
 }
 
 interface Results {
@@ -240,23 +241,26 @@ function createIdleScene(): Scene {
 
 function createManyArcsScene(): Scene {
   const { world, registry } = createManyArcsFlowScenario(manyArcsExtraArcs);
-  return { world, registry };
+  return { world, registry, engine: createFlowEngine(world, registry, [geodesicModelModule(), curveShorteningModule()]) };
+}
+
+function createFlowEngine(world: CompiledCellComplex, registry: RuntimeObjectRegistry, modules: NonNullable<Parameters<typeof createWorldEngine>[0]["modules"]>): WorldEngine {
+  return createWorldEngine({
+    registry,
+    getWorld: () => world,
+    participants: [createLocalPlayerParticipant(createDefaultPlayerPose("torus-room"))],
+    modules,
+  });
 }
 
 function createFlowScene(withDependents: boolean): Scene {
   const { world, registry } = createTorusTiedPairScenario();
-  if (!withDependents) return { world, registry };
+  if (!withDependents) return { world, registry, engine: createFlowEngine(world, registry, [geodesicModelModule(), curveShorteningModule()]) };
   addLength(registry, world, "length-g1", "g1");
   const emitter = registry.get("e1") as GeodesicCannonObject;
   addAngle(registry, emitter, "angle-g", { geodesicId: "g1", endRole: "start" }, { geodesicId: "g2", endRole: "end" });
   // The dependents are derived by the engine's derive pass: crossings, then lengths and angles.
-  const engine = createWorldEngine({
-    registry,
-    getWorld: () => world,
-    participants: [createLocalPlayerParticipant(createDefaultPlayerPose("torus-room"))],
-    modules: [geodesicModelModule(), geodesicMeasurementsModule()],
-  });
-  return { world, registry, engine };
+  return { world, registry, engine: createFlowEngine(world, registry, [geodesicModelModule(), geodesicMeasurementsModule(), curveShorteningModule()]) };
 }
 
 function addLength(registry: RuntimeObjectRegistry, world: CompiledCellComplex, id: string, geodesicId: string): void {
@@ -278,33 +282,30 @@ function addAngle(registry: RuntimeObjectRegistry, emitter: GeodesicCannonObject
   registry.add(createProtractorAngleObject({ id, center, first: firstSide, second: secondSide }));
 }
 
-// ---- the legacy driver --------------------------------------------------------------------------------------
+// ---- the driver ---------------------------------------------------------------------------------------------
 
-/** Today's objects-phase sequence: the flow; on a scene with an engine, then the engine's step (whose derive pass refreshes what depends on the flow's writes) and the end-of-frame clearing. */
-function legacyStep(scene: Scene): void {
-  advanceCurveShorteningPairs({ world: scene.world, registry: scene.registry, deltaSeconds });
-  // The frame's engine calls: a step, then the end-of-frame clearing.
-  if (scene.engine) {
-    scene.engine.step(deltaSeconds);
-    scene.engine.endFrame();
-  }
+/** One frame's engine calls: a step, then the end-of-frame clearing. */
+function frameStep(scene: Scene): void {
+  scene.engine.step(deltaSeconds);
+  scene.engine.endFrame();
 }
 
 // ---- measurements -------------------------------------------------------------------------------------------
 
 function timeIdle(): number {
   const scene = createIdleScene();
-  for (let i = 0; i < 200; i += 1) legacyStep(scene);
+  for (let i = 0; i < 200; i += 1) frameStep(scene);
   const start = performance.now();
-  for (let i = 0; i < idleTimingSteps; i += 1) legacyStep(scene);
+  for (let i = 0; i < idleTimingSteps; i += 1) frameStep(scene);
   return ((performance.now() - start) * 1000) / idleTimingSteps;
 }
 
-/** Steps `scene` until no pair is left or `maxFlowSteps` steps; returns the steps taken. The loop condition uses `countOfKind`, so the driver does not count itself as a scan. */
+/** Steps `scene` until the flow is at rest or `maxFlowSteps` steps; returns the steps taken. The loop condition reads `isAtRest`, which scans no kind, so the driver does not count itself as a scan. */
 function runFlow(scene: Scene): number {
+  const flow = scene.engine.query(curveDynamicsToken);
   let runSteps = 0;
-  while (runSteps < maxFlowSteps && scene.registry.countOfKind("curve-shortening-pair") > 0) {
-    legacyStep(scene);
+  while (runSteps < maxFlowSteps && !flow.isAtRest()) {
+    frameStep(scene);
     runSteps += 1;
   }
   return runSteps;
@@ -347,10 +348,10 @@ function measureAllCounters(): CounterSet {
 
 function measureIdleBytesPerStep(gc: () => void): number {
   const scene = createIdleScene();
-  for (let i = 0; i < 200; i += 1) legacyStep(scene);
+  for (let i = 0; i < 200; i += 1) frameStep(scene);
   gc();
   const before = process.memoryUsage().heapUsed;
-  for (let i = 0; i < idleAllocationSteps; i += 1) legacyStep(scene);
+  for (let i = 0; i < idleAllocationSteps; i += 1) frameStep(scene);
   const after = process.memoryUsage().heapUsed;
   return Math.max(0, after - before) / idleAllocationSteps;
 }

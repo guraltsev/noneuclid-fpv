@@ -53,9 +53,8 @@ imports only modules before it): `src/math/vec2.ts` (2-D helpers), `objects.ts` 
 `portalWord.ts` (pure portal-word algebra), `development.ts` (cached inverse portal transforms), `trace.ts` (single-cell
 and multi-cell ray tracing), `intersections.ts` (crossing markers), `endpoints.ts` (endpoint attachments and lifting),
 `segments.ts` (derived segments), `lifecycle.ts` (locked queries and removal), `intervals.ts` (interval rebuilds and
-previews), `curveShortening.ts` (tie-and-detach and the
-curve shortening flow of curve-shortening pairs) and `cannon.ts` (shooting, extending, connecting and placing
-cannons).
+previews), `vertices.ts` (tying, moving and removing a vertex) and `cannon.ts` (shooting, extending, connecting and placing
+cannons). The curve shortening flow that decides what to do with a vertex is the world module `src/modules/curveShortening/`.
 
 ## Layers and the dependency rule
 
@@ -146,8 +145,7 @@ Order of work in each frame (`renderFrame`; the engine's journals, events and re
 4. Resolve the active aim ray (camera centre ray or controller ray), update carried emitters, and dispatch the primary
    action to the selected tool (place flag, emit geodesic, measure, protractor, tie-and-detach, carry, rotate, aim, or the
    focused object's own interaction).
-5. Advance the world: creature runtimes, the engine's step (`engine.step`: queued commands, then module ticks; no modules yet), curve-shortening pairs
-   (`src/world-objects/geodesic/curveShortening.ts#advanceCurveShorteningPairs`), refresh dependent measurements and angles.
+5. Advance the world: creature runtimes, then the engine's step (`engine.step`: queued commands, then the module ticks, among them the curve shortening flow, and the derive pass that refreshes crossings, measurements and angles).
 6. Place the camera(s); for XR also the per-eye culling cameras.
 7. **Portal visibility and instances**: compute visible portal paths from the camera, update the instanced cell meshes
    (one draw per cell archetype, one instance per visible path). This pass builds one frame snapshot (rendered root

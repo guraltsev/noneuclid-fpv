@@ -737,20 +737,6 @@ What an emitter does to its geodesics when it has been carried: rebuild after a 
 | interface | `CarriedEmitterRelease` | What releasing a carried emitter touched. |
 | function | `releaseCarriedEmitter` | The emitter has stopped being carried, whether the hand put it down or let it go: its geodesics are rebuilt one last time without the safety net of the carry, and the intersection objects whose geodesics no longer exist… |
 
-### `world-objects/geodesic/curveShortening.ts`
-
-Curve shortening: tie-and-detach of two endpoint roles into a curve-shortening pair, and the curve shortening flow that then runs over many frames.
-
-| Kind | Name | Summary |
-| --- | --- | --- |
-| interface | `TieAndDetachGeodesicEndpointsRequest` | Request for `tieAndDetachGeodesicEndpoints`: detach two endpoint roles from one emitter and tie them at a new shared vertex. |
-| interface | `AdvanceCurveShorteningPairsRequest` | Request for `advanceCurveShorteningPairs`: one tick of the curve shortening flow of every moving pair. |
-| function | `tieAndDetachGeodesicEndpoints` | Detaches two endpoint roles from one emitter and ties them to a new shared vertex (`tieAtNewVertex`), starting a curve-shortening pair. |
-| const | `curveShorteningSpeedMetersPerSecond` | Speed (meters per second) at which a vertex moves along its descent direction; the exact line search never overshoots the minimum. |
-| const | `curveShorteningTautTurnRadians` | Turning angle (radians) below which a vertex counts as taut: its two arcs are one geodesic and the vertex is removed. |
-| function | `advanceCurveShorteningPairs` | Advances every moving curve-shortening curve by one tick of the curve shortening flow and returns the ids that changed. |
-| type | `CurveShorteningNotice` | A user-visible event of the curve shortening flow; the shell logs it (there is no on-screen message system yet). |
-
 ### `world-objects/geodesic/development.ts`
 
 Development of portal words: inverse portal transforms, cached per compiled portal (a compiled world is immutable, so a WeakMap keyed by portal is always valid); pure.
@@ -844,7 +830,6 @@ Geodesic emitters ("cannons"), geodesic arcs and curve shortening on a glued cel
 | interface | `GeodesicEndpointSelection` | An endpoint attachment picked by the user (typically from a segment hit) as input to tie-and-detach. |
 | interface | `GeodesicVertexObject` | An invisible, non-colliding anchor object marking a geodesic endpoint that is not on an emitter. |
 | interface | `GeodesicArcObject` | The authoritative description of one geodesic: two endpoint attachments plus the portal word joining them. |
-| interface | `CurveShorteningPairObject` | Bookkeeping object owning one curve-shortening process: a piecewise-geodesic curve whose free vertices relax under the curve shortening flow. |
 | interface | `LiftedGeodesicEndpoint` | An interval's far endpoint pulled back into the cell of a chosen source endpoint (the "development" of the interval). |
 | interface | `GeodesicTraceBuildResult` | Outcome of rebuilding an interval's derived geometry: the interval, its new segments, and how the trace ended. |
 | interface | `GeodesicSegmentObject` | A derived, per-cell straight piece of a geodesic: a ray inside one cell from `start` along `direction` for `lengthMeters`. |
@@ -869,7 +854,6 @@ Geodesic emitters ("cannons"), geodesic arcs and curve shortening on a glued cel
 | function | `createGeodesicVertexObject` | Builds a free-end anchor at `point` (cell-local meters, including its beam height in z) in cell `cellId`. |
 | function | `withoutStale` | The arc without its transient `stale` mark (the arc itself when it has none). |
 | function | `createGeodesicArcObject` | Builds a geodesic interval from two anchor ids, a start cell and an optional portal word. |
-| function | `createCurveShorteningPairObject` | Builds a curve-shortening pair object (see `CurveShorteningPairObject`); `state` defaults to `"moving"`. |
 | function | `getGeodesicSegmentEnd` | Returns the segment's end point, `start + direction * lengthMeters`, in the segment's cell frame (meters). |
 | function | `canExtendGeodesicSegment` | True unless the segment ended at a wall, forbidden zone or emitter (those terminals cannot be continued). |
 | function | `getGeodesicCannonEmitterPoint` | Point where the cannon's beam starts, in the cannon's cell frame. |
@@ -958,7 +942,6 @@ Operations on the vertices of a piecewise-geodesic curve (design 013 section 13.
 | interface | `VertexMovePreview` | The result of {@link previewVertexMove}: the new vertex record and the realized arcs, opaque to callers. |
 | type | `VertexRemovalPreview` | What removing a vertex would give: a merged arc, a taut loop, a collapsed curve, or blocked. |
 | function | `arcTangentsAtVertex` | Tangents of the arcs at the vertex; with `displacedTo`, as if the vertex stood at that point of its own cell (no portal walk). |
-| function | `lengthSlopeAtVertex` | The derivative of the total length of the arcs at the vertex along `direction`, with the vertex displaced to `displacedTo` of its own cell: minus the sum of the dot products of `direction` with the tangents. |
 | function | `lengthOfArcs` | Total length (meters) of the distinct arcs among `arcs`. |
 | function | `previewVertexMove` | Walks the vertex `lengthMeters` along `direction` (vertex cell frame) through portals, updates the words of the arcs by the portals crossed and realizes each arc as the geodesic chord of its class. |
 | function | `commitVertexMove` | Applies a {@link previewVertexMove}: the vertex, the arcs with their new words and their realized segments. |
@@ -1592,6 +1575,59 @@ The carry module (design 013 section 7): who carries what is world state.
 | type | `CarryModuleDefinition` | The module as the engine's list takes it. |
 | function | `carryModule` | Creates the carry module. |
 
+### `modules/curveShortening/api.ts`
+
+The curve shortening module's public face (design 013 section 13.2, amended by design 014 sections 2.1 and 9): the token of its read-only answers and the plain-data shapes of its events.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `BlockedVertex` | A tied vertex the flow could not move and could not merge away, with the reason it gives. |
+| interface | `CurveDynamicsApi` | What the module answers: reads only. |
+| const | `curveDynamicsToken` | The token a dynamics module provides (so that a module that sticks curves at corners can replace the flow). |
+| interface | `CurveShorteningFreeLoopCollapsedEvent` | A loop around a cone point shrank below the minimum length and was deleted. |
+| interface | `CurveShorteningCollapsedEvent` | A tied curve shrank to a point and was deleted. |
+| interface | `CurveShorteningUnresolvedEvent` | A vertex could be neither moved nor merged away and went quiet; emitted once, when it goes quiet. |
+| type | `CurveShorteningEvent` | Every event of the module. |
+| type | `BlockedPolicy` | What the module does with a vertex it cannot move or merge. |
+| type | `SpeedLawName` | How far a vertex may move in one step, before the line search caps it. |
+| interface | `CurveShorteningOptions` | Options of the module. |
+
+### `modules/curveShortening/flow.ts`
+
+The curve shortening flow (design 013 section 13.2): the rule applied to every tied vertex each step, in `forEachTiedVertex` order (Gauss-Seidel, so a vertex sees the position its neighbour just took).
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| const | `tautLoopReason` | The reason a taut closed loop is quiet with: it is at rest, not blocked. |
+| interface | `FlowDeps` | What one step of the flow works with. |
+| function | `flowStep` | One step of the flow over every tied vertex that is not quiet. |
+
+### `modules/curveShortening/index.ts`
+
+The curve shortening module's world factory (design 013 section 12.1).
+
+_No exports._
+
+### `modules/curveShortening/module.ts`
+
+The curve shortening module (design 013 section 13.2, design 014 sections 2.1 and 9): the flow that straightens the curves whose vertices the geodesic model has tied.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| type | `CurveShorteningModuleDefinition` | The module as the engine's list takes it. |
+| function | `curveShorteningModule` | Creates the curve shortening module. |
+
+### `modules/curveShortening/policies.ts`
+
+The policies of the curve shortening flow (design 013 section 13.2): how far a vertex may move in one step.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| type | `SpeedLaw` | Metres this vertex may move this step, before the line search caps it. |
+| const | `curveShorteningSpeedMetersPerSecond` | Speed (meters per second) at which a vertex moves along its descent direction; the exact line search never overshoots the minimum. |
+| const | `maxCurveShorteningDeltaSeconds` | Longest frame time (seconds) one step of the flow integrates; a stalled tab does not teleport a vertex. |
+| function | `speedLawNamed` | The speed law an option names. |
+
 ### `modules/geodesicMeasurements/index.ts`
 
 The geodesic measurements module's world factory (design 013 section 12.1): the length and angle labels as records derived from the geodesic model.
@@ -1986,7 +2022,7 @@ Browser-console debug surface for the app: window-level helper installation, the
 | interface | `CameraPoseDebugDump` | Snapshot of the player/camera pose returned by dumpCameraPose; angles in both radians and degrees, matrices as 16-element column-major arrays (Three.js order). |
 | interface | `GeodesicPathDebugDump` | Description of one geodesic's lock state, portal word, and segments. |
 | interface | `GeodesicWordDebugDump` | Portal word of one locked geodesic with its individual transitions. |
-| interface | `AllGeodesicsDebugDump` | Whole-world geodesic inventory: intervals, segments, anchors and curve-shortening pairs. |
+| interface | `AllGeodesicsDebugDump` | Whole-world geodesic inventory: intervals, segments and anchors (the vertices of a curve under the curve shortening flow are anchors). |
 | interface | `EndpointDebugDump` | Identifies one geodesic endpoint and the anchor object it is attached to. |
 | function | `installPortalDebugHelpers` | Publishes the helpers as window.noneuclidPortalDebug, replacing any previous object; pair with uninstallPortalDebugHelpers on teardown. |
 | function | `uninstallPortalDebugHelpers` | Removes window.noneuclidPortalDebug and the public API namespace `portal`. |

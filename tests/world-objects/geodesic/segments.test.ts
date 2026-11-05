@@ -18,7 +18,7 @@ import { rebuildDerivedGeodesicSegments, splitGeodesicIntervalAtSegmentHit } fro
 import { shootGeodesic } from "../../../src/world-objects/geodesic/cannon";
 import { removeGeodesic } from "../../../src/world-objects/geodesic/lifecycle";
 import { getGeodesicSegments, removeGeodesicSegments, resolveGeodesicNumber } from "../../../src/world-objects/geodesic/segments";
-import { compileLargeWorld, createSymmetricPairScenario, runCurveShorteningUntilPairGone } from "../../fixtures/world-objects/geodesic";
+import { compileLargeWorld, createFlowTestEngine, createSymmetricPairScenario, runCurveShorteningUntilAtRest } from "../../fixtures/world-objects/geodesic";
 
 function addEmitter(registry: ReturnType<typeof createRuntimeObjectRegistry>, id: string, x: number, y: number): void {
   registry.add(createGeodesicCannonObject({ id, cellId: "a", localPose: yawRigidTransform3(0, { x, y, z: 0 }) }));
@@ -121,7 +121,7 @@ describe("display numbers are stored on the arc", () => {
       registry.update({ ...arc, geodesicNumber });
     }
 
-    runCurveShorteningUntilPairGone(world, registry, { pairId: "pair", geodesicIds: ["g1", "g2"], deltaSeconds: 1 / 60, maxTicks: 4000 });
+    runCurveShorteningUntilAtRest(createFlowTestEngine(world, registry), { geodesicIds: ["g1", "g2"], deltaSeconds: 1 / 60, maxTicks: 4000 });
 
     expect(registry.get("g2")).toBeUndefined();
     expect(resolveGeodesicNumber(registry, "g1")).toBe(3);

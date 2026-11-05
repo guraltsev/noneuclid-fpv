@@ -121,7 +121,6 @@ const kinds: Record<Kind, KindCase> = {
   },
   "geodesicModel/arc": { exempt: notDrawn },
   "geodesicModel/vertex": { exempt: notDrawn },
-  "curve-shortening-pair": { exempt: notDrawn },
 };
 
 const squareRoomBase = [
