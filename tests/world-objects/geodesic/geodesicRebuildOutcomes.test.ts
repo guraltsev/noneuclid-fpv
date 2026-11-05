@@ -11,6 +11,7 @@
  * trace counters and spied on the registry; those are implementation, not behaviour — see `_docs/tests.md` §2.2.
  * A `carrying 10 loops through a frame` perf number, if wanted again, belongs in a `scripts/bench/` script.)
  */
+import { createFixtureArc as createGeodesicArcObject } from "../../support/arcs";
 import { describe, expect, it } from "vitest";
 import { yawRigidTransform3 } from "../../../src/math/rigidTransform3";
 import { rebuildConnectedGeodesicBetweenEmitters } from "../../../src/world-objects/geodesic/cannon";
@@ -22,7 +23,6 @@ import { realizeIntervalChord } from "../../../src/world-objects/geodesic/interv
 import {
   createGeodesicVertexObject,
   createGeodesicEmitterObject,
-  createGeodesicArcObject,
   geodesicRayBeamHeightMeters,
 } from "../../../src/world-objects/geodesic/objects";
 import { compileLargePortalWorld, compileLargeWorld, createTorusLoopBenchmarkScene } from "../../fixtures/world-objects/geodesic";

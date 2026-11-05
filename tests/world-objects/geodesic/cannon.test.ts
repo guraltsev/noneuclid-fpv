@@ -10,11 +10,11 @@
  * that preview rebuilds never connect emitters, and that deleting a connected geodesic clears both emitters'
  * associations.
  */
+import { createFixtureArc as createGeodesicArcObject } from "../../support/arcs";
 import { describe, expect, it } from "vitest";
 import { createRuntimeObjectRegistry } from "../../../src/world-objects/runtimeObjectRegistry";
 import {
   createGeodesicEmitterObject,
-  createGeodesicArcObject,
   geodesicRayBeamHeightMeters,
   minGeodesicSegmentLengthMeters,
 } from "../../../src/world-objects/geodesic/objects";

@@ -358,7 +358,12 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
     }
   }
 
-  // The emitter's selection is gone: the tool is left at once, and the world is told in the next frame.
+  // The emitter the world says this participant edits: the slot turns that one, whatever the selection has moved to.
+  function editedEmitter(): Emitter | undefined {
+    return emitterAt(participantAttachment(engine.read.participant(localParticipantId), geodesicEmitterEditAttachmentKind)?.objectId);
+  }
+
+  // The emitter is gone, and with it the edit: the tool is left at once.
   function leaveEditWithoutEmitter(): void {
     deps.dispatch({ kind: "set-cannon-tool-state", state: {} });
     deps.dispatch({ kind: "clear-selected-tool" });
@@ -370,7 +375,7 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
     if (deps.toolContext(rotateTool).commandInFlight()) {
       return;
     }
-    const cannon = emitterAt(deps.session.get().cannonToolState.selectedCannonId);
+    const cannon = editedEmitter();
     if (cannon === undefined) {
       leaveEditWithoutEmitter();
       return;
@@ -394,7 +399,7 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
     if (deps.toolContext(aimTool).commandInFlight()) {
       return;
     }
-    const cannon = emitterAt(deps.session.get().cannonToolState.selectedCannonId);
+    const cannon = editedEmitter();
     if (cannon === undefined) {
       leaveEditWithoutEmitter();
       return;

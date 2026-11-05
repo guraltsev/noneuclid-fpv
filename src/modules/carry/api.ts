@@ -33,15 +33,8 @@ export interface CarryDetachCommand extends EngineCommandBase {
   readonly kind: "carry/detach";
 }
 
-/** Module-only: the carry ends by the carry rules themselves (the hand's leash). Emits `carry/dropped` and then does what a detach does. */
-export interface CarryDropCommand extends EngineCommandBase {
-  readonly kind: "carry/drop";
-  readonly participantId: string;
-  readonly reason: CarryDropReason;
-}
-
 /** Every command of the module. */
-export type CarryCommand = CarryAttachCommand | CarryDetachCommand | CarryDropCommand;
+export type CarryCommand = CarryAttachCommand | CarryDetachCommand;
 
 /** Why the world ended a carry: the hand's leash released the object (too far, or unreachable), or the object no longer exists. */
 export type CarryDropReason = "leash" | "missing";
@@ -55,15 +48,7 @@ export interface CarryMovedEvent extends EngineEventBase {
   readonly regrownActiveGeodesicId?: string;
 }
 
-/** A carry ended, however it ended (detach or drop): the final rebuild ran. */
-export interface CarryReleasedEvent extends EngineEventBase {
-  readonly kind: "carry/released";
-  readonly participantId: string;
-  readonly objectId: string;
-  readonly regrownActiveGeodesicId?: string;
-}
-
-/** The world ended the carry (design 013 section 7); the client leaves its carry tool. Followed by `carry/released` for the same object. */
+/** The world ended the carry (design 013 section 7), in the `bodies` tick; the final rebuild has run, and the client leaves its carry tool. */
 export interface CarryDroppedEvent extends EngineEventBase {
   readonly kind: "carry/dropped";
   readonly participantId: string;
@@ -72,7 +57,7 @@ export interface CarryDroppedEvent extends EngineEventBase {
 }
 
 /** Every event of the module. */
-export type CarryEvent = CarryMovedEvent | CarryReleasedEvent | CarryDroppedEvent;
+export type CarryEvent = CarryMovedEvent | CarryDroppedEvent;
 
 /** Refusal codes of `carry/attach`. */
 export const carryRefusals = {

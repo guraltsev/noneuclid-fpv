@@ -186,7 +186,7 @@ describe("lifting an emitter", () => {
 
 describe("carry/attach and carry/detach", () => {
   it("attaches the object to the participant, opens the offset slot and detaches again", () => {
-    const { engine, registry, run, step, hand, events } = setup();
+    const { engine, registry, run, step, hand } = setup();
 
     expect(run("local", { kind: "carry/attach", objectId: "cannon-b" })).toEqual({ ok: true });
     expect(participantAttachment(engine.read.participant("local"), "carry")).toEqual({ kind: "carry", objectId: "cannon-b", arrived: false });
@@ -198,7 +198,6 @@ describe("carry/attach and carry/detach", () => {
 
     expect(run("local", { kind: "carry/detach" })).toEqual({ ok: true });
     expect(participantAttachment(engine.read.participant("local"), "carry")).toBeUndefined();
-    expect(events.some((event) => event.kind === "carry/released" && (event as { objectId?: string }).objectId === "cannon-b")).toBe(true);
 
     // The slot is closed: a hand set now is ignored and the emitter stays.
     const before = registry.get("cannon-b");
@@ -259,10 +258,10 @@ describe("carry/attach and carry/detach", () => {
     expect(participantAttachment(engine.read.participant("local"), "carry")).toMatchObject({ objectId: "cannon-a", arrived: false });
   });
 
-  it("keeps the module-only drop away from clients", () => {
+  it("keeps the module-only lift away from clients", () => {
     const { run } = setup();
 
-    expect(run("local", { kind: "carry/drop", participantId: "local", reason: "leash" })).toMatchObject({ ok: false, refusal: { code: "world/moduleOnly" } });
+    expect(run("local", { kind: "geodesicEmitters/lift", emitterId: "cannon-a" } as never)).toMatchObject({ ok: false, refusal: { code: "world/moduleOnly" } });
   });
 });
 
@@ -347,6 +346,38 @@ describe("the carry move, once per frame", () => {
   });
 });
 
+describe("a carry the world ends in a frame with no tick", () => {
+  it("drops at the leash in applyControls, with no step: slot closed, emitter settled", () => {
+    const { engine, events, run, hand } = setup();
+    run("local", { kind: "carry/attach", objectId: "cannon-a" });
+    const stepIndex = engine.read.stepIndex;
+
+    hand(3.9, 2.5, 0.001);
+    engine.applyControls(frameSeconds);
+    hand(0.5, 0.5, 0.001);
+    engine.applyControls(frameSeconds);
+    engine.forEachEvent((event) => events.push(event));
+
+    expect(engine.read.stepIndex).toBe(stepIndex);
+    expect(participantAttachment(engine.read.participant("local"), "carry")).toBeUndefined();
+    expect(events).toContainEqual(expect.objectContaining({ kind: "carry/dropped", reason: "leash" }));
+    expect(engine.read.participant("local")?.attachments).toEqual([]);
+  });
+
+  it("drops a missing object in applyControls, with no step", () => {
+    const { engine, events, registry, run } = setup();
+    run("local", { kind: "carry/attach", objectId: "cannon-a" });
+    registry.remove("g-a");
+    registry.remove("cannon-a");
+
+    engine.applyControls(frameSeconds);
+    engine.forEachEvent((event) => events.push(event));
+
+    expect(participantAttachment(engine.read.participant("local"), "carry")).toBeUndefined();
+    expect(events).toContainEqual(expect.objectContaining({ kind: "carry/dropped", reason: "missing" }));
+  });
+});
+
 describe("the hand lets go", () => {
   it("ends the carry in the world and emits carry/dropped when the emitter is beyond the leash", () => {
     const { engine, registry, run, hand, step, events } = setup();
@@ -359,7 +390,6 @@ describe("the hand lets go", () => {
     step(0);
 
     expect(events).toContainEqual(expect.objectContaining({ kind: "carry/dropped", participantId: "local", objectId: "cannon-b", reason: "leash" }));
-    expect(events).toContainEqual(expect.objectContaining({ kind: "carry/released", objectId: "cannon-b" }));
     expect(participantAttachment(engine.read.participant("local"), "carry")).toBeUndefined();
     expect(registry.get("cannon-b")).toMatchObject({ kind: "geodesicEmitters/emitter" });
   });

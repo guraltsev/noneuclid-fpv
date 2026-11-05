@@ -67,7 +67,7 @@ export function rebuildEmitterGeodesics(input: {
   }
   // A tied arc is never regrown: its curve is not a ray from the emitter. An arc that is gone, lifted away, has nothing to regrow.
   const arc = geodesicId === undefined ? undefined : registry.get(geodesicId);
-  if (geodesicId && arc?.kind === "geodesicModel/arc" && arc.intendedLengthMeters !== undefined && !isTied(registry, geodesicId)) {
+  if (geodesicId && arc?.kind === "geodesicModel/arc" && !isTied(registry, geodesicId)) {
     const launchYawRadians = resolveEmitterLaunchYaw(registry, cannon, geodesicId);
     rebuildGeodesicToLength({
       world,

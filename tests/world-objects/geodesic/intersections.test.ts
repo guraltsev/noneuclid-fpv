@@ -10,12 +10,12 @@
  * same markers as an all-pairs search. The lifecycle helpers this file also exercises (endpoint detachment,
  * stale active-emitter state) are a geodesic's own bookkeeping, owned here because they share this fixture set.
  */
+import { createFixtureArc as createGeodesicArcObject } from "../../support/arcs";
 import { describe, expect, it } from "vitest";
 import { createRuntimeObjectRegistry } from "../../../src/world-objects/runtimeObjectRegistry";
 import {
   createGeodesicVertexObject,
   createGeodesicEmitterObject,
-  createGeodesicArcObject,
   geodesicRayBeamHeightMeters,
   getGeodesicSegmentEnd,
   intersectionTolerance,

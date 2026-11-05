@@ -238,6 +238,8 @@ export interface StepContext {
   /** Replaces the attachments of a participant. */
   setAttachments(participantId: string, attachments: readonly ParticipantAttachment[]): void;
   control(participantId: string, slot: string): PlainData | undefined;
+  /** Closes a slot, for a relation that ends in a tick: on the fast channel, nothing may wait for a command. */
+  closeControl(participantId: string, slot: string): void;
   emit(event: EngineEventBase): void;
   /** Runs a command now, inside the step, as actor "world" (design 013 section 5.7). */
   dispatch(command: EngineCommandBase): CommandResult;

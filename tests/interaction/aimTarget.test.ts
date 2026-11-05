@@ -10,6 +10,7 @@
  * implementation detail; the selection and miss behaviour at their boundary is what is tested), and resolver call
  * counts as a proxy for the cache (its outcome — a stale result until invalidated — is asserted directly instead).
  */
+import { createFixtureArc as createGeodesicArcObject } from "../support/arcs";
 import { describe, expect, it } from "vitest";
 import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
 import { buildPortalPathTables, type PortalRenderPath } from "../../src/cell-complex/portalPaths";
@@ -18,7 +19,6 @@ import { transformPoint3, yawRigidTransform3 } from "../../src/math/rigidTransfo
 import { createPlacedFlagObject } from "../../src/world-objects/placedFlags";
 import { createRuntimeObjectRegistry } from "../../src/world-objects/runtimeObjectRegistry";
 import {
-  createGeodesicArcObject,
   createGeodesicEmitterObject,
   createGeodesicVertexObject,
   geodesicRayBeamHeightMeters,

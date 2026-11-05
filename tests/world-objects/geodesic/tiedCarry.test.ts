@@ -7,6 +7,7 @@
  * release. A plain shot geodesic (an unshared free end) is still deleted when its emitter is lifted. The flow is not involved: without it a dragged
  * tied curve stays kinked at its vertex.
  */
+import { createFixtureArc as createGeodesicArcObject } from "../../support/arcs";
 import { describe, expect, it } from "vitest";
 import { yawRigidTransform3 } from "../../../src/math/rigidTransform3";
 import { expectSegmentsAreRealizedFromArcs } from "../../support/segmentOracle";
@@ -16,7 +17,6 @@ import { rebuildEmitterGeodesics } from "../../../src/world-objects/geodesic/car
 import { arcsOfCurve, isStale, isTied } from "../../../src/world-objects/geodesic/endpoints";
 import { arcFollowsEmitter, removePlainGeodesicsFromCannon } from "../../../src/world-objects/geodesic/lifecycle";
 import {
-  createGeodesicArcObject,
   createGeodesicEmitterObject,
   createGeodesicVertexObject,
   geodesicRayBeamHeightMeters,

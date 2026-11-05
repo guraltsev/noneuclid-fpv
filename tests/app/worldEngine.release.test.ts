@@ -33,7 +33,7 @@ describe("api.world", () => {
 
     expect(await app.api.world.submit({ kind: "carry/attach", objectId: "no-such-object" })).toMatchObject({ ok: false, refusal: { code: "carry/notCarriable" } });
     expect(await app.api.world.submit({ kind: "carry/detach" })).toEqual({ ok: true });
-    expect(await app.api.world.submit({ kind: "carry/drop", participantId: "local", reason: "leash" })).toMatchObject({ ok: false, refusal: { code: "world/moduleOnly" } });
+    expect(await app.api.world.submit({ kind: "geodesicEmitters/lift", emitterId: "missing" })).toMatchObject({ ok: false, refusal: { code: "world/moduleOnly" } });
     const participants = (await app.api.world.participants()) as { id: string; attachments: unknown[] }[];
     expect(participants[0]!.attachments).toEqual([]);
   });

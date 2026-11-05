@@ -43,7 +43,7 @@ export interface GeodesicEmittersApi {
   /** The emitter has moved: its arcs are rebuilt, keeping an arc whose rebuild failed (the safety net of a carry in progress). `regrownActiveGeodesicId` names a plain arc that was regrown from it. */
   rebuildGeodesics(emitterId: string, activeArcId: string | undefined): { readonly regrownActiveGeodesicId?: string };
   /** The emitter has been put down: its arcs are rebuilt one last time, without the safety net. */
-  settleGeodesics(emitterId: string, activeArcId: string | undefined): { readonly regrownActiveGeodesicId?: string };
+  settleGeodesics(emitterId: string, activeArcId: string | undefined): void;
 }
 
 /** The emitters' token: `provides` of the module, `requires` of what moves an emitter. */
@@ -98,7 +98,7 @@ export interface GeodesicEmitterBeginEditCommand extends EngineCommandBase {
   readonly arcId?: string;
 }
 
-/** Ends the issuing participant's edit: the geodesic is traced once more and connects to an emitter it reaches, snapping onto one that lies almost on its ray. The attachment and the slot go. Does nothing with no edit. */
+/** Ends the issuing participant's edit: the attachment and the slot go, and the geodesic is traced once more and connects to an emitter it reaches, snapping onto one that lies almost on its ray. Does nothing with no edit. An edit also ends by itself when its emitter is gone. */
 export interface GeodesicEmitterEndEditCommand extends EngineCommandBase {
   readonly kind: "geodesicEmitters/endEdit";
 }

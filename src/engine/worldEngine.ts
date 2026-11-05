@@ -168,6 +168,11 @@ export function createWorldEngine(options: WorldEngineOptions): WorldEngine {
     }
   }
 
+  function closeControl(participantId: string, slot: string): void {
+    assertSlotName(slot);
+    controls.close(participantId, slot);
+  }
+
   const stepContext: MutableStepContext = {
     get world() {
       return options.getWorld();
@@ -180,6 +185,7 @@ export function createWorldEngine(options: WorldEngineOptions): WorldEngine {
     forEachParticipant: (fn) => participants.forEach(fn),
     setAttachments: (participantId, attachments) => void participants.setAttachments(participantId, attachments),
     control: (participantId, slot) => controls.get(participantId, slot),
+    closeControl,
     emit,
     dispatch: dispatchFromModule,
     ids: activeIds,
@@ -203,10 +209,7 @@ export function createWorldEngine(options: WorldEngineOptions): WorldEngine {
       assertSlotName(slot);
       controls.open(participantId, slot);
     },
-    closeControl(participantId, slot) {
-      assertSlotName(slot);
-      controls.close(participantId, slot);
-    },
+    closeControl,
   };
 
   const ticks = createTickRunner(experience.modules, { frames, context: stepContext, journal: registry.changes });

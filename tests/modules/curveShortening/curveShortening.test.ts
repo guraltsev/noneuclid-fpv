@@ -7,6 +7,7 @@
  * a curve of six arcs with five tied vertices, a torus loop pair and free loops reaching the known taut geometry within a tolerance; the total length never growing and the number of vertices never growing at any step; the same limit at 60 Hz
  * and 240 Hz; a loop around a cone point shrinking until it is deleted with a notice; and a curve that would need a wrap vertex at a forbidden-zone disk being destroyed with a notice. The flow on its own, against a scripted model, is in `flow.test.ts`.
  */
+import { createFixtureArc as createGeodesicArcObject } from "../../support/arcs";
 import { describe, expect, it } from "vitest";
 import type { CommandResult, EngineEventBase } from "../../../src/engine/moduleTypes";
 import { curveDynamicsToken, type CurveShorteningEvent } from "../../../src/modules/curveShortening/api";
@@ -24,7 +25,6 @@ import { arcConnectsEmitters } from "../../../src/world-objects/geodesic/lifecyc
 import {
   createGeodesicVertexObject,
   createGeodesicEmitterObject,
-  createGeodesicArcObject,
   geodesicRayBeamHeightMeters,
   type GeodesicSegmentObject,
 } from "../../../src/world-objects/geodesic/objects";

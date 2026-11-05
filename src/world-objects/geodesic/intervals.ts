@@ -210,7 +210,7 @@ function commitRealizedTraces(
  * Re-aims a free geodesic (emitter at one role, a singly attached free end at the other) toward a target point.
  *
  * The free end is moved to wherever the new ray ends (cell, position), the interval's start cell and portal word are
- * recomputed from the actual trace, and segments are replaced. If `connectEmitters` (default true) and the ray ends at
+ * recomputed from the actual trace, and segments are replaced. The arc then runs from the emitter: one that held it at `end`, an arc freed from a tied curve, is turned round, since the trace, and so the word, starts at the emitter. If `connectEmitters` (default true) and the ray ends at
  * another emitter, the free role is re-attached to that emitter and the interval is rebuilt as a connected geodesic.
  * Returns `undefined` for non-interval ids, non-(emitter, free end) attachments, a free end shared with other
  * attachments, or a target within `intersectionTolerance` of the emitter (length is otherwise at least `minGeodesicSegmentLengthMeters`).
@@ -231,8 +231,7 @@ export function aimFreeGeodesicFromEndpoint(input: {
     return undefined;
   }
   const emitterAttachment = interval[input.emitterEndRole];
-  const freeRole = getOppositeEndRole(input.emitterEndRole);
-  const freeAttachment = interval[freeRole];
+  const freeAttachment = interval[getOppositeEndRole(input.emitterEndRole)];
   const emitter = input.registry.get(emitterAttachment.anchorObjectId);
   const freeEnd = input.registry.get(freeAttachment.anchorObjectId);
   if (emitter?.kind !== "geodesicEmitters/emitter" || freeEnd?.kind !== "geodesicModel/vertex") {
@@ -272,8 +271,6 @@ export function aimFreeGeodesicFromEndpoint(input: {
   const terminalCellId = tail.cellId;
   // The free end moves to wherever the trace actually ended, possibly in another cell after portal crossings; the portal word
   // below is read off the realized traces, so the interval's homotopy class always matches the picture.
-  // Caveat: the traces start at the EMITTER. The stored word/`startCellId` follow that order, which equals the interval's
-  // start-to-end convention only when the emitter holds the `start` role.
   const nextFreeEnd = {
     ...freeEnd,
     cellId: terminalCellId,
@@ -283,6 +280,8 @@ export function aimFreeGeodesicFromEndpoint(input: {
 
   let nextInterval: GeodesicArcObject = {
     ...interval,
+    start: { geodesicId: interval.id, role: "start", anchorObjectId: emitter.id },
+    end: { geodesicId: interval.id, role: "end", anchorObjectId: freeEnd.id },
     startCellId: emitter.cellId,
     cellId: emitter.cellId,
     portalWord,
@@ -293,7 +292,7 @@ export function aimFreeGeodesicFromEndpoint(input: {
     nextInterval = replaceGeodesicEndpointAttachment(
       input.registry,
       input.geodesicId,
-      freeRole,
+      "end",
       tail.terminal.emitterId,
     ) ?? nextInterval;
     const rebuilt = rebuildDerivedGeodesicSegments({
@@ -401,6 +400,7 @@ export function splitGeodesicIntervalAtSegmentHit(input: {
   const totalLengthMeters = totalGeodesicLengthFromSegments(segments);
   const prefixLengthMeters = totalLengthThroughSegment(segments, segment, clampedDistance);
   const continuationLengthMeters = totalLengthMeters - prefixLengthMeters;
+  const continuationIntendedLengthMeters = interval.intendedLengthMeters - prefixLengthMeters;
   // `freeRole` holds the free end, the other role is the original source emitter.
   const freeRole: GeodesicEndRole = input.registry.get(interval.start.anchorObjectId)?.kind === "geodesicModel/vertex"
     ? "start"
@@ -433,7 +433,7 @@ export function splitGeodesicIntervalAtSegmentHit(input: {
       endAnchorObjectId: freeEnd.id,
       startCellId: placed.cellId,
       geodesicNumber: nextGeodesicNumber(input.registry),
-      intendedLengthMeters: (interval.intendedLengthMeters ?? totalLengthMeters) - prefixLengthMeters,
+      intendedLengthMeters: continuationIntendedLengthMeters,
     }));
   }
   // Shorten the original interval: its free role now attaches to the placed emitter, and its portal word becomes the prefix word.
@@ -463,7 +463,7 @@ export function splitGeodesicIntervalAtSegmentHit(input: {
       placed,
       freeEnd,
       yawRadians: Math.atan2(segment.direction.y, segment.direction.x),
-      lengthMeters: continuationLengthMeters,
+      lengthMeters: continuationIntendedLengthMeters,
     });
   }
   removeUnusedFreeGeodesicEnds(input.registry);
@@ -798,7 +798,7 @@ function traceTerminalToBuildTerminalForInterval(
 }
 
 // Retraces the part of a split free geodesic beyond a newly placed emitter: from the placed emitter along the original yaw
-// for the remaining length, moving the old free end to the new terminal point. Deletes the continuation interval if no trace
+// to what is left of the intended length, moving the old free end to the new terminal point. Deletes the continuation interval if no trace
 // came out; if the trace reaches an emitter, the free end is re-attached to that emitter (the interval becomes connected).
 function rebuildContinuationFromCut(input: {
   readonly world: CompiledCellComplex;

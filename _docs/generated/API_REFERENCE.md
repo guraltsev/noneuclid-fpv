@@ -1578,12 +1578,10 @@ The carry module's public face (design 013 sections 7 and 12.1): the names of it
 | type | `CarryOffset` | Value of the `carry/offset` slot, plain data. |
 | interface | `CarryAttachCommand` | Picks an object up. |
 | interface | `CarryDetachCommand` | Puts down what the issuing participant carries (a detach only, design 012 P4); the final rebuild of the emitter's geodesics runs. |
-| interface | `CarryDropCommand` | Module-only: the carry ends by the carry rules themselves (the hand's leash). |
 | type | `CarryCommand` | Every command of the module. |
 | type | `CarryDropReason` | Why the world ended a carry: the hand's leash released the object (too far, or unreachable), or the object no longer exists. |
 | interface | `CarryMovedEvent` | The carried object moved this frame; the geodesics it anchors were rebuilt, so what depends on them needs a refresh. |
-| interface | `CarryReleasedEvent` | A carry ended, however it ended (detach or drop): the final rebuild ran. |
-| interface | `CarryDroppedEvent` | The world ended the carry (design 013 section 7); the client leaves its carry tool. |
+| interface | `CarryDroppedEvent` | The world ended the carry (design 013 section 7), in the `bodies` tick; the final rebuild has run, and the client leaves its carry tool. |
 | type | `CarryEvent` | Every event of the module. |
 | const | `carryRefusals` | Refusal codes of `carry/attach`. |
 
@@ -1669,7 +1667,7 @@ The geodesic emitters' public face (design 013 sections 12.1 and 16): the emitte
 | interface | `GeodesicEmitterDeleteGeodesicCommand` | Deletes one geodesic of an emitter. |
 | interface | `GeodesicEmitterRemoveCommand` | Removes an emitter and every geodesic on it; a tied arc takes its whole curve. |
 | interface | `GeodesicEmitterBeginEditCommand` | The issuing participant begins to edit an emitter: the attachment is held and the slot `geodesicEmitters/yaw` opens. |
-| interface | `GeodesicEmitterEndEditCommand` | Ends the issuing participant's edit: the geodesic is traced once more and connects to an emitter it reaches, snapping onto one that lies almost on its ray. |
+| interface | `GeodesicEmitterEndEditCommand` | Ends the issuing participant's edit: the attachment and the slot go, and the geodesic is traced once more and connects to an emitter it reaches, snapping onto one that lies almost on its ray. |
 | interface | `GeodesicEmitterLiftCommand` | Module-only. |
 | type | `GeodesicEmittersCommand` | Every command of the module. |
 | type | `GeodesicEmittersResult` | What a command that succeeded answers with: `outcome` names the command, the ids are what it created or touched. |

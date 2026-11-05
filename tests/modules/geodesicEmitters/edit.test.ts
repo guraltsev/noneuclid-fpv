@@ -4,7 +4,7 @@
  * The edit relation of the geodesic emitters module and the intended length of a free geodesic, driven through the world engine alone, with the write guard on: `beginEdit` and `endEdit` are commands, the absolute yaw is the control slot `geodesicEmitters/yaw`, and the re-trace runs in `applyControls`, in a frame with no tick too.
  * A free geodesic is a laser of a certain power: a wall or a junction's zone stops the trace and not the intention, so it grows back as soon as nothing stands in the way, across edits.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { participantAttachment, type CommandResult, type EngineCommandBase, type ParticipantRecord } from "../../../src/engine/moduleTypes";
 import { createLocalPlayerParticipant } from "../../../src/engine/participants";
 import { createDefaultPlayerPose } from "../../../src/movement/playerPose";
@@ -13,7 +13,9 @@ import { createDefaultWorldModules } from "../../../src/runtime/experience";
 import { arcConnectsEmitters } from "../../../src/world-objects/geodesic/lifecycle";
 import { getGeodesicSegments } from "../../../src/world-objects/geodesic/segments";
 import { createRuntimeObjectRegistry } from "../../../src/world-objects/runtimeObjectRegistry";
-import { compileLargePortalWorld, totalGeodesicLength } from "../../fixtures/world-objects/geodesic";
+import { arcsAtVertex } from "../../../src/world-objects/geodesic/endpoints";
+import { previewVertexRemoval, removeVertex } from "../../../src/world-objects/geodesic/vertices";
+import { compileLargePortalWorld, createSymmetricPairScenario, createTorusTiedPairScenario, totalGeodesicLength } from "../../fixtures/world-objects/geodesic";
 import { createTestEngine, runFrame } from "../../support/engine";
 
 const frameSeconds = 1 / 60;
@@ -31,7 +33,9 @@ function setup() {
   const world = compileLargePortalWorld();
   const registry = createRuntimeObjectRegistry();
   const playerPose = { ...createDefaultPlayerPose("a"), position: { x: 1.5, y: 2.5, z: 0 } };
-  const engine = createTestEngine({ registry, getWorld: () => world, modules: createDefaultWorldModules(), participants: [createLocalPlayerParticipant(playerPose), ana()] });
+  let worldIsBroken = false;
+  const getWorld = () => (worldIsBroken ? ({} as typeof world) : world);
+  const engine = createTestEngine({ registry, getWorld, modules: createDefaultWorldModules(), participants: [createLocalPlayerParticipant(playerPose), ana()] });
 
   function run(command: EngineCommandBase, who = "local"): CommandResult {
     const ticket = engine.submit(who, command);
@@ -73,7 +77,9 @@ function setup() {
     expect(run({ kind: "geodesicEmitters/endEdit" })).toEqual({ ok: true });
   }
   const edit = (who = "local") => participantAttachment(engine.read.participant(who), geodesicEmitterEditAttachmentKind);
-  return { world, registry, engine, emitterId, arcId, arc, emitter, run, value, frameWithNoTick, editTo, edit };
+  /** From now on every trace throws: what no expected failure does. */
+  const breakWorld = () => void (worldIsBroken = true);
+  return { world, registry, engine, emitterId, arcId, arc, emitter, run, value, frameWithNoTick, editTo, edit, breakWorld };
 }
 
 describe("a free geodesic's intended length", () => {
@@ -121,6 +127,17 @@ describe("a free geodesic's intended length", () => {
     const continuation = registry.get(placed.arcIds.find((id) => id !== arcId)!);
     expect(continuation).toMatchObject({ kind: "geodesicModel/arc" });
     expect((continuation as { readonly intendedLengthMeters: number }).intendedLengthMeters).toBeCloseTo(lengthMeters - 1);
+    expect(getGeodesicSegments(registry, continuation!.id).at(-1)?.terminal.kind).toBe("forbidden-zone-hit");
+  });
+
+  it("is the sum of the real lengths on an arc merged at a taut vertex", () => {
+    const { world, registry } = createSymmetricPairScenario(2, 0);
+    const preview = previewVertexRemoval(world, registry, { vertexId: "free", arcs: arcsAtVertex(registry, "free") });
+    expect(preview.kind).toBe("merge");
+
+    const [mergedId] = removeVertex(registry, "free", preview);
+
+    expect(registry.get(mergedId!)).toMatchObject({ intendedLengthMeters: expect.closeTo(4, 6) });
   });
 });
 
@@ -217,17 +234,69 @@ describe("the yaw slot", () => {
     expect(registry.get(arcId)).toBeUndefined();
   });
 
-  it("does nothing for an emitter removed during the edit, and the edit can still end", () => {
-    const { registry, run, emitterId, arcId, edit, frameWithNoTick } = setup();
+  it("ends the edit in the world, with no command, when the emitter is removed", () => {
+    const { registry, engine, run, emitterId, arcId, edit } = setup();
     run({ kind: "geodesicEmitters/beginEdit", emitterId, arcId } as EngineCommandBase);
     run({ kind: "geodesicEmitters/remove", emitterId } as EngineCommandBase);
     const version = registry.getVersion();
 
-    frameWithNoTick(1);
+    engine.applyControls(frameSeconds);
 
+    expect(edit()).toBeUndefined();
     expect(registry.getVersion()).toBe(version);
     expect(run({ kind: "geodesicEmitters/endEdit" })).toEqual({ ok: true });
-    expect(edit()).toBeUndefined();
+  });
+
+  it("does not leave applyControls when a re-trace fails: the emitter has turned", () => {
+    const { run, emitter, emitterId, arcId, breakWorld, frameWithNoTick } = setup();
+    run({ kind: "geodesicEmitters/beginEdit", emitterId, arcId } as EngineCommandBase);
+    breakWorld();
+    const warned = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    expect(() => frameWithNoTick(1)).not.toThrow();
+
+    expect(emitter().aimYawRadians).toBeCloseTo(1);
+    expect(warned).toHaveBeenCalledOnce();
+    warned.mockRestore();
+  });
+});
+
+describe("an arc freed from a tied curve", () => {
+  /** The tied pair of the torus with the world's modules; `arcId` leaves `e1` with the tied vertex at its other end. */
+  function tied() {
+    const { world, registry } = createTorusTiedPairScenario();
+    const playerPose = { ...createDefaultPlayerPose("torus-room"), position: { x: -2.5, y: 0, z: 0 } };
+    const engine = createTestEngine({ registry, getWorld: () => world, modules: createDefaultWorldModules(), playerPose });
+    function run(command: EngineCommandBase): CommandResult {
+      const ticket = engine.submit("local", command);
+      runFrame(engine, frameSeconds);
+      const result = engine.resultOf(ticket) as CommandResult;
+      engine.endFrame();
+      return result;
+    }
+    return { registry, engine, run };
+  }
+
+  it("is refused with blocked while it is tied", () => {
+    const { run } = tied();
+
+    expect(run({ kind: "geodesicEmitters/beginEdit", emitterId: "e1", arcId: "g1" } as EngineCommandBase)).toMatchObject({ ok: false, refusal: { code: "geodesicEmitters/blocked" } });
+  });
+
+  it("turns and ends with the emitter at its end role, the arc then leaving from the emitter", () => {
+    const { registry, engine, run } = tied();
+    expect(run({ kind: "geodesicEmitters/deleteGeodesic", emitterId: "e1", arcId: "g1" } as EngineCommandBase)).toMatchObject({ ok: true });
+    expect(registry.get("g2")).toMatchObject({ end: { anchorObjectId: "e1" } });
+    expect(run({ kind: "geodesicEmitters/beginEdit", emitterId: "e1", arcId: "g2" } as EngineCommandBase)).toEqual({ ok: true });
+
+    engine.setControl("local", geodesicEmitterYawSlot, 0.3);
+    expect(() => engine.applyControls(frameSeconds)).not.toThrow();
+    expect(run({ kind: "geodesicEmitters/endEdit" })).toEqual({ ok: true });
+
+    expect(participantAttachment(engine.read.participant("local"), geodesicEmitterEditAttachmentKind)).toBeUndefined();
+    expect(registry.get("g2")).toMatchObject({ start: { anchorObjectId: "e1", role: "start" }, end: { role: "end" } });
+    const first = getGeodesicSegments(registry, "g2")[0]!;
+    expect(Math.atan2(first.direction.y, first.direction.x)).toBeCloseTo(0.3);
   });
 });
 
@@ -254,6 +323,18 @@ describe("geodesicEmitters/endEdit", () => {
 
     expect(emitter().aimYawRadians).toBeCloseTo(Math.PI / 2);
     expect(arcConnectsEmitters(registry, arcId)).toBe(true);
+  });
+
+  it("ends the edit even when the last trace fails", () => {
+    const { engine, run, emitterId, arcId, edit, breakWorld } = setup();
+    run({ kind: "geodesicEmitters/beginEdit", emitterId, arcId } as EngineCommandBase);
+    breakWorld();
+
+    const ticket = engine.submit("local", { kind: "geodesicEmitters/endEdit" });
+    expect(() => engine.step(frameSeconds)).toThrow();
+
+    expect(engine.resultOf(ticket)).toMatchObject({ ok: false, refusal: { code: "world/internalError" } });
+    expect(edit()).toBeUndefined();
   });
 
   it("does nothing with no edit", () => {

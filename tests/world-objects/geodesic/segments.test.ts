@@ -4,11 +4,11 @@
  * The display state of the derived segments of an arc (`connectionState`): `"connected"` when both ends of the arc are on
  * emitters, `"open"` otherwise. An arc tied at a vertex is drawn open: there is no separate state for a tied arc.
  */
+import { createFixtureArc as createGeodesicArcObject } from "../../support/arcs";
 import { describe, expect, it } from "vitest";
 import { yawRigidTransform3 } from "../../../src/math/rigidTransform3";
 import { createRuntimeObjectRegistry } from "../../../src/world-objects/runtimeObjectRegistry";
 import {
-  createGeodesicArcObject,
   createGeodesicEmitterObject,
   createGeodesicVertexObject,
   geodesicRayBeamHeightMeters,

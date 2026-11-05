@@ -8,6 +8,7 @@
  * and its vertex; every query leaves the registry version unchanged; `removeVertex` on a blocked vertex is refused and changes nothing; both previews refuse an
  * emitter id; the module-only commands are refused to clients. The geometry itself is tested in `tests/world-objects/geodesic/`.
  */
+import { createFixtureArc as createGeodesicArcObject } from "../support/arcs";
 import { describe, expect, it } from "vitest";
 import type { CompiledCellComplex } from "../../src/cell-complex/compileCellComplex";
 import type { AnyModuleDefinition, CommandContext, CommandResult, EngineCommandBase, EngineEventBase, ModuleCreateContext } from "../../src/engine/moduleTypes";
@@ -21,7 +22,6 @@ import { createDefaultPlayerPose } from "../../src/movement/playerPose";
 import { rebuildConnectedGeodesicBetweenEmitters } from "../../src/world-objects/geodesic/cannon";
 import { rebuildDerivedGeodesicSegments } from "../../src/world-objects/geodesic/intervals";
 import {
-  createGeodesicArcObject,
   createGeodesicEmitterObject,
   createGeodesicVertexObject,
   geodesicRayBeamHeightMeters,

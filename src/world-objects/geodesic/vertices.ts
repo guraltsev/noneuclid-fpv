@@ -344,6 +344,8 @@ export function previewVertexRemoval(
     startCellId: anchorA.cellId,
     portalWord: word,
     geodesicNumber: (mergedId === firstArc.id ? firstArc : secondArc).geodesicNumber,
+    // A vertex goes when its two arcs are taut, so their real lengths add up to the merged chord.
+    intendedLengthMeters: getGeodesicTotalLengthMeters(registry, firstArc.id) + getGeodesicTotalLengthMeters(registry, secondArc.id),
   });
   const preview = previewRebuildGeodesicInterval({ world, registry, interval: merged });
   if (!preview) {

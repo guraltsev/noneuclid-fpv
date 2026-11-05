@@ -3,6 +3,7 @@
  *
  * The arc index groups arc ends by anchor: attachments, ArcEnd records, distinct arc ids and tied vertices, in registry order, frozen. These tests check each list on a hand-built registry (an arc with both ends on one anchor, a closed loop), the order guarantees, the filter that ignores vertex moves and portal words, and the oracle fuzz against a full recompute.
  */
+import { createFixtureArc as createGeodesicArcObject } from "../../support/arcs";
 import { describe, expect, it } from "vitest";
 import { identityRigidTransform3 } from "../../../src/math/rigidTransform3";
 import { derivedStatsOf } from "../../../src/world-objects/derived";
@@ -17,7 +18,6 @@ import {
   tiedVertexCount,
 } from "../../../src/world-objects/geodesic/endpoints";
 import {
-  createGeodesicArcObject,
   createGeodesicEmitterObject,
   createGeodesicVertexObject,
   type GeodesicArcObject,

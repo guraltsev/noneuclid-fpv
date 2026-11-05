@@ -158,10 +158,10 @@ export interface GeodesicArcObject extends RuntimeWorldObjectBase {
   /** Display number ("G1", "G2", ...), assigned once when the arc is created (`nextGeodesicNumber`); real state, never recomputed. Absent only in test fixtures. */
   readonly geodesicNumber?: number;
   /**
-   * Real state of a free geodesic, a laser of a certain power (maintainer, 2026-11-05): the length it means to have, set by `shootGeodesic`, raised by `extendGeodesic` and shared out by a cut.
-   * Every rebuild of a free geodesic traces to it, so what stands in the way, a wall or a junction's zone, stops the trace and not the intention. It says nothing of the real path: a measured length is the sum of the segments. Absent only in test fixtures; once an arc connects emitters nothing reads it.
+   * Real state of a geodesic, a laser of a certain power (maintainer, 2026-11-05): the length it means to have, set by `shootGeodesic`, raised by `extendGeodesic`, shared out by a cut and summed by a merge.
+   * Every rebuild of a free geodesic traces to it, so what stands in the way, a wall or a junction's zone, stops the trace and not the intention. It says nothing of the real path: a measured length is the sum of the segments. While an arc connects emitters or is tied nothing reads it.
    */
-  readonly intendedLengthMeters?: number;
+  readonly intendedLengthMeters: number;
   /** Transient: set while the last rebuild of this arc failed during a carry, so it still shows its old path; the next successful rebuild clears it (`isStale`). */
   readonly stale?: true;
 }
@@ -452,7 +452,7 @@ export function createGeodesicArcObject(input: {
   readonly portalWord?: readonly GeodesicPortalTraversal[];
   /** Display number, assigned once at creation (see `nextGeodesicNumber`). */
   readonly geodesicNumber?: number;
-  readonly intendedLengthMeters?: number;
+  readonly intendedLengthMeters: number;
 }): GeodesicArcObject {
   return {
     id: input.id,
@@ -463,7 +463,7 @@ export function createGeodesicArcObject(input: {
     startCellId: input.startCellId,
     portalWord: reduceAdjacentInversePortalTraversals(input.portalWord ?? []),
     ...(input.geodesicNumber === undefined ? {} : { geodesicNumber: input.geodesicNumber }),
-    ...(input.intendedLengthMeters === undefined ? {} : { intendedLengthMeters: input.intendedLengthMeters }),
+    intendedLengthMeters: input.intendedLengthMeters,
     start: {
       geodesicId: input.id,
       role: "start",

@@ -225,7 +225,7 @@ export function geodesicModelModule(options: Partial<GeodesicModelOptions> = {})
         previewVertexRemoval: (input) => previewVertexRemoval(context.getWorld(), objects, input),
         retraceArc({ emitter, arcId, connectEmitters }) {
           const arc = objects.get(arcId);
-          if (arc?.kind !== "geodesicModel/arc" || arc.intendedLengthMeters === undefined || !isAimableFreeGeodesic(objects, arc)) return;
+          if (arc?.kind !== "geodesicModel/arc" || !isAimableFreeGeodesic(objects, arc)) return;
           rebuildGeodesicToLength({ world: context.getWorld(), registry: objects, cannon: emitter, geodesicId: arcId, totalLengthMeters: arc.intendedLengthMeters, connectEmitters });
         },
         followAnchorRoute: (emitterId, route) => followAnchorRoute(objects, emitterId, route),

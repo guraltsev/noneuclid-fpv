@@ -65,8 +65,6 @@ export type RuntimeCommand =
   | { readonly kind: "step-goal-page"; readonly delta: -1 | 1 }
   // Tool and sign selection.
   | { readonly kind: "select-tool"; readonly toolId: RuntimeToolId }
-  /** A tool entered a mode of its own (rotate, aim, carry): close the menu and select that tool. Not gated and no session reset: the tool started itself. */
-
   /** Ends the tool in use without closing the menu page: selects no tool. */
   | { readonly kind: "clear-selected-tool" }
   | { readonly kind: "choose-place-flag-type"; readonly flagType: PlacedFlagType }

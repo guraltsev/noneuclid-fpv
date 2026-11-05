@@ -78,6 +78,32 @@ describe("a deleted geodesic's measurements", () => {
     expect(run({ kind: "geodesicEmitters/deleteGeodesic", emitterId, arcId })).toMatchObject({ ok: false });
   });
 
+  it("take an angle too: it stays through a frame with no tick and goes with the step", () => {
+    const { engine, registry, arcId } = withShotGeodesic();
+    const emitterId = (registry.get(arcId) as { readonly start: { readonly anchorObjectId: string } }).start.anchorObjectId;
+    const shot = engine.submit("local", { kind: "geodesicEmitters/shoot", emitterId, yawRadians: 1.5, lengthMeters: 1.5 } as EngineCommandBase);
+    engine.step(0);
+    const secondArcId = (engine.resultOf(shot) as unknown as { readonly value: { readonly arcId: string } }).value.arcId;
+    engine.endFrame();
+    const emitter = registry.get(emitterId);
+    if (emitter?.kind !== emitterKind) throw new Error("Expected the emitter.");
+    const center = resolveProtractorCenterSelection(registry, emitter);
+    const first = resolveProtractorEmitterGeodesicSelection({ center, emitter, registry, geodesicId: arcId });
+    const second = resolveProtractorEmitterGeodesicSelection({ center, emitter, registry, geodesicId: secondArcId });
+    if (!first || !second) throw new Error("Expected both sides.");
+    registry.add(createProtractorAngleObject({ id: "angle", center, first, second }));
+    runDerivePass(engine);
+    expect(registry.get("angle")).toBeDefined();
+
+    const ticket = engine.submit("local", { kind: "geodesicEmitters/deleteGeodesic", emitterId, arcId: secondArcId } as EngineCommandBase);
+    engine.applyControls(1 / 60);
+    expect(registry.get("angle")).toBeDefined();
+    engine.step(1 / 60);
+
+    expect(engine.resultOf(ticket)).toMatchObject({ ok: true });
+    expect(registry.get("angle")).toBeUndefined();
+  });
+
   it("outlive an arc removed outside a tick until the next one, and nothing reads them wrongly", () => {
     const { registry, arcId, engine } = withShotGeodesic();
     const length = createMeasuredGeodesicLengthObject({ id: "length", registry, geodesicId: arcId, playerCellId: "a", playerPoint: { x: 3, y: 2.5, z: 0 } });

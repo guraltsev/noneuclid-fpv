@@ -35,9 +35,7 @@ import {
   distanceAlongSegment,
   getGeodesicSegments,
   getGeodesicTail,
-  getGeodesicTotalLengthMeters,
   nextGeodesicNumber,
-
   resolveEndpointTangentAtAnchor,
   totalGeodesicLengthFromSegments,
   totalLengthThroughSegment,
@@ -46,7 +44,6 @@ import { arcConnectsEmitters, arcFollowsEmitter, collectFollowingArcIdsForEmitte
 import {
   aimFreeGeodesicFromEndpoint,
   rebuildConnectedGeodesicFromEndpointsAndPortalWordDetailed,
-
   updateConnectedGeodesicPortalWordForCarriedAnchorTraversals,
 } from "./intervals";
 
@@ -329,13 +326,15 @@ export function shootGeodesic(input: ShootGeodesicInput): GeodesicSegmentObject 
       endAnchorObjectId: freeEndId,
       startCellId: input.cannon.cellId,
       geodesicNumber: nextGeodesicNumber(input.registry),
+      intendedLengthMeters: input.maxLengthMeters,
     }));
   }
   const result = aimFreeGeodesicFromEndpoint({
     world: input.world,
     registry: input.registry,
     geodesicId: input.geodesicId,
-    emitterEndRole: "start",
+    // An arc freed from a tied curve may hold the emitter at its end.
+    emitterEndRole: interval?.kind === "geodesicModel/arc" && interval.start.anchorObjectId !== input.cannon.id ? "end" : "start",
     targetPointInEmitterCell: targetPoint,
     connectEmitters: input.connectEmitters ?? true,
     intendedLengthMeters: input.maxLengthMeters,
@@ -373,7 +372,7 @@ export function extendGeodesic(input: ExtendGeodesicInput): GeodesicSegmentObjec
     endRole: emitterRole,
   });
   const yaw = tangent?.yawRadians ?? emitter.aimYawRadians;
-  const intendedLengthMeters = (interval.intendedLengthMeters ?? getGeodesicTotalLengthMeters(input.registry, input.geodesicId)) + input.maxLengthMeters;
+  const intendedLengthMeters = interval.intendedLengthMeters + input.maxLengthMeters;
   const targetPoint = addVec3(
     getGeodesicCannonEmitterPoint(emitter),
     scaleVec3(directionFromYaw(yaw), intendedLengthMeters),
@@ -804,9 +803,9 @@ export function cutGeodesicsAtVertex(input: {
     const realLengthMeters = totalGeodesicLengthFromSegments(originalSegments);
     const continuationLengthMeters = realLengthMeters - totalLengthMeters;
     const continuationTerminal = originalSegments.at(-1)?.terminal;
-    // What was stopped short of the arc's intention goes on with the continuation.
+    // What was stopped short of a free arc's intention goes on with the continuation.
     const arc = input.registry.get(match.segment.geodesicId);
-    const stoppedShortMeters = arc?.kind === "geodesicModel/arc" && arc.intendedLengthMeters !== undefined
+    const stoppedShortMeters = arc?.kind === "geodesicModel/arc" && continuationTerminal?.kind !== "emitter-hit"
       ? Math.max(0, arc.intendedLengthMeters - realLengthMeters)
       : 0;
     const shouldCreateContinuation = continuationLengthMeters >=

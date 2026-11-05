@@ -160,6 +160,11 @@ function withoutEdit(participant: ParticipantRecord) {
   return participant.attachments.filter((attachment) => attachment.kind !== geodesicEmitterEditAttachmentKind);
 }
 
+function endEdit(ctx: Pick<StepContext, "setAttachments" | "closeControl">, participant: ParticipantRecord): void {
+  ctx.setAttachments(participant.id, withoutEdit(participant));
+  ctx.closeControl(participant.id, geodesicEmitterYawSlot);
+}
+
 function createBeginEdit(model: GeodesicModelQueries) {
   return (command: GeodesicEmitterBeginEditCommand, ctx: CommandContext): CommandResult => {
     const participant = ctx.participant(ctx.participantId);
@@ -198,16 +203,16 @@ function createEndEdit(model: GeodesicModelApi) {
     const participant = ctx.participant(ctx.participantId);
     const edit = participantAttachment(participant, geodesicEmitterEditAttachmentKind);
     if (participant === undefined || edit === undefined) return { ok: true };
+    // The relation goes first: whatever the last trace does, the edit has ended.
+    endEdit(ctx, participant);
     const emitter = emitterAt(ctx.objects, edit.objectId);
     const arcId = edit.activeGeodesicId;
     const arc = arcId === undefined ? undefined : ctx.objects.get(arcId);
-    if (emitter !== undefined && arcId !== undefined && arc?.kind === "geodesicModel/arc" && arc.intendedLengthMeters !== undefined) {
+    if (emitter !== undefined && arcId !== undefined && arc?.kind === "geodesicModel/arc") {
       const snapped = resolveCannonSnappedToEmitter({ world: ctx.world, registry: ctx.objects, cannon: emitter, geodesicId: arcId, totalLengthMeters: arc.intendedLengthMeters }) ?? emitter;
       if (snapped !== emitter) ctx.objects.update(snapped);
       model.retraceArc({ emitter: snapped, arcId, connectEmitters: true });
     }
-    ctx.setAttachments(participant.id, withoutEdit(participant));
-    ctx.closeControl(participant.id, geodesicEmitterYawSlot);
     return { ok: true };
   };
 }
@@ -217,18 +222,30 @@ function lift(command: GeodesicEmitterLiftCommand, ctx: CommandContext): Command
   return ctx.dispatch(removal);
 }
 
-/** Once per frame: an edited emitter takes the yaw of the slot, and its free geodesic follows. A yaw it already has costs one comparison. */
+/**
+ * Once per frame: an edited emitter takes the yaw of the slot, and its free geodesic follows. A yaw it already has costs one comparison. An emitter that is gone ends the edit.
+ * A failed re-trace stays in this frame: the geodesic keeps its last path, and the fast channel and the frame's steps go on.
+ */
 function followEdit(ctx: StepContext, model: GeodesicModelApi, participant: ParticipantRecord): void {
   const edit = participantAttachment(participant, geodesicEmitterEditAttachmentKind);
   if (edit === undefined) return;
+  const emitter = emitterAt(ctx.objects, edit.objectId);
+  if (emitter === undefined) {
+    endEdit(ctx, participant);
+    return;
+  }
   const yaw = ctx.control(participant.id, geodesicEmitterYawSlot);
   if (typeof yaw !== "number" || !Number.isFinite(yaw)) return;
-  const emitter = emitterAt(ctx.objects, edit.objectId);
   const yawRadians = sanitizeYaw(yaw);
-  if (emitter === undefined || emitter.aimYawRadians === yawRadians) return;
+  if (emitter.aimYawRadians === yawRadians) return;
   const turned = facing(emitter, yawRadians);
   ctx.objects.update(turned);
-  if (edit.activeGeodesicId !== undefined) model.retraceArc({ emitter: turned, arcId: edit.activeGeodesicId, connectEmitters: false });
+  if (edit.activeGeodesicId === undefined) return;
+  try {
+    model.retraceArc({ emitter: turned, arcId: edit.activeGeodesicId, connectEmitters: false });
+  } catch (error) {
+    console.warn(`Geodesic "${edit.activeGeodesicId}" keeps its path: ${String(error)}`);
+  }
 }
 
 function createApi(objects: RuntimeObjectRegistry, model: GeodesicModelApi): GeodesicEmittersApi {
@@ -245,7 +262,7 @@ function createApi(objects: RuntimeObjectRegistry, model: GeodesicModelApi): Geo
     moveAlong: ({ emitterId, cellId, localPose, route }) =>
       moveEmitterAlongRoute({ registry: objects, emitterId, cellId, localPose, route, followRoute: (followed) => model.followAnchorRoute(emitterId, followed) }),
     rebuildGeodesics: (emitterId, activeArcId) => rebuild(emitterId, activeArcId, true),
-    settleGeodesics: (emitterId, activeArcId) => rebuild(emitterId, activeArcId, false),
+    settleGeodesics: (emitterId, activeArcId) => void rebuild(emitterId, activeArcId, false),
   };
 }
 

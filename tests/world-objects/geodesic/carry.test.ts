@@ -12,13 +12,13 @@
  * out-of-bounds or forbidden-zone-blocked endpoint, and same-emitter loop words under anchor portal crossings
  * (conjugation, folding several crossings of one frame, and the lifting/reduction rules a portal word obeys).
  */
+import { createFixtureArc as createGeodesicArcObject } from "../../support/arcs";
 import { describe, expect, it } from "vitest";
 import { moveDynamicObject } from "../../../src/movement/moveDynamicObject";
 import { createRuntimeObjectRegistry } from "../../../src/world-objects/runtimeObjectRegistry";
 import { runtimeObjectToDynamicObjectState } from "../../../src/world-objects/runtimeObjectBase";
 import {
   createGeodesicEmitterObject,
-  createGeodesicArcObject,
   geodesicRayBeamStartOffsetMeters,
 } from "../../../src/world-objects/geodesic/objects";
 import { collectGeodesicPortalWord, getGeodesicSegments } from "../../../src/world-objects/geodesic/segments";

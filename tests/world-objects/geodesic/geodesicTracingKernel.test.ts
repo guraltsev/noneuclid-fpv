@@ -11,13 +11,13 @@
  * shared corner — these tests check that through `shootGeodesic`, the one public entry point that reaches this
  * mapping, rather than the pure (but test-only-exported) conversion function directly.
  */
+import { createFixtureArc as createGeodesicArcObject } from "../../support/arcs";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { compileCellComplex } from "../../../src/cell-complex/compileCellComplex";
 import { invertRigidTransform3, transformPoint3, yawRigidTransform3 } from "../../../src/math/rigidTransform3";
 import {
   createGeodesicEmitterObject,
-  createGeodesicArcObject,
   geodesicRayBeamHeightMeters,
   getGeodesicSegmentEnd,
   type GeodesicSegmentObject,

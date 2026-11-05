@@ -3,6 +3,7 @@
  * `tests/world-objects/runtimeObjectRegistry.test.ts`): small compiled worlds, segment/scenario builders, and
  * geometric helpers. Not a test file itself; see `tests.md` §3.
  */
+import { createFixtureArc as createGeodesicArcObject } from "../../support/arcs";
 import { expect } from "vitest";
 import { compileCellComplex, type CompiledCellComplex } from "../../../src/cell-complex/compileCellComplex";
 import { createRuntimeObjectRegistry, type RuntimeObjectRegistry } from "../../../src/world-objects/runtimeObjectRegistry";
@@ -13,7 +14,6 @@ import { tieAtNewVertex } from "../../../src/world-objects/geodesic/vertices";
 import {
   createGeodesicVertexObject,
   createGeodesicEmitterObject,
-  createGeodesicArcObject,
   geodesicRayBeamHeightMeters,
   type GeodesicSegmentObject,
 } from "../../../src/world-objects/geodesic/objects";

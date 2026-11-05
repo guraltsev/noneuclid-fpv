@@ -1,7 +1,7 @@
 /**
  * The carry module (design 013 section 7): who carries what is world state.
  * `carry/attach` and `carry/detach` are commands; the hand sets the `carry/offset` slot each frame; in `applyControls`, once per frame, the carried emitter moves toward the hand by the carry contract (`world-objects/carry.ts`: displacement steps, re-homing, wall and zone stops) and the geodesics it anchors are rebuilt (the emitter's rule, `world-objects/geodesic/carryEnd.ts`), so the flow of the frame's steps sees them rebuilt.
- * The hand's leash policy stays `src/interaction/handCarry.ts`; the module applies it with the loose leash the carrier sends in the slot, and ends the carry itself when the policy says release (`carry/dropped`).
+ * The hand's leash policy stays `src/interaction/handCarry.ts`; the module applies it with the loose leash the carrier sends in the slot, and ends the carry itself, in the tick and with no command, when the policy says release (`carry/dropped`).
  * The module holds no state of its own: the relation is an attachment of the participant, the hand is a control slot. It writes no object: the emitter moves through the emitters' `api`, not by a command, because carrying uses the fast channel (design 013 section 5.4).
  */
 import { decideHandCarry, handCarryArrived, handCarryLeashSlackMeters } from "../../interaction/handCarry";
@@ -27,12 +27,11 @@ import {
   carryRefusals,
   type CarryAttachCommand,
   type CarryCommand,
-  type CarryDropCommand,
+  type CarryDropReason,
   type CarryDroppedEvent,
   type CarryEvent,
   type CarryMovedEvent,
   type CarryOffset,
-  type CarryReleasedEvent,
 } from "./api";
 
 /** The module as the engine's list takes it. */
@@ -67,20 +66,18 @@ function asCannon(object: RuntimeWorldObject | undefined): Cannon | undefined {
   return object?.kind === "geodesicEmitters/emitter" ? object : undefined;
 }
 
-/**
- * Ends the carry of `participant`: the emitter's final rebuild (without the safety net of the carry in progress), the attachment and the slot go, and `carry/released` tells the clients what to refresh.
- */
-function endCarry(ctx: CommandContext, emitters: GeodesicEmittersApi, participant: ParticipantRecord, carry: ParticipantAttachment): void {
-  const release = emitters.settleGeodesics(carry.objectId, carry.activeGeodesicId);
+/** Ends the carry of `participant`: the emitter's final rebuild (without the safety net of the carry in progress), and the attachment and the slot go. */
+function endCarry(ctx: Pick<StepContext, "setAttachments" | "closeControl">, emitters: GeodesicEmittersApi, participant: ParticipantRecord, carry: ParticipantAttachment): void {
+  emitters.settleGeodesics(carry.objectId, carry.activeGeodesicId);
   ctx.setAttachments(participant.id, withoutCarry(participant));
   ctx.closeControl(participant.id, carryOffsetSlot);
-  const released: CarryReleasedEvent = {
-    kind: "carry/released",
-    participantId: participant.id,
-    objectId: carry.objectId,
-    ...(release.regrownActiveGeodesicId === undefined ? {} : { regrownActiveGeodesicId: release.regrownActiveGeodesicId }),
-  };
-  ctx.emit(released);
+}
+
+/** The carry rules end the carry themselves, in the tick. */
+function dropCarry(ctx: StepContext, emitters: GeodesicEmittersApi, participant: ParticipantRecord, carry: ParticipantAttachment, reason: CarryDropReason): void {
+  const dropped: CarryDroppedEvent = { kind: "carry/dropped", participantId: participant.id, objectId: carry.objectId, reason };
+  ctx.emit(dropped);
+  endCarry(ctx, emitters, participant, carry);
 }
 
 function attach(command: CarryAttachCommand, ctx: CommandContext): CommandResult {
@@ -140,17 +137,6 @@ function createDetach(emitters: GeodesicEmittersApi) {
   };
 }
 
-function createDrop(emitters: GeodesicEmittersApi) {
-  return (command: CarryDropCommand, ctx: CommandContext): CommandResult => {
-    const participant = ctx.participant(command.participantId);
-    const carry = participantAttachment(participant, carryAttachmentKind);
-    if (participant === undefined || carry === undefined) return { ok: true };
-    const dropped: CarryDroppedEvent = { kind: "carry/dropped", participantId: participant.id, objectId: carry.objectId, reason: command.reason };
-    ctx.emit(dropped);
-    endCarry(ctx, emitters, participant, carry);
-    return { ok: true };
-  };
-}
 
 /** Once per frame: the emitter a participant carries moves toward the participant's hand. */
 function followCarrier(ctx: StepContext, emitters: GeodesicEmittersApi, participant: ParticipantRecord): void {
@@ -158,8 +144,7 @@ function followCarrier(ctx: StepContext, emitters: GeodesicEmittersApi, particip
   if (carry === undefined) return;
   const cannon = asCannon(ctx.objects.get(carry.objectId));
   if (cannon === undefined) {
-    const command: CarryDropCommand = { kind: "carry/drop", participantId: participant.id, reason: "missing" };
-    ctx.dispatch(command);
+    dropCarry(ctx, emitters, participant, carry, "missing");
     return;
   }
   const offset = readOffset(ctx.control(participant.id, carryOffsetSlot));
@@ -209,8 +194,7 @@ function followCarrier(ctx: StepContext, emitters: GeodesicEmittersApi, particip
   if (arrived && !carry.arrived) current = { ...current, arrived: true };
   if (current !== carry) ctx.setAttachments(participant.id, withCarry(participant, current));
   if (decideHandCarry(advance.remaining, arrived ? "held" : "gliding", offset.leashMeters) === "release") {
-    const command: CarryDropCommand = { kind: "carry/drop", participantId: participant.id, reason: "leash" };
-    ctx.dispatch(command);
+    dropCarry(ctx, emitters, participant, current, "leash");
   }
 }
 
@@ -243,7 +227,7 @@ export function carryModule(): CarryModuleDefinition {
       const commands: CommandHandlers<CarryCommand> = {
         "carry/attach": { run: attach, requiresTool: carryToolId },
         "carry/detach": { run: createDetach(emitters), requiresTool: carryToolId },
-        "carry/drop": { run: createDrop(emitters), moduleOnly: true },
+
       };
       return { api: undefined, queries: {}, commands, ticks };
     },

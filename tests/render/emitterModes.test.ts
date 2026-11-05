@@ -218,6 +218,18 @@ describe("starting an emitter's mode", () => {
     expect(selected()).toBe("protractor");
     expect(engine.read.participant("local")?.attachments).toEqual([]);
   });
+
+  it("a pickup abandoned after the gate has still lifted: the plain geodesic is not restored", () => {
+    const { registry, tools, tick, dispatch } = setup();
+
+    tools.startGeodesicCannonCarry("cannon");
+    tick();
+    dispatch({ kind: "select-tool", toolId: "protractor" });
+    tick();
+    tick();
+
+    expect(registry.get("g")).toBeUndefined();
+  });
 });
 
 describe("rotating and aiming", () => {
@@ -313,6 +325,33 @@ describe("rotating and aiming", () => {
     tools.updateCarriedGeodesicCannonPose(false, undefined);
     tick();
     expect(attachment("geodesicEmitters/edit")).toMatchObject({ objectId: "cannon" });
+  });
+
+  it("turns the attached emitter from its own yaw when the selection moves to another", () => {
+    const { registry, tools, noTick, yaw, dispatch } = rotating();
+    registry.add(createGeodesicEmitterObject({ id: "other", cellId: "a", localPose: yawRigidTransform3(2, { x: 3, y: 4, z: 0 }) }));
+    dispatch({ kind: "set-cannon-tool-state", state: { selectedCannonId: "other" } });
+
+    tools.updateActiveGeodesicCannonRotation(0.5, false);
+    noTick();
+
+    expect(yaw()).toBeCloseTo(0.5);
+    expect(registry.get("other")).toMatchObject({ aimYawRadians: 2 });
+  });
+
+  it("aims the attached emitter, not the selected one", () => {
+    const scene = setup();
+    scene.tools.startGeodesicCannonAim("cannon", "g");
+    scene.tick();
+    scene.tick();
+    scene.registry.add(createGeodesicEmitterObject({ id: "other", cellId: "a", localPose: yawRigidTransform3(0, { x: 3, y: 2.5, z: 0 }) }));
+    scene.dispatch({ kind: "set-cannon-tool-state", state: { selectedCannonId: "other" } });
+    scene.aimed.rootPoint = { x: 1, y: 4.5, z: 0 };
+
+    scene.tools.updateActiveGeodesicCannonAim(false, { origin: worldPointToThree({ x: 1, y: 4.5, z: 1.2 }), direction: new THREE.Vector3(0, 0, -1), quaternion: new THREE.Quaternion() } satisfies RootAimRay);
+    scene.noTick();
+
+    expect(scene.yaw()).toBeCloseTo(Math.PI / 2);
   });
 
   it("leaves the tool when the emitter is gone", () => {

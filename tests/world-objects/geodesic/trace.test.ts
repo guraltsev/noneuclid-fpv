@@ -9,10 +9,10 @@
  * resolution, rebuilding to a length across portals and when a forbidden zone blocks it (with and without
  * breaking the geodesic entirely), and that lifting an emitter removes its free geodesics immediately.
  */
+import { createFixtureArc as createGeodesicArcObject } from "../../support/arcs";
 import { describe, expect, it } from "vitest";
 import { createRuntimeObjectRegistry } from "../../../src/world-objects/runtimeObjectRegistry";
 import {
-  createGeodesicArcObject,
   createGeodesicEmitterObject,
   geodesicRayBeamHeightMeters,
   geodesicRayBeamStartOffsetMeters,
