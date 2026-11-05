@@ -1,7 +1,7 @@
 /**
  * Queries whether an arc connects emitters or follows one, and removal of geodesics and cannons together with their derived objects.
  */
-import type { RuntimeObjectRegistry } from "../runtimeObjectRegistry";
+import type { RuntimeObjectReader, RuntimeObjectRegistry } from "../runtimeObjectRegistry";
 import type { GeodesicEmitterAttachment } from "./objects";
 import {
   getEmitterGeodesicIds,
@@ -17,7 +17,7 @@ import { removeGeodesicIntervalAndDerivedObjects, removeGeodesicSegments } from 
  * outgoing and `open`. Returns `undefined` for an id that is not an interval or has no emitter at either end.
  */
 export function getGeodesicConnection(
-  registry: RuntimeObjectRegistry,
+  registry: RuntimeObjectReader,
   geodesicId: string,
 ): GeodesicEmitterAttachment | undefined {
   const interval = registry.get(geodesicId);
@@ -45,7 +45,7 @@ export function getGeodesicConnection(
  * True when both ends of the arc are on emitters: a geodesic with no interior vertex. This is a fact about the ends, not a state.
  * An id that is not an arc never connects emitters.
  */
-export function arcConnectsEmitters(registry: RuntimeObjectRegistry, arcId: string): boolean {
+export function arcConnectsEmitters(registry: RuntimeObjectReader, arcId: string): boolean {
   const arc = registry.get(arcId);
   return arc?.kind === "geodesicModel/arc" &&
     registry.get(arc.start.anchorObjectId)?.kind === "geodesic-cannon" &&

@@ -12,7 +12,7 @@
 import type { ClientSession } from "../../runtime/clientSession";
 import type { RuntimeCommand } from "../../runtime/runtimeCommands";
 import * as THREE from "three";
-import { type RuntimeObjectRegistry, type RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
+import { type LegacyWorldWriter, type RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
 import {
   MeasuredGeodesicLengthRuntime,
   createMeasuredGeodesicLengthRuntime,
@@ -31,7 +31,7 @@ export interface ToolObjectRuntimesDeps {
   /** Preloaded models/textures used to build placed-flag runtimes. */
   readonly assets: PreparedWorldAssets;
   /** Registry of runtime world objects, the source of truth these runtimes mirror. */
-  readonly runtimeObjectRegistry: RuntimeObjectRegistry;
+  readonly runtimeObjectRegistry: LegacyWorldWriter;
   /** Per-cell root objects (by cell id) that runtimes parent themselves under. */
   readonly cellMeshes: ReadonlyMap<string, THREE.Object3D>;
   /** Placed-flag runtimes by object id; shared with the shell and mutated here. */

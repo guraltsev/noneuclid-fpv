@@ -8,7 +8,7 @@ import * as THREE from "three";
 import { type Vec3 } from "../../math/vec3";
 import { getEmitterGeodesicIds } from "../../world-objects/geodesic/endpoints";
 import { geodesicRayBeamHeightMeters } from "../../world-objects/geodesic/objects";
-import { type RuntimeObjectRegistry, type RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
+import { type RuntimeObjectReader, type RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
 import { RootAimRay } from "./rootAimRay";
 import { threePointToWorld } from "./worldAxes";
 
@@ -76,7 +76,7 @@ export function resolveVrCarriedGeodesicCannonAnchor(
  * that, otherwise its first attached geodesic; `undefined` when the cannon has none.
  */
 export function resolveCannonGeodesicId(
-  registry: RuntimeObjectRegistry,
+  registry: RuntimeObjectReader,
   cannon: Extract<RuntimeWorldObject, { readonly kind: "geodesic-cannon" }>,
   requestedGeodesicId: string | undefined,
   activeGeodesicId: string | undefined,

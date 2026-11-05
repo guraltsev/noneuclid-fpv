@@ -15,7 +15,7 @@ import {
 import { getRememberedGeodesicIntersectionObject } from "./geodesic/intersections";
 import { getEmitterGeodesicIds, getGeodesicEndpointAttachmentsForAnchor } from "./geodesic/endpoints";
 import { resolveEndpointTangentAtAnchor } from "./geodesic/segments";
-import type { RuntimeObjectRegistry } from "./runtimeObjectRegistry";
+import type { RuntimeObjectReader, RuntimeObjectRegistry } from "./runtimeObjectRegistry";
 import type {
   ProtractorAngleLabelHitbox,
   ProtractorAngleObject,
@@ -71,7 +71,7 @@ export interface ProtractorToolState {
  * The centre point is the object's `aimStickyTarget` if present, otherwise its pose translation (raised by the ray beam height for cannons so it lies on the drawn beam).
  */
 export function resolveProtractorCenterSelection(
-  registry: RuntimeObjectRegistry,
+  registry: RuntimeObjectReader,
   object: GeodesicCannonObject | GeodesicCrossingObject,
 ): ProtractorCenterSelection {
   return {
@@ -144,7 +144,7 @@ export function resolveProtractorDirectedGeodesicSelection(options: {
 export function resolveProtractorEmitterGeodesicSelection(options: {
   readonly center: ProtractorCenterSelection;
   readonly emitter: GeodesicCannonObject;
-  readonly registry?: RuntimeObjectRegistry;
+  readonly registry?: RuntimeObjectReader;
   readonly geodesicId?: string;
   readonly endRole?: GeodesicEndRole;
 }): ProtractorDirectedGeodesic | undefined {
@@ -361,7 +361,7 @@ function resolveEmitterSelectionObject(
 }
 
 function selectEmitterEndpointRole(options: {
-  readonly registry: RuntimeObjectRegistry;
+  readonly registry: RuntimeObjectReader;
   readonly emitterId: string;
   readonly geodesicId: string;
   readonly endRole?: GeodesicEndRole;

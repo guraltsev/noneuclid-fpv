@@ -5,7 +5,7 @@
 
 This reference is produced from the source code. For the *meaning* of the modules — the mathematical model they implement — read [../MATHEMATICAL_MODEL.md](../MATHEMATICAL_MODEL.md) and [../ARCHITECTURE.md](../ARCHITECTURE.md). For every exported symbol see [API_REFERENCE.md](API_REFERENCE.md).
 
-**263 modules, 52,742 lines** under `src/`.
+**263 modules, 52,751 lines** under `src/`.
 
 ## Layers
 
@@ -19,7 +19,7 @@ A module belongs to the layer named by its first path segment under `src/`. "May
 | `visibility` | 2 | 1,036 | `math`, `cell-complex` | Per-frame portal visibility: funnel clipping of portal-path tables against a camera. Pure; no renderer. |
 | `movement` | 10 | 1,645 | `math`, `cell-complex` | Player body, collision, movement and portal crossing in compiled cell complexes. |
 | `world-assets` | 1 | 201 | `cell-complex` | Floor-texture and asset descriptors. |
-| `world-objects` | 36 | 9,202 | `math`, `cell-complex`, `diagnostics`, `movement`, `world-assets` | Placeable runtime objects: registry, geodesic emitters, measurement tools, flags, creature behaviors. |
+| `world-objects` | 36 | 9,211 | `math`, `cell-complex`, `diagnostics`, `movement`, `world-assets` | Placeable runtime objects: registry, geodesic emitters, measurement tools, flags, creature behaviors. |
 | `authoring` | 5 | 671 | `math`, `cell-complex`, `examples`, `world-assets`, `world-objects` | World builder DSL, world-script compiler, validation and world catalog. |
 | `glue` | 11 | 1,025 | `math`, `cell-complex`, `diagnostics`, `authoring` | Launch options, debug settings, tool ids, asset URLs, app configuration. |
 | `interaction` | 5 | 1,564 | `math`, `cell-complex`, `movement`, `world-objects`, `glue` | Renderer-free interaction logic: input frames, aim picking, VR locomotion, XR session state, carried-object portal transitions. |
@@ -225,8 +225,8 @@ None: every import respects the intended layering.
 | `world-objects/placedFlags.ts` | 198 | Placed flags (signs): player-placed wooden signs carrying a short text label. | `cell-complex/compileCellComplex`, `math/rigidTransform3`, `math/vec3`, `movement/collision`, `movement/dynamicObject`, `world-objects/runtimeObjectBase`, `world-objects/runtimeObjectRegistry`, `world-objects/toolObjects` |
 | `world-objects/protractorTool.ts` | 515 | Protractor tool: persistent angle measurements between two geodesic directions at a common vertex. | `math/rigidTransform3`, `math/vec3`, `world-objects/geodesic/endpoints`, `world-objects/geodesic/intersections`, `world-objects/geodesic/objects`, `world-objects/geodesic/segments`, `world-objects/runtimeObjectRegistry`, `world-objects/toolObjects` |
 | `world-objects/runtimeObjectBase.ts` | 92 | The fields every object in the runtime object registry shares, and the projection of such an object onto the movement/collision state. | `cell-complex/specs`, `math/rigidTransform3`, `movement/dynamicObject` |
-| `world-objects/runtimeObjectChangeJournal.ts` | 177 | Change journal of the runtime object registry (design 013 section 6.2) over a change ring with absolute sequence numbers (design 014 section 3.1). | — |
-| `world-objects/runtimeObjectRegistry.ts` | 465 | Runtime object registry: the per-cell, id-indexed store of every live (non-terrain) object in the world. | `cell-complex/specs`, `math/rigidTransform3`, `world-objects/geodesic/objects`, `world-objects/objectMetadata`, `world-objects/runtimeObjectBase`, `world-objects/runtimeObjectChangeJournal`, `world-objects/toolObjects` |
+| `world-objects/runtimeObjectChangeJournal.ts` | 181 | Change journal of the runtime object registry (design 013 section 6.2) over a change ring with absolute sequence numbers (design 014 section 3.1). | — |
+| `world-objects/runtimeObjectRegistry.ts` | 470 | Runtime object registry: the per-cell, id-indexed store of every live (non-terrain) object in the world. | `cell-complex/specs`, `math/rigidTransform3`, `world-objects/geodesic/objects`, `world-objects/objectMetadata`, `world-objects/runtimeObjectBase`, `world-objects/runtimeObjectChangeJournal`, `world-objects/toolObjects` |
 | `world-objects/simpleGeoCreature.ts` | 190 | Simple geodesic creatures: the mouse and the butterfly, autonomous walkers that follow straight lines (geodesics) through the cell complex. | `cell-complex/specs`, `math/rigidTransform3`, `math/vec3`, `world-objects/runtimeObjectBase`, `world-objects/staticAssets` |
 | `world-objects/staticAssets.ts` | 99 | Static asset authoring helper: converts author-facing parameters for a glTF decoration into an AssetObjectSpec. | `cell-complex/specs` |
 | `world-objects/toolObjects.ts` | 97 | Registry record types of the results of the player's tools: placed flags (signs), geodesic length labels and protractor angles. | `math/vec3`, `world-objects/geodesic/objects`, `world-objects/runtimeObjectBase` |

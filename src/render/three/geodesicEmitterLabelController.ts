@@ -20,7 +20,7 @@ import {
 } from "../../math/rigidTransform3";
 import { getEmitterGeodesicIds } from "../../world-objects/geodesic/endpoints";
 import { resolveGeodesicNumber } from "../../world-objects/geodesic/segments";
-import { type RuntimeObjectRegistry, type RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
+import { type RuntimeObjectReader, type RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
 import { threePointToWorld, worldPointToThree } from "./worldAxes";
 import {
   createGeodesicEmitterLabel,
@@ -48,7 +48,7 @@ export interface GeodesicEmitterLabelControllerDeps {
   /** Camera whose world orientation labels copy each frame so they face the viewer. */
   readonly camera: THREE.Camera;
   /** Registry scanned for geodesic cannons and used to number geodesics. */
-  readonly runtimeObjectRegistry: RuntimeObjectRegistry;
+  readonly runtimeObjectRegistry: RuntimeObjectReader;
   /** Mutable label store keyed by `getGeodesicEmitterLabelKey`; shared with the shell, mutated in place by the controller. */
   readonly geodesicEmitterLabelsByKey: Map<string, GeodesicEmitterLabel>;
   /** Getter for the active compiled world, used to find where a cannon on another face appears from the player. */

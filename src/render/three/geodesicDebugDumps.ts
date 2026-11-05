@@ -14,7 +14,7 @@ import { getEmitterGeodesicIds, isTied } from "../../world-objects/geodesic/endp
 import { collectGeodesicPortalWord, getGeodesicSegments } from "../../world-objects/geodesic/segments";
 import { getGeodesicConnection, arcConnectsEmitters } from "../../world-objects/geodesic/lifecycle";
 import { type GeodesicMarmotRuntime } from "./creatures/geodesicMarmotView";
-import { type RuntimeObjectRegistry, type RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
+import { type RuntimeObjectReader, type RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
 import { type SimpleGeoCreatureRuntime } from "./creatures/simpleGeoCreatureView";
 import { AimTarget } from "../../interaction/aimTarget";
 import {
@@ -41,7 +41,7 @@ export interface GeodesicDebugDumpsDeps {
   /** Selected world id; value (fixed for the app's lifetime), reported in the all-geodesics dump. */
   readonly worldId: string;
   /** Registry read for geodesic segments, intervals, cannons, and anchors. */
-  readonly runtimeObjectRegistry: RuntimeObjectRegistry;
+  readonly runtimeObjectRegistry: RuntimeObjectReader;
   /** Live creature runtimes checked by the creature dump and consistency check; the array is read each call, not copied. */
   readonly dynamicObjectRuntimes: readonly (GeodesicMarmotRuntime | SimpleGeoCreatureRuntime)[];
   /** Per-cell root objects by cell id, used to verify creature parenting and visibility. */

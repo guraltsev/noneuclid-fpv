@@ -15,7 +15,7 @@ import {
 } from "../../ui/worldInteractionDefinition";
 import { canExtendGeodesicSegment } from "../../world-objects/geodesic/objects";
 import { arcConnectsEmitters } from "../../world-objects/geodesic/lifecycle";
-import { type RuntimeObjectRegistry, type RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
+import { type RuntimeObjectReader, type RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
 import { AimTarget } from "../../interaction/aimTarget";
 import { resolveAimTargets as defaultResolveAimTargets } from "./aimTarget";
 import { formatVec3, roundNumber } from "./appDebugHelpers";
@@ -36,7 +36,7 @@ export interface AimInteractionDeps {
   /** XR player rig; its root matrixWorld maps controller poses from the XR reference space into the scene. */
   readonly xrRig: ReturnType<typeof createXrPlayerRig>;
   /** Registry of world objects tested for aim hits; also used to check whether a geodesic is locked. */
-  readonly runtimeObjectRegistry: RuntimeObjectRegistry;
+  readonly runtimeObjectRegistry: RuntimeObjectReader;
   /** Getter: the currently active (possibly deformed) compiled world. */
   getWorld(): CompiledCellComplex;
   /** The shell session; its menu state's selectedTool affects which geodesic is ignored and the focus message. */

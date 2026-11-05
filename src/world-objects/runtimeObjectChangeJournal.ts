@@ -116,8 +116,8 @@ export function createChangeRing<T extends JournalRecord>(capacity: number = def
   };
 }
 
-/** Every registry write since the last clear, in order, as a view of the ring. */
-export interface RuntimeObjectChangeJournal<T extends JournalRecord> {
+/** The read side of the journal: every registry write since the last clear, in order, as a view of the ring. This is what clients get. */
+export interface RuntimeObjectChangeReader<T extends JournalRecord> {
   readonly length: number;
   opAt(index: number): ChangeOp;
   idAt(index: number): string;
@@ -126,14 +126,18 @@ export interface RuntimeObjectChangeJournal<T extends JournalRecord> {
   objectAt(index: number): T;
   /** Highest index holding this kind, or -1 if none since the last clear. O(1), no allocation. */
   lastIndexOfKind(kind: string): number;
-  /** Starts a new frame: the frame start and the retention mark move to the head. */
-  clear(): void;
-  /** Lowers the retention mark to `seq` (never above the head), for an owner whose cursors lag behind the frame start. */
-  retainFrom(seq: number): void;
   /** The whole ring behind this view, addressed by absolute sequence number. */
   readonly ring: ChangeRing<T>;
   /** The sequence number of index 0. */
   readonly frameStartSeq: number;
+}
+
+/** The journal as its owner sees it: the read side plus the two calls that move the frame start and the retention mark. */
+export interface RuntimeObjectChangeJournal<T extends JournalRecord> extends RuntimeObjectChangeReader<T> {
+  /** Starts a new frame: the frame start and the retention mark move to the head. */
+  clear(): void;
+  /** Lowers the retention mark to `seq` (never above the head), for an owner whose cursors lag behind the frame start. */
+  retainFrom(seq: number): void;
 }
 
 /** The registry's side of the journal: the read interface plus `record`. Not part of the public reader type. */

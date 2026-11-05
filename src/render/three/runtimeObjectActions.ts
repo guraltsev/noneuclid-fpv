@@ -31,7 +31,7 @@ import type {
   ProtractorAngleObject,
   ProtractorDirectedGeodesic,
 } from "../../world-objects/toolObjects";
-import type { RuntimeObjectRegistry, RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
+import type { LegacyWorldWriter, RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
 import type { PlainWorldObject } from "../../world-objects/worldObjectOwner";
 import type { PlayerPoseDebugDump } from "./appDebugHelpers";
 import type { GeodesicMarmotRuntime } from "./creatures/geodesicMarmotView";
@@ -50,7 +50,7 @@ export interface RuntimeObjectActionsDeps {
   /** Runs a command through the shell's one command path. */
   dispatch(command: RuntimeCommand): void;
   /** Registry of runtime objects; mutated directly. */
-  readonly runtimeObjectRegistry: RuntimeObjectRegistry;
+  readonly runtimeObjectRegistry: LegacyWorldWriter;
   /** The active compiled world; read on every call because geometry commits replace it. */
   getWorld(): CompiledCellComplex;
   /** Feature toggles; decide which tools may open an object's menu. */

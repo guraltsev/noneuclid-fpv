@@ -20,7 +20,7 @@ import { getEmitterGeodesicIds } from "../world-objects/geodesic/endpoints";
 import { geodesicRayBeamHeightMeters, geodesicRayBeamStartOffsetMeters } from "../world-objects/geodesic/objects";
 import { resolveEmitterLaunchYaw } from "../world-objects/geodesic/segments";
 import { createProtractorAngleLabelHitbox } from "../world-objects/protractorTool";
-import { type RuntimeObjectRegistry, type RuntimeWorldObject } from "../world-objects/runtimeObjectRegistry";
+import { type RuntimeObjectReader, type RuntimeWorldObject } from "../world-objects/runtimeObjectRegistry";
 import { runtimeObjectToDynamicObjectState } from "../world-objects/runtimeObjectBase";
 import { locateDevelopedPoint, walkDevelopedSegment, type SegmentWalkPiece } from "../cell-complex/segmentWalk";
 import {
@@ -73,7 +73,7 @@ export interface ResolveAimTargetRequest {
   /** Compiled cell complex used to look up destination cells. */
   readonly world: CompiledCellComplex;
   /** Runtime objects, queried per cell. */
-  readonly registry: RuntimeObjectRegistry;
+  readonly registry: RuntimeObjectReader;
   /** The aim ray, in the root cell's frame. */
   readonly ray: AimRay;
   /** The player's (render root) cell; the ray's frame is this cell's local frame. */
@@ -298,7 +298,7 @@ function compareAimTargets(left: AimTarget, right: AimTarget): number {
 
 // Object proxy hit for one object in the cell-local frame (before the window test).
 function intersectAimObject(
-  registry: RuntimeObjectRegistry,
+  registry: RuntimeObjectReader,
   object: RuntimeWorldObject,
   origin: Vec3,
   direction: Vec3,
@@ -318,7 +318,7 @@ function intersectAimObject(
 }
 
 function resolveObjectAimTargets(
-  registry: RuntimeObjectRegistry,
+  registry: RuntimeObjectReader,
   cell: CompiledPrismCell,
   ray: CellRay,
   window: HitWindow,
@@ -966,7 +966,7 @@ function scaleVec3Like(vector: Vec3, scale: number): Vec3 {
 
 // Cannon proxy: union of padded cylinder and sphere, plus per-geodesic handle capsules which win if within the priority tolerance of the body hit.
 function intersectRayWithGeodesicEmitterAimCylinder(
-  registry: RuntimeObjectRegistry,
+  registry: RuntimeObjectReader,
   origin: Vec3,
   direction: Vec3,
   emitter: Extract<RuntimeWorldObject, { readonly kind: "geodesic-cannon" }>,
@@ -997,7 +997,7 @@ function intersectRayWithGeodesicEmitterAimCylinder(
 
 // One capsule per non-ignored geodesic along its emission yaw, starting at the beam start offset at beam height; nearest wins.
 function intersectRayWithEmitterGeodesicHandles(
-  registry: RuntimeObjectRegistry,
+  registry: RuntimeObjectReader,
   origin: Vec3,
   direction: Vec3,
   emitter: Extract<RuntimeWorldObject, { readonly kind: "geodesic-cannon" }>,
@@ -1053,7 +1053,7 @@ function intersectRayWithEmitterGeodesicHandles(
 
 // The emitter's first attached geodesic that is not ignored.
 function resolveDefaultEmitterGeodesicId(
-  registry: RuntimeObjectRegistry,
+  registry: RuntimeObjectReader,
   emitter: Extract<RuntimeWorldObject, { readonly kind: "geodesic-cannon" }>,
   ignoredGeodesicIds: ReadonlySet<string>,
 ): string | undefined {

@@ -7,7 +7,7 @@ import type { CompiledCellComplex } from "../cell-complex/compileCellComplex";
 import { pruneMissingGeodesicIntersectionObjects } from "../world-objects/geodesic/intersections";
 import { arcConnectsEmitters, removeGeodesic } from "../world-objects/geodesic/lifecycle";
 import { rebuildConnectedGeodesicBetweenEmitters } from "../world-objects/geodesic/cannon";
-import type { RuntimeObjectRegistry } from "../world-objects/runtimeObjectRegistry";
+import type { LegacyWorldWriter } from "../world-objects/runtimeObjectRegistry";
 
 /**
  * Optional renderer hooks invoked as the policy removes dependent objects so visuals can follow.
@@ -24,7 +24,7 @@ export interface ApplyGeometryCommitComputedObjectPolicyOptions {
   /** Newly committed compiled world in which locked geodesics are re-solved. */
   readonly world: CompiledCellComplex;
   /** Runtime object registry that is mutated in place. */
-  readonly registry: RuntimeObjectRegistry;
+  readonly registry: LegacyWorldWriter;
   readonly callbacks?: GeometryCommitComputedObjectPolicyCallbacks;
 }
 
@@ -91,14 +91,14 @@ export function applyGeometryCommitComputedObjectPolicy(
   return freezeGeometryCommitComputedObjectPolicyResult(result);
 }
 
-function collectLockedGeodesicIds(registry: RuntimeObjectRegistry): Set<string> {
+function collectLockedGeodesicIds(registry: LegacyWorldWriter): Set<string> {
   return new Set(
     [...collectAllGeodesicIds(registry)]
       .filter((geodesicId) => arcConnectsEmitters(registry, geodesicId)),
   );
 }
 
-function collectAllGeodesicIds(registry: RuntimeObjectRegistry): Set<string> {
+function collectAllGeodesicIds(registry: LegacyWorldWriter): Set<string> {
   const geodesicIds = new Set<string>();
   for (const object of registry.getAll()) {
     if (object.kind === "geodesicModel/arc") {

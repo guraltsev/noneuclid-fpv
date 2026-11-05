@@ -3,7 +3,7 @@
  */
 import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex";
 import { transformPoint3 } from "../../math/rigidTransform3";
-import type { RuntimeObjectRegistry, RuntimeWorldObject } from "../runtimeObjectRegistry";
+import type { RuntimeObjectReader, RuntimeObjectRegistry, RuntimeWorldObject } from "../runtimeObjectRegistry";
 import { type GeodesicEndpointAttachment, type GeodesicEndpointSelection, type GeodesicEndRole, type GeodesicArcObject, type GeodesicPortalTraversal, type LiftedGeodesicEndpoint } from "./objects";
 import { canObjectAttachGeodesics, getAnchorBeamPoint } from "./anchors";
 import { reverseGeodesicPortalWord } from "./portalWord";
@@ -18,7 +18,7 @@ import { arcIndex, noArcIndexEntries, type ArcEnd } from "./arcIndex";
  * An interval whose both ends attach to the same anchor appears twice (once per role). Order follows registry order.
  */
 export function getGeodesicEndpointAttachmentsForAnchor(
-  registry: RuntimeObjectRegistry,
+  registry: RuntimeObjectReader,
   anchorObjectId: string,
 ): readonly GeodesicEndpointAttachment[] {
   return arcIndex.read(registry).attachmentsByAnchor.get(anchorObjectId) ?? noArcIndexEntries;
@@ -57,7 +57,7 @@ export function replaceGeodesicEndpointAttachment(
 
 /** Returns the stored portal word of an interval (ordered `start` -> `end`), or `undefined` if `geodesicId` is not an interval. */
 export function getGeodesicPortalWord(
-  registry: RuntimeObjectRegistry,
+  registry: RuntimeObjectReader,
   geodesicId: string,
 ): readonly GeodesicPortalTraversal[] | undefined {
   const interval = registry.get(geodesicId);
@@ -284,7 +284,7 @@ export function isVertexSharedWithOtherArc(registry: RuntimeObjectRegistry, anch
 }
 
 /** The arc has an end on a vertex that another arc end shares. A closed loop on one vertex is not tied; an id that is not an arc is not tied. Allocation-free. */
-export function isTied(registry: RuntimeObjectRegistry, arcId: string): boolean {
+export function isTied(registry: RuntimeObjectReader, arcId: string): boolean {
   const arc = registry.get(arcId);
   if (arc?.kind !== "geodesicModel/arc") {
     return false;
@@ -366,6 +366,6 @@ export function removeUnusedFreeGeodesicEnds(registry: RuntimeObjectRegistry): v
 }
 
 /** Ids of the geodesics attached to an emitter (either end), each once, in registry order. This is the only record of which geodesics belong to an emitter. */
-export function getEmitterGeodesicIds(registry: RuntimeObjectRegistry, emitterId: string): readonly string[] {
+export function getEmitterGeodesicIds(registry: RuntimeObjectReader, emitterId: string): readonly string[] {
   return arcIndex.read(registry).arcIdsByAnchor.get(emitterId) ?? noArcIndexEntries;
 }

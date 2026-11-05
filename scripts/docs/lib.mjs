@@ -193,9 +193,6 @@ function resolveImport(fromRel, specifier, known) {
   return undefined;
 }
 
-/** A call of a registry write method: the mark of a world-objects module that mutates the world (`ModuleInfo.writesRegistry`). */
-const registryWritePattern = /[rR]egistry\??\.(add|update|remove|claimOwnership|releaseOwnership|moveToCell)\(/;
-
 /**
  * Scans all modules.
  * @returns {Map<string, ModuleInfo>} keyed by path relative to `src/`, with forward slashes.
@@ -248,7 +245,6 @@ export function scanProject() {
       lines: text.split("\n").length,
       header: headerComment(sourceFile),
       imports: [...imports].sort(),
-      writesRegistry: rel.startsWith("world-objects/") && rel !== "world-objects/runtimeObjectRegistry.ts" && registryWritePattern.test(text),
       packages: [...packages].sort(),
       exports,
       declared,
@@ -309,8 +305,8 @@ export function layerViolations(modules) {
  *   under `toPrefix` is a violation unless the target is in `onlyVia` (entries ending in `/` are prefixes) or the
  *   importer is under an `exceptFromPrefixes` entry.
  *
- * {@link moduleImportRuleViolations} also applies the rules generated from the directories of `src/modules/` and the
- * legacy-writer rule (design 013 section 12.2).
+ * {@link moduleImportRuleViolations} also applies the rules generated from the directories of `src/modules/` (design 013
+ * section 12.2).
  */
 export const moduleImportRules = [
   {
@@ -356,27 +352,156 @@ export const moduleImportRules = [
 ];
 
 /**
- * The render and ui files that import a world-objects module which writes the registry (`ModuleInfo.writesRegistry`),
- * as of design 013 (job 48). New behaviour reaches the world through the engine (section 5.7); any other render or ui
- * file that imports such a module breaks the rule below. The list may only shrink:
+ * The client files (`render/`, `ui/`, `runtime/`) that still write the world: exactly those that name `LegacyWorldWriter`
+ * or call a world-objects mutator, as {@link scanClientWrites} finds them. New behaviour reaches the world through the
+ * engine (design 013 section 5.7). {@link legacyWorldWriterViolations} fails on a file outside the list that does either
+ * and on a listed file that does neither, so the list stays exact. It may only shrink:
  * `tests/project/moduleImportRules.test.ts` compares it with a committed copy.
  */
 export const legacyWorldWriters = [
-  "render/three/carriedGeodesicCannon.ts",
   "render/three/createThreeApp.ts",
   "render/three/creatures/geodesicMarmotView.ts",
   "render/three/creatures/simpleGeoCreatureView.ts",
-  "render/three/geodesicCannonRenderer.ts",
   "render/three/geodesicCannonTools.ts",
-  "render/three/geodesicDebugDumps.ts",
-  "render/three/geodesicEmitterLabelController.ts",
-  "render/three/geodesicEmitterLabels.ts",
   "render/three/geometryCommit.ts",
-  "render/three/placedFlagRenderer.ts",
-  "render/three/preloadWorldAssets.ts",
   "render/three/runtimeObjectActions.ts",
-  "ui/paletteDefinition.ts",
+  "render/three/toolObjectRuntimes.ts",
+  "runtime/worldGeometryComputedObjects.ts",
 ];
+
+/** The layers of client code, whose files receive `RuntimeObjectReader` unless they are in {@link legacyWorldWriters}. */
+const clientPrefixes = ["render/", "ui/", "runtime/"];
+
+/** The module that declares the registry; its own implementation is not a mutator. */
+const registryModule = "world-objects/runtimeObjectRegistry.ts";
+
+/** The methods of `RuntimeObjectRegistry` that write. `RuntimeObjectReader` has none of them. */
+const registryWriteMethods = new Set(["add", "update", "remove", "claimOwnership", "releaseOwnership", "moveToCell"]);
+
+/** The top-level values a source file declares, as `[declaration name, node holding its code]` pairs. */
+function topLevelValues(sourceFile) {
+  const values = [];
+  for (const statement of sourceFile.statements) {
+    if ((ts.isFunctionDeclaration(statement) || ts.isClassDeclaration(statement)) && statement.name) values.push([statement.name, statement]);
+    if (ts.isVariableStatement(statement)) {
+      for (const declaration of statement.declarationList.declarations) {
+        if (ts.isIdentifier(declaration.name)) values.push([declaration.name, declaration]);
+      }
+    }
+  }
+  return values;
+}
+
+/**
+ * What every client file does with the registry, found with the type checker, so a write counts whatever the variable is called and a `Set.add` does not.
+ *
+ * A **direct write** is a use of a write method declared on the interface `RuntimeObjectRegistry`. A **mutator** is a top-level function, variable or class of a
+ * `world-objects/` module (other than the registry's own) whose code holds a direct write or uses another mutator, nested closures included. A **mutator use** is
+ * any reference to one, called or passed as a value; a re-export resolves to the original. Not seen: a write through a destructured method
+ * (`const { add } = registry`), and a method of an object a mutator returned.
+ *
+ * @param {string} root the source tree to scan.
+ * @returns {Map<string, {path: string, namesWriter: boolean, writes: {line: number, text: string}[], mutatorUses: {line: number, name: string}[]}>} keyed by path relative to `root`, one entry per client file.
+ */
+export function scanClientWrites(root = srcRoot) {
+  const program = ts.createProgram(listSourceFiles(root), {
+    target: ts.ScriptTarget.ES2022,
+    module: ts.ModuleKind.ESNext,
+    moduleResolution: ts.ModuleResolutionKind.Bundler,
+    noEmit: true,
+    skipLibCheck: true,
+    types: [],
+  });
+  const checker = program.getTypeChecker();
+  const sourceFiles = listSourceFiles(root).map((file) => [toPosix(path.relative(root, file)), program.getSourceFile(file)]);
+
+  const isDirectWrite = (node) =>
+    ts.isPropertyAccessExpression(node) &&
+    registryWriteMethods.has(node.name.text) &&
+    (checker.getSymbolAtLocation(node.name)?.declarations ?? []).some(
+      (declaration) => ts.isInterfaceDeclaration(declaration.parent) && declaration.parent.name.text === "RuntimeObjectRegistry",
+    );
+
+  /** The symbol an identifier refers to, through imports and object shorthand. */
+  function referencedSymbol(identifier) {
+    const shorthand = ts.isShorthandPropertyAssignment(identifier.parent) && identifier.parent.name === identifier;
+    const symbol = shorthand ? checker.getShorthandAssignmentValueSymbol(identifier.parent) : checker.getSymbolAtLocation(identifier);
+    return symbol && symbol.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol;
+  }
+
+  /** Calls `visit` on `node` and every node under it. */
+  function walk(node, visit) {
+    visit(node);
+    ts.forEachChild(node, (child) => walk(child, visit));
+  }
+
+  /** Whether an identifier is a use of a mutator; the name in an import or export statement uses nothing. */
+  const usesMutator = (identifier) =>
+    mutators.has(referencedSymbol(identifier)) && !ts.findAncestor(identifier, (node) => ts.isImportDeclaration(node) || ts.isExportDeclaration(node));
+
+  const mutators = new Set();
+  const usesByValue = new Map();
+  for (const [rel, sourceFile] of sourceFiles) {
+    if (!rel.startsWith("world-objects/") || rel === registryModule) continue;
+    for (const [name, code] of topLevelValues(sourceFile)) {
+      const value = checker.getSymbolAtLocation(name);
+      const uses = new Set();
+      usesByValue.set(value, uses);
+      walk(code, (node) => {
+        if (isDirectWrite(node)) mutators.add(value);
+        if (ts.isIdentifier(node)) uses.add(referencedSymbol(node));
+      });
+    }
+  }
+  for (let grew = true; grew; ) {
+    grew = false;
+    for (const [value, uses] of usesByValue) {
+      if (mutators.has(value) || ![...uses].some((use) => mutators.has(use))) continue;
+      mutators.add(value);
+      grew = true;
+    }
+  }
+
+  const clients = new Map();
+  for (const [rel, sourceFile] of sourceFiles) {
+    if (!clientPrefixes.some((prefix) => rel.startsWith(prefix))) continue;
+    const client = { path: rel, namesWriter: false, writes: [], mutatorUses: [] };
+    const lineOf = (node) => sourceFile.getLineAndCharacterOfPosition(node.getStart()).line + 1;
+    walk(sourceFile, (node) => {
+      if (isDirectWrite(node)) client.writes.push({ line: lineOf(node), text: node.getText() });
+      if (!ts.isIdentifier(node)) return;
+      if (node.text === "LegacyWorldWriter") client.namesWriter = true;
+      if (usesMutator(node)) client.mutatorUses.push({ line: lineOf(node), name: node.text });
+    });
+    clients.set(rel, client);
+  }
+  return clients;
+}
+
+/**
+ * Violations of the legacy-writer rule (design 013 sections 12.2 and 14): `{ path, reason }` for every client file outside `listed` that writes, and for every listed
+ * file that does not. "Writes" means names `LegacyWorldWriter`, writes the registry directly, or uses a world-objects mutator.
+ *
+ * @param {ReturnType<typeof scanClientWrites>} clients
+ * @param {readonly string[]} listed
+ */
+export function legacyWorldWriterViolations(clients, listed = legacyWorldWriters) {
+  const violations = [];
+  for (const client of clients.values()) {
+    if (listed.includes(client.path)) continue;
+    if (!client.namesWriter && client.writes.length === 0 && client.mutatorUses.length === 0) continue;
+    violations.push({
+      path: client.path,
+      reason: "client files change the world through the engine and take RuntimeObjectReader; only the files in legacyWorldWriters (scripts/docs/lib.mjs) still name LegacyWorldWriter or call a world-objects mutator",
+    });
+  }
+  for (const entry of listed) {
+    const client = clients.get(entry);
+    if (client && (client.namesWriter || client.writes.length > 0 || client.mutatorUses.length > 0)) continue;
+    violations.push({ path: entry, reason: "listed in legacyWorldWriters (scripts/docs/lib.mjs) but neither names LegacyWorldWriter nor calls a world-objects mutator: take it off the list" });
+  }
+  return violations;
+}
 
 /** The rules generated from the directories of `src/modules/`: another module reaches module `X` only through `modules/X/api.ts`. */
 function generatedModuleDirectoryRules(modules) {
@@ -437,18 +562,6 @@ export function moduleImportRuleViolations(modules) {
     }
   }
   violations.push(...prefixImportRuleViolations(modules, [...moduleImportRules, ...generatedModuleDirectoryRules(modules)]));
-  for (const mod of modules.values()) {
-    if (!mod.path.startsWith("render/") && !mod.path.startsWith("ui/")) continue;
-    if (legacyWorldWriters.includes(mod.path)) continue;
-    for (const dep of mod.imports) {
-      if (!modules.get(dep)?.writesRegistry) continue;
-      violations.push({
-        from: mod.path,
-        to: dep,
-        reason: "render and ui files change the world through the engine, not by importing a world-objects mutator; only the files in legacyWorldWriters (scripts/docs/lib.mjs) still do",
-      });
-    }
-  }
   return violations;
 }
 

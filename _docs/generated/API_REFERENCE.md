@@ -1068,7 +1068,8 @@ Change journal of the runtime object registry (design 013 section 6.2) over a ch
 | interface | `ChangeRingStore` | The ring with its writing side. |
 | const | `defaultChangeRingCapacity` | The default capacity of a ring. |
 | function | `createChangeRing` | Creates an empty ring. |
-| interface | `RuntimeObjectChangeJournal` | Every registry write since the last clear, in order, as a view of the ring. |
+| interface | `RuntimeObjectChangeReader` | The read side of the journal: every registry write since the last clear, in order, as a view of the ring. |
+| interface | `RuntimeObjectChangeJournal` | The journal as its owner sees it: the read side plus the two calls that move the frame start and the retention mark. |
 | interface | `RuntimeObjectChangeRecorder` | The registry's side of the journal: the read interface plus `record`. |
 | function | `createRuntimeObjectChangeJournal` | Creates an empty journal over a new ring of `capacity` (a power of two; default 8192). |
 
@@ -1081,7 +1082,8 @@ Runtime object registry: the per-cell, id-indexed store of every live (non-terra
 | interface | `RuntimeStaticAssetObject` | Registry record for a static glTF decoration or landmark placed in a cell. |
 | type | `RuntimeWorldObject` | Discriminated union (on `kind`) of every object type the registry can hold. |
 | interface | `RuntimeObjectRegistry` | Mutable id- and cell-indexed collection of runtime objects. |
-| type | `RuntimeObjectReader` | The read-only face of the registry (design 013 section 6.1): everything except the writes `add`, `update`, `remove`, `claimOwnership`, `releaseOwnership` and `moveToCell`. |
+| type | `RuntimeObjectReader` | The read-only face of the registry (design 013 section 6.1): everything except the writes `add`, `update`, `remove`, `claimOwnership`, `releaseOwnership` and `moveToCell`, and with `changes` narrowed to its read side (n… |
+| type | `LegacyWorldWriter` | The registry as a client file that still writes the world takes it (design 013 section 14): `RuntimeObjectRegistry` under a name that can be searched for. |
 | function | `createRuntimeObjectRegistry` | Creates a registry, optionally pre-populated with `initialObjects`. |
 | function | `createRuntimeStaticAssetObject` | Builds the registry record for an authored static asset placed in `cellId`. |
 

@@ -39,6 +39,18 @@ describe("runtime object change journal", () => {
     expect(journal.objectAt(3)).toBe(moved);
   });
 
+  it("hides clear, retainFrom and the writes from the reader type", () => {
+    const reader: RuntimeObjectReader = createRuntimeObjectRegistry([mouse("m1")]);
+    // @ts-expect-error a reader cannot start a new frame
+    void reader.changes.clear;
+    // @ts-expect-error a reader cannot move the retention mark
+    void reader.changes.retainFrom;
+    // @ts-expect-error a reader cannot write
+    void reader.update;
+
+    expect(reader.changes.ring.headSeq).toBe(1);
+  });
+
   it("records moveToCell and owner publishes as updates", () => {
     const registry = createRuntimeObjectRegistry([mouse("m1"), mouse("m2")]);
     registry.changes.clear();

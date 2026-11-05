@@ -54,7 +54,7 @@ import {
   rebuildGeodesicToLength,
   shootGeodesic,
 } from "../../world-objects/geodesic/cannon";
-import { type RuntimeObjectRegistry, type RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
+import { type LegacyWorldWriter, type RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
 import { AimTarget } from "../../interaction/aimTarget";
 import { handCarryLeashMeters } from "../../interaction/handCarry";
 import {
@@ -92,7 +92,7 @@ export interface GeodesicCannonToolsDeps {
   /** Desktop controls, used to request pointer lock while rotating, aiming, or carrying. */
   readonly controls: ReturnType<typeof createDesktopControls>;
   /** Registry holding cannons, geodesic segments/intervals, and related objects; mutated directly. */
-  readonly runtimeObjectRegistry: RuntimeObjectRegistry;
+  readonly runtimeObjectRegistry: LegacyWorldWriter;
   /** Getter for the active compiled world. */
   getWorld(): CompiledCellComplex;
   /** The shell session; the menu state (selected tool, open menu) is read from it. */

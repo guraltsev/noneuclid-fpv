@@ -20,7 +20,7 @@ import {
 import type { WorldGeometrySnapshot } from "../../runtime/worldGeometrySession";
 import type { DynamicObjectState } from "../../movement/dynamicObject";
 import type { PlayerPose } from "../../movement/playerPose";
-import type { RuntimeObjectRegistry } from "../../world-objects/runtimeObjectRegistry";
+import type { LegacyWorldWriter } from "../../world-objects/runtimeObjectRegistry";
 import type { ObjectHost } from "../../world-objects/worldObjectOwner";
 import type { PlacedFlagObject } from "../../world-objects/toolObjects";
 import { deriveCellRenderArchetypeCapacities } from "./cellRenderArchetypes";
@@ -48,7 +48,7 @@ export interface GeometryCommitDeps {
   readonly geometrySession: { pollReadySnapshot(): WorldGeometrySnapshot | undefined };
   /** The world engine: the player's pose is read from it and the mapped pose is published to it. */
   readonly engine: WorldEngine;
-  readonly runtimeObjectRegistry: RuntimeObjectRegistry;
+  readonly runtimeObjectRegistry: LegacyWorldWriter;
   readonly objectHost: Pick<ObjectHost, "transformGeometry">;
   /** The player's collision body at a pose. */
   readonly createPlayerCollisionState: (pose: PlayerPose) => DynamicObjectState;

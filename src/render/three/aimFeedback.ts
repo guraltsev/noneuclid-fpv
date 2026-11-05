@@ -12,7 +12,7 @@ import type { AimTarget } from "../../interaction/aimTarget";
 import type { ClientSession } from "../../runtime/clientSession";
 import type { ToolsById } from "../../runtime/toolRegistry";
 import { createHelpLensDefinition } from "../../ui/helpLensDefinition";
-import type { RuntimeObjectRegistry, RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
+import type { RuntimeObjectReader, RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
 import {
   protractorSelectionsUseDifferentGeodesics,
   resolveProtractorCenterSelection,
@@ -42,7 +42,7 @@ export interface AimFeedbackDeps {
   /** The world engine; the player's pose is read from it. */
   readonly engine: WorldEngine;
   /** Registry of runtime objects; read to find the nearest auto-help object and to read emitters. */
-  readonly runtimeObjectRegistry: RuntimeObjectRegistry;
+  readonly runtimeObjectRegistry: RuntimeObjectReader;
   /** Cell root groups; the protractor drawing is parented into the root of its cell. */
   readonly cellMeshes: ReadonlyMap<string, THREE.Object3D>;
   /** DOM tooltip for the desktop view. */

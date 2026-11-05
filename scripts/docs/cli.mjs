@@ -5,10 +5,11 @@
  *   node scripts/docs/cli.mjs check           fail on missing docs, stale generated files, layering or reference errors
  *   node scripts/docs/cli.mjs baseline        freeze today's layering violations into layering-baseline.json
  *   node scripts/docs/cli.mjs coverage [dir]  list undocumented modules/exports (optionally under src/<dir>)
+ *   node scripts/docs/cli.mjs writers         list every client write of the world, then the counts later jobs compare
  */
 import fs from "node:fs";
 import path from "node:path";
-import { layerViolations, layeringBaselinePath, repoRoot, scanProject } from "./lib.mjs";
+import { layerViolations, layeringBaselinePath, repoRoot, scanClientWrites, scanProject } from "./lib.mjs";
 import { generatedFiles, runAllChecks } from "./checks.mjs";
 
 const [command = "check", argument] = process.argv.slice(2);
@@ -44,6 +45,18 @@ if (command === "generate") {
     }
   }
   console.log(`\n${missingHeaders} module(s) without header, ${missingExports} undocumented export(s).`);
+} else if (command === "writers") {
+  const writers = [...scanClientWrites().values()].filter((client) => client.namesWriter || client.writes.length > 0 || client.mutatorUses.length > 0);
+  let writes = 0;
+  let mutatorUses = 0;
+  for (const client of writers) {
+    writes += client.writes.length;
+    mutatorUses += client.mutatorUses.length;
+    console.log(`src/${client.path}: ${client.writes.length} direct write(s), ${client.mutatorUses.length} mutator use(s)${client.namesWriter ? ", names LegacyWorldWriter" : ""}`);
+    for (const write of client.writes) console.log(`  ${write.line}  write   ${write.text}`);
+    for (const use of client.mutatorUses) console.log(`  ${use.line}  mutator ${use.name}`);
+  }
+  console.log(`\n${writers.length} file(s), ${writes} direct write call(s), ${mutatorUses} mutator use(s).`);
 } else if (command === "check") {
   const { results } = runAllChecks();
   let failed = false;

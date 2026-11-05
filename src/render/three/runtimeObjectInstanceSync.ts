@@ -18,7 +18,7 @@ import { carryAttachmentKind } from "../../modules/carry/api";
 import type { ClientSession } from "../../runtime/clientSession";
 import type * as THREE from "three";
 import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex";
-import type { RuntimeObjectRegistry, RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
+import type { RuntimeObjectReader, RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
 import { runtimeObjectToDynamicObjectState } from "../../world-objects/runtimeObjectBase";
 import { collectCarryHighlightRecords, createCarryHighlightSource, type CarryHighlightObject } from "./carryHighlight";
 import type { FrameRenderSnapshot } from "./frameRenderSnapshot";
@@ -71,7 +71,7 @@ export type RuntimeObjectRecordSource = (typeof runtimeObjectRecordSources)[numb
 
 /** Inputs of {@link createRuntimeObjectInstanceSync}; the maps are shared with the tool object runtimes and mutated here. */
 export interface RuntimeObjectInstanceSyncDeps {
-  readonly registry: RuntimeObjectRegistry;
+  readonly registry: RuntimeObjectReader;
   readonly runtimeObjectRootsById: ReadonlyMap<string, THREE.Object3D>;
   /** Shared with toolObjectRuntimes (which deletes keys directly on invalidation). */
   readonly renderSourcesByKey: Map<string, RuntimeObjectRenderSourceMesh>;

@@ -8,7 +8,7 @@ import type { CellDeformationMap } from "../../../cell-complex/worldGeometryDefo
 import type { GeodesicMarmotObjectSpec } from "../../../cell-complex/specs";
 import { runtimeDiagnostics } from "../../../diagnostics/runtimeDiagnostics";
 import { createGeodesicMarmotBehavior } from "../../../world-objects/creatures/geodesicMarmotBehavior";
-import type { RuntimeObjectRegistry } from "../../../world-objects/runtimeObjectRegistry";
+import type { LegacyWorldWriter } from "../../../world-objects/runtimeObjectRegistry";
 import type { WorldObjectOwner } from "../../../world-objects/worldObjectOwner";
 import { buildStaticMarmotProxy } from "../buildDecorationMesh";
 import { buildObjectCollisionWireframe, updateObjectCollisionWireframe } from "../debugCollisionWireframes";
@@ -46,7 +46,7 @@ export function createGeodesicMarmotRuntime(
   objectSpec: GeodesicMarmotObjectSpec,
   startCellId: string,
   _assets: PreparedWorldAssets,
-  registry?: RuntimeObjectRegistry,
+  registry?: LegacyWorldWriter,
 ): GeodesicMarmotRuntime {
   const root = new THREE.Group();
   root.name = `geodesci-marmot:${objectSpec.id}`;

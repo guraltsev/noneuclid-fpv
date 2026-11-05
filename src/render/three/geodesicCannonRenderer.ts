@@ -19,7 +19,7 @@ import {
 import { yawRigidTransform3, type RigidTransform3 } from "../../math/rigidTransform3";
 import { getEmitterGeodesicIds } from "../../world-objects/geodesic/endpoints";
 import { resolveEmitterLaunchYaw } from "../../world-objects/geodesic/segments";
-import type { RuntimeObjectRegistry } from "../../world-objects/runtimeObjectRegistry";
+import type { RuntimeObjectReader } from "../../world-objects/runtimeObjectRegistry";
 import { collectRuntimeObjectRenderSourceMeshes, type RuntimeObjectRenderRecord, type RuntimeObjectRenderSourceMesh } from "./runtimeObjectRenderRecords";
 import type { PreparedWorldAssets } from "./preparedWorldAssets";
 import { rigidTransformToThreeMatrix } from "./worldAxes";
@@ -102,7 +102,7 @@ export interface GeodesicBodyPlacement {
  * tangent. For an intersection: the balloon at its pose.
  */
 export function collectGeodesicBodyPlacements(
-  registry: RuntimeObjectRegistry,
+  registry: RuntimeObjectReader,
   object: GeodesicCannonObject | GeodesicSegmentObject | GeodesicCrossingObject,
   geodesicArchetypeKeys: readonly string[] = [],
 ): readonly GeodesicBodyPlacement[] {
@@ -138,7 +138,7 @@ export function collectGeodesicBodyPlacements(
  * (empty means no cannon or intersection records).
  */
 export function collectGeodesicRuntimeRenderRecords(
-  registry: RuntimeObjectRegistry,
+  registry: RuntimeObjectReader,
   object: GeodesicCannonObject | GeodesicSegmentObject | GeodesicCrossingObject,
   geodesicArchetypeKeys: readonly string[] = [],
 ): readonly RuntimeObjectRenderRecord[] {
@@ -170,12 +170,12 @@ export function collectGeodesicRuntimeRenderRecords(
 }
 
 // Yaw about world +z at the cannon's position, along the geodesic's launch tangent.
-function emitterYawPose(registry: RuntimeObjectRegistry, cannon: GeodesicCannonObject, geodesicId: string): RigidTransform3 {
+function emitterYawPose(registry: RuntimeObjectReader, cannon: GeodesicCannonObject, geodesicId: string): RigidTransform3 {
   return yawRigidTransform3(resolveEmitterLaunchYaw(registry, cannon, geodesicId), cannon.localPose.translation);
 }
 
 /** A string that changes whenever the heads drawn at a cannon change: the attached geodesics and their launch yaws. Empty for any other object. */
-export function emitterHeadsKey(registry: RuntimeObjectRegistry, object: { readonly kind: string }): string {
+export function emitterHeadsKey(registry: RuntimeObjectReader, object: { readonly kind: string }): string {
   if (object.kind !== "geodesic-cannon") {
     return "";
   }

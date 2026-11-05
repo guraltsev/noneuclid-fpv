@@ -194,6 +194,7 @@ checked by a manual/headless smoke run (see [DEVELOPMENT.md](DEVELOPMENT.md)).
 | `npm run docs:generate` | rewrites `_docs/generated/*` from the code |
 | `npm run docs:check` / `tests/docs/documentation.test.ts` | fails on: a module without a header comment; an exported symbol without JSDoc; a stale generated file; a layering violation not in the baseline; a `three` import outside `render`; an import cycle; a dangling `` `src/<dir>/<file>.ts#<symbol>` `` reference in the hand-written documents |
 | `npm run docs:coverage [dir]` | lists what is still undocumented |
+| `npm run docs:writers` | lists every direct registry write and world-objects mutator use in `render/`, `ui/` and `runtime/`, then the file and call counts; `docs:check` fails when those files and `legacyWorldWriters` in `scripts/docs/lib.mjs` differ |
 
 Rules for contributors: put the *why* and the *contract* in the code comment next to the code (header + JSDoc), put the
 *mathematics that spans modules* in [MATHEMATICAL_MODEL.md](MATHEMATICAL_MODEL.md) with symbol references, and run

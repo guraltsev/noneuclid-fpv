@@ -3,7 +3,7 @@
  */
 import { yawRigidTransform3 } from "../../math/rigidTransform3";
 import { addVec3, scaleVec3, type Vec3 } from "../../math/vec3";
-import type { RuntimeObjectRegistry, RuntimeWorldObject } from "../runtimeObjectRegistry";
+import type { RuntimeObjectReader, RuntimeObjectRegistry, RuntimeWorldObject } from "../runtimeObjectRegistry";
 import {
   type GeodesicCannonObject,
   type GeodesicEndRole,
@@ -63,7 +63,7 @@ export function removeGeodesicIntervalAndDerivedObjects(
 
 /** Returns the derived segments of a geodesic sorted by `segmentIndex` (empty if none). */
 export function getGeodesicSegments(
-  registry: RuntimeObjectRegistry,
+  registry: RuntimeObjectReader,
   geodesicId: string,
 ): readonly GeodesicSegmentObject[] {
   return [...registry.getSegmentsOfGeodesic(geodesicId)].sort((a, b) => a.segmentIndex - b.segmentIndex);
@@ -78,7 +78,7 @@ export function getGeodesicTail(
 }
 
 /** Returns the 1-based display number of a geodesic: its arc's `geodesicNumber`, or 1 (an arc without one exists only in test fixtures). Only reads. */
-export function resolveGeodesicNumber(registry: RuntimeObjectRegistry, geodesicId: string): number {
+export function resolveGeodesicNumber(registry: RuntimeObjectReader, geodesicId: string): number {
   const arc = registry.get(geodesicId);
   return arc?.kind === "geodesicModel/arc" ? arc.geodesicNumber ?? 1 : 1;
 }
@@ -163,7 +163,7 @@ export function splitDerivedSegmentsIntoEndpointHalves(
  * cell. Returns `undefined` if the interval or its segments are missing.
  */
 export function resolveEndpointTangentAtAnchor(input: {
-  readonly registry: RuntimeObjectRegistry;
+  readonly registry: RuntimeObjectReader;
   readonly geodesicId: string;
   readonly endRole: GeodesicEndRole;
 }): { readonly anchorObjectId: string; readonly yawRadians: number } | undefined {
@@ -192,7 +192,7 @@ export function resolveEndpointTangentAtAnchor(input: {
  * emitter, or the emitter's default `aimYawRadians` when the geodesic has no segments yet (or does not attach to it).
  */
 export function resolveEmitterLaunchYaw(
-  registry: RuntimeObjectRegistry,
+  registry: RuntimeObjectReader,
   emitter: GeodesicCannonObject,
   geodesicId: string,
 ): number {
@@ -323,7 +323,7 @@ export function getGeodesicTotalLengthMeters(registry: RuntimeObjectRegistry, ge
 
 /** Returns the stored portal word of an interval geodesic; `[]` for unknown ids or geodesics that never cross a portal. */
 export function collectGeodesicPortalWord(
-  registry: RuntimeObjectRegistry,
+  registry: RuntimeObjectReader,
   geodesicId: string,
 ): readonly GeodesicPortalTraversal[] {
   return getGeodesicPortalWord(registry, geodesicId) ?? [];
