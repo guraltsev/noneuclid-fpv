@@ -1596,8 +1596,9 @@ The curve shortening module's public face (design 013 section 13.2, amended by d
 | interface | `CurveShorteningFreeLoopCollapsedEvent` | A loop around a cone point shrank below the minimum length and was deleted. |
 | interface | `CurveShorteningCollapsedEvent` | A tied curve shrank to a point and was deleted. |
 | interface | `CurveShorteningUnresolvedEvent` | A vertex could be neither moved nor merged away and went quiet; emitted once, when it goes quiet. |
+| interface | `CurveShorteningDestroyedEvent` | A vertex could be neither moved nor merged away and its whole curve was removed (the "destroy" policy). |
 | type | `CurveShorteningEvent` | Every event of the module. |
-| type | `BlockedPolicy` | What the module does with a vertex it cannot move or merge. |
+| type | `BlockedPolicy` | What the module does with a vertex it cannot move or merge: "unresolve" makes it quiet and reports it; "destroy" removes its whole curve. |
 | type | `SpeedLawName` | How far a vertex may move in one step, before the line search caps it. |
 | interface | `CurveShorteningOptions` | Options of the module. |
 

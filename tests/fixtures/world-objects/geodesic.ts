@@ -365,8 +365,8 @@ export function compileRotatedFreeLoopWorld() {
 }
 
 // An engine over `registry` whose modules are the geodesic model and the curve shortening flow, with the module write guard on.
-export function createFlowTestEngine(world: ReturnType<typeof compileCellComplex>, registry: ReturnType<typeof createRuntimeObjectRegistry>) {
-  return createTestEngine({ registry, getWorld: () => world, modules: [geodesicModelModule(), curveShorteningModule()] });
+export function createFlowTestEngine(world: ReturnType<typeof compileCellComplex>, registry: ReturnType<typeof createRuntimeObjectRegistry>, options: Parameters<typeof curveShorteningModule>[0] = {}) {
+  return createTestEngine({ registry, getWorld: () => world, modules: [geodesicModelModule(), curveShorteningModule(options)] });
 }
 
 // Steps `engine` until the flow is at rest or `maxTicks` is reached. Fails if the total length of `geodesicIds` ever grows by more than 1e-9 m, or if a step adds a vertex.

@@ -581,6 +581,26 @@ describe("curve shortening flow that would need a wrap vertex", () => {
     expect(registry.getObjectsOfKind("geodesicModel/arc").every((interval) => isTied(registry, interval.id))).toBe(true);
   });
 
+  it("destroys the whole curve, vertex included, with one notice under destroy", () => {
+    const { world, registry } = createWrapScenario();
+    const engine = createFlowTestEngine(world, registry, { onBlocked: "destroy" });
+    const events: EngineEventBase[] = [];
+
+    for (let tick = 0; tick < 3000 && registry.getObjectsOfKind("geodesicModel/arc").length > 0; tick += 1) {
+      stepFlow(engine, frame60Hz, events);
+    }
+
+    expect(registry.getObjectsOfKind("geodesicModel/arc")).toEqual([]);
+    expect(registry.getObjectsOfKind("geodesicModel/vertex")).toEqual([]);
+    expect(registry.getObjectsOfKind("geodesicModel/segment")).toEqual([]);
+    const notices = flowEvents(events);
+    expect(notices).toHaveLength(1);
+    expect(notices[0]).toMatchObject({ kind: "curveShortening/destroyed" });
+    expect([...(notices[0] as { arcIds: readonly string[] }).arcIds].sort()).toEqual(["g1", "g2"]);
+    expect(engine.query(curveDynamicsToken).blockedVertices()).toEqual([]);
+    expect(engine.query(curveDynamicsToken).isAtRest()).toBe(true);
+  });
+
   it("leaves a quiet vertex untouched and skips it on later steps, with no second notice", () => {
     const { world, registry } = createWrapScenario();
     const engine = createFlowTestEngine(world, registry);

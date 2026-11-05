@@ -5,7 +5,7 @@
 
 This reference is produced from the source code. For the *meaning* of the modules — the mathematical model they implement — read [../MATHEMATICAL_MODEL.md](../MATHEMATICAL_MODEL.md) and [../ARCHITECTURE.md](../ARCHITECTURE.md). For every exported symbol see [API_REFERENCE.md](API_REFERENCE.md).
 
-**262 modules, 52,549 lines** under `src/`.
+**262 modules, 52,564 lines** under `src/`.
 
 ## Layers
 
@@ -24,7 +24,7 @@ A module belongs to the layer named by its first path segment under `src/`. "May
 | `glue` | 11 | 1,025 | `math`, `cell-complex`, `diagnostics`, `authoring` | Launch options, debug settings, tool ids, asset URLs, app configuration. |
 | `interaction` | 5 | 1,564 | `math`, `cell-complex`, `movement`, `world-objects`, `glue` | Renderer-free interaction logic: input frames, aim picking, VR locomotion, XR session state, carried-object portal transitions. |
 | `engine` | 9 | 1,561 | `math`, `cell-complex`, `diagnostics`, `movement`, `world-objects`, `glue`, `interaction` | The world engine core (design 013): step order, command queue, participants, module composition and ticks. Imports no module. |
-| `modules` | 15 | 1,313 | `math`, `cell-complex`, `diagnostics`, `movement`, `world-objects`, `glue`, `interaction`, `engine` | World modules (design 013): each owns a slice of world behaviour and exposes a typed api.ts to the others. |
+| `modules` | 15 | 1,328 | `math`, `cell-complex`, `diagnostics`, `movement`, `world-objects`, `glue`, `interaction`, `engine` | World modules (design 013): each owns a slice of world behaviour and exposes a typed api.ts to the others. |
 | `runtime` | 16 | 2,707 | `math`, `cell-complex`, `diagnostics`, `movement`, `world-objects`, `authoring`, `glue`, `engine`, `modules` | Application state, runtime menu state, command dispatch, geometry session/worker, server channel and public API. |
 | `ui` | 6 | 1,275 | `math`, `cell-complex`, `world-objects`, `authoring`, `glue`, `engine`, `modules`, `runtime` | Renderer-neutral palette, help, tooltip and input-intent definitions. |
 | `render` | 117 | 25,053 | every lower layer | Three.js / DOM / WebXR rendering and input adapters (the application shell). |
@@ -290,8 +290,8 @@ None: every import respects the intended layering.
 | `modules/carry/api.ts` | 88 | The carry module's public face (design 013 sections 7 and 12.1): the names of its commands, events and control slot, and their plain-data shapes. | `engine/moduleTypes` |
 | `modules/carry/index.ts` | 5 | The carry module's world factory (design 013 section 12.1). | `modules/carry/module` |
 | `modules/carry/module.ts` | 251 | The carry module (design 013 section 7): who carries what is world state. | `engine/moduleTypes`, `interaction/handCarry`, `math/rigidTransform3`, `modules/carry/api`, `movement/collision`, `world-objects/carry`, `world-objects/geodesic/cannon`, `world-objects/geodesic/carryEnd`, `world-objects/interactionRange`, `world-objects/runtimeObjectBase`, `world-objects/runtimeObjectRegistry` |
-| `modules/curveShortening/api.ts` | 64 | The curve shortening module's public face (design 013 section 13.2, amended by design 014 sections 2.1 and 9): the token of its read-only answers and the plain-data shapes of its events. | `engine/moduleTypes` |
-| `modules/curveShortening/flow.ts` | 175 | The curve shortening flow (design 013 section 13.2): the rule applied to every tied vertex each step, in `forEachTiedVertex` order (Gauss-Seidel, so a vertex sees the position its neighbour just took). | `engine/moduleTypes`, `modules/curveShortening/api`, `modules/curveShortening/policies`, `modules/geodesicModel/api` |
+| `modules/curveShortening/api.ts` | 72 | The curve shortening module's public face (design 013 section 13.2, amended by design 014 sections 2.1 and 9): the token of its read-only answers and the plain-data shapes of its events. | `engine/moduleTypes` |
+| `modules/curveShortening/flow.ts` | 182 | The curve shortening flow (design 013 section 13.2): the rule applied to every tied vertex each step, in `forEachTiedVertex` order (Gauss-Seidel, so a vertex sees the position its neighbour just took). | `engine/moduleTypes`, `modules/curveShortening/api`, `modules/curveShortening/policies`, `modules/geodesicModel/api` |
 | `modules/curveShortening/index.ts` | 5 | The curve shortening module's world factory (design 013 section 12.1). | `modules/curveShortening/module` |
 | `modules/curveShortening/module.ts` | 106 | The curve shortening module (design 013 section 13.2, design 014 sections 2.1 and 9): the flow that straightens the curves whose vertices the geodesic model has tied. | `engine/moduleTypes`, `modules/curveShortening/api`, `modules/curveShortening/flow`, `modules/curveShortening/policies`, `modules/geodesicModel/api`, `world-objects/runtimeObjectRegistry` |
 | `modules/curveShortening/policies.ts` | 26 | The policies of the curve shortening flow (design 013 section 13.2): how far a vertex may move in one step. | `modules/curveShortening/api` |

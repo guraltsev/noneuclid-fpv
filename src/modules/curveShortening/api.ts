@@ -44,14 +44,22 @@ export interface CurveShorteningUnresolvedEvent extends EngineEventBase {
   readonly message: string;
 }
 
+/** A vertex could be neither moved nor merged away and its whole curve was removed (the "destroy" policy). The message is for people. */
+export interface CurveShorteningDestroyedEvent extends EngineEventBase {
+  readonly kind: "curveShortening/destroyed";
+  readonly arcIds: readonly string[];
+  readonly message: string;
+}
+
 /** Every event of the module. */
 export type CurveShorteningEvent =
   | CurveShorteningFreeLoopCollapsedEvent
   | CurveShorteningCollapsedEvent
-  | CurveShorteningUnresolvedEvent;
+  | CurveShorteningUnresolvedEvent
+  | CurveShorteningDestroyedEvent;
 
-/** What the module does with a vertex it cannot move or merge. */
-export type BlockedPolicy = "unresolve";
+/** What the module does with a vertex it cannot move or merge: "unresolve" makes it quiet and reports it; "destroy" removes its whole curve. */
+export type BlockedPolicy = "unresolve" | "destroy";
 
 /** How far a vertex may move in one step, before the line search caps it. */
 export type SpeedLawName = "constant";

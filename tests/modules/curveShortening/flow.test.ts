@@ -21,6 +21,7 @@ function scriptedModel(script: {
   readonly tangents?: readonly ArcTangent[];
   readonly stale?: (arcId: string) => boolean;
   readonly removal?: VertexRemovalPreview;
+  readonly curve?: readonly string[];
 }) {
   const vertices = script.vertices ?? ["v"];
   const model = {
@@ -30,6 +31,7 @@ function scriptedModel(script: {
     arcsAtVertex: vi.fn((vertexId: string) => (script.arcsAt ? script.arcsAt(vertexId) : ends)),
     isStale: vi.fn((arcId: string) => script.stale?.(arcId) ?? false),
     arcTangentsAtVertex: vi.fn((): readonly ArcTangent[] | undefined => script.tangents),
+    arcsOfCurve: vi.fn((): readonly string[] => script.curve ?? ["a", "b"]),
     lengthOfArcs: vi.fn(() => 2),
     previewVertexMove: vi.fn(() => undefined),
     commitVertexMove: vi.fn(),
@@ -38,14 +40,14 @@ function scriptedModel(script: {
   return model as unknown as GeodesicModelApi & typeof model;
 }
 
-function setup(model: GeodesicModelApi) {
+function setup(model: GeodesicModelApi, onBlocked: FlowDeps["onBlocked"] = "unresolve") {
   const events: CurveShorteningEvent[] = [];
   const dispatched: EngineCommandBase[] = [];
   const quiet = new Map<string, string>();
   const deps: FlowDeps = {
     model,
     speedLaw: speedLawNamed("constant"),
-    onBlocked: "unresolve",
+    onBlocked,
     quiet,
     vertexPoint: () => ({ x: 0, y: 0 }),
     dispatch: (command): CommandResult => {
@@ -90,6 +92,28 @@ describe("curve shortening flow against a scripted model", () => {
       { kind: "curveShortening/unresolved", vertexId: "v", reason: "merge-blocked", message: "The tied geodesic could not be straightened (merge-blocked)." },
     ]);
     expect(model.arcsAtVertex).toHaveBeenCalledTimes(1);
+  });
+
+  it("destroys the whole curve with one notice when the merge is refused", () => {
+    const model = scriptedModel({ tangents: bent, removal: { kind: "blocked", reason: "mergeBlocked" }, curve: ["a", "b", "c"] });
+    const { deps, dispatched, events, quiet } = setup(model, "destroy");
+
+    flowStep(deps, 1 / 60);
+
+    expect(dispatched).toEqual([{ kind: "geodesicModel/removeCurve", arcIds: ["a", "b", "c"] }]);
+    expect(quiet.size).toBe(0);
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ kind: "curveShortening/destroyed", arcIds: ["a", "b", "c"] });
+  });
+
+  it("does not destroy a vertex with a stale arc", () => {
+    const model = scriptedModel({ tangents: bent, removal: { kind: "blocked", reason: "mergeBlocked" }, stale: (arcId) => arcId === "b" });
+    const { deps, dispatched, events } = setup(model, "destroy");
+
+    flowStep(deps, 1 / 60);
+
+    expect(dispatched).toEqual([]);
+    expect(events).toEqual([]);
   });
 
   it("skips a vertex with a stale arc for the step, without blocking it", () => {

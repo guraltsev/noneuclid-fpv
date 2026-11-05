@@ -7,7 +7,7 @@
  * it holds no world state, only the `quiet` memo it is given: the vertices with nothing to do, each with the reason.
  */
 import type { CommandResult, EngineCommandBase } from "../../engine/moduleTypes";
-import { vertexTautTurnRadians, type ArcEnd, type GeodesicModelApi, type GeodesicRemoveVertexCommand } from "../geodesicModel/api";
+import { vertexTautTurnRadians, type ArcEnd, type GeodesicModelApi, type GeodesicRemoveCurveCommand, type GeodesicRemoveVertexCommand } from "../geodesicModel/api";
 import type { BlockedPolicy, CurveShorteningEvent } from "./api";
 import type { SpeedLaw } from "./policies";
 
@@ -163,12 +163,19 @@ function mergeOrBlock(deps: FlowDeps, vertexId: string, ends: readonly ArcEnd[])
   }
 }
 
-// The blocked policy: a vertex that can neither move nor merge goes quiet, once, with a notice.
+// The blocked policy: a vertex that can neither move nor merge either goes quiet, once, with a notice ("unresolve"), or its whole curve is removed with a notice ("destroy").
 function blockVertex(deps: FlowDeps, vertexId: string, reason: string): void {
   switch (deps.onBlocked) {
     case "unresolve":
       deps.quiet.set(vertexId, reason);
       deps.emit({ kind: "curveShortening/unresolved", vertexId, reason, message: `The tied geodesic could not be straightened (${reason}).` });
       return;
+    case "destroy": {
+      const arcIds = deps.model.arcsOfCurve(vertexId);
+      const removal: GeodesicRemoveCurveCommand = { kind: "geodesicModel/removeCurve", arcIds };
+      if (!deps.dispatch(removal).ok) return;
+      deps.emit({ kind: "curveShortening/destroyed", arcIds, message: `The tied geodesic touched a forbidden-zone singularity and was removed (${reason}).` });
+      return;
+    }
   }
 }

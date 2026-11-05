@@ -10,7 +10,7 @@ import { geodesicModelClient, geodesicModelModule } from "../modules/geodesicMod
 
 /** The world modules of the default experience. */
 export function createDefaultWorldModules(): readonly AnyModuleDefinition[] {
-  return [geodesicModelModule(), geodesicMeasurementsModule(), carryModule(), curveShorteningModule()];
+  return [geodesicModelModule(), geodesicMeasurementsModule(), carryModule(), curveShorteningModule({ onBlocked: "destroy" })];
 }
 
 /** The client parts of the default experience's modules (only the modules with tools have one). */

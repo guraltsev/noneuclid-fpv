@@ -53,3 +53,5 @@ Each is fixed by a job above.
 ## Outcome
 
 ## Closing evidence
+
+Status note: job 55 is done in code; see the Report of .agents/jobs/55_destroy_policy.md (one manual check outstanding).
