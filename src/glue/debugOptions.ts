@@ -54,6 +54,16 @@ export const debugOptionDefinitions = [
     label: "Aim Collision Outlines",
     description: "Render wireframe outlines around the volumes used by object aiming.",
   },
+  {
+    id: "module-write-guard",
+    label: "Module Write Guard",
+    description: "Check every module write against the object kinds the module declares (the world engine's write guard).",
+  },
+  {
+    id: "derived-verify",
+    label: "Derived Cache Verify",
+    description: "Every 64th derived-cache read also recomputes the value and throws when the cached one differs.",
+  },
 ] as const;
 
 /** Id of a debug option, derived from debugOptionDefinitions. */

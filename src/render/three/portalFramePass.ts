@@ -11,11 +11,12 @@
  *
  * Every sync takes the frame `serial` of the shell, which stamps the frame snapshot; the pass does not store it.
  */
+import { readLocalPlayerPose, type WorldEngine } from "../../engine/worldEngine";
 import * as THREE from "three";
 import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex";
 import type { StaticPortalPathCullResult } from "../../cell-complex/staticPortalPathCull";
 import type { VisiblePortalPathOptions } from "../../visibility/visiblePortalPaths";
-import type { AppSession } from "../../runtime/appSession";
+import type { ClientSession } from "../../runtime/clientSession";
 import { mergeStaticPathCounts } from "./appDebugHelpers";
 import {
   type BuildCellRenderArchetypesOptions,
@@ -68,7 +69,9 @@ export interface PortalFramePassDeps {
   /** The main (desktop) camera; also the initial camera of the mono root list. */
   readonly camera: THREE.Camera;
   readonly renderer: THREE.WebGLRenderer;
-  readonly session: AppSession;
+  readonly session: ClientSession;
+  /** The world engine; the player's pose is read from it. */
+  readonly engine: WorldEngine;
   /** Options of every visibility call (mono, shared-root stereo, split-root stereo). */
   readonly visiblePortalPathOptions: VisiblePortalPathOptions;
   /** The world of the active geometry; read on every sync because a geometry commit replaces it. */
@@ -121,7 +124,7 @@ export interface PortalFramePass {
 
 /** Creates the portal pass over `deps`. */
 export function createPortalFramePass(deps: PortalFramePassDeps): PortalFramePass {
-  const { scene, camera, renderer, session, portalClipData, portalClipMaterialState } = deps;
+  const { scene, camera, renderer, session, engine, portalClipData, portalClipMaterialState } = deps;
   const portalInstanceDiagnostics = createPortalInstanceDiagnostics();
   let portalClipOverflowWarned = false;
   let latestFrameSnapshot: FrameRenderSnapshot | undefined;
@@ -171,8 +174,8 @@ export function createPortalFramePass(deps: PortalFramePassDeps): PortalFramePas
   function resolvePortalEyeRenderRoot(cullingCamera: THREE.Camera, eyeIndex: number): XrPortalEyeRenderRoot {
     return resolveXrPortalEyeRenderRoot({
       world: deps.getWorld(),
-      sourceCellId: session.get().playerPose.cellId,
-      anchorPoint: session.get().playerPose.position,
+      sourceCellId: readLocalPlayerPose(engine).cellId,
+      anchorPoint: readLocalPlayerPose(engine).position,
       camera: cullingCamera,
       target: (portalEyeRootTargets[eyeIndex] ??= createXrPortalEyeRenderRootTarget()),
     });
@@ -191,7 +194,7 @@ export function createPortalFramePass(deps: PortalFramePassDeps): PortalFramePas
     );
 
     if (!hasTables) {
-      clearPortalInstances(renderRoots[0]?.rootCellId ?? session.get().playerPose.cellId, serial);
+      clearPortalInstances(renderRoots[0]?.rootCellId ?? readLocalPlayerPose(engine).cellId, serial);
     } else if (renderRoots.length === 1) {
       syncMonoPortalFrame(renderRoots[0], serial);
     } else {
@@ -296,7 +299,7 @@ export function createPortalFramePass(deps: PortalFramePassDeps): PortalFramePas
       updatePortalVisiblePathInstances(visiblePathsByDestinationCell, portalRootsUnclipped);
       latestFrameSnapshot = createFrameRenderSnapshot({
         serial,
-        rootCellId: portalEyeRenderStates[0]?.rootCellId ?? session.get().playerPose.cellId,
+        rootCellId: portalEyeRenderStates[0]?.rootCellId ?? readLocalPlayerPose(engine).cellId,
         visiblePathsByDestinationCell,
         clipIndexByPathId: portalClipData.clipIndexByPathId,
         cameraPositions,
@@ -309,7 +312,7 @@ export function createPortalFramePass(deps: PortalFramePassDeps): PortalFramePas
         true,
       );
     } else {
-      clearPortalInstances(renderRoots[0]?.rootCellId ?? session.get().playerPose.cellId, serial);
+      clearPortalInstances(renderRoots[0]?.rootCellId ?? readLocalPlayerPose(engine).cellId, serial);
     }
   }
 
@@ -394,10 +397,10 @@ export function createPortalFramePass(deps: PortalFramePassDeps): PortalFramePas
 
   return {
     syncPlayerCell(serial) {
-      syncPortalInstances(monoPortalRoots.set(session.get().playerPose.cellId, camera), serial);
+      syncPortalInstances(monoPortalRoots.set(readLocalPlayerPose(engine).cellId, camera), serial);
     },
     syncDesktop(cullingCamera, serial) {
-      syncPortalInstances(monoPortalRoots.set(session.get().playerPose.cellId, cullingCamera), serial);
+      syncPortalInstances(monoPortalRoots.set(readLocalPlayerPose(engine).cellId, cullingCamera), serial);
     },
     syncXr(cullingCameras, serial) {
       if (cullingCameras.length > 1) {
@@ -414,7 +417,7 @@ export function createPortalFramePass(deps: PortalFramePassDeps): PortalFramePas
       activePortalEyeIndex = 0;
     },
     frameSnapshot(serial) {
-      return latestFrameSnapshot ?? createEmptyFrameRenderSnapshot(serial, session.get().playerPose.cellId);
+      return latestFrameSnapshot ?? createEmptyFrameRenderSnapshot(serial, readLocalPlayerPose(engine).cellId);
     },
     latestVisibleResult: () => latestVisibleResult,
     instanceRenderState: () => portalInstanceRenderState,

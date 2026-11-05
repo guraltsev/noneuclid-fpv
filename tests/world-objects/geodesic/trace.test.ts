@@ -12,6 +12,7 @@
 import { describe, expect, it } from "vitest";
 import { createRuntimeObjectRegistry } from "../../../src/world-objects/runtimeObjectRegistry";
 import {
+  createGeodesicArcObject,
   createGeodesicCannonObject,
   geodesicRayBeamHeightMeters,
   geodesicRayBeamStartOffsetMeters,
@@ -21,12 +22,11 @@ import {
   getGeodesicEndpointAttachmentsForAnchor,
   resolveGeodesicEndpointSelectionFromSegmentHit,
 } from "../../../src/world-objects/geodesic/endpoints";
-import { getGeodesicSegments, resolveGeodesicNumber } from "../../../src/world-objects/geodesic/segments";
+import { getGeodesicSegments, nextGeodesicNumber, resolveGeodesicNumber } from "../../../src/world-objects/geodesic/segments";
 import { removeGeodesic, removeUnlockedGeodesicsFromCannon } from "../../../src/world-objects/geodesic/lifecycle";
 import { traceGeodesicSegment } from "../../../src/world-objects/geodesic/trace";
 import { yawRigidTransform3 } from "../../../src/math/rigidTransform3";
 import {
-  createSegment,
   compileWorld,
   totalGeodesicLength,
   getCannonGeodesicIds,
@@ -92,7 +92,7 @@ describe("geodesic cannon world objects: trace", () => {
       { geodesicId: "g-a", role: "start", anchorObjectId: "cannon-a" },
     ]);
     const interval = registry.get("g-a");
-    const freeEndId = interval?.kind === "geodesic-interval" ? interval.end.anchorObjectId : undefined;
+    const freeEndId = interval?.kind === "geodesicModel/arc" ? interval.end.anchorObjectId : undefined;
     expect(freeEndId).toBeDefined();
     expect(freeEndId ? getGeodesicEndpointAttachmentsForAnchor(registry, freeEndId) : []).toEqual([
       { geodesicId: "g-a", role: "end", anchorObjectId: freeEndId },
@@ -152,15 +152,17 @@ describe("geodesic cannon world objects: trace", () => {
 
   it("preserves existing global geodesic numbers when lower numbers are absent", () => {
     const registry = createRuntimeObjectRegistry([
-      createSegment({
-        id: "g-b:segment:0",
-        geodesicId: "g-b",
+      createGeodesicArcObject({
+        id: "g-b",
+        startAnchorObjectId: "e1",
+        endAnchorObjectId: "e2",
+        startCellId: "a",
         geodesicNumber: 2,
       }),
     ]);
 
     expect(resolveGeodesicNumber(registry, "g-b")).toBe(2);
-    expect(resolveGeodesicNumber(registry, "g-c")).toBe(1);
+    expect(nextGeodesicNumber(registry)).toBe(1);
   });
 
   it("keeps a rebuilt geodesic's number and reuses the lowest free number for a new one", () => {
@@ -259,7 +261,7 @@ describe("geodesic cannon world objects: trace", () => {
     }));
     registry.add({
       id: "g-a:segment:0",
-      kind: "geodesic-segment",
+      kind: "geodesicModel/segment",
       cellId: "a",
       localPose: yawRigidTransform3(Math.atan2(direction.y, direction.x), result.start),
       portalRenderable: true,

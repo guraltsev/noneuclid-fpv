@@ -13,6 +13,7 @@ import { describe, expect, it } from "vitest";
 import { identityRigidTransform3 } from "../../src/math/rigidTransform3";
 import { simpleCollisionCylinder } from "../../src/movement/dynamicObject";
 import { createRuntimeObjectRegistry, createRuntimeStaticAssetObject } from "../../src/world-objects/runtimeObjectRegistry";
+import { ChangeOp } from "../../src/world-objects/runtimeObjectChangeJournal";
 import { type RuntimeCreatureObject } from "../../src/world-objects/runtimeObjectBase";
 import type { GeodesicCannonObject } from "../../src/world-objects/geodesic/objects";
 import { createSegment } from "../fixtures/world-objects/geodesic";
@@ -42,6 +43,70 @@ function emitter(id: string, cellId: string, extra: Partial<GeodesicCannonObject
 }
 
 describe("runtimeObjectRegistry", () => {
+  it("counts one kind scan per getObjectsOfKind call, under its kind", () => {
+    const registry = createRuntimeObjectRegistry([emitter("e1", "a")]);
+
+    expect(registry.getKindScanCounts()).toEqual({});
+    registry.getObjectsOfKind("geodesic-cannon");
+    expect(registry.getKindScanCounts()).toEqual({ "geodesic-cannon": 1 });
+    registry.countOfKind("geodesic-cannon");
+    expect(registry.getKindScanCounts()).toEqual({ "geodesic-cannon": 1 });
+  });
+
+  it("returns the same frozen kind list until a write of that kind, and counts only the builds", () => {
+    const registry = createRuntimeObjectRegistry([emitter("e1", "a"), creature("m1", "a")]);
+
+    const first = registry.getObjectsOfKind("geodesic-cannon");
+    expect(registry.getObjectsOfKind("geodesic-cannon")).toBe(first);
+    expect(Object.isFrozen(first)).toBe(true);
+    expect(registry.getKindScanCounts()).toEqual({ "geodesic-cannon": 1 });
+
+    registry.update(creature("m1", "b"));
+    expect(registry.getObjectsOfKind("geodesic-cannon")).toBe(first);
+
+    registry.add(emitter("e2", "a"));
+    const second = registry.getObjectsOfKind("geodesic-cannon");
+    expect(second).not.toBe(first);
+    expect(second.map((object) => object.id)).toEqual(["e1", "e2"]);
+    expect(first.map((object) => object.id)).toEqual(["e1"]);
+
+    registry.remove("e1");
+    expect(registry.getObjectsOfKind("geodesic-cannon").map((object) => object.id)).toEqual(["e2"]);
+    expect(registry.getKindScanCounts()).toEqual({ "geodesic-cannon": 3 });
+  });
+
+  it("counts a getAll rebuild once, not the cached return, and again after a write", () => {
+    const registry = createRuntimeObjectRegistry([emitter("e1", "a")]);
+
+    registry.getAll();
+    registry.getAll();
+    expect(registry.getKindScanCounts()).toEqual({ "*": 1 });
+    registry.add(emitter("e2", "a"));
+    registry.getAll();
+    expect(registry.getKindScanCounts()).toEqual({ "*": 2 });
+  });
+
+  it("records a kind change as Removed then Added, and the record before an update", () => {
+    const registry = createRuntimeObjectRegistry();
+    const first = creature("x", "a");
+    registry.add(first);
+    const moved = { ...first, cellId: "b" };
+    registry.update(moved);
+    const turned = emitter("x", "b");
+    registry.update(turned);
+    registry.remove("x");
+
+    const ring = registry.changes.ring;
+    expect([0, 1, 2, 3, 4].map((seq) => ring.opAt(seq))).toEqual([ChangeOp.Added, ChangeOp.Updated, ChangeOp.Removed, ChangeOp.Added, ChangeOp.Removed]);
+    expect([0, 1, 2, 3, 4].map((seq) => ring.kindAt(seq))).toEqual(["geo-mouse", "geo-mouse", "geo-mouse", "geodesic-cannon", "geodesic-cannon"]);
+    expect(ring.beforeAt(0)).toBeUndefined();
+    expect(ring.beforeAt(1)).toBe(first);
+    expect(ring.objectAt(2)).toBe(moved);
+    expect(ring.objectAt(3)).toBe(turned);
+    expect(ring.beforeAt(3)).toBeUndefined();
+    expect(ring.beforeAt(4)).toBe(turned);
+  });
+
   it("adds objects by id and indexes them under their cell", () => {
     const registry = createRuntimeObjectRegistry();
     const object = creature("mouse-a", "cell-a");
@@ -217,7 +282,7 @@ describe("runtimeObjectRegistry", () => {
 
     registry.remove("s1");
     expect(registry.getSegmentsOfGeodesic("g2").map((object) => object.id)).toEqual(["s3"]);
-    expect(registry.getObjectsOfKind("geodesic-segment").map((object) => object.id).sort()).toEqual(["s2", "s3"]);
+    expect(registry.getObjectsOfKind("geodesicModel/segment").map((object) => object.id).sort()).toEqual(["s2", "s3"]);
 
     registry.moveToCell("e1", "b");
     registry.moveToCell("s2", "b");

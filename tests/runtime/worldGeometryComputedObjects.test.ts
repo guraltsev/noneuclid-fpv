@@ -2,10 +2,11 @@
  * `tests/runtime/worldGeometryComputedObjects.test.ts` — unit tier.
  *
  * `applyGeometryCommitComputedObjectPolicy` runs after a geometry commit (a deformation, or any change that can
- * move geodesics): it rebuilds every locked geodesic it still can, removes the ones it cannot, and refreshes or
- * removes the measured-length and protractor-angle objects attached to them, reporting what it did so a caller can
- * sync its own render state. These tests check: an unlocked (open) geodesic and its attachments are removed; a
- * rebuildable locked geodesic keeps its attachments, which are refreshed with new values; an angle selected by
+ * move geodesics): it rebuilds every locked geodesic it still can and removes the ones it cannot, together with the
+ * measured-length and protractor-angle objects attached to them, reporting what it did so a caller can
+ * sync its own render state. The attachments of a surviving geodesic are refreshed by the next derive pass of the
+ * engine, not by the policy. These tests check: an unlocked (open) geodesic and its attachments are removed; a
+ * rebuildable locked geodesic keeps its attachments, which a derive pass then refreshes with new values; an angle selected by
  * segment (not by the emitter id) survives a rebuild of its endpoints; and a locked interval geodesic rebuilds even
  * when it was never owned by a cannon's own id list.
  */
@@ -13,12 +14,14 @@ import { describe, expect, it } from "vitest";
 import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
 import type { CompiledCellComplex } from "../../src/cell-complex/compileCellComplex";
 import { yawRigidTransform3 } from "../../src/math/rigidTransform3";
+import { createDefaultPlayerPose } from "../../src/movement/playerPose";
+import { createDerivingTestEngine, runDerivePass } from "../support/engine";
 import { vec3, type Vec3 } from "../../src/math/vec3";
 import { applyGeometryCommitComputedObjectPolicy } from "../../src/runtime/worldGeometryComputedObjects";
 import { createGeodesicCannonObject, geodesicRayBeamHeightMeters } from "../../src/world-objects/geodesic/objects";
 import { getEmitterGeodesicIds } from "../../src/world-objects/geodesic/endpoints";
 import { getGeodesicSegments, getGeodesicTail } from "../../src/world-objects/geodesic/segments";
-import { isGeodesicLocked } from "../../src/world-objects/geodesic/lifecycle";
+import { arcConnectsEmitters } from "../../src/world-objects/geodesic/lifecycle";
 import { shootGeodesic } from "../../src/world-objects/geodesic/cannon";
 import { createMeasuredGeodesicLengthObject } from "../../src/world-objects/measureLengthTool";
 import { createProtractorAngleObject, protractorAngleRadiusMeters, resolveProtractorCenterSelection, resolveProtractorDirectedGeodesicSelection, resolveProtractorEmitterGeodesicSelection } from "../../src/world-objects/protractorTool";
@@ -54,15 +57,13 @@ describe("world geometry computed object policy", () => {
     const result = applyGeometryCommitComputedObjectPolicy({
       world,
       registry,
-      playerCellId: "a",
-      playerPoint: vec3(0, 0, geodesicRayBeamHeightMeters),
       callbacks: {
         removeMeasuredGeodesicLength: (id) => removedMeasurements.push(id),
         removeProtractorAngle: (id) => removedAngles.push(id),
       },
     });
 
-    expect(isGeodesicLocked(registry, "g-open")).toBe(false);
+    expect(arcConnectsEmitters(registry, "g-open")).toBe(false);
     expect(result.removedGeodesicIds).toContain("g-open");
     expect(result.removedMeasuredGeodesicLengthIds).toEqual(["measure-open"]);
     expect(result.removedProtractorAngleIds).toEqual(["angle-open"]);
@@ -74,7 +75,7 @@ describe("world geometry computed object policy", () => {
     expect(getEmitterGeodesicIds(registry, "cannon-a")).not.toContain("g-open");
   });
 
-  it("rebuilds locked geodesics and refreshes attached measurements and protractor angles", () => {
+  it("rebuilds locked geodesics; a derive pass refreshes their measurements and angles", () => {
     const { world, registry } = threeCannonWorld();
     shoot(world, registry, "cannon-a", "g-a");
     shoot(world, registry, "cannon-c", "g-b");
@@ -93,36 +94,23 @@ describe("world geometry computed object policy", () => {
     const previousLength = measurement.lengthMeters;
     moveIncoming(registry, vec3(1, 1, 0));
 
-    const syncedMeasurements: string[] = [];
-    const syncedAngles: string[] = [];
-    const result = applyGeometryCommitComputedObjectPolicy({
-      world,
-      registry,
-      playerCellId: "a",
-      playerPoint: centerPoint,
-      callbacks: {
-        syncMeasuredGeodesicLength: (object) => syncedMeasurements.push(object.id),
-        syncProtractorAngle: (object) => syncedAngles.push(object.id),
-      },
-    });
+    const engine = createDerivingTestEngine(registry, { getWorld: () => world, playerPose: { ...createDefaultPlayerPose("a"), position: centerPoint } });
+    const result = applyGeometryCommitComputedObjectPolicy({ world, registry });
+    runDerivePass(engine);
 
     expect([...result.rebuiltGeodesicIds].sort()).toEqual(["g-a", "g-b"]);
     expect(result.failedLockedGeodesicIds).toEqual([]);
-    expect(result.refreshedMeasuredGeodesicLengthIds).toContain("measure-g-a");
-    expect(result.refreshedProtractorAngleIds).toContain("angle-incoming");
-    expect(syncedMeasurements).toContain("measure-g-a");
-    expect(syncedAngles).toContain("angle-incoming");
-    expect(isGeodesicLocked(registry, "g-a")).toBe(true);
-    expect(isGeodesicLocked(registry, "g-b")).toBe(true);
+    expect(arcConnectsEmitters(registry, "g-a")).toBe(true);
+    expect(arcConnectsEmitters(registry, "g-b")).toBe(true);
     expect(getGeodesicTail(registry, "g-a")?.terminal).toEqual({ kind: "emitter-hit", emitterId: "cannon-b" });
     const refreshedMeasurement = registry.get("measure-g-a");
-    expect(refreshedMeasurement?.kind).toBe("measured-geodesic-length");
-    if (refreshedMeasurement?.kind === "measured-geodesic-length") {
+    expect(refreshedMeasurement?.kind).toBe("geodesicMeasurements/length");
+    if (refreshedMeasurement?.kind === "geodesicMeasurements/length") {
       expect(refreshedMeasurement.lengthMeters).not.toBeCloseTo(previousLength);
     }
     const angle = registry.get("angle-incoming");
-    expect(angle?.kind).toBe("protractor-angle");
-    if (angle?.kind === "protractor-angle") {
+    expect(angle?.kind).toBe("geodesicMeasurements/angle");
+    if (angle?.kind === "geodesicMeasurements/angle") {
       expect(angle.centerPoint.x).toBeCloseTo(1);
       expect(angle.centerPoint.y).toBeCloseTo(1);
       expect(angle.centerPoint.z).toBeCloseTo(geodesicRayBeamHeightMeters);
@@ -136,16 +124,12 @@ describe("world geometry computed object policy", () => {
     registry.add(createIncomingSegmentAngle(registry));
     moveIncoming(registry, vec3(1, 1, 0));
 
-    const result = applyGeometryCommitComputedObjectPolicy({
-      world,
-      registry,
-      playerCellId: "a",
-      playerPoint: centerPoint,
-    });
+    const engine = createDerivingTestEngine(registry, { getWorld: () => world });
+    const result = applyGeometryCommitComputedObjectPolicy({ world, registry });
+    runDerivePass(engine);
 
     expect(result.removedProtractorAngleIds).toEqual([]);
-    expect(result.refreshedProtractorAngleIds).toEqual(["angle-segment-incoming"]);
-    expect(registry.get("angle-segment-incoming")?.kind).toBe("protractor-angle");
+    expect(registry.get("angle-segment-incoming")?.kind).toBe("geodesicMeasurements/angle");
   });
 
 });
@@ -212,7 +196,7 @@ function createProtractorFixture(
 ): ProtractorAngleObject {
   return {
     id,
-    kind: "protractor-angle",
+    kind: "geodesicMeasurements/angle",
     cellId: "a",
     localPose: yawRigidTransform3(0, centerPoint),
     aimStickyTarget: { localPoint: centerPoint },

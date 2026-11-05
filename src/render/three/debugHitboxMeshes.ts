@@ -82,7 +82,7 @@ export function buildSphereAimCollisionOutlineDebugMesh(
  * Uses the object's stored labelHitbox, or derives one from the angle geometry when absent. The box is yawed about the vertical axis by the hitbox yaw (radians). The caller-supplied material is used directly, not cloned.
  */
 export function buildProtractorAngleLabelBoxDebugMesh(
-  object: Extract<RuntimeWorldObject, { readonly kind: "protractor-angle" }>,
+  object: Extract<RuntimeWorldObject, { readonly kind: "geodesicMeasurements/angle" }>,
   name: string,
   material: THREE.Material,
   renderOrder: number,
@@ -128,7 +128,7 @@ export function buildGeodesicEmitterAimCollisionOutlineDebugMesh(
  * The capsule has radius geodesicSegmentAimRadiusMeters and runs from the segment start along its direction for its length (at least 1 mm).
  */
 export function buildGeodesicSegmentSelectableHitboxDebugMesh(
-  object: Extract<RuntimeWorldObject, { readonly kind: "geodesic-segment" }>,
+  object: Extract<RuntimeWorldObject, { readonly kind: "geodesicModel/segment" }>,
 ): THREE.Group {
   const group = new THREE.Group();
   group.name = "selectable-hitbox:geodesic-segment";
@@ -184,7 +184,7 @@ export function buildGeodesicSegmentSelectableHitboxDebugMesh(
 
 /** Builds the wireframe counterpart of the segment hitbox: a capsule (cylinder plus two sphere caps) of geodesicSegmentAimRadiusMeters along the segment. */
 export function buildGeodesicSegmentAimCollisionOutlineDebugMesh(
-  object: Extract<RuntimeWorldObject, { readonly kind: "geodesic-segment" }>,
+  object: Extract<RuntimeWorldObject, { readonly kind: "geodesicModel/segment" }>,
 ): THREE.Group {
   const group = new THREE.Group();
   group.name = "aim-collision-outline:geodesic-segment";
@@ -270,11 +270,11 @@ export function buildSelectableHitboxDebugMesh(object: RuntimeWorldObject): THRE
     return undefined;
   }
 
-  if (object.kind === "geodesic-segment") {
+  if (object.kind === "geodesicModel/segment") {
     return buildGeodesicSegmentSelectableHitboxDebugMesh(object);
   }
 
-  if (object.kind === "protractor-angle") {
+  if (object.kind === "geodesicMeasurements/angle") {
     return buildProtractorAngleLabelBoxDebugMesh(
       object,
       "selectable-hitbox:protractor-angle-label",
@@ -296,7 +296,7 @@ export function buildAimCollisionOutlineDebugMesh(object: RuntimeWorldObject): T
     return undefined;
   }
 
-  if (object.kind === "geodesic-segment") {
+  if (object.kind === "geodesicModel/segment") {
     return buildGeodesicSegmentAimCollisionOutlineDebugMesh(object);
   }
 
@@ -305,7 +305,7 @@ export function buildAimCollisionOutlineDebugMesh(object: RuntimeWorldObject): T
     return bounds ? buildGeodesicEmitterAimCollisionOutlineDebugMesh(object, bounds) : undefined;
   }
 
-  if (object.kind === "protractor-angle") {
+  if (object.kind === "geodesicMeasurements/angle") {
     return buildProtractorAngleLabelBoxDebugMesh(
       object,
       "aim-collision-outline:protractor-angle-label",

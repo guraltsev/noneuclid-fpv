@@ -37,7 +37,7 @@ decisions of its own.
 | 2026-11-03 | Performance is enforced by a bench with a `--check` mode against a committed baseline, run in every job's acceptance. No CI is added. | **Agreed** (maintainer) |
 | 2026-11-03 | **Naming**: every name a module contributes is `<moduleId>/<noun>`, nouns from the mathematical model; renaming is part of the jobs (section 10). | **Agreed** (maintainer) |
 | 2026-11-03 | The tie tool's selection highlight stays on the segments, behind a model API call, until a client overlay replaces it. | **Agreed** (maintainer) |
-| 2026-11-02 | When a flow touches a forbidden-zone singularity, the geodesic is destroyed. **Not implemented**: the code still marks the curve `unresolved`. Job 55 implements it. | **Agreed** (maintainer, earlier) |
+| 2026-11-02 | When a flow touches a forbidden-zone singularity, the geodesic is destroyed. **Implemented** (job 55): the default experience destroys the curve; `"unresolve"` stays available. | **Agreed** (maintainer, earlier) |
 
 ## 2. Where the code stands (checked 2026-11-03)
 

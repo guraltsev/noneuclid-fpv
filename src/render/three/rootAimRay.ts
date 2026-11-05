@@ -64,12 +64,7 @@ export function createAimTargetCycleSignature(targets: readonly AimTarget[]): st
   ].join(":")).join("|");
 }
 
-/**
- * Returns the maximum interaction distance in meters for an object: tooltip range, else interactable range, else 2.5.
- */
-export function getRuntimeObjectInteractionRangeMeters(object: RuntimeWorldObject): number {
-  return object.tooltip?.rangeMeters ?? object.interactable?.rangeMeters ?? 2.5;
-}
+export { getRuntimeObjectInteractionRangeMeters } from "../../world-objects/interactionRange";
 
 /** The interactable object the aim ray currently rests on. */
 export interface FocusedRuntimeObject {

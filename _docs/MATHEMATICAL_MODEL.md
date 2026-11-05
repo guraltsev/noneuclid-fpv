@@ -248,10 +248,12 @@ The result (`src/world-objects/geodesic/intervals.ts#traceGeodesicFromLiftedChor
 per-cell **segments** of a geodesic; the ordered list of portals crossed is its **portal word**
 (`src/world-objects/geodesic/objects.ts#GeodesicPortalTraversal`).
 
-**Intervals and endpoints.** A `GeodesicIntervalObject` is a geodesic arc with a `start` and an `end`
-*attachment* (`src/world-objects/geodesic/objects.ts#GeodesicEndpointAttachment`): each end is attached to an
-*anchor object* — an emitter ("cannon"), or a `FreeGeodesicEndObject` (a loose end that can be aimed). The interval stores
-its portal word, so the arc is determined by (anchor positions, word) alone. This is the "geodesic end model" of
+**Arcs, vertices and crossings.** A `GeodesicArcObject` (kind `geodesicModel/arc`, formerly "geodesic interval") is a geodesic arc
+with a `start` and an `end` *attachment* (`src/world-objects/geodesic/objects.ts#GeodesicEndpointAttachment`): each end is attached to an
+*anchor object* — an emitter ("cannon"), or a `GeodesicVertexObject` (kind `geodesicModel/vertex`, formerly "free geodesic end"; a point of a
+cell that is not an emitter: it can be aimed when only one arc end is on it, and it is a shared vertex of a curve when two or more are). The arc stores
+its portal word, so it is determined by (anchor positions, word) alone. A `GeodesicCrossingObject` (kind `geodesicModel/crossing`, formerly
+"geodesic intersection") marks a point where the segments of two different geodesics cross. This is the "geodesic end model" of
 `_issues/_closed/31_geodesic_end_model_and_curve_shortening_rehaul.md`.
 
 **Lifting (unfolding).** Given the word $w=(p_1,\dots,p_k)$ from the source anchor $a$ (in cell $C_0$) to the target
@@ -275,41 +277,44 @@ always freely reduced.)
 
 ## 7. Curve shortening
 
-Tying two geodesic ends and releasing them produces a *curve-shortening pair*
-(`src/world-objects/geodesic/objects.ts#CurveShorteningPairObject`): a **piecewise-geodesic curve**, a chain of geodesic arcs
-(the `"moving"` intervals) meeting at **free vertices** $F_1,dots,F_n$ and ending at fixed anchors $A$ and $B$ (emitters or pinned
-corners), or a closed *free loop* (an interval with both ends on one $F$). The tie does not change the geometry: it starts with the two arcs at one
-vertex. The curve is real state at every tick: the registry holds exactly the current arcs, their portal words and segments.
+Tying two geodesic ends at a new vertex (`src/modules/geodesicModel/api.ts#GeodesicTieAndDetachCommand`) produces a **piecewise-geodesic curve**: a chain of geodesic arcs meeting at **tied vertices** $F_1,\dots,F_n$ (vertices with two arc ends) and ending at fixed anchors $A$ and $B$ (emitters or pinned
+corners), or a closed *free loop* (an arc with both ends on one $F$). The tie does not change the geometry: it starts with the two arcs at one
+vertex. The curve is real state at every step: the registry holds exactly the current arcs, their portal words and segments.
 
-**The flow.** Each call of `src/world-objects/geodesic/curveShortening.ts#advanceCurveShorteningPairs` is one tick of the curve shortening flow.
-At a free vertex $F$ let $u_1,u_2$ be the unit tangents of its two arcs pointing away from $F$ (each arc is lifted into $F$'s cell frame by
-its portal word, `liftGeodesicEndpointWithAnchors`, and is the straight segment to the lifted far end). The total length $ell(F)$
-has the descent direction $d=u_1+u_2$ and $|d|approx$ the turning angle. $F$ moves along $hat d$ by
-$$t=minigl(v,Delta t,;t^*igr),qquad t^*=argmin_{sge 0} ell(F+shat d),$$
-with $v=$ `curveShorteningSpeedMetersPerSecond` $=1.5$ m/s and $Delta t$ the frame time clamped to $0.1$ s. Along the ray $ell$ is convex
-with derivative $-hat dcdot(u_1+u_2)$ evaluated at the candidate position, so $t^*$ is found by bisection on its sign: the step never
-overshoots the minimum and never stalls (the descent of job 06 stalled because it had a fixed step). The vertices of a curve are visited in
-order and each sees the position its neighbour just took. The walk of $F$ through the world
-(`src/cell-complex/segmentWalk.ts#walkDevelopedSegment`) records the portals it crosses; the word of an arc that ends at $F$ is extended by them,
-the word of an arc that starts at $F$ is prefixed by their inverse, both freely reduced, and both arcs are previewed
-(`previewRebuildGeodesicInterval`) before anything is written. A step that is rejected (a wall, a forbidden zone, or a result that is not
-shorter) is halved up to eight times. The total length therefore never grows.
+**A curve has no lifecycle.** There is no object that stands for the process, and a curve is never started, finished or locked: it is a chain of arcs, and nothing stores whether it is "moving" or "stable". The flow of the module
+`src/modules/curveShortening/` applies one rule to every tied vertex in each step, and it stops because nothing is left to act on: a curve whose arcs all connect emitters has no tied vertex, and a vertex that cannot act is
+*quiet* (below).
 
-**Taut vertices.** A vertex whose turning angle $|d|$ is below `curveShorteningTautTurnRadians` $=5cdot10^{-3}$, or that cannot move
-at all, is removed: its two arcs merge into one interval from the far anchor of the first to the far anchor of the second, whose word is the
-reduced concatenation of the two words. The merged interval is *stable* when neither of its anchors is a free vertex of the curve any more, so a
-curve ends when its last free vertex is removed. A free loop on $F$ with holonomy a translation (every word on a torus) is taut at once and
-stays as a stable loop on $F$. A loop with holonomy a rotation $	heta
-e0$ encircles a cone point $c$, its length $2|sin(	heta/2)|,|F-c|$
+**The rule,** per tied vertex $F$, in registry order, each vertex seeing the position its neighbour just took. Let $u_1,u_2$ be the unit tangents of the two arcs at $F$ pointing away from $F$ (each arc is lifted into $F$'s cell frame by
+its portal word, `liftGeodesicEndpointWithAnchors`, and is the straight segment to the lifted far end). The total length $\ell(F)$
+has the descent direction $d=u_1+u_2$, and $|d|\approx$ the turning angle.
+
+1. If an arc at $F$ is *stale* (its last rebuild failed during a carry, so it still shows its old path), $F$ is skipped for this step. Nothing else is decided.
+2. If $F$ is **at rest**, $|d|<$ `curveShorteningTautTurnRadians` $=5\cdot10^{-3}$, it always merges: its two arcs become one arc from the far anchor of the first to the far anchor of the second, whose word is the reduced concatenation
+   of the two words. A free loop on $F$ has nothing to merge with: with holonomy a translation (every word on a torus) it is taut at once and keeps $F$ as its base point.
+3. Otherwise $F$ moves along $\hat d$ by
+   $$t=\min\bigl(v\,\Delta t,\;t^*\bigr),\qquad t^*=\operatorname*{argmin}_{s\ge 0}\ \ell(F+s\hat d),$$
+   with $v=$ `curveShorteningSpeedMetersPerSecond` $=1.5$ m/s and $\Delta t$ the frame time clamped to $0.1$ s (the *constant* speed law). Along the ray $\ell$ is convex
+   with derivative $-\hat d\cdot(u_1+u_2)$ evaluated at the candidate position, so $t^*$ is found by bisection on its sign: the step never
+   overshoots the minimum and never stalls (the descent of job 06 stalled because it had a fixed step). The walk of $F$ through the world
+   (`src/cell-complex/segmentWalk.ts#walkDevelopedSegment`) records the portals it crosses; the word of an arc that ends at $F$ is extended by them,
+   the word of an arc that starts at $F$ is prefixed by their inverse, both freely reduced, and both arcs are previewed
+   before anything is written. A step that is rejected (a wall, a forbidden zone, or a result that is not
+   shorter) is halved up to eight times. The total length therefore never grows.
+4. A vertex that cannot move, at a step shorter than $10^{-5}$ m, tries the merge of rule 2 (the corner is cut). If that is refused too, the *blocked* policy applies; `unresolve` makes $F$ quiet and fires a notice once; `destroy`, the default experience's setting, removes the whole curve (every arc, and every vertex left without an arc) and fires a notice once.
+
+A loop with holonomy a rotation $\theta\ne0$ encircles a cone point $c$, its length $2|\sin(\theta/2)|\,|F-c|$
 shrinks as $F$ flows to $c$, and when the loop is shorter than four times the minimum geodesic length it is deleted with a notice. A merged chord shorter than
-`src/world-objects/geodesic/objects.ts#GEODESIC_MIN_LENGTH_METERS` is deleted with a notice. A merged interval that duplicates an existing stable geodesic
+`src/world-objects/geodesic/objects.ts#GEODESIC_MIN_LENGTH_METERS` is deleted with a notice. A merged arc that duplicates an existing geodesic
 (same anchors, same word read in either direction) is discarded in its favour.
 
-**The vertex count never grows.** The flow only moves and removes vertices; it never inserts one. A curve whose taut shape would wrap a
+**Quiet vertices.** The flow keeps a private memo of the vertices with nothing to do: taut closed loops and blocked vertices. It is a memo, not a cache and not world state: whether a vertex can move depends on the step length, so it is not
+a function of state. Any write of an arc that has the vertex at an end, before or after the write, makes the vertex act again. The flow is at rest when every tied vertex is quiet, and a step with nothing to do costs nothing.
+
+**The vertex count never grows.** This algorithm only moves and removes vertices; it never inserts one (a later algorithm may). A curve whose taut shape would wrap a
 forbidden-zone disk at a portal junction (that would need new corner vertices on the disk boundary) is therefore not finished: the step toward
-the disk is rejected, the merge that would cut the corner is rejected too, and the pair is marked `unresolved`, skipped by later ticks, with a
-notice. Nothing is deleted because a path touches a disk. Apertures at vertices that are not portal endpoints, and in the end cells, are not
-modelled; the previews catch any hit there.
+the disk is rejected, the merge that would cut the corner is rejected too, and the vertex goes quiet as blocked, with a notice. Nothing is deleted because a path touches a disk. Apertures at vertices that are not portal endpoints, and in the end cells, are not
+modelled; the previews catch any hit there. Merging loses a bend: a merged arc cannot bend at that vertex again.
 
 **Limit.** The limit of the flow is the shortest path of the curve's homotopy class when no disk is in the way: for two emitters the straight
 chord of the developed word. The tests compare the limit of curves of up to six arcs, in the 6 m cell and across the seam of the 15 m torus,
@@ -535,5 +540,4 @@ rather than discovered.
 - **Yaw conventions.** Rigid-transform yaw is $\operatorname{atan2}(R_{10},R_{00})$ and forward is $R e_y$. The marmot
   derives its yaw from its velocity as $\operatorname{atan2}(-v_x,v_y)$, so it walks along $v$. Geodesic cannon and
   protractor yaws are direction angles along $(\cos\psi,\sin\psi)$.
-- **Curve shortening.** The flow does not insert vertices: a curve that needs a wrap around a forbidden-zone disk stays `unresolved`.
-  The segments of a moving interval carry the display state `"moving"` (drawn in the moving colour).
+- **Curve shortening.** The flow does not insert vertices: a curve that needs a wrap around a forbidden-zone disk is destroyed under the default `destroy` policy, and stays `unresolved` under `unresolve`.

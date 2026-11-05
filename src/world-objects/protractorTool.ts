@@ -1,6 +1,6 @@
 /**
  * Protractor tool: persistent angle measurements between two geodesic directions at a common vertex.
- * A protractor angle is anchored at a centre object (a geodesic cannon/emitter or a geodesic-intersection object) in one cell. It measures the angle, at that point, between two geodesic rays leaving the point, each given as a "directed geodesic": the horizontal direction of a geodesic segment through the vertex (forward or backward along the segment) or the aim direction of an emitter attached to the vertex. Everything lives in a single cell's local frame, so no portal transport is involved: both rays are expressed in the vertex cell.
+ * A protractor angle is anchored at a centre object (a geodesic cannon/emitter or a geodesicModel/crossing object) in one cell. It measures the angle, at that point, between two geodesic rays leaving the point, each given as a "directed geodesic": the horizontal direction of a geodesic segment through the vertex (forward or backward along the segment) or the aim direction of an emitter attached to the vertex. Everything lives in a single cell's local frame, so no portal transport is involved: both rays are expressed in the vertex cell.
  * Angles are radians (degrees stored alongside for display); yaw here is atan2(y, x), counterclockwise from cell-local +x viewed from above, and vertical components of directions are ignored. The measured angle is counterclockwise from the first ray to the second, in [0, 2π).
  */
 import { yawRigidTransform3 } from "../math/rigidTransform3";
@@ -9,7 +9,7 @@ import {
   geodesicRayBeamHeightMeters,
   type GeodesicEndRole,
   type GeodesicCannonObject,
-  type GeodesicIntersectionObject,
+  type GeodesicCrossingObject,
   type GeodesicSegmentObject,
 } from "./geodesic/objects";
 import { getRememberedGeodesicIntersectionObject } from "./geodesic/intersections";
@@ -72,7 +72,7 @@ export interface ProtractorToolState {
  */
 export function resolveProtractorCenterSelection(
   registry: RuntimeObjectRegistry,
-  object: GeodesicCannonObject | GeodesicIntersectionObject,
+  object: GeodesicCannonObject | GeodesicCrossingObject,
 ): ProtractorCenterSelection {
   return {
     objectId: object.id,
@@ -82,7 +82,7 @@ export function resolveProtractorCenterSelection(
   };
 }
 
-function resolveProtractorCenterPoint(object: GeodesicCannonObject | GeodesicIntersectionObject): Vec3 {
+function resolveProtractorCenterPoint(object: GeodesicCannonObject | GeodesicCrossingObject): Vec3 {
   if (object.aimStickyTarget?.localPoint) {
     return object.aimStickyTarget.localPoint;
   }
@@ -208,7 +208,7 @@ export function createProtractorAngleObject(options: {
 
   return {
     id: options.id,
-    kind: "protractor-angle",
+    kind: "geodesicMeasurements/angle",
     cellId: options.center.cellId,
     localPose: yawRigidTransform3(options.first.yawRadians, options.center.point),
     aimStickyTarget: {
@@ -274,7 +274,7 @@ export function refreshProtractorAngleObject(options: {
   readonly angle: ProtractorAngleObject;
 }): ProtractorAngleObject | undefined {
   const centerObject = options.registry.get(options.angle.centerObjectId);
-  if (centerObject?.kind !== "geodesic-cannon" && centerObject?.kind !== "geodesic-intersection") {
+  if (centerObject?.kind !== "geodesic-cannon" && centerObject?.kind !== "geodesicModel/crossing") {
     const rememberedCenter = getRememberedGeodesicIntersectionObject(options.registry, options.angle.centerObjectId);
     return rememberedCenter ? {
       ...options.angle,
@@ -381,15 +381,14 @@ function resolveSegmentSelectionObject(
 ): GeodesicSegmentObject | undefined {
   const current = registry.get(previous.segmentId);
   if (
-    current?.kind === "geodesic-segment" &&
+    current?.kind === "geodesicModel/segment" &&
     (previous.endRole === undefined || current.halfRole === previous.endRole) &&
     segmentCanAnchorProtractorSelection(center, current)
   ) {
     return current;
   }
 
-  return registry.getAll()
-    .filter((object): object is GeodesicSegmentObject => object.kind === "geodesic-segment")
+  return registry.getSegmentsOfGeodesic(previous.geodesicId)
     .filter((segment) =>
       segment.geodesicId === previous.geodesicId &&
       (previous.endRole === undefined || segment.halfRole === previous.endRole) &&

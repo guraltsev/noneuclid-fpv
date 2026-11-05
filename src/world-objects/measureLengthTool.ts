@@ -1,6 +1,6 @@
 /**
  * Measured-length tool: persistent "geodesic length = N m" labels attached to a geodesic.
- * A geodesic (GeodesicIntervalObject) is rendered as a chain of straight GeodesicSegmentObjects, one run per cell it passes through, joined at portals; the measured length is the sum of `lengthMeters` over all registry segments with that `geodesicId`, i.e. the true intrinsic length along the geodesic through portals, not a Euclidean distance within one cell.
+ * A geodesic (GeodesicArcObject) is rendered as a chain of straight GeodesicSegmentObjects, one run per cell it passes through, joined at portals; the measured length is the sum of `lengthMeters` over all registry segments with that `geodesicId`, i.e. the true intrinsic length along the geodesic through portals, not a Euclidean distance within one cell.
  * The label object is placed in the cell-local frame (meters) at the point of the segment, in the player's current cell, nearest to the player, and is refreshed as the geodesic is extended, rebuilt or the player moves.
  */
 import type { CompiledCellComplex } from "../cell-complex/compileCellComplex";
@@ -116,7 +116,7 @@ function createMeasuredGeodesicLengthObjectAtSegment(options: {
 
   return withMeasuredGeodesicLengthTooltip({
     id: options.id,
-    kind: "measured-geodesic-length",
+    kind: "geodesicMeasurements/length",
     cellId: options.segment.cellId,
     localPose: yawRigidTransform3(yawRadians, labelPoint),
     aimStickyTarget: {
@@ -159,9 +159,7 @@ function findClosestGeodesicSegment(
   cellId: string,
   point: Vec3,
 ): { readonly segment: GeodesicSegmentObject; readonly playerPoint: Vec3 } | undefined {
-  const segments = registry.getAll().filter((object): object is GeodesicSegmentObject =>
-    object.kind === "geodesic-segment" && object.geodesicId === geodesicId
-  );
+  const segments = registry.getSegmentsOfGeodesic(geodesicId);
   const images = world
     ? enumerateCellImages(world, cellId, closestSegmentMaxHops)
     : [{ cellId, cellFromStart: identityRigidTransform3, hops: 0 }];
@@ -184,10 +182,7 @@ function findClosestGeodesicSegment(
 }
 
 function getGeodesicTotalLengthMeters(registry: RuntimeObjectRegistry, geodesicId: string): number {
-  return registry.getAll()
-    .filter((object): object is GeodesicSegmentObject =>
-      object.kind === "geodesic-segment" && object.geodesicId === geodesicId
-    )
+  return registry.getSegmentsOfGeodesic(geodesicId)
     .reduce((total, segment) => total + segment.lengthMeters, 0);
 }
 

@@ -4,11 +4,12 @@
  * A restart while presenting ends the session first and runs after its `end` event; a session that fails to end sets the
  * state to "failed" and the restart never runs. Disposal ends the session and detaches the `end` handling.
  */
+import { createTestEngine } from "../support/engine";
 import * as THREE from "three";
 import { describe, expect, it, vi } from "vitest";
 import { createXrSessionController, type XrRendererLike } from "../../src/render/three/xrSessionController";
 import { createDefaultPlayerPose } from "../../src/movement/playerPose";
-import { createTestAppSession } from "../support/appSession";
+import { createTestClientSession } from "../support/clientSession";
 import { createFakeXrSession } from "../support/fakeXr";
 
 type FakeSession = ReturnType<typeof createFakeXrSession>;
@@ -30,7 +31,8 @@ function createController(options: { readonly session?: FakeSession; readonly pr
       },
     },
     secureContext: true,
-    session: createTestAppSession(),
+    session: createTestClientSession(),
+    engine: createTestEngine(),
     initialPlayerPose: createDefaultPlayerPose("room-a"),
     xr,
     xrRig: { root: new THREE.Group(), getSharedRenderRootCellId: (pose) => pose.cellId },

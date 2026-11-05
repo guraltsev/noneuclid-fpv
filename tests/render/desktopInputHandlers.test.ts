@@ -12,7 +12,8 @@ import { createDesktopInputHandlers } from "../../src/render/three/desktopInputH
 import { defaultAppConfig } from "../../src/glue/appConfig";
 import { createRuntimeMenuState } from "../../src/runtime/runtimeMenuState";
 import type { RuntimeInputFrame } from "../../src/interaction/inputFrame";
-import { createTestAppSession } from "../support/appSession";
+import { createTestClientSession } from "../support/clientSession";
+import { createTestToolsById } from "../support/tools";
 
 const canvas = {};
 
@@ -30,7 +31,7 @@ function emptyFrame(): Omit<RuntimeInputFrame, "source"> {
 }
 
 function createHarness(options: { readonly menuOpen?: boolean; readonly presenting?: boolean; readonly pinnedHelp?: boolean } = {}) {
-  const session = createTestAppSession(
+  const session = createTestClientSession(
     options.menuOpen ? { menuState: { ...createRuntimeMenuState({ selectedWorldId: "test" }), isOpen: true } } : {},
   );
   const calls = {
@@ -45,6 +46,7 @@ function createHarness(options: { readonly menuOpen?: boolean; readonly presenti
   const handlers = createDesktopInputHandlers({
     session,
     appConfig: defaultAppConfig,
+    toolsById: createTestToolsById(),
     camera: new THREE.PerspectiveCamera(),
     renderer: { domElement: canvas, xr: { isPresenting: options.presenting ?? false, getSession: () => null } },
     xrRig: { root: new THREE.Group() },

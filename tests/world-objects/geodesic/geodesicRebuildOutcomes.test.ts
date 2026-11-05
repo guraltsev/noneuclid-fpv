@@ -4,31 +4,29 @@
  * `rebuildConnectedGeodesicBetweenEmitters` rebuilds a geodesic (or, carrying an emitter, several at once) after a
  * change, preserving it when the rebuild fails and the caller asked to preserve it, or deleting it when the
  * rebuilt chord lands in a forbidden zone; `realizeIntervalChord` classifies a straight chord between two anchors
- * as feasible, blocked by a wall, blocked by a zone, or degenerate (too short to realize). `withDeferredGeodesicIntersections`
- * batches intersection-marker recomputation, including across nested scopes and when the wrapped body throws.
- * These tests check each rebuild/classification outcome and that nested deferred scopes still leave the right
- * markers in place, with or without an error. (Rewritten from a performance test that asserted internal pass and
+ * as feasible, blocked by a wall, blocked by a zone, or degenerate (too short to realize). The crossings derive tick recomputes
+ * the intersection markers once per pass, however many geodesics changed since the last pass.
+ * These tests check each rebuild/classification outcome and that a derive pass after several removals leaves the right
+ * markers in place. (Rewritten from a performance test that asserted internal pass and
  * trace counters and spied on the registry; those are implementation, not behaviour — see `_docs/tests.md` §2.2.
  * A `carrying 10 loops through a frame` perf number, if wanted again, belongs in a `scripts/bench/` script.)
  */
 import { describe, expect, it } from "vitest";
 import { yawRigidTransform3 } from "../../../src/math/rigidTransform3";
 import { rebuildConnectedGeodesicBetweenEmitters } from "../../../src/world-objects/geodesic/cannon";
-import {
-  updateGeodesicIntersectionObjects,
-  withDeferredGeodesicIntersections,
-} from "../../../src/world-objects/geodesic/intersections";
-import { collectLockedIncidentGeodesicIdsForEmitter, removeGeodesic } from "../../../src/world-objects/geodesic/lifecycle";
+import { updateGeodesicIntersectionObjects } from "../../../src/world-objects/geodesic/intersections";
+import { collectFollowingArcIdsForEmitter, removeGeodesic } from "../../../src/world-objects/geodesic/lifecycle";
 import { getGeodesicSegments } from "../../../src/world-objects/geodesic/segments";
 import { createRuntimeObjectRegistry } from "../../../src/world-objects/runtimeObjectRegistry";
 import { realizeIntervalChord } from "../../../src/world-objects/geodesic/intervals";
 import {
-  createFreeGeodesicEndObject,
+  createGeodesicVertexObject,
   createGeodesicCannonObject,
-  createGeodesicIntervalObject,
+  createGeodesicArcObject,
   geodesicRayBeamHeightMeters,
 } from "../../../src/world-objects/geodesic/objects";
 import { compileLargePortalWorld, compileLargeWorld, createTorusLoopBenchmarkScene } from "../../fixtures/world-objects/geodesic";
+import { createDerivingTestEngine, runDerivePass } from "../../support/engine";
 
 describe("geodesic rebuild outcomes", () => {
   it("keeps every carried loop's segments and portal word after moving the shared emitter", () => {
@@ -39,19 +37,17 @@ describe("geodesic rebuild outcomes", () => {
     }
     registry.update({ ...before, localPose: yawRigidTransform3(0, { x: -1.95, y: 1.95, z: 0 }) });
 
-    withDeferredGeodesicIntersections(registry, () => {
-      for (const id of collectLockedIncidentGeodesicIdsForEmitter(registry, "e")) {
-        rebuildConnectedGeodesicBetweenEmitters({
-          world,
-          registry,
-          geodesicId: id,
-          carriedEmitterId: "e",
-          carriedEmitterBeforeMove: before,
-          preserveGeodesicOnRebuildFailure: true,
-          allowOutOfBoundsCarriedEndpoint: true,
-        });
-      }
-    });
+    for (const id of collectFollowingArcIdsForEmitter(registry, "e")) {
+      rebuildConnectedGeodesicBetweenEmitters({
+        world,
+        registry,
+        geodesicId: id,
+        carriedEmitterId: "e",
+        carriedEmitterBeforeMove: before,
+        preserveGeodesicOnRebuildFailure: true,
+        allowOutOfBoundsCarriedEndpoint: true,
+      });
+    }
 
     for (let j = 0; j < 10; j += 1) {
       expect(getGeodesicSegments(registry, `loop-${j}`).length).toBeGreaterThan(0);
@@ -64,7 +60,7 @@ describe("geodesic rebuild outcomes", () => {
     const registry = createRuntimeObjectRegistry();
     registry.add(createGeodesicCannonObject({ id: "cannon-a", cellId: "a", localPose: yawRigidTransform3(0, { x: 1, y: 2.5, z: 0 }) }));
     registry.add(createGeodesicCannonObject({ id: "cannon-b", cellId: "a", localPose: yawRigidTransform3(Math.PI, { x: 5, y: 0, z: 0 }) }));
-    registry.add(createGeodesicIntervalObject({
+    registry.add(createGeodesicArcObject({
       id: "g-a",
       startAnchorObjectId: "cannon-a",
       endAnchorObjectId: "cannon-b",
@@ -89,7 +85,7 @@ describe("geodesic rebuild outcomes", () => {
     const registry = createRuntimeObjectRegistry();
     registry.add(createGeodesicCannonObject({ id: "cannon-a", cellId: "a", localPose: yawRigidTransform3(0, { x: 1, y: 2.5, z: 0 }) }));
     registry.add(createGeodesicCannonObject({ id: "cannon-b", cellId: "b", localPose: yawRigidTransform3(Math.PI, { x: 1, y: 2.5, z: 0 }) }));
-    registry.add(createGeodesicIntervalObject({
+    registry.add(createGeodesicArcObject({
       id: "g-a",
       startAnchorObjectId: "cannon-a",
       endAnchorObjectId: "cannon-b",
@@ -113,7 +109,7 @@ describe("geodesic rebuild outcomes", () => {
     });
 
     expect(rebuilt).toEqual([]);
-    expect(registry.get("g-a")?.kind).toBe("geodesic-interval");
+    expect(registry.get("g-a")?.kind).toBe("geodesicModel/arc");
   });
 
   it("classifies a straight chord as feasible, wall-blocked, or too short to realize", () => {
@@ -123,8 +119,8 @@ describe("geodesic rebuild outcomes", () => {
     const realize = (freeEndPoint: { x: number; y: number }) => {
       registry.remove("tip");
       registry.remove("g-tip");
-      registry.add(createFreeGeodesicEndObject({ id: "tip", cellId: "a", point: { ...freeEndPoint, z: geodesicRayBeamHeightMeters } }));
-      const interval = createGeodesicIntervalObject({ id: "g-tip", startAnchorObjectId: "cannon-a", endAnchorObjectId: "tip", startCellId: "a" });
+      registry.add(createGeodesicVertexObject({ id: "tip", cellId: "a", point: { ...freeEndPoint, z: geodesicRayBeamHeightMeters } }));
+      const interval = createGeodesicArcObject({ id: "g-tip", startAnchorObjectId: "cannon-a", endAnchorObjectId: "tip", startCellId: "a" });
       registry.add(interval);
       return realizeIntervalChord({ world, registry, interval });
     };
@@ -139,7 +135,7 @@ describe("geodesic rebuild outcomes", () => {
     const registry = createRuntimeObjectRegistry();
     registry.add(createGeodesicCannonObject({ id: "cannon-a", cellId: "a", localPose: yawRigidTransform3(0, { x: 1, y: 2.5, z: 0 }) }));
     registry.add(createGeodesicCannonObject({ id: "cannon-b", cellId: "a", localPose: yawRigidTransform3(Math.PI, { x: 5, y: 0, z: 0 }) }));
-    const interval = createGeodesicIntervalObject({ id: "g-a", startAnchorObjectId: "cannon-a", endAnchorObjectId: "cannon-b", startCellId: "a" });
+    const interval = createGeodesicArcObject({ id: "g-a", startAnchorObjectId: "cannon-a", endAnchorObjectId: "cannon-b", startCellId: "a" });
     registry.add(interval);
 
     const realization = realizeIntervalChord({ world, registry, interval });
@@ -148,27 +144,21 @@ describe("geodesic rebuild outcomes", () => {
     expect(realization.kind === "zone" ? realization.junctionId : "").not.toBe("");
   });
 
-  it("keeps intersection markers correct across nested deferred scopes, even if the body throws", () => {
+  it("keeps intersection markers correct across derive passes that follow several removals", () => {
     const { registry } = createTorusLoopBenchmarkScene();
     updateGeodesicIntersectionObjects(registry);
+    const engine = createDerivingTestEngine(registry);
 
-    withDeferredGeodesicIntersections(registry, () =>
-      withDeferredGeodesicIntersections(registry, () => {
-        removeGeodesic(registry, "loop-0");
-        removeGeodesic(registry, "loop-1");
-      })
-    );
-    const markers = registry.getObjectsOfKind("geodesic-intersection");
+    removeGeodesic(registry, "loop-0");
+    removeGeodesic(registry, "loop-1");
+    runDerivePass(engine);
+    const markers = registry.getObjectsOfKind("geodesicModel/crossing");
     expect(markers.some((marker) => marker.geodesicIds.some((id) => id === "loop-0" || id === "loop-1"))).toBe(false);
     expect(markers.some((marker) => marker.geodesicIds.includes("loop-2"))).toBe(true);
 
-    expect(() =>
-      withDeferredGeodesicIntersections(registry, () => {
-        removeGeodesic(registry, "loop-2");
-        throw new Error("boom");
-      })
-    ).toThrow("boom");
-    expect(registry.getObjectsOfKind("geodesic-intersection").some((marker) =>
+    removeGeodesic(registry, "loop-2");
+    runDerivePass(engine);
+    expect(registry.getObjectsOfKind("geodesicModel/crossing").some((marker) =>
       marker.geodesicIds.includes("loop-2")
     )).toBe(false);
   });

@@ -8,7 +8,7 @@ import {
   type GeodesicCannonObject,
   type GeodesicEndRole,
   type GeodesicHalfRole,
-  type GeodesicIntervalObject,
+  type GeodesicArcObject,
   type GeodesicPortalTraversal,
   type GeodesicSegmentObject,
   intersectionTolerance,
@@ -16,7 +16,6 @@ import {
   sanitizeYaw,
   type TraceGeodesicSegmentResult,
 } from "./objects";
-import { requestGeodesicIntersectionUpdate, withDeferredGeodesicIntersections } from "./intersections";
 import {
   getGeodesicPortalWord,
   removeUnusedFreeGeodesicEnds,
@@ -33,30 +32,23 @@ export function removeGeodesicIntervalAndDerivedObjects(
   registry: RuntimeObjectRegistry,
   geodesicId: string,
 ): void {
-  withDeferredGeodesicIntersections(registry, () => removeGeodesicIntervalAndDerivedObjectsNow(registry, geodesicId));
-}
-
-function removeGeodesicIntervalAndDerivedObjectsNow(
-  registry: RuntimeObjectRegistry,
-  geodesicId: string,
-): void {
   removeGeodesicSegments(registry, geodesicId);
   const doomed: RuntimeWorldObject[] = [];
   const interval = registry.get(geodesicId);
-  if (interval?.kind === "geodesic-interval") {
+  if (interval?.kind === "geodesicModel/arc") {
     doomed.push(interval);
   }
-  for (const object of registry.getObjectsOfKind("measured-geodesic-length")) {
+  for (const object of registry.getObjectsOfKind("geodesicMeasurements/length")) {
     if (object.geodesicId === geodesicId) {
       doomed.push(object);
     }
   }
-  for (const object of registry.getObjectsOfKind("protractor-angle")) {
+  for (const object of registry.getObjectsOfKind("geodesicMeasurements/angle")) {
     if (object.first.geodesicId === geodesicId || object.second.geodesicId === geodesicId) {
       doomed.push(object);
     }
   }
-  for (const object of registry.getObjectsOfKind("geodesic-intersection")) {
+  for (const object of registry.getObjectsOfKind("geodesicModel/crossing")) {
     if (object.geodesicIds.includes(geodesicId)) {
       doomed.push(object);
     }
@@ -65,7 +57,6 @@ function removeGeodesicIntervalAndDerivedObjectsNow(
     registry.remove(object.id);
   }
   removeUnusedFreeGeodesicEnds(registry);
-  requestGeodesicIntersectionUpdate(registry);
 }
 
 // ---- Derived-segment and connection queries ----
@@ -86,14 +77,25 @@ export function getGeodesicTail(
   return getGeodesicSegments(registry, geodesicId).at(-1);
 }
 
-/** Returns the 1-based display number of a geodesic, defaulting to 1 when it has none. */
+/** Returns the 1-based display number of a geodesic: its arc's `geodesicNumber`, or 1 (an arc without one exists only in test fixtures). Only reads. */
 export function resolveGeodesicNumber(registry: RuntimeObjectRegistry, geodesicId: string): number {
-  for (const segment of registry.getSegmentsOfGeodesic(geodesicId)) {
-    if (segment.geodesicNumber !== undefined) {
-      return segment.geodesicNumber;
+  const arc = registry.get(geodesicId);
+  return arc?.kind === "geodesicModel/arc" ? arc.geodesicNumber ?? 1 : 1;
+}
+
+/** The smallest positive integer not used as a `geodesicNumber` by any arc. Scans the arcs; call it once per shot or split. */
+export function nextGeodesicNumber(registry: RuntimeObjectRegistry): number {
+  const used = new Set<number>();
+  for (const arc of registry.getObjectsOfKind("geodesicModel/arc")) {
+    if (arc.geodesicNumber !== undefined) {
+      used.add(arc.geodesicNumber);
     }
   }
-  return getGlobalGeodesicNumbers(registry, geodesicId).get(geodesicId) ?? 1;
+  let next = 1;
+  while (used.has(next)) {
+    next += 1;
+  }
+  return next;
 }
 
 /**
@@ -166,7 +168,7 @@ export function resolveEndpointTangentAtAnchor(input: {
   readonly endRole: GeodesicEndRole;
 }): { readonly anchorObjectId: string; readonly yawRadians: number } | undefined {
   const interval = input.registry.get(input.geodesicId);
-  if (interval?.kind !== "geodesic-interval") {
+  if (interval?.kind !== "geodesicModel/arc") {
     return undefined;
   }
   const attachment = interval[input.endRole];
@@ -195,7 +197,7 @@ export function resolveEmitterLaunchYaw(
   geodesicId: string,
 ): number {
   const interval = registry.get(geodesicId);
-  if (interval?.kind === "geodesic-interval") {
+  if (interval?.kind === "geodesicModel/arc") {
     for (const endRole of ["start", "end"] as const) {
       if (interval[endRole].anchorObjectId === emitter.id) {
         const tangent = resolveEndpointTangentAtAnchor({ registry, geodesicId, endRole });
@@ -211,7 +213,7 @@ export function resolveEmitterLaunchYaw(
 /** Re-labels the tail of a trace as an emitter hit when the interval ends on an emitter. */
 export function withAnchoredTargetTerminal(
   registry: RuntimeObjectRegistry,
-  interval: GeodesicIntervalObject,
+  interval: GeodesicArcObject,
   traces: readonly TraceGeodesicSegmentResult[],
 ): readonly TraceGeodesicSegmentResult[] {
   return withAnchoredTargetTerminalForAnchors(registry, interval, traces);
@@ -222,7 +224,7 @@ export function withAnchoredTargetTerminal(
 /** Like `withAnchoredTargetTerminal`, with candidate anchors that may differ from the registry. */
 export function withAnchoredTargetTerminalForAnchors(
   registry: RuntimeObjectRegistry,
-  interval: GeodesicIntervalObject,
+  interval: GeodesicArcObject,
   traces: readonly TraceGeodesicSegmentResult[],
   candidateAnchorsById?: ReadonlyMap<string, RuntimeWorldObject>,
 ): readonly TraceGeodesicSegmentResult[] {
@@ -250,7 +252,6 @@ export function replaceDerivedSegmentsFromTraces(input: {
   readonly geodesicId: string;
   readonly traces: readonly TraceGeodesicSegmentResult[];
 }): readonly GeodesicSegmentObject[] {
-  // Resolve the display number before the old segments go, so a rebuilt geodesic keeps its number.
   const geodesicNumber = resolveGeodesicNumber(input.registry, input.geodesicId);
   removeGeodesicSegments(input.registry, input.geodesicId);
   const splitSegments = buildDerivedSegmentsFromTraces({ ...input, geodesicNumber });
@@ -288,18 +289,15 @@ export function buildDerivedSegmentsFromTraces(input: {
   return splitSegments;
 }
 
-// Display state of a geodesic's segments: `"moving"` for a moving interval, `"connected"` for a stable interval pinned at
-// both ends, else `"open"`. An id that is not an interval is `"open"`.
+// Display state of a geodesic's segments: `"connected"` for an arc whose two ends are on emitters, else `"open"` (a tied arc
+// is drawn open). An id that is not an interval is `"open"`.
 function resolveDerivedSegmentConnectionState(
   registry: RuntimeObjectRegistry,
   geodesicId: string,
-): "open" | "connected" | "moving" {
+): "open" | "connected" {
   const interval = registry.get(geodesicId);
-  if (interval?.kind !== "geodesic-interval") {
+  if (interval?.kind !== "geodesicModel/arc") {
     return "open";
-  }
-  if (interval.motionState === "moving") {
-    return "moving";
   }
   const start = registry.get(interval.start.anchorObjectId);
   const end = registry.get(interval.end.anchorObjectId);
@@ -346,7 +344,7 @@ export function createSegmentFromTrace(options: {
 
   return {
     id: options.id,
-    kind: "geodesic-segment",
+    kind: "geodesicModel/segment",
     cellId: options.trace.cellId,
     localPose: yawRigidTransform3(yaw, options.trace.start),
     portalRenderable: true,
@@ -411,61 +409,4 @@ export function removeGeodesicSegments(registry: RuntimeObjectRegistry, geodesic
   for (const segment of getGeodesicSegments(registry, geodesicId)) {
     registry.remove(segment.id);
   }
-  requestGeodesicIntersectionUpdate(registry);
-}
-
-// Assigns display numbers: already numbered segments keep theirs; the remaining ids (cannon lists, segments, intervals, then the requested id)
-// get the smallest unused positive integers in encounter order. Pure function of the registry, recomputed on every call.
-function getGlobalGeodesicNumbers(
-  registry: RuntimeObjectRegistry,
-  requestedGeodesicId: string,
-): ReadonlyMap<string, number> {
-  const numbersById = new Map<string, number>();
-  const usedNumbers = new Set<number>();
-  const ids: string[] = [];
-  const seenIds = new Set<string>();
-  const numberedSegments = [...registry.getObjectsOfKind("geodesic-segment")]
-    .filter((segment) => segment.geodesicNumber !== undefined)
-    .sort((left, right) => left.geodesicNumber! - right.geodesicNumber!);
-
-  for (const segment of numberedSegments) {
-    if (!numbersById.has(segment.geodesicId) && segment.geodesicNumber !== undefined) {
-      numbersById.set(segment.geodesicId, segment.geodesicNumber);
-      usedNumbers.add(segment.geodesicNumber);
-    }
-    pushUniqueId(ids, seenIds, segment.geodesicId);
-  }
-
-  for (const object of registry.getAll()) {
-    if (object.kind === "geodesic-segment") {
-      pushUniqueId(ids, seenIds, object.geodesicId);
-    } else if (object.kind === "geodesic-interval") {
-      pushUniqueId(ids, seenIds, object.id);
-    }
-  }
-
-  pushUniqueId(ids, seenIds, requestedGeodesicId);
-  let nextNumber = 1;
-  for (const geodesicId of ids) {
-    if (numbersById.has(geodesicId)) {
-      continue;
-    }
-
-    while (usedNumbers.has(nextNumber)) {
-      nextNumber += 1;
-    }
-    numbersById.set(geodesicId, nextNumber);
-    usedNumbers.add(nextNumber);
-  }
-
-  return numbersById;
-}
-
-function pushUniqueId(ids: string[], seenIds: Set<string>, geodesicId: string): void {
-  if (seenIds.has(geodesicId)) {
-    return;
-  }
-
-  seenIds.add(geodesicId);
-  ids.push(geodesicId);
 }

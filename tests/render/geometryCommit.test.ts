@@ -6,6 +6,8 @@
  * it is sent home), moves the emitters, re-solves the derived objects (an open geodesic of an emitter is gone afterwards), swaps
  * the active world and only then calls `afterSwap`; `commitReady` commits only when the geometry session has a snapshot.
  */
+import { readLocalPlayerPose } from "../../src/engine/worldEngine";
+import { createTestEngine } from "../support/engine";
 import { describe, expect, it, vi } from "vitest";
 import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
 import type { CellDeformationMap } from "../../src/cell-complex/worldGeometryDeformations";
@@ -14,7 +16,6 @@ import { yawRigidTransform3 } from "../../src/math/rigidTransform3";
 import { vec3 } from "../../src/math/vec3";
 import { simpleCollisionCylinder } from "../../src/movement/dynamicObject";
 import { createDefaultPlayerPose, playerPoseToDynamicObject, type PlayerPose } from "../../src/movement/playerPose";
-import { applyRuntimeCommand } from "../../src/runtime/applyRuntimeCommand";
 import { createWorldDeformationFamilyRegistry } from "../../src/runtime/worldGeometryDeformationFamilies";
 import type { WorldGeometrySnapshot } from "../../src/runtime/worldGeometrySession";
 import { createGeometryCommit } from "../../src/render/three/geometryCommit";
@@ -27,7 +28,6 @@ import { createGeodesicCannonObject } from "../../src/world-objects/geodesic/obj
 import { getGeodesicSegments } from "../../src/world-objects/geodesic/segments";
 import { createObjectHost } from "../../src/world-objects/worldObjectOwner";
 import { createRuntimeObjectRegistry } from "../../src/world-objects/runtimeObjectRegistry";
-import { createTestAppSession } from "../support/appSession";
 
 const world = compileCellComplex({
   cells: [
@@ -103,8 +103,8 @@ describe("geometry commit transforms", () => {
 
 describe("geometry commit", () => {
   function setup(pending: WorldGeometrySnapshot[] = []) {
-    const session = createTestAppSession({ playerPose: { ...createDefaultPlayerPose("a"), position: vec3(1, 1, 0) } });
     const runtimeObjectRegistry = createRuntimeObjectRegistry();
+    const engine = createTestEngine({ registry: runtimeObjectRegistry, playerPose: { ...createDefaultPlayerPose("a"), position: vec3(1, 1, 0) } });
     const family = { kind: "fake", createDynamicObjectMaps: () => mapsByCellId };
     const afterSwap = vi.fn();
     const commit = createGeometryCommit({
@@ -112,8 +112,7 @@ describe("geometry commit", () => {
       maxVisiblePaths: 10,
       familyRegistry: createWorldDeformationFamilyRegistry([family as never]),
       geometrySession: { pollReadySnapshot: () => pending.shift() },
-      session,
-      dispatch: (command) => void applyRuntimeCommand(session, command),
+      engine,
       runtimeObjectRegistry,
       objectHost: createObjectHost(),
       createPlayerCollisionState: playerCollisionState,
@@ -123,11 +122,11 @@ describe("geometry commit", () => {
       computedObjectCallbacks: {},
       afterSwap: (snapshot) => afterSwap(snapshot, commit.active().snapshot.version),
     });
-    return { session, runtimeObjectRegistry, commit, afterSwap };
+    return { engine, runtimeObjectRegistry, commit, afterSwap };
   }
 
   it("maps the player and emitters, drops open geodesics and swaps before afterSwap", () => {
-    const { session, runtimeObjectRegistry, commit, afterSwap } = setup();
+    const { engine, runtimeObjectRegistry, commit, afterSwap } = setup();
     const cannon = createGeodesicCannonObject({ id: "cannon-a", cellId: "a", localPose: yawRigidTransform3(0, vec3(-1.5, 0, 0)) });
     runtimeObjectRegistry.add(cannon);
     shootGeodesic({ world, registry: runtimeObjectRegistry, cannon, geodesicId: "g-open", maxLengthMeters: 1.5 });
@@ -136,7 +135,7 @@ describe("geometry commit", () => {
     const next = snapshotOf(1);
     commit.commit(next);
 
-    expect(session.get().playerPose.position.x).toBeCloseTo(1.5);
+    expect(readLocalPlayerPose(engine).position.x).toBeCloseTo(1.5);
     const moved = runtimeObjectRegistry.get("cannon-a");
     expect(moved?.localPose.translation.x).toBeCloseTo(-1);
     expect(getGeodesicSegments(runtimeObjectRegistry, "g-open")).toHaveLength(0);

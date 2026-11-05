@@ -9,10 +9,10 @@
 import * as THREE from "three";
 import { type CompiledCellComplex } from "../../cell-complex/compileCellComplex";
 import { addVec3, scaleVec3 } from "../../math/vec3";
-import type { AppSession } from "../../runtime/appSession";
-import { getEmitterGeodesicIds } from "../../world-objects/geodesic/endpoints";
+import type { ClientSession } from "../../runtime/clientSession";
+import { getEmitterGeodesicIds, isTied } from "../../world-objects/geodesic/endpoints";
 import { collectGeodesicPortalWord, getGeodesicSegments } from "../../world-objects/geodesic/segments";
-import { getGeodesicConnection, isGeodesicLocked } from "../../world-objects/geodesic/lifecycle";
+import { getGeodesicConnection, arcConnectsEmitters } from "../../world-objects/geodesic/lifecycle";
 import { type GeodesicMarmotRuntime } from "./creatures/geodesicMarmotView";
 import { type RuntimeObjectRegistry, type RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
 import { type SimpleGeoCreatureRuntime } from "./creatures/simpleGeoCreatureView";
@@ -49,7 +49,7 @@ export interface GeodesicDebugDumpsDeps {
   /** Getter for the active compiled world (it can be replaced at runtime). */
   getWorld(): CompiledCellComplex;
   /** The shell session; only the menu state's selected tool is reported. */
-  readonly session: AppSession;
+  readonly session: ClientSession;
   /** Getter for the id of the cell currently rendered as visible, if any. */
   getVisibleCellId(): string | undefined;
   /** Getter for the most recent portal crossing by the player or carried emitter, if any. */
@@ -108,7 +108,7 @@ export function createGeodesicDebugDumps(deps: GeodesicDebugDumpsDeps) {
     const start = segments[0]?.start;
     const dump: GeodesicPathDebugDump = {
       geodesicId,
-      locked: isGeodesicLocked(runtimeObjectRegistry, geodesicId),
+      locked: arcConnectsEmitters(runtimeObjectRegistry, geodesicId),
       connection: getGeodesicConnection(runtimeObjectRegistry, geodesicId),
       startCellId: segments[0]?.cellId,
       start: start ? formatVec3(start) : undefined,
@@ -134,7 +134,7 @@ export function createGeodesicDebugDumps(deps: GeodesicDebugDumpsDeps) {
 
   function dumpLockedGeodesicWords(): readonly GeodesicWordDebugDump[] {
     const geodesicIds = collectKnownGeodesicIds()
-      .filter((geodesicId) => isGeodesicLocked(runtimeObjectRegistry, geodesicId))
+      .filter((geodesicId) => arcConnectsEmitters(runtimeObjectRegistry, geodesicId))
       .sort();
     const dumps = geodesicIds.map(createGeodesicWordDebugDump);
     console.info("[noneuclid] locked geodesic words", dumps);
@@ -154,24 +154,19 @@ export function createGeodesicDebugDumps(deps: GeodesicDebugDumpsDeps) {
     const objects = runtimeObjectRegistry.getAll();
     const geodesicIds = [...collectKnownGeodesicIds()].sort();
     const segments = objects
-      .filter((object): object is Extract<RuntimeWorldObject, { readonly kind: "geodesic-segment" }> =>
-        object.kind === "geodesic-segment"
+      .filter((object): object is Extract<RuntimeWorldObject, { readonly kind: "geodesicModel/segment" }> =>
+        object.kind === "geodesicModel/segment"
       )
       .sort((left, right) =>
         left.geodesicId.localeCompare(right.geodesicId) || left.segmentIndex - right.segmentIndex
       );
     const intervals = objects
-      .filter((object): object is Extract<RuntimeWorldObject, { readonly kind: "geodesic-interval" }> =>
-        object.kind === "geodesic-interval"
+      .filter((object): object is Extract<RuntimeWorldObject, { readonly kind: "geodesicModel/arc" }> =>
+        object.kind === "geodesicModel/arc"
       )
       .sort((left, right) => left.id.localeCompare(right.id));
     const anchors = objects
-      .filter((object) => object.kind === "geodesic-cannon" || object.kind === "free-geodesic-end")
-      .sort((left, right) => left.id.localeCompare(right.id));
-    const curveShorteningPairs = objects
-      .filter((object): object is Extract<RuntimeWorldObject, { readonly kind: "curve-shortening-pair" }> =>
-        object.kind === "curve-shortening-pair"
-      )
+      .filter((object) => object.kind === "geodesic-cannon" || object.kind === "geodesicModel/vertex")
       .sort((left, right) => left.id.localeCompare(right.id));
 
     const dump: AllGeodesicsDebugDump = {
@@ -186,13 +181,13 @@ export function createGeodesicDebugDumps(deps: GeodesicDebugDumpsDeps) {
           id: interval.id,
           cellId: interval.cellId,
           startCellId: interval.startCellId,
-          motionState: interval.motionState,
+          tied: isTied(runtimeObjectRegistry, interval.id),
           start: describeEndpointAttachment(interval.start),
           end: describeEndpointAttachment(interval.end),
           portalWordText: formatGeodesicPortalWord(interval.portalWord),
           portalWord: interval.portalWord,
           connection: getGeodesicConnection(runtimeObjectRegistry, interval.id),
-          locked: isGeodesicLocked(runtimeObjectRegistry, interval.id),
+          locked: arcConnectsEmitters(runtimeObjectRegistry, interval.id),
           segmentCount: intervalSegments.length,
           totalSegmentLengthMeters: roundedMeters(totalGeodesicLengthFromDebugSegments(intervalSegments)),
           segmentCells: [...new Set(intervalSegments.map((segment) => segment.cellId))],
@@ -218,22 +213,12 @@ export function createGeodesicDebugDumps(deps: GeodesicDebugDumpsDeps) {
         cellId: anchor.cellId,
         point: formatVec3(anchor.kind === "geodesic-cannon" ? getGeodesicDebugAnchorPoint(anchor) : anchor.localPose.translation),
         attachedEndpoints: objects
-          .filter((object): object is Extract<RuntimeWorldObject, { readonly kind: "geodesic-interval" }> =>
-            object.kind === "geodesic-interval"
+          .filter((object): object is Extract<RuntimeWorldObject, { readonly kind: "geodesicModel/arc" }> =>
+            object.kind === "geodesicModel/arc"
           )
           .flatMap((interval) => [interval.start, interval.end])
           .filter((endpoint) => endpoint.anchorObjectId === anchor.id)
           .map(formatEndpointRef),
-      })),
-      curveShorteningPairs: curveShorteningPairs.map((pair) => ({
-        id: pair.id,
-        state: pair.state,
-        vertices: pair.vertexIds.map((vertexId) => {
-          const vertex = runtimeObjectRegistry.get(vertexId);
-          return vertex
-            ? { id: vertexId, cellId: vertex.cellId, point: formatVec3(vertex.localPose.translation) }
-            : { id: vertexId, cellId: "(missing)", point: "(missing)" };
-        }),
       })),
     };
 
@@ -241,7 +226,7 @@ export function createGeodesicDebugDumps(deps: GeodesicDebugDumpsDeps) {
     console.info("[noneuclid] copyable all geodesics dump\n" + JSON.stringify(dump, null, 2));
     console.table(dump.intervals.map((interval) => ({
       id: interval.id,
-      motionState: interval.motionState,
+      tied: interval.tied,
       start: `${interval.start.anchorObjectId}@${interval.start.anchorCellId}`,
       end: `${interval.end.anchorObjectId}@${interval.end.anchorCellId}`,
       word: interval.portalWordText,
@@ -275,7 +260,7 @@ export function createGeodesicDebugDumps(deps: GeodesicDebugDumpsDeps) {
     const start = segments[0]?.start;
     return {
       geodesicId,
-      locked: isGeodesicLocked(runtimeObjectRegistry, geodesicId),
+      locked: arcConnectsEmitters(runtimeObjectRegistry, geodesicId),
       connection: getGeodesicConnection(runtimeObjectRegistry, geodesicId),
       startCellId: segments[0]?.cellId,
       start: start ? formatVec3(start) : undefined,
@@ -294,9 +279,9 @@ export function createGeodesicDebugDumps(deps: GeodesicDebugDumpsDeps) {
   function collectKnownGeodesicIds(): readonly string[] {
     const ids = new Set<string>();
     for (const object of runtimeObjectRegistry.getAll()) {
-      if (object.kind === "geodesic-segment") {
+      if (object.kind === "geodesicModel/segment") {
         ids.add(object.geodesicId);
-      } else if (object.kind === "geodesic-interval") {
+      } else if (object.kind === "geodesicModel/arc") {
         ids.add(object.id);
       }
     }
@@ -316,7 +301,7 @@ export function createGeodesicDebugDumps(deps: GeodesicDebugDumpsDeps) {
 
     const target = deps.resolveCameraAimTarget();
     const object = target?.object;
-    if (object?.kind === "geodesic-segment") {
+    if (object?.kind === "geodesicModel/segment") {
       return object.geodesicId;
     }
     if (object?.kind === "geodesic-cannon") {

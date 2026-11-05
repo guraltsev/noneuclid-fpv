@@ -3,7 +3,7 @@
  * Pending target values live in the runtime menu state (geometryComputerOptions); the geometry session holds the current and target geometry. All lengths are meters: a is the x skew, b the depth, and the width is fixed.
  * Only worlds whose current or target geometry has kind torus-skew are supported; otherwise the actions refresh the menu as unavailable and do nothing.
  */
-import type { AppSession } from "../../runtime/appSession";
+import type { ClientSession } from "../../runtime/clientSession";
 import type { RuntimeCommand, ShowGeometryComputerActionsPayload } from "../../runtime/runtimeCommands";
 import { createWorldGeometrySession } from "../../runtime/worldGeometrySession";
 import { clampInteger } from "./runtimeSceneUtils";
@@ -13,7 +13,7 @@ export interface GeometryComputerMenuDeps {
   /** Session holding the current and target geometry; setTarget starts the deformation toward a new target. */
   readonly geometrySession: ReturnType<typeof createWorldGeometrySession>;
   /** The shell session; the pending targets are read from its menu state. */
-  readonly session: AppSession;
+  readonly session: ClientSession;
   /** Runs a command through the shell's one command path. */
   dispatch(command: RuntimeCommand): void;
   /** Re-renders the desktop palette/menu UI after a menu state change. */

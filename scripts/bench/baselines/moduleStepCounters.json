@@ -1,0 +1,38 @@
+{
+  "flow": {
+    "steps": 120,
+    "writes": 1557,
+    "scans": {
+      "geodesicMeasurements/angle": 1,
+      "geodesicMeasurements/length": 1,
+      "geodesicModel/arc": 3,
+      "geodesicModel/crossing": 1,
+      "geodesicModel/segment": 120,
+      "geodesicModel/vertex": 3
+    }
+  },
+  "flow+dependents": {
+    "steps": 120,
+    "writes": 1797,
+    "scans": {
+      "geodesicMeasurements/angle": 121,
+      "geodesicMeasurements/length": 120,
+      "geodesicModel/arc": 2,
+      "geodesicModel/crossing": 1,
+      "geodesicModel/segment": 120,
+      "geodesicModel/vertex": 2
+    }
+  },
+  "manyArcs": {
+    "steps": 120,
+    "writes": 126897,
+    "scans": {
+      "geodesicMeasurements/angle": 1,
+      "geodesicMeasurements/length": 1,
+      "geodesicModel/arc": 3,
+      "geodesicModel/crossing": 120,
+      "geodesicModel/segment": 120,
+      "geodesicModel/vertex": 3
+    }
+  }
+}

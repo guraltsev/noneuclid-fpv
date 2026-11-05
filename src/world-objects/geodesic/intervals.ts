@@ -5,12 +5,11 @@ import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex"
 import { transformPoint3, yawRigidTransform3 } from "../../math/rigidTransform3";
 import { addVec3, distanceSquaredVec3, scaleVec3, type Vec3 } from "../../math/vec3";
 import type { RuntimeObjectRegistry, RuntimeWorldObject } from "../runtimeObjectRegistry";
-import { createGeodesicIntervalObject, directionFromYaw, emitterConnectionToleranceMeters, type FreeGeodesicEndObject, GEODESIC_MIN_LENGTH_METERS, type GeodesicCannonObject, type GeodesicCarryPortalTransition, type GeodesicEndRole, type GeodesicIntervalObject, type GeodesicPortalTraversal, type GeodesicTraceBuildResult, getGeodesicCannonEmitterPoint, getOppositeEndRole, intersectionTolerance, isFreeGeodesicEndObject, type LiftedGeodesicEndpoint, minGeodesicSegmentLengthMeters, type TraceGeodesicSegmentResult } from "./objects";
+import { createGeodesicArcObject, directionFromYaw, emitterConnectionToleranceMeters, type GeodesicVertexObject, GEODESIC_MIN_LENGTH_METERS, type GeodesicCannonObject, type GeodesicCarryPortalTransition, type GeodesicEndRole, type GeodesicArcObject, type GeodesicPortalTraversal, type GeodesicTraceBuildResult, getGeodesicCannonEmitterPoint, getOppositeEndRole, intersectionTolerance, isGeodesicVertexObject, type LiftedGeodesicEndpoint, minGeodesicSegmentLengthMeters, type TraceGeodesicSegmentResult, withoutStale } from "./objects";
 import { canObjectAttachGeodesics } from "./anchors";
 import { applyAnchorCrossingTraversals, collectPortalWordFromTraces, portalTraversalFromCarryTransition, portalWordAfterAnchorCrossing, samePortalWord } from "./portalWord";
 import { reduceAdjacentInversePortalTraversals } from "./objects";
 import { traceGeodesicPathForConnectionMode, traceTerminalToBuildTerminal } from "./trace";
-import { requestGeodesicIntersectionUpdate, withDeferredGeodesicIntersections } from "./intersections";
 import {
   getGeodesicEndpointAttachmentsForAnchor,
   isAimableFreeGeodesic,
@@ -23,6 +22,7 @@ import {
   buildDerivedSegmentsFromTraces,
   canConnectGeodesicSegmentAtDistance,
   getGeodesicSegments,
+  nextGeodesicNumber,
   removeGeodesicIntervalAndDerivedObjects,
   replaceDerivedSegmentsFromTraces,
   segmentToTrace,
@@ -53,12 +53,8 @@ export function traceGeodesicFromLiftedChord(input: {
   readonly expectedPortalWord?: readonly GeodesicPortalTraversal[];
   readonly allowUnexpectedPortalWord?: boolean;
 }): GeodesicTraceBuildResult | undefined {
-  return withDeferredGeodesicIntersections(input.registry, () => traceGeodesicFromLiftedChordNow(input));
-}
-
-function traceGeodesicFromLiftedChordNow(input: Parameters<typeof traceGeodesicFromLiftedChord>[0]): GeodesicTraceBuildResult | undefined {
   const interval = input.registry.get(input.geodesicId);
-  if (interval?.kind !== "geodesic-interval" || input.lengthMeters < minGeodesicSegmentLengthMeters) {
+  if (interval?.kind !== "geodesicModel/arc" || input.lengthMeters < minGeodesicSegmentLengthMeters) {
     return undefined;
   }
   const classified = traceAndClassifyChord({
@@ -108,7 +104,7 @@ export type IntervalChordRealization =
 export function realizeIntervalChord(input: {
   readonly world: CompiledCellComplex;
   readonly registry: RuntimeObjectRegistry;
-  readonly interval: GeodesicIntervalObject;
+  readonly interval: GeodesicArcObject;
   readonly candidateAnchorsById?: ReadonlyMap<string, RuntimeWorldObject>;
   readonly allowUnexpectedPortalWord?: boolean;
 }): IntervalChordRealization {
@@ -150,7 +146,7 @@ export function realizeIntervalChord(input: {
 function traceAndClassifyChord(input: {
   readonly world: CompiledCellComplex;
   readonly registry: RuntimeObjectRegistry;
-  readonly interval: GeodesicIntervalObject;
+  readonly interval: GeodesicArcObject;
   readonly sourceCellId: string;
   readonly sourcePoint: Vec3;
   readonly yawRadians: number;
@@ -195,13 +191,18 @@ function traceAndClassifyChord(input: {
 // Commit: replaces the interval's segments by the traces (an `open` last piece becomes `emitter-hit` if the end anchor is an emitter).
 function commitRealizedTraces(
   registry: RuntimeObjectRegistry,
-  interval: GeodesicIntervalObject,
+  interval: GeodesicArcObject,
   traces: readonly TraceGeodesicSegmentResult[],
 ): GeodesicTraceBuildResult {
   const realizedTraces = withAnchoredTargetTerminal(registry, interval, traces);
+  // A successful rebuild clears the transient `stale` mark of a failed one during a carry.
+  const stored = registry.get(interval.id);
+  if (stored?.kind === "geodesicModel/arc" && stored.stale !== undefined) {
+    registry.update(withoutStale(stored));
+  }
   const segments = replaceDerivedSegmentsFromTraces({ registry, geodesicId: interval.id, traces: realizedTraces });
   return {
-    interval,
+    interval: withoutStale(interval),
     segments,
     terminal: traceTerminalToBuildTerminalForInterval(interval, realizedTraces.at(-1), registry),
   };
@@ -225,12 +226,8 @@ export function aimFreeGeodesicFromEndpoint(input: {
   readonly targetPointInEmitterCell: Vec3;
   readonly connectEmitters?: boolean;
 }): GeodesicTraceBuildResult | undefined {
-  return withDeferredGeodesicIntersections(input.registry, () => aimFreeGeodesicFromEndpointNow(input));
-}
-
-function aimFreeGeodesicFromEndpointNow(input: Parameters<typeof aimFreeGeodesicFromEndpoint>[0]): GeodesicTraceBuildResult | undefined {
   const interval = input.registry.get(input.geodesicId);
-  if (interval?.kind !== "geodesic-interval") {
+  if (interval?.kind !== "geodesicModel/arc") {
     return undefined;
   }
   const emitterAttachment = interval[input.emitterEndRole];
@@ -238,7 +235,7 @@ function aimFreeGeodesicFromEndpointNow(input: Parameters<typeof aimFreeGeodesic
   const freeAttachment = interval[freeRole];
   const emitter = input.registry.get(emitterAttachment.anchorObjectId);
   const freeEnd = input.registry.get(freeAttachment.anchorObjectId);
-  if (emitter?.kind !== "geodesic-cannon" || freeEnd?.kind !== "free-geodesic-end") {
+  if (emitter?.kind !== "geodesic-cannon" || freeEnd?.kind !== "geodesicModel/vertex") {
     return undefined;
   }
   // A free end shared with another attachment (e.g. a curve-shortening vertex) must not be dragged around.
@@ -284,7 +281,7 @@ function aimFreeGeodesicFromEndpointNow(input: Parameters<typeof aimFreeGeodesic
   };
   input.registry.update(nextFreeEnd);
 
-  let nextInterval: GeodesicIntervalObject = {
+  let nextInterval: GeodesicArcObject = {
     ...interval,
     startCellId: emitter.cellId,
     cellId: emitter.cellId,
@@ -304,7 +301,6 @@ function aimFreeGeodesicFromEndpointNow(input: Parameters<typeof aimFreeGeodesic
       geodesicId: input.geodesicId,
     });
     if (rebuilt) {
-      requestGeodesicIntersectionUpdate(input.registry);
       return {
         interval: rebuilt.interval,
         segments: rebuilt.segments,
@@ -318,7 +314,6 @@ function aimFreeGeodesicFromEndpointNow(input: Parameters<typeof aimFreeGeodesic
     geodesicId: input.geodesicId,
     traces,
   });
-  requestGeodesicIntersectionUpdate(input.registry);
   return {
     interval: nextInterval,
     segments,
@@ -360,26 +355,24 @@ export function rebuildDerivedGeodesicSegmentsDetailed(input: {
   readonly realization: IntervalChordRealization | undefined;
   readonly result: GeodesicTraceBuildResult | undefined;
 } {
-  return withDeferredGeodesicIntersections(input.registry, () => {
-    const interval = input.registry.get(input.geodesicId);
-    if (interval?.kind !== "geodesic-interval") {
-      return { realization: undefined, result: undefined };
-    }
-    const realization = realizeIntervalChord({
-      world: input.world,
-      registry: input.registry,
-      interval,
-      allowUnexpectedPortalWord: input.allowUnexpectedPortalWord,
-    });
-    if (realization.kind === "degenerate") {
-      // The endpoints coincide in the development: the geodesic is degenerate, so the interval and everything derived from it is DELETED.
-      removeGeodesicIntervalAndDerivedObjects(input.registry, input.geodesicId);
-    }
-    return {
-      realization,
-      result: realization.kind === "ok" ? commitRealizedTraces(input.registry, interval, realization.traces) : undefined,
-    };
+  const interval = input.registry.get(input.geodesicId);
+  if (interval?.kind !== "geodesicModel/arc") {
+    return { realization: undefined, result: undefined };
+  }
+  const realization = realizeIntervalChord({
+    world: input.world,
+    registry: input.registry,
+    interval,
+    allowUnexpectedPortalWord: input.allowUnexpectedPortalWord,
   });
+  if (realization.kind === "degenerate") {
+    // The endpoints coincide in the development: the geodesic is degenerate, so the interval and everything derived from it is DELETED.
+    removeGeodesicIntervalAndDerivedObjects(input.registry, input.geodesicId);
+  }
+  return {
+    realization,
+    result: realization.kind === "ok" ? commitRealizedTraces(input.registry, interval, realization.traces) : undefined,
+  };
 }
 /**
  * Splits a free geodesic at a point on one of its segments, ending the first part at a newly placed emitter.
@@ -400,17 +393,13 @@ export function splitGeodesicIntervalAtSegmentHit(input: {
   readonly distanceAlongSegmentMeters: number;
   readonly placedEmitterId: string;
   readonly createContinuationGeodesicId: (sourceGeodesicId: string, sideIndex: number) => string;
-}): readonly GeodesicIntervalObject[] {
-  return withDeferredGeodesicIntersections(input.registry, () => splitGeodesicIntervalAtSegmentHitNow(input));
-}
-
-function splitGeodesicIntervalAtSegmentHitNow(input: Parameters<typeof splitGeodesicIntervalAtSegmentHit>[0]): readonly GeodesicIntervalObject[] {
+}): readonly GeodesicArcObject[] {
   const interval = input.registry.get(input.geodesicId);
   const segment = input.registry.get(input.segmentId);
   const placed = input.registry.get(input.placedEmitterId);
   if (
-    interval?.kind !== "geodesic-interval" ||
-    segment?.kind !== "geodesic-segment" ||
+    interval?.kind !== "geodesicModel/arc" ||
+    segment?.kind !== "geodesicModel/segment" ||
     segment.geodesicId !== input.geodesicId ||
     placed?.kind !== "geodesic-cannon" ||
     !isAimableFreeGeodesic(input.registry, interval)
@@ -429,13 +418,13 @@ function splitGeodesicIntervalAtSegmentHitNow(input: Parameters<typeof splitGeod
   const prefixLengthMeters = totalLengthThroughSegment(segments, segment, clampedDistance);
   const continuationLengthMeters = totalLengthMeters - prefixLengthMeters;
   // `freeRole` holds the free end, the other role is the original source emitter.
-  const freeRole: GeodesicEndRole = input.registry.get(interval.start.anchorObjectId)?.kind === "free-geodesic-end"
+  const freeRole: GeodesicEndRole = input.registry.get(interval.start.anchorObjectId)?.kind === "geodesicModel/vertex"
     ? "start"
     : "end";
   const sourceRole = getOppositeEndRole(freeRole);
   const sourceAnchor = input.registry.get(interval[sourceRole].anchorObjectId);
   const freeEnd = input.registry.get(interval[freeRole].anchorObjectId);
-  if (sourceAnchor?.kind !== "geodesic-cannon" || freeEnd?.kind !== "free-geodesic-end") {
+  if (sourceAnchor?.kind !== "geodesic-cannon" || freeEnd?.kind !== "geodesicModel/vertex") {
     return [];
   }
 
@@ -457,12 +446,12 @@ function splitGeodesicIntervalAtSegmentHitNow(input: Parameters<typeof splitGeod
     : undefined;
   // The continuation takes over the old free end: placed emitter -> old free end. Its word/geometry is filled in by rebuildContinuationFromCut.
   if (continuationId) {
-    input.registry.add(createGeodesicIntervalObject({
+    input.registry.add(createGeodesicArcObject({
       id: continuationId,
       startAnchorObjectId: placed.id,
       endAnchorObjectId: freeEnd.id,
       startCellId: placed.cellId,
-      motionState: "stable",
+      geodesicNumber: nextGeodesicNumber(input.registry),
     }));
   }
   // Shorten the original interval: its free role now attaches to the placed emitter, and its portal word becomes the prefix word.
@@ -498,9 +487,8 @@ function splitGeodesicIntervalAtSegmentHitNow(input: Parameters<typeof splitGeod
   removeUnusedFreeGeodesicEnds(input.registry);
   if (continuationId) {
   }
-  requestGeodesicIntersectionUpdate(input.registry);
   return [input.registry.get(input.geodesicId), continuationId ? input.registry.get(continuationId) : undefined]
-    .filter((object): object is GeodesicIntervalObject => object?.kind === "geodesic-interval");
+    .filter((object): object is GeodesicArcObject => object?.kind === "geodesicModel/arc");
 }
 
 /**
@@ -533,14 +521,8 @@ export function rebuildLockedGeodesicFromEndpointsAndPortalWord(input: {
 export function rebuildLockedGeodesicFromEndpointsAndPortalWordDetailed(
   input: Parameters<typeof rebuildLockedGeodesicFromEndpointsAndPortalWord>[0],
 ): ReturnType<typeof rebuildDerivedGeodesicSegmentsDetailed> {
-  return withDeferredGeodesicIntersections(input.registry, () => rebuildLockedGeodesicDetailedNow(input));
-}
-
-function rebuildLockedGeodesicDetailedNow(
-  input: Parameters<typeof rebuildLockedGeodesicFromEndpointsAndPortalWord>[0],
-): ReturnType<typeof rebuildDerivedGeodesicSegmentsDetailed> {
   const interval = input.registry.get(input.geodesicId);
-  if (interval?.kind !== "geodesic-interval") {
+  if (interval?.kind !== "geodesicModel/arc") {
     return { realization: undefined, result: undefined };
   }
 
@@ -574,9 +556,6 @@ function rebuildLockedGeodesicDetailedNow(
     ...input,
     allowUnexpectedPortalWord: input.allowOutOfBoundsCarriedEndpoint,
   });
-  if (rebuilt.result) {
-    requestGeodesicIntersectionUpdate(input.registry);
-  }
   return rebuilt;
 }
 
@@ -614,7 +593,7 @@ export function updateLockedGeodesicPortalWordForCarriedAnchorTraversals(input: 
   readonly traversals: readonly GeodesicPortalTraversal[];
 }): readonly GeodesicPortalTraversal[] | undefined {
   const interval = input.registry.get(input.geodesicId);
-  if (interval?.kind !== "geodesic-interval") {
+  if (interval?.kind !== "geodesicModel/arc") {
     return undefined;
   }
 
@@ -650,7 +629,7 @@ export function updateLockedGeodesicPortalWordForCarriedAnchorTraversals(input: 
 export function previewRebuildGeodesicInterval(input: {
   readonly world: CompiledCellComplex;
   readonly registry: RuntimeObjectRegistry;
-  readonly interval: GeodesicIntervalObject;
+  readonly interval: GeodesicArcObject;
   readonly candidateAnchorsById?: ReadonlyMap<string, RuntimeWorldObject>;
 }): GeodesicIntervalPreview | undefined {
   // The realized path must cross exactly the stored word; a wall hit or zone hit anywhere along the way also rejects the preview.
@@ -692,7 +671,7 @@ export interface GeodesicIntervalPreview extends GeodesicTraceBuildResult {
 // conjugates the word; see `portalWordAfterAnchorCrossing`), then reduced and validated against the endpoint cells. Returns `undefined` whenever the candidate word is inconsistent.
 function resolveCarriedIntervalPortalWord(input: {
   readonly world: CompiledCellComplex;
-  readonly interval: GeodesicIntervalObject;
+  readonly interval: GeodesicArcObject;
   readonly registry: RuntimeObjectRegistry;
   readonly carriedAnchorObjectId?: string;
   readonly carriedAnchorBeforeMove?: GeodesicCannonObject;
@@ -821,10 +800,10 @@ function carriedTransitionMatchesAnchorMove(
 }
 
 // Names the free-end object of a trace that simply ran out. With a registry the end anchor is identified by its object kind
-// (`isFreeGeodesicEndObject`); the "free-end" id-substring heuristic is only a fallback when no registry is available or the anchor
+// (`isGeodesicVertexObject`); the "free-end" id-substring heuristic is only a fallback when no registry is available or the anchor
 // is not registered. A non-free anchor yields an empty `freeEndObjectId`.
 function traceTerminalToBuildTerminalForInterval(
-  interval: GeodesicIntervalObject,
+  interval: GeodesicArcObject,
   tail: TraceGeodesicSegmentResult | undefined,
   registry?: RuntimeObjectRegistry,
 ): GeodesicTraceBuildResult["terminal"] {
@@ -835,7 +814,7 @@ function traceTerminalToBuildTerminalForInterval(
   const endAnchorId = interval.end.anchorObjectId;
   const endAnchor = registry?.get(endAnchorId);
   const endsAtFreeEnd = endAnchor
-    ? isFreeGeodesicEndObject(endAnchor)
+    ? isGeodesicVertexObject(endAnchor)
     : endAnchorId.startsWith(`${interval.id}:free-end`) || endAnchorId.includes("free-end");
   return endsAtFreeEnd ? { kind: "free-end", freeEndObjectId: endAnchorId } : terminal;
 }
@@ -848,7 +827,7 @@ function rebuildContinuationFromCut(input: {
   readonly registry: RuntimeObjectRegistry;
   readonly geodesicId: string;
   readonly placed: GeodesicCannonObject;
-  readonly freeEnd: FreeGeodesicEndObject;
+  readonly freeEnd: GeodesicVertexObject;
   readonly yawRadians: number;
   readonly lengthMeters: number;
 }): void {
@@ -876,7 +855,7 @@ function rebuildContinuationFromCut(input: {
     localPose: yawRigidTransform3(0, terminalPoint),
   });
   const interval = input.registry.get(input.geodesicId);
-  if (interval?.kind !== "geodesic-interval") {
+  if (interval?.kind !== "geodesicModel/arc") {
     return;
   }
   input.registry.update({

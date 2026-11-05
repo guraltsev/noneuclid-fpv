@@ -239,7 +239,7 @@ export function findNearestEmitterHitOnTrace(input: {
   // An emitter the geodesic is already attached to is not a hit (only the source emitter, handled below, is exempt from that).
   const interval = input.geodesicId ? input.registry.get(input.geodesicId) : undefined;
   const isAttached = (emitterId: string): boolean =>
-    interval?.kind === "geodesic-interval" && (interval.start.anchorObjectId === emitterId || interval.end.anchorObjectId === emitterId);
+    interval?.kind === "geodesicModel/arc" && (interval.start.anchorObjectId === emitterId || interval.end.anchorObjectId === emitterId);
 
   for (const object of input.registry.getObjectsInCell(input.cellId)) {
     if (object.kind !== "geodesic-cannon") {

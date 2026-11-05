@@ -4,7 +4,7 @@
  * They are installed while the active deformation is a torus skew or the debug level is not `off`, and removed otherwise. The module
  * keeps no state: it reads the geometry session and the debug settings each time it is asked to install.
  */
-import type { AppSession } from "../../runtime/appSession";
+import type { ClientSession } from "../../runtime/clientSession";
 import { setApiNamespace } from "../../runtime/publicApi";
 import type { WorldGeometrySession } from "../../runtime/worldGeometrySession";
 import {
@@ -15,7 +15,7 @@ import {
 
 /** Dependencies of {@link createGeometryDebugHelpers}. */
 export interface GeometryDebugHelpersDeps {
-  readonly session: AppSession;
+  readonly session: ClientSession;
   readonly geometrySession: WorldGeometrySession;
 }
 

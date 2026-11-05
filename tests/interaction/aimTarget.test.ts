@@ -18,14 +18,17 @@ import { transformPoint3, yawRigidTransform3 } from "../../src/math/rigidTransfo
 import { createPlacedFlagObject } from "../../src/world-objects/placedFlags";
 import { createRuntimeObjectRegistry } from "../../src/world-objects/runtimeObjectRegistry";
 import {
+  createGeodesicArcObject,
   createGeodesicCannonObject,
+  createGeodesicVertexObject,
   geodesicRayBeamHeightMeters,
-  type GeodesicIntersectionObject,
+  type GeodesicCrossingObject,
   type GeodesicSegmentObject,
 } from "../../src/world-objects/geodesic/objects";
 import { createProtractorAngleObject } from "../../src/world-objects/protractorTool";
 import { getGeodesicEmitterAimSphereCenter, resolveAimTarget, resolveAimTargets, type AimRay } from "../../src/interaction/aimTarget";
 import { normalizeVec3, subVec3 } from "../../src/math/vec3";
+import { isTied } from "../../src/world-objects/geodesic/endpoints";
 import { addGeodesicLeavingEmitter } from "../fixtures/world-objects/geodesic";
 
 describe("resolveAimTarget", () => {
@@ -189,6 +192,27 @@ describe("resolveAimTarget", () => {
     expect(target?.object?.id).toBe("segment-a");
     expect(target?.localPoint.x).toBeCloseTo(0);
     expect(target?.localPoint.z).toBeCloseTo(1.08);
+  });
+
+  it("resolves a segment of a tied arc like any other segment", () => {
+    const world = compileCellComplex(singleRoomWorld());
+    const segment = createGeodesicSegment({ geodesicId: "g-tied", connectionState: "open" });
+    const registry = createRuntimeObjectRegistry([
+      createGeodesicCannonObject({ id: "e1", cellId: "room", localPose: yawRigidTransform3(0, { x: -3, y: 2, z: 0 }) }),
+      createGeodesicCannonObject({ id: "e2", cellId: "room", localPose: yawRigidTransform3(0, { x: 3, y: 2, z: 0 }) }),
+      createGeodesicVertexObject({ id: "v", cellId: "room", point: { x: 0, y: 0, z: 1.08 } }),
+      createGeodesicArcObject({ id: "g-tied", startAnchorObjectId: "e1", endAnchorObjectId: "v", startCellId: "room" }),
+      createGeodesicArcObject({ id: "g-other", startAnchorObjectId: "v", endAnchorObjectId: "e2", startCellId: "room" }),
+      segment,
+    ]);
+    expect(isTied(registry, "g-tied")).toBe(true);
+    const rootPath = buildPortalPathTables(world, { maxDepth: 0 }).tablesByRootCellId.get("room")!.pathsById.get(0)!;
+    const ray = aimRayLookingAt({ x: 0, y: -2, z: 1.08 }, { x: 0, y: 0, z: 1.08 });
+
+    const target = resolveAimTarget({ world, registry, ray, rootCellId: rootPath.destinationCellId });
+
+    expect(target?.kind).toBe("object");
+    expect(target?.object?.id).toBe("segment-a");
   });
 
   it("resolves geodesic ray segments near an emitter with a missed hitbox", () => {
@@ -419,7 +443,7 @@ describe("resolveAimTarget", () => {
 
     expect(target?.kind).toBe("object");
     expect(target?.object?.id).toBe("vertex-a");
-    expect(target?.object?.kind).toBe("geodesic-intersection");
+    expect(target?.object?.kind).toBe("geodesicModel/crossing");
   });
 
   it("prioritizes geodesic emitters over overlapping geodesic intersection balloons", () => {
@@ -961,7 +985,7 @@ function squareBase(): readonly { readonly x: number; readonly y: number }[] {
 function createGeodesicSegment(overrides: Partial<GeodesicSegmentObject> = {}): GeodesicSegmentObject {
   return {
     id: "segment-a",
-    kind: "geodesic-segment",
+    kind: "geodesicModel/segment",
     cellId: "room",
     localPose: yawRigidTransform3(0, { x: -0.5, y: 0, z: 1.08 }),
     portalRenderable: true,
@@ -979,10 +1003,10 @@ function createGeodesicSegment(overrides: Partial<GeodesicSegmentObject> = {}): 
   };
 }
 
-function createGeodesicIntersection(overrides: Partial<GeodesicIntersectionObject> = {}): GeodesicIntersectionObject {
+function createGeodesicIntersection(overrides: Partial<GeodesicCrossingObject> = {}): GeodesicCrossingObject {
   return {
     id: "vertex-a",
-    kind: "geodesic-intersection",
+    kind: "geodesicModel/crossing",
     cellId: "room",
     localPose: yawRigidTransform3(0, { x: 0, y: 0, z: 1.23 }),
     portalRenderable: true,

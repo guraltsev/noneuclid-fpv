@@ -29,7 +29,7 @@ export interface PlacedFlagObject extends RuntimeWorldObjectBase {
  * `lengthMeters` is the total length of all segments of `geodesicId` (across every cell), while `labelPoint` and `segmentId` identify where, in `cellId`'s frame, the label is anchored.
  */
 export interface MeasuredGeodesicLengthObject extends RuntimeWorldObjectBase {
-  readonly kind: "measured-geodesic-length";
+  readonly kind: "geodesicMeasurements/length";
   /** Id of the measured geodesic interval. */
   readonly geodesicId: string;
   /** Optional display name used in place of `geodesicId` in the label text. */
@@ -47,7 +47,7 @@ export interface MeasuredGeodesicLengthObject extends RuntimeWorldObjectBase {
  * `localPose` is the centre point with the first ray's yaw, `cellId` is the centre's cell, and all points are in that cell's local frame (meters). `angleRadians` is counterclockwise from `first` to `second` in [0, 2π).
  */
 export interface ProtractorAngleObject extends RuntimeWorldObjectBase {
-  readonly kind: "protractor-angle";
+  readonly kind: "geodesicMeasurements/angle";
   /** Id of the cannon or intersection object at the vertex; the angle is recomputed from it on refresh. */
   readonly centerObjectId: string;
   /** Vertex position in the cell-local frame (meters). */

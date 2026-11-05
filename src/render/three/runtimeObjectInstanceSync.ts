@@ -12,7 +12,10 @@
  * (`carryHighlight.ts`) at the object's place and at its own portal ghosts, decided by the shape's reach, so it is whole on whichever side of a portal the viewer is.
  * It never touches the selectable-hitbox debug meshes.
  */
-import type { AppSession } from "../../runtime/appSession";
+import { localParticipantId, readLocalPlayerPose, type WorldEngine } from "../../engine/worldEngine";
+import { participantAttachment } from "../../engine/moduleTypes";
+import { carryAttachmentKind } from "../../modules/carry/api";
+import type { ClientSession } from "../../runtime/clientSession";
 import type * as THREE from "three";
 import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex";
 import type { RuntimeObjectRegistry, RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
@@ -83,7 +86,9 @@ export interface RuntimeObjectInstanceSyncDeps {
   readonly diagnostics: RuntimeObjectRenderArchetypeDiagnostics;
   getWorld(): CompiledCellComplex;
   /** The shell session: player pose, debug settings and the cannon tool state are read from it. */
-  readonly session: AppSession;
+  readonly session: ClientSession;
+  /** The world engine; the player's pose is read from it. */
+  readonly engine: WorldEngine;
   /** Builds a new archetype and installs whatever hooks the shell needs on its mesh. */
   buildArchetype(source: RuntimeObjectRenderSourceMesh, capacity: number): RuntimeObjectRenderArchetype;
 }
@@ -247,7 +252,7 @@ export function createRuntimeObjectInstanceSync(deps: RuntimeObjectInstanceSyncD
     };
 
     // The highlight shape exists as an archetype only while something is carried.
-    const carriedId = deps.session.get().carry?.objectId;
+    const carriedId = participantAttachment(deps.engine.read.participant(localParticipantId), carryAttachmentKind)?.objectId;
     if (carriedId !== undefined && objects.some((object) => object.id === carriedId)) {
       addSource(carryHighlightSource);
     }
@@ -331,13 +336,13 @@ export function createRuntimeObjectInstanceSync(deps: RuntimeObjectInstanceSyncD
     const prefix = geodesic ? "" : runtimeObjectArchetypeKeyPrefix(object);
     const archetypeKeys = geodesic ? deps.geodesicArchetypeKeys : archetypeKeysForObject(object, prefix);
 
-    if (geodesic && object.kind === "geodesic-segment") {
+    if (geodesic && object.kind === "geodesicModel/segment") {
       // A segment is computed per cell and continues as the next segment: it has no body parts to ghost.
       return [{
         partId: object.id,
         source: "geodesic-segments",
         archetypeKeys,
-        exemption: "geodesic-segment",
+        exemption: "geodesicModel/segment",
         records: () => collectGeodesicRuntimeRenderRecords(registry, object, deps.geodesicArchetypeKeys),
       }];
     }
@@ -379,7 +384,7 @@ export function createRuntimeObjectInstanceSync(deps: RuntimeObjectInstanceSyncD
     }
 
     const roverKeys = archetypeKeysByPrefix.get(rover.archetypeKeyPrefix) ?? noKeys;
-    const placement = rover.placement(deps.session.get().playerPose);
+    const placement = rover.placement(readLocalPlayerPose(deps.engine));
 
     if (roverKeys.length === 0) {
       return { partId: placement.id, source: "player-rover", archetypeKeys: roverKeys, exemption: "nothing-drawn", records: () => [] };
@@ -416,7 +421,7 @@ export function createRuntimeObjectInstanceSync(deps: RuntimeObjectInstanceSyncD
     const seenIds = new Set<string>();
     const groups: PortalGhostedRecords[] = [];
     const groupSources: RuntimeObjectRecordSource[] = [];
-    const carriedId = deps.session.get().carry?.objectId;
+    const carriedId = participantAttachment(deps.engine.read.participant(localParticipantId), carryAttachmentKind)?.objectId;
     let carriedObject: RuntimeWorldObject | undefined;
 
     for (const object of objects) {
@@ -431,7 +436,7 @@ export function createRuntimeObjectInstanceSync(deps: RuntimeObjectInstanceSyncD
       }
       const prefix = geodesic ? "" : runtimeObjectArchetypeKeyPrefix(object);
       const archetypeKeys = geodesic ? deps.geodesicArchetypeKeys : archetypeKeysForObject(object, prefix);
-      const source: RuntimeObjectRecordSource = !geodesic ? "runtime-objects" : object.kind === "geodesic-segment" ? "geodesic-segments" : "geodesic-body-parts";
+      const source: RuntimeObjectRecordSource = !geodesic ? "runtime-objects" : object.kind === "geodesicModel/segment" ? "geodesic-segments" : "geodesic-body-parts";
       const cached = recordCacheByObjectId.get(object.id);
       const headsKey = emitterHeadsKey(registry, object);
 
@@ -441,7 +446,7 @@ export function createRuntimeObjectInstanceSync(deps: RuntimeObjectInstanceSyncD
         continue;
       }
 
-      if (!(geodesic && object.kind === "geodesic-segment")) {
+      if (!(geodesic && object.kind === "geodesicModel/segment")) {
         stats.ghostComputations += 1;
       }
       const objectRecords = recordsOfParts(ghostPartsOfObject(object, world));

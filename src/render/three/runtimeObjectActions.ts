@@ -3,16 +3,18 @@
  * the protractor, the primary interaction and context menu of the focused object, going home, resetting the world, and the
  * debug pose helpers.
  *
- * It owns no state: menu, tool, serial and pose state are read from the session and changed by commands through `dispatch`;
+ * It owns no state: menu and tool state are read from the session, the pose from the engine and changed by commands through `dispatch`;
  * the registry and the tool-object runtimes are mutated directly. Poses are cell-local meters; yaws are radians about +z
- * (the debug helpers take degrees). Ids of new objects embed `Date.now()` plus a per-kind session serial.
+ * (the debug helpers take degrees). Ids of new objects come from the engine.
  */
+import type { ObjectActionEntry } from "../../engine/moduleTypes";
+import { publishLocalPlayerPose, readLocalPlayerPose, type WorldEngine } from "../../engine/worldEngine";
 import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex";
 import { isRuntimeToolEnabled, type AppConfig } from "../../glue/appConfig";
 import { yawRigidTransform3 } from "../../math/rigidTransform3";
 import type { PlayerPose } from "../../movement/playerPose";
 import type { AimTarget } from "../../interaction/aimTarget";
-import { takeObjectIdSerial, type AppSession } from "../../runtime/appSession";
+import type { ClientSession } from "../../runtime/clientSession";
 import { getEmitterGeodesicIds } from "../../world-objects/geodesic/endpoints";
 import type { RuntimeCommand, ShowGeometryComputerActionsPayload } from "../../runtime/runtimeCommands";
 import { createMeasuredGeodesicLengthObject } from "../../world-objects/measureLengthTool";
@@ -42,7 +44,9 @@ import type * as THREE from "three";
 /** Dependencies of the runtime-object actions, supplied by createThreeApp's shell. */
 export interface RuntimeObjectActionsDeps {
   /** The shell session; menu, tool, serial and pose state are read from it. */
-  readonly session: AppSession;
+  readonly session: ClientSession;
+  /** The world engine: the player's pose, the object ids and the pose writes of reset and teleport. */
+  readonly engine: WorldEngine;
   /** Runs a command through the shell's one command path. */
   dispatch(command: RuntimeCommand): void;
   /** Registry of runtime objects; mutated directly. */
@@ -79,8 +83,8 @@ export interface RuntimeObjectActionsDeps {
   getGeodesicLabelsById(geodesicIds: readonly string[]): Readonly<Record<string, string>>;
   /** Ids among the given geodesics that are locked. */
   getLockedGeodesicIds(geodesicIds: readonly string[]): readonly string[];
-  /** True when the cannon has geodesics the tie-and-detach tool can join. */
-  canTieAndDetachGeodesicsFromCannon(cannonId: string): boolean;
+  /** The actions the tools contribute to the menu page of an object (design 013 section 8.3), with their availability now. */
+  objectActionsFor(objectKind: string, objectId: string): readonly ObjectActionEntry[];
   /** Menu options of the geometry computer object with this id. */
   createGeometryComputerMenuOptions(objectId: string): ShowGeometryComputerActionsPayload;
   /** Builds or refreshes the drawn copy of a sign. */
@@ -156,6 +160,7 @@ export interface RuntimeObjectActions {
 export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): RuntimeObjectActions {
   const {
     session,
+    engine,
     runtimeObjectRegistry,
     getWorld: activeWorld,
     appConfig,
@@ -172,7 +177,7 @@ export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): Runt
     getGeodesicDisplayName,
     getGeodesicLabelsById,
     getLockedGeodesicIds,
-    canTieAndDetachGeodesicsFromCannon,
+    objectActionsFor,
     createGeometryComputerMenuOptions,
     syncPlacedFlagRuntime,
     removePlacedFlagRuntime,
@@ -260,7 +265,7 @@ export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): Runt
       eyePosition: target.localEyePosition,
       floorPoint: target.localPoint,
       flagType: currentMenuState().placeFlagOptions.flagType,
-      id: `placed-flag:${Date.now()}:${takeObjectIdSerial(session, "placed-flag")}`,
+      id: engine.ids.next("placed-flag"),
     });
 
     if (result.placed && result.object) {
@@ -277,21 +282,21 @@ export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): Runt
 
     const target = resolveCurrentAimTarget(ray);
     logVerboseAimClick(target);
-    if (!targetIsWithinInteractionRange(target) || target?.object?.kind !== "geodesic-segment") {
+    if (!targetIsWithinInteractionRange(target) || target?.object?.kind !== "geodesicModel/segment") {
       return;
     }
 
     const geodesicId = target.object.geodesicId;
     const existing = runtimeObjectRegistry.getAll().find((object) =>
-      object.kind === "measured-geodesic-length" && object.geodesicId === geodesicId
+      object.kind === "geodesicMeasurements/length" && object.geodesicId === geodesicId
     );
     const measurement = createMeasuredGeodesicLengthObject({
-      id: existing?.id ?? `measured-geodesic-length:${Date.now()}:${takeObjectIdSerial(session, "measured-geodesic-length")}`,
+      id: existing?.id ?? engine.ids.next("measured-geodesic-length"),
       registry: runtimeObjectRegistry,
       world: activeWorld(),
       geodesicId,
-      playerCellId: session.get().playerPose.cellId,
-      playerPoint: session.get().playerPose.position,
+      playerCellId: readLocalPlayerPose(engine).cellId,
+      playerPoint: readLocalPlayerPose(engine).position,
       label: getGeodesicDisplayName(geodesicId),
       fallbackSegment: target.object,
     });
@@ -323,7 +328,7 @@ export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): Runt
           ...deps.initialPlayerPose,
           cellId: fallbackCell?.id ?? deps.initialPlayerPose.cellId,
         };
-    dispatchRuntimeCommand({ kind: "set-player-pose", pose: homePose });
+    publishLocalPlayerPose(engine, homePose);
     xrRig.reset();
   }
 
@@ -339,7 +344,7 @@ export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): Runt
   }
 
   function debugPlayerPose(): PlayerPoseDebugDump {
-    const pose = session.get().playerPose;
+    const pose = readLocalPlayerPose(engine);
     const round = (value: number): number => Math.round(value * 1e6) / 1e6;
     return {
       cellId: pose.cellId,
@@ -356,15 +361,12 @@ export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): Runt
     if (![x, y, yawDegrees, pitchDegrees ?? 0].every(Number.isFinite)) {
       throw new Error("setPlayerPose needs finite numbers");
     }
-    const current = session.get().playerPose;
-    dispatchRuntimeCommand({
-      kind: "set-player-pose",
-      pose: {
-        cellId,
-        position: { x, y, z: 0 },
-        yawRadians: (yawDegrees * Math.PI) / 180,
-        pitchRadians: pitchDegrees === undefined ? current.pitchRadians : (pitchDegrees * Math.PI) / 180,
-      },
+    const current = readLocalPlayerPose(engine);
+    publishLocalPlayerPose(engine, {
+      cellId,
+      position: { x, y, z: 0 },
+      yawRadians: (yawDegrees * Math.PI) / 180,
+      pitchRadians: pitchDegrees === undefined ? current.pitchRadians : (pitchDegrees * Math.PI) / 180,
     });
     return debugPlayerPose();
   }
@@ -401,7 +403,7 @@ export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): Runt
     }
 
     if (!protractor.center) {
-      if (target?.object?.kind !== "geodesic-cannon" && target?.object?.kind !== "geodesic-intersection") {
+      if (target?.object?.kind !== "geodesic-cannon" && target?.object?.kind !== "geodesicModel/crossing") {
         return;
       }
 
@@ -431,7 +433,7 @@ export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): Runt
     }
 
     const angle = createProtractorAngleObject({
-      id: `protractor-angle:${Date.now()}:${takeObjectIdSerial(session, "protractor-angle")}`,
+      id: engine.ids.next("protractor-angle"),
       center: protractor.center,
       first: protractor.first,
       second: selected,
@@ -446,7 +448,7 @@ export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): Runt
 
   function tryRemoveFocusedProtractorAngle(ray?: RootAimRay): boolean {
     const focused = findFocusedRuntimeObject(ray);
-    if (focused?.object.kind !== "protractor-angle") {
+    if (focused?.object.kind !== "geodesicMeasurements/angle") {
       return false;
     }
 
@@ -459,7 +461,7 @@ export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): Runt
 
   function tryRemoveFocusedMeasuredGeodesicLength(ray?: RootAimRay): boolean {
     const focused = findFocusedRuntimeObject(ray);
-    if (focused?.object.kind !== "measured-geodesic-length") {
+    if (focused?.object.kind !== "geodesicMeasurements/length") {
       return false;
     }
 
@@ -483,11 +485,11 @@ export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): Runt
     switch (target?.object?.kind) {
       case "asset":
         return tryOpenFocusedQuestionHelp(target.object);
-      case "geodesic-segment":
+      case "geodesicModel/segment":
         return tryExtendFocusedGeodesicFromAim(ray);
-      case "measured-geodesic-length":
+      case "geodesicMeasurements/length":
         return tryRemoveFocusedMeasuredGeodesicLength(ray);
-      case "protractor-angle":
+      case "geodesicMeasurements/angle":
         return tryRemoveFocusedProtractorAngle(ray);
       default:
         return false;
@@ -549,7 +551,7 @@ export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): Runt
         geodesicIds,
         geodesicLabelsById: getGeodesicLabelsById(geodesicIds),
         lockedGeodesicIds: getLockedGeodesicIds(geodesicIds),
-        canTieAndDetach: canTieAndDetachGeodesicsFromCannon(focused.object.id),
+        objectActions: objectActionsFor("geodesic-cannon", focused.object.id),
       });
       return true;
     }

@@ -1,21 +1,17 @@
 /**
- * Scene-graph runtimes for placed flags, measured lengths, and protractor angles: sync, removal, and refresh.
+ * Scene-graph runtimes for placed flags, measured lengths, and protractor angles: sync and removal.
  *
  * Bridges the runtime object registry (the source of truth for tool-created objects) and their Three.js
  * runtimes: `sync*` creates or updates a runtime from a registry object, `remove*` disposes a runtime and drops
- * its bookkeeping (and, for measurements and angles, cached instanced-render state), and `refresh*` recomputes
- * derived measurements after geodesics move, updating the registry and runtime only when something changed and
- * deleting objects that can no longer be recomputed. All maps are owned by createThreeApp and mutated in place;
+ * its bookkeeping (and, for measurements and angles, cached instanced-render state), and `syncLabelRuntimesFromJournal`
+ * brings the label runtimes up to date with the length and angle records the derive ticks of the geodesic measurements module wrote
+ * (those ticks, not this file, recompute the values). All maps are owned by createThreeApp and mutated in place;
  * poses are cell-local (meters, radians). Removing a registry object does not itself dispose its runtime,
  * so each removal path here pairs the two.
  */
-import type { AppSession } from "../../runtime/appSession";
+import type { ClientSession } from "../../runtime/clientSession";
 import type { RuntimeCommand } from "../../runtime/runtimeCommands";
 import * as THREE from "three";
-import { type CompiledCellComplex } from "../../cell-complex/compileCellComplex";
-import { refreshMeasuredGeodesicLengthObject } from "../../world-objects/measureLengthTool";
-import { refreshProtractorAngleObject } from "../../world-objects/protractorTool";
-import { type ProtractorAngleObject } from "../../world-objects/toolObjects";
 import { type RuntimeObjectRegistry, type RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
 import {
   MeasuredGeodesicLengthRuntime,
@@ -52,10 +48,8 @@ export interface ToolObjectRuntimesDeps {
   readonly runtimeObjectRenderArchetypesByKey: Map<string, RuntimeObjectRenderArchetype>;
   /** Parent object of the instanced archetype meshes. */
   readonly runtimeObjectRenderRoot: THREE.Object3D;
-  /** Getter for the active compiled world, used to re-measure lengths against geodesic parts seen through portals. */
-  getWorld(): CompiledCellComplex;
   /** The shell session: player pose, debug settings and the cannon tool state are read from it. */
-  readonly session: AppSession;
+  readonly session: ClientSession;
   /** Runs a command through the shell's one command path. */
   dispatch(command: RuntimeCommand): void;
   /** Removes the in-scene protractor preview feedback. */
@@ -121,7 +115,7 @@ export function createToolObjectRuntimes(deps: ToolObjectRuntimesDeps) {
   }
 
   function syncMeasuredGeodesicLengthRuntime(object: RuntimeWorldObject): void {
-    if (object.kind !== "measured-geodesic-length") {
+    if (object.kind !== "geodesicMeasurements/length") {
       return;
     }
 
@@ -150,7 +144,7 @@ export function createToolObjectRuntimes(deps: ToolObjectRuntimesDeps) {
   }
 
   function syncProtractorAngleRuntime(object: RuntimeWorldObject): void {
-    if (object.kind !== "protractor-angle") {
+    if (object.kind !== "geodesicMeasurements/angle") {
       return;
     }
 
@@ -205,7 +199,7 @@ export function createToolObjectRuntimes(deps: ToolObjectRuntimesDeps) {
 
   function removeMeasuredGeodesicLengths(): void {
     for (const object of runtimeObjectRegistry.getAll()) {
-      if (object.kind === "measured-geodesic-length") {
+      if (object.kind === "geodesicMeasurements/length") {
         runtimeObjectRegistry.remove(object.id);
         removeMeasuredGeodesicLengthRuntime(object.id);
       }
@@ -216,73 +210,16 @@ export function createToolObjectRuntimes(deps: ToolObjectRuntimesDeps) {
 
   function removeMeasuredGeodesicLengthsForGeodesic(geodesicId: string): void {
     for (const object of runtimeObjectRegistry.getAll()) {
-      if (object.kind === "measured-geodesic-length" && object.geodesicId === geodesicId) {
+      if (object.kind === "geodesicMeasurements/length" && object.geodesicId === geodesicId) {
         runtimeObjectRegistry.remove(object.id);
         removeMeasuredGeodesicLengthRuntime(object.id);
       }
     }
   }
 
-  function refreshMeasuredGeodesicLengths(): void {
-    for (const object of runtimeObjectRegistry.getAll()) {
-      if (object.kind !== "measured-geodesic-length") {
-        continue;
-      }
-
-      refreshMeasuredGeodesicLength(object);
-    }
-  }
-
-  function refreshMeasuredGeodesicLengthsForGeodesic(geodesicId: string): void {
-    for (const object of runtimeObjectRegistry.getAll()) {
-      if (object.kind === "measured-geodesic-length" && object.geodesicId === geodesicId) {
-        refreshMeasuredGeodesicLength(object);
-      }
-    }
-  }
-
-  function refreshMeasuredGeodesicLength(
-    object: Extract<RuntimeWorldObject, { readonly kind: "measured-geodesic-length" }>,
-  ): void {
-    // A falsy result means the measurement could not be recomputed: delete the object and its runtime.
-    const refreshed = refreshMeasuredGeodesicLengthObject({
-      registry: runtimeObjectRegistry,
-      world: deps.getWorld(),
-      measurement: object,
-      playerCellId: deps.session.get().playerPose.cellId,
-      playerPoint: deps.session.get().playerPose.position,
-    });
-    if (!refreshed) {
-      runtimeObjectRegistry.remove(object.id);
-      removeMeasuredGeodesicLengthRuntime(object.id);
-      return;
-    }
-
-    // Only the fields that affect rendering are compared; the rotation check covers just m00/m10 (the yaw),
-    // plus the pose translation.
-    const changed =
-      refreshed.cellId !== object.cellId ||
-      refreshed.lengthMeters !== object.lengthMeters ||
-      refreshed.labelPoint.x !== object.labelPoint.x ||
-      refreshed.labelPoint.y !== object.labelPoint.y ||
-      refreshed.labelPoint.z !== object.labelPoint.z ||
-      refreshed.localPose.rotation.m00 !== object.localPose.rotation.m00 ||
-      refreshed.localPose.rotation.m10 !== object.localPose.rotation.m10 ||
-      refreshed.localPose.translation.x !== object.localPose.translation.x ||
-      refreshed.localPose.translation.y !== object.localPose.translation.y ||
-      refreshed.localPose.translation.z !== object.localPose.translation.z ||
-      refreshed.segmentId !== object.segmentId;
-    if (!changed) {
-      return;
-    }
-
-    runtimeObjectRegistry.update(refreshed);
-    syncMeasuredGeodesicLengthRuntime(refreshed);
-  }
-
   function removeProtractorAngles(): void {
     for (const object of runtimeObjectRegistry.getAll()) {
-      if (object.kind === "protractor-angle") {
+      if (object.kind === "geodesicMeasurements/angle") {
         runtimeObjectRegistry.remove(object.id);
         removeProtractorAngleRuntime(object.id);
       }
@@ -296,7 +233,7 @@ export function createToolObjectRuntimes(deps: ToolObjectRuntimesDeps) {
   function removeProtractorAnglesForGeodesic(geodesicId: string): void {
     for (const object of runtimeObjectRegistry.getAll()) {
       if (
-        object.kind === "protractor-angle" &&
+        object.kind === "geodesicMeasurements/angle" &&
         (object.first.geodesicId === geodesicId || object.second.geodesicId === geodesicId)
       ) {
         runtimeObjectRegistry.remove(object.id);
@@ -312,36 +249,33 @@ export function createToolObjectRuntimes(deps: ToolObjectRuntimesDeps) {
 
     const missingVertexIds = new Set(vertexIds);
     for (const object of runtimeObjectRegistry.getAll()) {
-      if (object.kind === "protractor-angle" && missingVertexIds.has(object.centerObjectId)) {
+      if (object.kind === "geodesicMeasurements/angle" && missingVertexIds.has(object.centerObjectId)) {
         runtimeObjectRegistry.remove(object.id);
         removeProtractorAngleRuntime(object.id);
       }
     }
   }
 
-  function refreshProtractorAnglesForGeodesic(geodesicId: string): void {
-    refreshProtractorAnglesForGeodesics([geodesicId]);
-  }
-
-  function refreshProtractorAnglesForGeodesics(geodesicIds: readonly string[]): void {
-    const affectedGeodesicIds = new Set(geodesicIds);
-    const angles = runtimeObjectRegistry.getAll().filter((object): object is ProtractorAngleObject =>
-      object.kind === "protractor-angle" &&
-      (affectedGeodesicIds.has(object.first.geodesicId) || affectedGeodesicIds.has(object.second.geodesicId))
-    );
-    for (const object of angles) {
-      const refreshed = refreshProtractorAngleObject({
-        registry: runtimeObjectRegistry,
-        angle: object,
-      });
-      if (!refreshed) {
-        runtimeObjectRegistry.remove(object.id);
-        removeProtractorAngleRuntime(object.id);
-        continue;
+  // Where the label runtimes read the world: every length or angle record written since the frame began (design 013 section 6.3). The derive ticks of the geodesic measurements module write
+  // them; a record that is gone from the registry loses its runtime.
+  function syncLabelRuntimesFromJournal(): void {
+    const journal = runtimeObjectRegistry.changes;
+    let touched: Set<string> | undefined;
+    for (let index = 0; index < journal.length; index += 1) {
+      const kind = journal.kindAt(index);
+      if (kind === "geodesicMeasurements/length" || kind === "geodesicMeasurements/angle") (touched ??= new Set()).add(journal.idAt(index));
+    }
+    if (touched === undefined) return;
+    for (const id of touched) {
+      const object = runtimeObjectRegistry.get(id);
+      if (object?.kind === "geodesicMeasurements/length") {
+        syncMeasuredGeodesicLengthRuntime(object);
+      } else if (object?.kind === "geodesicMeasurements/angle") {
+        syncProtractorAngleRuntime(object);
+      } else {
+        removeMeasuredGeodesicLengthRuntime(id);
+        removeProtractorAngleRuntime(id);
       }
-
-      runtimeObjectRegistry.update(refreshed);
-      syncProtractorAngleRuntime(refreshed);
     }
   }
 
@@ -355,12 +289,9 @@ export function createToolObjectRuntimes(deps: ToolObjectRuntimesDeps) {
     removePlacedFlags,
     removeMeasuredGeodesicLengths,
     removeMeasuredGeodesicLengthsForGeodesic,
-    refreshMeasuredGeodesicLengths,
-    refreshMeasuredGeodesicLengthsForGeodesic,
     removeProtractorAngles,
     removeProtractorAnglesForGeodesic,
     removeProtractorAnglesForMissingVertices,
-    refreshProtractorAnglesForGeodesic,
-    refreshProtractorAnglesForGeodesics,
+    syncLabelRuntimesFromJournal,
   };
 }

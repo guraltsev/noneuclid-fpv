@@ -23,7 +23,7 @@ import {
 import {
   geodesicRayBeamHeightMeters,
   type GeodesicCannonObject,
-  type GeodesicIntersectionObject,
+  type GeodesicCrossingObject,
   type GeodesicSegmentObject,
 } from "../../src/world-objects/geodesic/objects";
 import { updateGeodesicIntersectionObjects } from "../../src/world-objects/geodesic/intersections";
@@ -96,7 +96,7 @@ describe("protractor tool objects", () => {
       second: { geodesicId: "g-b", segmentId: "segment-b", yawRadians: Math.PI / 2 },
     });
 
-    expect(angle.kind).toBe("protractor-angle");
+    expect(angle.kind).toBe("geodesicMeasurements/angle");
     expect(angle.radiusMeters).toBe(protractorAngleRadiusMeters);
     expect(angle.angleDegrees).toBeCloseTo(90);
     expect(angle.tooltip?.label).toBe("g-a ∠ g-b = 90°");
@@ -292,10 +292,10 @@ describe("protractor tool objects", () => {
   });
 });
 
-function createIntersection(overrides: Partial<GeodesicIntersectionObject> = {}): GeodesicIntersectionObject {
+function createIntersection(overrides: Partial<GeodesicCrossingObject> = {}): GeodesicCrossingObject {
   return {
     id: "vertex-a",
-    kind: "geodesic-intersection",
+    kind: "geodesicModel/crossing",
     cellId: "cell-a",
     localPose: yawRigidTransform3(0, { x: 0, y: 0, z: 1.33 }),
     aimStickyTarget: { localPoint: { x: 0, y: 0, z: 1.08 } },
@@ -321,7 +321,7 @@ function createEmitter(overrides: Partial<GeodesicCannonObject> = {}): GeodesicC
 function createSegment(overrides: Partial<GeodesicSegmentObject> = {}): GeodesicSegmentObject {
   return {
     id: "segment-a",
-    kind: "geodesic-segment",
+    kind: "geodesicModel/segment",
     cellId: "cell-a",
     localPose: yawRigidTransform3(0, { x: -1, y: 0, z: 1.08 }),
     portalRenderable: true,

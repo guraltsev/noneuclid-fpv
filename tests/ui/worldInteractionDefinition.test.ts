@@ -86,7 +86,7 @@ describe("worldInteractionDefinition", () => {
   it("emits primary remove for measurements and angles", () => {
     expect(createWorldFocusMessageDefinition({
       object: {
-        ...baseObjectFields("measurement-a", "measured-geodesic-length", "G1 length = 5 m"),
+        ...baseObjectFields("measurement-a", "geodesicMeasurements/length", "G1 length = 5 m"),
         geodesicId: "g-a",
         lengthMeters: 5,
         labelPoint: { x: 0, y: 0, z: 0 },
@@ -96,7 +96,7 @@ describe("worldInteractionDefinition", () => {
 
     expect(createWorldFocusMessageDefinition({
       object: {
-        ...baseObjectFields("angle-a", "protractor-angle", "G1 angle G2 = 90 deg"),
+        ...baseObjectFields("angle-a", "geodesicMeasurements/angle", "G1 angle G2 = 90 deg"),
         centerObjectId: "center",
         centerPoint: { x: 0, y: 0, z: 0 },
         first: { geodesicId: "g-a", segmentId: "s-a", yawRadians: 0 },
@@ -129,7 +129,7 @@ function baseObjectFields(id: string, kind: RuntimeWorldObject["kind"], label: s
 
 function segment(): RuntimeWorldObject {
   return {
-    ...baseObject("geodesic-segment", "Geodesic G1"),
+    ...baseObject("geodesicModel/segment", "Geodesic G1"),
     geodesicId: "g-a",
     segmentIndex: 0,
     start: { x: 0, y: 0, z: 0 },

@@ -53,16 +53,15 @@ imports only modules before it): `src/math/vec2.ts` (2-D helpers), `objects.ts` 
 `portalWord.ts` (pure portal-word algebra), `development.ts` (cached inverse portal transforms), `trace.ts` (single-cell
 and multi-cell ray tracing), `intersections.ts` (crossing markers), `endpoints.ts` (endpoint attachments and lifting),
 `segments.ts` (derived segments), `lifecycle.ts` (locked queries and removal), `intervals.ts` (interval rebuilds and
-previews), `curveShortening.ts` (tie-and-detach and the
-curve shortening flow of curve-shortening pairs) and `cannon.ts` (shooting, extending, connecting and placing
-cannons).
+previews), `vertices.ts` (tying, moving and removing a vertex) and `cannon.ts` (shooting, extending, connecting and placing
+cannons). The curve shortening flow that decides what to do with a vertex is the world module `src/modules/curveShortening/`.
 
 ## Layers and the dependency rule
 
 Dependencies point downward; lower layers never import higher ones. The layers form a strict order, and the module graph has no import cycles (type-only imports count).
 
 ```text
-math, examples → cell-complex → diagnostics, visibility, movement → world-assets → world-objects → authoring → glue → interaction → runtime → ui → render → main
+math, examples → cell-complex → diagnostics, visibility, movement → world-assets → world-objects → authoring → glue → interaction → engine → modules → runtime → ui → render → main
 ```
 
 The exact allowed edges, the live dependency graph (Mermaid) and the list of *known violations* are in the
@@ -82,6 +81,7 @@ generated reference, and the check rejects new ones.
 | `src/movement` | collision, motion, portal crossing | `src/movement/movePlayer.ts#movePlayer` |
 | `src/world-objects` | runtime objects and tools (flags, emitters, measurements, creatures) | `src/world-objects/runtimeObjectRegistry.ts#createRuntimeObjectRegistry` |
 | `src/interaction` | input frames, aim picking, VR locomotion, XR session state (no renderer) | `src/interaction/aimTarget.ts#resolveAimTargets` |
+| `src/engine` | the world engine (design 013): participants, commands and results, ids, the step order, events, module composition | `src/engine/worldEngine.ts#createWorldEngine` |
 | `src/runtime` | menu state machine, commands, live geometry session | `src/runtime/worldGeometrySession.ts#createWorldGeometrySession` |
 | `src/ui` | renderer-neutral palette/help/tooltips and input intents | `src/ui/paletteDefinition.ts#createPaletteDefinition` |
 | `src/glue` | launch options, debug settings, app config, asset URLs | `src/glue/readLaunchOptions.ts#readLaunchOptions` |
@@ -111,7 +111,8 @@ was superseded while it was loading.
   to its (deformation-mapped) authored pose. Bulk particles (bullets, stars) never go through the registry.
 - **Menu/tool state** is an immutable value updated by pure functions
   (`src/runtime/runtimeMenuState.ts#RuntimeMenuState`); the shell replaces its reference.
-- **Player state** (`PlayerPose`) is replaced each frame by the result of `movePlayer`.
+- **Player state** (`PlayerPose`) is the body of the engine's `"local"` participant: the shell replaces it each frame with the result of `movePlayer` through `publishBody`, and reads it back with `readLocalPlayerPose`.
+- **World state and client state are separate** (design 013): the world engine (`src/engine/worldEngine.ts#createWorldEngine`) holds participants, engine ids, commands and the step order; the client session (`src/runtime/clientSession.ts`) holds the menu, the selected tool, tool picks and settings. Selecting a tool asks the world first (`world/requestTool`), and the world may refuse.
 
 ## Live geometry deformation
 
@@ -135,17 +136,16 @@ order. The factories are `aimInteraction`, `geodesicCannonTools`, `toolObjectRun
 `debugVisualization`, `geodesicDebugDumps`, `portalDebugRuntime`, `geodesicEmitterLabelController` and
 `xrObjectTooltipController`.
 
-Order of work in each frame (`renderFrame`):
+Order of work in each frame (`renderFrame`; the engine's journals, events and results are cleared by `engine.endFrame()` after the frame):
 
 1. Commit a finished geometry snapshot, if any.
 2. Read input: the desktop or XR input frame (`RuntimeInputFrame`), including the reset request.
 3. **Move the player** with `movePlayer` against the compiled world, then block against runtime-object colliders; in XR,
    additionally apply the *physical* head motion as a second move.
 4. Resolve the active aim ray (camera centre ray or controller ray), update carried emitters, and dispatch the primary
-   action to the selected tool (place flag, emit geodesic, measure, protractor, tie-and-detach, carry, rotate, aim, or the
-   focused object's own interaction).
-5. Advance the world: creature runtimes, curve-shortening pairs
-   (`src/world-objects/geodesic/curveShortening.ts#advanceCurveShorteningPairs`), refresh dependent measurements and angles.
+   action to the selected tool through the one tool lookup, `toolsById` (`src/render/three/toolHost.ts#createToolHost`; the shell's tools: place flag, emit geodesic, measure, protractor, carry, rotate, aim; the modules' tools, such as the tie tool, come from their client parts), or to the
+   focused object's own interaction when no tool is selected.
+5. Advance the world: creature runtimes, then the engine's step (`engine.step`: queued commands, then the module ticks, among them the curve shortening flow, and the derive pass that refreshes crossings, measurements and angles).
 6. Place the camera(s); for XR also the per-eye culling cameras.
 7. **Portal visibility and instances**: compute visible portal paths from the camera, update the instanced cell meshes
    (one draw per cell archetype, one instance per visible path). This pass builds one frame snapshot (rendered root
@@ -175,7 +175,9 @@ Input from the mouse/keyboard (`src/render/three/desktopControls.ts`) and from W
 renderer-neutral data (`src/ui/paletteDefinition.ts#createPaletteDefinition`) and drawn by the in-scene palette
 (`src/render/three/scenePaletteController.ts`) on desktop and in VR through the same code path
 (`src/render/three/palette/scenePaletteAdapter.ts` builds the VR widgets). Commands requested by the UI are plain data
-(`src/runtime/runtimeCommands.ts`) and applied to the shell session (`src/runtime/appSession.ts`) by the pure reducer `applyRuntimeCommand` in `src/runtime/applyRuntimeCommand.ts`, which returns the effects the shell runs.
+(`src/runtime/runtimeCommands.ts`) and applied to the client session (`src/runtime/clientSession.ts`) by the pure reducer `applyRuntimeCommand` in `src/runtime/applyRuntimeCommand.ts`, which returns the effects the shell runs.
+
+A tool is a descriptor (`src/engine/moduleTypes.ts#ToolDescriptor`): its label, help, icon, prompt and what it does with the primary action. The shell's own tools are described in `src/runtime/coreTools.ts#createCoreToolDescriptors`; a module contributes its tools in the client part of the module (`src/modules/geodesicModel/client.ts#geodesicModelClient`), and the shell merges both into `toolsById` (`src/runtime/toolRegistry.ts#createToolsById`). The indicators, the help lens, the aim cross and the actions on an object's menu page read this map, so a tool is added without changing any of them. A tool acts on the world only through `ToolContext.submit` and keeps its picks in the client session, under its module (`moduleToolState`); both are cleared when the tool ends.
 
 ## Testing strategy
 

@@ -8,7 +8,7 @@ import { resolveVrPaletteHeaderActions } from "../vrPaletteHeaderActions";
 import type { ScenePaletteAdapterOptions } from "./adapterTypes";
 import { actionColor, textColor } from "./tokens";
 import { createHeaderIcon } from "./icons";
-import { createButtonText, createHeaderActionButton, createInteractiveSurface } from "./widgets";
+import { createButtonText, createHeaderActionButton, createInteractiveSurface, headerActionIcon } from "./widgets";
 
 /**
  * Header row: left (action, plus home/reload on the main page and a confirm tooltip), center contextual actions, right action. The unused title Text is an empty placeholder.
@@ -83,7 +83,7 @@ export function buildHeader(
   return header;
 }
 
-// Page-specific header buttons: cannon add/carry/tie-and-detach, or the sign trash button; empty otherwise.
+// Page-specific header buttons: cannon add, carry and the actions tools contribute, or the sign trash button; empty otherwise.
 function createContextualHeaderActions(
   definition: PaletteDefinition,
   options: ScenePaletteAdapterOptions,
@@ -103,12 +103,12 @@ function createContextualHeaderActions(
         () => options.onGeodesicCannonCarryRequested?.(content.cannonId),
         { icon: "carry", disabled: content.carryAction.disabled, width: 52 },
       ),
-      createHeaderActionButton(
-        "geodesic-cannon-action:tie-and-detach",
+      ...content.objectActions.map((action) => createHeaderActionButton(
+        `geodesic-cannon-action:${action.actionId}`,
         "",
-        () => options.onGeodesicCannonTieAndDetachRequested?.(content.cannonId),
-        { icon: "tie-and-detach", disabled: content.tieAndDetachAction.disabled, backgroundColor: "#b45309", width: 52 },
-      ),
+        () => options.onObjectActionRequested?.("geodesic-cannon", content.cannonId, action.actionId),
+        { icon: headerActionIcon(action.iconId), disabled: !action.enabled, backgroundColor: "#b45309", width: 52, tooltip: action.tooltip },
+      )),
     ];
   }
 

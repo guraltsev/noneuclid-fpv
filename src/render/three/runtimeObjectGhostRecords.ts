@@ -52,7 +52,7 @@ export type PortalGhostedRecords = readonly RuntimeObjectRenderRecord[] & { read
 /** The records that deliberately get no portal ghosts, each with the reason. */
 export const portalGhostExemptions = {
   "nothing-drawn": "the source draws nothing at the moment (no archetypes collected yet, or no shape to draw), so there is nothing to ghost",
-  "geodesic-segment":
+  "geodesicModel/segment":
     "a segment is computed per cell and continues as the next segment of the geodesic in the next cell; ghosting it would draw it twice",
 } as const;
 

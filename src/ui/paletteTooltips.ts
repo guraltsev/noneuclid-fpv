@@ -72,7 +72,6 @@ const fixedTooltips: Readonly<Record<string, string>> = {
   "tool-options:place-sign": "Sign options",
   "geodesic-cannon-action:add-geodesic": "Add geodesic",
   "geodesic-cannon-action:carry": "Move emitter while maintaining attached geodesics",
-  "geodesic-cannon-action:tie-and-detach": "Select two geodesics attached to this emitter, tie them together, and release them from the emitter",
   "sign-action:trash": "Delete sign",
   "sign-key:Space": "Space",
   "sign-key:Enter": "New line",

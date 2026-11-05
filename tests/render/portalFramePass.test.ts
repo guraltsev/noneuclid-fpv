@@ -4,6 +4,7 @@
  * per-eye states and stereo path counts; `reset` and every later pass leave none of the stereo state behind. The renderer is the shared
  * fake, so no GPU is involved.
  */
+import { createTestEngine } from "../support/engine";
 import * as THREE from "three";
 import { describe, expect, it, vi } from "vitest";
 import { torusModuli } from "../../src/authoring/exampleWorlds";
@@ -15,7 +16,7 @@ import { createPortalClipMaterialState } from "../../src/render/three/portalClip
 import { createPortalFramePass } from "../../src/render/three/portalFramePass";
 import { worldPointToThree } from "../../src/render/three/worldAxes";
 import type { VisiblePortalPathOptions } from "../../src/visibility/visiblePortalPaths";
-import { createTestAppSession } from "../support/appSession";
+import { createTestClientSession } from "../support/clientSession";
 import { createFakeRenderer } from "../support/fakeRenderer";
 
 const world = compileCellComplex(torusModuli);
@@ -34,9 +35,8 @@ const visiblePortalPathOptions: VisiblePortalPathOptions = {
 };
 
 function createPass() {
-  const session = createTestAppSession({
-    playerPose: { ...createDefaultPlayerPose("torus-room"), position: { x: 7.3, y: 0, z: 0 } },
-  });
+  const session = createTestClientSession();
+  const engine = createTestEngine({ playerPose: { ...createDefaultPlayerPose("torus-room"), position: { x: 7.3, y: 0, z: 0 } } });
   const portalClipData = createPortalClipData({ maxVisiblePaths: 2000 });
   const camera = new THREE.PerspectiveCamera(90, 1, 0.01, 100);
   camera.position.copy(worldPointToThree({ x: 7.5, y: 0, z: 1.6 }));
@@ -47,6 +47,7 @@ function createPass() {
     camera,
     renderer: createFakeRenderer() as unknown as THREE.WebGLRenderer,
     session,
+    engine,
     visiblePortalPathOptions,
     getWorld: () => world,
     getStaticCull: () => staticCull,

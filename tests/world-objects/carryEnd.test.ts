@@ -12,7 +12,7 @@ import { vec3 } from "../../src/math/vec3";
 import { yawRigidTransform3 } from "../../src/math/rigidTransform3";
 import { rebuildEmitterGeodesics, releaseCarriedEmitter } from "../../src/world-objects/geodesic/carryEnd";
 import { moveEmitterAlongRoute, shootGeodesic } from "../../src/world-objects/geodesic/cannon";
-import { isGeodesicLocked } from "../../src/world-objects/geodesic/lifecycle";
+import { arcConnectsEmitters } from "../../src/world-objects/geodesic/lifecycle";
 import { createGeodesicCannonObject } from "../../src/world-objects/geodesic/objects";
 import { collectGeodesicPortalWord } from "../../src/world-objects/geodesic/segments";
 import { createRuntimeObjectRegistry } from "../../src/world-objects/runtimeObjectRegistry";
@@ -35,7 +35,7 @@ function lockedCube() {
     throw new Error("Expected the source emitter.");
   }
   shootGeodesic({ world, registry, cannon: source, geodesicId: "g-a", maxLengthMeters: 12 });
-  expect(isGeodesicLocked(registry, "g-a")).toBe(true);
+  expect(arcConnectsEmitters(registry, "g-a")).toBe(true);
   return { world, registry };
 }
 
@@ -64,7 +64,7 @@ describe("rebuilding an emitter's geodesics after it moved", () => {
 
     expect(rebuild.rebuiltGeodesicIds).toEqual(["g-a"]);
     expect(rebuild.regrownActiveGeodesicId).toBeUndefined();
-    expect(isGeodesicLocked(registry, "g-a")).toBe(true);
+    expect(arcConnectsEmitters(registry, "g-a")).toBe(true);
     const word = collectGeodesicPortalWord(registry, "g-a");
     word.slice(1).forEach((traversal, index) => expect(traversal.sourceCellId).toBe(word[index].targetCellId));
     expect(word.at(-1)?.targetCellId ?? "front").toBe(registry.get("cannon-b")?.cellId);
@@ -86,7 +86,7 @@ describe("releasing a carried emitter", () => {
 
     expect(release.rebuiltGeodesicIds).toEqual(["g-a"]);
     expect(release.prunedIntersectionIds).toEqual([]);
-    expect(isGeodesicLocked(registry, "g-a")).toBe(true);
+    expect(arcConnectsEmitters(registry, "g-a")).toBe(true);
     const word = collectGeodesicPortalWord(registry, "g-a");
     word.slice(1).forEach((traversal, index) => expect(traversal.sourceCellId).toBe(word[index].targetCellId));
     expect(word.at(-1)?.targetCellId ?? "front").toBe(registry.get("cannon-b")?.cellId);

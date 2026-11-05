@@ -5,23 +5,24 @@
  * Invariants: ids are unique registry-wide; the by-cell index always matches each object's current `cellId`; objects are treated as immutable values and changed by `update` with a replacement; `getVersion` increases by one per content change (add, update, remove of an existing id, moveToCell, owner publish).
  * For objects with an owner (creatures, the marmot, collidable static assets) the registry is a read model: only the owner's publisher (from `claimOwnership`) may replace the record; `update`, `moveToCell` and `remove` throw for owned ids.
  * Query results (`getAll`, the per-cell queries) are cached and frozen: the same array is returned until a change touches it, a later change returns a new array, and callers must never mutate one.
+ * Every write is also recorded in `changes`, the change journal (see runtimeObjectChangeJournal.ts); the frame owner clears it at the frame end, which only moves the frame start: earlier entries stay readable by sequence number through `changes.ring`.
  * Bulk fragments (bullets, stars and other particles) must not go through the registry per particle; per-tick immutable replacement allocates too much.
  */
 import type { RigidTransform3 } from "../math/rigidTransform3";
 import type { AssetObjectSpec } from "../cell-complex/specs";
 import { yawRigidTransform3 } from "../math/rigidTransform3";
 import type {
-  FreeGeodesicEndObject,
-  CurveShorteningPairObject,
+  GeodesicVertexObject,
   GeodesicCannonObject,
-  GeodesicIntersectionObject,
-  GeodesicIntervalObject,
+  GeodesicCrossingObject,
+  GeodesicArcObject,
   GeodesicSegmentObject,
 } from "./geodesic/objects";
 import type { MeasuredGeodesicLengthObject } from "./toolObjects";
 import type { PlacedFlagObject } from "./toolObjects";
 import type { ProtractorAngleObject } from "./toolObjects";
 import { userObjectClass } from "./objectMetadata";
+import { ChangeOp, createRuntimeObjectChangeJournal, type RuntimeObjectChangeJournal } from "./runtimeObjectChangeJournal";
 import type { RuntimeCreatureObject, RuntimeWorldObjectBase } from "./runtimeObjectBase";
 
 /**
@@ -35,18 +36,17 @@ export interface RuntimeStaticAssetObject extends RuntimeWorldObjectBase {
 
 /**
  * Discriminated union (on `kind`) of every object type the registry can hold.
- * Includes creatures, static assets, placed signs, geodesic cannons/segments/intervals/free ends/curve-shortening pairs/intersections, and the persistent measurement results (length and protractor angle).
+ * Includes creatures, static assets, placed signs, geodesic cannons/segments/intervals/free ends/intersections, and the persistent measurement results (length and protractor angle).
  */
 export type RuntimeWorldObject =
   | RuntimeCreatureObject
   | RuntimeStaticAssetObject
   | PlacedFlagObject
   | GeodesicCannonObject
-  | GeodesicIntervalObject
-  | FreeGeodesicEndObject
-  | CurveShorteningPairObject
+  | GeodesicArcObject
+  | GeodesicVertexObject
   | GeodesicSegmentObject
-  | GeodesicIntersectionObject
+  | GeodesicCrossingObject
   | MeasuredGeodesicLengthObject
   | ProtractorAngleObject;
 
@@ -83,11 +83,25 @@ export interface RuntimeObjectRegistry {
   getTooltipObjectsInCell(cellId: string): readonly RuntimeWorldObject[];
   /** Every registered object across all cells. */
   getAll(): readonly RuntimeWorldObject[];
-  /** Objects of one kind, in insertion order (a fresh array). */
+  /** Objects of one kind, in insertion order: a frozen snapshot, the same array until a write of that kind (it never tracks later writes). */
   getObjectsOfKind<K extends RuntimeWorldObject["kind"]>(kind: K): readonly (RuntimeWorldObject & { readonly kind: K })[];
+  /** Kind scans so far, keyed by kind (`"*"` for `getAll` rebuilds): how often a kind was walked to build a list (a cached list counts once). A fresh object; for the bench and `debug.kindScans()`. */
+  getKindScanCounts(): Readonly<Record<string, number>>;
+  /** Number of objects of one kind: the size of the per-kind id set. No allocation. */
+  countOfKind(kind: RuntimeWorldObject["kind"]): number;
+  /** Every write since the last `changes.clear()`, in order, and (through `changes.ring`) earlier ones by sequence number; the registry only appends to it. A replacement that changes the kind is recorded as a `Removed` then an `Added`. */
+  readonly changes: RuntimeObjectChangeJournal<RuntimeWorldObject>;
   /** The derived segments whose `geodesicId` is `geodesicId`, unsorted (a fresh array). */
   getSegmentsOfGeodesic(geodesicId: string): readonly GeodesicSegmentObject[];
 }
+
+/**
+ * The read-only face of the registry (design 013 section 6.1): everything except the writes `add`, `update`, `remove`, `claimOwnership`, `releaseOwnership` and `moveToCell`. A type only; the object is the same registry, so clients that receive the reader cannot write by type.
+ */
+export type RuntimeObjectReader = Omit<
+  RuntimeObjectRegistry,
+  "add" | "update" | "remove" | "claimOwnership" | "releaseOwnership" | "moveToCell"
+>;
 
 /**
  * Creates a registry, optionally pre-populated with `initialObjects`.
@@ -138,19 +152,22 @@ export function createRuntimeObjectRegistry(
 
   function indexKinds(object: RuntimeWorldObject): void {
     addToIndex(objectIdsByKind, object.kind, object.id);
-    if (object.kind === "geodesic-segment") {
+    if (object.kind === "geodesicModel/segment") {
       addToIndex(segmentIdsByGeodesicId, object.geodesicId, object.id);
     }
   }
 
   function unindexKinds(object: RuntimeWorldObject): void {
     removeFromIndex(objectIdsByKind, object.kind, object.id);
-    if (object.kind === "geodesic-segment") {
+    if (object.kind === "geodesicModel/segment") {
       removeFromIndex(segmentIdsByGeodesicId, object.geodesicId, object.id);
     }
   }
 
+  const changes = createRuntimeObjectChangeJournal<RuntimeWorldObject>();
   const ownedIds = new Set<string>();
+  const kindScanCounts = new Map<string, number>();
+  const kindLists = new Map<string, readonly RuntimeWorldObject[]>();
   let version = 0;
 
   // Query caches: each array is built on first request, frozen, and shared until a change touches it.
@@ -191,15 +208,23 @@ export function createRuntimeObjectRegistry(
       indexObject(next);
     }
 
-    const previousGeodesicId = previous.kind === "geodesic-segment" ? previous.geodesicId : undefined;
-    const nextGeodesicId = next.kind === "geodesic-segment" ? next.geodesicId : undefined;
+    const previousGeodesicId = previous.kind === "geodesicModel/segment" ? previous.geodesicId : undefined;
+    const nextGeodesicId = next.kind === "geodesicModel/segment" ? next.geodesicId : undefined;
     if (previous.kind !== next.kind || previousGeodesicId !== nextGeodesicId) {
       unindexKinds(previous);
       indexKinds(next);
     }
 
     objectsById.set(next.id, next);
+    kindLists.delete(previous.kind);
+    kindLists.delete(next.kind);
     version += 1;
+    if (previous.kind !== next.kind) {
+      changes.record(ChangeOp.Removed, previous, previous);
+      changes.record(ChangeOp.Added, next);
+    } else {
+      changes.record(ChangeOp.Updated, next, previous);
+    }
     invalidateQueries(previous.cellId, next.cellId);
   }
 
@@ -214,8 +239,10 @@ export function createRuntimeObjectRegistry(
 
       version += 1;
       objectsById.set(object.id, object);
+      kindLists.delete(object.kind);
       indexObject(object);
       indexKinds(object);
+      changes.record(ChangeOp.Added, object);
       invalidateQueries(object.cellId);
     },
     update(object) {
@@ -243,7 +270,9 @@ export function createRuntimeObjectRegistry(
       unindexObject(object);
       unindexKinds(object);
       objectsById.delete(id);
+      kindLists.delete(object.kind);
       version += 1;
+      changes.record(ChangeOp.Removed, object, object);
       invalidateQueries(object.cellId);
     },
     claimOwnership(id) {
@@ -325,17 +354,36 @@ export function createRuntimeObjectRegistry(
       ));
     },
     getAll() {
-      return (allObjects ??= Object.freeze([...objectsById.values()]));
+      if (!allObjects) {
+        kindScanCounts.set("*", (kindScanCounts.get("*") ?? 0) + 1);
+        allObjects = Object.freeze([...objectsById.values()]);
+      }
+      return allObjects;
     },
     getObjectsOfKind<K extends RuntimeWorldObject["kind"]>(kind: K) {
-      return [...(objectIdsByKind.get(kind) ?? [])]
-        .map((id) => objectsById.get(id))
-        .filter((object): object is RuntimeWorldObject & { readonly kind: K } => object !== undefined);
+      let list = kindLists.get(kind);
+      if (list === undefined) {
+        kindScanCounts.set(kind, (kindScanCounts.get(kind) ?? 0) + 1);
+        list = Object.freeze(
+          [...(objectIdsByKind.get(kind) ?? [])]
+            .map((id) => objectsById.get(id))
+            .filter((object): object is RuntimeWorldObject => object !== undefined),
+        );
+        kindLists.set(kind, list);
+      }
+      return list as readonly (RuntimeWorldObject & { readonly kind: K })[];
     },
+    getKindScanCounts() {
+      return Object.fromEntries(kindScanCounts);
+    },
+    countOfKind(kind) {
+      return objectIdsByKind.get(kind)?.size ?? 0;
+    },
+    changes,
     getSegmentsOfGeodesic(geodesicId) {
       return [...(segmentIdsByGeodesicId.get(geodesicId) ?? [])]
         .map((id) => objectsById.get(id))
-        .filter((object): object is GeodesicSegmentObject => object?.kind === "geodesic-segment");
+        .filter((object): object is GeodesicSegmentObject => object?.kind === "geodesicModel/segment");
     },
   };
 

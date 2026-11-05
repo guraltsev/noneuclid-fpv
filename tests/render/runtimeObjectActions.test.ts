@@ -7,19 +7,21 @@
  * nothing, going home dispatches the world's starting pose and clears the rig, and teleporting home first cancels an open
  * menu.
  */
+import { readLocalPlayerPose } from "../../src/engine/worldEngine";
+import { createTestEngine } from "../support/engine";
 import * as THREE from "three";
 import { describe, expect, it, vi } from "vitest";
 import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
 import type { AimTarget } from "../../src/interaction/aimTarget";
 import { defaultAppConfig } from "../../src/glue/appConfig";
 import { createDefaultPlayerPose } from "../../src/movement/playerPose";
-import type { AppSessionState } from "../../src/runtime/appSession";
+import type { ClientSessionState } from "../../src/runtime/clientSession";
 import type { RuntimeCommand } from "../../src/runtime/runtimeCommands";
 import { createRuntimeMenuState } from "../../src/runtime/runtimeMenuState";
 import { createRuntimeObjectRegistry } from "../../src/world-objects/runtimeObjectRegistry";
 import { createRuntimeObjectActions } from "../../src/render/three/runtimeObjectActions";
 import type { RootAimRay } from "../../src/render/three/rootAimRay";
-import { createTestAppSession } from "../support/appSession";
+import { createTestClientSession } from "../support/clientSession";
 
 const world = compileCellComplex({
   startingPosition: { cellId: "room", position: { x: 1, y: 2, z: 0 }, yawRadians: 0.5 },
@@ -56,15 +58,17 @@ const floorTarget: AimTarget = {
   hopCount: 0,
 };
 
-function createHarness(target: AimTarget | undefined, sessionOverrides: Partial<AppSessionState> = {}) {
-  const session = createTestAppSession({ playerPose: createDefaultPlayerPose("room"), ...sessionOverrides });
+function createHarness(target: AimTarget | undefined, sessionOverrides: Partial<ClientSessionState> = {}) {
+  const session = createTestClientSession(sessionOverrides);
   const registry = createRuntimeObjectRegistry();
+  const engine = createTestEngine({ registry, playerPose: createDefaultPlayerPose("room") });
   const commands: RuntimeCommand[] = [];
   const syncedFlagIds: string[] = [];
   const rigResets = vi.fn();
   const none = vi.fn();
   const actions = createRuntimeObjectActions({
     session,
+    engine,
     dispatch: (command) => commands.push(command),
     runtimeObjectRegistry: registry,
     getWorld: () => world,
@@ -83,7 +87,7 @@ function createHarness(target: AimTarget | undefined, sessionOverrides: Partial<
     getGeodesicDisplayName: (geodesicId) => geodesicId,
     getGeodesicLabelsById: () => ({}),
     getLockedGeodesicIds: () => [],
-    canTieAndDetachGeodesicsFromCannon: () => false,
+    objectActionsFor: () => [],
     createGeometryComputerMenuOptions: () => {
       throw new Error("not used");
     },
@@ -103,7 +107,7 @@ function createHarness(target: AimTarget | undefined, sessionOverrides: Partial<
     clearProtractorToolFeedback: none,
     resolveProtractorDirectedSelectionFromAimTarget: () => undefined,
   });
-  return { actions, registry, commands, syncedFlagIds, rigResets };
+  return { actions, registry, commands, syncedFlagIds, rigResets, engine };
 }
 
 describe("createRuntimeObjectActions", () => {
@@ -138,23 +142,30 @@ describe("createRuntimeObjectActions", () => {
   });
 
   it("sends the player to the starting position and resets the rig", () => {
-    const { actions, commands, rigResets } = createHarness(undefined);
+    const { actions, engine, rigResets } = createHarness(undefined);
 
     actions.resetPlayerToHome();
 
-    expect(commands).toEqual([
-      { kind: "set-player-pose", pose: { cellId: "room", position: { x: 1, y: 2, z: 0 }, yawRadians: 0.5, pitchRadians: 0 } },
-    ]);
+    expect(readLocalPlayerPose(engine)).toEqual({ cellId: "room", position: { x: 1, y: 2, z: 0 }, yawRadians: 0.5, pitchRadians: 0 });
     expect(rigResets).toHaveBeenCalledTimes(1);
   });
 
   it("cancels an open menu before teleporting home", () => {
     const menuState = { ...createRuntimeMenuState({ selectedWorldId: "test" }), isOpen: true };
-    const { actions, commands } = createHarness(undefined, { menuState });
+    const { actions, commands, engine } = createHarness(undefined, { menuState });
+    const publish = engine.publishBody.bind(engine);
+    const commandsWhenPublished: number[] = [];
+    engine.publishBody = (participantId, body) => {
+      commandsWhenPublished.push(commands.length);
+      return publish(participantId, body);
+    };
 
     actions.teleportPlayerHome();
 
-    expect(commands.map((command) => command.kind)).toEqual(["cancel-menu-and-tool", "set-player-pose"]);
+    expect(commandsWhenPublished).toEqual([1]);
+
+    expect(commands.map((command) => command.kind)).toEqual(["cancel-menu-and-tool"]);
+    expect(readLocalPlayerPose(engine).position).toEqual({ x: 1, y: 2, z: 0 });
   });
 
   it("rejects a debug pose in a cell the world does not have", () => {

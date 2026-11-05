@@ -84,6 +84,9 @@ queued job, despite their numbers (they were numbered after the existing queue t
 **Priority (maintainer, 2026-11-03):** the coordinator of jobs 48-55 comes before every other queued job, despite the
 lower numbers of jobs 18, 24, 30, 34 and 35.
 
+**Order of jobs 51-60 (2026-11-04):** the coordinator [00_coordinate_jobs_51_60](_done/00_coordinate_jobs_51_60.md) runs them in the order 51, 56, 57, 58,
+59, 60, 52, 53, 54, 55, despite their numbers: the new jobs 56 to 60 lay the foundation the older ones need. It comes before every other queued job.
+
 | Job | Title | Status | Resolves issues | Former issue |
 | --- | --- | --- | --- | --- |
 | [00](_done/00_coordinate_jobs_01_10.md) | Coordinate jobs 01-10: order, gates, batch report | done, needs review | - |  |
@@ -137,12 +140,18 @@ lower numbers of jobs 18, 24, 30, 34 and 35.
 | [45](45_api_functions_for_scenarios.md) | API functions that scenarios need, and the checks they convert | blocked on the maintainer (012) | - |  |
 | [46](_done/46_shell_session_and_command_path.md) | One shell-side state holder and one command path | done, needs review | - | 77 |
 | [47](_done/47_carry_contract.md) | The carry contract: an emitter that can be carried reacts to a stream of displacement steps | done, needs review | - |  |
-| [00](00_coordinate_jobs_48_55.md) | Coordinate jobs 48-55 (world engine, clients and modules): order, gates, fresh-context reviews, batch report | queued | [84](../../_issues/84_behaviors_are_hard_wired_into_the_shell_and_need_a_plugin_system.md) |  |
-| [48](48_module_bench_change_journal_layers.md) | Record the performance baseline, add the change journal, and add the engine and module layers | queued | - |  |
-| [49](49_world_engine_and_client_session.md) | Build the world engine and split the client session from it | queued | - |  |
-| [50](50_carry_as_world_attachment.md) | Make carrying a world attachment | queued | - |  |
-| [51](51_geodesic_model_module_and_renames.md) | Create the geodesic model module, with its renames and end nodes | queued | - |  |
-| [52](52_derived_state_through_the_journal.md) | Derive crossings, lengths and angles from the change journal | queued | - |  |
-| [53](53_curve_shortening_module.md) | Move curve shortening into a module with no lifecycle | queued | - |  |
-| [54](54_tools_from_modules.md) | Build tools from module descriptors | queued | - |  |
-| [55](55_destroy_policy.md) | Add the "destroy" policy for blocked curves | queued | [84](../../_issues/84_behaviors_are_hard_wired_into_the_shell_and_need_a_plugin_system.md) |  |
+| [00](_done/00_coordinate_jobs_48_55.md) | Coordinate jobs 48-55 (world engine, clients and modules): order, gates, fresh-context reviews, batch report | done, needs review | [84](../../_issues/84_behaviors_are_hard_wired_into_the_shell_and_need_a_plugin_system.md) |  |
+| [48](_done/48_module_bench_change_journal_layers.md) | Record the performance baseline, add the change journal, and add the engine and module layers | done, needs review | - |  |
+| [49](_done/49_world_engine_and_client_session.md) | Build the world engine and split the client session from it | done, needs review | - |  |
+| [50](_done/50_carry_as_world_attachment.md) | Make carrying a world attachment | done, needs review | - |  |
+| [00](_done/00_coordinate_jobs_51_60.md) | Coordinate jobs 51-60 (derived state, then the geodesic and flow modules): order, gates, fresh-context reviews, batch report | done, needs review | [84](../../_issues/84_behaviors_are_hard_wired_into_the_shell_and_need_a_plugin_system.md), [86](../../_issues/86_derived_state_is_recomputed_by_scanning_the_world.md) |  |
+| [51](_done/51_geodesic_model_module_and_renames.md) | Restore the geodesic model module and abolish the "moving" state | done, needs review | - |  |
+| [52](_done/52_derived_state_through_the_journal.md) | Derive crossings, lengths and angles from the change ring | done, needs review | - |  |
+| [53](_done/53_curve_shortening_module.md) | Move curve shortening into a module with no lifecycle | done, needs review | - |  |
+| [54](_done/54_tools_from_modules.md) | Build tools from module descriptors | done, needs review | - |  |
+| [55](_done/55_destroy_policy.md) | Add the "destroy" policy for blocked curves | done, needs review | [84](../../_issues/84_behaviors_are_hard_wired_into_the_shell_and_need_a_plugin_system.md), [86](../../_issues/86_derived_state_is_recomputed_by_scanning_the_world.md) |  |
+| [56](_done/56_bench_counters_and_ab_gate.md) | Make the performance gate exact: scan counters, a many-arcs scene and an A/B tool | done, needs review | - |  |
+| [57](_done/57_change_ring.md) | Keep every change readable: a ring behind the journal, cursors that survive endFrame | done, needs review | - |  |
+| [58](_done/58_derived_cache.md) | Add the derived cache, cached kind lists and their guards | done, needs review | - |  |
+| [59](_done/59_arc_index.md) | Answer every arc-end question from one cache, the arc index | done, needs review | - |  |
+| [60](_done/60_materialized_state_is_a_function_of_real_state.md) | Make stored segments a function of real state, and test that | done, needs review | - |  |

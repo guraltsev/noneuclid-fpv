@@ -8,6 +8,7 @@
  * portal path and on another face; it is the object's own declared shape (an ellipsoid for an emitter), or a sphere from the collision shape when it declares none; and it knows
  * nothing about the kind of object, so any carryable object gets it.
  */
+import { createTestEngine } from "../support/engine";
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
@@ -31,7 +32,7 @@ import type { RuntimeCreatureObject } from "../../src/world-objects/runtimeObjec
 import { createGeodesicRuntimeRenderSources } from "../../src/render/three/geodesicCannonRenderer";
 import { createGeodesicCannonObject } from "../../src/world-objects/geodesic/objects";
 import { createRuntimeObjectRegistry } from "../../src/world-objects/runtimeObjectRegistry";
-import { createTestAppSession } from "../support/appSession";
+import { createTestClientSession } from "../support/clientSession";
 
 const collision = { radius: 0.3, height: 1.6, offset: { x: 0, y: 0, z: 0.8 } } as const;
 
@@ -161,10 +162,8 @@ function setupSync(carriedId: string | undefined) {
     maxVisiblePaths: 4,
     diagnostics: createRuntimeObjectRenderArchetypeDiagnostics(),
     getWorld: () => world,
-    session: createTestAppSession({
-      playerPose: { cellId: "room-b", position: { x: 0, y: 0, z: 0 }, yawRadians: 0 } as unknown as PlayerPose,
-      carry: carriedId === undefined ? undefined : { objectId: carriedId, arrived: true },
-    }),
+    session: createTestClientSession(),
+    engine: createTestEngine({ playerPose: { cellId: "room-b", position: { x: 0, y: 0, z: 0 }, yawRadians: 0 } as unknown as PlayerPose, carrying: carriedId }),
     buildArchetype: (source, capacity) => buildRuntimeObjectRenderArchetype(source, capacity, undefined),
   });
   return { sync, renderArchetypesByKey, object };
@@ -237,7 +236,8 @@ describe("the highlight of a carried geodesic emitter", () => {
       maxVisiblePaths: 4,
       diagnostics: createRuntimeObjectRenderArchetypeDiagnostics(),
       getWorld: () => world,
-      session: createTestAppSession({ carry: { objectId: "cannon-b", arrived: true } }),
+      session: createTestClientSession(),
+      engine: createTestEngine({ carrying: "cannon-b" }),
       buildArchetype: (source, capacity) => buildRuntimeObjectRenderArchetype(source, capacity, undefined),
     });
     const shift = new THREE.Matrix4().makeTranslation(-2, 0, 0);
@@ -283,7 +283,8 @@ describe("the highlight of a carried emitter that stands at a portal", () => {
       maxVisiblePaths: 4,
       diagnostics: createRuntimeObjectRenderArchetypeDiagnostics(),
       getWorld: () => world,
-      session: createTestAppSession({ carry: { objectId: "cannon-b", arrived: true } }),
+      session: createTestClientSession(),
+      engine: createTestEngine({ carrying: "cannon-b" }),
       buildArchetype: (source, capacity) => buildRuntimeObjectRenderArchetype(source, capacity, undefined),
     });
     // room-b's frame seen from room-a: room-b's west wall (x = -1) is room-a's east wall (x = 1).

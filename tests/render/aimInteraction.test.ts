@@ -4,8 +4,9 @@
  * is covered in `tests/interaction/aimTarget.test.ts`; its outcome here is observed directly (a stale result until
  * invalidated) rather than through resolver call counts.
  */
+import { createTestEngine } from "../support/engine";
 import * as THREE from "three";
-import { createTestAppSession } from "../support/appSession";
+import { createTestClientSession } from "../support/clientSession";
 import { describe, expect, it } from "vitest";
 import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
 import type { CellComplexSpec } from "../../src/cell-complex/specs";
@@ -27,9 +28,8 @@ describe("createAimInteraction", () => {
       xrRig: {} as never,
       runtimeObjectRegistry: registry,
       getWorld: () => world,
-      session: createTestAppSession({
-        playerPose: { cellId: "room-a", position: { x: 0, y: 0, z: 0 }, yawRadians: 0, pitchRadians: 0 },
-      }),
+      session: createTestClientSession(),
+      engine: createTestEngine({ playerPose: { cellId: "room-a", position: { x: 0, y: 0, z: 0 }, yawRadians: 0, pitchRadians: 0 } }),
       getFrameSerial: () => frameSerial,
     });
     const camera = cameraLookingAt({ x: 0, y: -0.5, z: 1.08 }, { x: 0, y: 0, z: 1.08 });
@@ -98,7 +98,7 @@ function squareBase(): readonly { readonly x: number; readonly y: number }[] {
 function createGeodesicSegment(overrides: Partial<GeodesicSegmentObject> = {}): GeodesicSegmentObject {
   return {
     id: "segment-a",
-    kind: "geodesic-segment",
+    kind: "geodesicModel/segment",
     cellId: "room",
     localPose: yawRigidTransform3(0, { x: -0.5, y: 0, z: 1.08 }),
     portalRenderable: true,

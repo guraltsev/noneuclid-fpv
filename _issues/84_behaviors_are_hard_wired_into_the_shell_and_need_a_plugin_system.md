@@ -94,3 +94,5 @@ corner flow). Its present behavior is described in `_docs/MATHEMATICAL_MODEL.md`
 
 Every new or alternative geodesic behavior needs edits in the shell, the tool layer and the core object model, so changes cannot
 be made or tested in isolation. Without a designed system, ad-hoc hooks will accumulate and can cost frame time.
+
+Status note: job 55 is done in code; see the Report of .agents/jobs/55_destroy_policy.md (one manual check outstanding).

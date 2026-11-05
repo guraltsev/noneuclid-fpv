@@ -11,13 +11,7 @@ import { describe, expect, it } from "vitest";
 import { defaultAppConfig, type AppConfig } from "../../src/glue/appConfig";
 import { applyRuntimeCommand, reduceRuntimeCommand } from "../../src/runtime/applyRuntimeCommand";
 import { defaultVrComfortOptions } from "../../src/glue/vrComfortOptions";
-import { createDefaultPlayerPose } from "../../src/movement/playerPose";
-import {
-  createAppSession,
-  initialObjectIdSerials,
-  takeObjectIdSerial,
-  type AppSessionState,
-} from "../../src/runtime/appSession";
+import { createClientSession, type ClientSessionState } from "../../src/runtime/clientSession";
 import type { RuntimeCommand, RuntimeEffect } from "../../src/runtime/runtimeCommands";
 import {
   createRuntimeMenuState,
@@ -35,22 +29,21 @@ const pages = [
   { title: "Two", body: "second" },
 ];
 
-function stateWith(menu?: Partial<RuntimeMenuState>, appConfig: AppConfig = defaultAppConfig): AppSessionState {
+function stateWith(menu?: Partial<RuntimeMenuState>, appConfig: AppConfig = defaultAppConfig): ClientSessionState {
   return {
     menuState: { ...createRuntimeMenuState({ selectedWorldId: "cube" }), ...menu },
     appConfig,
     debugSettings: { debugLevel: "off", portalPanelMode: "none", debugOptions: [] },
     showCellPathRendersInstances: false,
     vrComfortOptions: defaultVrComfortOptions,
-    playerPose: createDefaultPlayerPose("room-a"),
     cannonToolState: {},
-    carry: undefined,
     protractorToolState: {},
-    objectIdSerials: initialObjectIdSerials,
+    moduleToolState: {},
+    pendingToolRequest: undefined,
   };
 }
 
-function reduce(command: RuntimeCommand, state: AppSessionState = stateWith()) {
+function reduce(command: RuntimeCommand, state: ClientSessionState = stateWith()) {
   return reduceRuntimeCommand(state, command);
 }
 
@@ -93,7 +86,7 @@ describe("applyRuntimeCommand: host actions", () => {
   });
 
   it("applies a command to the session and returns the effects", () => {
-    const session = createAppSession(stateWith());
+    const session = createClientSession(stateWith());
 
     const effects = applyRuntimeCommand(session, { kind: "open-menu" });
 
@@ -187,10 +180,11 @@ describe("applyRuntimeCommand: navigation", () => {
   });
 
   it("shows the geodesic cannon actions page", () => {
-    const result = reduce({ kind: "show-geodesic-cannon-actions", cannonId: "c1", geodesicIds: ["g1"], canTieAndDetach: true });
+    const objectActions = [{ actionId: "tie-and-detach", label: "Tie & detach", iconId: "tie-and-detach", tooltip: "Tie them", enabled: true }];
+    const result = reduce({ kind: "show-geodesic-cannon-actions", cannonId: "c1", geodesicIds: ["g1"], objectActions });
 
     expect(result.state.menuState.page).toBe("geodesic-cannon-actions");
-    expect(result.state.menuState.geodesicCannonOptions).toMatchObject({ cannonId: "c1", geodesicIds: ["g1"], canTieAndDetach: true });
+    expect(result.state.menuState.geodesicCannonOptions).toMatchObject({ cannonId: "c1", geodesicIds: ["g1"], objectActions });
     expect(result.effects).toEqual([sync]);
   });
 
@@ -406,7 +400,8 @@ describe("applyRuntimeCommand: cannon and geometry computer actions", () => {
   it("forwards each cannon action to the host when its tool is enabled", () => {
     expect(reduce({ kind: "add-geodesic-to-cannon", cannonId: "c" }).effects).toEqual([{ kind: "add-geodesic-to-cannon", cannonId: "c" }]);
     expect(reduce({ kind: "start-cannon-carry", cannonId: "c" }).effects).toEqual([{ kind: "start-cannon-carry", cannonId: "c" }]);
-    expect(reduce({ kind: "start-cannon-tie-and-detach", cannonId: "c" }).effects).toEqual([{ kind: "start-cannon-tie-and-detach", cannonId: "c" }]);
+    const objectAction = { kind: "start-object-action", objectKind: "geodesic-cannon", objectId: "c", actionId: "tie-and-detach" } as const;
+    expect(reduce(objectAction).effects).toEqual([objectAction]);
     expect(reduce({ kind: "start-cannon-rotation", cannonId: "c", geodesicId: "g" }).effects).toEqual([
       { kind: "start-cannon-rotation", cannonId: "c", geodesicId: "g" },
     ]);
@@ -420,7 +415,6 @@ describe("applyRuntimeCommand: cannon and geometry computer actions", () => {
 
     expect(reduce({ kind: "add-geodesic-to-cannon", cannonId: "c" }, off).effects).toEqual([]);
     expect(reduce({ kind: "start-cannon-carry", cannonId: "c" }, off).effects).toEqual([]);
-    expect(reduce({ kind: "start-cannon-tie-and-detach", cannonId: "c" }, off).effects).toEqual([]);
     expect(reduce({ kind: "start-cannon-rotation", cannonId: "c" }, off).effects).toEqual([]);
     expect(reduce({ kind: "start-cannon-aim", cannonId: "c" }, off).effects).toEqual([]);
     expect(reduce({ kind: "delete-geodesic-from-cannon", cannonId: "c", geodesicId: "g" }, off).effects).toEqual([
@@ -469,84 +463,23 @@ describe("applyRuntimeCommand: tool and player state", () => {
     expect(result.effects).toEqual([]);
   });
 
-  it("replaces the player pose", () => {
-    const pose = { ...createDefaultPlayerPose("room-b"), yawRadians: 1 };
-    const result = reduce({ kind: "set-player-pose", pose });
+  it("sets and clears one module's client tool state without touching the others", () => {
+    const first = reduce({ kind: "set-module-tool-state", moduleId: "geodesicModel", state: { picks: [] } });
+    const second = reduce({ kind: "set-module-tool-state", moduleId: "other", state: 1 }, first.state);
+    expect(second.state.moduleToolState).toEqual({ geodesicModel: { picks: [] }, other: 1 });
 
-    expect(result.state.playerPose).toBe(pose);
-    expect(result.effects).toEqual([]);
+    const cleared = reduce({ kind: "set-module-tool-state", moduleId: "geodesicModel", state: undefined }, second.state);
+    expect(cleared.state.moduleToolState).toEqual({ other: 1 });
+    expect(reduce({ kind: "set-module-tool-state", moduleId: "missing", state: undefined }, cleared.state).state).toBe(cleared.state);
+    expect(cleared.effects).toEqual([]);
   });
 
-  it("hands out increasing serial numbers per object id family", () => {
-    const session = createAppSession(stateWith());
+  it("records a pending tool request and clears it", () => {
+    const request = { toolId: "protractor" as const, ticket: 3 };
+    const pending = reduce({ kind: "set-pending-tool-request", request });
 
-    expect(takeObjectIdSerial(session, "placed-flag")).toBe(0);
-    expect(takeObjectIdSerial(session, "placed-flag")).toBe(1);
-    expect(takeObjectIdSerial(session, "geodesic")).toBe(0);
-    expect(session.get().objectIdSerials).toMatchObject({ "placed-flag": 2, geodesic: 1, "protractor-angle": 0 });
-  });
-});
-
-describe("applyRuntimeCommand: carrying", () => {
-  const carrying = (objectId = "cannon-a"): AppSessionState =>
-    reduce({ kind: "begin-carry", objectId }, reduce({ kind: "enter-tool-mode", toolId: "geodesic-cannon-carry" }).state).state;
-
-  it("records the carried object on pickup while the carry tool is selected", () => {
-    expect(carrying().carry).toEqual({ objectId: "cannon-a", arrived: false });
-  });
-
-  it("ignores a second pickup of the object already carried, keeping the state object", () => {
-    const state = carrying();
-
-    expect(reduce({ kind: "begin-carry", objectId: "cannon-a" }, state).state).toBe(state);
-  });
-
-  it("lets a pickup of another object replace the record (the record has one slot)", () => {
-    expect(reduce({ kind: "begin-carry", objectId: "cannon-b" }, carrying()).state.carry).toEqual({ objectId: "cannon-b", arrived: false });
-  });
-
-  it("does not record a pickup outside the carry tool", () => {
-    expect(reduce({ kind: "begin-carry", objectId: "cannon-a" }).state.carry).toBeUndefined();
-  });
-
-  it("marks the carry as arrived the first time, and only then changes the state", () => {
-    const arrived = reduce({ kind: "carry-arrived" }, carrying());
-
-    expect(arrived.state.carry).toEqual({ objectId: "cannon-a", arrived: true });
-    expect(arrived.effects).toEqual([]);
-    expect(reduce({ kind: "carry-arrived" }, arrived.state).state).toBe(arrived.state);
-  });
-
-  it("ignores an arrival when nothing is carried", () => {
-    const state = stateWith();
-
-    expect(reduce({ kind: "carry-arrived" }, state).state).toBe(state);
-  });
-
-  it("starts a pickup of another object as not arrived", () => {
-    const arrived = reduce({ kind: "carry-arrived" }, carrying()).state;
-
-    expect(reduce({ kind: "begin-carry", objectId: "cannon-b" }, arrived).state.carry).toEqual({ objectId: "cannon-b", arrived: false });
-  });
-
-  it("clears the record on release and leaves the tool selection alone", () => {
-    const result = reduce({ kind: "end-carry" }, carrying());
-
-    expect(result.state.carry).toBeUndefined();
-    expect(result.state.menuState.selectedTool).toBe("geodesic-cannon-carry");
-    expect(result.effects).toEqual([]);
-  });
-
-  it("keeps the state object when released with nothing carried", () => {
-    const state = stateWith();
-
-    expect(reduce({ kind: "end-carry" }, state).state).toBe(state);
-  });
-
-  it("drops the record when the carry tool is cleared, replaced or cancelled", () => {
-    expect(reduce({ kind: "clear-selected-tool" }, carrying()).state.carry).toBeUndefined();
-    expect(reduce({ kind: "select-tool", toolId: "protractor" }, carrying()).state.carry).toBeUndefined();
-    expect(reduce({ kind: "cancel-menu-and-tool" }, carrying()).state.carry).toBeUndefined();
-    expect(reduce({ kind: "clear-selected-tool" }, reduce({ kind: "carry-arrived" }, carrying()).state).state.carry).toBeUndefined();
+    expect(pending.state.pendingToolRequest).toBe(request);
+    expect(reduce({ kind: "set-pending-tool-request", request }, pending.state).state).toBe(pending.state);
+    expect(reduce({ kind: "set-pending-tool-request", request: undefined }, pending.state).state.pendingToolRequest).toBeUndefined();
   });
 });

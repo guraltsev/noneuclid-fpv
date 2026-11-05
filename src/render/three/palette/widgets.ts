@@ -184,6 +184,17 @@ export function createActionButton(
   return button;
 }
 
+/** The icons a contextual header action can show. */
+export type HeaderActionIcon = "add-geodesic" | "carry" | "tie-and-detach" | "trash";
+
+const headerActionIcons: readonly string[] = ["add-geodesic", "carry", "tie-and-detach", "trash"];
+
+/** The header icon for an icon id a tool contributed; throws on an id the palette has no icon for. */
+export function headerActionIcon(iconId: string): HeaderActionIcon {
+  if (!headerActionIcons.includes(iconId)) throw new Error(`the palette has no icon ${iconId}`);
+  return iconId as HeaderActionIcon;
+}
+
 /**
  * Square icon button for contextual header actions; disabled ones are dimmed and inert.
  */
@@ -192,10 +203,12 @@ export function createHeaderActionButton(
   label: string,
   onClick: () => void,
   options: {
-    readonly icon: "add-geodesic" | "carry" | "tie-and-detach" | "trash";
+    readonly icon: HeaderActionIcon;
     readonly disabled?: boolean;
     readonly width?: number;
     readonly backgroundColor?: string;
+    /** Text shown when the button is pointed at, for buttons whose id has no entry in the tooltip table. */
+    readonly tooltip?: string;
   },
 ): Container {
   const button = createInteractiveSurface({
@@ -208,6 +221,9 @@ export function createHeaderActionButton(
     backgroundColor: options.disabled ? "#334155" : (options.backgroundColor ?? actionColor),
   });
   button.userData.scenePaletteItemId = itemId;
+  if (options.tooltip !== undefined) {
+    button.userData.scenePaletteTooltip = options.tooltip;
+  }
   if (options.icon === "trash") {
     button.add(new Trash2({
       width: 22,

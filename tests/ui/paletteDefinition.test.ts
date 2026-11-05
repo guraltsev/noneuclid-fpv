@@ -54,21 +54,21 @@ describe("createPaletteDefinition", () => {
     );
   });
 
-  it("disables tie-and-detach exactly when the geodesic cannon options say it is unavailable", () => {
+  it("shows each contributed action with the availability the cannon options give it", () => {
     const state = createRuntimeMenuState({ selectedWorldId: "cube" });
     const available = createPaletteDefinition(showRuntimeMenuGeodesicCannonActions(state, {
       cannonId: "cannon-a",
       geodesicIds: ["g-a"],
-      canTieAndDetach: true,
+      objectActions: [{ actionId: "tie-and-detach", label: "Tie & detach", iconId: "tie-and-detach", tooltip: "Tie them", enabled: true }],
     })).content as GeodesicCannonActionsPaletteContent;
     const unavailable = createPaletteDefinition(showRuntimeMenuGeodesicCannonActions(state, {
       cannonId: "cannon-a",
       geodesicIds: ["g-a"],
-      canTieAndDetach: false,
+      objectActions: [{ actionId: "tie-and-detach", label: "Tie & detach", iconId: "tie-and-detach", tooltip: "Tie them", enabled: false }],
     })).content as GeodesicCannonActionsPaletteContent;
 
-    expect(available.tieAndDetachAction.disabled).toBe(false);
-    expect(unavailable.tieAndDetachAction.disabled).toBe(true);
+    expect(available.objectActions.map((action) => action.enabled)).toEqual([true]);
+    expect(unavailable.objectActions.map((action) => action.enabled)).toEqual([false]);
   });
 
   it("marks a locked geodesic with a connection-symbol label; an unlocked one with none", () => {

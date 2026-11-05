@@ -8,7 +8,7 @@ import { isRuntimeToolEnabled } from "../glue/appConfig";
 import { hasActiveDebugOption } from "../glue/debugOptions";
 import type { DebugSettings } from "../glue/debugSettings";
 import type { RuntimeToolId } from "../glue/toolIds";
-import type { AppSession, AppSessionState } from "./appSession";
+import type { ClientSession, ClientSessionState } from "./clientSession";
 import type { RuntimeCommand, RuntimeEffect } from "./runtimeCommands";
 import {
   closeRuntimeMenu,
@@ -48,7 +48,7 @@ import {
 
 /** Result of reducing one command: the next session state and the effects to run. */
 export interface RuntimeCommandResult {
-  readonly state: AppSessionState;
+  readonly state: ClientSessionState;
   readonly effects: readonly RuntimeEffect[];
 }
 
@@ -57,7 +57,7 @@ const syncPalette: RuntimeEffect = { kind: "sync-palette" };
 /**
  * Applies `command` to the session and returns the effects the host runs, in order. The session is updated before any effect runs.
  */
-export function applyRuntimeCommand(session: AppSession, command: RuntimeCommand): readonly RuntimeEffect[] {
+export function applyRuntimeCommand(session: ClientSession, command: RuntimeCommand): readonly RuntimeEffect[] {
   const result = reduceRuntimeCommand(session.get(), command);
   session.update(() => result.state);
   return result.effects;
@@ -65,17 +65,8 @@ export function applyRuntimeCommand(session: AppSession, command: RuntimeCommand
 
 /**
  * Pure reducer: the next session state and the ordered effects for one command. Returns the same state object when the command changes nothing.
- * The carry record exists only while the carry tool is the selected tool: any command that leaves that tool drops the record.
  */
-export function reduceRuntimeCommand(state: AppSessionState, command: RuntimeCommand): RuntimeCommandResult {
-  const result = reduceCommand(state, command);
-  if (result.state.carry && result.state.menuState.selectedTool !== "geodesic-cannon-carry") {
-    return { state: { ...result.state, carry: undefined }, effects: result.effects };
-  }
-  return result;
-}
-
-function reduceCommand(state: AppSessionState, command: RuntimeCommand): RuntimeCommandResult {
+export function reduceRuntimeCommand(state: ClientSessionState, command: RuntimeCommand): RuntimeCommandResult {
   const menu = state.menuState;
   const config = state.appConfig;
   const toolEnabled = (toolId: RuntimeToolId): boolean => isRuntimeToolEnabled(config, toolId);
@@ -242,17 +233,15 @@ function reduceCommand(state: AppSessionState, command: RuntimeCommand): Runtime
       return { state: { ...state, cannonToolState: command.state }, effects: [] };
     case "set-protractor-tool-state":
       return { state: { ...state, protractorToolState: command.state }, effects: [] };
-    case "set-player-pose":
-      return { state: { ...state, playerPose: command.pose }, effects: [] };
-    case "begin-carry":
-      // A second pickup of the object already carried changes nothing. (Outside the carry tool the wrapper drops the record again.)
-      return state.carry?.objectId === command.objectId
-        ? nothing
-        : { state: { ...state, carry: { objectId: command.objectId, arrived: false } }, effects: [] };
-    case "carry-arrived":
-      return state.carry && !state.carry.arrived ? { state: { ...state, carry: { ...state.carry, arrived: true } }, effects: [] } : nothing;
-    case "end-carry":
-      return state.carry ? { state: { ...state, carry: undefined }, effects: [] } : nothing;
+    case "set-module-tool-state": {
+      const { [command.moduleId]: previous, ...rest } = state.moduleToolState;
+      if (command.state === undefined) {
+        return previous === undefined ? nothing : { state: { ...state, moduleToolState: rest }, effects: [] };
+      }
+      return { state: { ...state, moduleToolState: { ...rest, [command.moduleId]: command.state } }, effects: [] };
+    }
+    case "set-pending-tool-request":
+      return command.request === state.pendingToolRequest ? nothing : { state: { ...state, pendingToolRequest: command.request }, effects: [] };
     case "adopt-debug-settings": {
       const seeded = createRuntimeMenuState({
         selectedWorldId: menu.selectedWorldId,
@@ -280,8 +269,9 @@ function reduceCommand(state: AppSessionState, command: RuntimeCommand): Runtime
       return toolEnabled("geodesic-cannon") ? effectsOnly({ ...command }) : nothing;
     case "start-cannon-carry":
       return toolEnabled("geodesic-cannon-carry") ? effectsOnly({ ...command }) : nothing;
-    case "start-cannon-tie-and-detach":
-      return toolEnabled("geodesic-cannon-tie-detach") ? effectsOnly({ ...command }) : nothing;
+    case "start-object-action":
+      // The world decides whether the action's tool is allowed (the tool request); nothing is checked here.
+      return effectsOnly({ ...command });
     case "start-cannon-rotation":
       return toolEnabled("geodesic-cannon-rotate") ? effectsOnly({ ...command }) : nothing;
     case "start-cannon-aim":
@@ -297,7 +287,7 @@ function reduceCommand(state: AppSessionState, command: RuntimeCommand): Runtime
 }
 
 /** The state with new debug settings; the portal-path overlay switch follows the debug options. */
-function withDebugSettings(state: AppSessionState, debugSettings: DebugSettings): AppSessionState {
+function withDebugSettings(state: ClientSessionState, debugSettings: DebugSettings): ClientSessionState {
   return {
     ...state,
     debugSettings,

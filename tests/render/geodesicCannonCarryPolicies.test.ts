@@ -9,17 +9,20 @@
  * - the emitter glides to the hand at no more than the speed cap when the tool is told how much time passed.
  * `tests/render/geodesicCannonCarry.test.ts` keeps the release, re-homing, glow and yaw behaviour.
  */
+import { createTestEngine } from "../support/engine";
+import { driveCarryTools } from "../support/carryTools";
+import { createDefaultWorldModules } from "../../src/runtime/experience";
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import { type CompiledCellComplex } from "../../src/cell-complex/compileCellComplex";
 import { yawRigidTransform3 } from "../../src/math/rigidTransform3";
 import { createDefaultPlayerPose, type PlayerPose } from "../../src/movement/playerPose";
 import { applyRuntimeCommand } from "../../src/runtime/applyRuntimeCommand";
-import { createTestAppSession } from "../support/appSession";
+import { createTestClientSession } from "../support/clientSession";
 import { handCarryLeashMeters } from "../../src/interaction/handCarry";
 import { carryMaxSpeedMetersPerSecond } from "../../src/world-objects/carry";
 import { shootGeodesic } from "../../src/world-objects/geodesic/cannon";
-import { isGeodesicLocked } from "../../src/world-objects/geodesic/lifecycle";
+import { arcConnectsEmitters } from "../../src/world-objects/geodesic/lifecycle";
 import { createGeodesicCannonObject, emitterConnectionToleranceMeters } from "../../src/world-objects/geodesic/objects";
 import { createRuntimeObjectRegistry, type RuntimeObjectRegistry } from "../../src/world-objects/runtimeObjectRegistry";
 import { createGeodesicCannonTools } from "../../src/render/three/geodesicCannonTools";
@@ -28,33 +31,34 @@ import { worldPointToThree } from "../../src/render/three/worldAxes";
 import { compileLargePortalWorld } from "../fixtures/world-objects/geodesic";
 
 function createHarness(world: CompiledCellComplex, registry: RuntimeObjectRegistry, playerPose: PlayerPose) {
-  const session = createTestAppSession({ playerPose });
+  const session = createTestClientSession();
+  const engine = createTestEngine({ registry, playerPose, getWorld: () => world, modules: createDefaultWorldModules() });
   const nothing = (): void => {};
-  const tools = createGeodesicCannonTools({
+  const rawTools = createGeodesicCannonTools({
     renderer: { xr: { isPresenting: false } } as unknown as THREE.WebGLRenderer,
     controls: { requestPointerLock: () => Promise.resolve() } as never,
     runtimeObjectRegistry: registry,
     getWorld: () => world,
     session,
+    engine,
     dispatch: (command) => {
       applyRuntimeCommand(session, command);
     },
     resolveCurrentAimTarget: () => undefined,
-    resolveCurrentAimTargets: () => [],
     targetIsWithinInteractionRange: () => false,
     logVerboseAimClick: nothing,
     findFocusedRuntimeObject: () => undefined,
     getGeodesicLabelsById: () => ({}),
+    objectActionsFor: () => [],
     syncDesktopPalette: nothing,
     syncRuntimeObjectPortalInstances: nothing,
     syncSelectableHitboxDebug: nothing,
-    refreshMeasuredGeodesicLengthsForGeodesic: nothing,
     removeMeasuredGeodesicLengthsForGeodesic: nothing,
     removeProtractorAnglesForGeodesic: nothing,
     removeProtractorAnglesForMissingVertices: nothing,
-    refreshProtractorAnglesForGeodesic: nothing,
-    refreshProtractorAnglesForGeodesics: nothing,
   });
+  // The shell steps the world after the tools have run; the harness steps it after each carry call.
+  const tools = driveCarryTools(rawTools, engine);
 
   return { tools, selectedTool: () => session.get().menuState.selectedTool };
 }
@@ -95,7 +99,7 @@ describe("the carry tool applies the agreed policies", () => {
     expect(emitter).toMatchObject({ kind: "geodesic-cannon", cellId: "a" });
     expect(emitter?.localPose.translation.y).toBeGreaterThan(4.9);
     expect(emitter?.localPose.translation.y).toBeLessThan(5);
-    expect(isGeodesicLocked(registry, "g-a")).toBe(true);
+    expect(arcConnectsEmitters(registry, "g-a")).toBe(true);
   });
 
   it("stops the emitter at a junction's zone, still carried, when a step would sweep it", () => {
@@ -104,7 +108,7 @@ describe("the carry tool applies the agreed policies", () => {
     const world = compileLargePortalWorld();
     const registry = createRuntimeObjectRegistry();
     registry.add(createGeodesicCannonObject({ id: "lamp", cellId: "b", localPose: yawRigidTransform3(0, { x: 1.6, y: 4.7, z: 0 }) }));
-    const { tools, selectedTool } = createHarness(world, registry, { ...createDefaultPlayerPose("a"), position: { x: 3.5, y: 2.5, z: 0 } });
+    const { tools, selectedTool } = createHarness(world, registry, { ...createDefaultPlayerPose("a"), position: { x: 4.5, y: 3.5, z: 0 } });
     const stopX = Math.sqrt((0.15 + emitterConnectionToleranceMeters) ** 2 - 0.3 ** 2);
 
     tools.startGeodesicCannonCarry("lamp");
@@ -203,7 +207,7 @@ describe("the carry tool applies the agreed policies", () => {
       expect(selectedTool()).toBe("none");
       const emitter = registry.get("cannon-b");
       expect(emitter).toMatchObject({ kind: "geodesic-cannon" });
-      expect(isGeodesicLocked(registry, "g-a")).toBe(true);
+      expect(arcConnectsEmitters(registry, "g-a")).toBe(true);
       const travelled = Math.hypot((emitter?.cellId === "b" ? 5 : 0) + (emitter?.localPose.translation.x ?? 0) - 6, (emitter?.localPose.translation.y ?? 0) - 2.5);
       expect(travelled).toBeLessThanOrEqual(carryMaxSpeedMetersPerSecond * frameSeconds + 1e-6);
     });
@@ -249,6 +253,6 @@ describe("the carry tool applies the agreed policies", () => {
 
     expect(frames).toBeGreaterThan(3);
     expect(registry.get("cannon-b")).toMatchObject({ cellId: "a" });
-    expect(isGeodesicLocked(registry, "g-a")).toBe(true);
+    expect(arcConnectsEmitters(registry, "g-a")).toBe(true);
   });
 });

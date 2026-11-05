@@ -25,15 +25,20 @@
  * The checks: the geodesic is still locked, still joins both emitters and ends in the emitter's cell, and the emitter
  * lives in the cell it is in. The geodesic-level rules are in `tests/world-objects/geodesic/carry.test.ts`.
  */
+import { publishLocalPlayerPose, readLocalPlayerPose } from "../../src/engine/worldEngine";
+import { participantAttachment } from "../../src/engine/moduleTypes";
+import { createTestEngine } from "../support/engine";
+import { driveCarryTools } from "../support/carryTools";
+import { createDefaultWorldModules } from "../../src/runtime/experience";
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import { applyRuntimeCommand } from "../../src/runtime/applyRuntimeCommand";
-import { createTestAppSession } from "../support/appSession";
+import { createTestClientSession } from "../support/clientSession";
 import { transformPoint3, yawRigidTransform3 } from "../../src/math/rigidTransform3";
 import { createGeodesicCannonObject } from "../../src/world-objects/geodesic/objects";
 import { shootGeodesic } from "../../src/world-objects/geodesic/cannon";
 import { getGeodesicSegments } from "../../src/world-objects/geodesic/segments";
-import { getGeodesicConnection, isGeodesicLocked } from "../../src/world-objects/geodesic/lifecycle";
+import { getGeodesicConnection, arcConnectsEmitters } from "../../src/world-objects/geodesic/lifecycle";
 import { createRuntimeObjectRegistry, type RuntimeObjectRegistry } from "../../src/world-objects/runtimeObjectRegistry";
 import { cube } from "../../src/authoring/exampleWorlds";
 import { compileCellComplex, type CompiledCellComplex } from "../../src/cell-complex/compileCellComplex";
@@ -49,45 +54,43 @@ function createHarness(
   registry: RuntimeObjectRegistry,
   startPose: PlayerPose,
 ) {
-  const session = createTestAppSession({ playerPose: startPose });
+  const session = createTestClientSession();
+  const engine = createTestEngine({ registry, playerPose: startPose, getWorld: () => world, modules: createDefaultWorldModules() });
   const nothing = (): void => {};
   // Where the aim ray hits, in the player's frame; none by default.
   const aim: { rootPoint?: { x: number; y: number; z: number } } = {};
-  const tools = createGeodesicCannonTools({
+  const rawTools = createGeodesicCannonTools({
     renderer: { xr: { isPresenting: false } } as unknown as THREE.WebGLRenderer,
     controls: { requestPointerLock: () => Promise.resolve() } as never,
     runtimeObjectRegistry: registry,
     getWorld: () => world,
     session,
+    engine,
     dispatch: (command) => {
       applyRuntimeCommand(session, command);
     },
     resolveCurrentAimTarget: () => (aim.rootPoint ? ({ kind: "floor", rootPoint: aim.rootPoint } as unknown as AimTarget) : undefined),
-    resolveCurrentAimTargets: () => [],
     targetIsWithinInteractionRange: () => false,
     logVerboseAimClick: nothing,
     findFocusedRuntimeObject: () => undefined,
     getGeodesicLabelsById: () => ({}),
+    objectActionsFor: () => [],
     syncDesktopPalette: nothing,
     syncRuntimeObjectPortalInstances: nothing,
     syncSelectableHitboxDebug: nothing,
-    refreshMeasuredGeodesicLengthsForGeodesic: nothing,
     removeMeasuredGeodesicLengthsForGeodesic: nothing,
     removeProtractorAnglesForGeodesic: nothing,
     removeProtractorAnglesForMissingVertices: nothing,
-    refreshProtractorAnglesForGeodesic: nothing,
-    refreshProtractorAnglesForGeodesics: nothing,
   });
+  // The shell steps the world after the tools have run; the harness steps it after each carry call.
+  const tools = driveCarryTools(rawTools, engine);
 
   // The player stands in `cellId` at (x, y); how they got there does not matter to the tools.
   function walkInto(cellId: string, x: number, y: number): void {
-    applyRuntimeCommand(session, {
-      kind: "set-player-pose",
-      pose: { ...session.get().playerPose, cellId, position: { x, y, z: 0 } },
-    });
+    publishLocalPlayerPose(engine, { ...readLocalPlayerPose(engine), cellId, position: { x, y, z: 0 } });
   }
 
-  return { world, registry, tools, walkInto, session, aim };
+  return { world, registry, tools, walkInto, session, engine, aim };
 }
 
 function setup() {
@@ -140,7 +143,7 @@ function handAt(x: number, y: number): RootAimRay {
 describe("releasing a carried emitter of a locked geodesic", () => {
   it("keeps the geodesic when the emitter is let go beyond a portal of the player's cell", () => {
     const { registry, tools } = setup();
-    expect(isGeodesicLocked(registry, "g-a")).toBe(true);
+    expect(arcConnectsEmitters(registry, "g-a")).toBe(true);
 
     tools.startGeodesicCannonCarry("cannon-b");
     // The player stands in cell a; the hand is past a's portal at x = 5, so the emitter sits in b at (0.8, 3).
@@ -151,8 +154,8 @@ describe("releasing a carried emitter of a locked geodesic", () => {
 
     const released = registry.get("cannon-b");
     expect(released).toMatchObject({ kind: "geodesic-cannon", cellId: "b" });
-    expect(registry.get("g-a")).toMatchObject({ kind: "geodesic-interval" });
-    expect(isGeodesicLocked(registry, "g-a")).toBe(true);
+    expect(registry.get("g-a")).toMatchObject({ kind: "geodesicModel/arc" });
+    expect(arcConnectsEmitters(registry, "g-a")).toBe(true);
     expect(getGeodesicConnection(registry, "g-a")).toEqual({
       outgoingEmitterId: "cannon-a",
       incomingEmitterId: "cannon-b",
@@ -173,28 +176,28 @@ describe("releasing a carried emitter of a locked geodesic", () => {
 
     // The hand was on the bottom face, so the emitter ends there and the geodesic no longer visits back.
     expect(registry.get("cannon-b")).toMatchObject({ kind: "geodesic-cannon", cellId: "bottom" });
-    expect(registry.get("g-a")).toMatchObject({ kind: "geodesic-interval" });
-    expect(isGeodesicLocked(registry, "g-a")).toBe(true);
+    expect(registry.get("g-a")).toMatchObject({ kind: "geodesicModel/arc" });
+    expect(arcConnectsEmitters(registry, "g-a")).toBe(true);
     expect(getGeodesicConnection(registry, "g-a")).toMatchObject({ state: "connected" });
   });
 
   it("keeps the geodesic when an emitter on another face is picked up and let go", () => {
-    // The emitter is on the right face; the player stands on the top face, which is next to it.
-    const { registry, tools } = setupCube("top", 0, 0);
+    // The emitter is on the right face, within the player's reach; the hand is on the top face, past the right face's wall at y = 7.5.
+    const { registry, tools } = setupCube("right", -2.4, -3);
 
     tools.startGeodesicCannonCarry("cannon-b");
-    tools.updateCarriedGeodesicCannonPose(true, handAt(1, 1));
-    tools.updateCarriedGeodesicCannonPose(true, handAt(1.5, 1.2));
+    tools.updateCarriedGeodesicCannonPose(true, handAt(-2.4, 8));
+    tools.updateCarriedGeodesicCannonPose(true, handAt(-2.4, 8.3));
     tools.finishGeodesicCannonCarry();
 
     expect(registry.get("cannon-b")).toMatchObject({ kind: "geodesic-cannon", cellId: "top" });
-    expect(registry.get("g-a")).toMatchObject({ kind: "geodesic-interval" });
-    expect(isGeodesicLocked(registry, "g-a")).toBe(true);
+    expect(registry.get("g-a")).toMatchObject({ kind: "geodesicModel/arc" });
+    expect(arcConnectsEmitters(registry, "g-a")).toBe(true);
     expect(getGeodesicConnection(registry, "g-a")).toMatchObject({ state: "connected" });
   });
 
   it("keeps the geodesic ending in the emitter's cell at every step of a drag across two faces", () => {
-    const { registry, tools } = setupCube("right", 0, 0);
+    const { registry, tools } = setupCube("right", -2.4, -3);
     tools.startGeodesicCannonCarry("cannon-b");
 
     const cellsSeen = new Set<string>();
@@ -209,7 +212,7 @@ describe("releasing a carried emitter of a locked geodesic", () => {
     tools.finishGeodesicCannonCarry();
 
     expect(cellsSeen.size).toBeGreaterThan(1);
-    expect(registry.get("g-a")).toMatchObject({ kind: "geodesic-interval" });
+    expect(registry.get("g-a")).toMatchObject({ kind: "geodesicModel/arc" });
   });
 
   it("turns an emitter with the face it is carried onto, its launch yaw following", () => {
@@ -232,7 +235,36 @@ describe("releasing a carried emitter of a locked geodesic", () => {
     expect(emitter.cellId).toBe("bottom");
     expect(Math.cos(poseYaw - faceTurn)).toBeCloseTo(1, 6);
     expect(Math.cos(emitter.aimYawRadians - poseYaw)).toBeCloseTo(1, 6);
-    expect(isGeodesicLocked(registry, "g-a")).toBe(true);
+    expect(arcConnectsEmitters(registry, "g-a")).toBe(true);
+  });
+});
+
+describe("leaving the carry tool puts the emitter down in the world", () => {
+  const leavers = [
+    ["clearing the selected tool", { kind: "clear-selected-tool" }],
+    ["selecting another tool", { kind: "select-tool", toolId: "protractor" }],
+    ["cancelling the menu and tool", { kind: "cancel-menu-and-tool" }],
+  ] as const;
+
+  it.each(leavers)("detaches after %s", (_name, command) => {
+    const { engine, session, tools } = setupCube("right", -2.4, -3);
+    tools.startGeodesicCannonCarry("cannon-b");
+    expect(participantAttachment(engine.read.participant("local"), "carry")?.objectId).toBe("cannon-b");
+
+    applyRuntimeCommand(session, command);
+    tools.updateCarriedGeodesicCannonPose(true, handAt(-2.4, -3));
+
+    expect(participantAttachment(engine.read.participant("local"), "carry")).toBeUndefined();
+  });
+
+  it("leaves the tool when the world refuses the pickup", () => {
+    const { engine, session, tools } = setupCube("right", -2.4, -3);
+    engine.publishBody("local", { ...readLocalPlayerPose(engine), cellId: "top", position: { x: 0, y: 0, z: 0 } });
+
+    tools.startGeodesicCannonCarry("cannon-b");
+
+    expect(session.get().menuState.selectedTool).toBe("none");
+    expect(participantAttachment(engine.read.participant("local"), "carry")).toBeUndefined();
   });
 });
 

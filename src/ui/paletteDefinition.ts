@@ -3,6 +3,7 @@
  * The content types form a discriminated union keyed by kind (main, settings, debug-settings, place-flag-options, edit-sign, geodesic-cannon-actions, geometry-computer-actions, tutorial, goal, question-help).
  * The module decides what is shown and enabled (config-gated sections, disabled buttons, tutorial text per input device, integer-meter limits for the geometry computer) but performs no rendering and holds no state; any page whose payload is missing falls back to the main page.
  */
+import type { ObjectActionEntry } from "../engine/moduleTypes";
 import { appConfigCatalog, defaultAppConfig, getEnabledMainTools, type AppConfig, type ConfigurableToolId } from "../glue/appConfig";
 import { formatBodyForInputMode } from "./inputModeText";
 import { worldCatalog } from "../authoring/worldCatalog";
@@ -98,7 +99,7 @@ export interface EditSignPaletteContent {
   readonly maxLength: number;
 }
 
-/** Content of the geodesic emitter menu: add/carry/tie-detach actions and one row per geodesic. */
+/** Content of the geodesic emitter menu: the add and carry actions, the actions tools contribute, and one row per geodesic. */
 export interface GeodesicCannonActionsPaletteContent {
   readonly kind: "geodesic-cannon-actions";
   readonly cannonId: string;
@@ -110,10 +111,8 @@ export interface GeodesicCannonActionsPaletteContent {
     readonly label: string;
     readonly disabled: boolean;
   };
-  readonly tieAndDetachAction: {
-    readonly label: string;
-    readonly disabled: boolean;
-  };
+  /** The actions the tools contribute to the page (design 013 section 8.3), in order, each with its availability. */
+  readonly objectActions: readonly ObjectActionEntry[];
   /**
    * One entry per geodesic of the emitter; locked ones carry a connection label explaining they run between emitters.
    */
@@ -366,10 +365,7 @@ export function createPaletteDefinition(
         cannonId: state.geodesicCannonOptions.cannonId,
         addAction: { label: "Add geodesic", disabled: false },
         carryAction: { label: "Carry", disabled: false },
-        tieAndDetachAction: {
-          label: "Tie & detach",
-          disabled: state.geodesicCannonOptions.canTieAndDetach !== true,
-        },
+        objectActions: state.geodesicCannonOptions.objectActions ?? [],
         geodesics: createGeodesicCannonEntries(
           state.geodesicCannonOptions.geodesicIds,
           state.geodesicCannonOptions.geodesicLabelsById,

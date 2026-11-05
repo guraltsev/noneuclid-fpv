@@ -6,9 +6,11 @@
  * the id of the object whose help the player pinned. Menu, tool and protractor selection state are read from the session.
  * The tooltip, cross marker and help lens handles are created and disposed by the shell. Everything is hidden while a menu is open.
  */
+import { readLocalPlayerPose, type WorldEngine } from "../../engine/worldEngine";
 import * as THREE from "three";
 import type { AimTarget } from "../../interaction/aimTarget";
-import type { AppSession } from "../../runtime/appSession";
+import type { ClientSession } from "../../runtime/clientSession";
+import type { ToolsById } from "../../runtime/toolRegistry";
 import { createHelpLensDefinition } from "../../ui/helpLensDefinition";
 import type { RuntimeObjectRegistry, RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
 import {
@@ -34,7 +36,11 @@ export interface AimFeedbackDeps {
   /** Main camera; the help lens panel is placed from it. */
   readonly camera: THREE.Camera;
   /** The shell session; menu, tool and protractor state are read from it. */
-  readonly session: AppSession;
+  readonly session: ClientSession;
+  /** The shell's tool lookup (read at use, so the shell may build it after this module); the aim cross and the help lens follow the selected tool's descriptor. */
+  readonly toolsById: () => ToolsById;
+  /** The world engine; the player's pose is read from it. */
+  readonly engine: WorldEngine;
   /** Registry of runtime objects; read to find the nearest auto-help object and to read emitters. */
   readonly runtimeObjectRegistry: RuntimeObjectRegistry;
   /** Cell root groups; the protractor drawing is parented into the root of its cell. */
@@ -90,7 +96,7 @@ export interface AimFeedback {
 
 /** Creates the aim feedback and adds its controller ray (hidden) to the scene. */
 export function createAimFeedback(deps: AimFeedbackDeps): AimFeedback {
-  const { scene, camera, session, runtimeObjectRegistry, cellMeshes, floatingObjectTooltip, aimCrossMarker, helpLensRenderer } = deps;
+  const { scene, camera, session, engine, runtimeObjectRegistry, cellMeshes, floatingObjectTooltip, aimCrossMarker, helpLensRenderer } = deps;
 
   const aimControllerRayPositions = new Float32Array(6);
   const aimControllerRayGeometry = new THREE.BufferGeometry();
@@ -169,19 +175,9 @@ export function createAimFeedback(deps: AimFeedbackDeps): AimFeedback {
   }
 
   function updateAimCrossMarker(xrActive: boolean, activeAimRay: RootAimRay | undefined): void {
-    if (
-      (
-        currentMenuState().selectedTool !== "none" &&
-        currentMenuState().selectedTool !== "aim" &&
-        currentMenuState().selectedTool !== "place-flag" &&
-        currentMenuState().selectedTool !== "geodesic-cannon" &&
-        currentMenuState().selectedTool !== "geodesic-cannon-aim" &&
-        currentMenuState().selectedTool !== "geodesic-cannon-tie-detach" &&
-        currentMenuState().selectedTool !== "measure-length" &&
-        currentMenuState().selectedTool !== "protractor"
-      ) ||
-      currentMenuState().isOpen
-    ) {
+    // "none" and "aim" have no descriptor and show the cross.
+    const selectedTool = deps.toolsById().get(currentMenuState().selectedTool);
+    if ((selectedTool !== undefined && !selectedTool.showsAimCross) || currentMenuState().isOpen) {
       aimCrossMarker.update(undefined);
       updateAimControllerRay(false);
       return;
@@ -222,7 +218,7 @@ export function createAimFeedback(deps: AimFeedbackDeps): AimFeedback {
     const target = activeAimRay ? deps.resolveCurrentAimTarget(activeAimRay) : undefined;
     const usableTarget = deps.targetIsWithinInteractionRange(target) ? target : undefined;
     const center = protractor.center ??
-      (usableTarget?.object?.kind === "geodesic-cannon" || usableTarget?.object?.kind === "geodesic-intersection"
+      (usableTarget?.object?.kind === "geodesic-cannon" || usableTarget?.object?.kind === "geodesicModel/crossing"
         ? resolveProtractorCenterSelection(runtimeObjectRegistry, usableTarget.object)
         : undefined);
     if (!center) {
@@ -259,7 +255,7 @@ export function createAimFeedback(deps: AimFeedbackDeps): AimFeedback {
     target: AimTarget | undefined,
     center: ProtractorCenterSelection,
   ): ProtractorDirectedGeodesic | undefined {
-    if (target?.object?.kind === "geodesic-segment") {
+    if (target?.object?.kind === "geodesicModel/segment") {
       const selected = resolveProtractorDirectedGeodesicSelection({
         center,
         segment: target.object,
@@ -368,20 +364,21 @@ export function createAimFeedback(deps: AimFeedbackDeps): AimFeedback {
       focus,
       selectedTool: currentMenuState().selectedTool,
       inputMode: xrActive ? "xr" : "desktop",
+      toolsById: deps.toolsById(),
     });
   }
 
   function findAutomaticHelpObject(): RuntimeWorldObject | undefined {
     let best: { readonly object: RuntimeWorldObject; readonly distanceSquared: number } | undefined;
-    for (const object of runtimeObjectRegistry.getObjectsInCell(session.get().playerPose.cellId)) {
+    for (const object of runtimeObjectRegistry.getObjectsInCell(readLocalPlayerPose(engine).cellId)) {
       const rangeMeters = object.autoDisplayHelpRangeMeters;
       if (!object.displayHelpMessage || rangeMeters === undefined) {
         continue;
       }
 
-      const dx = object.localPose.translation.x - session.get().playerPose.position.x;
-      const dy = object.localPose.translation.y - session.get().playerPose.position.y;
-      const dz = object.localPose.translation.z - session.get().playerPose.position.z;
+      const dx = object.localPose.translation.x - readLocalPlayerPose(engine).position.x;
+      const dy = object.localPose.translation.y - readLocalPlayerPose(engine).position.y;
+      const dz = object.localPose.translation.z - readLocalPlayerPose(engine).position.z;
       const distanceSquared = dx * dx + dy * dy + dz * dz;
       if (distanceSquared > rangeMeters * rangeMeters) {
         continue;

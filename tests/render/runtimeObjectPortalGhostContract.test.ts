@@ -8,6 +8,7 @@
  * The table of kinds is keyed by every `kind` of `RuntimeWorldObject`, so adding a kind to the union fails typecheck until the kind is listed
  * here with an object to test, or with the reason it needs no ghosts. That is what stops the same gap from being found one kind at a time.
  */
+import { createTestEngine } from "../support/engine";
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
@@ -31,7 +32,7 @@ import {
 import type { RuntimeObjectRenderSourceMesh } from "../../src/render/three/runtimeObjectRenderRecords";
 import type { VisiblePortalPath } from "../../src/render/three/visiblePortalPaths";
 import { createGeodesicCannonObject } from "../../src/world-objects/geodesic/objects";
-import type { GeodesicIntersectionObject } from "../../src/world-objects/geodesic/objects";
+import type { GeodesicCrossingObject } from "../../src/world-objects/geodesic/objects";
 import { createPlacedFlagObject } from "../../src/world-objects/placedFlags";
 import {
   createRuntimeObjectRegistry,
@@ -40,7 +41,7 @@ import {
 } from "../../src/world-objects/runtimeObjectRegistry";
 import type { MeasuredGeodesicLengthObject, ProtractorAngleObject } from "../../src/world-objects/toolObjects";
 import { readGlbBounds } from "../support/glbBounds";
-import { createTestAppSession } from "../support/appSession";
+import { createTestClientSession } from "../support/clientSession";
 import { createFakePreparedAssets } from "../support/preparedAssets";
 import type { PlayerPose } from "../../src/movement/playerPose";
 
@@ -76,10 +77,10 @@ const kinds: Record<Kind, KindCase> = {
       activeGeodesicId: "g1",
     }),
   },
-  "geodesic-intersection": {
-    object: (cellId, x, y): GeodesicIntersectionObject => ({
+  "geodesicModel/crossing": {
+    object: (cellId, x, y): GeodesicCrossingObject => ({
       id: "subject",
-      kind: "geodesic-intersection",
+      kind: "geodesicModel/crossing",
       cellId,
       localPose: standing(x, y),
       portalRenderable: true,
@@ -87,10 +88,10 @@ const kinds: Record<Kind, KindCase> = {
       segmentIds: ["g1:segment:0", "g2:segment:0"],
     }),
   },
-  "measured-geodesic-length": {
+  "geodesicMeasurements/length": {
     object: (cellId, x, y): MeasuredGeodesicLengthObject => ({
       id: "subject",
-      kind: "measured-geodesic-length",
+      kind: "geodesicMeasurements/length",
       cellId,
       localPose: standing(x, y),
       portalRenderable: true,
@@ -99,10 +100,10 @@ const kinds: Record<Kind, KindCase> = {
       labelPoint: { x, y, z: 0 },
     }),
   },
-  "protractor-angle": {
+  "geodesicMeasurements/angle": {
     object: (cellId, x, y): ProtractorAngleObject => ({
       id: "subject",
-      kind: "protractor-angle",
+      kind: "geodesicMeasurements/angle",
       cellId,
       localPose: standing(x, y),
       portalRenderable: true,
@@ -115,12 +116,11 @@ const kinds: Record<Kind, KindCase> = {
       radiusMeters: 0.3,
     }),
   },
-  "geodesic-segment": {
+  "geodesicModel/segment": {
     exempt: "a segment is computed per cell and continues as the next segment of the geodesic in the next cell; ghosting it would draw it twice",
   },
-  "geodesic-interval": { exempt: notDrawn },
-  "free-geodesic-end": { exempt: notDrawn },
-  "curve-shortening-pair": { exempt: notDrawn },
+  "geodesicModel/arc": { exempt: notDrawn },
+  "geodesicModel/vertex": { exempt: notDrawn },
 };
 
 const squareRoomBase = [
@@ -192,7 +192,8 @@ function setup(
     maxVisiblePaths: 4,
     diagnostics: createRuntimeObjectRenderArchetypeDiagnostics(),
     getWorld: () => world,
-    session: createTestAppSession(player.pose ? { playerPose: player.pose } : {}),
+    session: createTestClientSession(),
+    engine: createTestEngine(player.pose ? { playerPose: player.pose } : {}),
     buildArchetype: (source, capacity) => buildRuntimeObjectRenderArchetype(source, capacity, undefined),
   });
   return { registry, sync, renderArchetypesByKey };
@@ -337,8 +338,8 @@ const poseAt = (x: number): PlayerPose => ({ cellId: "room-b", position: { x, y:
 /** What each source of the sync's records is checked by. A new source must be listed in `runtimeObjectRecordSources` and then here. */
 const sourceChecks: Record<RuntimeObjectRecordSource, { readonly coveredBy: string } | { readonly exempt: keyof typeof portalGhostExemptions }> = {
   "runtime-objects": { coveredBy: "the per-kind tests above" },
-  "geodesic-body-parts": { coveredBy: "the geodesic-cannon and geodesic-intersection kinds above" },
-  "geodesic-segments": { exempt: "geodesic-segment" },
+  "geodesic-body-parts": { coveredBy: "the geodesic-cannon and geodesicModel/crossing kinds above" },
+  "geodesic-segments": { exempt: "geodesicModel/segment" },
   "carry-highlight": { coveredBy: "tests/render/carryHighlight.test.ts (a shape across a portal is drawn on both sides)" },
   "player-rover": { coveredBy: "the player rover tests below" },
 };

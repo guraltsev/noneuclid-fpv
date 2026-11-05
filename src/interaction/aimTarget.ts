@@ -306,9 +306,9 @@ function intersectAimObject(
 ): ObjectAimHit | undefined {
   const bounds = getDynamicObjectCollisionBounds(runtimeObjectToDynamicObjectState(object));
   // Pick the proxy shape by object kind: protractor label box, geodesic capsule, cannon cylinder+sphere+handles, collision cylinder, else a small sphere at the pose.
-  return object.kind === "protractor-angle"
+  return object.kind === "geodesicMeasurements/angle"
     ? intersectRayWithProtractorAngleLabelHitbox(object, origin, direction)
-    : object.kind === "geodesic-segment"
+    : object.kind === "geodesicModel/segment"
     ? intersectRayWithSelectableSegment(object, origin, direction)
     : object.kind === "geodesic-cannon"
       ? intersectRayWithGeodesicEmitterAimCylinder(registry, origin, direction, object, ignoredGeodesicIds)
@@ -330,15 +330,11 @@ function resolveObjectAimTargets(
   const hits: AimTarget[] = [];
 
   for (const object of registry.getObjectsInCell(cell.id)) {
-    if (object.kind === "protractor-angle" && !object.portalRenderable) {
+    if (object.kind === "geodesicMeasurements/angle" && !object.portalRenderable) {
       continue;
     }
 
-    if (object.kind === "geodesic-segment" && ignoredGeodesicIds.has(object.geodesicId)) {
-      continue;
-    }
-
-    if (object.kind === "geodesic-segment" && object.connectionState === "moving") {
+    if (object.kind === "geodesicModel/segment" && ignoredGeodesicIds.has(object.geodesicId)) {
       continue;
     }
 
@@ -362,7 +358,7 @@ function resolveObjectAimTargets(
 
     const localPoint = hit.point ?? pointOnRay(ray.origin, ray.direction, hit.distance);
     // Sticky targets (saved aim points) override the raw hit, except protractor labels prefer the live hitbox centre.
-    const targetLocalPoint = object.kind === "protractor-angle"
+    const targetLocalPoint = object.kind === "geodesicMeasurements/angle"
       ? hit.targetPoint ?? object.aimStickyTarget?.localPoint ?? localPoint
       : object.aimStickyTarget?.localPoint ?? hit.targetPoint ?? localPoint;
     hits.push({
@@ -414,20 +410,20 @@ function isGeodesicVsEmitterChoice(left: AimTarget, right: AimTarget): boolean {
 }
 
 function isGeodesicAimObjectKind(kind: RuntimeWorldObject["kind"] | undefined): boolean {
-  return kind === "geodesic-segment" || kind === "geodesic-intersection";
+  return kind === "geodesicModel/segment" || kind === "geodesicModel/crossing";
 }
 
 // Higher is preferred: protractor 5, cannon 4, geodesic intersection 3, geodesic segment 1, everything else (floor, plain objects) 0.
 function getAimTargetPriority(target: AimTarget): number {
-  if (target.object?.kind === "protractor-angle") {
+  if (target.object?.kind === "geodesicMeasurements/angle") {
     return 5;
   }
 
-  if (target.object?.kind === "geodesic-intersection") {
+  if (target.object?.kind === "geodesicModel/crossing") {
     return 3;
   }
 
-  if (target.object?.kind === "geodesic-segment") {
+  if (target.object?.kind === "geodesicModel/segment") {
     return 1;
   }
 
@@ -440,7 +436,7 @@ function getAimTargetPriority(target: AimTarget): number {
 
 // Capsule hit for a geodesic segment with the aimed distance clamped to the segment and the aim point snapped to the centerline.
 function intersectRayWithSelectableSegment(
-  segment: Extract<RuntimeWorldObject, { readonly kind: "geodesic-segment" }>,
+  segment: Extract<RuntimeWorldObject, { readonly kind: "geodesicModel/segment" }>,
   rayOrigin: Vec3,
   rayDirection: Vec3,
 ): ObjectAimHit | undefined {
@@ -803,7 +799,7 @@ function intersectRayWithVerticalCylinder(
 
 // Label hitbox is a yawed box (half-extents from width/depth/height); the aim target is the box centre.
 function intersectRayWithProtractorAngleLabelHitbox(
-  angle: Extract<RuntimeWorldObject, { readonly kind: "protractor-angle" }>,
+  angle: Extract<RuntimeWorldObject, { readonly kind: "geodesicMeasurements/angle" }>,
   origin: Vec3,
   direction: Vec3,
 ): ObjectAimHit | undefined {

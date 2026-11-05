@@ -6,14 +6,14 @@
  * maps each runtime object to records naming an archetype and a Three.js model matrix (meters, cell-local pose converted
  * from world axes with x right, y forward, z up). Segments are a unit-length ribbon along local +x scaled non-uniformly to
  * the segment length; cannon heads are yawed per geodesic emitter. The ribbon colour selects archetype state: tie-detach
- * selection beats moving, which beats connected, which beats the default. Assets that fail to be preloaded fall back to simple procedural
+ * selection beats connected, which beats the default. Assets that fail to be preloaded fall back to simple procedural
  * stand-ins, so source creation never throws.
  */
 import * as THREE from "three";
 import {
   geodesicRayBeamHeightMeters,
   type GeodesicCannonObject,
-  type GeodesicIntersectionObject,
+  type GeodesicCrossingObject,
   type GeodesicSegmentObject,
 } from "../../world-objects/geodesic/objects";
 import { yawRigidTransform3, type RigidTransform3 } from "../../math/rigidTransform3";
@@ -28,8 +28,6 @@ import { rigidTransformToThreeMatrix } from "./worldAxes";
 export const geodesicSegmentArchetypeKey = "geodesic-segment:ribbon-cross";
 /** Archetype of a geodesic segment that is connected (tied) to others; amber ribbon. */
 export const geodesicSegmentConnectedArchetypeKey = "geodesic-segment:ribbon-cross:connected";
-/** Archetype of a segment currently being straightened; orange ribbon. */
-export const geodesicSegmentMovingArchetypeKey = "geodesic-segment:ribbon-cross:moving";
 /** Archetype of a segment selected for tie detachment; green ribbon. */
 export const geodesicSegmentTieDetachSelectedArchetypeKey = "geodesic-segment:ribbon-cross:tie-detach-selected";
 /** Archetype-key prefix (followed by `:<mesh>`) for the cannon post meshes. */
@@ -37,7 +35,7 @@ export const geodesicRayPostArchetypePrefix = "geodesic-ray:post";
 /** Archetype-key prefix (followed by `:<mesh>`) for the per-geodesic cannon head (lightsaber) meshes. */
 export const geodesicRayHeadArchetypePrefix = "geodesic-ray:head";
 /** Archetype-key prefix (followed by `:<mesh>`) for the intersection balloon meshes. */
-export const geodesicIntersectionArchetypePrefix = "geodesic-intersection:balloon";
+export const geodesicIntersectionArchetypePrefix = "geodesicModel/crossing:balloon";
 /** glTF asset paths (relative to the public asset root) needed by the geodesic renderer. */
 export const geodesicRayAssetPaths = {
   post: "flashlight/Post.glb",
@@ -68,11 +66,6 @@ export function createGeodesicRuntimeRenderSources(
       archetypeKey: geodesicSegmentConnectedArchetypeKey,
       color: 0xf6c445,
       opacity: 0.92,
-    }),
-    createSegmentSource({
-      archetypeKey: geodesicSegmentMovingArchetypeKey,
-      color: 0xf59e0b,
-      opacity: 0.94,
     }),
     createSegmentSource({
       archetypeKey: geodesicSegmentTieDetachSelectedArchetypeKey,
@@ -110,7 +103,7 @@ export interface GeodesicBodyPlacement {
  */
 export function collectGeodesicBodyPlacements(
   registry: RuntimeObjectRegistry,
-  object: GeodesicCannonObject | GeodesicSegmentObject | GeodesicIntersectionObject,
+  object: GeodesicCannonObject | GeodesicSegmentObject | GeodesicCrossingObject,
   geodesicArchetypeKeys: readonly string[] = [],
 ): readonly GeodesicBodyPlacement[] {
   const keysWithPrefix = (prefix: string): readonly string[] => geodesicArchetypeKeys.filter((key) => key.startsWith(`${prefix}:`));
@@ -127,7 +120,7 @@ export function collectGeodesicBodyPlacements(
         archetypeKeys: headKeys,
       });
     }
-  } else if (object.kind === "geodesic-intersection") {
+  } else if (object.kind === "geodesicModel/crossing") {
     placements.push({ objectId: object.id, cellId: object.cellId, localPose: object.localPose, archetypeKeys: keysWithPrefix(geodesicIntersectionArchetypePrefix) });
   }
 
@@ -146,10 +139,10 @@ export function collectGeodesicBodyPlacements(
  */
 export function collectGeodesicRuntimeRenderRecords(
   registry: RuntimeObjectRegistry,
-  object: GeodesicCannonObject | GeodesicSegmentObject | GeodesicIntersectionObject,
+  object: GeodesicCannonObject | GeodesicSegmentObject | GeodesicCrossingObject,
   geodesicArchetypeKeys: readonly string[] = [],
 ): readonly RuntimeObjectRenderRecord[] {
-  if (object.kind === "geodesic-cannon" || object.kind === "geodesic-intersection") {
+  if (object.kind === "geodesic-cannon" || object.kind === "geodesicModel/crossing") {
     return collectGeodesicBodyPlacements(registry, object, geodesicArchetypeKeys).flatMap((placement) => {
       const localMatrix = rigidTransformToThreeMatrix(placement.localPose);
       return placement.archetypeKeys.map((archetypeKey) => ({
@@ -165,11 +158,9 @@ export function collectGeodesicRuntimeRenderRecords(
     {
       objectId: object.id,
       cellId: object.cellId,
-      // State priority: tie-detach selection, then moving, then connected, else default.
+      // State priority: tie-detach selection, then connected, else default.
       archetypeKey: object.highlightState === "tie-detach-selected"
         ? geodesicSegmentTieDetachSelectedArchetypeKey
-        : object.connectionState === "moving"
-        ? geodesicSegmentMovingArchetypeKey
         : object.connectionState === "connected"
           ? geodesicSegmentConnectedArchetypeKey
           : geodesicSegmentArchetypeKey,
@@ -297,15 +288,15 @@ function createIntersectionBalloonSources(
   assets: PreparedWorldAssets | undefined,
 ): readonly RuntimeObjectRenderSourceMesh[] {
   const root = new THREE.Group();
-  root.name = "geodesic-intersection-balloon-source";
+  root.name = "geodesicModel/crossing-balloon-source";
   const balloon = assets?.instantiateGltf(geodesicRayAssetPaths.balloon)?.scene ?? createFallbackBalloon();
-  balloon.name = "asset:geodesic-intersection-balloon";
+  balloon.name = "asset:geodesicModel/crossing-balloon";
   balloon.scale.setScalar(geodesicIntersectionBalloonScale);
   root.add(balloon);
   root.updateMatrixWorld(true);
 
   return collectRuntimeObjectRenderSourceMeshes(
-    "geodesic-intersection:balloon-source",
+    "geodesicModel/crossing:balloon-source",
     root,
     geodesicIntersectionArchetypePrefix,
   );

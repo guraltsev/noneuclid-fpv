@@ -6,10 +6,10 @@
  * and Three handles: with a menu open everything is hidden, a focused sign gets a desktop tooltip, a pinned help follows the
  * focused object until it is dismissed, and the aim cross is shown for the aim tool with a ray only in XR.
  */
+import { createTestEngine } from "../support/engine";
 import * as THREE from "three";
 import { describe, expect, it, vi } from "vitest";
 import type { AimTarget } from "../../src/interaction/aimTarget";
-import { createDefaultPlayerPose } from "../../src/movement/playerPose";
 import { createRuntimeMenuState } from "../../src/runtime/runtimeMenuState";
 import { createWorldFocusMessageDefinition } from "../../src/ui/worldInteractionDefinition";
 import { createPlacedFlagObject } from "../../src/world-objects/placedFlags";
@@ -17,8 +17,9 @@ import { createRuntimeObjectRegistry, type RuntimeWorldObject } from "../../src/
 import { identityRigidTransform3 } from "../../src/math/rigidTransform3";
 import { createAimFeedback } from "../../src/render/three/aimFeedback";
 import type { RootAimRay } from "../../src/render/three/rootAimRay";
-import type { AppSessionState } from "../../src/runtime/appSession";
-import { createTestAppSession } from "../support/appSession";
+import type { ClientSessionState } from "../../src/runtime/clientSession";
+import { createTestClientSession } from "../support/clientSession";
+import { createTestToolsById } from "../support/tools";
 
 const sign = createPlacedFlagObject({
   id: "sign-a",
@@ -46,19 +47,22 @@ const floorTarget: AimTarget = {
   hopCount: 0,
 };
 
-function createHarness(sessionOverrides: Partial<AppSessionState> = {}) {
+function createHarness(sessionOverrides: Partial<ClientSessionState> = {}) {
   const focus: { object: RuntimeWorldObject | undefined } = { object: sign };
-  const session = createTestAppSession({ playerPose: createDefaultPlayerPose("room-a"), ...sessionOverrides });
+  const session = createTestClientSession(sessionOverrides);
   const scene = new THREE.Scene();
   const tooltipUpdates: { visible: boolean; text?: string }[] = [];
   const helpUpdates: { visible: boolean; title?: string }[] = [];
   const crossUpdates: (AimTarget | undefined)[] = [];
   const xrTooltipUpdates: unknown[] = [];
   const crossRoot = new THREE.Group();
+  const toolsById = createTestToolsById();
   const feedback = createAimFeedback({
+    toolsById: () => toolsById,
     scene,
     camera: new THREE.PerspectiveCamera(),
     session,
+    engine: createTestEngine(),
     runtimeObjectRegistry: createRuntimeObjectRegistry(),
     cellMeshes: new Map(),
     floatingObjectTooltip: {

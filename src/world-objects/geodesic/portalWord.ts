@@ -5,7 +5,7 @@ import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex"
 import type {
   GeodesicCarryPortalTransition,
   GeodesicEndRole,
-  GeodesicIntervalObject,
+  GeodesicArcObject,
   GeodesicPortalTraversal,
   TraceGeodesicSegmentResult,
 } from "./objects";
@@ -30,7 +30,7 @@ export function reverseGeodesicPortalWord(
 
 /** Returns the interval's portal word read from `sourceRole` to `targetRole`: the stored word, its inverse, or empty when the roles are equal. */
 export function getPortalWordBetweenEndpointRoles(input: {
-  readonly interval: GeodesicIntervalObject;
+  readonly interval: GeodesicArcObject;
   readonly sourceRole: GeodesicEndRole;
   readonly targetRole: GeodesicEndRole;
 }): readonly GeodesicPortalTraversal[] {
@@ -117,7 +117,7 @@ export function getPortalTraversalFromSource(
 // freely reduced. Returns undefined when neither role is on the anchor. Does not check the cell chain; callers do.
 /** Portal word of an interval after one of its anchors crossed a portal. */
 export function portalWordAfterAnchorCrossing(input: {
-  readonly interval: GeodesicIntervalObject;
+  readonly interval: GeodesicArcObject;
   readonly anchorObjectId: string;
   readonly traversal: GeodesicPortalTraversal;
 }): readonly GeodesicPortalTraversal[] | undefined {
@@ -141,7 +141,7 @@ export function portalWordAfterAnchorCrossing(input: {
  * Returns `undefined` if any step fails (the anchor is not an endpoint of the interval).
  */
 export function applyAnchorCrossingTraversals(input: {
-  readonly interval: GeodesicIntervalObject;
+  readonly interval: GeodesicArcObject;
   readonly anchorObjectId: string;
   readonly traversals: readonly GeodesicPortalTraversal[];
 }): readonly GeodesicPortalTraversal[] | undefined {

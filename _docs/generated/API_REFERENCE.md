@@ -656,6 +656,22 @@ Motion of the simple geodesic creatures (the mouse and the butterfly), with no r
 | function | `butterflyVerticalOscillationRateHz` | Returns the butterfly's instantaneous vertical bob rate in Hz at `elapsedSeconds`, or 0 for non-butterflies. |
 | function | `butterflyVerticalOscillationHeightMagnitudeMeters` | Returns the butterfly's vertical bob amplitude in meters (10% of its collision height, capped at 0.08 m), or 0 for non-butterflies. |
 
+### `world-objects/derived.ts`
+
+The derived cache (design 014 section 4): a value defined by a full `compute` over a source, invalidated by relevant entries on the change ring and recomputed on the next read.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `DerivedSource` | What a cache reads from: the registry and its guarded copy both fit, and share one `changes`. |
+| interface | `DerivedSpec` | The definition of a cache: what it depends on and how to build it from scratch. |
+| interface | `Derived` | A defined cache; `read` returns the current value, recomputing it first when it is stale. |
+| interface | `DerivedStats` | The cheap counters of one cache instance (design 014 section 5). |
+| function | `setDerivedReadObserver` | Installs (or, with `undefined`, removes) the observer told the declared kinds of every cache `read`, hit or miss. |
+| function | `setDerivedVerification` | `derived-verify`: every `everyReads`th read also runs `compute` and throws when the two differ. |
+| function | `defineDerived` | Defines a cache. |
+| function | `derivedStatsOf` | The caches that exist on this source's ring, for the debug API. |
+| function | `deepEqual` | Structural equality of plain data (also maps and sets), the check of the cache fuzz and of the derive ticks that write a record only when it changed. |
+
 ### `world-objects/geodesic/anchors.ts`
 
 Anchors of geodesic intervals: which registry objects can hold an endpoint, and where the beam of one starts in its cell frame.
@@ -664,6 +680,18 @@ Anchors of geodesic intervals: which registry objects can hold an endpoint, and 
 | --- | --- | --- |
 | function | `canObjectAttachGeodesics` | True when the object may be the anchor of a geodesic interval endpoint. |
 | function | `getAnchorBeamPoint` | Beam-height point of an anchor object in its cell frame. |
+
+### `world-objects/geodesic/arcIndex.ts`
+
+The arc index (design 014 section 7.1): which arc ends sit on each anchor, built by one pass over the arcs and cached.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `ArcEnd` | An arc end: one endpoint role of an arc. |
+| interface | `ArcIndex` | The arc ends grouped by anchor. |
+| const | `noArcIndexEntries` | The shared answer for an anchor with no arc ends. |
+| const | `arcIndex` | Read with `arcIndex.read(registry)`. |
+| const | `computeArcIndex` | The index computed from scratch, for the oracle tests. |
 
 ### `world-objects/geodesic/cannon.ts`
 
@@ -693,7 +721,7 @@ Emitter (cannon) operations: shooting, extending and re-aiming geodesics, connec
 
 ### `world-objects/geodesic/cannonToolState.ts`
 
-The editing state of the geodesic emitter (cannon) tools, as plain data: which cannon and geodesic the tool works on and the endpoints picked by tie-and-detach.
+The editing state of the geodesic emitter (cannon) tools, as plain data: which cannon and geodesic the tool works on.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
@@ -709,20 +737,6 @@ What an emitter does to its geodesics when it has been carried: rebuild after a 
 | function | `rebuildEmitterGeodesics` | Rebuilds the geodesics that depend on an emitter after it moved. |
 | interface | `CarriedEmitterRelease` | What releasing a carried emitter touched. |
 | function | `releaseCarriedEmitter` | The emitter has stopped being carried, whether the hand put it down or let it go: its geodesics are rebuilt one last time without the safety net of the carry, and the intersection objects whose geodesics no longer exist… |
-
-### `world-objects/geodesic/curveShortening.ts`
-
-Curve shortening: tie-and-detach of two endpoint roles into a curve-shortening pair, and the curve shortening flow that then runs over many frames.
-
-| Kind | Name | Summary |
-| --- | --- | --- |
-| interface | `TieAndDetachGeodesicEndpointsRequest` | Request for `tieAndDetachGeodesicEndpoints`: detach two endpoint roles from one emitter and tie them at a new shared free end. |
-| interface | `AdvanceCurveShorteningPairsRequest` | Request for `advanceCurveShorteningPairs`: one tick of the curve shortening flow of every moving pair. |
-| function | `tieAndDetachGeodesicEndpoints` | Detaches two endpoint roles from one emitter and ties them to a new shared free end, starting a curve-shortening pair. |
-| const | `curveShorteningSpeedMetersPerSecond` | Speed (meters per second) at which a free vertex moves along its descent direction; the exact line search never overshoots the minimum. |
-| const | `curveShorteningTautTurnRadians` | Turning angle (radians) below which a vertex counts as taut: its two arcs are one geodesic and the vertex is removed. |
-| function | `advanceCurveShorteningPairs` | Advances every moving curve-shortening curve by one tick of the curve shortening flow and returns the ids that changed. |
-| type | `CurveShorteningNotice` | A user-visible event of the curve shortening flow; the shell logs it (there is no on-screen message system yet). |
 
 ### `world-objects/geodesic/development.ts`
 
@@ -746,7 +760,15 @@ Endpoint attachments of geodesic intervals: lookup by anchor, re-attachment, lif
 | function | `resolveGeodesicEndpointSelectionFromSegmentHit` | Maps a clicked segment (by id) to the endpoint attachment of its half, or `undefined` if it is not a half-labelled segment of an existing interval. |
 | function | `portalWordMatchesCurrentEndpointCells` | True when the interval's portal word leads from the start anchor's cell to the end anchor's cell. |
 | function | `portalWordMatchesEndpointCellsWithAnchors` | Like `portalWordMatchesCurrentEndpointCells`, with candidate anchors that may differ from the registry. |
-| function | `isAimableFreeGeodesic` | True for a stable interval with one emitter endpoint and one free end that no other geodesic uses. |
+| function | `isAimableFreeGeodesic` | True for an arc with one emitter endpoint and one vertex that no other arc end uses (a plain shot geodesic). |
+| function | `arcsAtVertex` | Both endpoint roles attached to the vertex (a loop on it contributes two), in registry insertion order. |
+| function | `forEachTiedVertex` | Visits the vertices with two or more arc ends in registry insertion order. |
+| function | `tiedVertexCount` | Number of vertices with two or more arc ends (closed loops included). |
+| function | `isVertexSharedWithOtherArc` | True when the anchor is a vertex shared with an end of some arc other than `arcId`. |
+| function | `isTied` | The arc has an end on a vertex that another arc end shares. |
+| function | `isStale` | The arc's last rebuild failed during a carry, so it still shows its old path. |
+| function | `arcsOfCurve` | Every arc of the curve through the vertex, walked over shared vertices, in discovery order. |
+| function | `arcsOfCurveContaining` | The arcs of the curve an arc belongs to: the arc itself and, through each vertex end, `arcsOfCurve`. |
 | function | `removeUnusedFreeGeodesicEnds` | Removes free-end anchors that no interval attaches to any more. |
 | function | `getEmitterGeodesicIds` | Ids of the geodesics attached to an emitter (either end), each once, in registry order. |
 
@@ -757,8 +779,6 @@ Geodesic intersection markers: crossings of segments in the same cell, stable ma
 | Kind | Name | Summary |
 | --- | --- | --- |
 | function | `updateGeodesicIntersectionObjects` | Recomputes all intersection markers (where segments of two different geodesics cross in a cell) and returns them. |
-| function | `requestGeodesicIntersectionUpdate` | Marks the intersection markers stale and recomputes them now, unless a deferral scope is open for this registry (see `withDeferredGeodesicIntersections`), in which case the recomputation happens once when the outermost … |
-| function | `withDeferredGeodesicIntersections` | Runs `body`; every `requestGeodesicIntersectionUpdate` inside it (also from nested scopes) is coalesced into one `updateGeodesicIntersectionObjects` when the outermost scope exits, also when `body` throws. |
 | function | `getRememberedGeodesicIntersectionObject` | Returns the last known intersection marker with this id even if it has since disappeared from the registry, or `undefined`. |
 | function | `pruneMissingGeodesicIntersectionObjects` | Forgets remembered intersection markers that are no longer in the registry; returns the forgotten ids. |
 
@@ -784,19 +804,20 @@ Interval rebuilds: realizing an interval's lifted chord, aiming free geodesics, 
 
 ### `world-objects/geodesic/lifecycle.ts`
 
-Queries whether a geodesic is locked or connected, and removal of geodesics and cannons together with their derived objects.
+Queries whether an arc connects emitters or follows one, and removal of geodesics and cannons together with their derived objects.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
 | function | `getGeodesicConnection` | Describes how an interval geodesic attaches to emitters. |
-| function | `isGeodesicLocked` | True when both endpoints of the geodesic are pinned anchors, each an emitter (a "locked" geodesic that cannot be extended or aimed freely). |
-| function | `collectLockedIncidentGeodesicIdsForEmitter` | Lists the ids of locked geodesics (see `isGeodesicLocked`) that have an endpoint on the emitter. |
+| function | `arcConnectsEmitters` | True when both ends of the arc are on emitters: a geodesic with no interior vertex. |
+| function | `arcFollowsEmitter` | The arc follows the emitter when it has an end on it and either connects emitters or its other end is a shared vertex (a tied arc). |
+| function | `collectFollowingArcIdsForEmitter` | Lists the ids of arcs that follow the emitter (see `arcFollowsEmitter`), in registry order. |
 | function | `removeGeodesic` | Removes a geodesic and its derived objects (an interval via `removeGeodesicIntervalAndDerivedObjects`; any other id only has stale segments and emitter cache entries removed), then refreshes intersections. |
-| function | `removeUnlockedGeodesicsFromCannon` | Removes every non-locked geodesic listed on the cannon and returns the removed ids (empty if the id is not a cannon). |
+| function | `removeUnlockedGeodesicsFromCannon` | Removes every geodesic of the cannon that does not follow it (a plain shot geodesic with an unshared free end) and returns the removed ids (empty if the id is not a cannon). |
 
 ### `world-objects/geodesic/objects.ts`
 
-Geodesic emitters ("cannons"), geodesic intervals and curve shortening on a glued cell complex.
+Geodesic emitters ("cannons"), geodesic arcs and curve shortening on a glued cell complex.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
@@ -808,13 +829,12 @@ Geodesic emitters ("cannons"), geodesic intervals and curve shortening on a glue
 | type | `GeodesicHalfRole` | Which half of an interval a derived segment belongs to (split at the midpoint of the total length). |
 | interface | `GeodesicEndpointAttachment` | Attachment of one endpoint role of one geodesic interval to an anchor object (emitter or free end). |
 | interface | `GeodesicEndpointSelection` | An endpoint attachment picked by the user (typically from a segment hit) as input to tie-and-detach. |
-| interface | `FreeGeodesicEndObject` | An invisible, non-colliding anchor object marking a geodesic endpoint that is not on an emitter. |
-| interface | `GeodesicIntervalObject` | The authoritative description of one geodesic: two endpoint attachments plus the portal word joining them. |
-| interface | `CurveShorteningPairObject` | Bookkeeping object owning one curve-shortening process: a piecewise-geodesic curve whose free vertices relax under the curve shortening flow. |
+| interface | `GeodesicVertexObject` | An invisible, non-colliding anchor object marking a geodesic endpoint that is not on an emitter. |
+| interface | `GeodesicArcObject` | The authoritative description of one geodesic: two endpoint attachments plus the portal word joining them. |
 | interface | `LiftedGeodesicEndpoint` | An interval's far endpoint pulled back into the cell of a chosen source endpoint (the "development" of the interval). |
 | interface | `GeodesicTraceBuildResult` | Outcome of rebuilding an interval's derived geometry: the interval, its new segments, and how the trace ended. |
 | interface | `GeodesicSegmentObject` | A derived, per-cell straight piece of a geodesic: a ray inside one cell from `start` along `direction` for `lengthMeters`. |
-| interface | `GeodesicIntersectionObject` | A computed marker where two distinct geodesics' segments cross in the same cell. |
+| interface | `GeodesicCrossingObject` | A computed marker where two distinct geodesics' segments cross in the same cell. |
 | type | `GeodesicSegmentTerminal` | How a single per-cell segment ends. |
 | interface | `CreateGeodesicCannonOptions` | Construction options for `createGeodesicCannonObject`; omitted optional fields get the defaults documented there. |
 | interface | `TraceGeodesicSegmentResult` | One traced piece: the cell, the (normalized) ray used, the length actually travelled, and why it stopped. |
@@ -830,11 +850,11 @@ Geodesic emitters ("cannons"), geodesic intervals and curve shortening on a glue
 | const | `minGeodesicSegmentLengthMeters` | Smallest segment/continuation length (meters) worth creating when splitting or building free geodesics. |
 | const | `emitterConnectionToleranceMeters` | Perpendicular distance (meters) within which a ray counts as hitting an emitter; equal to the cannon collision radius. |
 | function | `createGeodesicCannonObject` | Builds a geodesic emitter object from options, filling defaults. |
-| function | `isGeodesicSegmentObject` | Type guard: true when the object is a `GeodesicSegmentObject` (`kind === "geodesic-segment"`). |
-| function | `isFreeGeodesicEndObject` | Type guard: true when the object is a `FreeGeodesicEndObject`. |
-| function | `createFreeGeodesicEndObject` | Builds a free-end anchor at `point` (cell-local meters, including its beam height in z) in cell `cellId`. |
-| function | `createGeodesicIntervalObject` | Builds a geodesic interval from two anchor ids, a start cell and an optional portal word. |
-| function | `createCurveShorteningPairObject` | Builds a curve-shortening pair object (see `CurveShorteningPairObject`); `state` defaults to `"moving"`. |
+| function | `isGeodesicSegmentObject` | Type guard: true when the object is a `GeodesicSegmentObject` (`kind === "geodesicModel/segment"`). |
+| function | `isGeodesicVertexObject` | Type guard: true when the object is a `GeodesicVertexObject`. |
+| function | `createGeodesicVertexObject` | Builds a free-end anchor at `point` (cell-local meters, including its beam height in z) in cell `cellId`. |
+| function | `withoutStale` | The arc without its transient `stale` mark (the arc itself when it has none). |
+| function | `createGeodesicArcObject` | Builds a geodesic interval from two anchor ids, a start cell and an optional portal word. |
 | function | `getGeodesicSegmentEnd` | Returns the segment's end point, `start + direction * lengthMeters`, in the segment's cell frame (meters). |
 | function | `canExtendGeodesicSegment` | True unless the segment ended at a wall, forbidden zone or emitter (those terminals cannot be continued). |
 | function | `getGeodesicCannonEmitterPoint` | Point where the cannon's beam starts, in the cannon's cell frame. |
@@ -877,7 +897,8 @@ Derived geodesic segments: lookup by geodesic, building segments from traces wit
 | function | `removeGeodesicIntervalAndDerivedObjects` | Deletes an interval together with everything derived from or pointing at it. |
 | function | `getGeodesicSegments` | Returns the derived segments of a geodesic sorted by `segmentIndex` (empty if none). |
 | function | `getGeodesicTail` | Returns the last (highest `segmentIndex`) segment of a geodesic, or `undefined` if it has none. |
-| function | `resolveGeodesicNumber` | Returns the 1-based display number of a geodesic, defaulting to 1 when it has none. |
+| function | `resolveGeodesicNumber` | Returns the 1-based display number of a geodesic: its arc's `geodesicNumber`, or 1 (an arc without one exists only in test fixtures). |
+| function | `nextGeodesicNumber` | The smallest positive integer not used as a `geodesicNumber` by any arc. |
 | function | `splitDerivedSegmentsIntoEndpointHalves` | Labels segments with `halfRole`, cutting the one that straddles the midpoint of the total length into two. |
 | function | `resolveEndpointTangentAtAnchor` | Yaw (radians) of the geodesic's tangent at the anchor of the given role, pointing away from the anchor along the geodesic. |
 | function | `resolveEmitterLaunchYaw` | Launch yaw (radians, in the emitter's cell frame) of a geodesic at an emitter: the tangent of the geodesic where it attaches to the emitter, or the emitter's default `aimYawRadians` when the geodesic has no segments yet… |
@@ -911,6 +932,26 @@ Tracing a horizontal geodesic ray through a compiled cell complex: the single-ce
 | function | `traceGeodesicPathForConnectionMode` | Traces a geodesic through the cell complex, restarting in the target cell at each portal hit. |
 | function | `traceTerminalToBuildTerminal` | Maps the terminal of a trace tail to the terminal of a build result. |
 
+### `world-objects/geodesic/vertices.ts`
+
+Operations on the vertices of a piecewise-geodesic curve (design 013 section 13.1): the arcs at a vertex, their tangents and length, moving a vertex (each incident arc keeps its homotopy class: its word changes exactly by the portals the vertex crosses), removing a vertex by merging its two arcs, and tying two endpoint roles of an emitter at a new vertex.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| const | `vertexTautTurnRadians` | Turning angle (radians) below which a vertex counts as taut: its two arcs are one geodesic and the vertex is removed. |
+| interface | `ArcTangent` | Unit tangent of an arc at a vertex, pointing away from it, in the vertex's cell frame, with the arc's chord length. |
+| interface | `VertexMovePreview` | The result of {@link previewVertexMove}: the new vertex record and the realized arcs, opaque to callers. |
+| type | `VertexRemovalPreview` | What removing a vertex would give: a merged arc, a taut loop, a collapsed curve, or blocked. |
+| function | `arcTangentsAtVertex` | Tangents of the arcs at the vertex; with `displacedTo`, as if the vertex stood at that point of its own cell (no portal walk). |
+| function | `lengthOfArcs` | Total length (meters) of the distinct arcs among `arcs`. |
+| function | `previewVertexMove` | Walks the vertex `lengthMeters` along `direction` (vertex cell frame) through portals, updates the words of the arcs by the portals crossed and realizes each arc as the geodesic chord of its class. |
+| function | `commitVertexMove` | Applies a {@link previewVertexMove}: the vertex, the arcs with their new words and their realized segments. |
+| function | `previewVertexRemoval` | What removing the vertex would give (writes nothing). |
+| function | `removeVertex` | Applies a {@link previewVertexRemoval} and returns the arc ids that changed or were removed (empty for `blocked`; the loop for `loopTaut`, which changes nothing). |
+| type | `TieAtNewVertexRefusal` | Why {@link tieAtNewVertex} changed nothing. |
+| type | `TieAtNewVertexResult` | Result of {@link tieAtNewVertex}. |
+| function | `tieAtNewVertex` | Detaches two endpoint roles from one emitter and ties them at a new vertex born at the emitter's beam point, so the geometry does not change at tie time. |
+
 ### `world-objects/geodesicMarmot.ts`
 
 Geodesic marmot: an autonomous creature that walks in a straight line (a locally straight geodesic) through the cell complex, crossing portals.
@@ -929,6 +970,14 @@ Help-hub copy shared by the authoring layer (world tutorial text) and the ui lay
 | Kind | Name | Summary |
 | --- | --- | --- |
 | const | `helpHubHomeGuidance` | Help-hub hint telling a stuck player to use the tool menu's Home button to return to the starting place. |
+
+### `world-objects/interactionRange.ts`
+
+How far a person may be from a runtime object to interact with it: the one number the aim system (to focus and pick up) and the carry module (to refuse a pickup out of reach) both read.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| function | `getRuntimeObjectInteractionRangeMeters` | Returns the maximum interaction distance in meters for an object: tooltip range, else interactable range, else 2.5. |
 
 ### `world-objects/library.ts`
 
@@ -1016,6 +1065,22 @@ The fields every object in the runtime object registry shares, and the projectio
 | interface | `RuntimeCreatureObject` | Registry record for an autonomous creature (geodesic marmot, mouse or butterfly). |
 | function | `runtimeObjectToDynamicObjectState` | Projects a runtime object onto the minimal movement/collision state (cell id, cell-local pose, collision cylinder). |
 
+### `world-objects/runtimeObjectChangeJournal.ts`
+
+Change journal of the runtime object registry (design 013 section 6.2) over a change ring with absolute sequence numbers (design 014 section 3.1).
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `JournalRecord` | What the journal needs of a record. |
+| enum | `ChangeOp` | What a journal entry records. |
+| interface | `ChangeRing` | Every entry ever recorded, addressed by absolute sequence number, for as long as it is retained. |
+| interface | `ChangeRingStore` | The ring with its writing side. |
+| const | `defaultChangeRingCapacity` | The default capacity of a ring. |
+| function | `createChangeRing` | Creates an empty ring. |
+| interface | `RuntimeObjectChangeJournal` | Every registry write since the last clear, in order, as a view of the ring. |
+| interface | `RuntimeObjectChangeRecorder` | The registry's side of the journal: the read interface plus `record`. |
+| function | `createRuntimeObjectChangeJournal` | Creates an empty journal over a new ring of `capacity` (a power of two; default 8192). |
+
 ### `world-objects/runtimeObjectRegistry.ts`
 
 Runtime object registry: the per-cell, id-indexed store of every live (non-terrain) object in the world.
@@ -1025,6 +1090,7 @@ Runtime object registry: the per-cell, id-indexed store of every live (non-terra
 | interface | `RuntimeStaticAssetObject` | Registry record for a static glTF decoration or landmark placed in a cell. |
 | type | `RuntimeWorldObject` | Discriminated union (on `kind`) of every object type the registry can hold. |
 | interface | `RuntimeObjectRegistry` | Mutable id- and cell-indexed collection of runtime objects. |
+| type | `RuntimeObjectReader` | The read-only face of the registry (design 013 section 6.1): everything except the writes `add`, `update`, `remove`, `claimOwnership`, `releaseOwnership` and `moveToCell`. |
 | function | `createRuntimeObjectRegistry` | Creates a registry, optionally pre-populated with `initialObjects`. |
 | function | `createRuntimeStaticAssetObject` | Builds the registry record for an authored static asset placed in `cellId`. |
 
@@ -1062,6 +1128,17 @@ Registry record types of the results of the player's tools: placed flags (signs)
 | interface | `ProtractorAngleObject` | Registry record for a persistent angle measurement. |
 | interface | `ProtractorAngleLabelHitbox` | Oriented box around an angle label used for aim picking, in the vertex cell's local frame. |
 | interface | `ProtractorDirectedGeodesic` | One side of an angle: a geodesic ray leaving the vertex. |
+
+### `world-objects/trackedReads.ts`
+
+Read tracking for pure refresh functions (design 014 D1, D9): the exact set of registry reads a refresh made, and the test of whether a range of the change ring touches it.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `ReadSet` | What one refresh read. |
+| interface | `ReadRecorder` | A recording reader and the read set of its last `run`. |
+| function | `createReadRecorder` | Wraps `registry` (or a guarded copy of it) in a recording reader. |
+| class | `ReadDigest` | The writes of a ring range, digested once per tick run so that each record's read set is tested against it in time proportional to the read set. |
 
 ### `world-objects/worldObjectOwner.ts`
 
@@ -1249,7 +1326,9 @@ Identifiers of the player's tools and of the debug-overlay items, with the canon
 | Kind | Name | Summary |
 | --- | --- | --- |
 | type | `RuntimeDebugOverlayItemId` | Item that can be shown in the on-screen debug overlay. |
-| type | `RuntimeToolId` | Tool the player can have active, including the geodesic-cannon sub-modes. |
+| type | `CoreToolId` | Tool of the shell that the player can have active, including the geodesic-cannon sub-modes. |
+| interface | `ModuleToolIds` | The tool ids that modules define (design 013 section 8.3): each module adds its ids by interface merging, in its `api.ts`, as `interface ModuleToolIds { geodesicModelTie: "geodesicModel/tie" }` (the property name is fre… |
+| type | `RuntimeToolId` | Tool the player can have active: a core tool or one that a module defines. |
 | const | `defaultRuntimeDebugOverlayItems` | Overlay items shown when a launch does not choose any, in canonical order. |
 | function | `parseRuntimeDebugOverlayItems` | Parses a comma-separated list of overlay item ids (null means all defaults), dropping unknown entries and returning canonical order. |
 | function | `serializeRuntimeDebugOverlayItems` | Serializes overlay items to a canonical comma-separated string. |
@@ -1345,6 +1424,306 @@ Pure model of the immersive-VR session lifecycle shown in the UI and debug state
 | function | `detectXrSessionState` | Probes WebXR support and returns the initial state: "insecure-context" if not secure, "unsupported" if `navigator.xr` is missing or reports no immersive-vr support, "available" if supported, or "failed" (with a readable… |
 | function | `transitionXrSessionState` | Returns the state for `status`, keeping `secureContext` and `immersiveVrSupported` from `state` (support is cleared only when moving to "unsupported"). |
 
+## `engine`
+
+### `engine/composeModules.ts`
+
+Composition of an experience's modules, once at engine creation (design 013 section 9.2).
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| class | `ModuleCompositionError` | Every composition problem at once. |
+| const | `contributedNamePattern` | The pattern every contributed name follows: "<moduleId>/<noun>" (design 013 section 10). |
+| interface | `ComposedHandler` | One command handler as the engine stores it. |
+| interface | `ComposedModule` | A created module and the facts the engine needs about it. |
+| interface | `ComposedExperience` | The result of composition. |
+| interface | `ComposeOptions` | What composition needs of the engine. |
+| function | `composeModules` | Checks, orders and creates the modules; throws a {@link ModuleCompositionError} listing every problem. |
+| function | `writableKindsOf` | The kinds the write guard lets a module write. |
+
+### `engine/coreIds.ts`
+
+The names the engine knows without any module: the object kinds of the registry's core union and the tool ids of the core tools.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| const | `coreObjectKinds` | Kinds of the core union of the registry. |
+| const | `moduleOwnedCoreKinds` | Kinds of the registry's core union that a module declares as its own (design 013 section 13.1): the geodesic model and the geodesic measurements keep their declaring files in `world-objects/geodesic/objects.ts` and in t… |
+| const | `coreToolIds` | Ids of the tools the shell defines itself. |
+
+### `engine/ids.ts`
+
+Engine-allocated object ids: "<family>:<serial>" with one counter per family, never reused (design 013 section 5.1; no `Date.now()`).
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| function | `createEngineIdSource` | Creates an id source; `isTaken` says whether an id is already in use. |
+
+### `engine/moduleTicks.ts`
+
+The bodies, simulate and derive passes over the composed modules (design 013 sections 5.2 and 6.4).
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| type | `MutableStepContext` | The step context as the runner writes it. |
+| interface | `TickRunnerDeps` | What the runner reads of the engine. |
+| interface | `TickRunner` | The passes of one engine. |
+| function | `createTickRunner` | Builds the runner for `modules`, which are already in topological order. |
+
+### `engine/moduleTypes.ts`
+
+The types of the world engine and of its modules (design 013 sections 5 and 9): commands and their results, participants, the read view, tokens, module definitions and the contexts the engine hands to handlers and ticks.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| type | `PlainData` | Data that survives a structured clone: what commands, results, events and control slots carry. |
+| interface | `EngineCommandBase` | A command: plain data with a namespaced kind (`"world/requestTool"`, `"geodesicModel/tieAndDetach"`). |
+| interface | `EngineEventBase` | An event: plain data with a namespaced kind. |
+| interface | `WorldRequestToolCommand` | The engine's own command: ask whether this participant may switch to a tool (design 013 section 8.1). |
+| interface | `WorldToolRevokedEvent` | Emitted when a tool that was open to a participant no longer is; a client with that tool selected leaves it and shows `message`. |
+| type | `CommandResult` | The answer to a command: accepted (with an optional value) or refused with a stable code and a sentence for people. |
+| type | `CommandTicket` | What `submit` returns: pass it to `resultOf` after the step that applied the command. |
+| type | `ParticipantBody` | Where a participant is: the same record as the player pose (cell, cell-local position, yaw, pitch). |
+| interface | `ParticipantAttachment` | A relation the world holds between a participant and an object (design 013 section 7). |
+| function | `participantAttachment` | The attachment of `kind` that `participant` holds, or undefined. |
+| interface | `ParticipantRecord` | Someone acting in the world. |
+| interface | `WorldReadView` | The read-only world state clients use between steps. |
+| interface | `EngineIdSource` | "<family>:<serial>" for core families, "<moduleId>/<family>:<serial>" for a module's (design 013 section 10), serials from the engine. |
+| type | `ToolGate` | A module's answer for one participant and tool; undefined means "no objection". |
+| interface | `WorldEngine` | The world engine: owner of world state, which it changes only in `step` (design 013 section 5.1). |
+| interface | `ModuleToken` | A typed name for an exported module API. |
+| function | `defineModuleToken` | Creates a token. |
+| type | `CommandHandlers` | One handler per command kind; the mapped type makes the set exhaustive. |
+| type | `ModulePhase` | The kinds of per-step work: bodies ticks (step phase 3) move what follows a participant, simulate ticks change the world, derive ticks recompute what follows from the journal. |
+| interface | `ObjectKindDeclaration` | An object kind a module declares. |
+| interface | `ModuleTick` | Per-step work of a module, in a phase. |
+| interface | `ModuleDefinition` | The world part of a module. |
+| interface | `ModuleInstance` | What a module's `create` returns. |
+| type | `AnyModuleDefinition` | Any module, whatever its command and API types. |
+| interface | `ModuleCreateContext` | What a module's `create` receives. |
+| interface | `StepContext` | One object, reused every step: never keep it across steps. |
+| interface | `CommandContext` | What a command handler receives. |
+| interface | `AimPickEndpoint` | An endpoint role of a geodesic arc, named by plain data: the arc, the role and the anchor it is attached to. |
+| interface | `AimPick` | One thing along the current aim ray, as plain data (the subset of the shell's aim target that tools read). |
+| interface | `ToolContext` | What a tool may do. |
+| interface | `ObjectActionPresentation` | How an action on an object's menu page looks. |
+| interface | `ObjectActionEntry` | An action offered on an object's menu page; `enabled` false shows it disabled. |
+| interface | `ToolDescriptor` | The client part of a tool: everything the shell shows and does for it. |
+| interface | `ModuleClient` | The client part of a module: a separate export of the module directory (`geodesicModelClient(options)`). |
+
+### `engine/participants.ts`
+
+Participants and control slots of the world engine (design 013 sections 5.1 and 5.4).
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| const | `localParticipantId` | Id of the participant the local device plays. |
+| const | `localDeviceId` | Owner id of participants the local device controls. |
+| function | `createLocalPlayerParticipant` | Creates the record of the local player. |
+| interface | `ParticipantTable` | The participants of one engine. |
+| function | `createParticipantTable` | Creates the table holding `initial`; `deviceId` is the device this engine serves. |
+| interface | `ControlSlots` | The control slots of one engine, keyed by participant and slot name. |
+| function | `createControlSlots` | Creates an empty slot table. |
+
+### `engine/toolGates.ts`
+
+Tool gates and the confirmation protocol's world side (design 013 section 8).
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `ToolRefusal` | Why a tool is refused. |
+| interface | `RevokedTool` | A tool newly refused to a participant. |
+| interface | `ToolGates` | The gates of one engine. |
+| interface | `ToolGatesOptions` | Options of {@link createToolGates}. |
+| function | `createToolGates` | Creates the gates. |
+
+### `engine/worldEngine.ts`
+
+The world engine (design 013 section 5): the owner of world state, which changes only inside `step`, from queued commands and control slots.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `WorldEngineOptions` | What the engine is built from. |
+| function | `createWorldEngine` | Creates the engine; throws a `ModuleCompositionError` when the module list is invalid. |
+| function | `readLocalPlayerPose` | The pose of the local player: where this device's body is in the world. |
+| function | `publishLocalPlayerPose` | Publishes the local player's body (direct write D1, design 013 section 5.7); the local device owns it, so a refusal is a bug. |
+
+### `engine/writeGuard.ts`
+
+Who is acting: a stack of module frames, and the write guard built on it (design 013 section 9.6).
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `ModuleFrames` | The stack of frames. |
+| function | `createModuleFrames` | Creates an empty stack. |
+| function | `guardRegistry` | The registry as modules see it with the guard on: every write is checked against the active frame first. |
+| function | `runFunctionsInFrame` | A copy of `target` whose functions run inside a frame of `moduleId` (with `writableKinds`); other properties are kept. |
+
+## `modules`
+
+### `modules/carry/api.ts`
+
+The carry module's public face (design 013 sections 7 and 12.1): the names of its commands, events and control slot, and their plain-data shapes.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| const | `carryAttachmentKind` | The kind of the attachment a carry holds on a participant. |
+| const | `carryOffsetSlot` | The control slot a carrier sets each frame: where the hand is and how far the carried object may fall behind it. |
+| type | `CarryOffset` | Value of the `carry/offset` slot, plain data. |
+| interface | `CarryAttachCommand` | Picks an object up. |
+| interface | `CarryDetachCommand` | Puts down what the issuing participant carries (a detach only, design 012 P4); the final rebuild of the emitter's geodesics runs. |
+| interface | `CarryDropCommand` | Module-only: the carry ends by the carry rules themselves (the hand's leash). |
+| type | `CarryCommand` | Every command of the module. |
+| type | `CarryDropReason` | Why the world ended a carry: the hand's leash released the object (too far, or unreachable), or the object no longer exists. |
+| interface | `CarryMovedEvent` | The carried object moved this step; the geodesics it anchors were rebuilt, so what depends on them needs a refresh. |
+| interface | `CarryReleasedEvent` | A carry ended, however it ended (detach or drop): the final rebuild ran. |
+| interface | `CarryDroppedEvent` | The world ended the carry (design 013 section 7); the client leaves its carry tool. |
+| type | `CarryEvent` | Every event of the module. |
+| const | `carryRefusals` | Refusal codes of `carry/attach`. |
+
+### `modules/carry/index.ts`
+
+The carry module's world factory (design 013 section 12.1).
+
+_No exports._
+
+### `modules/carry/module.ts`
+
+The carry module (design 013 section 7): who carries what is world state.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| type | `CarryModuleDefinition` | The module as the engine's list takes it. |
+| function | `carryModule` | Creates the carry module. |
+
+### `modules/curveShortening/api.ts`
+
+The curve shortening module's public face (design 013 section 13.2, amended by design 014 sections 2.1 and 9): the token of its read-only answers and the plain-data shapes of its events.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `BlockedVertex` | A tied vertex the flow could not move and could not merge away, with the reason it gives. |
+| interface | `CurveDynamicsApi` | What the module answers: reads only. |
+| const | `curveDynamicsToken` | The token a dynamics module provides (so that a module that sticks curves at corners can replace the flow). |
+| interface | `CurveShorteningFreeLoopCollapsedEvent` | A loop around a cone point shrank below the minimum length and was deleted. |
+| interface | `CurveShorteningCollapsedEvent` | A tied curve shrank to a point and was deleted. |
+| interface | `CurveShorteningUnresolvedEvent` | A vertex could be neither moved nor merged away and went quiet; emitted once, when it goes quiet. |
+| interface | `CurveShorteningDestroyedEvent` | A vertex could be neither moved nor merged away and its whole curve was removed (the "destroy" policy). |
+| type | `CurveShorteningEvent` | Every event of the module. |
+| type | `BlockedPolicy` | What the module does with a vertex it cannot move or merge: "unresolve" makes it quiet and reports it; "destroy" removes its whole curve. |
+| type | `SpeedLawName` | How far a vertex may move in one step, before the line search caps it. |
+| interface | `CurveShorteningOptions` | Options of the module. |
+
+### `modules/curveShortening/flow.ts`
+
+The curve shortening flow (design 013 section 13.2): the rule applied to every tied vertex each step, in `forEachTiedVertex` order (Gauss-Seidel, so a vertex sees the position its neighbour just took).
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| const | `tautLoopReason` | The reason a taut closed loop is quiet with: it is at rest, not blocked. |
+| interface | `FlowDeps` | What one step of the flow works with. |
+| function | `flowStep` | One step of the flow over every tied vertex that is not quiet. |
+
+### `modules/curveShortening/index.ts`
+
+The curve shortening module's world factory (design 013 section 12.1).
+
+_No exports._
+
+### `modules/curveShortening/module.ts`
+
+The curve shortening module (design 013 section 13.2, design 014 sections 2.1 and 9): the flow that straightens the curves whose vertices the geodesic model has tied.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| type | `CurveShorteningModuleDefinition` | The module as the engine's list takes it. |
+| function | `curveShorteningModule` | Creates the curve shortening module. |
+
+### `modules/curveShortening/policies.ts`
+
+The policies of the curve shortening flow (design 013 section 13.2): how far a vertex may move in one step.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| type | `SpeedLaw` | Metres this vertex may move this step, before the line search caps it. |
+| const | `curveShorteningSpeedMetersPerSecond` | Speed (meters per second) at which a vertex moves along its descent direction; the exact line search never overshoots the minimum. |
+| const | `maxCurveShorteningDeltaSeconds` | Longest frame time (seconds) one step of the flow integrates; a stalled tab does not teleport a vertex. |
+| function | `speedLawNamed` | The speed law an option names. |
+
+### `modules/geodesicMeasurements/index.ts`
+
+The geodesic measurements module's world factory (design 013 section 12.1): the length and angle labels as records derived from the geodesic model.
+
+_No exports._
+
+### `modules/geodesicMeasurements/module.ts`
+
+The geodesic measurements module (design 013 section 6.4, design 014 D9): the length labels and protractor angles the player's tools place, kept current by two derive ticks that read the change ring.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| type | `GeodesicMeasurementsModuleDefinition` | The module as the engine's list takes it. |
+| const | `lengthReadKinds` | The kinds a length label can read: the segments of its geodesic. |
+| const | `angleReadKinds` | The kinds an angle can read: its centre (a cannon or a crossing marker), the segments of its legs, and the arc index (arcs and vertices). |
+| function | `geodesicMeasurementsModule` | Creates the geodesic measurements module. |
+
+### `modules/geodesicModel/api.ts`
+
+The geodesic model's public face (design 013 sections 12.1 and 13.1): its token, the read-only queries clients and dependents share, the operations only dependents hold, and the plain-data shapes of its commands and events.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| const | `geodesicTieToolId` | The id of the tie tool. |
+| interface | `GeodesicModelOptions` | Options of the geodesic model, for the world part and the client part alike (plain data). |
+| const | `defaultGeodesicModelOptions` | The options when none are given. |
+| interface | `ArcEnd` | An arc end at a vertex: one endpoint role of an arc. |
+| interface | `ArcTangent` | Unit tangent of an arc at a vertex, pointing away from it, in the vertex's cell frame, with the arc's chord length. |
+| interface | `GeodesicEndpointRef` | An endpoint role of an arc, named by the arc, the role and the anchor it is attached to (plain data, so that a command can carry it). |
+| interface | `GeodesicModelQueries` | What clients and dependents receive: reads only, which never change the registry. |
+| interface | `VertexMovePreview` | The result of `previewVertexMove`. |
+| type | `VertexRemovalPreview` | What removing a vertex would give: a merged arc, a taut loop, a collapsed curve, or blocked. |
+| interface | `GeodesicModelApi` | For dependents only: the hot route M1, M2 of design 013 section 5.7. |
+| const | `geodesicModelToken` | The geodesic model's token: `provides` of the module, `requires` of the modules that act on its curves. |
+| interface | `GeodesicTieAndDetachCommand` | Detaches two endpoint roles from an emitter and ties them at a new shared vertex, born at the emitter's beam point (the geometry does not change). |
+| interface | `GeodesicHighlightEndpointCommand` | Tool highlight of one endpoint's half of a geodesic (the segments' `highlightState`); transient. |
+| interface | `GeodesicRemoveVertexCommand` | Module-only. |
+| interface | `GeodesicRemoveCurveCommand` | Module-only. |
+| type | `GeodesicModelCommand` | Every command of the module. |
+| interface | `GeodesicVertexTiedEvent` | Two endpoint roles were tied at a new vertex. |
+| type | `GeodesicModelEvent` | Every event of the module. |
+| const | `geodesicModelRefusals` | The refusal codes of the module's commands. |
+
+### `modules/geodesicModel/client.ts`
+
+The geodesic model's client part (design 013 sections 9.1 and 12.1): the tools the module contributes to the shell.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| function | `geodesicModelClient` | Creates the client part; pass the same options as the world part. |
+
+### `modules/geodesicModel/index.ts`
+
+The geodesic model module's factories (design 013 section 12.1): `geodesicModelModule` is the world part, `geodesicModelClient` the client part (the tie tool).
+
+_No exports._
+
+### `modules/geodesicModel/module.ts`
+
+The geodesic model module (design 013 section 13.1): piecewise geodesics on the glued complex as a world module.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| type | `GeodesicModelModuleDefinition` | The module as the engine's list takes it. |
+| function | `geodesicModelModule` | Creates the geodesic model module. |
+
+### `modules/geodesicModel/tieTool.ts`
+
+The tie tool, the client part of `geodesicModel/tie` (design 013 sections 8.3 and 13.1): started from an emitter's menu page, it takes two endpoint roles of the emitter's geodesics that connect emitters, then asks the world to tie them at a new vertex.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| function | `createTieToolDescriptor` | The descriptor of the tie tool. |
+
 ## `runtime`
 
 ### `runtime/apiCall.ts`
@@ -1368,20 +1747,6 @@ The one command path: applyRuntimeCommand(session, command) changes the session 
 | function | `applyRuntimeCommand` | Applies `command` to the session and returns the effects the host runs, in order. |
 | function | `reduceRuntimeCommand` | Pure reducer: the next session state and the ordered effects for one command. |
 
-### `runtime/appSession.ts`
-
-The shell-side session: the one record that holds the mutable state of a running world, and the cell that owns it.
-
-| Kind | Name | Summary |
-| --- | --- | --- |
-| type | `ObjectIdFamily` | Families of runtime objects whose ids carry a serial number from the session. |
-| interface | `CarryRecord` | Who is being carried, and whether the object has reached the hand yet. |
-| interface | `AppSessionState` | Mutable state of one running world, as one plain record. |
-| interface | `AppSession` | Owner of the current AppSessionState. |
-| function | `createAppSession` | Creates a session holding `initial`. |
-| const | `initialObjectIdSerials` | Serial numbers all start at zero. |
-| function | `takeObjectIdSerial` | Returns the next unused serial number of an object id family and advances the counter; the caller formats the id. |
-
 ### `runtime/appState.ts`
 
 Defines AppState, the initial immutable bundle of compiled world, player body and player pose that main.ts hands to the renderer, and the factory that builds it.
@@ -1390,6 +1755,35 @@ Defines AppState, the initial immutable bundle of compiled world, player body an
 | --- | --- | --- |
 | interface | `AppState` | Initial application state for one world run: compiled world, player body and player pose. |
 | function | `createInitialAppState` | Creates the AppState for a compiled world, placing the player at world.startingPosition (yaw and pitch default to 0) or at the default pose in cells[0]; throws if the world has no cells. |
+
+### `runtime/clientSession.ts`
+
+The client session: the one record that holds how one person is interacting with a running world (menu, selected tool, tool picks, debug and comfort settings), and the cell that owns it.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `PendingToolRequest` | A request to switch to a tool that the world has not answered yet (design 013 section 8.1): the old tool stays active until `world/requestTool` is accepted. |
+| interface | `ClientSessionState` | Mutable state of one client of a running world, as one plain record. |
+| interface | `ClientSession` | Owner of the current ClientSessionState. |
+| function | `createClientSession` | Creates a session holding `initial`. |
+
+### `runtime/coreTools.ts`
+
+The descriptors of the tools the shell defines itself (design 013 section 8.3): sign, geodesic ray, length, protractor, and the emitter's carry, rotate and aim sub-modes.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `CoreToolHandlers` | What the shell does for each core tool; each handler reads the current frame's input itself. |
+| function | `createCoreToolDescriptors` | The descriptors of the core tools. |
+
+### `runtime/experience.ts`
+
+The default experience (design 013 section 12.1): the world modules the app composes into its engine, in list order.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| function | `createDefaultWorldModules` | The world modules of the default experience. |
+| function | `createDefaultClientModules` | The client parts of the default experience's modules (only the modules with tools have one). |
 
 ### `runtime/publicApi.ts`
 
@@ -1469,16 +1863,27 @@ Page side of the channel to the local server (scripts/server/localServer.mjs): a
 | interface | `ServerChannel` | Handle returned by {@link startServerChannel}. |
 | function | `startServerChannel` | Connects to the local server when the page was served by it, and answers its requests; returns a handle to stop it. |
 
+### `runtime/toolRegistry.ts`
+
+The shell's one lookup of tools (design 013 section 8.3): `toolsById` maps a tool id to its descriptor, built once from the shell's own descriptors (coreTools.ts) and the descriptors the experience's client parts contribute.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| type | `ToolsById` | The descriptors by tool id. |
+| function | `createToolsById` | Builds the lookup; throws on a tool id described twice, because two descriptors for one tool would make the dispatch depend on list order. |
+| function | `findObjectActionTool` | The descriptor started by an action of an object of this kind, or undefined. |
+| function | `objectActionsFor` | The actions the tools contribute to the menu page of one object, in registration order, each with its current availability. |
+
 ### `runtime/worldGeometryComputedObjects.ts`
 
 Policy for derived objects (geodesics, measured geodesic lengths, protractor angles, geodesic intersection markers) when a newly deformed world geometry is committed.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
-| interface | `GeometryCommitComputedObjectPolicyCallbacks` | Optional renderer hooks invoked as the policy removes or updates dependent objects so visuals can follow. |
+| interface | `GeometryCommitComputedObjectPolicyCallbacks` | Optional renderer hooks invoked as the policy removes dependent objects so visuals can follow. |
 | interface | `ApplyGeometryCommitComputedObjectPolicyOptions` | Inputs for applying the post-commit policy. |
-| interface | `GeometryCommitComputedObjectPolicyResult` | Ids (deduplicated, in first-seen order) of the objects the policy removed, rebuilt, refreshed or pruned. |
-| function | `applyGeometryCommitComputedObjectPolicy` | Applies the post-commit policy to the registry (delete unlocked geodesics, re-solve locked ones, refresh dependent measurements and angles, prune stale intersections) and returns what changed. |
+| interface | `GeometryCommitComputedObjectPolicyResult` | Ids (deduplicated, in first-seen order) of the objects the policy removed, rebuilt or pruned. |
+| function | `applyGeometryCommitComputedObjectPolicy` | Applies the post-commit policy to the registry (delete unlocked geodesics, re-solve locked ones, prune stale intersections) and returns what changed. |
 
 ### `runtime/worldGeometryDeformationFamilies.ts`
 
@@ -1572,7 +1977,7 @@ Renderer-neutral definition of the tool/settings palette: createPaletteDefinitio
 | interface | `DebugSettingsPaletteContent` | Content of the debug-settings page: console log level, overlay items and portal/collision debug switches. |
 | interface | `PlaceFlagOptionsPaletteContent` | Content of the place-flag options page: choice of sign type. |
 | interface | `EditSignPaletteContent` | Content of the edit-sign page for one placed flag. |
-| interface | `GeodesicCannonActionsPaletteContent` | Content of the geodesic emitter menu: add/carry/tie-detach actions and one row per geodesic. |
+| interface | `GeodesicCannonActionsPaletteContent` | Content of the geodesic emitter menu: the add and carry actions, the actions tools contribute, and one row per geodesic. |
 | interface | `GeometryComputerActionsPaletteContent` | Content of the world-deformation (geometry computer) page, in whole meters: torus width, current and target (a, b), limits and step buttons. |
 | interface | `TutorialPaletteContent` | Content of one tutorial page, with previous/next paging controls. |
 | interface | `GoalPaletteContent` | Content of one goal page, with previous/next paging controls. |
@@ -1681,7 +2086,7 @@ Browser-console debug surface for the app: window-level helper installation, the
 | interface | `CameraPoseDebugDump` | Snapshot of the player/camera pose returned by dumpCameraPose; angles in both radians and degrees, matrices as 16-element column-major arrays (Three.js order). |
 | interface | `GeodesicPathDebugDump` | Description of one geodesic's lock state, portal word, and segments. |
 | interface | `GeodesicWordDebugDump` | Portal word of one locked geodesic with its individual transitions. |
-| interface | `AllGeodesicsDebugDump` | Whole-world geodesic inventory: intervals, segments, anchors and curve-shortening pairs. |
+| interface | `AllGeodesicsDebugDump` | Whole-world geodesic inventory: intervals, segments and anchors (the vertices of a curve under the curve shortening flow are anchors). |
 | interface | `EndpointDebugDump` | Identifies one geodesic endpoint and the anchor object it is attached to. |
 | function | `installPortalDebugHelpers` | Publishes the helpers as window.noneuclidPortalDebug, replacing any previous object; pair with uninstallPortalDebugHelpers on teardown. |
 | function | `uninstallPortalDebugHelpers` | Removes window.noneuclidPortalDebug and the public API namespace `portal`. |
@@ -1983,7 +2388,6 @@ Render sources and per-frame render records for geodesic cannons, geodesic segme
 | --- | --- | --- |
 | const | `geodesicSegmentArchetypeKey` | Archetype of an ordinary (unconnected) geodesic segment ribbon. |
 | const | `geodesicSegmentConnectedArchetypeKey` | Archetype of a geodesic segment that is connected (tied) to others; amber ribbon. |
-| const | `geodesicSegmentMovingArchetypeKey` | Archetype of a segment currently being straightened; orange ribbon. |
 | const | `geodesicSegmentTieDetachSelectedArchetypeKey` | Archetype of a segment selected for tie detachment; green ribbon. |
 | const | `geodesicRayPostArchetypePrefix` | Archetype-key prefix (followed by `:<mesh>`) for the cannon post meshes. |
 | const | `geodesicRayHeadArchetypePrefix` | Archetype-key prefix (followed by `:<mesh>`) for the per-geodesic cannon head (lightsaber) meshes. |
@@ -2001,7 +2405,7 @@ Render sources and per-frame render records for geodesic cannons, geodesic segme
 
 ### `render/three/geodesicCannonTools.ts`
 
-Geodesic emitter (cannon) tools: place, rotate, aim, carry, tie-and-detach, and delete geodesics.
+Geodesic emitter (cannon) tools: place, rotate, aim, carry, and delete geodesics.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
@@ -2238,6 +2642,8 @@ Generic uikit widgets of the in-scene palette panel (buttons, toggles, option gr
 | function | `createToggleRow` | Label plus On/Off toggle. |
 | function | `createToggleButton` | On/Off button; clicking calls onToggled with the inverted value of the state captured at build time (state is not read back). |
 | function | `createActionButton` | Generic labelled action button with an optional home/reload icon. |
+| type | `HeaderActionIcon` | The icons a contextual header action can show. |
+| function | `headerActionIcon` | The header icon for an icon id a tool contributed; throws on an id the palette has no icon for. |
 | function | `createHeaderActionButton` | Square icon button for contextual header actions; disabled ones are dimmed and inert. |
 | function | `createInteractiveSurface` | Base clickable Container. |
 | function | `createButtonText` | Bold label text that wraps and may shrink. |
@@ -2551,7 +2957,6 @@ Aim-ray value type and pure aim helpers shared by desktop and XR interaction cod
 | function | `intersectRootRayWithFloor` | Intersects a Three.js-frame ray with the floor plane z = 0 of the world frame. |
 | function | `getAimForwardVector` | Returns the ray's direction in world axes, or `undefined` if no ray is given. |
 | function | `createAimTargetCycleSignature` | Builds a string identifying an ordered list of aim targets (object id, geodesic emitter id, portal hop count) so callers can detect when the set under the ray changed and reset target cycling. |
-| function | `getRuntimeObjectInteractionRangeMeters` | Returns the maximum interaction distance in meters for an object: tooltip range, else interactable range, else 2.5. |
 | interface | `FocusedRuntimeObject` | The interactable object the aim ray currently rests on. |
 
 ### `render/three/runtimeEffects.ts`
@@ -2680,7 +3085,7 @@ Lighting rig for the stylized (non-physical) look of the scene.
 
 ### `render/three/scenePaletteCommands.ts`
 
-What the scene palette's buttons do: one callback per palette action, each dispatching the command that action stands for.
+What the scene palette's buttons do: one callback per palette action, each dispatching the command that action stands for (selecting a tool is a request to the world instead).
 
 | Kind | Name | Summary |
 | --- | --- | --- |
@@ -2763,9 +3168,21 @@ Builds the per-eye visibility states of one stereo (XR) frame, as a pure functio
 | function | `haveSameRootIdentity` | True iff the two eyes' render roots have the same cell id and the same frame (within 1e-9 per matrix element). |
 | function | `buildStereoPortalFrame` | Computes the visible paths of every eye and groups the eyes by root identity. |
 
+### `render/three/toolHost.ts`
+
+The shell's tool host (design 013 section 8.3): the one lookup of tools (`toolsById`, built from the shell's own tools and the experience's client parts), the `ToolContext` that tools act through, and the per-frame dispatch of the primary action.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `CoreToolActions` | What the shell does for each of its own tools; the aim ray and the frame's input are passed in. |
+| interface | `ToolFrameInput` | One frame's input to the tools. |
+| interface | `ToolHostDeps` | Dependencies of {@link createToolHost}. |
+| interface | `ToolHost` | Handle returned by {@link createToolHost}. |
+| function | `createToolHost` | Creates the tool host. |
+
 ### `render/three/toolObjectRuntimes.ts`
 
-Scene-graph runtimes for placed flags, measured lengths, and protractor angles: sync, removal, and refresh.
+Scene-graph runtimes for placed flags, measured lengths, and protractor angles: sync and removal.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
@@ -2846,6 +3263,16 @@ Conversion between the simulation's world frame and the Three.js scene frame.
 | function | `rigidTransformToThreeMatrix` | Converts a world-frame rigid transform into the equivalent Three.js `Matrix4` (basis-changed by B * M * B^-1). |
 | function | `applyWorldRigidTransform` | Sets an object's position and quaternion from a world-frame rigid transform (converted to Three axes); scale is left untouched. |
 
+### `render/three/worldClient.ts`
+
+The shell's side of its conversation with the world engine (design 013 sections 5.3, 5.5 and 8.1): the tool-switch protocol (also for tools started from an object's menu page), the generic event sink and the `api.world` namespace.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `WorldClientDeps` | What the world client needs from the shell. |
+| interface | `WorldClient` | Handle returned by {@link createWorldClient}. |
+| function | `createWorldClient` | Creates the world client over the shell's engine, session and command path. |
+
 ### `render/three/worldResultBadge.ts`
 
 Floating text badge ("pill" with an optional downward pointer) used as an in-world result label, for example for measured lengths and protractor angles.
@@ -2866,7 +3293,7 @@ Cosmetic low-poly hand models that follow XR controllers (or tracked hands), plu
 | interface | `XrControllerHandModels` | Controller hand model manager returned by `createXrControllerHandModels`. |
 | function | `createXrControllerHandModels` | Creates hidden left/right hand anchors and the wrist indicator sprite in `scene` and starts loading the hand GLB. |
 | interface | `WristToolIndicatorVisual` | Icon description for the wrist tool indicator. |
-| function | `resolveWristToolIndicatorVisual` | Maps a tool id (and sign variant for "place-flag") to the icon, color, and label shown on the wrist, or `undefined` for "aim" and "none" (no indicator). |
+| function | `resolveWristToolIndicatorVisual` | Maps a tool descriptor (and sign variant for the sign tool) to the icon, color, and label shown on the wrist, or `undefined` for no tool ("aim" and "none" have no descriptor). |
 | interface | `HandModelTemplates` | Per-hand template objects (already scaled, rotated, and centered) that are cloned for each hand instance. |
 | function | `createHandModelTemplates` | Builds left and right templates from a loaded GLB scene that contains both hands: each template keeps only the meshes on its side of the midpoint of the mesh centers (left keeps those with larger x), then scales by 0.42… |
 

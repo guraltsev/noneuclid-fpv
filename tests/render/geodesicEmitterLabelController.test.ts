@@ -7,8 +7,9 @@
  *
  * `document.createElement("canvas")` (the label's text texture) is faked by tests/support/fakeCanvas2d.ts.
  */
+import { createTestEngine } from "../support/engine";
 import * as THREE from "three";
-import { createTestAppSession } from "../support/appSession";
+import { createTestClientSession } from "../support/clientSession";
 import { describe, expect, it } from "vitest";
 import {
   createGeodesicEmitterLabelController,
@@ -44,7 +45,8 @@ describe("geodesicEmitterLabelController sweep", () => {
       runtimeObjectRegistry: registry,
       geodesicEmitterLabelsByKey: labels,
       getWorld: () => compileLargePortalWorld(),
-      session: createTestAppSession({ playerPose: { cellId: "a", position: { x: 0, y: 0, z: 0 }, yawRadians: 0 } as never }),
+      session: createTestClientSession(),
+      engine: createTestEngine({ playerPose: { cellId: "a", position: { x: 0, y: 0, z: 0 }, yawRadians: 0 } as never }),
       getRegistryVersion: () => registry.getVersion(),
     });
 
@@ -72,7 +74,8 @@ describe("geodesicEmitterLabelController placement", () => {
       runtimeObjectRegistry: registry,
       geodesicEmitterLabelsByKey: labels,
       getWorld: () => world,
-      session: createTestAppSession({ playerPose: { cellId: "a", position: { x: 4.5, y: 2.5, z: 0 }, yawRadians: 0, pitchRadians: 0 } }),
+      session: createTestClientSession(),
+      engine: createTestEngine({ playerPose: { cellId: "a", position: { x: 4.5, y: 2.5, z: 0 }, yawRadians: 0, pitchRadians: 0 } }),
       getRegistryVersion: () => registry.getVersion(),
     });
     controller.updateGeodesicEmitterLabels();

@@ -2,15 +2,16 @@
  * Defines RuntimeCommand, the closed discriminated union of every action the UI can request (a palette or menu press, a key, an API call), and RuntimeEffect, what a command asks the host to do beyond changing the session.
  * Commands and effects are plain immutable data. applyRuntimeCommand.ts turns a command into a new session state plus a list of effects; the rendering shell runs the effects in order. No renderer type appears here.
  */
+import type { ObjectActionEntry } from "../engine/moduleTypes";
 import type { TutorialPageSpec } from "../cell-complex/specs";
 import type { DebugSettings } from "../glue/debugSettings";
 import type { PortalPanelModeId } from "../glue/portalPanelMode";
 import type { RuntimeDebugOverlayItemId, RuntimeToolId } from "../glue/toolIds";
-import type { PlayerPose } from "../movement/playerPose";
 import type { GeodesicCannonToolState } from "../world-objects/geodesic/cannonToolState";
 import type { ProtractorToolState } from "../world-objects/protractorTool";
 import type { PlacedFlagType } from "../world-objects/toolObjects";
 import type { RuntimeMenuConsoleLogLevelId } from "./runtimeMenuState";
+import type { PendingToolRequest } from "./clientSession";
 
 /** Payload of the cannon actions page. */
 export interface ShowGeodesicCannonActionsPayload {
@@ -18,7 +19,8 @@ export interface ShowGeodesicCannonActionsPayload {
   readonly geodesicIds?: readonly string[];
   readonly geodesicLabelsById?: Readonly<Record<string, string>>;
   readonly lockedGeodesicIds?: readonly string[];
-  readonly canTieAndDetach?: boolean;
+  /** The actions the tools contribute to the page, with their availability (design 013 section 8.3). */
+  readonly objectActions?: readonly ObjectActionEntry[];
 }
 
 /** Payload of the geometry computer page. */
@@ -63,24 +65,20 @@ export type RuntimeCommand =
   | { readonly kind: "step-goal-page"; readonly delta: -1 | 1 }
   // Tool and sign selection.
   | { readonly kind: "select-tool"; readonly toolId: RuntimeToolId }
-  /** A tool entered a mode of its own (rotate, aim, carry, tie-and-detach): close the menu and select that tool. Not gated and no session reset: the tool started itself. */
+  /** A tool entered a mode of its own (rotate, aim, carry): close the menu and select that tool. Not gated and no session reset: the tool started itself. */
   | { readonly kind: "enter-tool-mode"; readonly toolId: RuntimeToolId }
   /** Ends the tool in use without closing the menu page: selects no tool. */
   | { readonly kind: "clear-selected-tool" }
   | { readonly kind: "choose-place-flag-type"; readonly flagType: PlacedFlagType }
   | { readonly kind: "set-editing-flag"; readonly flagId: string | undefined }
   | { readonly kind: "set-editing-sign-message"; readonly message: string }
-  // Tool and player state written by the tools and the frame loop.
+  // Tool state written by the tools and the frame loop.
   | { readonly kind: "set-cannon-tool-state"; readonly state: GeodesicCannonToolState }
   | { readonly kind: "set-protractor-tool-state"; readonly state: ProtractorToolState }
-  | { readonly kind: "set-player-pose"; readonly pose: PlayerPose }
-  // Carrying. The record lives only while the carry tool is selected; leaving that tool by any command drops it.
-  /** Pickup: the carry tool holds `objectId`. Ignored when the session already carries that object. */
-  | { readonly kind: "begin-carry"; readonly objectId: string }
-  /** Release: the carry tool no longer holds anything (the tool selection is left alone). */
-  | { readonly kind: "end-carry" }
-  /** The carried object is at the hand for the first time since the pickup; the hand's tight leash applies from now on. Ignored when nothing is carried or the object had arrived. */
-  | { readonly kind: "carry-arrived" }
+  /** A module's client tool state (picks, prompts); `undefined` clears it. Design 013 section 9.3. */
+  | { readonly kind: "set-module-tool-state"; readonly moduleId: string; readonly state: unknown }
+  /** The tool request the world has not answered yet (design 013 section 8.1), or undefined once it has. */
+  | { readonly kind: "set-pending-tool-request"; readonly request: PendingToolRequest | undefined }
   // World, config, reload.
   | { readonly kind: "select-world"; readonly worldId: string }
   | { readonly kind: "select-config"; readonly configName: string }
@@ -109,7 +107,7 @@ export type RuntimeCommand =
   // Geodesic cannon page actions.
   | { readonly kind: "add-geodesic-to-cannon"; readonly cannonId: string }
   | { readonly kind: "start-cannon-carry"; readonly cannonId: string }
-  | { readonly kind: "start-cannon-tie-and-detach"; readonly cannonId: string }
+  | { readonly kind: "start-object-action"; readonly objectKind: string; readonly objectId: string; readonly actionId: string }
   | { readonly kind: "start-cannon-rotation"; readonly cannonId: string; readonly geodesicId?: string }
   | { readonly kind: "start-cannon-aim"; readonly cannonId: string; readonly geodesicId?: string }
   | { readonly kind: "delete-geodesic-from-cannon"; readonly cannonId: string; readonly geodesicId: string }
@@ -151,7 +149,7 @@ export type RuntimeEffect =
   | { readonly kind: "arm-reload-confirmation-timer"; readonly windowMs: number }
   | { readonly kind: "add-geodesic-to-cannon"; readonly cannonId: string }
   | { readonly kind: "start-cannon-carry"; readonly cannonId: string }
-  | { readonly kind: "start-cannon-tie-and-detach"; readonly cannonId: string }
+  | { readonly kind: "start-object-action"; readonly objectKind: string; readonly objectId: string; readonly actionId: string }
   | { readonly kind: "start-cannon-rotation"; readonly cannonId: string; readonly geodesicId?: string }
   | { readonly kind: "start-cannon-aim"; readonly cannonId: string; readonly geodesicId?: string }
   | { readonly kind: "delete-geodesic-from-cannon"; readonly cannonId: string; readonly geodesicId: string }

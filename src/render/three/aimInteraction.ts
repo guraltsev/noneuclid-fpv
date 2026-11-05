@@ -4,16 +4,17 @@
  * The ray is cast from the root frame and walked through the portals it actually crosses (see aimTarget.ts), with a maximum distance of 24 m. One resolution is cached per distinct ray, ignored geodesic and frame serial.
  * Mutable state is limited to the target-cycle selection, which is keyed by a signature of the candidate list and so resets whenever the candidates change.
  */
+import { readLocalPlayerPose, type WorldEngine } from "../../engine/worldEngine";
 import * as THREE from "three";
 import { type CompiledCellComplex } from "../../cell-complex/compileCellComplex";
 import { DEFAULT_PLAYER_EYE_HEIGHT_METERS } from "../../movement/playerBody";
-import type { AppSession } from "../../runtime/appSession";
+import type { ClientSession } from "../../runtime/clientSession";
 import {
   createWorldFocusMessageDefinition,
   formatWorldFocusMessageTextForLegacyFallback,
 } from "../../ui/worldInteractionDefinition";
 import { canExtendGeodesicSegment } from "../../world-objects/geodesic/objects";
-import { isGeodesicLocked } from "../../world-objects/geodesic/lifecycle";
+import { arcConnectsEmitters } from "../../world-objects/geodesic/lifecycle";
 import { type RuntimeObjectRegistry, type RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
 import { AimTarget } from "../../interaction/aimTarget";
 import { resolveAimTargets as defaultResolveAimTargets } from "./aimTarget";
@@ -39,7 +40,9 @@ export interface AimInteractionDeps {
   /** Getter: the currently active (possibly deformed) compiled world. */
   getWorld(): CompiledCellComplex;
   /** The shell session; its menu state's selectedTool affects which geodesic is ignored and the focus message. */
-  readonly session: AppSession;
+  readonly session: ClientSession;
+  /** The world engine; the player's pose is read from it. */
+  readonly engine: WorldEngine;
   /** Getter: frame counter, incremented once per rendered frame; invalidates the per-frame aim cache. */
   getFrameSerial(): number;
   /** Optional override of the ray-walk resolver (tests count resolutions through it). */
@@ -102,7 +105,7 @@ export function createAimInteraction(deps: AimInteractionDeps) {
     }
 
     const aimCamera = syncAimRayCamera(ray);
-    const pose = deps.session.get().playerPose;
+    const pose = readLocalPlayerPose(deps.engine);
     const targets = resolveAimTargets({
       world: deps.getWorld(),
       registry: runtimeObjectRegistry,
@@ -310,9 +313,9 @@ export function createAimInteraction(deps: AimInteractionDeps) {
     return createWorldFocusMessageDefinition({
       object,
       selectedTool: deps.session.get().menuState.selectedTool,
-      canExtendGeodesic: object.kind === "geodesic-segment" &&
+      canExtendGeodesic: object.kind === "geodesicModel/segment" &&
         canExtendGeodesicSegment(object) &&
-        !isGeodesicLocked(runtimeObjectRegistry, object.geodesicId),
+        !arcConnectsEmitters(runtimeObjectRegistry, object.geodesicId),
     });
   }
 

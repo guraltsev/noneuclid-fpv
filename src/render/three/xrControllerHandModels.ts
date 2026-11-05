@@ -9,7 +9,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { clone as cloneSkeleton } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { publicAssetUrl } from "../../glue/assetUrls";
-import type { RuntimeToolId } from "../../glue/toolIds";
+import type { ToolDescriptor } from "../../engine/moduleTypes";
 import type { PlacedFlagType } from "../../world-objects/toolObjects";
 import { xrRigidTransformLocalMatrix } from "./xrPlayerRig";
 
@@ -25,8 +25,8 @@ export interface XrControllerHandModelsUpdate {
   readonly referenceSpace: XRReferenceSpace;
   /** Transform from reference-space coordinates to Three.js world (the shell passes `xrRig.root.matrixWorld`; read each call, not copied). */
   readonly referenceSpaceToWorldMatrix: THREE.Matrix4;
-  /** Tool shown by the right wrist indicator; defaults to "none" (indicator hidden). */
-  readonly selectedTool?: RuntimeToolId;
+  /** Tool shown by the right wrist indicator; absent for no tool (indicator hidden). */
+  readonly tool?: ToolDescriptor;
   /** Sign variant shown when the tool is "place-flag"; defaults to "WoodenSign1". */
   readonly placeFlagType?: PlacedFlagType;
 }
@@ -104,7 +104,6 @@ export function createXrControllerHandModels(scene: THREE.Scene): XrControllerHa
     update(frame) {
       const seenHands = new Set<"left" | "right">();
 
-      const selectedTool = frame.selectedTool ?? "none";
       const placeFlagType = frame.placeFlagType ?? "WoodenSign1";
 
       for (const source of frame.inputSources) {
@@ -124,7 +123,7 @@ export function createXrControllerHandModels(scene: THREE.Scene): XrControllerHa
         applyXrPoseToObject(model, pose.transform, frame.referenceSpaceToWorldMatrix, 1);
         model.visible = true;
         if (handedness === "right") {
-          updateWristToolIndicator(rightToolIndicator, model, selectedTool, placeFlagType);
+          updateWristToolIndicator(rightToolIndicator, model, frame.tool, placeFlagType);
         }
       }
 
@@ -182,75 +181,34 @@ const wristToolIndicatorRayIconSource = publicAssetUrl("flashlight/Lightsaber.pn
 const wristToolIndicatorProtractorIconSource = publicAssetUrl("icons/protractor.png");
 const wristToolIndicatorMeasureLengthIconSource = publicAssetUrl("icons/ruler.svg");
 
+const wristToolIndicatorIconSources: Readonly<Record<string, string>> = {
+  ray: wristToolIndicatorRayIconSource,
+  rotate: wristToolIndicatorRotateIconSource,
+  aim: wristToolIndicatorAimIconSource,
+  carry: wristToolIndicatorCarryIconSource,
+  protractor: wristToolIndicatorProtractorIconSource,
+  length: wristToolIndicatorMeasureLengthIconSource,
+};
+
 /**
- * Maps a tool id (and sign variant for "place-flag") to the icon, color, and label shown on the wrist, or `undefined` for "aim" and "none" (no indicator).
+ * Maps a tool descriptor (and sign variant for the sign tool) to the icon, color, and label shown on the wrist, or `undefined` for no tool ("aim" and "none" have no descriptor).
  */
 export function resolveWristToolIndicatorVisual(
-  toolId: RuntimeToolId,
+  tool: ToolDescriptor | undefined,
   flagType: PlacedFlagType,
 ): WristToolIndicatorVisual | undefined {
-  switch (toolId) {
-    case "aim":
-      return undefined;
-    case "place-flag":
-      return {
-        icon: "image",
-        imageSource: wristToolIndicatorSignIconSources[flagType],
-        color: flagType === "WoodenSign2" ? "#f59e0b" : "#22c55e",
-        label: "Sign",
-      };
-    case "geodesic-cannon":
-      return {
-        icon: "image",
-        imageSource: wristToolIndicatorRayIconSource,
-        color: "#facc15",
-        label: "Geodesic emitter",
-      };
-    case "protractor":
-      return {
-        icon: "image",
-        imageSource: wristToolIndicatorProtractorIconSource,
-        color: "#fb7185",
-        label: "Protractor",
-      };
-    case "measure-length":
-      return {
-        icon: "image",
-        imageSource: wristToolIndicatorMeasureLengthIconSource,
-        color: "#22c55e",
-        label: "Length",
-      };
-    case "geodesic-cannon-rotate":
-      return {
-        icon: "image",
-        imageSource: wristToolIndicatorRotateIconSource,
-        color: "#a78bfa",
-        label: "Turn",
-      };
-    case "geodesic-cannon-carry":
-      return {
-        icon: "image",
-        imageSource: wristToolIndicatorCarryIconSource,
-        color: "#fb7ac8",
-        label: "Carry",
-      };
-    case "geodesic-cannon-aim":
-      return {
-        icon: "image",
-        imageSource: wristToolIndicatorAimIconSource,
-        color: "#facc15",
-        label: "Aim ray",
-      };
-    case "geodesic-cannon-tie-detach":
-      return {
-        icon: "image",
-        imageSource: wristToolIndicatorRayIconSource,
-        color: "#f59e0b",
-        label: "Tie",
-      };
-    case "none":
-      return undefined;
+  if (tool === undefined) {
+    return undefined;
   }
+  if (tool.iconId === "sign") {
+    return {
+      icon: "image",
+      imageSource: wristToolIndicatorSignIconSources[flagType],
+      color: flagType === "WoodenSign2" ? "#f59e0b" : tool.indicatorColor,
+      label: tool.label,
+    };
+  }
+  return { icon: "image", imageSource: wristToolIndicatorIconSources[tool.iconId], color: tool.indicatorColor, label: tool.label };
 }
 
 /**
@@ -431,10 +389,10 @@ function createWristToolIndicator(): WristToolIndicator {
 function updateWristToolIndicator(
   indicator: WristToolIndicator,
   wrist: THREE.Object3D,
-  selectedTool: RuntimeToolId,
+  tool: ToolDescriptor | undefined,
   placeFlagType: PlacedFlagType,
 ): void {
-  const visual = resolveWristToolIndicatorVisual(selectedTool, placeFlagType);
+  const visual = resolveWristToolIndicatorVisual(tool, placeFlagType);
   if (!visual) {
     indicator.root.visible = false;
     return;

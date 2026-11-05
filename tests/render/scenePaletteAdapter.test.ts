@@ -39,7 +39,7 @@ describe("scenePaletteAdapter", () => {
     const adapter = createScenePaletteAdapter(createNoopOptions());
     adapter.setDefinition(createPaletteDefinition(showRuntimeMenuGeodesicCannonActions(
       createRuntimeMenuState({ selectedWorldId: "cube" }),
-      { cannonId: "cannon-a", geodesicIds: ["g-a"], canTieAndDetach: true },
+      { cannonId: "cannon-a", geodesicIds: ["g-a"], objectActions: [{ actionId: "tie-and-detach", label: "Tie & detach", iconId: "tie-and-detach", tooltip: "Tie them", enabled: true }] },
     )));
 
     const imageSources = collectPaletteImageSources(adapter.root);
@@ -51,11 +51,11 @@ describe("scenePaletteAdapter", () => {
     adapter.dispose();
   });
 
-  it("omits the tie-and-detach action when it is unavailable", () => {
+  it("omits a contributed action when it is unavailable", () => {
     const adapter = createScenePaletteAdapter(createNoopOptions());
     adapter.setDefinition(createPaletteDefinition(showRuntimeMenuGeodesicCannonActions(
       createRuntimeMenuState({ selectedWorldId: "cube" }),
-      { cannonId: "cannon-a", geodesicIds: ["g-a"], canTieAndDetach: false },
+      { cannonId: "cannon-a", geodesicIds: ["g-a"], objectActions: [{ actionId: "tie-and-detach", label: "Tie & detach", iconId: "tie-and-detach", tooltip: "Tie them", enabled: false }] },
     )));
 
     expect(collectPaletteItemIds(adapter.root)).toContain("geodesic-cannon-action:tie-and-detach");
