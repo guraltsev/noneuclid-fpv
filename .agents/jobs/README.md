@@ -144,12 +144,12 @@ lower numbers of jobs 18, 24, 30, 34 and 35.
 | [48](_done/48_module_bench_change_journal_layers.md) | Record the performance baseline, add the change journal, and add the engine and module layers | done, needs review | - |  |
 | [49](_done/49_world_engine_and_client_session.md) | Build the world engine and split the client session from it | done, needs review | - |  |
 | [50](_done/50_carry_as_world_attachment.md) | Make carrying a world attachment | done, needs review | - |  |
-| [00](00_coordinate_jobs_51_60.md) | Coordinate jobs 51-60 (derived state, then the geodesic and flow modules): order, gates, fresh-context reviews, batch report | queued | [84](../../_issues/84_behaviors_are_hard_wired_into_the_shell_and_need_a_plugin_system.md), [86](../../_issues/86_derived_state_is_recomputed_by_scanning_the_world.md) |  |
+| [00](_done/00_coordinate_jobs_51_60.md) | Coordinate jobs 51-60 (derived state, then the geodesic and flow modules): order, gates, fresh-context reviews, batch report | done, needs review | [84](../../_issues/84_behaviors_are_hard_wired_into_the_shell_and_need_a_plugin_system.md), [86](../../_issues/86_derived_state_is_recomputed_by_scanning_the_world.md) |  |
 | [51](_done/51_geodesic_model_module_and_renames.md) | Restore the geodesic model module and abolish the "moving" state | done, needs review | - |  |
 | [52](_done/52_derived_state_through_the_journal.md) | Derive crossings, lengths and angles from the change ring | done, needs review | - |  |
 | [53](_done/53_curve_shortening_module.md) | Move curve shortening into a module with no lifecycle | done, needs review | - |  |
 | [54](_done/54_tools_from_modules.md) | Build tools from module descriptors | done, needs review | - |  |
-| [55](55_destroy_policy.md) | Add the "destroy" policy for blocked curves | queued | [84](../../_issues/84_behaviors_are_hard_wired_into_the_shell_and_need_a_plugin_system.md), [86](../../_issues/86_derived_state_is_recomputed_by_scanning_the_world.md) |  |
+| [55](_done/55_destroy_policy.md) | Add the "destroy" policy for blocked curves | done, needs review | [84](../../_issues/84_behaviors_are_hard_wired_into_the_shell_and_need_a_plugin_system.md), [86](../../_issues/86_derived_state_is_recomputed_by_scanning_the_world.md) |  |
 | [56](_done/56_bench_counters_and_ab_gate.md) | Make the performance gate exact: scan counters, a many-arcs scene and an A/B tool | done, needs review | - |  |
 | [57](_done/57_change_ring.md) | Keep every change readable: a ring behind the journal, cursors that survive endFrame | done, needs review | - |  |
 | [58](_done/58_derived_cache.md) | Add the derived cache, cached kind lists and their guards | done, needs review | - |  |

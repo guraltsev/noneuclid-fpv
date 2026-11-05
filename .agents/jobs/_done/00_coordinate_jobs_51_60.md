@@ -1,6 +1,6 @@
 # Job 00 - Coordinate jobs 51-60 (derived state, then the geodesic and flow modules)
 
-Status: queued.
+Status: done, needs review on 2026-11-04.
 Coordinates: jobs [51](51_geodesic_model_module_and_renames.md), [56](56_bench_counters_and_ab_gate.md), [57](57_change_ring.md),
 [58](58_derived_cache.md), [59](59_arc_index.md), [60](60_materialized_state_is_a_function_of_real_state.md),
 [52](52_derived_state_through_the_journal.md), [53](53_curve_shortening_module.md), [54](54_tools_from_modules.md) and

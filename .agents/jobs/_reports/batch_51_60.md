@@ -1,8 +1,8 @@
 # Batch report: jobs 51-60 (derived state, then the geodesic and flow modules)
 
-Coordinator: [00_coordinate_jobs_51_60](../00_coordinate_jobs_51_60.md).
+Coordinator: [00_coordinate_jobs_51_60](../_done/00_coordinate_jobs_51_60.md).
 Continues: [batch_48_55](batch_48_55.md).
-Branch: batch-48-55. Batch start: 5d7b803. Batch end: (open).
+Branch: batch-48-55. Batch start: 5d7b803. Batch end: the last commit on the branch (Close coordinator job 00).
 
 ## Start state
 Worktree `../noneuclid-batch-48-55`, branch batch-48-55. The queued files (design 014, issue 86, jobs 51-60) were uncommitted and
@@ -14,14 +14,34 @@ test:report: unit 155 files / 1206 tests, process 3 / 18, release 7 / 11, hygien
 ## Summary
 | Job | Result | Commits | Review |
 | --- | --- | --- | --- |
-| 51 | needs review (timing red, permitted) | 2a52924, 64e14f1, 207bbd5, close | fresh agent; no blocking finding. Fixed two stale comments (api.ts:43, endpoints.ts:290). Code reached only by tests (module api/commands/queries) is by design until job 54. |
+| 51 | needs review (timing red at the time, permitted; cleared by job 56's A/B) | 2a52924, 64e14f1, 207bbd5 | fresh agent; no blocking finding; two stale comments fixed |
+| 56 | needs review (timing: `--check` exit 3, A/B exit 0) | c1f2771, cea3e52 | fresh agent; no finding on 1-9 |
+| 57 | needs review | d0818cd, f13817f | fresh agent; no Decision violated; removed unread `retainFromSeq` |
+| 58 | needs review | 3bf3997, 20d9e9d | fresh agent; fixed a stale value after a throwing compute |
+| 59 | needs review (vertex-scan counter 1 -> 2, not named by the job) | 3752f2c | fresh agent; no Decision violated; rise unavoidable within the Decisions |
+| 60 | needs review | a65f31d, bc946a4 | fresh agent; no Decision violated; oracle is not a tautology |
+| 52 | needs review (flow crossing scans 0 -> 1; bench coverage loss) | 5833c08 | fresh agent; removed an empty branch; wake gap, coverage loss, identity change left for the maintainer |
+| 53 | needs review | 6503dab | fresh agent; no Decision violated; counter rises are the crossings tick now running in all scenes |
+| 54 | needs review (manual desktop/VR check not done) | d3b6aba, c3df835 | fresh agent; fixed a per-frame allocation |
+| 55 | needs review (manual app check not done; issues 84, 86 stay open) | f69fd28 + repair | fresh agent; fixed the stale skip running after the valence block |
 
 ## Indicators
-| Indicator | Start | After each job (51, 56, 57, 58, 59, 60, 52, 53, 54, 55) |
+| Indicator | Start | After job 55 (end) |
 | --- | --- | --- |
-| Test files / tests (unit, process, release) | 155/1206, 3/18, 7/11 | |
+| Arc scans per flow+dependents run | 836 (job 56 baseline) | 2 (job 59) |
+| Arc index computes per run | n/a | 2 (flow+dependents), 3 (flow) |
+| Writes per flow+dependents run | 1918 | 1797 |
+| Writes per manyArcs run | 127420 | 126897 (fell to 1559 in job 52, back up in job 53 when the crossings tick ran under the flow) |
+| Bench (median, Leibniz) idle / flow / flow+dependents | 0.13-0.22 / 19.4-20.8 / 36.9-39.1 us/step (job 51 code) | 0.08 / 16.09 / 26.33 us/step; idle alloc 13.3 B/step (was 640); bare engine 0.3-2 B/step |
+| Lines in createThreeApp.ts | 1783 | 1764 |
+| Lines in `legacyWorldWriters` | 36 (block) | 36 (unchanged) |
+| Test files / tests (`npm test`) | 158 / 1332 | 169 / 1451 |
+| test:report: unit / process / release | 155/1206, 3/18, 7/11 | 166/1326, 3/18, 7/12 |
+
+Per-job `npm test` after: 51: 162/1362; 56: 162/1364; 57: 163/1374; 58: 164/1389; 59: 165/1397; 60: 165/1401; 52: 166/1406; 53: 167/1419; 54: 169/1448; 55: 169/1451.
 
 ## Manual checks for the maintainer
+- Job 55: in the default world with a forbidden-zone corner, shoot two geodesics, tie them with the tie tool at one emitter so the curve wraps the corner, let the flow run. The whole tied geodesic should vanish with no vertex left behind, and a `curveShortening/destroyed` notice should appear in the console. Then issues 84 and 86 can be closed (see the notes of job 55).
 - Job 54 (desktop and VR): the tie tool in the app and in the headset. Steps are in `### Not done` of `_done/54_tools_from_modules.md` (an emitter scene cannot be built through the public API, and there is no headset here). Also check that with the emitters config off the tie tool cannot start and shows a refusal message.
 - Job 59: run the app with the `derived-verify` debug option, carry an emitter, shoot a geodesic, tie two ends, let the flow run to the merge; no "differs from compute" error must appear in the console.
 
@@ -87,3 +107,24 @@ Start 039229d; commits d3b6aba, c3df835, repair + close. Tests after: 169 files 
 Done: tools are ToolDescriptors merged into `toolsById`; the tie tool lives in `src/modules/geodesicModel/tieTool.ts` and acts only through `ToolContext.submit`; `tieTool:false` drops it; `geodesic-cannon-tie-detach` is gone from src and tests; createThreeApp.ts names no module tool; `legacyWorldWriters` unchanged.
 Changed assertions (payload shape, no motion/length/geometry): applyRuntimeCommand.test.ts (canTieAndDetach -> objectActions; `start-cannon-tie-and-detach` -> `start-object-action`; **one assertion deleted**: the reducer no longer refuses the action with emitters disabled - the world's tool gate does, and no test covers world/requestTool with the emitters config off); runtimeMenuState, paletteDefinition, scenePaletteAdapter (tie payload -> objectActions); paletteTooltips (tie tooltip lookup now undefined: the descriptor carries it); runtimeEffects (tie highlight assertion and `session` dep dropped; the "ends on any deselection" comparison in dispatchRuntimeCommand has no test); xrControllerHandModels (icons, colours, labels unchanged).
 Review (fresh agent): no Decision violated. Fixed: a new frame-input object was allocated every frame in createThreeApp.ts; now one reused object. For the maintainer: (a) the old tool-switch effect also requested a runtime-object instance sync and cleared the tie selection; that branch is deleted, and whether the sync is still needed on a plain tool switch is unverified; (b) the help-lens tool-help branch is dead (never reached with no focus) and the palette main page still uses `toolLabels`; (c) descriptor fields read by no production code: `main-tool` entry kind, `ModuleClient.moduleId`, `AimPick.cellId/point`, `ToolContext.read`; (d) emitter-page action availability is a snapshot at page build, not per frame; (e) toolHost.ts, appConfig.ts and palette widgets.ts still name geodesicModel kinds or the tie id (the job's grep covers only createThreeApp.ts); (f) a dead id `tie-detach-geodesics` remains in worldInteractionDefinition.ts; (g) `api.geodesicModel.tieAndDetach` does not exist (no `publicApi`).
+
+## Job 55 notes
+Start 1c13ca5; commit f69fd28 + repair + close. Tests after: 169 files / 1451 tests; release 16 tests. Bench `--check` exit 0, no counter changed.
+Done: `BlockedPolicy = "unresolve" | "destroy"`; under "destroy" a blocked vertex removes the whole curve (`arcsOfCurve` + `geodesicModel/removeCurve`) and emits one `curveShortening/destroyed { arcIds, message }`; the default experience uses "destroy", the module default stays "unresolve". Design 013 section 1: one row marked Implemented. No test assertion changed (additions only). `policies.ts` unchanged (the policy lives in api.ts and flow.ts: Deviation).
+Review (fresh agent): fixed: the valence block ran before the stale-arc skip, so a vertex with a stale arc and wrong valence would be destroyed; the stale check now runs first (affects "unresolve" too: a stale vertex of any valence now waits). Not fixed, for the maintainer: "destroy" fires for every blocked reason (wall, merge-blocked, lift, valence, a refused removeVertex), not only a forbidden-zone disk as design 013 s1/s9.5 says; a refused destroy dispatch is retried every step, silently and unbounded (cannot happen today); no test of the refused-dispatch retry; 013 s13.2 still reads `onBlocked: "unresolve"; "destroy" in job 55`.
+Issues 84 and 86: left open with a one-line pointer. 84 also needs the before/after frame-time and allocation measurement (req 3) and the shell-genericity checks (req 1, 4, 5). 86 Done-when items belong to jobs 56-60 and are met by the counters (arc scans 836 -> 2, cursors surviving endFrame, oracle fuzz, stored-segment oracle), but its Outcome and Closing evidence sections are still empty and the manual `derived-verify` session of job 59 is not done.
+
+## Overall
+All ten jobs were carried out in the planned order on branch batch-48-55; none was reverted or skipped. Every job ended "done, needs review", because each has an open Uncertain item or an undone manual check. Final run: typecheck ok; `npm test` 169 files / 1451 tests; docs:check ok; smoke cube,torus-moduli ok; test:release 7 files / 16 tests; `bench moduleStep --check` exit 0 (counters ok, timing ok).
+The timing gate fired (exit 3) after several jobs and was cleared each time by `bench:ab` (exit 0) or by a rerun; no timing result reverted or stopped a job. Environment: browser-driven checks (smoke, release) failed with CDP timeouts around jobs 56, 58 and 60 while the machine was loaded; they also failed on the base commit by checkout and passed on rerun. Stale headless Edge processes were present; I was not allowed to stop them.
+Not pushed. The worktree `../noneuclid-batch-48-55` is kept.
+
+## Questions for the maintainer (collected)
+1. Job 59: the arc index adds a vertex pass per compute (vertex scans 1 -> 2). Approve, or change the Decisions (compute `tiedVertexIds` lazily)?
+2. Job 53: the geodesic model's crossings tick removes and re-adds every marker on each wake, so `manyArcs` writes are 126,897 against 1,559. Should it touch only changed markers?
+3. Job 52: an angle centred on or with a leg at an emitter can go stale if the cannon moves with no arc or crossing written (unproven); crossing ids are lost across a pass that does not return them.
+4. Job 54: the old tool-switch effect also requested an object-instance sync; verify it is not needed on a plain tool switch.
+5. Job 55: should "destroy" apply only to forbidden-zone blocks? Update 013 s13.2.
+6. Test-only code left: `computeArcIndex` (oracle), `getRememberedGeodesicIntersectionObject`, the remembered-centre branch of `refreshProtractorAngleObject`, `rebuiltGeodesicIds` on carry events, `curveShorteningSpeedMetersPerSecond`, descriptor fields read by no production code, the dead help-lens tool branch.
+7. The ring has no clamp for a cursor older than its tail (job 57); no test covers it.
+8. Closing issues 84 and 86 after the manual checks above.

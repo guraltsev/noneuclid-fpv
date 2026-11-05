@@ -58,13 +58,13 @@ function flowVertex(deps: FlowDeps, vertexId: string, deltaSeconds: number): voi
   const ends = model.arcsAtVertex(vertexId);
   // The visit walks a snapshot: a merge earlier in this step may have removed the vertex.
   if (ends.length === 0) return;
-  if (ends.length !== 2) {
-    blockVertex(deps, vertexId, `vertex-valence-${ends.length}`);
-    return;
-  }
   // An arc whose last rebuild failed during a carry still shows its old path; the vertex waits for a good one.
   for (let index = 0; index < ends.length; index += 1) {
     if (model.isStale(ends[index]!.arcId)) return;
+  }
+  if (ends.length !== 2) {
+    blockVertex(deps, vertexId, `vertex-valence-${ends.length}`);
+    return;
   }
   const tangents = model.arcTangentsAtVertex(vertexId, ends);
   if (!tangents) {
