@@ -84,7 +84,7 @@ queued job, despite their numbers (they were numbered after the existing queue t
 **Priority (maintainer, 2026-11-03):** the coordinator of jobs 48-55 comes before every other queued job, despite the
 lower numbers of jobs 18, 24, 30, 34 and 35.
 
-**Order of jobs 51-60 (2026-11-04):** the coordinator [00_coordinate_jobs_51_60](00_coordinate_jobs_51_60.md) runs them in the order 51, 56, 57, 58,
+**Order of jobs 51-60 (2026-11-04):** the coordinator [00_coordinate_jobs_51_60](_done/00_coordinate_jobs_51_60.md) runs them in the order 51, 56, 57, 58,
 59, 60, 52, 53, 54, 55, despite their numbers: the new jobs 56 to 60 lay the foundation the older ones need. It comes before every other queued job.
 
 | Job | Title | Status | Resolves issues | Former issue |
