@@ -806,7 +806,6 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
     options: {
       readonly connectEmitters?: boolean;
       readonly snapToEmitter?: boolean;
-      readonly breakOnForbiddenZone?: boolean;
     } = {},
   ): void {
     const geodesicId = deps.session.get().cannonToolState.activeGeodesicId;
@@ -824,7 +823,6 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
       totalLengthMeters,
       connectEmitters: options.connectEmitters,
       snapToEmitter: options.snapToEmitter,
-      breakOnForbiddenZone: options.breakOnForbiddenZone,
       rebuildLocked: true,
     });
     deps.dispatch({ kind: "set-cannon-tool-state", state: {

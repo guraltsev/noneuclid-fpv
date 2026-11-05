@@ -324,42 +324,6 @@ describe("geodesic cannon world objects: trace", () => {
     expect(totalGeodesicLength(registry, "g-a")).toBeCloseTo(rememberedLength);
   });
 
-  it("breaks carried geodesics completely when the rebuilt path crosses a forbidden zone", () => {
-    const world = compileLargePortalWorld();
-    const registry = createRuntimeObjectRegistry();
-    const cannon = createGeodesicCannonObject({
-      id: "cannon-a",
-      cellId: "a",
-      localPose: yawRigidTransform3(0, { x: 1, y: 2.5, z: 0 }),
-    });
-    registry.add(cannon);
-    rebuildGeodesicToLength({
-      world,
-      registry,
-      cannon,
-      geodesicId: "g-a",
-      totalLengthMeters: 4.7,
-    });
-    const rememberedLength = totalGeodesicLength(registry, "g-a");
-
-    const blockedCannon = createGeodesicCannonObject({
-      ...cannon,
-      aimYawRadians: Math.atan2(-2.5, 4),
-    });
-    const rebuilt = rebuildGeodesicToLength({
-      world,
-      registry,
-      cannon: blockedCannon,
-      geodesicId: "g-a",
-      totalLengthMeters: rememberedLength,
-      breakOnForbiddenZone: true,
-    });
-
-    expect(rebuilt).toEqual([]);
-    expect(getGeodesicSegments(registry, "g-a")).toEqual([]);
-    expect(getCannonGeodesicIds(registry, "cannon-a")).toEqual([]);
-  });
-
   it("removes unlocked geodesics immediately when lifting an emitter", () => {
     const world = compileLargeWorld();
     const registry = createRuntimeObjectRegistry();

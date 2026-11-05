@@ -456,7 +456,7 @@ The JSDoc of the exported constants changes, so `_docs/generated/API_REFERENCE.m
   - Note in the Outcome that issue 66's "Proposed change 2" (projection onto the developed chord) was not done; job 26
     supersedes it.
   - Fix links to the old path: `_issues/50_deep_code_audit_2026_10_09_index.md:87` becomes `_closed/66_...md`,
-    `_issues/67_exact_curve_shortening_via_sleeve_funnel.md:84` becomes `_closed/66_...md`, and
+    `_issues/_closed/67_exact_curve_shortening_via_sleeve_funnel.md:84` becomes `_closed/66_...md`, and
     `_issues/_closed/41_documentation_audit_findings.md:18` (`../66_...md`) becomes `66_...md`. Run
     `grep -rn "66_curve_shortening_stalls" --exclude-dir=node_modules .` to find any other.
 

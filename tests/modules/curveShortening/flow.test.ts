@@ -2,14 +2,14 @@
  * `tests/modules/curveShortening/flow.test.ts` - unit tier.
  *
  * The flow of the curve shortening module (`flowStep`, design 013 section 13.2) alone, against a scripted fake of `GeodesicModelApi` and of `dispatch`, with no engine and no world: a vertex at rest merges
- * (the removal command is dispatched and the vertex does not move); a vertex that cannot move or merge goes quiet and `unresolved` fires once; a vertex with a stale arc is skipped for the step, not blocked; a taut closed loop goes
+ * (the removal command is dispatched and the vertex does not move); a vertex that cannot move or merge destroys its curve with one notice, and goes quiet with no notice if the removal is refused; a vertex with a stale arc is skipped for the step, not blocked; a taut closed loop goes
  * quiet with no command; a vertex merged away earlier in the same step is skipped; and a quiet vertex is not visited.
  */
 import { describe, expect, it, vi } from "vitest";
 import type { CommandResult, EngineCommandBase } from "../../../src/engine/moduleTypes";
 import type { ArcEnd, ArcTangent, GeodesicModelApi, VertexRemovalPreview } from "../../../src/modules/geodesicModel/api";
 import type { CurveShorteningEvent } from "../../../src/modules/curveShortening/api";
-import { flowStep, tautLoopReason, type FlowDeps } from "../../../src/modules/curveShortening/flow";
+import { flowStep, type FlowDeps } from "../../../src/modules/curveShortening/flow";
 import { speedLawNamed } from "../../../src/modules/curveShortening/policies";
 
 const ends: readonly ArcEnd[] = [{ arcId: "a", role: "end" }, { arcId: "b", role: "start" }];
@@ -40,14 +40,13 @@ function scriptedModel(script: {
   return model as unknown as GeodesicModelApi & typeof model;
 }
 
-function setup(model: GeodesicModelApi, onBlocked: FlowDeps["onBlocked"] = "unresolve") {
+function setup(model: GeodesicModelApi) {
   const events: CurveShorteningEvent[] = [];
   const dispatched: EngineCommandBase[] = [];
-  const quiet = new Map<string, string>();
+  const quiet = new Set<string>();
   const deps: FlowDeps = {
     model,
     speedLaw: speedLawNamed("constant"),
-    onBlocked,
     quiet,
     vertexPoint: () => ({ x: 0, y: 0 }),
     dispatch: (command): CommandResult => {
@@ -78,37 +77,47 @@ describe("curve shortening flow against a scripted model", () => {
     expect(quiet.size).toBe(0);
   });
 
-  it("goes quiet when the merge is refused, and fires unresolved once", () => {
-    const model = scriptedModel({ tangents: bent, removal: { kind: "blocked", reason: "mergeBlocked" } });
-    const { deps, dispatched, events, quiet } = setup(model);
-
-    flowStep(deps, 1 / 60);
-    flowStep(deps, 1 / 60);
-    flowStep(deps, 1 / 60);
-
-    expect(dispatched).toEqual([]);
-    expect(quiet.get("v")).toBe("merge-blocked");
-    expect(events).toEqual([
-      { kind: "curveShortening/unresolved", vertexId: "v", reason: "merge-blocked", message: "The tied geodesic could not be straightened (merge-blocked)." },
-    ]);
-    expect(model.arcsAtVertex).toHaveBeenCalledTimes(1);
-  });
-
   it("destroys the whole curve with one notice when the merge is refused", () => {
     const model = scriptedModel({ tangents: bent, removal: { kind: "blocked", reason: "mergeBlocked" }, curve: ["a", "b", "c"] });
-    const { deps, dispatched, events, quiet } = setup(model, "destroy");
+    const { deps, dispatched, events, quiet } = setup(model);
 
     flowStep(deps, 1 / 60);
 
     expect(dispatched).toEqual([{ kind: "geodesicModel/removeCurve", arcIds: ["a", "b", "c"] }]);
     expect(quiet.size).toBe(0);
-    expect(events).toHaveLength(1);
-    expect(events[0]).toMatchObject({ kind: "curveShortening/destroyed", arcIds: ["a", "b", "c"] });
+    expect(events).toEqual([{
+      kind: "curveShortening/destroyed",
+      vertexId: "v",
+      reason: "merge-blocked",
+      arcIds: ["a", "b", "c"],
+      message: "The tied geodesic could not shorten any further and was removed (merge-blocked).",
+    }]);
+  });
+
+  it("goes quiet with no notice and no retry when the removal of the curve is refused", () => {
+    const model = scriptedModel({ tangents: bent, removal: { kind: "blocked", reason: "mergeBlocked" } });
+    const { deps, dispatched, events, quiet } = setup(model);
+    const refusing: FlowDeps = {
+      ...deps,
+      dispatch: (command) => {
+        dispatched.push(command);
+        return { ok: false, refusal: { code: "geodesicModel/unknownArc", message: "One of the arcs does not exist." } };
+      },
+    };
+
+    flowStep(refusing, 1 / 60);
+    flowStep(refusing, 1 / 60);
+    flowStep(refusing, 1 / 60);
+
+    expect(dispatched).toEqual([{ kind: "geodesicModel/removeCurve", arcIds: ["a", "b"] }]);
+    expect(events).toEqual([]);
+    expect(quiet.has("v")).toBe(true);
+    expect(model.arcsAtVertex).toHaveBeenCalledTimes(1);
   });
 
   it("does not destroy a vertex with a stale arc", () => {
     const model = scriptedModel({ tangents: bent, removal: { kind: "blocked", reason: "mergeBlocked" }, stale: (arcId) => arcId === "b" });
-    const { deps, dispatched, events } = setup(model, "destroy");
+    const { deps, dispatched, events } = setup(model);
 
     flowStep(deps, 1 / 60);
 
@@ -137,7 +146,7 @@ describe("curve shortening flow against a scripted model", () => {
 
     expect(dispatched).toEqual([]);
     expect(events).toEqual([]);
-    expect(quiet.get("v")).toBe(tautLoopReason);
+    expect(quiet.has("v")).toBe(true);
   });
 
   it("emits the collapse notice after the removal of a curve that shrank to a point", () => {
@@ -171,7 +180,7 @@ describe("curve shortening flow against a scripted model", () => {
   it("does not visit a quiet vertex", () => {
     const model = scriptedModel({ tangents: straight });
     const { deps, dispatched, quiet } = setup(model);
-    quiet.set("v", "merge-blocked");
+    quiet.add("v");
 
     flowStep(deps, 1 / 60);
 

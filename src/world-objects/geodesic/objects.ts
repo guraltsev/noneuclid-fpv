@@ -45,7 +45,7 @@
  * geodesic chords of their portal words (the words change by the portals the vertex crosses), and a vertex whose turning angle is below the tolerance is
  * removed, merging its two arcs. The vertex count never grows and the length never grows. A single interval whose two roles share F is a free loop:
  * with a translation as holonomy it is already taut and its vertex stays as a base point, with a rotation (it encircles a cone point) it shrinks until it is
- * deleted with a notice. A curve that would need a wrap vertex at a forbidden-zone disk goes quiet as unresolved.
+ * deleted with a notice. A curve that would need a wrap vertex at a forbidden-zone disk is removed with a notice.
  *
  */
 import type { SimpleCollisionCylinder } from "../../movement/dynamicObject";

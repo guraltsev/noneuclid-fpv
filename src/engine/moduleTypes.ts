@@ -5,7 +5,6 @@
 import type { CompiledCellComplex } from "../cell-complex/compileCellComplex";
 import type { RuntimeToolId } from "../glue/toolIds";
 import type { PlayerPose } from "../movement/playerPose";
-import type { RuntimeObjectChangeJournal } from "../world-objects/runtimeObjectChangeJournal";
 import type { RuntimeObjectReader, RuntimeObjectRegistry } from "../world-objects/runtimeObjectRegistry";
 
 /** Data that survives a structured clone: what commands, results, events and control slots carry. */
@@ -33,14 +32,6 @@ export interface EngineEventBase {
 export interface WorldRequestToolCommand extends EngineCommandBase {
   readonly kind: "world/requestTool";
   readonly toolId: RuntimeToolId;
-}
-
-/** Emitted when a tool that was open to a participant no longer is; a client with that tool selected leaves it and shows `message`. */
-export interface WorldToolRevokedEvent extends EngineEventBase {
-  readonly kind: "world/toolRevoked";
-  readonly participantId: string;
-  readonly toolId: RuntimeToolId;
-  readonly message: string;
 }
 
 /** The answer to a command: accepted (with an optional value) or refused with a stable code and a sentence for people. */
@@ -97,21 +88,12 @@ export interface WorldReadView {
   participant(id: string): ParticipantRecord | undefined;
   /** Every participant, in creation order (a fresh array). */
   participants(): readonly ParticipantRecord[];
-  /** Every participant write since the last `endFrame`. */
-  readonly participantChanges: RuntimeObjectChangeJournal<ParticipantRecord>;
 }
 
 /** "<family>:<serial>" for core families, "<moduleId>/<family>:<serial>" for a module's (design 013 section 10), serials from the engine. */
 export interface EngineIdSource {
   next(family: string): string;
 }
-
-/** A module's answer for one participant and tool; undefined means "no objection". Pure function of the read view. */
-export type ToolGate = (input: {
-  readonly participantId: string;
-  readonly toolId: RuntimeToolId;
-  readonly read: WorldReadView;
-}) => { readonly refused: true; readonly code: string; readonly message: string } | undefined;
 
 /** The world engine: owner of world state, which it changes only in `step` (design 013 section 5.1). Clients reach it through this interface only. */
 export interface WorldEngine<Cmd extends EngineCommandBase = EngineCommandBase> {
@@ -153,7 +135,7 @@ export function defineModuleToken<Api, Queries = Record<string, never>>(id: stri
 export type CommandHandlers<C extends EngineCommandBase> = {
   readonly [K in C["kind"]]: {
     readonly run: (command: Extract<C, { kind: K }>, ctx: CommandContext) => CommandResult;
-    /** The tool a participant must be allowed to use; a client without it is refused with `world/capabilityMissing`. */
+    /** The tool this command needs; a client is refused with `world/capabilityMissing` while the tool configuration disables it. */
     readonly requiresTool?: RuntimeToolId;
     /** Reachable by `ctx.dispatch` only; clients are refused with `world/moduleOnly`. */
     readonly moduleOnly?: true;
@@ -220,9 +202,6 @@ export interface ModuleInstance<
   readonly queries: Queries;
   readonly commands: CommandHandlers<Cmd>;
   readonly ticks: readonly ModuleTick[];
-  /** Handlers for events of any module, run before this module's derive ticks. */
-  readonly onEvents?: { readonly [kind: string]: (event: EngineEventBase, ctx: StepContext) => void };
-  readonly toolGates?: readonly ToolGate[];
   /** Phantom: the events this module emits. */
   readonly __events?: Evt;
 }
@@ -236,7 +215,6 @@ export interface ModuleCreateContext {
   require<A>(token: ModuleToken<A, unknown>): A;
   readonly objects: RuntimeObjectRegistry;
   readonly getWorld: () => CompiledCellComplex;
-  readonly ids: EngineIdSource;
 }
 
 /** One object, reused every step: never keep it across steps. */
@@ -244,21 +222,18 @@ export interface StepContext {
   readonly world: CompiledCellComplex;
   readonly objects: RuntimeObjectRegistry;
   readonly deltaSeconds: number;
-  readonly stepIndex: number;
   /** The range of change-ring sequence numbers this tick has not seen: read entry `seq` through `ctx.objects.changes.ring` (`objectAt(seq)`, `beforeAt(seq)`). Sequence numbers, not frame indices. */
   readonly changesFrom: number;
   readonly changesTo: number;
   participant(id: string): ParticipantRecord | undefined;
   /** Calls `fn` for every participant, in creation order, without allocating. */
   forEachParticipant(fn: (participant: ParticipantRecord) => void): void;
-  /** Replaces the attachments of a participant (a journal entry of the participant journal). */
+  /** Replaces the attachments of a participant. */
   setAttachments(participantId: string, attachments: readonly ParticipantAttachment[]): void;
   control(participantId: string, slot: string): PlainData | undefined;
   emit(event: EngineEventBase): void;
   /** Runs a command now, inside the step, as actor "world" (design 013 section 5.7). */
   dispatch(command: EngineCommandBase): CommandResult;
-  /** Tells the engine that the answers of the tool gates for this participant may have changed. */
-  capabilitiesChanged(participantId: string): void;
   readonly ids: EngineIdSource;
 }
 
@@ -272,7 +247,7 @@ export interface CommandContext {
   participant(id: string): ParticipantRecord | undefined;
   /** Calls `fn` for every participant, in creation order, without allocating. */
   forEachParticipant(fn: (participant: ParticipantRecord) => void): void;
-  /** Replaces the attachments of a participant (a journal entry of the participant journal). */
+  /** Replaces the attachments of a participant. */
   setAttachments(participantId: string, attachments: readonly ParticipantAttachment[]): void;
   emit(event: EngineEventBase): void;
   dispatch(command: EngineCommandBase): CommandResult;
@@ -382,6 +357,5 @@ export interface ToolDescriptor {
 
 /** The client part of a module: a separate export of the module directory (`geodesicModelClient(options)`). */
 export interface ModuleClient {
-  readonly moduleId: string;
   readonly tools: readonly ToolDescriptor[];
 }

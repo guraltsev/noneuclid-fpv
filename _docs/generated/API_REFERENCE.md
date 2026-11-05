@@ -1471,7 +1471,6 @@ The types of the world engine and of its modules (design 013 sections 5 and 9): 
 | interface | `EngineCommandBase` | A command: plain data with a namespaced kind (`"world/requestTool"`, `"geodesicModel/tieAndDetach"`). |
 | interface | `EngineEventBase` | An event: plain data with a namespaced kind. |
 | interface | `WorldRequestToolCommand` | The engine's own command: ask whether this participant may switch to a tool (design 013 section 8.1). |
-| interface | `WorldToolRevokedEvent` | Emitted when a tool that was open to a participant no longer is; a client with that tool selected leaves it and shows `message`. |
 | type | `CommandResult` | The answer to a command: accepted (with an optional value) or refused with a stable code and a sentence for people. |
 | type | `CommandTicket` | What `submit` returns: pass it to `resultOf` after the step that applied the command. |
 | type | `ParticipantBody` | Where a participant is: the same record as the player pose (cell, cell-local position, yaw, pitch). |
@@ -1480,7 +1479,6 @@ The types of the world engine and of its modules (design 013 sections 5 and 9): 
 | interface | `ParticipantRecord` | Someone acting in the world. |
 | interface | `WorldReadView` | The read-only world state clients use between steps. |
 | interface | `EngineIdSource` | "<family>:<serial>" for core families, "<moduleId>/<family>:<serial>" for a module's (design 013 section 10), serials from the engine. |
-| type | `ToolGate` | A module's answer for one participant and tool; undefined means "no objection". |
 | interface | `WorldEngine` | The world engine: owner of world state, which it changes only in `step` (design 013 section 5.1). |
 | interface | `ModuleToken` | A typed name for an exported module API. |
 | function | `defineModuleToken` | Creates a token. |
@@ -1509,10 +1507,9 @@ Participants and control slots of the world engine (design 013 sections 5.1 and 
 | Kind | Name | Summary |
 | --- | --- | --- |
 | const | `localParticipantId` | Id of the participant the local device plays. |
-| const | `localDeviceId` | Owner id of participants the local device controls. |
 | function | `createLocalPlayerParticipant` | Creates the record of the local player. |
 | interface | `ParticipantTable` | The participants of one engine. |
-| function | `createParticipantTable` | Creates the table holding `initial`; `deviceId` is the device this engine serves. |
+| function | `createParticipantTable` | Creates the table holding `initial`. |
 | interface | `ControlSlots` | The control slots of one engine, keyed by participant and slot name. |
 | function | `createControlSlots` | Creates an empty slot table. |
 
@@ -1523,7 +1520,6 @@ Tool gates and the confirmation protocol's world side (design 013 section 8).
 | Kind | Name | Summary |
 | --- | --- | --- |
 | interface | `ToolRefusal` | Why a tool is refused. |
-| interface | `RevokedTool` | A tool newly refused to a participant. |
 | interface | `ToolGates` | The gates of one engine. |
 | interface | `ToolGatesOptions` | Options of {@link createToolGates}. |
 | function | `createToolGates` | Creates the gates. |
@@ -1593,15 +1589,12 @@ The curve shortening module's public face (design 013 section 13.2, amended by d
 
 | Kind | Name | Summary |
 | --- | --- | --- |
-| interface | `BlockedVertex` | A tied vertex the flow could not move and could not merge away, with the reason it gives. |
 | interface | `CurveDynamicsApi` | What the module answers: reads only. |
 | const | `curveDynamicsToken` | The token a dynamics module provides (so that a module that sticks curves at corners can replace the flow). |
 | interface | `CurveShorteningFreeLoopCollapsedEvent` | A loop around a cone point shrank below the minimum length and was deleted. |
 | interface | `CurveShorteningCollapsedEvent` | A tied curve shrank to a point and was deleted. |
-| interface | `CurveShorteningUnresolvedEvent` | A vertex could be neither moved nor merged away and went quiet; emitted once, when it goes quiet. |
-| interface | `CurveShorteningDestroyedEvent` | A vertex could be neither moved nor merged away and its whole curve was removed (the "destroy" policy). |
+| interface | `CurveShorteningDestroyedEvent` | The vertex `vertexId` could be neither moved nor merged away, for `reason`, and its whole curve was removed. |
 | type | `CurveShorteningEvent` | Every event of the module. |
-| type | `BlockedPolicy` | What the module does with a vertex it cannot move or merge: "unresolve" makes it quiet and reports it; "destroy" removes its whole curve. |
 | type | `SpeedLawName` | How far a vertex may move in one step, before the line search caps it. |
 | interface | `CurveShorteningOptions` | Options of the module. |
 
@@ -1611,7 +1604,6 @@ The curve shortening flow (design 013 section 13.2): the rule applied to every t
 
 | Kind | Name | Summary |
 | --- | --- | --- |
-| const | `tautLoopReason` | The reason a taut closed loop is quiet with: it is at rest, not blocked. |
 | interface | `FlowDeps` | What one step of the flow works with. |
 | function | `flowStep` | One step of the flow over every tied vertex that is not quiet. |
 

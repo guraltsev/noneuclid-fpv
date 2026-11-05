@@ -8,7 +8,6 @@ import type {
   CommandContext,
   CommandResult,
   EngineEventBase,
-  EngineIdSource,
   ModuleCreateContext,
   ModuleInstance,
   ModuleTick,
@@ -58,8 +57,6 @@ export interface ComposedExperience {
   readonly modules: readonly ComposedModule[];
   /** Command kind to handler. */
   readonly handlers: ReadonlyMap<string, ComposedHandler>;
-  /** Token id to the module providing it. */
-  readonly providers: ReadonlyMap<string, ComposedModule>;
   /** Tool ids of the modules (not the core tools). */
   readonly moduleToolIds: readonly RuntimeToolId[];
 }
@@ -72,8 +69,6 @@ export interface ComposeOptions {
   readonly coreToolIds: readonly string[];
   readonly objects: RuntimeObjectRegistry;
   readonly getWorld: () => CompiledCellComplex;
-  /** The id source of one module: its ids start with "<moduleId>/". */
-  idsFor(moduleId: string): EngineIdSource;
   /** What `ctx.require` hands to a dependent in place of the provider's `api` (the engine wraps it for the write guard). */
   wrapApi(moduleId: string, api: unknown): unknown;
 }
@@ -106,7 +101,6 @@ export function composeModules(definitions: readonly AnyModuleDefinition[], opti
       },
       objects: options.objects,
       getWorld: options.getWorld,
-      ids: options.idsFor(definition.id),
     };
     let instance: ModuleInstance<unknown, never, EngineEventBase, unknown>;
     try {
@@ -132,11 +126,7 @@ export function composeModules(definitions: readonly AnyModuleDefinition[], opti
     throw new ModuleCompositionError(problems);
   }
 
-  const providers = new Map<string, ComposedModule>();
-  for (const module of modules) {
-    if (module.definition.provides) providers.set(module.definition.provides.id, module);
-  }
-  return { modules, handlers, providers, moduleToolIds };
+  return { modules, handlers, moduleToolIds };
 }
 
 /** The kinds the write guard lets a module write. */

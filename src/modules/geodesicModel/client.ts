@@ -8,5 +8,5 @@ import { createTieToolDescriptor } from "./tieTool";
 /** Creates the client part; pass the same options as the world part. */
 export function geodesicModelClient(options: Partial<GeodesicModelOptions> = {}): ModuleClient {
   const { tieTool } = { ...defaultGeodesicModelOptions, ...options };
-  return { moduleId: "geodesicModel", tools: tieTool ? [createTieToolDescriptor()] : [] };
+  return { tools: tieTool ? [createTieToolDescriptor()] : [] };
 }

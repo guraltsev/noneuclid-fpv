@@ -42,6 +42,9 @@ decisions of its own.
 | 2026-11-05 | **A blocked curve is destroyed, whatever blocked it**, not only at a forbidden zone, until a better behaviour exists. The maintainer does not want `unresolved` as a resting state. | **Agreed** (maintainer) |
 | 2026-11-05 | **Simulation time belongs to the simulation** (012 P8): ticks of length \(h\), default \(1/90\) s, maximum \(1/30\) s. The shell never passes frame time. The local body stays outside the ticks, published at draw time, until locomotion moves into the engine. Not built yet: the code still steps once per frame. | **Agreed** (maintainer) |
 | 2026-11-05 | **Read tracking for measurements is on by default** (`geodesicMeasurementsModule({ trackReads })`, `world-objects/trackedReads.ts`; 014 D14). It costs a little with few records and pays with many that a change does not touch, and the step is well within budget. | **Agreed** (maintainer) |
+| 2026-11-05 | **`unresolve` is deleted**: a blocked curve is always destroyed. Better behaviour comes with a later algorithm, not as a resting state. | **Agreed** (maintainer) |
+| 2026-11-05 | **Engine hooks with no user are deleted** and listed in section 18, so that the design work survives: `onEvents`, module tool gates, revocation, the participant journal, `deviceId`, `ctx.stepIndex`, create-context `ids`. | **Agreed** (maintainer) |
+| 2026-11-05 | **A free geodesic is not destroyed at a corner.** Aimed or rotated through one, it stops there, remembers its length and extends as soon as the corner is cleared. A later effect makes the corner glow. The length is world state (issue 93). | **Agreed** (maintainer) |
 | 2026-11-05 | **The next batch is `geodesicEmitters`**, with the time change and `publicApi` (section 16). | **Agreed** (maintainer) |
 
 ## 2. Where the code stood before this wave (checked 2026-11-03)
@@ -235,8 +238,7 @@ Rendering is not part of a step; the client reads the result.
 ### 5.5 Events
 
 Events are plain data with namespaced kinds, emitted by commands and ticks, collected per step, readable by clients until
-`endFrame`. Participant-addressed events carry `participantId` (`world/toolRevoked`, section 8). Module event handlers
-(`onEvents`) let a module react to a provider's events in the derive pass (9.4).
+`endFrame`. Participant-addressed events carry `participantId`.
 
 ### 5.6 Queries
 
@@ -341,8 +343,7 @@ place; `lastIndexByKind: Map<string, number>` plus a reused `touchedKinds: strin
 used; `clear` sets `length = 0` without truncating. The registry's `add`, `replaceObject` (serving `update` and owner
 publishers) and `remove` each record one entry; nothing else in the registry changes.
 
-Participants are not registry objects: they are few and change every frame. The engine keeps them in its own table and records participant changes in a second, tiny journal with the same interface
-(`engine.read.participantChanges`). Clients that care (the camera, presence) read it.
+Participants are not registry objects: they are few and change every frame. The engine keeps them in its own table; clients read it through `engine.read.participant`.
 
 ### 6.3 Who clears it
 
@@ -357,7 +358,6 @@ Run at step phase 5 (and phase 7 after a deformation):
 - each derive tick keeps a cursor, a sequence number of the ring. It wakes when `wants(ctx)` is true, or when
   `lastSeqOfKind(k) >= cursor` for a `k` in its `subscribes`; it reads `[changesFrom, changesTo)` through
   `ctx.objects.changes.ring`, filtering by kind. A pass that does not wake a tick still moves its cursor to the head;
-- a module's `onEvents` handlers run before its derive ticks, over the events since their own cursor;
 - ticks run in module order, then in the order of the module's `ticks` array; a tick sees every earlier tick's writes
   (rule 9 of 9.2 forbids subscribing to a later writer).
 
@@ -447,10 +447,7 @@ follow in the emitter module (section 16).
 4. Commands that need a tool declare it (`requiresTool` on the command handler, 9.1). The engine checks the same gates
    before running the handler and refuses with `world/capabilityMissing`. The request in step 1 gives early feedback;
    the check in step 4 is what enforces, so a script or a stale client is refused the same way.
-5. When a gate's answer changes for a participant (the teacher disables a tool; the protractor is taken away), the
-   module calls `ctx.capabilitiesChanged(participantId)`. The engine re-asks the gates for every tool of that
-   participant and emits `world/toolRevoked { participantId, toolId, message }` for those now refused. A client with
-   that tool selected leaves it and shows the message.
+5. *Specified, not built* (section 18): a tool revoked while a client holds it.
 
 The world never records which tool is selected: requesting is a question, not a state change. *Rejected alternative:*
 world-held "equipped tool" state. It would be state only humans use, would need a round trip and replay entries for
@@ -460,18 +457,10 @@ protractor on the table that students must share), picking it up is an attachmen
 
 ### 8.2 Tool gates
 
-```ts
-/** A module's answer for one participant and tool; undefined means "no objection". */
-export type ToolGate = (input: { readonly participantId: string; readonly toolId: RuntimeToolId; readonly read: WorldReadView })
-  => { readonly refused: true; readonly code: string; readonly message: string } | undefined;
-```
-
 - The engine's own gate: the experience's **tool configuration** (today `appConfig.tools`, the four groups
   `placeFlags`, `geodesicEmitters`, `distances`, `angles`): a tool outside it is refused with `world/toolDisabled`.
   It is world configuration, fixed per world load.
-- Module gates, declared in the module's world part (9.1). Examples: a later `toolInventory` module ("found items grant
-  tools"); roles (012 P5: the teacher may deform, students may not).
-- Gates are pure functions of the read view; they never write.
+- Module gates are *specified, not built* (section 18). The configuration gate is the only one today.
 
 ### 8.3 Client tool descriptors
 
@@ -593,8 +582,6 @@ export interface ModuleInstance<Api, Cmd extends EngineCommandBase, Evt extends 
   readonly queries: Queries;                              // dependents and clients; read-only, plain data (5.7)
   readonly commands: CommandHandlers<Cmd>;
   readonly ticks: readonly ModuleTick[];
-  readonly onEvents?: { readonly [kind: string]: (event: EngineEventBase, ctx: StepContext) => void };
-  readonly toolGates?: readonly ToolGate[];
   readonly publicApi?: { readonly [name: string]: (...args: never[]) => unknown };  // api.<moduleId>, plain data; reads or submits only (5.7)
   readonly __events?: Evt;                                                          // phantom
 }
@@ -603,7 +590,6 @@ export interface ModuleCreateContext {
   require<A>(token: ModuleToken<A, unknown>): A;          // throws unless in `requires`
   readonly objects: RuntimeObjectRegistry;
   readonly getWorld: () => CompiledCellComplex;
-  readonly ids: EngineIdSource;
 }
 
 /** One object, reused every step; never keep it across steps. */
@@ -611,7 +597,6 @@ export interface StepContext {
   readonly world: CompiledCellComplex;
   readonly objects: RuntimeObjectRegistry;
   readonly deltaSeconds: number;
-  readonly stepIndex: number;
   readonly changesFrom: number;                           // journal range this tick has not seen
   readonly changesTo: number;
   participant(id: string): ParticipantRecord | undefined;
@@ -619,7 +604,6 @@ export interface StepContext {
   emit(event: EngineEventBase): void;
   /** Runs a command now, inside the step (section 5.7). */
   dispatch(command: EngineCommandBase): CommandResult;
-  capabilitiesChanged(participantId: string): void;
   readonly ids: EngineIdSource;
 }
 
@@ -648,7 +632,6 @@ The **client part** of a module is a separate export (`client.ts` in the module 
 
 ```ts
 export interface ModuleClient {
-  readonly moduleId: string;
   readonly tools?: readonly ToolDescriptor[];
   /** Initial client tool state; typed by interface merging into `ModuleToolStates` of the client session. */
   readonly initialToolState?: unknown;
@@ -688,7 +671,7 @@ engine; the shell composes the client parts.
 | Shared world state (real) | registry objects of the module's declared kinds | a flow's vertex list |
 | Per-participant world state | attachments and control slots of the participant record | a carry |
 | Client tool state | client session `moduleToolState[moduleId]`, changed by the client command `set-module-tool-state` | tie picks |
-| Configuration | factory options, fixed for the run | `onBlocked: "unresolve"` |
+| Configuration | factory options, fixed for the run | `speedLaw: "constant"` |
 | Caches (derived) | a cache or a memo of 014 (section 2, D9); a cache needs no reset | the arc index; the flow's `quiet` |
 
 A module keeps no other mutable state. So the world has one holder of real state (the engine: registry plus
@@ -726,8 +709,6 @@ state model or an invariant is a **replacement module** providing the **same tok
 
 | Variation | Kind | How |
 | --- | --- | --- |
-| Blocked at a singularity: mark unresolved (today) | policy | `onBlocked: "unresolve"` |
-| Blocked at a singularity: destroy the geodesic (2026-11-02) | policy | `onBlocked: "destroy"` (job 55) |
 | Instant straightening | policy | `speedLaw: "instant"` (run to rest within one step, bounded) |
 | Speed from tension | policy | `speedLaw: "tension"` (section 16) |
 | Intermediate vertices | policy | `refinement` option, added with that job (section 16) |
@@ -825,7 +806,7 @@ src/engine/                    world engine core; imports no module
   composeModules.ts            checks of 9.2, topological order, flat tick arrays, handler map
   moduleTicks.ts               bodies, simulate and derive passes, cursors
   writeGuard.ts                the write guard
-  toolGates.ts                 the configuration gate, revocation (world/requestTool itself is in worldEngine.ts)
+  toolGates.ts                 the configuration gate (world/requestTool itself is in worldEngine.ts)
   ids.ts, coreIds.ts           EngineIdSource
 src/modules/
   geodesicModel/
@@ -1042,7 +1023,7 @@ Failures while dragging:
   and is marked with the transient field `stale: true`; the next successful rebuild clears it. At release, a failed rebuild
   of a tied arc removes the whole curve.
 - **The flow and a stale arc:** a stale arc would make `previewVertexMove` fail, and the flow would read that as blocked
-  and end the curve (`unresolved`, or destroyed after job 55) over a momentary failure. So the flow skips a vertex with a
+  and destroy the curve over a momentary failure. So the flow skips a vertex with a
   stale incident arc for that step (`isStale`). It knows nothing of carrying.
 
 The guard on the flow's side: `previewVertexMove` and `previewVertexRemoval` refuse an id that is not a
@@ -1063,8 +1044,8 @@ of its two arc ends, pointing away from it:
    stays, as a base point, and goes quiet.
 3. Otherwise it moves along `u1 + u2`: `previewVertexMove` and `commitVertexMove`, step from the speed law, capped by the
    line search.
-4. A vertex that cannot move tries the merge, as today (the corner cut of `mergeVertexOrFail`). If that is refused, the
-   `onBlocked` policy decides.
+4. A vertex that cannot move tries the merge, as today (the corner cut of `mergeVertexOrFail`). If that is refused, its whole
+   curve is destroyed (`arcsOfCurve`, then dispatched `geodesicModel/removeCurve`), and `curveShortening/destroyed` carries the vertex and the reason.
 
 A curve has merged every vertex when it is one arc between emitters. Motion, tolerances, step halving and merging are
 today's code, moved. The one timing change: the first flow step is in the step that applied the tie, not the next.
@@ -1073,15 +1054,13 @@ today's code, moved. The one timing change: the first flow step is in the step t
 moves it stays one chord, and a dragged curve is rigid once merged. That is accepted for the simplest algorithm. Inserting
 vertices (below) restores the bend. In the app each tie makes one vertex, so a flow has no neighbour today.
 
-**Quiet vertices.** The flow keeps a private memo `quiet` of vertices with nothing to do: taut closed loops and blocked
-vertices. A derive tick `curveShortening/wake` (`subscribes: ["geodesicModel/arc"]`) removes from `quiet` every vertex whose
-arc changed, so a dragged loop or an unblocked vertex acts again. `quiet` is a memo, not world state (014 section 9): it empties
+**Quiet vertices.** The flow keeps a private memo `quiet` of vertices with nothing to do: taut closed loops. A derive tick `curveShortening/wake` (`subscribes: ["geodesicModel/arc"]`) removes from `quiet` every vertex whose
+arc changed, so a dragged loop acts again. `quiet` is a memo, not world state (014 section 9): it empties
 through the `wake` tick alone, because a geometry commit deletes every arc that does not connect emitters and the tick sees
 those removals, and a load makes a new engine.
 
 - Requires `geodesicModelToken`; provides `curveDynamicsToken` (so a stick-at-corner module can replace it).
-- Options `{ onBlocked; speedLaw: "constant" }`. The default experience uses `onBlocked: "destroy"`, for every reason a vertex
-  can be blocked (section 1, 2026-11-05).
+- Options `{ speedLaw: "constant" }`.
 
 ```ts
 export const curveDynamicsToken = defineModuleToken<CurveDynamicsApi, CurveDynamicsApi>("curveDynamics");
@@ -1089,7 +1068,6 @@ export const curveDynamicsToken = defineModuleToken<CurveDynamicsApi, CurveDynam
 export interface CurveDynamicsApi {
   /** True when every tied vertex is quiet. */
   isAtRest(): boolean;
-  blockedVertices(): readonly { readonly vertexId: string; readonly reason: string }[];
 }
 
 /** policies.ts. Metres this vertex may move this step, before the line search caps it. */
@@ -1098,18 +1076,16 @@ export type SpeedLaw = (input: { readonly tangentSum: { readonly x: number; read
 export type CurveShorteningEvent =
   | { readonly kind: "curveShortening/freeLoopCollapsed"; readonly arcId: string; readonly message: string }
   | { readonly kind: "curveShortening/collapsed"; readonly arcIds: readonly string[]; readonly message: string }
-  | { readonly kind: "curveShortening/unresolved"; readonly vertexId: string; readonly reason: string; readonly message: string };
+  | { readonly kind: "curveShortening/destroyed"; readonly vertexId: string; readonly reason: string; readonly arcIds: readonly string[]; readonly message: string };
 ```
 
-These carry exactly today's `CurveShorteningNotice` messages; the shell's generic event sink logs every event with a
-`message` to the console and `runtimeDiagnostics().recordDebugEvent`, as today. `unresolved` is emitted once, when the
-vertex goes quiet.
+The shell's generic event sink logs every event with a `message` to the console and `runtimeDiagnostics().recordDebugEvent`.
 
 - **Tick `curveShortening/step`** (simulate): `writes: []` (the model writes); `isIdle` is
   `tiedVertexCount() === quiet.size`, no allocation.
 - **`speedLaw: "constant"`** returns `curveShorteningSpeedMetersPerSecond * min(deltaSeconds, maxCurveShorteningDeltaSeconds)`,
   today's step budget.
-- **`publicApi`**: `{ isAtRest(), blockedVertices() }` as `api.curveShortening`.
+- **`publicApi`**: `{ isAtRest() }` as `api.curveShortening`.
 
 **Built for extension** (**Agreed**: a later algorithm takes tension into account and creates intermediate vertices):
 
@@ -1290,7 +1266,8 @@ are their specification.
 
 - **time** (012 P8): ticks of length \(h\), an accumulator in the shell, no caps on the flow;
 - **`geodesicEmitters`**: the emitter kind (`geodesicEmitters/emitter`), place, shoot, aim, rotate and carry as commands, rotate and
-  aim as edit attachments with slots. Closes issues 88 and 89, and ends the carry module's `writesCoreKinds`;
+  aim as edit attachments with slots, and a free geodesic's intended length as real state on its arc. Closes issues 88, 89 and 93, and
+  ends the carry module's `writesCoreKinds`;
 - **`publicApi`** on modules, then job 45 rewritten: emitters can be created through the API, so manual checks become release
   scenarios;
 - **measurement tools** and **flags** as modules.
@@ -1306,7 +1283,8 @@ Then, in a likely order:
 - the geometry tools moved into a P15 manifold layer; `world-objects/geodesic/` under `src/modules/geodesicModel/`;
 - **the P7 prototype**: the engine in a worker on a Quest, fed by the journals, measured against the main thread;
 - the static cull as an optional accelerator module (012 section 6);
-- the tie highlight as a client overlay.
+- the tie highlight as a client overlay;
+- the corner's glow while a free geodesic is stopped there.
 
 ## 17. Open questions
 
@@ -1330,6 +1308,20 @@ Then, in a likely order:
    Displacement messages (job 50) will be the first real case. A message can be added beside
    `submit` and `dispatch` without changing them.
 
+## 18. Specified, not built
+
+Removed on 2026-11-05 (maintainer) because nothing used them. Each is small to rebuild when a planned item needs it; the code as it stood
+is at commit 41f3606.
+
+| Item | What it was for | What would bring it back |
+| --- | --- | --- |
+| Module tool gates (`toolGates`) | a module refusing a tool: "You have not found a protractor yet." | the first experience with found tools or roles; the configuration gate and `requiresTool` stay |
+| Revocation (`capabilitiesChanged`, `world/toolRevoked`) | a tool taken away while a client holds it: the teacher disables it | the same; a client with the tool selected leaves it and shows the message |
+| `onEvents` | a module reacting to another module's events in the derive pass. As built it lost events emitted after a module's slot | a real consumer; deliver from a cursor that survives `endFrame` |
+| Participant journal (`participantChanges`) | clients following participant changes | presence, in multiplayer |
+| `deviceId` option | a device serving a participant it does not own | multiplayer; the `publishBody` owner check stays, against `localDeviceId` |
+| `ctx.stepIndex`, create-context `ids` | a tick reading the step count; minting ids at creation | a tick that needs them; with a varying \(h\), a step count is not time |
+
 ## Decision log
 
 | Date | Change |
@@ -1347,4 +1339,5 @@ Then, in a likely order:
 | 2026-11-03 | Agreed (maintainer): no final locked state; the flow stops by a natural condition; a vertex at rest always merges; the simplest algorithm now, extensible to tension and intermediate vertices. Replaces `drivenBy`, `setDriver`, the flow object, claiming and the `started` and `finished` events. Proposed: `quiet`, `SpeedLaw`, the rename to `arcConnectsEmitters`. |
 | 2026-11-03 | Agreed (maintainer): no tool switch until confirmed, in VR too; section 16 keeps its order; a chord into a forbidden zone removes the whole tied curve; the `stale` skip; plain shot geodesics are still deleted on lift. Job files 48 to 55 written. |
 | 2026-11-05 | Jobs 48 to 60 merged. Text aligned with the code and with 014's section 9 amendments (ring, cursors, `quiet` as a memo, no `reset` or `transformGeometry`). Status of Proposed items unchanged. |
+| 2026-11-05 | Agreed (maintainer): `unresolve` deleted; the unused engine hooks deleted and listed in section 18; a free geodesic stops at a corner, remembers its length and extends when clear (issue 93); a corner glow later. |
 | 2026-11-05 | Agreed (maintainer): a blocked curve is destroyed for any reason, for now; time as in 012 P8 with \(h = 1/90\) s by default and at most \(1/30\) s; read tracking on by default for measurements; section 16 reordered, the emitters first. |

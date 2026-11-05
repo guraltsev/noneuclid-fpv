@@ -301,19 +301,19 @@ has the descent direction $d=u_1+u_2$, and $|d|\approx$ the turning angle.
    the word of an arc that starts at $F$ is prefixed by their inverse, both freely reduced, and both arcs are previewed
    before anything is written. A step that is rejected (a wall, a forbidden zone, or a result that is not
    shorter) is halved up to eight times. The total length therefore never grows.
-4. A vertex that cannot move, at a step shorter than $10^{-5}$ m, tries the merge of rule 2 (the corner is cut). If that is refused too, the *blocked* policy applies; `unresolve` makes $F$ quiet and fires a notice once; `destroy`, the default experience's setting, removes the whole curve (every arc, and every vertex left without an arc) and fires a notice once.
+4. A vertex that cannot move, at a step shorter than $10^{-5}$ m, tries the merge of rule 2 (the corner is cut). If that is refused too, the whole curve is removed (every arc, and every vertex left without an arc) and a notice fires once.
 
 A loop with holonomy a rotation $\theta\ne0$ encircles a cone point $c$, its length $2|\sin(\theta/2)|\,|F-c|$
 shrinks as $F$ flows to $c$, and when the loop is shorter than four times the minimum geodesic length it is deleted with a notice. A merged chord shorter than
 `src/world-objects/geodesic/objects.ts#GEODESIC_MIN_LENGTH_METERS` is deleted with a notice. A merged arc that duplicates an existing geodesic
 (same anchors, same word read in either direction) is discarded in its favour.
 
-**Quiet vertices.** The flow keeps a private memo of the vertices with nothing to do: taut closed loops and blocked vertices. It is a memo, not a cache and not world state: whether a vertex can move depends on the step length, so it is not
+**Quiet vertices.** The flow keeps a private memo of the vertices with nothing to do: taut closed loops. It is a memo, not a cache and not world state: whether a vertex can move depends on the step length, so it is not
 a function of state. Any write of an arc that has the vertex at an end, before or after the write, makes the vertex act again. The flow is at rest when every tied vertex is quiet, and a step with nothing to do costs nothing.
 
 **The vertex count never grows.** This algorithm only moves and removes vertices; it never inserts one (a later algorithm may). A curve whose taut shape would wrap a
 forbidden-zone disk at a portal junction (that would need new corner vertices on the disk boundary) is therefore not finished: the step toward
-the disk is rejected, the merge that would cut the corner is rejected too, and the vertex is blocked. The default experience then destroys the curve, with a notice; a better answer waits for a later algorithm. Under the `unresolve` policy the vertex goes quiet instead, and nothing is deleted because a path touches a disk. Apertures at vertices that are not portal endpoints, and in the end cells, are not
+the disk is rejected, the merge that would cut the corner is rejected too, and the vertex is blocked, so the curve is destroyed, with a notice; a better answer waits for a later algorithm. This is the flow's rule only: a free geodesic aimed or rotated through a corner stops there, keeps its length and extends again once the corner is cleared. Apertures at vertices that are not portal endpoints, and in the end cells, are not
 modelled; the previews catch any hit there. Merging loses a bend: a merged arc cannot bend at that vertex again.
 
 **Limit.** The limit of the flow is the shortest path of the curve's homotopy class when no disk is in the way: for two emitters the straight
@@ -540,4 +540,4 @@ rather than discovered.
 - **Yaw conventions.** Rigid-transform yaw is $\operatorname{atan2}(R_{10},R_{00})$ and forward is $R e_y$. The marmot
   derives its yaw from its velocity as $\operatorname{atan2}(-v_x,v_y)$, so it walks along $v$. Geodesic cannon and
   protractor yaws are direction angles along $(\cos\psi,\sin\psi)$.
-- **Curve shortening.** The flow does not insert vertices: a curve that needs a wrap around a forbidden-zone disk is destroyed under the default `destroy` policy, and stays `unresolved` under `unresolve`.
+- **Curve shortening.** The flow does not insert vertices: a curve that needs a wrap around a forbidden-zone disk is destroyed.

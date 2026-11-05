@@ -2,35 +2,29 @@
  * The curve shortening module (design 013 section 13.2, design 014 sections 2.1 and 9): the flow that straightens the curves whose vertices the geodesic model has tied. A curve has no lifecycle: nothing starts, finishes
  * or locks. The module has no command, no tool and no object kind; one simulate tick applies the rule of `flow.ts` to every tied vertex, and the flow stops because nothing is left to act on.
  *
- * `quiet` is a private memo of the vertices with nothing to do (taut closed loops and blocked vertices), not world state and not a cache: whether a vertex can move depends on the step length, so it is not a function of state.
- * The derive tick `curveShortening/wake` empties it where it can be wrong: it reads the change ring for arc writes and forgets both anchors of every arc as it was before and after the write, so a dragged loop, an unblocked vertex, a vertex whose
+ * `quiet` is a private memo of the vertices with nothing to do (taut closed loops, and blocked vertices whose curve could not be removed), not world state and not a cache: whether a vertex can move depends on the step length, so it is not a function of state.
+ * The derive tick `curveShortening/wake` empties it where it can be wrong: it reads the change ring for arc writes and forgets both anchors of every arc as it was before and after the write, so a dragged loop, a vertex no longer blocked, a vertex whose
  * arc moved off it and a vertex merged away all leave the memo. There is no `reset`: a geometry commit deletes every arc that does not connect emitters, the tick sees those removals, and a load makes a new engine.
- * The tick `curveShortening/step` writes nothing itself (`writes: []`): the geodesic model writes, through its operations and the dispatched `geodesicModel/removeVertex`. It is idle when every tied vertex is quiet.
+ * The tick `curveShortening/step` writes nothing itself (`writes: []`): the geodesic model writes, through its operations and the dispatched `geodesicModel/removeVertex` and `geodesicModel/removeCurve`. It is idle when every tied vertex is quiet.
  */
 import type { ModuleDefinition, ModuleTick } from "../../engine/moduleTypes";
 import type { RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
 import { geodesicModelToken } from "../geodesicModel/api";
-import {
-  curveDynamicsToken,
-  type BlockedVertex,
-  type CurveDynamicsApi,
-  type CurveShorteningEvent,
-  type CurveShorteningOptions,
-} from "./api";
-import { flowStep, tautLoopReason } from "./flow";
+import { curveDynamicsToken, type CurveDynamicsApi, type CurveShorteningEvent, type CurveShorteningOptions } from "./api";
+import { flowStep } from "./flow";
 import { speedLawNamed } from "./policies";
 
 /** The module as the engine's list takes it. */
 export type CurveShorteningModuleDefinition = ModuleDefinition<CurveDynamicsApi, never, CurveShorteningEvent, CurveDynamicsApi>;
 
-const defaultOptions: CurveShorteningOptions = { onBlocked: "unresolve", speedLaw: "constant" };
+const defaultOptions: CurveShorteningOptions = { speedLaw: "constant" };
 
 /**
  * Creates the curve shortening module.
  * It requires the geodesic model and provides `curveDynamicsToken`.
  */
 export function curveShorteningModule(options: Partial<CurveShorteningOptions> = {}): CurveShorteningModuleDefinition {
-  const { onBlocked, speedLaw } = { ...defaultOptions, ...options };
+  const { speedLaw } = { ...defaultOptions, ...options };
   return {
     id: "curveShortening",
     provides: curveDynamicsToken,
@@ -39,17 +33,10 @@ export function curveShorteningModule(options: Partial<CurveShorteningOptions> =
     create: (context) => {
       const model = context.require(geodesicModelToken);
       const { objects } = context;
-      const quiet = new Map<string, string>();
+      const quiet = new Set<string>();
 
       const queries: CurveDynamicsApi = {
         isAtRest: () => model.tiedVertexCount() === quiet.size,
-        blockedVertices() {
-          const blocked: BlockedVertex[] = [];
-          for (const [vertexId, reason] of quiet) {
-            if (reason !== tautLoopReason) blocked.push({ vertexId, reason });
-          }
-          return blocked;
-        },
       };
 
       const stepTick: ModuleTick = {
@@ -63,7 +50,6 @@ export function curveShorteningModule(options: Partial<CurveShorteningOptions> =
             {
               model,
               speedLaw: speedLawNamed(speedLaw),
-              onBlocked,
               quiet,
               vertexPoint(vertexId) {
                 const vertex = objects.get(vertexId);

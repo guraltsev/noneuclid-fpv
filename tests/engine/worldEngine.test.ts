@@ -1,7 +1,7 @@
 /**
  * `tests/engine/worldEngine.test.ts` — unit tier.
  *
- * The world engine of design 013: commands and their results, the step order, events, ids, control slots, the derive pass and its cursors, the realtime view, tool requests and their gates, and the access rule (who may write what). Modules are small fakes defined in this file.
+ * The world engine of design 013: commands and their results, the step order, events, ids, control slots, the derive pass and its cursors, the realtime view, tool requests and the configuration's gate, and the access rule (who may write what). Modules are small fakes defined in this file.
  */
 import { describe, expect, it } from "vitest";
 import {
@@ -9,11 +9,8 @@ import {
   type AnyModuleDefinition,
   type CommandContext,
   type CommandResult,
-  type EngineEventBase,
   type ModuleCreateContext,
   type ModuleTick,
-  type StepContext,
-  type ToolGate,
   type WorldRequestToolCommand,
 } from "../../src/engine/moduleTypes";
 import { createLocalPlayerParticipant } from "../../src/engine/participants";
@@ -21,7 +18,6 @@ import { createWorldEngine } from "../../src/engine/worldEngine";
 import type { RuntimeToolId } from "../../src/glue/toolIds";
 import { identityRigidTransform3 } from "../../src/math/rigidTransform3";
 import { createDefaultPlayerPose } from "../../src/movement/playerPose";
-import { ChangeOp } from "../../src/world-objects/runtimeObjectChangeJournal";
 import type { RuntimeObjectRegistry, RuntimeWorldObject } from "../../src/world-objects/runtimeObjectRegistry";
 import { createTestEngine } from "../support/engine";
 
@@ -45,9 +41,7 @@ function fake(
     readonly provides?: ReturnType<typeof defineModuleToken>;
     readonly api?: object;
     readonly queries?: object;
-    readonly toolGates?: readonly ToolGate[];
     readonly toolIds?: readonly string[];
-    readonly onEvents?: Record<string, (event: EngineEventBase, ctx: StepContext) => void>;
     readonly onCreate?: (objects: RuntimeObjectRegistry, require: ModuleCreateContext["require"]) => void;
   } = {},
 ): AnyModuleDefinition {
@@ -64,8 +58,6 @@ function fake(
         queries: parts.queries ?? {},
         commands: parts.commands ?? {},
         ticks: parts.ticks ?? [],
-        toolGates: parts.toolGates,
-        onEvents: parts.onEvents,
       };
     },
   };
@@ -143,7 +135,7 @@ describe("commands and results", () => {
     expect(engine.read.stepIndex).toBe(1);
   });
 
-  it("clears results, events and both journals at endFrame", () => {
+  it("clears results, events and the journal at endFrame", () => {
     const registry = createTestEngine().registry;
     const engine = createTestEngine({
       registry,
@@ -151,19 +143,16 @@ describe("commands and results", () => {
     });
     const ticket = engine.submit("local", { kind: "a/go" });
     engine.step(0);
-    engine.publishBody("local", createDefaultPlayerPose("room-b"));
     const events: string[] = [];
     engine.forEachEvent((event) => events.push(event.kind));
     expect(events).toEqual(["a/went"]);
     expect(registry.changes.length).toBe(1);
-    expect(engine.read.participantChanges.length).toBe(1);
 
     engine.endFrame();
     expect(engine.resultOf(ticket)).toBeUndefined();
     engine.forEachEvent((event) => events.push(event.kind));
     expect(events).toEqual(["a/went"]);
     expect(registry.changes.length).toBe(0);
-    expect(engine.read.participantChanges.length).toBe(0);
   });
 
   it("allocates ids by family, skipping taken ones, and prefixes a module's ids with its id", () => {
@@ -389,24 +378,6 @@ describe("the step order and the derive pass", () => {
     expect(registry.changes.length).toBe(0);
   });
 
-  it("runs a module's event handlers before its derive ticks, from their own cursor", () => {
-    const log: string[] = [];
-    const tokenA = defineModuleToken<unknown>("a");
-    const engine = createTestEngine({
-      modules: [
-        fake("a", { provides: tokenA, commands: { "a/ping": { run: (_c, ctx) => (ctx.emit({ kind: "a/pinged", message: "hi" }), ok) } } }),
-        fake("b", {
-          requires: [tokenA],
-          onEvents: { "a/pinged": (event) => void log.push(`handled ${event.message}`) },
-          ticks: [{ id: "b/derive", phase: "derive", writes: [], wants: () => true, run: () => void log.push("derive") }],
-        }),
-      ],
-    });
-    engine.submit("local", { kind: "a/ping" });
-    engine.step(0);
-    engine.step(0);
-    expect(log).toEqual(["handled hi", "derive", "derive"]);
-  });
 });
 
 describe("the realtime view", () => {
@@ -422,7 +393,6 @@ describe("the realtime view", () => {
     expect(engine.publishBody("local", body)).toBe(true);
     engine.step(1 / 60);
     expect(engine.read.participant("local")?.body).toBe(body);
-    expect(engine.read.participantChanges.opAt(0)).toBe(ChangeOp.Updated);
   });
 });
 
@@ -438,30 +408,20 @@ describe("tool requests and gates", () => {
     expect(engine.resultOf(unknown)).toMatchObject({ ok: false, refusal: { code: "world/unknownTool" } });
   });
 
-  it("asks a module's gates after the configuration and shows the first refusal", () => {
-    const gate: ToolGate = ({ toolId }) => (toolId === "place-flag" ? { refused: true, code: "inventory/missing", message: "You have not found a flag yet." } : undefined);
-    const engine = createTestEngine({ modules: [fake("inventory", { toolGates: [gate] })] });
-    const flag = engine.submit("local", requestTool("place-flag"));
-    const aim = engine.submit("local", requestTool("aim"));
-    engine.step(0);
-    expect(engine.resultOf(flag)).toEqual({ ok: false, refusal: { code: "inventory/missing", message: "You have not found a flag yet." } });
-    expect(engine.resultOf(aim)).toMatchObject({ ok: true });
-  });
-
-  it("refuses a command whose tool the participant may not use, but not a dispatched one", () => {
+  it("refuses a command whose tool the configuration disables, but not a dispatched one", () => {
     let allowed = false;
-    const gate: ToolGate = ({ toolId }) => (toolId === ("a/tool" as RuntimeToolId) && !allowed ? { refused: true, code: "a/denied", message: "Denied." } : undefined);
     const tokenA = defineModuleToken<unknown>("a");
     const results: CommandResult[] = [];
     const engine = createTestEngine({
+      isToolEnabled: (toolId) => toolId !== ("a/tool" as RuntimeToolId) || allowed,
       modules: [
-        fake("a", { provides: tokenA, toolGates: [gate], toolIds: ["a/tool"], commands: { "a/use": { requiresTool: "a/tool" as RuntimeToolId, run: () => ok } } }),
+        fake("a", { provides: tokenA, toolIds: ["a/tool"], commands: { "a/use": { requiresTool: "a/tool" as RuntimeToolId, run: () => ok } } }),
         fake("b", { requires: [tokenA], ticks: [{ id: "b/use", phase: "simulate", writes: [], run: (ctx) => void results.push(ctx.dispatch({ kind: "a/use" })) }] }),
       ],
     });
     const ticket = engine.submit("local", { kind: "a/use" });
     engine.step(0);
-    expect(engine.resultOf(ticket)).toEqual({ ok: false, refusal: { code: "world/capabilityMissing", message: "Denied." } });
+    expect(engine.resultOf(ticket)).toEqual({ ok: false, refusal: { code: "world/capabilityMissing", message: "This tool is not available in this world." } });
     expect(results).toEqual([ok]);
 
     allowed = true;
@@ -470,23 +430,6 @@ describe("tool requests and gates", () => {
     expect(engine.resultOf(second)).toEqual(ok);
   });
 
-  it("emits world/toolRevoked for a tool that capabilitiesChanged finds newly refused", () => {
-    let revoked = false;
-    const gate: ToolGate = ({ toolId }) => (revoked && toolId === "protractor" ? { refused: true, code: "inventory/taken", message: "The protractor was taken away." } : undefined);
-    const engine = createTestEngine({
-      modules: [fake("inventory", { toolGates: [gate], commands: { "inventory/take": { run: () => ((revoked = true), ok) } }, ticks: [{ id: "inventory/notice", phase: "simulate", writes: [], isIdle: () => !revoked, run: (ctx) => ctx.capabilitiesChanged("local") }] })],
-    });
-    engine.step(0);
-    const events: EngineEventBase[] = [];
-    engine.forEachEvent((event) => events.push(event));
-    expect(events).toEqual([]);
-
-    engine.submit("local", { kind: "inventory/take" });
-    engine.step(0);
-    engine.step(0);
-    engine.forEachEvent((event) => events.push(event));
-    expect(events).toEqual([{ kind: "world/toolRevoked", participantId: "local", toolId: "protractor", message: "The protractor was taken away." }]);
-  });
 });
 
 describe("the access rule", () => {
@@ -497,7 +440,6 @@ describe("the access rule", () => {
     expect(engine.publishBody("ana", createDefaultPlayerPose("room-b"))).toBe(false);
     expect(engine.publishBody("nobody", createDefaultPlayerPose("room-b"))).toBe(false);
     expect(engine.read.participant("ana")?.body.cellId).toBe("room-a");
-    expect(engine.read.participantChanges.length).toBe(0);
   });
 
   it("returns a module's queries, never its api", () => {
@@ -652,7 +594,7 @@ describe("attachments and the bodies phase", () => {
     expect(order).toEqual(["bodies", "simulate"]);
   });
 
-  it("replaces attachments through the context, journals it, and keeps them over a body write", () => {
+  it("replaces attachments through the context and keeps them over a body write", () => {
     const attachment = { kind: "a/hold", objectId: "x", arrived: false };
     const engine = createTestEngine({
       modules: [fake("a", { commands: { "a/hold": { run: (_command, ctx) => (ctx.setAttachments(ctx.participantId, [attachment]), ok) } } })],
@@ -661,7 +603,6 @@ describe("attachments and the bodies phase", () => {
     engine.step(0);
 
     expect(engine.read.participant("local")?.attachments).toEqual([attachment]);
-    expect(engine.read.participantChanges.length).toBe(1);
     engine.publishBody("local", { ...createDefaultPlayerPose("room-a"), yawRadians: 1 });
     expect(engine.read.participant("local")?.attachments).toEqual([attachment]);
   });

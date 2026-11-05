@@ -5,18 +5,10 @@
 import { defineModuleToken } from "../../engine/moduleTypes";
 import type { EngineEventBase } from "../../engine/moduleTypes";
 
-/** A tied vertex the flow could not move and could not merge away, with the reason it gives. */
-export interface BlockedVertex {
-  readonly vertexId: string;
-  readonly reason: string;
-}
-
 /** What the module answers: reads only. */
 export interface CurveDynamicsApi {
   /** True when every tied vertex is quiet: a taut closed loop, or a vertex the flow could not act on. O(1). */
   isAtRest(): boolean;
-  /** The quiet vertices that are blocked, not taut loops, with their reasons. */
-  blockedVertices(): readonly BlockedVertex[];
 }
 
 /** The token a dynamics module provides (so that a module that sticks curves at corners can replace the flow). */
@@ -36,17 +28,11 @@ export interface CurveShorteningCollapsedEvent extends EngineEventBase {
   readonly message: string;
 }
 
-/** A vertex could be neither moved nor merged away and went quiet; emitted once, when it goes quiet. */
-export interface CurveShorteningUnresolvedEvent extends EngineEventBase {
-  readonly kind: "curveShortening/unresolved";
-  readonly vertexId: string;
-  readonly reason: string;
-  readonly message: string;
-}
-
-/** A vertex could be neither moved nor merged away and its whole curve was removed (the "destroy" policy). The message is for people. */
+/** The vertex `vertexId` could be neither moved nor merged away, for `reason`, and its whole curve was removed. The message is for people. */
 export interface CurveShorteningDestroyedEvent extends EngineEventBase {
   readonly kind: "curveShortening/destroyed";
+  readonly vertexId: string;
+  readonly reason: string;
   readonly arcIds: readonly string[];
   readonly message: string;
 }
@@ -55,17 +41,12 @@ export interface CurveShorteningDestroyedEvent extends EngineEventBase {
 export type CurveShorteningEvent =
   | CurveShorteningFreeLoopCollapsedEvent
   | CurveShorteningCollapsedEvent
-  | CurveShorteningUnresolvedEvent
   | CurveShorteningDestroyedEvent;
-
-/** What the module does with a vertex it cannot move or merge: "unresolve" makes it quiet and reports it; "destroy" removes its whole curve. */
-export type BlockedPolicy = "unresolve" | "destroy";
 
 /** How far a vertex may move in one step, before the line search caps it. */
 export type SpeedLawName = "constant";
 
 /** Options of the module. */
 export interface CurveShorteningOptions {
-  readonly onBlocked: BlockedPolicy;
   readonly speedLaw: SpeedLawName;
 }

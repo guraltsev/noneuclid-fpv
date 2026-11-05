@@ -1,10 +1,10 @@
 /**
  * `tests/render/worldClient.test.ts` — unit tier.
  *
- * The shell's side of the tool-switch protocol (design 013 section 8.1): selecting a tool asks the world first, switches only when the world accepts, shows the world's message and stays on the old tool when it refuses, and leaves a tool the world revokes. Also `api.world`: `submit` resolves with the command's result after the next step, and `participants` lists the bodies.
+ * The shell's side of the tool-switch protocol (design 013 section 8.1): selecting a tool asks the world first, switches only when the world accepts, and shows the world's message and stays on the old tool when it refuses. An event's message is shown. Also `api.world`: `submit` resolves with the command's result after the next step, `participants` lists the bodies, and `stepIndex` counts the steps.
  */
 import { describe, expect, it } from "vitest";
-import type { AnyModuleDefinition, ToolGate } from "../../src/engine/moduleTypes";
+import type { AnyModuleDefinition, CommandContext } from "../../src/engine/moduleTypes";
 import { applyRuntimeCommand } from "../../src/runtime/applyRuntimeCommand";
 import type { RuntimeCommand } from "../../src/runtime/runtimeCommands";
 import { createWorldClient } from "../../src/render/three/worldClient";
@@ -65,48 +65,35 @@ describe("selecting a tool", () => {
     expect(messages).toEqual(["This tool is not available in this world."]);
   });
 
-  it("shows a module gate's message", () => {
-    const gate: ToolGate = ({ toolId }) => (toolId === "place-flag" ? { refused: true, code: "inventory/missing", message: "You have not found a flag yet." } : undefined);
+});
+
+describe("the event sink", () => {
+  it("shows the message of an event that has one", () => {
     const module: AnyModuleDefinition = {
-      id: "inventory",
-      requires: [],
-      objectKinds: [],
-      create: () => ({ api: {}, queries: {}, commands: {}, ticks: [], toolGates: [gate] }),
-    };
-    const { client, messages, session, frame } = setup({ modules: [module] });
-
-    client.requestTool("place-flag");
-    frame();
-
-    expect(messages).toEqual(["You have not found a flag yet."]);
-    expect(session.get().menuState.selectedTool).toBe("none");
-  });
-
-  it("leaves the selected tool when the world revokes it", () => {
-    let revoked = false;
-    const gate: ToolGate = ({ toolId }) => (revoked && toolId === "measure-length" ? { refused: true, code: "inventory/taken", message: "The ruler was taken away." } : undefined);
-    const module: AnyModuleDefinition = {
-      id: "inventory",
+      id: "notice",
       requires: [],
       objectKinds: [],
       create: () => ({
         api: {},
         queries: {},
-        commands: {},
-        ticks: [{ id: "inventory/notice", phase: "simulate", writes: [], isIdle: () => !revoked, run: (ctx) => ctx.capabilitiesChanged("local") }],
-        toolGates: [gate],
+        commands: {
+          "notice/post": {
+            run: (_command: never, ctx: CommandContext) => {
+              ctx.emit({ kind: "notice/silent" });
+              ctx.emit({ kind: "notice/posted", message: "The notice was posted." });
+              return { ok: true };
+            },
+          },
+        },
+        ticks: [],
       }),
     };
-    const { client, session, messages, frame } = setup({ modules: [module] });
-    client.requestTool("measure-length");
-    frame();
-    expect(session.get().menuState.selectedTool).toBe("measure-length");
+    const { engine, messages, frame } = setup({ modules: [module] });
 
-    revoked = true;
+    engine.submit("local", { kind: "notice/post" });
     frame();
 
-    expect(session.get().menuState.selectedTool).toBe("none");
-    expect(messages).toEqual(["The ruler was taken away."]);
+    expect(messages).toEqual(["The notice was posted."]);
   });
 });
 
@@ -123,7 +110,6 @@ describe("api.world", () => {
   });
 
   it("answers a caller and a pending tool request when a handler throws", async () => {
-    let armed = false;
     const broken: AnyModuleDefinition = {
       id: "broken",
       requires: [],
@@ -133,16 +119,14 @@ describe("api.world", () => {
         queries: {},
         commands: { "broken/boom": { run: () => { throw new Error("boom"); } } },
         ticks: [],
-        toolGates: [() => {
-          if (armed) throw new Error("gate");
-          return undefined;
-        }],
       }),
     };
-    const { engine, client, session, messages } = setup({ modules: [broken] });
+    const isToolEnabled = (): boolean => {
+      throw new Error("configuration");
+    };
+    const { engine, client, session, messages } = setup({ modules: [broken], isToolEnabled });
     const submit = client.api.submit as (command: unknown) => Promise<unknown>;
 
-    armed = true;
     const pending = submit({ kind: "broken/boom" });
     client.requestTool("measure-length");
     // The shell's frame: the step and the client's read are separate guarded phases.
@@ -154,6 +138,16 @@ describe("api.world", () => {
     expect(session.get().pendingToolRequest).toBeUndefined();
     expect(session.get().menuState.selectedTool).toBe("none");
     expect(messages).toEqual(["The command failed inside the world."]);
+  });
+
+  it("counts the engine's steps", () => {
+    const { client, frame } = setup();
+    const stepIndex = client.api.stepIndex as () => number;
+
+    expect(stepIndex()).toBe(0);
+    frame();
+    frame();
+    expect(stepIndex()).toBe(2);
   });
 
   it("lists the participants", () => {

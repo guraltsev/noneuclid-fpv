@@ -79,7 +79,6 @@ export function rebuildEmitterGeodesics(input: {
       launchYawRadians: resolveEmitterLaunchYaw(registry, cannon, geodesicId),
       totalLengthMeters: input.rotationTargetLengthMeters ?? geodesicTotalLengthMeters(registry, geodesicId),
       connectEmitters: false,
-      breakOnForbiddenZone: true,
       rebuildLocked: true,
     });
     return { rebuiltGeodesicIds: [geodesicId], regrownActiveGeodesicId: geodesicId };

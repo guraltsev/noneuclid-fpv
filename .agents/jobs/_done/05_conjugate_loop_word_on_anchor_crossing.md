@@ -538,7 +538,7 @@ word is right, the length decreased, the loop exists), use the measured number. 
     reduction at creation) and `## Closing evidence` (a bullet list of the seven test names with their file, and the
     commit hash), in the style of `_issues/_closed/74_frame_loop_error_containment_and_dispose_leaks.md`.
   - Fix links to the old path: `_issues/50_deep_code_audit_2026_10_09_index.md:89` becomes
-    `_closed/68_...md`, and in `_issues/67_exact_curve_shortening_via_sleeve_funnel.md:85` `68_...md` becomes
+    `_closed/68_...md`, and in `_issues/_closed/67_exact_curve_shortening_via_sleeve_funnel.md:85` `68_...md` becomes
     `_closed/68_...md`. In `.agents/jobs/25_split_geodesic_cannon_modules.md:96`, `../../_issues/68_...md` becomes
     `../../_issues/_closed/68_...md`. Run `grep -rn "68_loop_endpoint" --exclude-dir=node_modules .` to find any other.
 

@@ -2,19 +2,16 @@
  * The curve shortening flow (design 013 section 13.2): the rule applied to every tied vertex each step, in `forEachTiedVertex` order (Gauss-Seidel, so a vertex sees the position its neighbour just took).
  * With `u1`, `u2` the unit tangents of the vertex's two arc ends, pointing away from it: a vertex with a stale arc is skipped for this step; a vertex at rest (`|u1 + u2|` below the taut tolerance) always merges
  * away; any other vertex moves along `u1 + u2` by the step the speed law allows, capped by an exact line search, and a rejected step is halved up to eight times; a vertex that cannot move tries the merge, and if that is
- * refused the blocked policy applies. A taut closed loop keeps its vertex, as a base point, and goes quiet. The vertex count never grows: this algorithm inserts no vertex, so a curve that would need a wrap at a
- * forbidden-zone disk is blocked, and the default experience's policy destroys it. The flow reads the geodesic model through `GeodesicModelApi` and changes the world only through its operations and the dispatched `geodesicModel/removeVertex`;
- * it holds no world state, only the `quiet` memo it is given: the vertices with nothing to do, each with the reason.
+ * refused it is blocked. A blocked vertex destroys its whole curve, with one notice; if the removal is refused, the vertex goes quiet with no notice instead of retrying every step. A taut closed loop keeps its vertex, as a base point, and goes quiet.
+ * The vertex count never grows: this algorithm inserts no vertex, so a curve that would need a wrap at a forbidden-zone disk is blocked and destroyed. The flow reads the geodesic model through `GeodesicModelApi` and changes the world only through
+ * its operations and the dispatched `geodesicModel/removeVertex` and `geodesicModel/removeCurve`; it holds no world state, only the `quiet` memo it is given: the vertices with nothing to do.
  */
 import type { CommandResult, EngineCommandBase } from "../../engine/moduleTypes";
 import { vertexTautTurnRadians, type ArcEnd, type GeodesicModelApi, type GeodesicRemoveCurveCommand, type GeodesicRemoveVertexCommand } from "../geodesicModel/api";
-import type { BlockedPolicy, CurveShorteningEvent } from "./api";
+import type { CurveShorteningEvent } from "./api";
 import type { SpeedLaw } from "./policies";
 
-/** The reason a taut closed loop is quiet with: it is at rest, not blocked. */
-export const tautLoopReason = "taut-loop";
-
-/** Smallest step (meters) worth taking; a vertex that cannot move this far, and is not taut, is merged away or goes quiet as blocked. */
+/** Smallest step (meters) worth taking; a vertex that cannot move this far, and is not taut, is merged away or blocked. */
 const minStepMeters = 1e-5;
 
 /** How many times a rejected step is halved before the vertex counts as blocked. */
@@ -32,9 +29,8 @@ const blockedReasons = { missingArc: "missing-interval", loopBlocked: "loop-bloc
 export interface FlowDeps {
   readonly model: GeodesicModelApi;
   readonly speedLaw: SpeedLaw;
-  readonly onBlocked: BlockedPolicy;
-  /** Vertices with nothing to do, each with the reason (a memo, design 014 section 2.1); the flow adds to it, the module's wake tick removes from it. */
-  readonly quiet: Map<string, string>;
+  /** Vertices with nothing to do (a memo, design 014 section 2.1); the flow adds to it, the module's wake tick removes from it. */
+  readonly quiet: Set<string>;
   /** The position of a vertex in its own cell, or `undefined` when there is no such vertex. */
   vertexPoint(vertexId: string): { readonly x: number; readonly y: number } | undefined;
   dispatch(command: EngineCommandBase): CommandResult;
@@ -139,7 +135,7 @@ function lineSearchStepMeters(
 
 // Removes a vertex whose two arcs form one geodesic (taut), or that cannot move any more. A loop on the vertex has nothing to merge with: it stays as a taut loop when taut
 // and is deleted when it has shrunk below the minimum length. A merge whose chord cannot be realized (a wall or a forbidden zone is in the way, which would need an inserted
-// wrap vertex) applies the blocked policy.
+// wrap vertex) blocks the vertex.
 function mergeOrBlock(deps: FlowDeps, vertexId: string, ends: readonly ArcEnd[]): void {
   const preview = deps.model.previewVertexRemoval({ vertexId, arcs: ends });
   if (preview.kind === "blocked") {
@@ -147,7 +143,7 @@ function mergeOrBlock(deps: FlowDeps, vertexId: string, ends: readonly ArcEnd[])
     return;
   }
   if (preview.kind === "loopTaut") {
-    deps.quiet.set(vertexId, tautLoopReason);
+    deps.quiet.add(vertexId);
     return;
   }
   const remove: GeodesicRemoveVertexCommand = { kind: "geodesicModel/removeVertex", vertexId, arcs: ends };
@@ -163,19 +159,13 @@ function mergeOrBlock(deps: FlowDeps, vertexId: string, ends: readonly ArcEnd[])
   }
 }
 
-// The blocked policy: a vertex that can neither move nor merge either goes quiet, once, with a notice ("unresolve"), or its whole curve is removed with a notice ("destroy").
+// A vertex that can neither move nor merge destroys its whole curve, with a notice. A refused removal would be refused again next step, so the vertex goes quiet, with no notice.
 function blockVertex(deps: FlowDeps, vertexId: string, reason: string): void {
-  switch (deps.onBlocked) {
-    case "unresolve":
-      deps.quiet.set(vertexId, reason);
-      deps.emit({ kind: "curveShortening/unresolved", vertexId, reason, message: `The tied geodesic could not be straightened (${reason}).` });
-      return;
-    case "destroy": {
-      const arcIds = deps.model.arcsOfCurve(vertexId);
-      const removal: GeodesicRemoveCurveCommand = { kind: "geodesicModel/removeCurve", arcIds };
-      if (!deps.dispatch(removal).ok) return;
-      deps.emit({ kind: "curveShortening/destroyed", arcIds, message: `The tied geodesic could not shorten any further and was removed (${reason}).` });
-      return;
-    }
+  const arcIds = deps.model.arcsOfCurve(vertexId);
+  const removal: GeodesicRemoveCurveCommand = { kind: "geodesicModel/removeCurve", arcIds };
+  if (!deps.dispatch(removal).ok) {
+    deps.quiet.add(vertexId);
+    return;
   }
+  deps.emit({ kind: "curveShortening/destroyed", vertexId, reason, arcIds, message: `The tied geodesic could not shorten any further and was removed (${reason}).` });
 }

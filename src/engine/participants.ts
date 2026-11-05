@@ -1,14 +1,13 @@
 /**
  * Participants and control slots of the world engine (design 013 sections 5.1 and 5.4).
- * A participant is someone acting in the world; its record is immutable and a body write replaces it and appends to the participant journal, which has the interface of the registry's change journal. Control slots are latest-value-wins inputs, opened and closed by commands and sampled once per step.
+ * A participant is someone acting in the world; its record is immutable and a body write replaces it. Control slots are latest-value-wins inputs, opened and closed by commands and sampled once per step.
  */
-import { ChangeOp, createRuntimeObjectChangeJournal, type RuntimeObjectChangeRecorder } from "../world-objects/runtimeObjectChangeJournal";
 import type { ParticipantAttachment, ParticipantBody, ParticipantRecord, PlainData } from "./moduleTypes";
 
 /** Id of the participant the local device plays. */
 export const localParticipantId = "local";
 /** Owner id of participants the local device controls. */
-export const localDeviceId = "local-device";
+const localDeviceId = "local-device";
 
 /** Creates the record of the local player. */
 export function createLocalPlayerParticipant(body: ParticipantBody, attachments: readonly ParticipantAttachment[] = []): ParticipantRecord {
@@ -22,22 +21,20 @@ export interface ParticipantTable {
   list(): readonly ParticipantRecord[];
   /** Calls `fn` for each participant in creation order; allocates nothing. */
   forEach(fn: (participant: ParticipantRecord) => void): void;
-  /** Replaces the attachments of a participant and records the write; false for an unknown participant. Callers are the modules owning the attachment kinds. */
+  /** Replaces the attachments of a participant; false for an unknown participant. Callers are the modules owning the attachment kinds. */
   setAttachments(id: string, attachments: readonly ParticipantAttachment[]): boolean;
-  /** Replaces the body of a participant `deviceId` owns; false, changing nothing, for an unknown participant or another owner. */
+  /** Replaces the body of a participant the local device owns; false, changing nothing, for an unknown participant or another owner. */
   publishBody(id: string, body: ParticipantBody): boolean;
-  readonly journal: RuntimeObjectChangeRecorder<ParticipantRecord>;
 }
 
-/** Creates the table holding `initial`; `deviceId` is the device this engine serves. */
-export function createParticipantTable(initial: readonly ParticipantRecord[], deviceId: string): ParticipantTable {
+/** Creates the table holding `initial`. */
+export function createParticipantTable(initial: readonly ParticipantRecord[]): ParticipantTable {
   const byId = new Map<string, ParticipantRecord>();
   for (const record of initial) {
     if (byId.has(record.id)) throw new Error(`Participant "${record.id}" is listed twice.`);
     byId.set(record.id, record);
   }
   const order = [...byId.keys()];
-  const journal = createRuntimeObjectChangeJournal<ParticipantRecord>();
   return {
     get: (id) => byId.get(id),
     list: () => [...byId.values()],
@@ -47,20 +44,15 @@ export function createParticipantTable(initial: readonly ParticipantRecord[], de
     setAttachments(id, attachments) {
       const existing = byId.get(id);
       if (existing === undefined) return false;
-      const next: ParticipantRecord = { ...existing, attachments };
-      byId.set(id, next);
-      journal.record(ChangeOp.Updated, next);
+      byId.set(id, { ...existing, attachments });
       return true;
     },
     publishBody(id, body) {
       const existing = byId.get(id);
-      if (existing === undefined || existing.ownerId !== deviceId) return false;
-      const next: ParticipantRecord = { ...existing, body };
-      byId.set(id, next);
-      journal.record(ChangeOp.Updated, next);
+      if (existing === undefined || existing.ownerId !== localDeviceId) return false;
+      byId.set(id, { ...existing, body });
       return true;
     },
-    journal,
   };
 }
 

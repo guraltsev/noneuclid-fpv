@@ -2,8 +2,8 @@
  * Per-frame feedback on what the player aims at: the floating object tooltip, the help lens, the aim cross marker with the
  * XR controller ray, and the protractor tool's preview drawing.
  *
- * The module owns the controller ray line (added to `scene`), the protractor feedback group (parented into a cell root) and
- * the id of the object whose help the player pinned. Menu, tool and protractor selection state are read from the session.
+ * The module owns the controller ray line (added to `scene`), the protractor feedback group (parented into a cell root),
+ * the id of the object whose help the player pinned and whether the player pinned the selected tool's help. Menu, tool and protractor selection state are read from the session.
  * The tooltip, cross marker and help lens handles are created and disposed by the shell. Everything is hidden while a menu is open.
  */
 import { readLocalPlayerPose, type WorldEngine } from "../../engine/worldEngine";
@@ -79,7 +79,7 @@ export interface AimFeedback {
   updateTooltips(xrActive: boolean, activeAimRay: RootAimRay | undefined, xrHeadWorldPose: XrHeadWorldPose | undefined): void;
   /** Updates the aim cross, the XR controller ray and the protractor drawing. */
   updateAim(xrActive: boolean, activeAimRay: RootAimRay | undefined): void;
-  /** Pins the help of the focused object, or unpins it when it is already pinned. */
+  /** Pins the help of the focused object, or with nothing focused the help of the selected tool (the explore text with no tool); unpins a help that is already pinned. */
   requestHelpLensForFocusedObject(activeAimRay: RootAimRay | undefined): void;
   /** Unpins the pinned help; true when there was one. */
   dismissHelpLensFocus(): boolean;
@@ -121,6 +121,7 @@ export function createAimFeedback(deps: AimFeedbackDeps): AimFeedback {
     readonly root: THREE.Group;
   } | undefined;
   let helpLensFocusedObjectId: string | undefined;
+  let toolHelpPinned = false;
 
   function currentMenuState() {
     return session.get().menuState;
@@ -327,6 +328,13 @@ export function createAimFeedback(deps: AimFeedbackDeps): AimFeedback {
       }
     }
 
+    // The tool's help stays pinned until the aim finds an object, as an object's stays until the aim leaves it.
+    toolHelpPinned &&= focused === undefined;
+    if (toolHelpPinned) {
+      helpLensRenderer.update({ visible: true, xrActive, camera, definition: createHelpDefinition(undefined, xrActive) });
+      return;
+    }
+
     const automaticObject = findAutomaticHelpObject();
     const definition = automaticObject ? createHelpDefinitionForObject(automaticObject, xrActive) : undefined;
     helpLensRenderer.update({
@@ -340,14 +348,16 @@ export function createAimFeedback(deps: AimFeedbackDeps): AimFeedback {
   function requestHelpLensForFocusedObject(activeAimRay: RootAimRay | undefined): void {
     const focused = deps.findFocusedRuntimeObject(activeAimRay);
     const focusedObjectId = focused?.object.id;
+    toolHelpPinned = focusedObjectId === undefined && !toolHelpPinned;
     helpLensFocusedObjectId = focusedObjectId === helpLensFocusedObjectId ? undefined : focusedObjectId;
   }
 
   function dismissHelpLensFocus(): boolean {
-    if (!helpLensFocusedObjectId) {
+    if (!helpLensFocusedObjectId && !toolHelpPinned) {
       return false;
     }
     helpLensFocusedObjectId = undefined;
+    toolHelpPinned = false;
     return true;
   }
 
@@ -356,10 +366,13 @@ export function createAimFeedback(deps: AimFeedbackDeps): AimFeedback {
     xrActive: boolean,
   ): ReturnType<typeof createHelpLensDefinition> | undefined {
     const focus = deps.getWorldFocusMessageDefinition(object);
-    if (!focus) {
-      return undefined;
-    }
+    return focus ? createHelpDefinition(focus, xrActive) : undefined;
+  }
 
+  function createHelpDefinition(
+    focus: Parameters<typeof createHelpLensDefinition>[0]["focus"],
+    xrActive: boolean,
+  ): ReturnType<typeof createHelpLensDefinition> {
     return createHelpLensDefinition({
       focus,
       selectedTool: currentMenuState().selectedTool,

@@ -1,11 +1,11 @@
 /**
  * The shell's side of its conversation with the world engine (design 013 sections 5.3, 5.5 and 8.1): the tool-switch protocol (also for tools started from an object's menu page), the generic event sink and the `api.world` namespace.
- * Selecting a tool does not switch it: `requestTool` submits `world/requestTool` and records the request as pending in the client session; after the engine's step, `afterStep` switches to the tool when the world accepted it, or shows the world's message and stays on the old tool when it refused. A `world/toolRevoked` event for the selected tool ends that tool.
+ * Selecting a tool does not switch it: `requestTool` submits `world/requestTool` and records the request as pending in the client session; after the engine's step, `afterStep` switches to the tool when the world accepted it, or shows the world's message and stays on the old tool when it refused.
  * The module keeps one list of API callers waiting for a command result; it owns no world or client state of its own.
  */
 import type { RuntimeToolId } from "../../glue/toolIds";
 import { localParticipantId, type WorldEngine } from "../../engine/worldEngine";
-import type { CommandResult, EngineCommandBase, EngineEventBase, WorldRequestToolCommand, WorldToolRevokedEvent } from "../../engine/moduleTypes";
+import type { CommandResult, EngineCommandBase, EngineEventBase, WorldRequestToolCommand } from "../../engine/moduleTypes";
 import type { ApiObject } from "../../runtime/apiCall";
 import type { ClientSession } from "../../runtime/clientSession";
 import type { RuntimeCommand } from "../../runtime/runtimeCommands";
@@ -28,7 +28,7 @@ export interface WorldClient {
   requestTool(toolId: RuntimeToolId, objectId?: string): void;
   /** Call after every `engine.step`: settles the pending tool request, runs the event sink and answers waiting API callers. */
   afterStep(): void;
-  /** The `world` namespace of the public API: `submit(command)` and `participants()`. */
+  /** The `world` namespace of the public API: `submit(command)`, `participants()` and `stepIndex()`. */
   readonly api: ApiObject;
   /** Resolves every waiting API caller with a refusal; call on teardown. */
   dispose(): void;
@@ -55,11 +55,6 @@ export function createWorldClient(deps: WorldClientDeps): WorldClient {
 
   function handleEvent(event: EngineEventBase): void {
     if (event.message !== undefined) deps.showMessage(event.message, event);
-    if (event.kind !== "world/toolRevoked") return;
-    const revoked = event as WorldToolRevokedEvent;
-    if (revoked.participantId === localParticipantId && session.get().menuState.selectedTool === revoked.toolId) {
-      deps.dispatch({ kind: "clear-selected-tool" });
-    }
   }
 
   function answerWaiters(): void {
@@ -93,6 +88,10 @@ export function createWorldClient(deps: WorldClientDeps): WorldClient {
       /** The participants of the world: id, kind, owner and body. */
       participants() {
         return engine.read.participants();
+      },
+      /** How many steps the engine has taken. */
+      stepIndex() {
+        return engine.read.stepIndex;
       },
     },
     dispose() {

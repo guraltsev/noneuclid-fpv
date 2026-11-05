@@ -4,7 +4,7 @@
  * `createAimFeedback` draws what the player aims at each frame: the floating tooltip, the help lens, the aim cross and the
  * XR controller ray. These tests drive the handle with a shell session, a real registry and recording stand-ins for the DOM
  * and Three handles: with a menu open everything is hidden, a focused sign gets a desktop tooltip, a pinned help follows the
- * focused object until it is dismissed, and the aim cross is shown for the aim tool with a ray only in XR.
+ * focused object until it is dismissed, the help key with nothing focused shows the selected tool's help, and the aim cross is shown for the aim tool with a ray only in XR.
  */
 import { createTestEngine } from "../support/engine";
 import * as THREE from "three";
@@ -142,6 +142,48 @@ describe("createAimFeedback", () => {
     focus.object = undefined;
     feedback.updateTooltips(false, aimRay, undefined);
 
+    expect(feedback.dismissHelpLensFocus()).toBe(false);
+  });
+
+  it("toggles the selected tool's help when the help key finds nothing focused", () => {
+    const { feedback, focus, helpUpdates } = createHarness({ menuState: { ...createRuntimeMenuState({ selectedWorldId: "test" }), selectedTool: "measure-length" } });
+    focus.object = undefined;
+
+    feedback.updateTooltips(false, aimRay, undefined);
+    expect(helpUpdates.at(-1)).toEqual({ visible: false, title: undefined });
+
+    feedback.requestHelpLensForFocusedObject(aimRay);
+    feedback.updateTooltips(false, aimRay, undefined);
+    expect(helpUpdates.at(-1)).toEqual({ visible: true, title: "Length tool" });
+
+    feedback.requestHelpLensForFocusedObject(aimRay);
+    feedback.updateTooltips(false, aimRay, undefined);
+    expect(helpUpdates.at(-1)).toEqual({ visible: false, title: undefined });
+  });
+
+  it("shows the explore text when the help key finds nothing focused and no tool selected", () => {
+    const { feedback, focus, helpUpdates } = createHarness();
+    focus.object = undefined;
+
+    feedback.requestHelpLensForFocusedObject(aimRay);
+    feedback.updateTooltips(false, aimRay, undefined);
+
+    expect(helpUpdates.at(-1)).toEqual({ visible: true, title: "Explore" });
+  });
+
+  it("drops the tool's help when it is dismissed or the aim finds an object", () => {
+    const { feedback, focus, helpUpdates } = createHarness();
+    focus.object = undefined;
+
+    feedback.requestHelpLensForFocusedObject(aimRay);
+    expect(feedback.dismissHelpLensFocus()).toBe(true);
+    expect(feedback.dismissHelpLensFocus()).toBe(false);
+
+    feedback.requestHelpLensForFocusedObject(aimRay);
+    focus.object = sign;
+    feedback.updateTooltips(false, aimRay, undefined);
+
+    expect(helpUpdates.at(-1)).toEqual({ visible: false, title: undefined });
     expect(feedback.dismissHelpLensFocus()).toBe(false);
   });
 

@@ -1,17 +1,24 @@
 # 67 - Curve shortening by gradient descent does not find the taut string
 
-Status: open; awaiting the maintainer's decision. The earlier status, "implemented by job 26", is false: job 26's sleeve solver was
-removed on 2026-11-01 (commit fe5ec0a; the maintainer chose a flow of real state, with no vertex insertion). The flow in
-`src/modules/curveShortening/flow.ts` descends along \(u_1 + u_2\), and under the default policy a blocked curve is destroyed, so
-the defect below is now the chosen behaviour. Either close this issue as decided, or rewrite it as "stick at the corner", the
-replacement module of design 013 section 9.5.
+Status: closed on 2026-11-05 as decided by the maintainer.
 
 Priority: P1 (correctness + design). Supersedes the "Tick Geometry" and "Monotonicity" sections of issue 32 and
 resolves the issue-41 items "failed fusion leaves a stuck ready-to-fuse pair", "degenerate free loop never deleted"
 and "failed previews retried forever", which are all symptoms of the problem below. Issue 66 covers the immediate
 stall bug.
 
-Jobs: [26](../.agents/jobs/26_exact_curve_shortening.md).
+Jobs: [26](../../.agents/jobs/26_exact_curve_shortening.md).
+
+## Outcome
+
+Not fixed as written, by decision. Job 26's sleeve solver was removed on 2026-11-01 (commit fe5ec0a): curve shortening is a flow of
+real state with no vertex insertion, and a curve the flow cannot shorten further is destroyed. A curve that sticks at a corner
+is the replacement module of design 013 section 9.5, and a more physical flow is in section 16.
+
+## Closing evidence
+
+- `src/modules/curveShortening/flow.ts`.
+- Design 013 sections 13.2 and 16.
 
 ## Status update 2026-10-29
 
@@ -84,7 +91,7 @@ disk, and the code then deletes or splits the construction.
 
 ## Fix
 
-Tracked as job [26](../.agents/jobs/26_exact_curve_shortening.md). This issue is resolved when that job's acceptance criteria hold.
+Tracked as job [26](../../.agents/jobs/26_exact_curve_shortening.md). This issue is resolved when that job's acceptance criteria hold.
 
 ## Merged from issue 41 (2026-10-28)
 
@@ -95,5 +102,5 @@ Curve-shortening defects from issue 41 that the exact solution must not reproduc
 - `tieAndDetachGeodesicEndpoints` deletes geodesics when a forbidden-zone rebuild fails, instead of rolling back.
 - A rejected (lengthening) step is skipped, not rolled back to a fused geodesic.
 
-The other curve-shortening items of issue 41 are tracked in [66](_closed/66_curve_shortening_stalls_at_high_frame_rate.md) (the short free loop stall, `TODO(issue 66)` at
-`geodesicCannon.ts:3727`) and [68](_closed/68_loop_endpoint_crossing_must_conjugate_portal_word.md) (a free loop whose free end crosses a portal, `TODO(issue 68)` at `:3755`).
+The other curve-shortening items of issue 41 are tracked in [66](66_curve_shortening_stalls_at_high_frame_rate.md) (the short free loop stall, `TODO(issue 66)` at
+`geodesicCannon.ts:3727`) and [68](68_loop_endpoint_crossing_must_conjugate_portal_word.md) (a free loop whose free end crosses a portal, `TODO(issue 68)` at `:3755`).

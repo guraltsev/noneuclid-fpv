@@ -46,7 +46,7 @@ function setup(options: { readonly available?: boolean } = {}) {
     onResult: (_tool, result) => void log.results.push(result),
     onEnd: () => void (log.ended += 1),
   };
-  const client: ModuleClient = { moduleId: "probe", tools: [probe] };
+  const client: ModuleClient = { tools: [probe] };
   const core: CoreToolActions = {
     placeFlag: vi.fn(),
     useGeodesicCannon: vi.fn(),
@@ -214,7 +214,7 @@ describe("the tool lookup", () => {
       probeId,
       "protractor",
     ]);
-    const twice: ModuleClient = { moduleId: "dup", tools: [host.toolsById.get("place-flag") as ToolDescriptor] };
+    const twice: ModuleClient = { tools: [host.toolsById.get("place-flag") as ToolDescriptor] };
     expect(() => createToolHost({ ...dummyDeps(), clients: [twice] })).toThrow("the tool place-flag is described twice");
   });
 });

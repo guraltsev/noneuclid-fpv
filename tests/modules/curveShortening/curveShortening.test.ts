@@ -5,7 +5,7 @@
  * tied vertices relax over many steps (each moves along the descent direction of the total length by an exact line search, the neighbouring arcs are re-realized as geodesic chords of their portal words, and a vertex whose turning angle is
  * below the tolerance is merged away). A curve has no lifecycle: the flow is at rest when every tied vertex is quiet. These tests check: tying through the command; one small step moving a vertex a bounded distance; the flow of a two-arc curve,
  * a curve of six arcs with five tied vertices, a torus loop pair and free loops reaching the known taut geometry within a tolerance; the total length never growing and the number of vertices never growing at any step; the same limit at 60 Hz
- * and 240 Hz; a loop around a cone point shrinking until it is deleted with a notice; and a curve that would need a wrap vertex at a forbidden-zone disk going quiet as unresolved. The flow on its own, against a scripted model, is in `flow.test.ts`.
+ * and 240 Hz; a loop around a cone point shrinking until it is deleted with a notice; and a curve that would need a wrap vertex at a forbidden-zone disk being destroyed with a notice. The flow on its own, against a scripted model, is in `flow.test.ts`.
  */
 import { describe, expect, it } from "vitest";
 import type { CommandResult, EngineEventBase } from "../../../src/engine/moduleTypes";
@@ -407,7 +407,6 @@ describe("curve shortening flow of loops", () => {
     runCurveShorteningUntilAtRest(engine, { geodesicIds: ["g-loop"], deltaSeconds: frame60Hz, maxTicks: 10 });
 
     expect(engine.query(curveDynamicsToken).isAtRest()).toBe(true);
-    expect(engine.query(curveDynamicsToken).blockedVertices()).toEqual([]);
     expect(registry.get("g-loop")).toMatchObject({ start: { anchorObjectId: "free-loop" }, end: { anchorObjectId: "free-loop" } });
     expect(totalGeodesicLength(registry, "g-loop")).toBeCloseTo(15, 6);
   });
@@ -463,7 +462,7 @@ describe("curve shortening flow when a vertex cannot move", () => {
     expect(engine.query(curveDynamicsToken).isAtRest()).toBe(true);
     expect(registry.getObjectsOfKind("geodesicModel/arc")).toHaveLength(0);
     expect(registry.getObjectsOfKind("geodesicModel/vertex")).toHaveLength(0);
-    expect(flowEvents(events).some((event) => event.kind === "curveShortening/collapsed" || event.kind === "curveShortening/unresolved")).toBe(true);
+    expect(flowEvents(events).some((event) => event.kind === "curveShortening/collapsed" || event.kind === "curveShortening/destroyed")).toBe(true);
   });
 });
 
@@ -556,14 +555,13 @@ function createWrapScenario() {
 }
 
 describe("curve shortening flow that would need a wrap vertex", () => {
-  it("goes quiet as unresolved, inserting no vertex, when a forbidden-zone disk is in the way", () => {
+  it("destroys the whole curve, inserting no vertex, when a forbidden-zone disk is in the way", () => {
     const { world, registry } = createWrapScenario();
     const engine = createFlowTestEngine(world, registry);
-    const flow = engine.query(curveDynamicsToken);
     const events: EngineEventBase[] = [];
     let previousLength = totalCurveLength(registry);
 
-    for (let tick = 0; tick < 3000 && flow.blockedVertices().length === 0; tick += 1) {
+    for (let tick = 0; tick < 3000 && registry.getObjectsOfKind("geodesicModel/arc").length > 0; tick += 1) {
       stepFlow(engine, frame60Hz, events);
       const length = totalCurveLength(registry);
       expect(length).toBeLessThanOrEqual(previousLength + 1e-9);
@@ -571,72 +569,33 @@ describe("curve shortening flow that would need a wrap vertex", () => {
       previousLength = length;
     }
 
-    expect(flow.blockedVertices()).toHaveLength(1);
-    expect(flow.blockedVertices()[0]).toMatchObject({ vertexId: "F" });
-    expect(flow.isAtRest()).toBe(true);
-    const notices = flowEvents(events);
-    expect(notices).toHaveLength(1);
-    expect(notices[0]).toMatchObject({ kind: "curveShortening/unresolved", vertexId: "F" });
-    expect(notices[0]!.message).toBe(`The tied geodesic could not be straightened (${(notices[0] as { reason: string }).reason}).`);
-    expect(registry.getObjectsOfKind("geodesicModel/arc").every((interval) => isTied(registry, interval.id))).toBe(true);
-  });
-
-  it("destroys the whole curve, vertex included, with one notice under destroy", () => {
-    const { world, registry } = createWrapScenario();
-    const engine = createFlowTestEngine(world, registry, { onBlocked: "destroy" });
-    const events: EngineEventBase[] = [];
-
-    for (let tick = 0; tick < 3000 && registry.getObjectsOfKind("geodesicModel/arc").length > 0; tick += 1) {
-      stepFlow(engine, frame60Hz, events);
-    }
-
     expect(registry.getObjectsOfKind("geodesicModel/arc")).toEqual([]);
     expect(registry.getObjectsOfKind("geodesicModel/vertex")).toEqual([]);
     expect(registry.getObjectsOfKind("geodesicModel/segment")).toEqual([]);
     const notices = flowEvents(events);
     expect(notices).toHaveLength(1);
-    expect(notices[0]).toMatchObject({ kind: "curveShortening/destroyed" });
-    expect([...(notices[0] as { arcIds: readonly string[] }).arcIds].sort()).toEqual(["g1", "g2"]);
-    expect(engine.query(curveDynamicsToken).blockedVertices()).toEqual([]);
+    expect(notices[0]).toMatchObject({ kind: "curveShortening/destroyed", vertexId: "F" });
+    const { arcIds, reason } = notices[0] as { arcIds: readonly string[]; reason: string };
+    expect([...arcIds].sort()).toEqual(["g1", "g2"]);
+    expect(notices[0]!.message).toBe(`The tied geodesic could not shorten any further and was removed (${reason}).`);
     expect(engine.query(curveDynamicsToken).isAtRest()).toBe(true);
   });
 
-  it("leaves a quiet vertex untouched and skips it on later steps, with no second notice", () => {
+  it("gives no second notice on the steps after the curve is destroyed", () => {
     const { world, registry } = createWrapScenario();
     const engine = createFlowTestEngine(world, registry);
     const events: EngineEventBase[] = [];
-    for (let tick = 0; tick < 3000 && engine.query(curveDynamicsToken).blockedVertices().length === 0; tick += 1) {
+    for (let tick = 0; tick < 3000 && registry.getObjectsOfKind("geodesicModel/arc").length > 0; tick += 1) {
       stepFlow(engine, frame60Hz);
     }
-    const lengthBefore = totalCurveLength(registry);
-    const arcBefore = registry.get("g1");
 
     for (let tick = 0; tick < 50; tick += 1) {
       stepFlow(engine, frame60Hz, events);
     }
 
-    expect(totalCurveLength(registry)).toBe(lengthBefore);
-    expect(registry.get("g1")).toBe(arcBefore);
     expect(flowEvents(events)).toEqual([]);
   });
 
-  it("wakes the vertex when an arc is moved off it", () => {
-    const { world, registry } = createWrapScenario();
-    const engine = createFlowTestEngine(world, registry);
-    const flow = engine.query(curveDynamicsToken);
-    for (let tick = 0; tick < 3000 && flow.blockedVertices().length === 0; tick += 1) {
-      stepFlow(engine, frame60Hz);
-    }
-    expect(flow.blockedVertices()).toHaveLength(1);
-    const g1 = registry.get("g1");
-    if (g1?.kind !== "geodesicModel/arc") throw new Error("missing arc");
-
-    // The new record no longer names F; only the record before the write does.
-    registry.update({ ...g1, end: { ...g1.end, anchorObjectId: "e2" } });
-    stepFlow(engine, 0);
-
-    expect(flow.blockedVertices()).toEqual([]);
-  });
 });
 
 describe("curve shortening flow of a taut closed loop", () => {
@@ -665,6 +624,19 @@ describe("curve shortening flow of a taut closed loop", () => {
     for (let step = 0; step < 100; step += 1) stepFlow(engine, frame60Hz);
 
     expect(registry.getKindScanCounts()).toEqual(scansBefore);
+  });
+
+  it("forgets the vertex when its arc is moved off it", () => {
+    const { engine, registry } = tautLoopEngine();
+    const flow = engine.query(curveDynamicsToken);
+    const arc = registry.get("g-loop");
+    if (arc?.kind !== "geodesicModel/arc") throw new Error("missing arc");
+
+    // The new record no longer names the vertex; only the record before the write does. A vertex left in the memo would keep the flow from being at rest.
+    registry.update({ ...arc, start: { ...arc.start, anchorObjectId: "elsewhere" }, end: { ...arc.end, anchorObjectId: "elsewhere" } });
+    stepFlow(engine, 0);
+
+    expect(flow.isAtRest()).toBe(true);
   });
 
   it("wakes when its arc is written, and goes quiet again", () => {

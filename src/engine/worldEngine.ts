@@ -1,7 +1,7 @@
 /**
  * The world engine (design 013 section 5): the owner of world state, which changes only inside `step`, from queued commands and control slots.
  * It holds the participants, the engine-allocated ids, the composed modules and their step order, the events and the command results; the registry of world objects stays where it is and the engine owns the frame end of its change journal: `endFrame` moves the journal's frame start (it erases no entry) and sets how far back the ring is retained, from the lowest derive cursor. Clients (the shell, tests, scripts) use the `WorldEngine` interface of moduleTypes.ts only.
- * One step: apply queued commands, sample control slots, bodies ticks (phase 3: attachments follow their carriers; locomotion joins later), simulate ticks, derive pass, tool-capability revocations, (deformation: empty until it moves in). Everything crossing the interface is plain data, and `read` hands out the engine's own records by reference.
+ * One step: apply queued commands, sample control slots, bodies ticks (phase 3: attachments follow their carriers; locomotion joins later), simulate ticks, derive pass, (deformation: empty until it moves in). Everything crossing the interface is plain data, and `read` hands out the engine's own records by reference.
  */
 import type { CompiledCellComplex } from "../cell-complex/compileCellComplex";
 import type { RuntimeToolId } from "../glue/toolIds";
@@ -11,7 +11,7 @@ import { composeModules, contributedNamePattern, writableKindsOf, type ComposedH
 import { coreObjectKinds, coreToolIds, moduleOwnedCoreKinds } from "./coreIds";
 import { createEngineIdSource } from "./ids";
 import { createTickRunner, type MutableStepContext } from "./moduleTicks";
-import { createControlSlots, createParticipantTable, localDeviceId, localParticipantId } from "./participants";
+import { createControlSlots, createParticipantTable, localParticipantId } from "./participants";
 import { createToolGates } from "./toolGates";
 import { createModuleFrames, guardRegistry, runFunctionsInFrame } from "./writeGuard";
 import type {
@@ -26,7 +26,6 @@ import type {
   WorldEngine,
   WorldReadView,
   WorldRequestToolCommand,
-  WorldToolRevokedEvent,
 } from "./moduleTypes";
 
 /** How deep `ctx.dispatch` may nest before it throws. */
@@ -43,8 +42,6 @@ export interface WorldEngineOptions {
   readonly modules?: readonly AnyModuleDefinition[];
   /** The tool configuration: false disables a tool in this world. Default: every tool is enabled. */
   readonly isToolEnabled?: (toolId: RuntimeToolId) => boolean;
-  /** The device this engine serves; it may publish the bodies of the participants it owns. Default: {@link localDeviceId}. */
-  readonly deviceId?: string;
   /** Check every module write against the module's declared kinds (design 013 section 9.6). Default: off. */
   readonly writeGuard?: boolean;
 }
@@ -66,10 +63,9 @@ export function createWorldEngine(options: WorldEngineOptions): WorldEngine {
   const guardOn = options.writeGuard === true;
   const frames = createModuleFrames();
   const moduleObjects = guardOn ? guardRegistry(registry, frames) : registry;
-  const participants = createParticipantTable(options.participants, options.deviceId ?? localDeviceId);
+  const participants = createParticipantTable(options.participants);
   const controls = createControlSlots();
   const coreIds = createEngineIdSource((id) => registry.get(id) !== undefined);
-  const idsFor = (moduleId: string): EngineIdSource => ({ next: (family) => coreIds.next(`${moduleId}/${family}`) });
   const activeIds: EngineIdSource = {
     next(family) {
       const moduleId = frames.activeModuleId();
@@ -84,7 +80,6 @@ export function createWorldEngine(options: WorldEngineOptions): WorldEngine {
     coreToolIds,
     objects: moduleObjects,
     getWorld: options.getWorld,
-    idsFor,
     wrapApi: (moduleId, api) => (guardOn ? runFunctionsInFrame(frames, moduleId, declaredKindsOf.get(moduleId)!, api) : api),
   });
   const queriesByToken = new Map<string, unknown>();
@@ -103,7 +98,6 @@ export function createWorldEngine(options: WorldEngineOptions): WorldEngine {
   let dispatchDepth = 0;
   let currentParticipantId = "world";
   let firstError: unknown;
-  const capabilityParticipants = new Set<string>();
 
   const read: WorldReadView = {
     get stepIndex() {
@@ -115,16 +109,12 @@ export function createWorldEngine(options: WorldEngineOptions): WorldEngine {
     objects: registry,
     participant: (id) => participants.get(id),
     participants: () => participants.list(),
-    participantChanges: participants.journal,
   };
 
   const gates = createToolGates({
     isToolEnabled: options.isToolEnabled ?? (() => true),
-    moduleGates: experience.modules.flatMap((module) => module.instance.toolGates ?? []),
     toolIds: [...coreToolIds, ...experience.moduleToolIds],
-    read,
   });
-  for (const participant of participants.list()) gates.remember(participant.id);
 
   function emit(event: EngineEventBase): void {
     const moduleId = frames.activeModuleId();
@@ -179,7 +169,6 @@ export function createWorldEngine(options: WorldEngineOptions): WorldEngine {
     },
     objects: moduleObjects,
     deltaSeconds: 0,
-    stepIndex: 0,
     changesFrom: 0,
     changesTo: 0,
     participant: (id) => participants.get(id),
@@ -188,7 +177,6 @@ export function createWorldEngine(options: WorldEngineOptions): WorldEngine {
     control: (participantId, slot) => controls.get(participantId, slot),
     emit,
     dispatch: dispatchFromModule,
-    capabilitiesChanged: (participantId) => void capabilityParticipants.add(participantId),
     ids: activeIds,
   };
 
@@ -216,11 +204,11 @@ export function createWorldEngine(options: WorldEngineOptions): WorldEngine {
     },
   };
 
-  const ticks = createTickRunner(experience.modules, { frames, context: stepContext, journal: registry.changes, events });
+  const ticks = createTickRunner(experience.modules, { frames, context: stepContext, journal: registry.changes });
 
-  function requestTool(participantId: string, command: WorldRequestToolCommand): CommandResult {
+  function requestTool(command: WorldRequestToolCommand): CommandResult {
     if (!gates.isKnownTool(command.toolId)) return refuse("world/unknownTool", `There is no tool "${command.toolId}".`);
-    const refusal = gates.refusal(participantId, command.toolId);
+    const refusal = gates.refusal(command.toolId);
     if (refusal) return refuse(refusal.code, refusal.message);
     return { ok: true, value: { toolId: command.toolId } };
   }
@@ -228,12 +216,12 @@ export function createWorldEngine(options: WorldEngineOptions): WorldEngine {
   /** A client's command: the checks of design 013 sections 5.7 and 8.1, then the handler. */
   function applyClientCommand(participantId: string, command: EngineCommandBase): CommandResult {
     if (participants.get(participantId) === undefined) return refuse("world/unknownParticipant", `There is no participant "${participantId}".`);
-    if (command.kind === "world/requestTool") return requestTool(participantId, command as WorldRequestToolCommand);
+    if (command.kind === "world/requestTool") return requestTool(command as WorldRequestToolCommand);
     const handler = experience.handlers.get(command.kind);
     if (!handler) return refuse("world/unknownCommand", `There is no command "${command.kind}".`);
     if (handler.moduleOnly) return refuse("world/moduleOnly", `The command "${command.kind}" is for modules only.`);
     if (handler.requiresTool !== undefined) {
-      const refusal = gates.refusal(participantId, handler.requiresTool);
+      const refusal = gates.refusal(handler.requiresTool);
       if (refusal) return refuse("world/capabilityMissing", refusal.message);
     }
     return runHandler(handler, command, participantId);
@@ -255,18 +243,6 @@ export function createWorldEngine(options: WorldEngineOptions): WorldEngine {
     }
   }
 
-  function reportRevocations(): void {
-    if (capabilityParticipants.size === 0) return;
-    const changed = [...capabilityParticipants];
-    capabilityParticipants.clear();
-    for (const participantId of changed) {
-      for (const revoked of gates.revoked(participantId)) {
-        const event: WorldToolRevokedEvent = { kind: "world/toolRevoked", participantId, toolId: revoked.toolId, message: revoked.message };
-        events.push(event);
-      }
-    }
-  }
-
   return {
     submit(participantId, command) {
       const ticket = nextTicket;
@@ -279,7 +255,6 @@ export function createWorldEngine(options: WorldEngineOptions): WorldEngine {
     step(deltaSeconds) {
       if (!(deltaSeconds >= 0) || !Number.isFinite(deltaSeconds)) throw new RangeError(`step needs a finite, non-negative duration, got ${deltaSeconds}`);
       stepIndex += 1;
-      stepContext.stepIndex = stepIndex;
       stepContext.deltaSeconds = deltaSeconds;
       firstError = undefined;
       applyQueuedCommands();
@@ -287,7 +262,6 @@ export function createWorldEngine(options: WorldEngineOptions): WorldEngine {
       ticks.runBodies();
       ticks.runSimulate();
       ticks.runDerive();
-      reportRevocations();
       if (firstError !== undefined) {
         const error = firstError;
         firstError = undefined;
@@ -306,17 +280,15 @@ export function createWorldEngine(options: WorldEngineOptions): WorldEngine {
     },
     endFrame() {
       registry.changes.clear();
-      participants.journal.clear();
       events.length = 0;
       if (results.size > 0) results.clear();
-      ticks.resetEventCursors();
       registry.changes.retainFrom(Math.min(registry.changes.frameStartSeq, ticks.lowestCursor()));
     },
   };
 }
 
 export type { WorldEngine } from "./moduleTypes";
-export { createLocalPlayerParticipant, localDeviceId, localParticipantId } from "./participants";
+export { createLocalPlayerParticipant, localParticipantId } from "./participants";
 
 /** The pose of the local player: where this device's body is in the world. */
 export function readLocalPlayerPose(engine: Pick<WorldEngine, "read">): PlayerPose {

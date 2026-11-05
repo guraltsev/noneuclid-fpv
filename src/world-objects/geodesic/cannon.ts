@@ -96,8 +96,6 @@ export interface RebuildGeodesicToLengthInput {
   readonly connectEmitters?: boolean;
   /** If true, the cannon is first re-aimed at the nearest emitter lying on its straight ray (within tolerance). */
   readonly snapToEmitter?: boolean;
-  /** If true, the geodesic is deleted when its trace ends in a forbidden zone. */
-  readonly breakOnForbiddenZone?: boolean;
   /** If false/absent, a locked (emitter-to-emitter) geodesic is returned unchanged instead of being re-shot. */
   readonly rebuildLocked?: boolean;
 }
@@ -355,10 +353,6 @@ function rebuildUnlockedGeodesicToLength(input: RebuildGeodesicToLengthInput): r
     maxLengthMeters: input.totalLengthMeters,
     connectEmitters: input.connectEmitters ?? true,
   });
-  if (input.breakOnForbiddenZone && getGeodesicTail(input.registry, input.geodesicId)?.terminal.kind === "forbidden-zone-hit") {
-    removeGeodesic(input.registry, input.geodesicId);
-    return [];
-  }
   return getGeodesicSegments(input.registry, input.geodesicId);
 }
 

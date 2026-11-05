@@ -1,6 +1,6 @@
 /**
  * Who is acting: a stack of module frames, and the write guard built on it (design 013 section 9.6).
- * The engine pushes a frame around every command handler, tick, event handler, dependency `api` call and `queries` call. With the guard on, the registry a module sees throws on a write of a kind outside the active frame's declaration, and on any write while a `queries` frame (no writable kinds) is active. With the guard off, modules get the plain registry and the wrappers below are not installed, so production pays nothing.
+ * The engine pushes a frame around every command handler, tick, dependency `api` call and `queries` call. With the guard on, the registry a module sees throws on a write of a kind outside the active frame's declaration, and on any write while a `queries` frame (no writable kinds) is active. With the guard off, modules get the plain registry and the wrappers below are not installed, so production pays nothing.
  */
 import type { RuntimeObjectRegistry } from "../world-objects/runtimeObjectRegistry";
 

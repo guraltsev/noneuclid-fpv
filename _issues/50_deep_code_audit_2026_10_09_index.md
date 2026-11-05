@@ -8,9 +8,9 @@ Priority: P1 (tracking issue). Close it when every issue listed below is closed 
 
 Every open issue was checked against the code after the engine wave.
 
-- Closed today: 61, 62, 63, 69, 78.
+- Closed today: 61, 62, 63, 67, 69, 78.
 - Code done, a manual check left: 56, 57, 58, 59, 70, 71, 72, 73.
-- Partly done: 52 (job 18), 75, 82 (job 30). Open: 55 (job 30), 67 (status corrected, decision pending).
+- Partly done: 52 (job 18), 75, 82 (job 30). Open: 55 (job 30).
 - The themes below have landed, except where those issues say otherwise. The order of work is history; do not follow it.
 - Close this index when the manual checks are done: each remaining item has its own issue or job.
 
@@ -61,7 +61,7 @@ to `src/cell-complex/validateCellComplexSpec.ts`.
 | # | Pri | Title |
 | --- | --- | --- |
 | [66](_closed/66_curve_shortening_stalls_at_high_frame_rate.md) | P1 | Curve shortening stalls above ~200 fps; near-fuse livelock |
-| [67](67_exact_curve_shortening_via_sleeve_funnel.md) | P1 | Exact taut-string solution via the sleeve/funnel algorithm replaces gradient descent |
+| [67](_closed/67_exact_curve_shortening_via_sleeve_funnel.md) | P1 | Exact taut-string solution via the sleeve/funnel algorithm replaces gradient descent |
 | [68](_closed/68_loop_endpoint_crossing_must_conjugate_portal_word.md) | P1 | Moving a loop's shared anchor across portal p must map w â†¦ pâ»Â¹wp (currently changes homotopy class) |
 | [69](_closed/69_geodesic_tracing_kernel_numerics.md) | P2 | Nudge drift kÂ·10â»â´ m, disk test from inside, missed self-intersections |
 | [70](70_geodesic_module_performance_and_split.md) | P2 | Rebuild cost (registry copies, repeated all-pairs intersections); the module split moved to 76 |
