@@ -206,11 +206,11 @@ function runSequence(scene: Scene, actions: readonly Action[]): void {
 }
 
 describe("the measurement ticks against fresh refreshes", () => {
-  it("keep angles and lengths of locked geodesics equal to a fresh refresh through carries of any cannon", () => {
+  it("match fresh refreshes for locked geodesics through carries of any cannon", () => {
     fc.assert(fc.property(fc.array(action, { minLength: 4, maxLength: 24 }), (actions) => runSequence(lockedScene(), actions)), { seed: 20261104, numRuns: 40 });
   });
 
-  it("keep angles and lengths of a tied, flowing pair equal to a fresh refresh through carries and flow steps", () => {
+  it("match fresh refreshes for a tied, flowing pair through carries and flow steps", () => {
     fc.assert(fc.property(fc.array(action, { minLength: 4, maxLength: 20 }), (actions) => runSequence(flowScene(), actions)), { seed: 20261105, numRuns: 25 });
   });
 });
