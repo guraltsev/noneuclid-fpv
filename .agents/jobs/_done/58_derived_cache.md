@@ -1,6 +1,6 @@
 # Job 58 - Add the derived cache, cached kind lists and their guards
 
-Status: in progress.
+Status: done, needs review on 2026-11-04.
 Resolves: part of issue [86](../../_issues/86_derived_state_is_recomputed_by_scanning_the_world.md).
 
 ## Goal

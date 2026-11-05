@@ -951,7 +951,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     placeObjectAt: debugPlaceObjectAt,
     playerPose: debugPlayerPose,
     kindScans: () => runtimeObjectRegistry.getKindScanCounts(),
-    derivedStats: () => derivedStatsOf(runtimeObjectRegistry),
+      derivedStats: () => derivedStatsOf(runtimeObjectRegistry),
     setPlayerPose: debugSetPlayerPose,
   });
   installRenderInspectionApi(runtimeObjectInstanceSync.inspection);

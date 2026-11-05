@@ -132,7 +132,15 @@ export function defineDerived<S extends DerivedSource<T>, T extends JournalRecor
         }
       }
       instance.cursor = ring.headSeq;
-      if (stale) runCompute(source, instance);
+      if (stale) {
+        try {
+          runCompute(source, instance);
+        } catch (error) {
+          // A failed compute leaves no value, so the next read computes again instead of returning the old one.
+          instance.hasValue = false;
+          throw error;
+        }
+      }
       if (verifyEvery > 0) verify(source, instance);
       return instance.value as V;
     },

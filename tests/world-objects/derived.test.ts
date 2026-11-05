@@ -159,6 +159,26 @@ describe("defineDerived", () => {
     expect(toyCache().derived.read(registry)).toEqual(["m1@a"]);
   });
 
+  it("computes again after a compute threw on a cache that had a value", () => {
+    const registry = createRuntimeObjectRegistry([mouse("m1", "a")]);
+    let fail = false;
+    const flaky = defineDerived<RuntimeObjectReader, RuntimeWorldObject, number>({
+      id: `flaky-${serial++}`,
+      kinds: ["geo-mouse"],
+      compute: (source) => {
+        if (fail) throw new Error("boom");
+        return source.getObjectsOfKind("geo-mouse").length;
+      },
+    });
+
+    expect(flaky.read(registry)).toBe(1);
+    registry.add(mouse("m2", "a"));
+    fail = true;
+    expect(() => flaky.read(registry)).toThrow(/boom/);
+    fail = false;
+    expect(flaky.read(registry)).toBe(2);
+  });
+
   it("with verification on, throws when the cached value disagrees with compute", () => {
     const registry = createRuntimeObjectRegistry([mouse("m1", "a")]);
     // A wrong filter: the cell change is never seen, so the cached value goes stale.
