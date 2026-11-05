@@ -1,6 +1,6 @@
 # Job 57 - Keep every change readable: a ring behind the journal, cursors that survive endFrame
 
-Status: queued.
+Status: in progress.
 Resolves: part of issue [86](../../_issues/86_derived_state_is_recomputed_by_scanning_the_world.md).
 
 ## Goal
@@ -120,3 +120,35 @@ Job 56.
 - `grep -n "touchedKinds\|resetCursors" src -r` is empty.
 - The journal test file is unchanged, and the new tick test passes.
 - All checks are green.
+
+## Report
+
+### Done
+Commit d0818cd.
+- `src/world-objects/runtimeObjectChangeJournal.ts`: `createChangeRing(capacity = 8192)` (parallel arrays, power-of-two capacity, doubling under retention, `lastSeqOfKind` never reset, `beforeAt`), and the journal rebuilt as a frame view of it (`ring`, `frameStartSeq`, `retainFrom`, `clear` moves frame start and retention mark to `headSeq`). `touchedKinds` is gone. The factory takes a capacity parameter for tests.
+- Registry: `replaceObject` passes `before`; a kind change is `Removed(previous)` then `Added(next)`; `remove` passes the object as `before`.
+- `moduleTicks.ts`: sequence-number cursors, a non-waking derive tick moves its cursor to `headSeq`, `resetEventCursors` and `lowestCursor` replace `resetCursors`. `worldEngine.endFrame` as decided. `StepContext` comment updated. Header comments updated.
+- Tests: new `tests/world-objects/changeRing.test.ts` (7 tests), a registry kind-change test, and three new engine tests (write between step and endFrame, sleeping tick past capacity, cursor kept across endFrame). `docs:generate` run (generated references changed).
+- `runtimeObjectChangeJournal.test.ts` is unchanged.
+
+### Deviations
+Changed assertions in `tests/engine/worldEngine.test.ts` (only these):
+- wake test, after t1: `[[0, 2]]` became `[[1, 2]]`.
+- wake test, after the idle step: `[[0, 2]]` became `[[1, 2]]`.
+- wake test, after `wants`: `[[0, 2], [2, 3]]` became `[[1, 2], [2, 3]]`.
+- "starts every cursor again after endFrame clears the journal" renamed "keeps each cursor across endFrame"; expected `[[0, 1], [0, 1]]` became `[[0, 1], [1, 2]]`.
+
+### Uncertain
+- The `ChangeRing` interface has no `capacity` (as decided); tests read it by casting to `ChangeRingStore`. `ChangeRingStore` and `defaultChangeRingCapacity` are extra exports.
+- New test names were shortened to pass the 90-character hygiene limit.
+- Participant journal records pass no `before` (the job did not ask for it).
+- Bare engine allocation measured 6.5 and 12.3 bytes/step in two runs (limit 16); it varies run to run.
+
+### Not done
+Nothing.
+
+### Checks
+- Baseline typecheck and tests were not run separately before editing; the final state is green.
+- `npm run typecheck` ok; `npm test` 163 files, 1374 tests pass; `npm run docs:check` ok.
+- `npm run smoke -- --world cube,torus-moduli`: SMOKE OK (2 pages).
+- `npm run bench -- moduleStep --check`: counters unchanged (writes 1559, 1918, 127420); timing failed twice (exit 3 kind: flow 19.2-19.9, flow+dependents 38.8 us/step); `npm run bench:ab -- 71cb857`: ok (median base flow 19.88, flow+dependents 39.96; head 19.78 and 39.00).
