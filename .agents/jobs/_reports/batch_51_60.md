@@ -34,3 +34,9 @@ Start ddf4350; commits c1f2771, cea3e52. Review: fresh agent, no finding on 1-9;
 `--check` itself still exits 3 on timing alone (flow+dependents ~37 us); by rule not red. Scratch-scan proof: exit 1, "geodesicModel/arc scans 242 > 122". Counter runs byte-identical.
 One full `test:release` run had a single failed test (not identified; output lost); reruns of appCommands.release and of the whole release tier passed 15/15. Treated as the known flake.
 Tests after: 162 files / 1364 tests.
+
+## Job 57 notes
+Start 71cb857; commits d0818cd, f13817f, close. Tests after: 163 files / 1374 tests. `writes` counters unchanged (1559, 1918, 127420); bare engine alloc 6.5-12.3 B/step (limit 16).
+Changed assertions (all in tests/engine/worldEngine.test.ts, allowed by step 5): three wake-test cursors `[[0,2]]`->`[[1,2]]` (x2) and `[[0,2],[2,3]]`->`[[1,2],[2,3]]`; "starts every cursor again after endFrame..." renamed "keeps each cursor across endFrame", `[[0,1],[0,1]]`->`[[0,1],[1,2]]`. runtimeObjectChangeJournal.test.ts unchanged.
+`--check` exit 3 (timing only); `bench:ab -- 71cb857` exit 0 (flow 19.88 base / 19.78 head; flow+dep 39.96 / 39.00).
+Review (fresh agent): no decision violated. Fixed finding 9: removed unread `retainFromSeq` from ChangeRingStore. Left: `capacity`, `beforeAt`, `defaultChangeRingCapacity` export are test-reached (job-decided). Weak test: no test puts a cursor older than the ring tail (no clamp by design; relies on retention) - for the maintainer.

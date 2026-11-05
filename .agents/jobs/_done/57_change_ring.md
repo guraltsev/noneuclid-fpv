@@ -1,6 +1,6 @@
 # Job 57 - Keep every change readable: a ring behind the journal, cursors that survive endFrame
 
-Status: in progress.
+Status: done, needs review on 2026-11-04.
 Resolves: part of issue [86](../../_issues/86_derived_state_is_recomputed_by_scanning_the_world.md).
 
 ## Goal

@@ -37,7 +37,6 @@ export interface ChangeRing<T extends JournalRecord> {
 /** The ring with its writing side. */
 export interface ChangeRingStore<T extends JournalRecord> extends ChangeRing<T> {
   readonly capacity: number;
-  readonly retainFromSeq: number;
   record(op: ChangeOp, object: T, before?: T): void;
   /** Sets the retention mark: entries at or after `seq` are never overwritten. */
   setRetainFrom(seq: number): void;
@@ -93,9 +92,6 @@ export function createChangeRing<T extends JournalRecord>(capacity: number = def
     },
     get capacity() {
       return cap;
-    },
-    get retainFromSeq() {
-      return retain;
     },
     lastSeqOfKind: (kind) => lastSeqByKind.get(kind) ?? -1,
     opAt: (seq) => ops[seq & (cap - 1)]!,
