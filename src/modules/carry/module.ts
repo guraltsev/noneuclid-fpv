@@ -76,7 +76,6 @@ function endCarry(ctx: CommandContext, participant: ParticipantRecord, carry: Pa
     kind: "carry/released",
     participantId: participant.id,
     objectId: carry.objectId,
-    rebuiltGeodesicIds: release.rebuiltGeodesicIds,
     prunedIntersectionIds: release.prunedIntersectionIds,
     ...(release.regrownActiveGeodesicId === undefined ? {} : { regrownActiveGeodesicId: release.regrownActiveGeodesicId }),
   };
@@ -197,7 +196,6 @@ function followCarrier(ctx: StepContext, participant: ParticipantRecord): void {
       kind: "carry/moved",
       participantId: participant.id,
       objectId: cannon.id,
-      rebuiltGeodesicIds: rebuild.rebuiltGeodesicIds,
       ...(rebuild.regrownActiveGeodesicId === undefined ? {} : { regrownActiveGeodesicId: rebuild.regrownActiveGeodesicId }),
     };
     ctx.emit(moved);

@@ -29,11 +29,10 @@ export interface ApplyGeometryCommitComputedObjectPolicyOptions {
 }
 
 /**
- * Ids (deduplicated, in first-seen order) of the objects the policy removed, rebuilt or pruned.
+ * Ids (deduplicated, in first-seen order) of the objects the policy removed or pruned.
  */
 export interface GeometryCommitComputedObjectPolicyResult {
   readonly removedGeodesicIds: readonly string[];
-  readonly rebuiltGeodesicIds: readonly string[];
   /**
    * Connected geodesics that could not be re-solved in the new geometry; these are also listed in removedGeodesicIds.
    */
@@ -76,10 +75,7 @@ export function applyGeometryCommitComputedObjectPolicy(
       removeGeodesic(options.registry, geodesicId);
       result.failedConnectedGeodesicIds.add(geodesicId);
       result.removedGeodesicIds.add(geodesicId);
-      continue;
     }
-
-    result.rebuiltGeodesicIds.add(geodesicId);
   }
 
   const prunedIntersectionIds = pruneMissingGeodesicIntersectionObjects(options.registry);
@@ -168,7 +164,6 @@ function removeProtractorAnglesForMissingVertices(
 
 interface GeometryCommitComputedObjectPolicyResultBuilder {
   readonly removedGeodesicIds: Set<string>;
-  readonly rebuiltGeodesicIds: Set<string>;
   readonly failedConnectedGeodesicIds: Set<string>;
   readonly removedMeasuredGeodesicLengthIds: Set<string>;
   readonly removedProtractorAngleIds: Set<string>;
@@ -178,7 +173,6 @@ interface GeometryCommitComputedObjectPolicyResultBuilder {
 function createGeometryCommitComputedObjectPolicyResultBuilder(): GeometryCommitComputedObjectPolicyResultBuilder {
   return {
     removedGeodesicIds: new Set(),
-    rebuiltGeodesicIds: new Set(),
     failedConnectedGeodesicIds: new Set(),
     removedMeasuredGeodesicLengthIds: new Set(),
     removedProtractorAngleIds: new Set(),
@@ -191,7 +185,6 @@ function freezeGeometryCommitComputedObjectPolicyResult(
 ): GeometryCommitComputedObjectPolicyResult {
   return {
     removedGeodesicIds: [...result.removedGeodesicIds],
-    rebuiltGeodesicIds: [...result.rebuiltGeodesicIds],
     failedConnectedGeodesicIds: [...result.failedConnectedGeodesicIds],
     removedMeasuredGeodesicLengthIds: [...result.removedMeasuredGeodesicLengthIds],
     removedProtractorAngleIds: [...result.removedProtractorAngleIds],

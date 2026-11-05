@@ -52,7 +52,6 @@ export interface CarryMovedEvent extends EngineEventBase {
   readonly kind: "carry/moved";
   readonly participantId: string;
   readonly objectId: string;
-  readonly rebuiltGeodesicIds: readonly string[];
   /** Set when the emitter's plain active geodesic was regrown: that geodesic is now the carrier's active one. */
   readonly regrownActiveGeodesicId?: string;
 }
@@ -62,7 +61,6 @@ export interface CarryReleasedEvent extends EngineEventBase {
   readonly kind: "carry/released";
   readonly participantId: string;
   readonly objectId: string;
-  readonly rebuiltGeodesicIds: readonly string[];
   /** Intersection objects that vanished with the rebuilt geodesics; the angles that used them as vertices must go. */
   readonly prunedIntersectionIds: readonly string[];
   readonly regrownActiveGeodesicId?: string;

@@ -735,7 +735,7 @@ What an emitter does to its geodesics when it has been carried: rebuild after a 
 
 | Kind | Name | Summary |
 | --- | --- | --- |
-| interface | `EmitterGeodesicRebuild` | What a rebuild of an emitter's geodesics touched. |
+| interface | `EmitterGeodesicRebuild` | What a rebuild of an emitter's geodesics means for the carrier. |
 | function | `rebuildEmitterGeodesics` | Rebuilds the geodesics that depend on an emitter after it moved. |
 | interface | `CarriedEmitterRelease` | What releasing a carried emitter touched. |
 | function | `releaseCarriedEmitter` | The emitter has stopped being carried, whether the hand put it down or let it go: its geodesics are rebuilt one last time without the safety net of the carry, and the intersection objects whose geodesics no longer exist… |
@@ -819,7 +819,7 @@ Queries whether an arc connects emitters or follows one, and removal of geodesic
 
 ### `world-objects/geodesic/objects.ts`
 
-Geodesic emitters ("cannons"), geodesic arcs and curve shortening on a glued cell complex.
+Geodesic emitters (formerly "cannons"), geodesic arcs and curve shortening on a glued cell complex.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
@@ -1926,7 +1926,7 @@ Policy for derived objects (geodesics, measured geodesic lengths, protractor ang
 | --- | --- | --- |
 | interface | `GeometryCommitComputedObjectPolicyCallbacks` | Optional renderer hooks invoked as the policy removes dependent objects so visuals can follow. |
 | interface | `ApplyGeometryCommitComputedObjectPolicyOptions` | Inputs for applying the post-commit policy. |
-| interface | `GeometryCommitComputedObjectPolicyResult` | Ids (deduplicated, in first-seen order) of the objects the policy removed, rebuilt or pruned. |
+| interface | `GeometryCommitComputedObjectPolicyResult` | Ids (deduplicated, in first-seen order) of the objects the policy removed or pruned. |
 | function | `applyGeometryCommitComputedObjectPolicy` | Applies the post-commit policy to the registry (delete free geodesics, re-solve connected ones, prune stale intersections) and returns what changed. |
 
 ### `runtime/worldGeometryDeformationFamilies.ts`

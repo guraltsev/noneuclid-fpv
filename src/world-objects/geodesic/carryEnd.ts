@@ -2,8 +2,7 @@
  * What an emitter does to its geodesics when it has been carried: rebuild after a move and the final rebuild when the carry ends.
  * These are rules of the emitter, not of whoever carries it: a hand, a bot and a script all end a carry the same way, by calling these functions with the registry, and the carrier only refreshes what it draws.
  *
- * Pure with respect to rendering. Each function changes the registry and returns the ids it touched, so the caller can refresh the
- * overlays (protractor angles, measured lengths) and the instances that depend on them.
+ * Pure with respect to rendering. Each function changes the registry and returns what a carrier needs to go on: the geodesic it regrew and the crossings that vanished.
  */
 import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex";
 import type { RuntimeObjectRegistry } from "../runtimeObjectRegistry";
@@ -13,10 +12,8 @@ import { getEmitterGeodesicIds, isTied } from "./endpoints";
 import { arcFollowsEmitter, collectFollowingArcIdsForEmitter } from "./lifecycle";
 import { collectGeodesicPortalWord, getGeodesicSegments, resolveEmitterLaunchYaw } from "./segments";
 
-/** What a rebuild of an emitter's geodesics touched. */
+/** What a rebuild of an emitter's geodesics means for the carrier. */
 export interface EmitterGeodesicRebuild {
-  /** Geodesics that were rebuilt; their overlays need a refresh. */
-  readonly rebuiltGeodesicIds: readonly string[];
   /** Set when the emitter's plain (free) active geodesic was regrown from it: that geodesic is the emitter's active one. */
   readonly regrownActiveGeodesicId?: string;
 }
@@ -39,13 +36,13 @@ export function rebuildEmitterGeodesics(input: {
   const { world, registry } = input;
   const cannon = registry.get(input.emitterId);
   if (cannon?.kind !== "geodesicEmitters/emitter") {
-    return { rebuiltGeodesicIds: [] };
+    return {};
   }
 
   const geodesicId = input.activeGeodesicId ?? getEmitterGeodesicIds(registry, cannon.id)[0];
   const connectedIncidentGeodesicIds = collectFollowingArcIdsForEmitter(registry, cannon.id);
   if (connectedIncidentGeodesicIds.length === 0 && !geodesicId) {
-    return { rebuiltGeodesicIds: [] };
+    return {};
   }
 
   const rebuildConnected = (connectedGeodesicId: string): void => {
@@ -63,11 +60,11 @@ export function rebuildEmitterGeodesics(input: {
     for (const incidentGeodesicId of connectedIncidentGeodesicIds) {
       rebuildConnected(incidentGeodesicId);
     }
-    return { rebuiltGeodesicIds: connectedIncidentGeodesicIds };
+    return {};
   }
   if (geodesicId && arcFollowsEmitter(registry, geodesicId, cannon.id)) {
     rebuildConnected(geodesicId);
-    return { rebuiltGeodesicIds: [geodesicId] };
+    return {};
   }
   // A tied arc is never regrown: its curve is not a ray from the emitter.
   if (geodesicId && !isTied(registry, geodesicId)) {
@@ -81,10 +78,10 @@ export function rebuildEmitterGeodesics(input: {
       connectEmitters: false,
       rebuildConnected: true,
     });
-    return { rebuiltGeodesicIds: [geodesicId], regrownActiveGeodesicId: geodesicId };
+    return { regrownActiveGeodesicId: geodesicId };
   }
 
-  return { rebuiltGeodesicIds: [] };
+  return {};
 }
 
 /** What releasing a carried emitter touched. */
@@ -105,7 +102,7 @@ export function releaseCarriedEmitter(input: {
   readonly rotationTargetLengthMeters?: number;
 }): CarriedEmitterRelease {
   if (input.registry.get(input.emitterId)?.kind !== "geodesicEmitters/emitter") {
-    return { rebuiltGeodesicIds: [], prunedIntersectionIds: [] };
+    return { prunedIntersectionIds: [] };
   }
 
   const rebuild = rebuildEmitterGeodesics(input);

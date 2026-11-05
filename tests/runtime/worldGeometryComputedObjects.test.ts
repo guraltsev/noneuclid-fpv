@@ -98,7 +98,6 @@ describe("world geometry computed object policy", () => {
     const result = applyGeometryCommitComputedObjectPolicy({ world, registry });
     runDerivePass(engine);
 
-    expect([...result.rebuiltGeodesicIds].sort()).toEqual(["g-a", "g-b"]);
     expect(result.failedConnectedGeodesicIds).toEqual([]);
     expect(arcConnectsEmitters(registry, "g-a")).toBe(true);
     expect(arcConnectsEmitters(registry, "g-b")).toBe(true);

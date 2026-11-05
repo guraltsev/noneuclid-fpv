@@ -1,5 +1,5 @@
 /**
- * Geodesic emitters ("cannons"), geodesic arcs and curve shortening on a glued cell complex.
+ * Geodesic emitters (formerly "cannons"), geodesic arcs and curve shortening on a glued cell complex.
  *
  * ## Setting
  * The world is a cell complex: convex prism cells, each with its own local frame (x right, y forward, z up, meters), glued along
@@ -9,7 +9,7 @@
  * (`geodesicRayBeamHeightMeters` above the emitter floor point).
  *
  * ## Objects (all live in a `RuntimeObjectRegistry`)
- * - `GeodesicEmitterObject` (emitter): a placed object that geodesic endpoints can attach to.
+ * - `GeodesicEmitterObject` (emitter, kind `geodesicEmitters/emitter`): a placed object that geodesic endpoints can attach to.
  * - `GeodesicVertexObject` (`geodesicModel/vertex`, formerly "free geodesic end"): an invisible anchor for an endpoint that is not on an emitter.
  * - `GeodesicArcObject` (`geodesicModel/arc`, formerly "geodesic interval"): THE authoritative geodesic. It has two endpoint attachments (`start`, `end`; each names an anchor object, an
  *   emitter or a free end) and a PORTAL WORD: the ordered list of portal traversals from `start` to `end`. Nothing else is stored.

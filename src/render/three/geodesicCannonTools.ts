@@ -378,7 +378,7 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
   // Selects again the emitter's plain active geodesic when it was regrown. What was rebuilt is the emitter's rule (geodesic/carryEnd.ts).
   function refreshAfterEmitterRebuild(
     cannonId: string,
-    rebuild: { readonly rebuiltGeodesicIds: readonly string[]; readonly regrownActiveGeodesicId?: string },
+    rebuild: { readonly regrownActiveGeodesicId?: string },
   ): void {
     if (rebuild.regrownActiveGeodesicId) {
       deps.dispatch({ kind: "set-cannon-tool-state", state: {

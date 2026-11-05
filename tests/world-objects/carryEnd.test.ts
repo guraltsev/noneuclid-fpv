@@ -62,7 +62,6 @@ describe("rebuilding an emitter's geodesics after it moved", () => {
 
     const rebuild = rebuildEmitterGeodesics({ world, registry, emitterId: "cannon-b", preserveGeodesicOnRebuildFailure: true });
 
-    expect(rebuild.rebuiltGeodesicIds).toEqual(["g-a"]);
     expect(rebuild.regrownActiveGeodesicId).toBeUndefined();
     expect(arcConnectsEmitters(registry, "g-a")).toBe(true);
     const word = collectGeodesicPortalWord(registry, "g-a");
@@ -73,7 +72,7 @@ describe("rebuilding an emitter's geodesics after it moved", () => {
   it("does nothing for an object that is not an emitter", () => {
     const { world, registry } = connectedCube();
 
-    expect(rebuildEmitterGeodesics({ world, registry, emitterId: "g-a" })).toEqual({ rebuiltGeodesicIds: [] });
+    expect(rebuildEmitterGeodesics({ world, registry, emitterId: "g-a" })).toEqual({});
   });
 });
 
@@ -84,7 +83,6 @@ describe("releasing a carried emitter", () => {
 
     const release = releaseCarriedEmitter({ world, registry, emitterId: "cannon-b" });
 
-    expect(release.rebuiltGeodesicIds).toEqual(["g-a"]);
     expect(release.prunedIntersectionIds).toEqual([]);
     expect(arcConnectsEmitters(registry, "g-a")).toBe(true);
     const word = collectGeodesicPortalWord(registry, "g-a");
@@ -99,7 +97,7 @@ describe("releasing a carried emitter", () => {
 
     const release = releaseCarriedEmitter({ world, registry, emitterId: "lone" });
 
-    expect(release.rebuiltGeodesicIds).toEqual([]);
+    expect(release.prunedIntersectionIds).toEqual([]);
     expect(registry.get("lone")).toBe(before);
   });
 });

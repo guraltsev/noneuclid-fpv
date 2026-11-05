@@ -71,9 +71,8 @@ describe("carrying the emitter of a tied curve", () => {
     });
     expect(moved).toEqual({ moved: true, brokenGeodesicIds: [] });
 
-    const rebuild = rebuildEmitterGeodesics({ world, registry, emitterId: "e1", preserveGeodesicOnRebuildFailure: true });
+    rebuildEmitterGeodesics({ world, registry, emitterId: "e1", preserveGeodesicOnRebuildFailure: true });
 
-    expect(rebuild.rebuiltGeodesicIds).toEqual(["g1"]);
     expect(registry.get("free")).toBe(vertexBefore);
     expect(collectGeodesicPortalWord(registry, "g1")).toEqual([]);
     expect(isTied(registry, "g1")).toBe(true);
@@ -168,9 +167,8 @@ describe("a tied curve that cannot follow its emitter", () => {
     expect(isStale(registry, "g-b")).toBe(true);
     expect(registry.get("g-a")?.kind).toBe("geodesicModel/arc");
 
-    const release = releaseCarriedEmitter({ world, registry, emitterId: "cannon-b" });
+    releaseCarriedEmitter({ world, registry, emitterId: "cannon-b" });
 
-    expect(release.rebuiltGeodesicIds).toEqual(["g-b"]);
     expect(registry.get("g-a")).toBeUndefined();
     expect(registry.get("g-b")).toBeUndefined();
     expect(registry.get("v")).toBeUndefined();

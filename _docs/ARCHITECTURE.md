@@ -52,9 +52,9 @@ The geodesic emitter code lives in `src/world-objects/geodesic/`, one module per
 imports only modules before it): `src/math/vec2.ts` (2-D helpers), `objects.ts` (object types, constants, constructors),
 `portalWord.ts` (pure portal-word algebra), `development.ts` (cached inverse portal transforms), `trace.ts` (single-cell
 and multi-cell ray tracing), `intersections.ts` (crossing markers), `endpoints.ts` (endpoint attachments and lifting),
-`segments.ts` (derived segments), `lifecycle.ts` (locked queries and removal), `intervals.ts` (interval rebuilds and
+`segments.ts` (derived segments), `lifecycle.ts` (connection queries and removal), `intervals.ts` (interval rebuilds and
 previews), `vertices.ts` (tying, moving and removing a vertex) and `cannon.ts` (shooting, extending, connecting and placing
-cannons). The curve shortening flow that decides what to do with a vertex is the world module `src/modules/curveShortening/`.
+emitters). The commands a person or a script uses on emitters are the world module `src/modules/geodesicEmitters/`, over `cannon.ts`. The curve shortening flow that decides what to do with a vertex is the world module `src/modules/curveShortening/`.
 
 ## Layers and the dependency rule
 
@@ -177,7 +177,7 @@ renderer-neutral data (`src/ui/paletteDefinition.ts#createPaletteDefinition`) an
 (`src/render/three/palette/scenePaletteAdapter.ts` builds the VR widgets). Commands requested by the UI are plain data
 (`src/runtime/runtimeCommands.ts`) and applied to the client session (`src/runtime/clientSession.ts`) by the pure reducer `applyRuntimeCommand` in `src/runtime/applyRuntimeCommand.ts`, which returns the effects the shell runs.
 
-A tool is a descriptor (`src/engine/moduleTypes.ts#ToolDescriptor`): its label, help, icon, prompt and what it does with the primary action. The shell's own tools are described in `src/runtime/coreTools.ts#createCoreToolDescriptors`; a module contributes its tools in the client part of the module (`src/modules/geodesicModel/client.ts#geodesicModelClient`), and the shell merges both into `toolsById` (`src/runtime/toolRegistry.ts#createToolsById`). The indicators, the help lens, the aim cross and the actions on an object's menu page read this map, so a tool is added without changing any of them. A tool acts on the world only through `ToolContext.submit` and keeps its picks in the client session, under its module (`moduleToolState`); both are cleared when the tool ends.
+A tool is a descriptor (`src/engine/moduleTypes.ts#ToolDescriptor`): its label, help, icon, prompt and what it does with the primary action. The shell's own tools are described in `src/runtime/coreTools.ts#createCoreToolDescriptors`; a module contributes its tools in the client part of the module (`src/modules/geodesicModel/client.ts#geodesicModelClient`, `src/modules/geodesicEmitters/client.ts#geodesicEmittersClient`), and the shell merges both into `toolsById` (`src/runtime/toolRegistry.ts#createToolsById`). The indicators, the help lens, the aim cross and the actions on an object's menu page read this map, so a tool is added without changing any of them. A tool acts on the world only through `ToolContext.submit` and keeps its picks in the client session, under its module (`moduleToolState`); both are cleared when the tool ends.
 
 ## Testing strategy
 
