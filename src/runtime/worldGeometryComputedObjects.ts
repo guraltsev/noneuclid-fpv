@@ -7,7 +7,7 @@ import type { CompiledCellComplex } from "../cell-complex/compileCellComplex";
 import { pruneMissingGeodesicIntersectionObjects } from "../world-objects/geodesic/intersections";
 import { arcConnectsEmitters, removeGeodesic } from "../world-objects/geodesic/lifecycle";
 import { rebuildConnectedGeodesicBetweenEmitters } from "../world-objects/geodesic/cannon";
-import type { LegacyWorldWriter } from "../world-objects/runtimeObjectRegistry";
+import type { LegacyWorldWriter, RuntimeObjectReader } from "../world-objects/runtimeObjectRegistry";
 
 /**
  * Optional renderer hooks invoked as the policy removes dependent objects so visuals can follow.
