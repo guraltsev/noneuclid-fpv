@@ -73,7 +73,7 @@ Do not move the player, creatures or tools onto ticks. Do not change the order o
 
 ### Done
 
-Commit e6d28cc (implementation, tests, documents); the Report is cb1ec69; the repair round after a fresh review is d95c5c0; the share over half a second is the commit after that.
+Commit e6d28cc (implementation, tests, documents); the Report is cb1ec69; the repair round after a fresh review is d95c5c0; the share over half a second is 8491694; the second repair round is the commit after that.
 
 Repair round: the medians look at 10 samples, not 9, and take the mean of the two middle ones, so a cadence alternating two periods keeps one \(h\) (frames of \(1/60\) and \(1/30\) s: 25 ms, no change in 7160 frames; before, it flipped in nearly every frame). Tests added
 for both cadences. The guards on the options and on `advance`, and their test, are deleted: only tests reached them. The comparator is hoisted, and `sorted` is written by index instead of `length = 0`, so it keeps its storage.
@@ -98,20 +98,22 @@ whole half second, so the first frames do not read as a sustained load.
 
 The plain rule chattered, so it has two cures: `loadHoldBand` (\(h\) holds while the share is within 10 percent under `tickBudgetShare`) and `secondsFitting` (\(h\) comes back only after a whole half second under the band). Spread of \(h\), 12000 frames, cost following the frame's parity, after the first 6 s:
 
-| Load | Hz | Plain rule: spread, changes | With the cures: \(h\), spread, changes | Whole run with the cures: spread, last change |
+| Load | Hz | Plain rule: spread, changes | With the cures: \(h\), spread, changes | From frame 100 with the cures: spread, last change |
 | --- | --- | --- | --- | --- |
 | below the share, 2 and 3 ms | 90 / 72 / 60 | 0, 0 | base \(h\), 0, 0 | 0, none |
 | above the share, 6 and 8 ms | 90 | 5.000 ms, 4078 | 24.000 ms, 0, 0 | 2.500 ms, 1.96 s |
 | above the share, 6 and 8 ms | 72 | 0.500 ms, 3540 | 21.250 ms, 0, 0 | 0.250 ms, 3.44 s |
-| above the share, 6 and 8 ms | 60 | 0.720 ms, 7534 | 21.360 ms, 0, 0 | 0, 1.13 s |
-| at the share, \(\pm 14\) percent by parity | 90 | 0.104 ms, 10576 | 11.146 ms, 0, 0 | 0, 0.51 s |
+| above the share, 6 and 8 ms | 60 | 0.720 ms, 7534 | 21.360 ms, 0, 0 | 0, none (last at frame 68) |
+| at the share, \(\pm 14\) percent by parity | 90 | 0.104 ms, 10576 | 11.146 ms, 0, 0 | 0, none |
 | at the share, \(\pm 14\) percent by parity | 72 | 0, 0 | 13.889 ms, 0, 0 | 0, none |
-| at the share, \(\pm 14\) percent by parity | 60 | 0.226 ms, 10769 | 16.742 ms, 0, 0 | 0, 0.53 s |
+| at the share, \(\pm 14\) percent by parity | 60 | 0.226 ms, 10769 | 16.742 ms, 0, 0 | 0, none |
 | 1.05 of the share, random \(\pm 10\) percent | 90 | 0.633 ms, 4337 | 11.908 to 12.006 ms, 0.098 ms, 6 | 0.148 ms, 59.92 s |
 | 1.05 of the share, random \(\pm 10\) percent | 72 | 0.895 ms, 4498 | 14.856 to 15.089 ms, 0.233 ms, 7 | 0.301 ms, 16.03 s |
 | 1.05 of the share, random \(\pm 10\) percent | 60 | 1.196 ms, 4570 | 17.917 to 18.062 ms, 0.145 ms, 6 | 0.308 ms, 162.07 s |
 
-The median of the review round gave 16 distinct lengths in the same pattern. "Whole run" starts at frame 100. With random noise the remaining changes are rare upward steps to a new peak, not an oscillation.
+The median of the review round gave 16 distinct lengths in the same pattern. Corrected in the second repair round: the last column now counts changes from frame 100 too; it used to count them from frame 1. The noise rows are one seed; over 2000 seeds per rate, in frames 3000 to 6000, the worst run has 15 changes, none downward, and a spread of 0.342 ms (2.1 percent). With random noise the remaining changes are rare upward steps to a new peak, not an oscillation.
+
+Second repair round: the frame-period median uses an insertion sort into a preallocated `Float64Array`, so `Array.prototype.sort` and its allocation are gone (`advance` measures about 146 bytes per call now, including its result object; not traced further). The header says what one expensive frame does: it moves the share by what it adds, and the threshold is about 0.17 s at a share of one third (0.15 s does not trip it; 0.17 s does at 72 and 90 Hz, not yet at 60 Hz, with no other load). New test "lengthens the tick for one frame that alone exceeds the share, and comes back"; "does not react to one expensive tick" is now "does not react to one tick that stays under the share of the half second".
 
 ### Deviations
 
@@ -119,7 +121,8 @@ The median of the review round gave 16 distinct lengths in the same pattern. "Wh
   "takes a step's duration as given: a long step moves a vertex as far as its speed allows". The replacement also changed the input, `stepFlow(engine, 5)` to `stepFlow(engine, 1)`.
 - Cost tests reworked for the share over half a second, as the decision allows: "leaves the tick alone while the ticks fit their share of the frame" is now "... of real time", same numbers. "keeps one tick length when the ticks alternate between two costs" no longer reports the old cost on a frame with no tick, which the shell never does, and its
   value is checked to 3 decimals instead of 9, because \(h\) settles at the upper envelope of the cost. New tests: a load going over the share, the first frames, a frame longer than the window, the frame-parity pattern, a load at the share.
-- The frame-parity test keeps its strict assertion, one tick length, but looks from 6 s on, not from frame 200 as the first test did: with the cures the pattern still takes up to 3.44 s to settle (72 Hz, one step of 0.25 ms at frame 248; at 90 Hz 14 changes, spread 2.5 ms, until 1.96 s). The transient is in the table above.
+- The frame-parity test keeps its strict assertion, one tick length, but looks from 6 s on, not from frame 200 as the first test did: with the cures the pattern still takes up to 3.44 s to settle (72 Hz, one step of 0.25 ms at frame 248; at 90 Hz 9 changes from frame 100, 14 from the first frame, spread 2.5 ms, until 1.96 s). The transient is in the table above.
+- The noise half of "does not chatter with a load sitting at the share" asserted one tick length, which held only for its seed (reviewer: about 90 of 200 other seeds failed per rate, with up to 13 lengths). It is now its own test, "only creeps up, a little, with a noisy load at the share", over 20 seeds per rate: at most 30 changes, none downward, spread under 4 percent. The bounds are about twice the worst of 2000 seeds per rate, and the seeds are a plain sequence, not chosen.
 - `takeBehindNotice()` and `engine.noticeBehindRealTime` are additions to the interfaces the job names. `advance` keeps the exact return the job gives; the once-per-second limit needs real time, which the engine must not receive, so it sits in the clock, and an
   event of the kind `world/...` can only enter the event list through the engine.
 - "`engine.step` rejects a duration above `maxTickSeconds` only in the shell's use": there is no separate check. The clock never returns a longer tick (tested at frame periods up to 2 s), and `step` takes any non-negative duration.
@@ -143,6 +146,12 @@ The median of the review round gave 16 distinct lengths in the same pattern. "Wh
 - **`carry/detach` is resubmitted in frames with no tick** (from the review, not reproduced). It is harmless: the command is idempotent.
 - **Jitter still gives frames of 0 and 2 ticks:** with 1 ms Gaussian jitter at 72 Hz, measured with the final clock on 100000 frames, 2.8 percent of frames have 0 ticks and 2.8 percent have 2.
 - **`runClockFrame` in `tests/support` is a copy of the shell loop,** so the real loop is covered only by smoke.
+- **Stated limits, reviewer's numbers, not rerun by me:**
+  - Wider parity costs still wander: 60 Hz with costs of 1 and 12 ms, \(h\) 16.85 to 25.00 ms, 2614 changes over 300 s; 90 Hz with 2 and 10 ms, 19.4 to 20.4 ms, 700 changes. 30 of 32 tried pairs were stable. The 6 s in the parity test is narrow: 90 Hz with 5 and 9 ms last changes at 6.6 s.
+  - The even median fixes only a period-2 cadence: short, short, long, long gives 6979 changes in 6980 frames; random double frames at 72 Hz with probability 0.3 give 1966 in 20000.
+  - Rounding has two stable cycles on a two-period cadence, 1, 1 and 0, 2 ticks, chosen by the starting phase; `tickSeconds` does not show which. A cold start on \(1/60\), \(1/30\) s settles at 0, 2.
+  - 0.1 ms of jitter at 72 Hz changes \(h\) in 63.4 percent of frames, range 13.74 to 14.05 ms.
+  - The ring-full branch in `createRecentLoad` needs more than about 1000 Hz; no test or display reaches it.
 - One `npm run typecheck` during the work crashed inside node with a native stack trace; the same command run again right away, and every later run, passed. Not investigated; it did not look related to the code.
 
 ### Not done
@@ -165,5 +174,6 @@ The bench figures come from this machine, which is much faster than a Quest 2; t
   `npm run test:release` exit 0 (7 files, 16 tests); `npm run bench -- moduleStep --check` exit 0, "check: ok".
 - Bench counters unchanged: `flow` steps 120, writes 1557; `flow+dependents` steps 120, writes 1797; `manyArcs` writes 126897. Timing: flow 16.57, flow+dependents 28.27 us/step. `moduleStepCounters.json` and the baseline were not written.
 - Smoke was run once, after all the changes to `createThreeApp.ts`, which were made in one pass, not after each edit.
-- Share over half a second, which does not touch `createThreeApp.ts`: SHARECHECKS
-- Repair round, which does not touch `createThreeApp.ts`: REPAIRCHECKS
+- Second repair round, which does not touch `createThreeApp.ts`: `npm run typecheck` exit 0; `npm test` exit 0 (172 files, 1505 tests); `npm run docs:generate` exit 0; `npm run docs:check` exit 0. Release tier, smoke and bench not rerun in this round, as the coordinator said: it reruns the gate.
+- Share over half a second (8491694), which does not touch `createThreeApp.ts`: `npm run typecheck` exit 0; `npm test` exit 0 (172 files, 1501 tests); `npm run docs:generate` exit 0; `npm run docs:check` exit 0. Release tier, smoke and bench not rerun in this round, as the coordinator said: it reruns the gate.
+- First repair round (d95c5c0), which does not touch `createThreeApp.ts`: `npm run typecheck` exit 0; `npm test` exit 0 (172 files, 1493 tests); `npm run docs:generate` exit 0; `npm run docs:check` exit 0. Release tier, smoke and bench not rerun in this round, as the coordinator said: it reruns the gate.

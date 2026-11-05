@@ -27,6 +27,31 @@ function runFrames(clock: SimulationClock, period: number, frames: number, tickC
 
 const lastOf = (advances: readonly ClockAdvance[]): ClockAdvance => advances[advances.length - 1]!;
 
+/** 6000 frames of ticks costing 0.95 to 1.15 of the share, at random; how the tick length moved over the last 3000, the spread as a part of its lowest value. */
+function noisyLoadRun(hertz: number, firstSeed: number): { readonly changes: number; readonly downward: number; readonly spread: number } {
+  const clock = newClock();
+  let seed = firstSeed;
+  let lastCost = 0;
+  let last = 0;
+  let changes = 0;
+  let downward = 0;
+  let lowest = Infinity;
+  let highest = 0;
+  for (let frame = 0; frame < 6000; frame += 1) {
+    const advance = clock.advance(1 / hertz, lastCost);
+    seed = (seed * 1664525 + 1013904223) % 4294967296;
+    lastCost = (advance.ticks * (0.95 + (0.2 * seed) / 4294967296)) / (3 * hertz);
+    if (frame >= 3000) {
+      if (frame > 3000 && advance.tickSeconds !== last) changes += 1;
+      if (frame > 3000 && advance.tickSeconds < last) downward += 1;
+      lowest = Math.min(lowest, advance.tickSeconds);
+      highest = Math.max(highest, advance.tickSeconds);
+    }
+    last = advance.tickSeconds;
+  }
+  return { changes, downward, spread: (highest - lowest) / lowest };
+}
+
 /** Runs `frames` frames of `period` seconds; `tickCost` gives the cost of each frame's ticks, one tick at most here, and `afterFrame` runs after every frame. Returns the tick lengths seen from frame `from` on. */
 function settledTickLengths(period: number, frames: number, from: number, tickCost: () => number, afterFrame: () => void = () => undefined): Set<number> {
   const clock = newClock();
@@ -176,13 +201,25 @@ describe("the cost of the ticks", () => {
     expect(advances.every((advance) => advance.tickSeconds <= tick30 && advance.behindSeconds === 0)).toBe(true);
   });
 
-  it("does not react to one expensive tick", () => {
+  it("does not react to one tick that stays under the share of the half second", () => {
     const clock = newClock();
     const before = lastOf(runFrames(clock, 1 / 72, 20)).tickSeconds;
 
     clock.advance(1 / 72, 0.05);
 
     expect(clock.advance(1 / 72, 0).tickSeconds).toBe(before);
+  });
+
+  it("lengthens the tick for one frame that alone exceeds the share, and comes back", () => {
+    const clock = newClock();
+    const before = lastOf(runFrames(clock, 1 / 72, 200)).tickSeconds;
+
+    const expensive = clock.advance(1 / 72, 0.3).tickSeconds;
+    const lengths = runFrames(clock, 1 / 72, 72 * 5).map((advance) => advance.tickSeconds);
+
+    expect(expensive).toBeGreaterThan(before);
+    expect(Math.max(...lengths)).toBeLessThanOrEqual(tick30);
+    expect(lengths[lengths.length - 1]).toBe(before);
   });
 
   it("keeps one tick length when the ticks alternate between two costs", () => {
@@ -212,14 +249,19 @@ describe("the cost of the ticks", () => {
     const atShare = 1 / (3 * hertz);
     let frame = 0;
     const parity = settledTickLengths(1 / hertz, 6000, 3000, () => (frame % 2 === 0 ? 0.86 : 1.14) * atShare, () => (frame += 1));
-    let seed = 777;
-    const noise = settledTickLengths(1 / hertz, 6000, 3000, () => {
-      seed = (seed * 1664525 + 1013904223) % 4294967296;
-      return (0.95 + (0.2 * seed) / 4294967296) * atShare;
-    });
 
     expect(parity.size).toBe(1);
-    expect(noise.size).toBe(1);
+  });
+
+  it.each([90, 72, 60])("only creeps up, a little, with a noisy load at the share at %i Hz", (hertz) => {
+    // Over 2000 seeds per rate the worst run had 15 changes, none downward, and a spread of 2.1 percent; the plain rule makes thousands of changes.
+    for (let run = 1; run <= 20; run += 1) {
+      const { changes, downward, spread } = noisyLoadRun(hertz, (run * 2654435761) % 4294967296);
+
+      expect(changes).toBeLessThanOrEqual(30);
+      expect(downward).toBe(0);
+      expect(spread).toBeLessThan(0.04);
+    }
   });
 
   it("does not count a frame with no tick as a cheap one", () => {

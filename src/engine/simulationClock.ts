@@ -2,7 +2,7 @@
  * The simulation clock (design 012 P8, 013 section 6.5): turns elapsed real time into ticks of length \(h\). Pure: it reads no clock, the shell tells it how much time passed and what the last ticks cost.
  * \(h\) is the longest of three lengths, capped by `maxTickSeconds`: the configured `tickSeconds`, the steady frame period (ticks never run faster than the display), and what the ticks' cost asks for (ticks take at most
  * `tickBudgetShare` of the last half second of real time). A frame has at most three ticks. When it needs more, \(h\) grows for that frame, up to `maxTickSeconds`; what still does not fit is dropped and reported, never paid back later.
- * The frame period is a median of the last few samples and the ticks' share an average over the last half second, so one odd frame moves neither. A frame's ticks are rounded to the nearest whole number: at \(h\) equal to the frame period, a frame slightly short
+ * The frame period is a median of the last few samples and the ticks' share an average over the last half second, so one odd frame does not move the period, and moves the share only by what it adds to the half second: a single frame whose ticks cost more than the share of the half second, about 0.17 s at a share of one third, does lengthen \(h\). A frame's ticks are rounded to the nearest whole number: at \(h\) equal to the frame period, a frame slightly short
  * of the period still gets its tick. The world then runs at most half a tick ahead of real time.
  */
 
@@ -55,12 +55,10 @@ const loadHoldBand = 0.1;
 /** Shortest real time between two notices, in seconds. */
 const behindNoticeIntervalSeconds = 1;
 
-const ascending = (a: number, b: number): number => a - b;
-
 /** The median of the last {@link medianWindow} samples, the mean of the two middle ones when their number is even; 0 before the first. */
 function createRecentMedian() {
   const samples: number[] = [];
-  const sorted: number[] = [];
+  const sorted = new Float64Array(medianWindow);
   let next = 0;
   return {
     push(value: number): void {
@@ -69,10 +67,18 @@ function createRecentMedian() {
     },
     median(): number {
       if (samples.length === 0) return 0;
-      // Written by index: `sorted` keeps its storage from frame to frame, and is never longer than `samples`.
-      for (let index = 0; index < samples.length; index += 1) sorted[index] = samples[index]!;
-      sorted.sort(ascending);
-      return (sorted[(sorted.length - 1) >> 1]! + sorted[sorted.length >> 1]!) / 2;
+      // An insertion sort into preallocated storage: this runs in every frame, and `Array.prototype.sort` allocates.
+      const count = samples.length;
+      for (let index = 0; index < count; index += 1) {
+        const value = samples[index]!;
+        let slot = index;
+        while (slot > 0 && sorted[slot - 1]! > value) {
+          sorted[slot] = sorted[slot - 1]!;
+          slot -= 1;
+        }
+        sorted[slot] = value;
+      }
+      return (sorted[(count - 1) >> 1]! + sorted[count >> 1]!) / 2;
     },
   };
 }
