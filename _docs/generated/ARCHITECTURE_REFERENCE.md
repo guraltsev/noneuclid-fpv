@@ -5,7 +5,7 @@
 
 This reference is produced from the source code. For the *meaning* of the modules — the mathematical model they implement — read [../MATHEMATICAL_MODEL.md](../MATHEMATICAL_MODEL.md) and [../ARCHITECTURE.md](../ARCHITECTURE.md). For every exported symbol see [API_REFERENCE.md](API_REFERENCE.md).
 
-**263 modules, 52,782 lines** under `src/`.
+**262 modules, 52,554 lines** under `src/`.
 
 ## Layers
 
@@ -19,12 +19,12 @@ A module belongs to the layer named by its first path segment under `src/`. "May
 | `visibility` | 2 | 1,036 | `math`, `cell-complex` | Per-frame portal visibility: funnel clipping of portal-path tables against a camera. Pure; no renderer. |
 | `movement` | 10 | 1,645 | `math`, `cell-complex` | Player body, collision, movement and portal crossing in compiled cell complexes. |
 | `world-assets` | 1 | 201 | `cell-complex` | Floor-texture and asset descriptors. |
-| `world-objects` | 37 | 9,230 | `math`, `cell-complex`, `diagnostics`, `movement`, `world-assets` | Placeable runtime objects: registry, geodesic emitters, measurement tools, flags, creature behaviors. |
+| `world-objects` | 36 | 9,067 | `math`, `cell-complex`, `diagnostics`, `movement`, `world-assets` | Placeable runtime objects: registry, geodesic emitters, measurement tools, flags, creature behaviors. |
 | `authoring` | 5 | 671 | `math`, `cell-complex`, `examples`, `world-assets`, `world-objects` | World builder DSL, world-script compiler, validation and world catalog. |
 | `glue` | 11 | 1,025 | `math`, `cell-complex`, `diagnostics`, `authoring` | Launch options, debug settings, tool ids, asset URLs, app configuration. |
 | `interaction` | 5 | 1,564 | `math`, `cell-complex`, `movement`, `world-objects`, `glue` | Renderer-free interaction logic: input frames, aim picking, VR locomotion, XR session state, carried-object portal transitions. |
 | `engine` | 9 | 1,561 | `math`, `cell-complex`, `diagnostics`, `movement`, `world-objects`, `glue`, `interaction` | The world engine core (design 013): step order, command queue, participants, module composition and ticks. Imports no module. |
-| `modules` | 15 | 1,383 | `math`, `cell-complex`, `diagnostics`, `movement`, `world-objects`, `glue`, `interaction`, `engine` | World modules (design 013): each owns a slice of world behaviour and exposes a typed api.ts to the others. |
+| `modules` | 15 | 1,318 | `math`, `cell-complex`, `diagnostics`, `movement`, `world-objects`, `glue`, `interaction`, `engine` | World modules (design 013): each owns a slice of world behaviour and exposes a typed api.ts to the others. |
 | `runtime` | 16 | 2,707 | `math`, `cell-complex`, `diagnostics`, `movement`, `world-objects`, `authoring`, `glue`, `engine`, `modules` | Application state, runtime menu state, command dispatch, geometry session/worker, server channel and public API. |
 | `ui` | 6 | 1,275 | `math`, `cell-complex`, `world-objects`, `authoring`, `glue`, `engine`, `modules`, `runtime` | Renderer-neutral palette, help, tooltip and input-intent definitions. |
 | `render` | 117 | 25,053 | every lower layer | Three.js / DOM / WebXR rendering and input adapters (the application shell). |
@@ -72,7 +72,7 @@ flowchart LR
   modules -->|1| interaction
   modules -->|1| math
   modules -->|1| movement
-  modules -->|19| world_objects
+  modules -->|17| world_objects
   movement -->|11| cell_complex
   movement -->|21| math
   render -->|53| cell_complex
@@ -200,7 +200,7 @@ None: every import respects the intended layering.
 | `world-objects/carryHighlightShape.ts` | 45 | The shape of the highlight drawn around a carried object. | `math/vec3` |
 | `world-objects/creatures/geodesicMarmotBehavior.ts` | 149 | Motion of the geodesic marmot, with no renderer: the state it owns, how it advances each frame along its heading (a locally straight geodesic that stays straight as portals re-express the frame), and how it follows geom… | `cell-complex/compileCellComplex`, `cell-complex/prismCells`, `cell-complex/specs`, `cell-complex/worldGeometryDeformations`, `math/rigidTransform3`, `math/vec3`, `movement/depenetrateDynamicObject`, `movement/dynamicObject`, `movement/moveDynamicObject`, `world-objects/geodesicMarmot`, `world-objects/runtimeObjectBase`, `world-objects/runtimeObjectRegistry`, `world-objects/worldObjectOwner` |
 | `world-objects/creatures/simpleGeoCreatureBehavior.ts` | 597 | Motion of the simple geodesic creatures (the mouse and the butterfly), with no renderer: the state a creature owns, how it advances each frame, and how it follows geometry changes. | `cell-complex/compileCellComplex`, `cell-complex/prismCells`, `cell-complex/segmentWalk`, `cell-complex/specs`, `cell-complex/worldGeometryDeformations`, `math/rigidTransform3`, `math/vec3`, `movement/collision`, `movement/depenetrateDynamicObject`, `movement/dynamicObject`, `movement/moveDynamicObject`, `world-objects/runtimeObjectBase`, `world-objects/runtimeObjectRegistry`, `world-objects/simpleGeoCreature`, `world-objects/worldObjectOwner` |
-| `world-objects/derived.ts` | 216 | The derived cache (design 014 section 4): a value defined by a full `compute` over a source, invalidated by relevant entries on the change ring and recomputed on the next read. | `world-objects/runtimeObjectChangeJournal` |
+| `world-objects/derived.ts` | 206 | The derived cache (design 014 section 4): a value defined by a full `compute` over a source, invalidated by relevant entries on the change ring and recomputed on the next read. | `world-objects/runtimeObjectChangeJournal` |
 | `world-objects/geodesic/anchors.ts` | 20 | Anchors of geodesic intervals: which registry objects can hold an endpoint, and where the beam of one starts in its cell frame. | `math/vec3`, `world-objects/geodesic/objects`, `world-objects/runtimeObjectRegistry` |
 | `world-objects/geodesic/arcIndex.ts` | 85 | The arc index (design 014 section 7.1): which arc ends sit on each anchor, built by one pass over the arcs and cached. | `world-objects/derived`, `world-objects/geodesic/objects`, `world-objects/runtimeObjectRegistry` |
 | `world-objects/geodesic/cannon.ts` | 823 | Emitter (cannon) operations: shooting, extending and re-aiming geodesics, connecting a geodesic to an emitter, rebuilding locked geodesics between emitters, and placing cannons on the floor, on a geodesic or at a geodes… | `cell-complex/compileCellComplex`, `math/rigidTransform3`, `math/vec3`, `movement/collision`, `world-objects/geodesic/endpoints`, `world-objects/geodesic/intervals`, `world-objects/geodesic/lifecycle`, `world-objects/geodesic/objects`, `world-objects/geodesic/segments`, `world-objects/geodesic/trace`, `world-objects/runtimeObjectBase`, `world-objects/runtimeObjectRegistry` |
@@ -231,7 +231,6 @@ None: every import respects the intended layering.
 | `world-objects/simpleGeoCreature.ts` | 190 | Simple geodesic creatures: the mouse and the butterfly, autonomous walkers that follow straight lines (geodesics) through the cell complex. | `cell-complex/specs`, `math/rigidTransform3`, `math/vec3`, `world-objects/runtimeObjectBase`, `world-objects/staticAssets` |
 | `world-objects/staticAssets.ts` | 99 | Static asset authoring helper: converts author-facing parameters for a glTF decoration into an AssetObjectSpec. | `cell-complex/specs` |
 | `world-objects/toolObjects.ts` | 97 | Registry record types of the results of the player's tools: placed flags (signs), geodesic length labels and protractor angles. | `math/vec3`, `world-objects/geodesic/objects`, `world-objects/runtimeObjectBase` |
-| `world-objects/trackedReads.ts` | 153 | Read tracking for pure refresh functions (design 014 D1, D9): the exact set of registry reads a refresh made, and the test of whether a range of the change ring touches it. | `world-objects/derived`, `world-objects/runtimeObjectChangeJournal`, `world-objects/runtimeObjectRegistry` |
 | `world-objects/worldObjectOwner.ts` | 137 | World object owners: the single authority on the pose of an object that can be moved (creatures, the marmot, collidable static assets). | `cell-complex/compileCellComplex`, `cell-complex/worldGeometryDeformations`, `math/rigidTransform3`, `movement/depenetrateDynamicObject`, `world-objects/runtimeObjectBase`, `world-objects/runtimeObjectRegistry` |
 
 ### `authoring`
@@ -297,7 +296,7 @@ None: every import respects the intended layering.
 | `modules/curveShortening/module.ts` | 106 | The curve shortening module (design 013 section 13.2, design 014 sections 2.1 and 9): the flow that straightens the curves whose vertices the geodesic model has tied. | `engine/moduleTypes`, `modules/curveShortening/api`, `modules/curveShortening/flow`, `modules/curveShortening/policies`, `modules/geodesicModel/api`, `world-objects/runtimeObjectRegistry` |
 | `modules/curveShortening/policies.ts` | 26 | The policies of the curve shortening flow (design 013 section 13.2): how far a vertex may move in one step. | `modules/curveShortening/api` |
 | `modules/geodesicMeasurements/index.ts` | 5 | The geodesic measurements module's world factory (design 013 section 12.1): the length and angle labels as records derived from the geodesic model. | `modules/geodesicMeasurements/module` |
-| `modules/geodesicMeasurements/module.ts` | 177 | The geodesic measurements module (design 013 section 6.4, design 014 D9): the length labels and protractor angles the player's tools place, kept current by two derive ticks that read the change ring. | `engine/moduleTypes`, `engine/participants`, `modules/geodesicModel/api`, `world-objects/derived`, `world-objects/measureLengthTool`, `world-objects/protractorTool`, `world-objects/runtimeObjectChangeJournal`, `world-objects/runtimeObjectRegistry`, `world-objects/trackedReads` |
+| `modules/geodesicMeasurements/module.ts` | 112 | The geodesic measurements module (design 013 section 6.4, design 014 D9): the length labels and protractor angles the player's tools place, kept current by two derive ticks that read the change ring. | `engine/moduleTypes`, `engine/participants`, `modules/geodesicModel/api`, `world-objects/derived`, `world-objects/measureLengthTool`, `world-objects/protractorTool`, `world-objects/runtimeObjectChangeJournal` |
 | `modules/geodesicModel/api.ts` | 162 | The geodesic model's public face (design 013 sections 12.1 and 13.1): its token, the read-only queries clients and dependents share, the operations only dependents hold, and the plain-data shapes of its commands and eve… | `engine/moduleTypes`, `world-objects/geodesic/vertices` |
 | `modules/geodesicModel/client.ts` | 13 | The geodesic model's client part (design 013 sections 9.1 and 12.1): the tools the module contributes to the shell. | `engine/moduleTypes`, `modules/geodesicModel/api`, `modules/geodesicModel/tieTool` |
 | `modules/geodesicModel/index.ts` | 6 | The geodesic model module's factories (design 013 section 12.1): `geodesicModelModule` is the world part, `geodesicModelClient` the client part (the tie tool). | `modules/geodesicModel/client`, `modules/geodesicModel/module` |
