@@ -20,6 +20,8 @@ export interface PendingToolRequest {
   readonly toolId: RuntimeToolId;
   /** The engine ticket of the `world/requestTool` command. */
   readonly ticket: number;
+  /** The object the tool was started from (an action on its menu page), handed to the tool's `onStart`. */
+  readonly objectId?: string;
 }
 
 /**
@@ -36,7 +38,7 @@ export interface ClientSessionState {
   readonly showCellPathRendersInstances: boolean;
   /** Real state: the VR comfort options in force; the anti-nausea flag follows the menu. */
   readonly vrComfortOptions: VrComfortOptions;
-  /** Real state: which cannon and geodesic the emitter tools work on and the tie-and-detach picks; empty when idle. */
+  /** Real state: which cannon and geodesic the emitter tools work on; empty when idle. */
   readonly cannonToolState: GeodesicCannonToolState;
   /** Real state: the protractor tool's picks; empty when idle. */
   readonly protractorToolState: ProtractorToolState;

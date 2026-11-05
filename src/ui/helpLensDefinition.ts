@@ -4,6 +4,7 @@
  * Input glyphs come from inputIntents.ts so the same definition renders correctly for keyboard/mouse and for VR controllers. The module is pure and builds fresh immutable records on each call.
  */
 import type { RuntimeToolId } from "../glue/toolIds";
+import type { ToolsById } from "../runtime/toolRegistry";
 import type { InputMode } from "./inputIntents";
 import { formatBodyForInputMode } from "./inputModeText";
 import { getInputHintGlyph, type InputHintGlyph } from "./inputIntents";
@@ -30,6 +31,8 @@ export interface CreateHelpLensDefinitionOptions {
   readonly selectedTool: RuntimeToolId;
   /** Whether to word text and choose glyphs for desktop or XR. */
   readonly inputMode: InputMode;
+  /** The shell's tool lookup; the selected tool's help comes from its descriptor. */
+  readonly toolsById: ToolsById;
 }
 
 /**
@@ -40,7 +43,7 @@ export function createHelpLensDefinition(options: CreateHelpLensDefinitionOption
     return createFocusedHelpLens(options.focus, options.inputMode);
   }
 
-  return createToolHelpLens(options.selectedTool, options.inputMode);
+  return createToolHelpLens(options.selectedTool, options.inputMode, options.toolsById);
 }
 
 /**
@@ -65,69 +68,26 @@ function createFocusedHelpLens(focus: WorldFocusMessageDefinition, inputMode: In
   };
 }
 
-function createToolHelpLens(selectedTool: RuntimeToolId, inputMode: InputMode): HelpLensDefinition {
+function createToolHelpLens(selectedTool: RuntimeToolId, inputMode: InputMode, toolsById: ToolsById): HelpLensDefinition {
   const moveHint = getInputHintGlyph(inputMode, "move");
   const primaryHint = getInputHintGlyph(inputMode, "primary");
   const contextHint = getInputHintGlyph(inputMode, "context-menu");
-  switch (selectedTool) {
-    case "place-flag":
-      return {
-        title: "Sign tool",
-        body: "Places a note on the floor where you aim.",
-        rows: [row(primaryHint, "place sign"), row(contextHint, "open tools")],
-      };
-    case "geodesic-cannon":
-      return {
-        title: "Ray tool",
-        body: "Places geodesic emitters and starts locally straight rays.",
-        rows: [row(primaryHint, "place or continue ray"), row(contextHint, "open choices")],
-      };
-    case "measure-length":
-      return {
-        title: "Length tool",
-        body: "Measures total length along a selected geodesic.",
-        rows: [row(primaryHint, "choose geodesic"), row(contextHint, "open choices")],
-      };
-    case "protractor":
-      return {
-        title: "Protractor tool",
-        body: "Measures the angle between two geodesic sides at a vertex.",
-        rows: [row(primaryHint, "select vertex or side"), row(contextHint, "open choices")],
-      };
-    case "geodesic-cannon-carry":
-      return {
-        title: "Carry emitter",
-        body: "Moves the selected geodesic emitter while preserving its editable rays.",
-        rows: [row(primaryHint, "place emitter")],
-      };
-    case "geodesic-cannon-rotate":
-      return {
-        title: "Rotate ray",
-        body: "Turns the selected geodesic around its emitter.",
-        rows: [row(primaryHint, "finish rotation")],
-      };
-    case "geodesic-cannon-aim":
-      return {
-        title: "Aim ray",
-        body: "Points the selected geodesic toward the aimed location.",
-        rows: [row(primaryHint, "accept aim")],
-      };
-    case "geodesic-cannon-tie-detach":
-      return {
-        title: "Tie and detach",
-        body: "Selects two locked incident geodesics and rebuilds them as a detached path.",
-        rows: [row(primaryHint, "select geodesic")],
-      };
-    case "aim":
-    case "none":
-      return {
-        title: "Explore",
-        body: inputMode === "desktop"
-          ? "Move with Arrow keys. Look at objects to see available actions, or open the tools menu."
-          : "Move with the left stick. Look at objects to see available actions, or open the tools menu.",
-        rows: [row(moveHint, "move"), row(primaryHint, "use selected/default action"), row(contextHint, "open tools or object menu")],
-      };
+  const tool = toolsById.get(selectedTool);
+  if (tool !== undefined) {
+    return {
+      title: tool.helpTitle,
+      body: tool.helpBody,
+      rows: tool.helpRows.map((helpRow) => row(helpRow.input === "primary" ? primaryHint : contextHint, helpRow.label)),
+    };
   }
+  // No tool (none, aim): the explore text.
+  return {
+    title: "Explore",
+    body: inputMode === "desktop"
+      ? "Move with Arrow keys. Look at objects to see available actions, or open the tools menu."
+      : "Move with the left stick. Look at objects to see available actions, or open the tools menu.",
+    rows: [row(moveHint, "move"), row(primaryHint, "use selected/default action"), row(contextHint, "open tools or object menu")],
+  };
 }
 
 function row(hint: InputHintGlyph, label: string): HelpLensRow {

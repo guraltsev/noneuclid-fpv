@@ -61,8 +61,10 @@
  * Distances are meters and angles radians. Cell-local coordinates are x right, y forward, z up; the Three.js
  * scene uses its own axes, converted by `worldAxes` helpers (for example `rigidTransformToThreeMatrix`).
  */
+import type { EngineEventBase } from "../../engine/moduleTypes";
+import { createToolHost } from "./toolHost";
 import { createWorldClient } from "./worldClient";
-import { createDefaultWorldModules } from "../../runtime/experience";
+import { createDefaultClientModules, createDefaultWorldModules } from "../../runtime/experience";
 import { createLocalPlayerParticipant, createWorldEngine, publishLocalPlayerPose, readLocalPlayerPose } from "../../engine/worldEngine";
 import * as THREE from "three";
 import { reversePainterSortStable } from "@pmndrs/uikit";
@@ -370,16 +372,24 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     isToolEnabled: (toolId) => isRuntimeToolEnabled(appConfig, toolId),
     writeGuard: hasActiveDebugOption(options.debugLevel, options.debugOptions, "module-write-guard"),
   });
+  function showWorldMessage(message: string, detail: EngineEventBase | { readonly code: string }): void {
+    console.info(`[noneuclid] ${message}`);
+    runtimeDiagnostics().recordDebugEvent(message, detail);
+  }
   // The tool-switch protocol, the generic event sink and api.world. There is no on-screen message system yet, so
   // the world's sentences go to the console and the diagnostics, always (not only in debug mode).
   const worldClient = createWorldClient({
     engine,
     session,
     dispatch: (command) => dispatchRuntimeCommand(command),
-    showMessage(message, detail) {
-      console.info(`[noneuclid] ${message}`);
-      runtimeDiagnostics().recordDebugEvent(message, detail);
+    toolStarted(toolId, objectId) {
+      toolHost.toolStarted(toolId, objectId);
+      // A tool started from an object's page takes the pointer, as the emitter's own modes do.
+      if (objectId !== undefined && !renderer.xr.isPresenting) {
+        void controls.requestPointerLock();
+      }
     },
+    showMessage: showWorldMessage,
   });
   // Disposal bookkeeping: `disposed` makes dispose() idempotent.
   let disposed = false;
@@ -685,6 +695,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
 
 
   const aimFeedback = createAimFeedback({
+    toolsById: () => toolHost.toolsById,
     engine,
     scene,
     camera,
@@ -747,10 +758,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     tryStartFocusedGeodesicCannonCarry,
     finishGeodesicCannonCarry,
     deleteGeodesicFromCannon,
-    canTieAndDetachGeodesicsFromCannon,
-    startGeodesicCannonTieAndDetach,
-    trySelectTieAndDetachGeodesicFromAim,
-    syncTieAndDetachSelectionHighlights,
     updateCarriedGeodesicCannonPose,
     afterWorldStep: afterCarryWorldStep,
     updateActiveGeodesicCannonRotation,
@@ -767,11 +774,11 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     session,
     dispatch: dispatchRuntimeCommand,
     resolveCurrentAimTarget,
-    resolveCurrentAimTargets,
     targetIsWithinInteractionRange,
     logVerboseAimClick,
     findFocusedRuntimeObject,
     getGeodesicLabelsById,
+    objectActionsFor: (objectKind, objectId) => toolHost.objectActionsFor(objectKind, objectId),
     syncDesktopPalette,
     syncRuntimeObjectPortalInstances: requestRuntimeObjectInstanceSync,
     syncSelectableHitboxDebug: requestSelectableHitboxDebugSync,
@@ -817,7 +824,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     getGeodesicDisplayName,
     getGeodesicLabelsById,
     getLockedGeodesicIds,
-    canTieAndDetachGeodesicsFromCannon,
+    objectActionsFor: (objectKind, objectId) => toolHost.objectActionsFor(objectKind, objectId),
     createGeometryComputerMenuOptions,
     syncPlacedFlagRuntime,
     removePlacedFlagRuntime,
@@ -836,6 +843,43 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     resolveProtractorDirectedSelectionFromAimTarget,
   });
 
+  // The tools: the shell's own, as handlers, and the modules' as descriptors from the experience's client parts. One lookup (`toolHost.toolsById`) serves every place that varies by tool.
+  const toolHost = createToolHost({
+    engine,
+    session,
+    dispatch: dispatchRuntimeCommand,
+    clients: createDefaultClientModules(),
+    core: {
+      placeFlag: tryPlaceFlagFromAim,
+      useGeodesicCannon: tryUseGeodesicCannonToolFromAim,
+      measureLength: tryUseMeasureLengthToolFromAim,
+      protractor: tryUseProtractorToolFromAim,
+      protractorPrompt: getProtractorToolPrompt,
+      carry: (primaryActionRequested) => {
+        if (primaryActionRequested) finishGeodesicCannonCarry();
+        return primaryActionRequested;
+      },
+      rotate: (yawDeltaRadians, primaryActionRequested) => {
+        updateActiveGeodesicCannonRotation(yawDeltaRadians, primaryActionRequested);
+        return primaryActionRequested;
+      },
+      aim: (primaryActionRequested, ray) => {
+        updateActiveGeodesicCannonAim(primaryActionRequested, ray);
+        return primaryActionRequested;
+      },
+    },
+    resolveCurrentAimTargets,
+    targetIsWithinInteractionRange,
+    useFocusedObject: tryUseFocusedObjectPrimaryInteraction,
+    requestTool: (toolId, objectId) => worldClient.requestTool(toolId, objectId),
+    showMessage: (message) => showWorldMessage(message, { code: "tool/message" }),
+    syncDesktopPalette,
+    syncWorldObjects() {
+      requestRuntimeObjectInstanceSync();
+      requestSelectableHitboxDebugSync();
+    },
+  });
+
   const {
     onDesktopContextMenu,
     onDesktopMouseDown,
@@ -847,6 +891,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   } = createDesktopInputHandlers({
     session,
     appConfig,
+    toolsById: toolHost.toolsById,
     camera,
     renderer,
     xrRig,
@@ -866,11 +911,9 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   const geometryDebugHelpers = createGeometryDebugHelpers({ session, geometrySession });
 
   const runtimeEffects = createRuntimeEffects({
-    session,
     dispatch: dispatchRuntimeCommand,
     host: options,
     syncDesktopPalette,
-    syncTieAndDetachSelectionHighlights,
     clearProtractorToolFeedback,
     requestRuntimeObjectInstanceSync,
     applyMenuDebugState,
@@ -879,7 +922,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     teleportPlayerHome,
     addGeodesicToCannon,
     startGeodesicCannonCarry,
-    startGeodesicCannonTieAndDetach,
+    startObjectAction: (objectKind, objectId, actionId) => toolHost.startObjectAction(objectKind, objectId, actionId),
     startGeodesicCannonRotation,
     startGeodesicCannonAim,
     deleteGeodesicFromCannon,
@@ -1205,8 +1248,8 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       aimFeedback.requestHelpLensForFocusedObject(activeAimRay);
     }
     const worldPrimaryActionRequested = frame.primaryActionRequested && !currentMenuState().isOpen;
-    // Tool dispatch: modal cannon tools consume the primary action themselves; world tools act only when
-    // no menu is open. primaryActionConsumed stops the generic focused-object interaction.
+    // Tool dispatch: the selected tool's descriptor takes the primary action (the emitter's modal tools every frame, the others when no
+    // menu is open). primaryActionConsumed stops the generic focused-object interaction.
     let primaryActionConsumed = false;
     if (frame.carryActionRequested && !currentMenuState().isOpen) {
       primaryActionConsumed = currentMenuState().selectedTool === "geodesic-cannon-carry"
@@ -1214,38 +1257,8 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
         : tryStartFocusedGeodesicCannonCarry(activeAimRay);
     }
 
-    if (currentMenuState().selectedTool === "geodesic-cannon-carry") {
-      if (frame.primaryActionRequested) {
-        finishGeodesicCannonCarry();
-        primaryActionConsumed = true;
-      }
-    } else if (currentMenuState().selectedTool === "geodesic-cannon-rotate") {
-      updateActiveGeodesicCannonRotation(frame.yawDeltaRadians, frame.primaryActionRequested);
-      primaryActionConsumed = frame.primaryActionRequested;
-    } else if (currentMenuState().selectedTool === "geodesic-cannon-aim") {
-      updateActiveGeodesicCannonAim(frame.primaryActionRequested, activeAimRay);
-      primaryActionConsumed = frame.primaryActionRequested;
-    } else if (worldPrimaryActionRequested && currentMenuState().selectedTool === "geodesic-cannon-tie-detach") {
-      primaryActionConsumed = trySelectTieAndDetachGeodesicFromAim(activeAimRay);
-    } else if (worldPrimaryActionRequested && currentMenuState().selectedTool === "place-flag") {
-      tryPlaceFlagFromAim(activeAimRay);
-      primaryActionConsumed = true;
-    } else if (worldPrimaryActionRequested && currentMenuState().selectedTool === "geodesic-cannon") {
-      tryUseGeodesicCannonToolFromAim(activeAimRay);
-      primaryActionConsumed = true;
-    } else if (worldPrimaryActionRequested && currentMenuState().selectedTool === "measure-length") {
-      tryUseMeasureLengthToolFromAim(activeAimRay);
-      primaryActionConsumed = true;
-    } else if (worldPrimaryActionRequested && currentMenuState().selectedTool === "protractor") {
-      tryUseProtractorToolFromAim(activeAimRay);
-      primaryActionConsumed = true;
-    } else if (
-      worldPrimaryActionRequested &&
-      !primaryActionConsumed &&
-      (currentMenuState().selectedTool === "none" || currentMenuState().selectedTool === "aim")
-    ) {
-      primaryActionConsumed = tryUseFocusedObjectPrimaryInteraction(activeAimRay);
-    }
+    toolHost.setFrame({ ray: activeAimRay, yawDeltaRadians: frame.yawDeltaRadians, primaryActionRequested: frame.primaryActionRequested });
+    primaryActionConsumed = toolHost.dispatchPrimaryAction(worldPrimaryActionRequested, primaryActionConsumed);
 
     if (primaryActionConsumed) {
       // A consumed action may have changed the registry; drop the per-frame aim cache.
@@ -1276,6 +1289,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     frameErrorGuard.runPhase("world engine", () => {
       engine.step(frame.resetRequested ? 0 : deltaSeconds);
       worldClient.afterStep();
+      toolHost.afterStep();
       afterCarryWorldStep();
     });
     // Crossings, lengths and angles follow from what changed: the engine's derive pass wrote them, and the label runtimes read them from the journal.
@@ -1679,10 +1693,8 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
 
   function syncDesktopPalette(): void {
     controls.setLookMode(currentMenuState().isOpen ? "palette" : "camera");
-    desktopToolIndicator.setTool(currentMenuState().selectedTool, currentMenuState().placeFlagOptions.flagType, {
-      protractorPrompt: getProtractorToolPrompt(),
-      tieAndDetachPrompt: getTieAndDetachToolPrompt(),
-    });
+    const selectedTool = currentMenuState().selectedTool;
+    desktopToolIndicator.setTool(toolHost.toolsById.get(selectedTool), currentMenuState().placeFlagOptions.flagType, toolHost.promptOf(selectedTool));
   }
 
   function getProtractorToolPrompt(): string {
@@ -1695,11 +1707,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     }
 
     return "select: side2";
-  }
-
-  function getTieAndDetachToolPrompt(): string {
-    const selectedCount = session.get().cannonToolState.tieAndDetachEndpointSelections?.length ?? 0;
-    return selectedCount === 0 ? "select: geodesic 1" : "select: geodesic 2";
   }
 
   function playerBlockingBodiesInCell(cellId: string) {
@@ -1730,7 +1737,13 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
 
   // The one command path: the reducer changes the session, then the effects run in the order it listed them.
   function dispatchRuntimeCommand(command: RuntimeCommand): void {
-    for (const effect of applyRuntimeCommand(session, command)) {
+    const toolBefore = session.get().menuState.selectedTool;
+    const effects = applyRuntimeCommand(session, command);
+    // A tool that is no longer selected has ended, whichever command ended it: it takes its marks off the world and drops its tool state.
+    if (session.get().menuState.selectedTool !== toolBefore) {
+      toolHost.toolEnded(toolBefore);
+    }
+    for (const effect of effects) {
       runtimeEffects.run(effect);
     }
   }

@@ -2,7 +2,7 @@
  * The names the engine knows without any module: the object kinds of the registry's core union and the tool ids of the core tools.
  * Both tables are `Record`s over the unions, so adding a kind or a tool id without listing it here is a type error. Composition (composeModules.ts) checks module declarations against them.
  */
-import type { RuntimeToolId } from "../glue/toolIds";
+import type { CoreToolId, RuntimeToolId } from "../glue/toolIds";
 import type { RuntimeWorldObject } from "../world-objects/runtimeObjectRegistry";
 
 const coreObjectKindTable: Record<RuntimeWorldObject["kind"], true> = {
@@ -20,7 +20,7 @@ const coreObjectKindTable: Record<RuntimeWorldObject["kind"], true> = {
   "geodesicMeasurements/angle": true,
 };
 
-const coreToolIdTable: Record<RuntimeToolId, true> = {
+const coreToolIdTable: Record<CoreToolId, true> = {
   none: true,
   aim: true,
   "place-flag": true,
@@ -30,7 +30,6 @@ const coreToolIdTable: Record<RuntimeToolId, true> = {
   "geodesic-cannon-carry": true,
   "geodesic-cannon-rotate": true,
   "geodesic-cannon-aim": true,
-  "geodesic-cannon-tie-detach": true,
 };
 
 /** Kinds of the core union of the registry. */

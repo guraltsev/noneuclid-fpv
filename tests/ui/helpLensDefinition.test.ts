@@ -8,12 +8,16 @@
  */
 import { describe, expect, it } from "vitest";
 import { publicAssetUrl } from "../../src/glue/assetUrls";
+import { createTestToolsById } from "../support/tools";
 import { createHelpLensDefinition } from "../../src/ui/helpLensDefinition";
+
+const toolsById = createTestToolsById();
 
 describe("helpLensDefinition", () => {
   it("creates concise object-aware help from focus metadata", () => {
     const help = createHelpLensDefinition({
       inputMode: "desktop",
+      toolsById,
       selectedTool: "none",
       focus: {
         title: "Sign",
@@ -38,6 +42,7 @@ describe("helpLensDefinition", () => {
   it("creates selected-tool help when no object is focused", () => {
     const help = createHelpLensDefinition({
       inputMode: "xr",
+      toolsById,
       selectedTool: "measure-length",
     });
 
@@ -51,6 +56,7 @@ describe("helpLensDefinition", () => {
   it("formats explicit object help for desktop controls", () => {
     const help = createHelpLensDefinition({
       inputMode: "desktop",
+      toolsById,
       selectedTool: "none",
       focus: {
         title: "Help hub",
@@ -66,6 +72,7 @@ describe("helpLensDefinition", () => {
   it("formats explicit object help for VR controls", () => {
     const help = createHelpLensDefinition({
       inputMode: "xr",
+      toolsById,
       selectedTool: "none",
       focus: {
         title: "Help hub",
@@ -81,6 +88,7 @@ describe("helpLensDefinition", () => {
   it("shows movement with the environment-specific explore help", () => {
     const help = createHelpLensDefinition({
       inputMode: "desktop",
+      toolsById,
       selectedTool: "none",
     });
 

@@ -5,7 +5,6 @@
  * geometry-computer action, applying debug or comfort state, asking the host to restart the app, editing a sign. This module only
  * routes: each case calls the handle that does the work, or dispatches a follow-up command. It owns the reload-confirmation timer.
  */
-import type { ClientSession } from "../../runtime/clientSession";
 import type { RuntimeCommand, RuntimeEffect } from "../../runtime/runtimeCommands";
 
 /** Callbacks the host passed to the app for restarts and URL copying. */
@@ -18,12 +17,10 @@ export interface RuntimeEffectHostCallbacks {
 
 /** Dependencies of {@link createRuntimeEffects}. */
 export interface RuntimeEffectsDeps {
-  readonly session: ClientSession;
   /** The one command path; follow-up commands go through it. */
   dispatch(command: RuntimeCommand): void;
   readonly host: RuntimeEffectHostCallbacks;
   syncDesktopPalette(): void;
-  syncTieAndDetachSelectionHighlights(selections: readonly never[]): void;
   clearProtractorToolFeedback(): void;
   requestRuntimeObjectInstanceSync(): void;
   applyMenuDebugState(): void;
@@ -33,7 +30,8 @@ export interface RuntimeEffectsDeps {
   teleportPlayerHome(): void;
   addGeodesicToCannon(cannonId: string): void;
   startGeodesicCannonCarry(cannonId: string): void;
-  startGeodesicCannonTieAndDetach(cannonId: string): void;
+  /** Asks the world to start the tool behind an action on an object's menu page. */
+  startObjectAction(objectKind: string, objectId: string, actionId: string): void;
   startGeodesicCannonRotation(cannonId: string, geodesicId: string | undefined): void;
   startGeodesicCannonAim(cannonId: string, geodesicId: string | undefined): void;
   deleteGeodesicFromCannon(cannonId: string, geodesicId: string): void;
@@ -54,7 +52,7 @@ export interface RuntimeEffects {
 
 /** Creates the runner of reducer effects. */
 export function createRuntimeEffects(deps: RuntimeEffectsDeps): RuntimeEffects {
-  const { session, dispatch, host } = deps;
+  const { dispatch, host } = deps;
   let reloadConfirmationTimeout: ReturnType<typeof setTimeout> | undefined;
 
   function run(effect: RuntimeEffect): void {
@@ -65,21 +63,12 @@ export function createRuntimeEffects(deps: RuntimeEffectsDeps): RuntimeEffects {
       case "end-tool-session":
         dispatch({ kind: "set-protractor-tool-state", state: {} });
         dispatch({ kind: "set-cannon-tool-state", state: {} });
-        deps.syncTieAndDetachSelectionHighlights([]);
         deps.clearProtractorToolFeedback();
         return;
       case "switch-tool-session":
         if (effect.toolId !== "protractor") {
           dispatch({ kind: "set-protractor-tool-state", state: {} });
           deps.clearProtractorToolFeedback();
-        }
-        if (effect.toolId !== "geodesic-cannon-tie-detach") {
-          deps.syncTieAndDetachSelectionHighlights([]);
-          deps.requestRuntimeObjectInstanceSync();
-          dispatch({ kind: "set-cannon-tool-state", state: {
-            ...session.get().cannonToolState,
-            tieAndDetachEndpointSelections: undefined,
-          } });
         }
         return;
       case "sync-object-instances":
@@ -121,8 +110,8 @@ export function createRuntimeEffects(deps: RuntimeEffectsDeps): RuntimeEffects {
       case "start-cannon-carry":
         deps.startGeodesicCannonCarry(effect.cannonId);
         return;
-      case "start-cannon-tie-and-detach":
-        deps.startGeodesicCannonTieAndDetach(effect.cannonId);
+      case "start-object-action":
+        deps.startObjectAction(effect.objectKind, effect.objectId, effect.actionId);
         return;
       case "start-cannon-rotation":
         deps.startGeodesicCannonRotation(effect.cannonId, effect.geodesicId);

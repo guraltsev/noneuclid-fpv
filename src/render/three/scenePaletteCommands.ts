@@ -27,7 +27,7 @@ export type ScenePaletteCommands = Pick<
   | "onPortalPanelModeSelected" | "onPortalInspectionToggled" | "onCollisionGeometryWireframesToggled"
   | "onAimCollisionOutlinesToggled" | "onCopyUrlWithOptionsRequested" | "onToolSelected" | "onPlaceFlagOptionsRequested"
   | "onPlaceFlagTypeSelected" | "onGeodesicCannonAddRequested" | "onGeodesicCannonCarryRequested"
-  | "onGeodesicCannonTieAndDetachRequested" | "onGeodesicCannonRotateRequested" | "onGeodesicCannonAimRequested"
+  | "onObjectActionRequested" | "onGeodesicCannonRotateRequested" | "onGeodesicCannonAimRequested"
   | "onGeodesicCannonDeleteRequested" | "onGeometryComputerStepTargetRequested" | "onGeometryComputerGoRequested"
   | "onQuestionHelpTutorialRequested" | "onQuestionHelpGoalRequested" | "onTutorialPreviousRequested"
   | "onTutorialNextRequested" | "onGoalPreviousRequested" | "onGoalNextRequested" | "onSignKeyboardCharacter"
@@ -110,8 +110,8 @@ export function createScenePaletteCommands(deps: ScenePaletteCommandsDeps): Scen
     onGeodesicCannonCarryRequested(cannonId) {
       dispatch({ kind: "start-cannon-carry", cannonId });
     },
-    onGeodesicCannonTieAndDetachRequested(cannonId) {
-      dispatch({ kind: "start-cannon-tie-and-detach", cannonId });
+    onObjectActionRequested(objectKind, objectId, actionId) {
+      dispatch({ kind: "start-object-action", objectKind, objectId, actionId });
     },
     onGeodesicCannonRotateRequested(cannonId, geodesicId) {
       dispatch({ kind: "start-cannon-rotation", cannonId, geodesicId });

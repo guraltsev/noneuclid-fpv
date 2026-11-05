@@ -42,7 +42,8 @@ export interface ScenePaletteAdapterOptions {
   /** Geodesic cannon page callbacks; the cannon id comes from the palette content. Aim and rotate receive the geodesic id; delete requires one. */
   readonly onGeodesicCannonAddRequested?: (cannonId: string) => void;
   readonly onGeodesicCannonCarryRequested?: (cannonId: string) => void;
-  readonly onGeodesicCannonTieAndDetachRequested?: (cannonId: string) => void;
+  /** An action a tool contributed to an object's page was pressed. */
+  readonly onObjectActionRequested?: (objectKind: string, objectId: string, actionId: string) => void;
   readonly onGeodesicCannonRotateRequested?: (cannonId: string, geodesicId?: string) => void;
   readonly onGeodesicCannonAimRequested?: (cannonId: string, geodesicId?: string) => void;
   readonly onGeodesicCannonDeleteRequested?: (cannonId: string, geodesicId: string) => void;

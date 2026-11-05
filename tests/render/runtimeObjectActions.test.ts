@@ -87,7 +87,7 @@ function createHarness(target: AimTarget | undefined, sessionOverrides: Partial<
     getGeodesicDisplayName: (geodesicId) => geodesicId,
     getGeodesicLabelsById: () => ({}),
     getLockedGeodesicIds: () => [],
-    canTieAndDetachGeodesicsFromCannon: () => false,
+    objectActionsFor: () => [],
     createGeometryComputerMenuOptions: () => {
       throw new Error("not used");
     },

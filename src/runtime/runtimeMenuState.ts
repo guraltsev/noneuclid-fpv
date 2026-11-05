@@ -5,6 +5,7 @@
  * Page-scoped payloads (editSignOptions, geodesicCannonOptions, ...) are cleared by closeRuntimeMenu and showRuntimeMenuMainPage so stale data never leaks to a later page; "show..." transitions for object-driven pages also force isOpen to true.
  * The debug-related fields round-trip with DebugSettings via createRuntimeMenuState and createDebugSettingsFromRuntimeMenuState.
  */
+import type { ObjectActionEntry } from "../engine/moduleTypes";
 import type { DebugOptionId } from "../glue/debugOptions";
 import type { DebugSettings } from "../glue/debugSettings";
 import type { DebugLevelId } from "../diagnostics/debugLevels";
@@ -100,14 +101,14 @@ export interface RuntimeMenuState {
     readonly message: string;
   };
   /**
-   * Payload of the geodesic-cannon-actions page: cannon id, its geodesics with optional display labels, which are locked, and whether tie/detach is possible.
+   * Payload of the geodesic-cannon-actions page: cannon id, its geodesics with optional display labels, which are locked, and the actions the tools contribute (with their availability).
    */
   readonly geodesicCannonOptions?: {
     readonly cannonId: string;
     readonly geodesicIds: readonly string[];
     readonly geodesicLabelsById?: Readonly<Record<string, string>>;
     readonly lockedGeodesicIds?: readonly string[];
-    readonly canTieAndDetach?: boolean;
+    readonly objectActions?: readonly ObjectActionEntry[];
   };
   /**
    * Payload of the geometry-computer-actions page: computer id, availability, torus width and current/target skew a and depth b in meters.
@@ -282,7 +283,7 @@ export function showRuntimeMenuGeodesicCannonActions(
     readonly geodesicIds?: readonly string[];
     readonly geodesicLabelsById?: Readonly<Record<string, string>>;
     readonly lockedGeodesicIds?: readonly string[];
-    readonly canTieAndDetach?: boolean;
+    readonly objectActions?: readonly ObjectActionEntry[];
   },
 ): RuntimeMenuState {
   return {
@@ -294,7 +295,7 @@ export function showRuntimeMenuGeodesicCannonActions(
       geodesicIds: options.geodesicIds ?? [],
       geodesicLabelsById: options.geodesicLabelsById,
       lockedGeodesicIds: options.lockedGeodesicIds,
-      canTieAndDetach: options.canTieAndDetach,
+      objectActions: options.objectActions,
     },
   };
 }

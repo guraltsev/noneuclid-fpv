@@ -1,11 +1,11 @@
 /**
  * Small DOM badge showing the currently selected desktop tool (icon, name, and a selection prompt) near the HUD.
- * Role: purely presentational. The caller passes the selected tool id, the current sign style and optional prompt strings each time the selection or prompt changes; the module toggles CSS classes (desktop-tool-indicator-*) that decide which icon is shown, and sets the label, prompt and aria-label text.
- * The indicator is hidden for the none and aim tools.
+ * Role: purely presentational. The caller passes the selected tool's descriptor, the current sign style and the tool's prompt each time the selection or prompt changes; the module toggles CSS classes (desktop-tool-indicator-*) that decide which icon is shown (by the descriptor's icon id), and sets the label, prompt and aria-label text.
+ * The indicator is hidden for the none and aim tools, which have no descriptor.
  * Lifecycle: the creator must call dispose() to remove the element.
  */
 import { publicAssetUrl } from "../../glue/assetUrls";
-import type { RuntimeToolId } from "../../glue/toolIds";
+import type { ToolDescriptor } from "../../engine/moduleTypes";
 import type { PlacedFlagType } from "../../world-objects/toolObjects";
 
 // Sign icon image per flag type.
@@ -23,17 +23,10 @@ export interface DesktopToolIndicator {
   /** Root element; hidden when no tool badge should be displayed. */
   readonly root: HTMLDivElement;
   /**
-   * Updates the indicator for the selected tool.
-   * flagType picks the sign icon and style regardless of the tool. protractorPrompt (default "select: vertex") is shown for the protractor tool and tieAndDetachPrompt (default "select: geodesic 1") for the tie-and-detach tool; the measure-length tool shows a fixed "select: geodesic" prompt.
+   * Updates the indicator for the selected tool's descriptor (undefined for none and aim: hidden).
+   * flagType picks the sign icon and style regardless of the tool. promptText is the tool's prompt while it asks the player to select something, else undefined.
    */
-  setTool(
-    toolId: RuntimeToolId,
-    flagType: PlacedFlagType,
-    options?: {
-      readonly protractorPrompt?: string;
-      readonly tieAndDetachPrompt?: string;
-    },
-  ): void;
+  setTool(tool: ToolDescriptor | undefined, flagType: PlacedFlagType, promptText?: string): void;
   /** Removes the indicator element from the DOM. */
   dispose(): void;
 }
@@ -100,70 +93,28 @@ export function createDesktopToolIndicator(container: HTMLElement): DesktopToolI
 
   return {
     root,
-    setTool(toolId, flagType, indicatorOptions = {}) {
-      // The aim tool uses the crosshair instead of a badge, so it is hidden along with none.
-      root.hidden = toolId === "none" || toolId === "aim";
-      root.classList.toggle("desktop-tool-indicator-aim", toolId === "aim");
-      root.classList.toggle("desktop-tool-indicator-place-flag", toolId === "place-flag");
-      root.classList.toggle("desktop-tool-indicator-measure-length", toolId === "measure-length");
-      root.classList.toggle(
-        "desktop-tool-indicator-geodesic-cannon",
-        toolId === "geodesic-cannon" ||
-          toolId === "geodesic-cannon-rotate" ||
-          toolId === "geodesic-cannon-aim" ||
-          toolId === "geodesic-cannon-tie-detach",
-      );
-      root.classList.toggle("desktop-tool-indicator-geodesic-cannon-carry", toolId === "geodesic-cannon-carry");
-      root.classList.toggle("desktop-tool-indicator-protractor", toolId === "protractor");
+    setTool(tool, flagType, promptText) {
+      // The aim tool uses the crosshair instead of a badge, so it is hidden along with none: neither has a descriptor.
+      root.hidden = tool === undefined;
+      const iconId = tool?.iconId;
+      root.classList.toggle("desktop-tool-indicator-place-flag", iconId === "sign");
+      root.classList.toggle("desktop-tool-indicator-measure-length", iconId === "length");
+      // The ray icon stands for every emitter tool that has no icon of its own here.
+      root.classList.toggle("desktop-tool-indicator-geodesic-cannon", iconId === "ray" || iconId === "rotate" || iconId === "aim");
+      root.classList.toggle("desktop-tool-indicator-geodesic-cannon-carry", iconId === "carry");
+      root.classList.toggle("desktop-tool-indicator-protractor", iconId === "protractor");
       root.classList.toggle("desktop-tool-indicator-WoodenSign1", flagType === "WoodenSign1");
       root.classList.toggle("desktop-tool-indicator-WoodenSign2", flagType === "WoodenSign2");
       signIcon.src = signIconSources[flagType];
-      // Short display name per tool; empty for tools without a badge.
-      label.textContent = toolId === "geodesic-cannon-rotate"
-        ? "Rotate"
-        : toolId === "geodesic-cannon-carry"
-          ? "Carry"
-        : toolId === "geodesic-cannon-aim"
-          ? "Aim"
-        : toolId === "geodesic-cannon-tie-detach"
-          ? "Tie"
-          : toolId === "measure-length"
-            ? "Length"
-          : toolId === "protractor"
-            ? "Protractor"
-          : toolId === "geodesic-cannon"
-            ? "Ray"
-            : toolId === "place-flag"
-              ? "Sign"
-              : "";
-      prompt.textContent = toolId === "protractor"
-        ? indicatorOptions.protractorPrompt ?? "select: vertex"
-        : toolId === "geodesic-cannon-tie-detach"
-          ? indicatorOptions.tieAndDetachPrompt ?? "select: geodesic 1"
-        : toolId === "measure-length"
-          ? "select: geodesic"
-          : "";
+      label.textContent = tool === undefined ? "" : tool.badgeLabel ?? tool.label;
+      prompt.textContent = promptText ?? "";
       // Prompt text is only shown for tools that ask the player to select something.
-      prompt.hidden = toolId !== "protractor" &&
-        toolId !== "measure-length" &&
-        toolId !== "geodesic-cannon-tie-detach";
-      root.ariaLabel = toolId === "place-flag"
-        ? "Selected tool: sign"
-        : toolId === "geodesic-cannon"
-          ? "Selected tool: geodesic ray"
-          : toolId === "measure-length"
-            ? "Selected tool: measure length, select geodesic"
-          : toolId === "protractor"
-            ? `Selected tool: protractor, ${prompt.textContent}`
-          : toolId === "geodesic-cannon-rotate"
-            ? "Selected tool: rotate geodesic ray emitter"
-            : toolId === "geodesic-cannon-carry"
-              ? "Selected tool: carry geodesic ray emitter"
-            : toolId === "geodesic-cannon-aim"
-              ? "Selected tool: aim geodesic ray emitter"
-            : toolId === "geodesic-cannon-tie-detach"
-              ? `Selected tool: tie and detach, ${prompt.textContent}`
-              : "No selected tool";
+      prompt.hidden = promptText === undefined;
+      root.ariaLabel = tool === undefined
+        ? "No selected tool"
+        : promptText === undefined
+          ? `Selected tool: ${tool.label}`
+          : `Selected tool: ${tool.label}, ${promptText}`;
     },
     dispose() {
       root.remove();

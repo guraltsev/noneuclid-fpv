@@ -15,10 +15,12 @@ function setup(options: TestEngineOptions = {}) {
   const engine = createTestEngine(options);
   const session = createTestClientSession();
   const messages: string[] = [];
+  const started: { toolId: string; objectId: string | undefined }[] = [];
   const client = createWorldClient({
     engine,
     session,
     dispatch: (command: RuntimeCommand) => void applyRuntimeCommand(session, command),
+    toolStarted: (toolId, objectId) => void started.push({ toolId, objectId }),
     showMessage: (message) => void messages.push(message),
   });
   const frame = (): void => {
@@ -26,7 +28,7 @@ function setup(options: TestEngineOptions = {}) {
     client.afterStep();
     engine.endFrame();
   };
-  return { engine, session, client, messages, frame };
+  return { engine, session, client, messages, started, frame };
 }
 
 describe("selecting a tool", () => {
@@ -40,6 +42,16 @@ describe("selecting a tool", () => {
     frame();
     expect(session.get().menuState.selectedTool).toBe("measure-length");
     expect(session.get().pendingToolRequest).toBeUndefined();
+  });
+
+  it("tells the shell which object a tool was started from, only once the world accepted", () => {
+    const { client, started, frame } = setup();
+
+    client.requestTool("measure-length", "cannon-a");
+    expect(started).toEqual([]);
+
+    frame();
+    expect(started).toEqual([{ toolId: "measure-length", objectId: "cannon-a" }]);
   });
 
   it("shows the world's message and keeps the old tool when the configuration disables it", () => {

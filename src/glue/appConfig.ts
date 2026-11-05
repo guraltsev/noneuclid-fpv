@@ -221,7 +221,7 @@ export function isRuntimeToolEnabled(config: AppConfig, toolId: RuntimeToolId): 
     case "geodesic-cannon-carry":
     case "geodesic-cannon-rotate":
     case "geodesic-cannon-aim":
-    case "geodesic-cannon-tie-detach":
+    case "geodesicModel/tie":
       return config.tools.geodesicEmitters;
     case "measure-length":
       return config.tools.distances;

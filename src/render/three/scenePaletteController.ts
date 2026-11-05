@@ -81,7 +81,7 @@ export interface ScenePaletteControllerOptions {
   /** Geodesic cannon action callbacks take the cannon id (and geodesic id where relevant); geodesicId is optional for rotate and aim. */
   readonly onGeodesicCannonAddRequested: (cannonId: string) => void;
   readonly onGeodesicCannonCarryRequested: (cannonId: string) => void;
-  readonly onGeodesicCannonTieAndDetachRequested: (cannonId: string) => void;
+  readonly onObjectActionRequested: (objectKind: string, objectId: string, actionId: string) => void;
   readonly onGeodesicCannonRotateRequested: (cannonId: string, geodesicId?: string) => void;
   readonly onGeodesicCannonAimRequested: (cannonId: string, geodesicId?: string) => void;
   readonly onGeodesicCannonDeleteRequested: (cannonId: string, geodesicId: string) => void;
@@ -196,7 +196,7 @@ export function createScenePaletteController(options: ScenePaletteControllerOpti
     onPlaceFlagTypeSelected: options.onPlaceFlagTypeSelected,
     onGeodesicCannonAddRequested: options.onGeodesicCannonAddRequested,
     onGeodesicCannonCarryRequested: options.onGeodesicCannonCarryRequested,
-    onGeodesicCannonTieAndDetachRequested: options.onGeodesicCannonTieAndDetachRequested,
+    onObjectActionRequested: options.onObjectActionRequested,
     onGeodesicCannonRotateRequested: options.onGeodesicCannonRotateRequested,
     onGeodesicCannonAimRequested: options.onGeodesicCannonAimRequested,
     onGeodesicCannonDeleteRequested: options.onGeodesicCannonDeleteRequested,
@@ -427,9 +427,11 @@ function resolvePaletteHit(
 
   let action: (() => void) | undefined;
   let itemId: string | undefined;
+  let ownTooltip: string | undefined;
   for (const intersection of intersections) {
     action ??= findPaletteAction(intersection.object);
     itemId ??= findPaletteItemId(intersection.object);
+    ownTooltip ??= findPaletteTooltip(intersection.object);
     if (action && itemId) {
       break;
     }
@@ -439,7 +441,7 @@ function resolvePaletteHit(
     point: firstIntersection.point.clone(),
     action,
     itemId,
-    tooltipLabel: resolvePaletteTooltipLabel(itemId),
+    tooltipLabel: resolvePaletteTooltipLabel(itemId) ?? ownTooltip,
   };
 }
 
@@ -486,6 +488,21 @@ function findPaletteItemId(object: THREE.Object3D | null): string | undefined {
     const itemId = current.userData.scenePaletteItemId;
     if (typeof itemId === "string") {
       return itemId;
+    }
+    current = current.parent;
+  }
+
+  return undefined;
+}
+
+// The tooltip text a button carries itself (actions that tools contribute), found like the item id.
+function findPaletteTooltip(object: THREE.Object3D | null): string | undefined {
+  let current: THREE.Object3D | null = object;
+
+  while (current) {
+    const tooltip = current.userData.scenePaletteTooltip;
+    if (typeof tooltip === "string") {
+      return tooltip;
     }
     current = current.parent;
   }

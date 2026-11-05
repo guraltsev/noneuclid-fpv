@@ -181,27 +181,27 @@ describe("runtimeMenuState", () => {
       throw new Error("Expected geodesic cannon actions.");
     }
     expect(definition.content.addAction).toEqual({ label: "Add geodesic", disabled: false });
-    expect(definition.content.tieAndDetachAction).toEqual({ label: "Tie & detach", disabled: true });
+    expect(definition.content.objectActions).toEqual([]);
     expect(definition.content.geodesics).toEqual([
       { id: "g-a", label: "G1", locked: false, connectionSymbolLabel: undefined, deleteDisabled: false },
       { id: "g-b", label: "G2", locked: false, connectionSymbolLabel: undefined, deleteDisabled: false },
     ]);
   });
 
-  it("enables tie and detach when the selected emitter has selectable endpoint roles", () => {
+  it("lists the actions the tools contribute to the emitter page", () => {
     const definition = createPaletteDefinition(showRuntimeMenuGeodesicCannonActions(createRuntimeMenuState({
       selectedWorldId: "cube",
     }), {
       cannonId: "cannon-a",
       geodesicIds: ["g-a", "g-b"],
-      canTieAndDetach: true,
+      objectActions: [{ actionId: "tie-and-detach", label: "Tie & detach", iconId: "tie-and-detach", tooltip: "Tie them", enabled: true }],
     }));
 
     expect(definition.content.kind).toBe("geodesic-cannon-actions");
     if (definition.content.kind !== "geodesic-cannon-actions") {
       throw new Error("Expected geodesic cannon actions.");
     }
-    expect(definition.content.tieAndDetachAction).toEqual({ label: "Tie & detach", disabled: false });
+    expect(definition.content.objectActions).toEqual([{ actionId: "tie-and-detach", label: "Tie & detach", iconId: "tie-and-detach", tooltip: "Tie them", enabled: true }]);
   });
 
   it("uses explicit global geodesic labels in emitter action menus", () => {

@@ -143,8 +143,8 @@ Order of work in each frame (`renderFrame`; the engine's journals, events and re
 3. **Move the player** with `movePlayer` against the compiled world, then block against runtime-object colliders; in XR,
    additionally apply the *physical* head motion as a second move.
 4. Resolve the active aim ray (camera centre ray or controller ray), update carried emitters, and dispatch the primary
-   action to the selected tool (place flag, emit geodesic, measure, protractor, tie-and-detach, carry, rotate, aim, or the
-   focused object's own interaction).
+   action to the selected tool through the one tool lookup, `toolsById` (`src/render/three/toolHost.ts#createToolHost`; the shell's tools: place flag, emit geodesic, measure, protractor, carry, rotate, aim; the modules' tools, such as the tie tool, come from their client parts), or to the
+   focused object's own interaction when no tool is selected.
 5. Advance the world: creature runtimes, then the engine's step (`engine.step`: queued commands, then the module ticks, among them the curve shortening flow, and the derive pass that refreshes crossings, measurements and angles).
 6. Place the camera(s); for XR also the per-eye culling cameras.
 7. **Portal visibility and instances**: compute visible portal paths from the camera, update the instanced cell meshes
@@ -176,6 +176,8 @@ renderer-neutral data (`src/ui/paletteDefinition.ts#createPaletteDefinition`) an
 (`src/render/three/scenePaletteController.ts`) on desktop and in VR through the same code path
 (`src/render/three/palette/scenePaletteAdapter.ts` builds the VR widgets). Commands requested by the UI are plain data
 (`src/runtime/runtimeCommands.ts`) and applied to the client session (`src/runtime/clientSession.ts`) by the pure reducer `applyRuntimeCommand` in `src/runtime/applyRuntimeCommand.ts`, which returns the effects the shell runs.
+
+A tool is a descriptor (`src/engine/moduleTypes.ts#ToolDescriptor`): its label, help, icon, prompt and what it does with the primary action. The shell's own tools are described in `src/runtime/coreTools.ts#createCoreToolDescriptors`; a module contributes its tools in the client part of the module (`src/modules/geodesicModel/client.ts#geodesicModelClient`), and the shell merges both into `toolsById` (`src/runtime/toolRegistry.ts#createToolsById`). The indicators, the help lens, the aim cross and the actions on an object's menu page read this map, so a tool is added without changing any of them. A tool acts on the world only through `ToolContext.submit` and keeps its picks in the client session, under its module (`moduleToolState`); both are cleared when the tool ends.
 
 ## Testing strategy
 

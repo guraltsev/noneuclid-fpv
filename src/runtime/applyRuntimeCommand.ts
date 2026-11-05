@@ -269,8 +269,9 @@ export function reduceRuntimeCommand(state: ClientSessionState, command: Runtime
       return toolEnabled("geodesic-cannon") ? effectsOnly({ ...command }) : nothing;
     case "start-cannon-carry":
       return toolEnabled("geodesic-cannon-carry") ? effectsOnly({ ...command }) : nothing;
-    case "start-cannon-tie-and-detach":
-      return toolEnabled("geodesic-cannon-tie-detach") ? effectsOnly({ ...command }) : nothing;
+    case "start-object-action":
+      // The world decides whether the action's tool is allowed (the tool request); nothing is checked here.
+      return effectsOnly({ ...command });
     case "start-cannon-rotation":
       return toolEnabled("geodesic-cannon-rotate") ? effectsOnly({ ...command }) : nothing;
     case "start-cannon-aim":

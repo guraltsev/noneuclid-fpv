@@ -45,11 +45,11 @@ function createHarness(world: CompiledCellComplex, registry: RuntimeObjectRegist
       applyRuntimeCommand(session, command);
     },
     resolveCurrentAimTarget: () => undefined,
-    resolveCurrentAimTargets: () => [],
     targetIsWithinInteractionRange: () => false,
     logVerboseAimClick: nothing,
     findFocusedRuntimeObject: () => undefined,
     getGeodesicLabelsById: () => ({}),
+    objectActionsFor: () => [],
     syncDesktopPalette: nothing,
     syncRuntimeObjectPortalInstances: nothing,
     syncSelectableHitboxDebug: nothing,

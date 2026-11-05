@@ -5,8 +5,8 @@
 
 /** Item that can be shown in the on-screen debug overlay. */
 export type RuntimeDebugOverlayItemId = "fps" | "location" | "portal-quantities";
-/** Tool the player can have active, including the geodesic-cannon sub-modes. */
-export type RuntimeToolId =
+/** Tool of the shell that the player can have active, including the geodesic-cannon sub-modes. */
+export type CoreToolId =
   | "none"
   | "aim"
   | "place-flag"
@@ -15,8 +15,16 @@ export type RuntimeToolId =
   | "protractor"
   | "geodesic-cannon-carry"
   | "geodesic-cannon-rotate"
-  | "geodesic-cannon-aim"
-  | "geodesic-cannon-tie-detach";
+  | "geodesic-cannon-aim";
+
+/**
+ * The tool ids that modules define (design 013 section 8.3): each module adds its ids by interface merging, in its `api.ts`, as `interface ModuleToolIds { geodesicModelTie: "geodesicModel/tie" }`
+ * (the property name is free; the value is the id, `<moduleId>/<name>`).
+ */
+export interface ModuleToolIds {}
+
+/** Tool the player can have active: a core tool or one that a module defines. */
+export type RuntimeToolId = CoreToolId | ModuleToolIds[keyof ModuleToolIds];
 
 /** Overlay items shown when a launch does not choose any, in canonical order. */
 export const defaultRuntimeDebugOverlayItems = ["fps", "location", "portal-quantities"] as const;

@@ -5,13 +5,14 @@
  * The module declares the four geodesic kinds (arc, vertex, segment, crossing), provides the token `geodesicModel` with the queries clients and dependents
  * read and the hot operations only dependents hold (`previewVertexMove`, `commitVertexMove`, `previewVertexRemoval`), and handles the commands `tieAndDetach`,
  * `highlightEndpoint`, and the module-only `removeVertex` and `removeCurve`. Its one tick, `crossings`, is a derive tick that recomputes the crossing markers when segments change. The
- * tie tool arrives with job 54, so the tie command carries no `requiresTool` yet. Each command is atomic: on refusal nothing changes.
+ * tie command requires the tie tool (defined here, with its client part in `client.ts`) unless the experience leaves the tool out. Each command is atomic: on refusal nothing changes.
  */
 import type { CommandContext, CommandHandlers, CommandResult, ModuleDefinition, ModuleTick, ObjectKindDeclaration } from "../../engine/moduleTypes";
 import {
   arcsAtVertex,
   arcsOfCurve,
   forEachTiedVertex,
+  getGeodesicEndpointAttachmentsForAnchor,
   isStale,
   isTied,
   tiedVertexCount,
@@ -30,10 +31,13 @@ import {
   type TieAtNewVertexRefusal,
 } from "../../world-objects/geodesic/vertices";
 import {
+  defaultGeodesicModelOptions,
   geodesicModelRefusals,
   geodesicModelToken,
+  geodesicTieToolId,
   type GeodesicHighlightEndpointCommand,
   type GeodesicModelApi,
+  type GeodesicModelOptions,
   type GeodesicModelCommand,
   type GeodesicModelEvent,
   type GeodesicModelQueries,
@@ -124,13 +128,16 @@ const crossingsTick: ModuleTick = {
 /**
  * Creates the geodesic model module.
  * It requires nothing; the modules that act on its curves require `geodesicModelToken`.
+ * With `tieTool: false` (default true) the module defines no tool id and the tie command does not require one.
  */
-export function geodesicModelModule(): GeodesicModelModuleDefinition {
+export function geodesicModelModule(options: Partial<GeodesicModelOptions> = {}): GeodesicModelModuleDefinition {
+  const { tieTool } = { ...defaultGeodesicModelOptions, ...options };
   return {
     id: "geodesicModel",
     provides: geodesicModelToken,
     requires: [],
     objectKinds,
+    toolIds: tieTool ? [geodesicTieToolId] : [],
     create: (context) => {
       const { objects } = context;
       const queries: GeodesicModelQueries = {
@@ -143,6 +150,7 @@ export function geodesicModelModule(): GeodesicModelModuleDefinition {
         forEachTiedVertex: (fn) => forEachTiedVertex(objects, fn),
         arcsOfCurve: (vertexId) => arcsOfCurve(objects, vertexId),
         isStale: (arcId) => isStale(objects, arcId),
+        tieableEnds: (emitterId) => getGeodesicEndpointAttachmentsForAnchor(objects, emitterId).filter((end) => arcConnectsEmitters(objects, end.geodesicId)),
       };
       const api: GeodesicModelApi = {
         ...queries,
@@ -151,7 +159,7 @@ export function geodesicModelModule(): GeodesicModelModuleDefinition {
         previewVertexRemoval: (input) => previewVertexRemoval(context.getWorld(), objects, input),
       };
       const commands: CommandHandlers<GeodesicModelCommand> = {
-        "geodesicModel/tieAndDetach": { run: tieAndDetach },
+        "geodesicModel/tieAndDetach": tieTool ? { run: tieAndDetach, requiresTool: geodesicTieToolId } : { run: tieAndDetach },
         "geodesicModel/highlightEndpoint": { run: highlightEndpoint },
         "geodesicModel/removeVertex": { run: removeVertexCommand, moduleOnly: true },
         "geodesicModel/removeCurve": { run: removeCurve, moduleOnly: true },

@@ -1,4 +1,5 @@
 /**
- * The geodesic model module's world factory (design 013 section 12.1). The client part (the tie tool descriptor) arrives with design job 54.
+ * The geodesic model module's factories (design 013 section 12.1): `geodesicModelModule` is the world part, `geodesicModelClient` the client part (the tie tool).
  */
+export { geodesicModelClient } from "./client";
 export { geodesicModelModule, type GeodesicModelModuleDefinition } from "./module";

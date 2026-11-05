@@ -7,6 +7,7 @@
  * the registry and the tool-object runtimes are mutated directly. Poses are cell-local meters; yaws are radians about +z
  * (the debug helpers take degrees). Ids of new objects come from the engine.
  */
+import type { ObjectActionEntry } from "../../engine/moduleTypes";
 import { publishLocalPlayerPose, readLocalPlayerPose, type WorldEngine } from "../../engine/worldEngine";
 import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex";
 import { isRuntimeToolEnabled, type AppConfig } from "../../glue/appConfig";
@@ -82,8 +83,8 @@ export interface RuntimeObjectActionsDeps {
   getGeodesicLabelsById(geodesicIds: readonly string[]): Readonly<Record<string, string>>;
   /** Ids among the given geodesics that are locked. */
   getLockedGeodesicIds(geodesicIds: readonly string[]): readonly string[];
-  /** True when the cannon has geodesics the tie-and-detach tool can join. */
-  canTieAndDetachGeodesicsFromCannon(cannonId: string): boolean;
+  /** The actions the tools contribute to the menu page of an object (design 013 section 8.3), with their availability now. */
+  objectActionsFor(objectKind: string, objectId: string): readonly ObjectActionEntry[];
   /** Menu options of the geometry computer object with this id. */
   createGeometryComputerMenuOptions(objectId: string): ShowGeometryComputerActionsPayload;
   /** Builds or refreshes the drawn copy of a sign. */
@@ -176,7 +177,7 @@ export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): Runt
     getGeodesicDisplayName,
     getGeodesicLabelsById,
     getLockedGeodesicIds,
-    canTieAndDetachGeodesicsFromCannon,
+    objectActionsFor,
     createGeometryComputerMenuOptions,
     syncPlacedFlagRuntime,
     removePlacedFlagRuntime,
@@ -550,7 +551,7 @@ export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): Runt
         geodesicIds,
         geodesicLabelsById: getGeodesicLabelsById(geodesicIds),
         lockedGeodesicIds: getLockedGeodesicIds(geodesicIds),
-        canTieAndDetach: canTieAndDetachGeodesicsFromCannon(focused.object.id),
+        objectActions: objectActionsFor("geodesic-cannon", focused.object.id),
       });
       return true;
     }

@@ -279,3 +279,109 @@ export interface CommandContext {
   openControl(participantId: string, slot: string): void;
   closeControl(participantId: string, slot: string): void;
 }
+
+// ---- The client part of a module: tools (design 013 sections 8.3 and 9.1) ----
+
+/** An endpoint role of a geodesic arc, named by plain data: the arc, the role and the anchor it is attached to. */
+export interface AimPickEndpoint {
+  readonly geodesicId: string;
+  readonly role: "start" | "end";
+  readonly anchorObjectId: string;
+}
+
+/**
+ * One thing along the current aim ray, as plain data (the subset of the shell's aim target that tools read). The shell builds the list, nearest first, from the portal ray walk.
+ * `objectKind` is the kind of the hit object, or "floor" for a floor hit. `geodesicEndpoint` is set when the hit is the half of a geodesic that belongs to one endpoint role.
+ */
+export interface AimPick {
+  readonly objectId?: string;
+  readonly objectKind: string;
+  readonly cellId: string;
+  /** The aim point in the hit cell's local frame, meters. */
+  readonly point: { readonly x: number; readonly y: number; readonly z: number };
+  /** The hit is close enough to interact with. */
+  readonly withinRange: boolean;
+  readonly geodesicEndpoint?: AimPickEndpoint;
+}
+
+/** What a tool may do. The shell implements it; tests fake it. A tool changes the world only through `submit`. */
+export interface ToolContext {
+  /** Picks along the current aim ray (desktop: camera; XR: the hand ray), nearest first. A read-only query. */
+  pickTargets(): readonly AimPick[];
+  /** Submits a command for the local participant; its result arrives through the tool's `onResult` after the next step. */
+  submit(command: EngineCommandBase): void;
+  /** The client tool state of a module (`moduleToolState[moduleId]` of the client session), or undefined while its tool is idle. */
+  getToolState<T>(moduleId: string): T | undefined;
+  /** Replaces the client tool state of a module; undefined clears it. */
+  setToolState(moduleId: string, state: unknown): void;
+  /** Ends the tool: closes the menu and selects no tool. */
+  endTool(): void;
+  readonly read: WorldReadView;
+  /** A module's read-only queries (design 013 section 5.7); never its `api`. */
+  query<Q>(token: ModuleToken<unknown, Q>): Q;
+  /** Shows a sentence to the person (console now, on-screen when a message system exists). */
+  showMessage(message: string): void;
+}
+
+/** How an action on an object's menu page looks. */
+export interface ObjectActionPresentation {
+  readonly actionId: string;
+  readonly label: string;
+  /** Key into the palette's icon table for the action button. */
+  readonly iconId: string;
+  /** Text shown when the button is pointed at. */
+  readonly tooltip: string;
+}
+
+/** An action offered on an object's menu page; `enabled` false shows it disabled. */
+export interface ObjectActionEntry extends ObjectActionPresentation {
+  readonly enabled: boolean;
+}
+
+/** The client part of a tool: everything the shell shows and does for it. A renderer-free record, in the module directory. */
+export interface ToolDescriptor {
+  readonly id: RuntimeToolId;
+  /** The module whose client tool state this tool uses; cleared when the tool ends. */
+  readonly ownerModuleId: string;
+  /** Name shown on the main tool list and on the wrist indicator. */
+  readonly label: string;
+  /** Shorter name for the desktop badge; `label` when absent. */
+  readonly badgeLabel?: string;
+  readonly helpTitle: string;
+  readonly helpBody: string;
+  /** What the primary and context-menu inputs do while the tool is active, for the help lens. */
+  readonly helpRows: readonly { readonly input: "primary" | "context-menu"; readonly label: string }[];
+  /** CSS color of the wrist indicator, "#f59e0b". */
+  readonly indicatorColor: string;
+  /** Key into the icon tables of the desktop indicator, the wrist indicator and the palette. */
+  readonly iconId: string;
+  /** The aim cross is drawn while this tool is active. */
+  readonly showsAimCross: boolean;
+  /** `onPrimaryAction` runs every frame, not only on a primary action while no menu is open (the tools that update from the input each frame). */
+  readonly runsEveryFrame?: boolean;
+  /** Where the tool is started from: the main tool list, or an action on an object's menu page. */
+  readonly entry:
+    | { readonly kind: "main-tool" }
+    | {
+        readonly kind: "object-action";
+        readonly objectKind: string;
+        readonly action: ObjectActionPresentation;
+        readonly isAvailable: (objectId: string, tool: ToolContext) => boolean;
+      };
+  /** The prompt shown while the tool is active, from its client tool state; undefined shows none. */
+  readonly prompt?: (tool: ToolContext) => string | undefined;
+  /** The primary action (click, trigger). Returns true when it consumed the input. */
+  readonly onPrimaryAction: (tool: ToolContext) => boolean;
+  /** Called when the tool has become active, after the world confirmed it; `objectId` is the object the action was started from. */
+  readonly onStart?: (tool: ToolContext, objectId?: string) => void;
+  /** Called with the result of each command this tool submitted. */
+  readonly onResult?: (tool: ToolContext, result: CommandResult) => void;
+  /** Called when the tool ends, whatever ended it, before the owner module's tool state is cleared. */
+  readonly onEnd?: (tool: ToolContext) => void;
+}
+
+/** The client part of a module: a separate export of the module directory (`geodesicModelClient(options)`). */
+export interface ModuleClient {
+  readonly moduleId: string;
+  readonly tools: readonly ToolDescriptor[];
+}

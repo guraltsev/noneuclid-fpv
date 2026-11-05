@@ -8,26 +8,23 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { RuntimeCommand } from "../../src/runtime/runtimeCommands";
 import { createRuntimeEffects, type RuntimeEffectsDeps } from "../../src/render/three/runtimeEffects";
-import { createTestClientSession } from "../support/clientSession";
 
 function createHarness() {
   const dispatched: RuntimeCommand[] = [];
   const calls = {
     syncDesktopPalette: vi.fn(),
-    syncTieAndDetachSelectionHighlights: vi.fn(),
     clearProtractorToolFeedback: vi.fn(),
     requestRuntimeObjectInstanceSync: vi.fn(),
     requestAppRestart: vi.fn((restart: () => void) => restart()),
     addGeodesicToCannon: vi.fn(),
+    startObjectAction: vi.fn(),
     onWorldChangeRequested: vi.fn(),
   };
   const noop = vi.fn();
   const deps: RuntimeEffectsDeps = {
-    session: createTestClientSession(),
     dispatch: (command) => dispatched.push(command),
     host: { onWorldChangeRequested: calls.onWorldChangeRequested },
     syncDesktopPalette: calls.syncDesktopPalette,
-    syncTieAndDetachSelectionHighlights: calls.syncTieAndDetachSelectionHighlights,
     clearProtractorToolFeedback: calls.clearProtractorToolFeedback,
     requestRuntimeObjectInstanceSync: calls.requestRuntimeObjectInstanceSync,
     applyMenuDebugState: noop,
@@ -36,7 +33,7 @@ function createHarness() {
     teleportPlayerHome: noop,
     addGeodesicToCannon: calls.addGeodesicToCannon,
     startGeodesicCannonCarry: noop,
-    startGeodesicCannonTieAndDetach: noop,
+    startObjectAction: calls.startObjectAction,
     startGeodesicCannonRotation: noop,
     startGeodesicCannonAim: noop,
     deleteGeodesicFromCannon: noop,
@@ -73,7 +70,6 @@ describe("createRuntimeEffects", () => {
       { kind: "set-protractor-tool-state", state: {} },
       { kind: "set-cannon-tool-state", state: {} },
     ]);
-    expect(calls.syncTieAndDetachSelectionHighlights).toHaveBeenCalledWith([]);
     expect(calls.clearProtractorToolFeedback).toHaveBeenCalledTimes(1);
   });
 
@@ -92,6 +88,14 @@ describe("createRuntimeEffects", () => {
     effects.run({ kind: "add-geodesic-to-cannon", cannonId: "cannon-a" });
 
     expect(calls.addGeodesicToCannon).toHaveBeenCalledWith("cannon-a");
+  });
+
+  it("routes an object action to the tool host", () => {
+    const { effects, calls } = createHarness();
+
+    effects.run({ kind: "start-object-action", objectKind: "geodesic-cannon", objectId: "cannon-a", actionId: "tie" });
+
+    expect(calls.startObjectAction).toHaveBeenCalledWith("geodesic-cannon", "cannon-a", "tie");
   });
 
   it("expires the reload confirmation once after its window", () => {

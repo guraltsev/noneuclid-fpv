@@ -19,6 +19,7 @@ import { createAimFeedback } from "../../src/render/three/aimFeedback";
 import type { RootAimRay } from "../../src/render/three/rootAimRay";
 import type { ClientSessionState } from "../../src/runtime/clientSession";
 import { createTestClientSession } from "../support/clientSession";
+import { createTestToolsById } from "../support/tools";
 
 const sign = createPlacedFlagObject({
   id: "sign-a",
@@ -55,7 +56,9 @@ function createHarness(sessionOverrides: Partial<ClientSessionState> = {}) {
   const crossUpdates: (AimTarget | undefined)[] = [];
   const xrTooltipUpdates: unknown[] = [];
   const crossRoot = new THREE.Group();
+  const toolsById = createTestToolsById();
   const feedback = createAimFeedback({
+    toolsById: () => toolsById,
     scene,
     camera: new THREE.PerspectiveCamera(),
     session,

@@ -180,10 +180,11 @@ describe("applyRuntimeCommand: navigation", () => {
   });
 
   it("shows the geodesic cannon actions page", () => {
-    const result = reduce({ kind: "show-geodesic-cannon-actions", cannonId: "c1", geodesicIds: ["g1"], canTieAndDetach: true });
+    const objectActions = [{ actionId: "tie-and-detach", label: "Tie & detach", iconId: "tie-and-detach", tooltip: "Tie them", enabled: true }];
+    const result = reduce({ kind: "show-geodesic-cannon-actions", cannonId: "c1", geodesicIds: ["g1"], objectActions });
 
     expect(result.state.menuState.page).toBe("geodesic-cannon-actions");
-    expect(result.state.menuState.geodesicCannonOptions).toMatchObject({ cannonId: "c1", geodesicIds: ["g1"], canTieAndDetach: true });
+    expect(result.state.menuState.geodesicCannonOptions).toMatchObject({ cannonId: "c1", geodesicIds: ["g1"], objectActions });
     expect(result.effects).toEqual([sync]);
   });
 
@@ -399,7 +400,8 @@ describe("applyRuntimeCommand: cannon and geometry computer actions", () => {
   it("forwards each cannon action to the host when its tool is enabled", () => {
     expect(reduce({ kind: "add-geodesic-to-cannon", cannonId: "c" }).effects).toEqual([{ kind: "add-geodesic-to-cannon", cannonId: "c" }]);
     expect(reduce({ kind: "start-cannon-carry", cannonId: "c" }).effects).toEqual([{ kind: "start-cannon-carry", cannonId: "c" }]);
-    expect(reduce({ kind: "start-cannon-tie-and-detach", cannonId: "c" }).effects).toEqual([{ kind: "start-cannon-tie-and-detach", cannonId: "c" }]);
+    const objectAction = { kind: "start-object-action", objectKind: "geodesic-cannon", objectId: "c", actionId: "tie-and-detach" } as const;
+    expect(reduce(objectAction).effects).toEqual([objectAction]);
     expect(reduce({ kind: "start-cannon-rotation", cannonId: "c", geodesicId: "g" }).effects).toEqual([
       { kind: "start-cannon-rotation", cannonId: "c", geodesicId: "g" },
     ]);
@@ -413,7 +415,6 @@ describe("applyRuntimeCommand: cannon and geometry computer actions", () => {
 
     expect(reduce({ kind: "add-geodesic-to-cannon", cannonId: "c" }, off).effects).toEqual([]);
     expect(reduce({ kind: "start-cannon-carry", cannonId: "c" }, off).effects).toEqual([]);
-    expect(reduce({ kind: "start-cannon-tie-and-detach", cannonId: "c" }, off).effects).toEqual([]);
     expect(reduce({ kind: "start-cannon-rotation", cannonId: "c" }, off).effects).toEqual([]);
     expect(reduce({ kind: "start-cannon-aim", cannonId: "c" }, off).effects).toEqual([]);
     expect(reduce({ kind: "delete-geodesic-from-cannon", cannonId: "c", geodesicId: "g" }, off).effects).toEqual([

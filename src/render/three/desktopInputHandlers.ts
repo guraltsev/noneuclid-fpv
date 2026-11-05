@@ -10,6 +10,7 @@ import * as THREE from "three";
 import type { RuntimeInputFrame } from "../../interaction/inputFrame";
 import type { AppConfig } from "../../glue/appConfig";
 import type { ClientSession } from "../../runtime/clientSession";
+import type { ToolsById } from "../../runtime/toolRegistry";
 import { createPaletteDefinitionCache } from "../../ui/paletteDefinition";
 import type { XrHeadWorldPose } from "./carriedGeodesicCannon";
 import type { DesktopControls } from "./desktopControls";
@@ -27,6 +28,8 @@ export interface DesktopInputHandlersDeps {
   readonly session: ClientSession;
   /** Builds the palette definition cache; the cache is owned by the handlers. */
   readonly appConfig: AppConfig;
+  /** The shell's tool lookup; the wrist indicator shows the selected tool's descriptor. */
+  readonly toolsById: ToolsById;
   readonly camera: THREE.PerspectiveCamera;
   /** The parts of the renderer the handlers read: its canvas and the XR state. */
   readonly renderer: {
@@ -146,7 +149,7 @@ export function createDesktopInputHandlers(deps: DesktopInputHandlersDeps): Desk
         xrFrame,
         referenceSpace: xrReferenceSpace,
         referenceSpaceToWorldMatrix: xrRig.root.matrixWorld,
-        selectedTool: currentMenuState().selectedTool,
+        tool: deps.toolsById.get(currentMenuState().selectedTool),
         placeFlagType: currentMenuState().placeFlagOptions.flagType,
       });
       return;

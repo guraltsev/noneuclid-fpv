@@ -10,6 +10,7 @@ import { readLocalPlayerPose, type WorldEngine } from "../../engine/worldEngine"
 import * as THREE from "three";
 import type { AimTarget } from "../../interaction/aimTarget";
 import type { ClientSession } from "../../runtime/clientSession";
+import type { ToolsById } from "../../runtime/toolRegistry";
 import { createHelpLensDefinition } from "../../ui/helpLensDefinition";
 import type { RuntimeObjectRegistry, RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
 import {
@@ -36,6 +37,8 @@ export interface AimFeedbackDeps {
   readonly camera: THREE.Camera;
   /** The shell session; menu, tool and protractor state are read from it. */
   readonly session: ClientSession;
+  /** The shell's tool lookup (read at use, so the shell may build it after this module); the aim cross and the help lens follow the selected tool's descriptor. */
+  readonly toolsById: () => ToolsById;
   /** The world engine; the player's pose is read from it. */
   readonly engine: WorldEngine;
   /** Registry of runtime objects; read to find the nearest auto-help object and to read emitters. */
@@ -172,19 +175,9 @@ export function createAimFeedback(deps: AimFeedbackDeps): AimFeedback {
   }
 
   function updateAimCrossMarker(xrActive: boolean, activeAimRay: RootAimRay | undefined): void {
-    if (
-      (
-        currentMenuState().selectedTool !== "none" &&
-        currentMenuState().selectedTool !== "aim" &&
-        currentMenuState().selectedTool !== "place-flag" &&
-        currentMenuState().selectedTool !== "geodesic-cannon" &&
-        currentMenuState().selectedTool !== "geodesic-cannon-aim" &&
-        currentMenuState().selectedTool !== "geodesic-cannon-tie-detach" &&
-        currentMenuState().selectedTool !== "measure-length" &&
-        currentMenuState().selectedTool !== "protractor"
-      ) ||
-      currentMenuState().isOpen
-    ) {
+    // "none" and "aim" have no descriptor and show the cross.
+    const selectedTool = deps.toolsById().get(currentMenuState().selectedTool);
+    if ((selectedTool !== undefined && !selectedTool.showsAimCross) || currentMenuState().isOpen) {
       aimCrossMarker.update(undefined);
       updateAimControllerRay(false);
       return;
@@ -371,6 +364,7 @@ export function createAimFeedback(deps: AimFeedbackDeps): AimFeedback {
       focus,
       selectedTool: currentMenuState().selectedTool,
       inputMode: xrActive ? "xr" : "desktop",
+      toolsById: deps.toolsById(),
     });
   }
 

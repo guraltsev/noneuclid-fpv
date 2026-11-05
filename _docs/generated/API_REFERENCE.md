@@ -720,7 +720,7 @@ Emitter (cannon) operations: shooting, extending and re-aiming geodesics, connec
 
 ### `world-objects/geodesic/cannonToolState.ts`
 
-The editing state of the geodesic emitter (cannon) tools, as plain data: which cannon and geodesic the tool works on and the endpoints picked by tie-and-detach.
+The editing state of the geodesic emitter (cannon) tools, as plain data: which cannon and geodesic the tool works on.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
@@ -1314,7 +1314,9 @@ Identifiers of the player's tools and of the debug-overlay items, with the canon
 | Kind | Name | Summary |
 | --- | --- | --- |
 | type | `RuntimeDebugOverlayItemId` | Item that can be shown in the on-screen debug overlay. |
-| type | `RuntimeToolId` | Tool the player can have active, including the geodesic-cannon sub-modes. |
+| type | `CoreToolId` | Tool of the shell that the player can have active, including the geodesic-cannon sub-modes. |
+| interface | `ModuleToolIds` | The tool ids that modules define (design 013 section 8.3): each module adds its ids by interface merging, in its `api.ts`, as `interface ModuleToolIds { geodesicModelTie: "geodesicModel/tie" }` (the property name is fre… |
+| type | `RuntimeToolId` | Tool the player can have active: a core tool or one that a module defines. |
 | const | `defaultRuntimeDebugOverlayItems` | Overlay items shown when a launch does not choose any, in canonical order. |
 | function | `parseRuntimeDebugOverlayItems` | Parses a comma-separated list of overlay item ids (null means all defaults), dropping unknown entries and returning canonical order. |
 | function | `serializeRuntimeDebugOverlayItems` | Serializes overlay items to a canonical comma-separated string. |
@@ -1489,6 +1491,13 @@ The types of the world engine and of its modules (design 013 sections 5 and 9): 
 | interface | `ModuleCreateContext` | What a module's `create` receives. |
 | interface | `StepContext` | One object, reused every step: never keep it across steps. |
 | interface | `CommandContext` | What a command handler receives. |
+| interface | `AimPickEndpoint` | An endpoint role of a geodesic arc, named by plain data: the arc, the role and the anchor it is attached to. |
+| interface | `AimPick` | One thing along the current aim ray, as plain data (the subset of the shell's aim target that tools read). |
+| interface | `ToolContext` | What a tool may do. |
+| interface | `ObjectActionPresentation` | How an action on an object's menu page looks. |
+| interface | `ObjectActionEntry` | An action offered on an object's menu page; `enabled` false shows it disabled. |
+| interface | `ToolDescriptor` | The client part of a tool: everything the shell shows and does for it. |
+| interface | `ModuleClient` | The client part of a module: a separate export of the module directory (`geodesicModelClient(options)`). |
 
 ### `engine/participants.ts`
 
@@ -1649,6 +1658,9 @@ The geodesic model's public face (design 013 sections 12.1 and 13.1): its token,
 
 | Kind | Name | Summary |
 | --- | --- | --- |
+| const | `geodesicTieToolId` | The id of the tie tool. |
+| interface | `GeodesicModelOptions` | Options of the geodesic model, for the world part and the client part alike (plain data). |
+| const | `defaultGeodesicModelOptions` | The options when none are given. |
 | interface | `ArcEnd` | An arc end at a vertex: one endpoint role of an arc. |
 | interface | `ArcTangent` | Unit tangent of an arc at a vertex, pointing away from it, in the vertex's cell frame, with the arc's chord length. |
 | interface | `GeodesicEndpointRef` | An endpoint role of an arc, named by the arc, the role and the anchor it is attached to (plain data, so that a command can carry it). |
@@ -1666,9 +1678,17 @@ The geodesic model's public face (design 013 sections 12.1 and 13.1): its token,
 | type | `GeodesicModelEvent` | Every event of the module. |
 | const | `geodesicModelRefusals` | The refusal codes of the module's commands. |
 
+### `modules/geodesicModel/client.ts`
+
+The geodesic model's client part (design 013 sections 9.1 and 12.1): the tools the module contributes to the shell.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| function | `geodesicModelClient` | Creates the client part; pass the same options as the world part. |
+
 ### `modules/geodesicModel/index.ts`
 
-The geodesic model module's world factory (design 013 section 12.1).
+The geodesic model module's factories (design 013 section 12.1): `geodesicModelModule` is the world part, `geodesicModelClient` the client part (the tie tool).
 
 _No exports._
 
@@ -1680,6 +1700,14 @@ The geodesic model module (design 013 section 13.1): piecewise geodesics on the 
 | --- | --- | --- |
 | type | `GeodesicModelModuleDefinition` | The module as the engine's list takes it. |
 | function | `geodesicModelModule` | Creates the geodesic model module. |
+
+### `modules/geodesicModel/tieTool.ts`
+
+The tie tool, the client part of `geodesicModel/tie` (design 013 sections 8.3 and 13.1): started from an emitter's menu page, it takes two endpoint roles of the emitter's geodesics that connect emitters, then asks the world to tie them at a new vertex.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| function | `createTieToolDescriptor` | The descriptor of the tie tool. |
 
 ## `runtime`
 
@@ -1724,6 +1752,15 @@ The client session: the one record that holds how one person is interacting with
 | interface | `ClientSession` | Owner of the current ClientSessionState. |
 | function | `createClientSession` | Creates a session holding `initial`. |
 
+### `runtime/coreTools.ts`
+
+The descriptors of the tools the shell defines itself (design 013 section 8.3): sign, geodesic ray, length, protractor, and the emitter's carry, rotate and aim sub-modes.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `CoreToolHandlers` | What the shell does for each core tool; each handler reads the current frame's input itself. |
+| function | `createCoreToolDescriptors` | The descriptors of the core tools. |
+
 ### `runtime/experience.ts`
 
 The default experience (design 013 section 12.1): the world modules the app composes into its engine, in list order.
@@ -1731,6 +1768,7 @@ The default experience (design 013 section 12.1): the world modules the app comp
 | Kind | Name | Summary |
 | --- | --- | --- |
 | function | `createDefaultWorldModules` | The world modules of the default experience. |
+| function | `createDefaultClientModules` | The client parts of the default experience's modules (only the modules with tools have one). |
 
 ### `runtime/publicApi.ts`
 
@@ -1809,6 +1847,17 @@ Page side of the channel to the local server (scripts/server/localServer.mjs): a
 | interface | `ServerChannelOptions` | Inputs of {@link startServerChannel}; everything but `api` defaults to the browser's own. |
 | interface | `ServerChannel` | Handle returned by {@link startServerChannel}. |
 | function | `startServerChannel` | Connects to the local server when the page was served by it, and answers its requests; returns a handle to stop it. |
+
+### `runtime/toolRegistry.ts`
+
+The shell's one lookup of tools (design 013 section 8.3): `toolsById` maps a tool id to its descriptor, built once from the shell's own descriptors (coreTools.ts) and the descriptors the experience's client parts contribute.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| type | `ToolsById` | The descriptors by tool id. |
+| function | `createToolsById` | Builds the lookup; throws on a tool id described twice, because two descriptors for one tool would make the dispatch depend on list order. |
+| function | `findObjectActionTool` | The descriptor started by an action of an object of this kind, or undefined. |
+| function | `objectActionsFor` | The actions the tools contribute to the menu page of one object, in registration order, each with its current availability. |
 
 ### `runtime/worldGeometryComputedObjects.ts`
 
@@ -1913,7 +1962,7 @@ Renderer-neutral definition of the tool/settings palette: createPaletteDefinitio
 | interface | `DebugSettingsPaletteContent` | Content of the debug-settings page: console log level, overlay items and portal/collision debug switches. |
 | interface | `PlaceFlagOptionsPaletteContent` | Content of the place-flag options page: choice of sign type. |
 | interface | `EditSignPaletteContent` | Content of the edit-sign page for one placed flag. |
-| interface | `GeodesicCannonActionsPaletteContent` | Content of the geodesic emitter menu: add/carry/tie-detach actions and one row per geodesic. |
+| interface | `GeodesicCannonActionsPaletteContent` | Content of the geodesic emitter menu: the add and carry actions, the actions tools contribute, and one row per geodesic. |
 | interface | `GeometryComputerActionsPaletteContent` | Content of the world-deformation (geometry computer) page, in whole meters: torus width, current and target (a, b), limits and step buttons. |
 | interface | `TutorialPaletteContent` | Content of one tutorial page, with previous/next paging controls. |
 | interface | `GoalPaletteContent` | Content of one goal page, with previous/next paging controls. |
@@ -2341,7 +2390,7 @@ Render sources and per-frame render records for geodesic cannons, geodesic segme
 
 ### `render/three/geodesicCannonTools.ts`
 
-Geodesic emitter (cannon) tools: place, rotate, aim, carry, tie-and-detach, and delete geodesics.
+Geodesic emitter (cannon) tools: place, rotate, aim, carry, and delete geodesics.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
@@ -2578,6 +2627,8 @@ Generic uikit widgets of the in-scene palette panel (buttons, toggles, option gr
 | function | `createToggleRow` | Label plus On/Off toggle. |
 | function | `createToggleButton` | On/Off button; clicking calls onToggled with the inverted value of the state captured at build time (state is not read back). |
 | function | `createActionButton` | Generic labelled action button with an optional home/reload icon. |
+| type | `HeaderActionIcon` | The icons a contextual header action can show. |
+| function | `headerActionIcon` | The header icon for an icon id a tool contributed; throws on an id the palette has no icon for. |
 | function | `createHeaderActionButton` | Square icon button for contextual header actions; disabled ones are dimmed and inert. |
 | function | `createInteractiveSurface` | Base clickable Container. |
 | function | `createButtonText` | Bold label text that wraps and may shrink. |
@@ -3102,6 +3153,18 @@ Builds the per-eye visibility states of one stereo (XR) frame, as a pure functio
 | function | `haveSameRootIdentity` | True iff the two eyes' render roots have the same cell id and the same frame (within 1e-9 per matrix element). |
 | function | `buildStereoPortalFrame` | Computes the visible paths of every eye and groups the eyes by root identity. |
 
+### `render/three/toolHost.ts`
+
+The shell's tool host (design 013 section 8.3): the one lookup of tools (`toolsById`, built from the shell's own tools and the experience's client parts), the `ToolContext` that tools act through, and the per-frame dispatch of the primary action.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `CoreToolActions` | What the shell does for each of its own tools; the aim ray and the frame's input are passed in. |
+| interface | `ToolFrameInput` | One frame's input to the tools. |
+| interface | `ToolHostDeps` | Dependencies of {@link createToolHost}. |
+| interface | `ToolHost` | Handle returned by {@link createToolHost}. |
+| function | `createToolHost` | Creates the tool host. |
+
 ### `render/three/toolObjectRuntimes.ts`
 
 Scene-graph runtimes for placed flags, measured lengths, and protractor angles: sync and removal.
@@ -3187,7 +3250,7 @@ Conversion between the simulation's world frame and the Three.js scene frame.
 
 ### `render/three/worldClient.ts`
 
-The shell's side of its conversation with the world engine (design 013 sections 5.3, 5.5 and 8.1): the tool-switch protocol, the generic event sink and the `api.world` namespace.
+The shell's side of its conversation with the world engine (design 013 sections 5.3, 5.5 and 8.1): the tool-switch protocol (also for tools started from an object's menu page), the generic event sink and the `api.world` namespace.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
@@ -3215,7 +3278,7 @@ Cosmetic low-poly hand models that follow XR controllers (or tracked hands), plu
 | interface | `XrControllerHandModels` | Controller hand model manager returned by `createXrControllerHandModels`. |
 | function | `createXrControllerHandModels` | Creates hidden left/right hand anchors and the wrist indicator sprite in `scene` and starts loading the hand GLB. |
 | interface | `WristToolIndicatorVisual` | Icon description for the wrist tool indicator. |
-| function | `resolveWristToolIndicatorVisual` | Maps a tool id (and sign variant for "place-flag") to the icon, color, and label shown on the wrist, or `undefined` for "aim" and "none" (no indicator). |
+| function | `resolveWristToolIndicatorVisual` | Maps a tool descriptor (and sign variant for the sign tool) to the icon, color, and label shown on the wrist, or `undefined` for no tool ("aim" and "none" have no descriptor). |
 | interface | `HandModelTemplates` | Per-hand template objects (already scaled, rotated, and centered) that are cloned for each hand instance. |
 | function | `createHandModelTemplates` | Builds left and right templates from a loaded GLB scene that contains both hands: each template keeps only the meshes on its side of the midpoint of the mesh centers (left keeps those with larger x), then scales by 0.42… |
 

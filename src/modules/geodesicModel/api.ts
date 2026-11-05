@@ -10,6 +10,25 @@
 import { defineModuleToken } from "../../engine/moduleTypes";
 import type { EngineCommandBase, EngineEventBase } from "../../engine/moduleTypes";
 
+declare module "../../glue/toolIds" {
+  interface ModuleToolIds {
+    /** The tie tool, defined by the geodesic model unless the experience leaves it out (`tieTool: false`). */
+    geodesicModelTie: "geodesicModel/tie";
+  }
+}
+
+/** The id of the tie tool. */
+export const geodesicTieToolId = "geodesicModel/tie" as const;
+
+/** Options of the geodesic model, for the world part and the client part alike (plain data). */
+export interface GeodesicModelOptions {
+  /** Defines the tie tool and its menu action, and makes the tie command require it (default true). Without it the command stays, for scripts. */
+  readonly tieTool: boolean;
+}
+
+/** The options when none are given. */
+export const defaultGeodesicModelOptions: GeodesicModelOptions = { tieTool: true };
+
 /** Turning angle (radians) below which a vertex counts as taut: its two arcs are one geodesic and the vertex may be removed. */
 export { vertexTautTurnRadians } from "../../world-objects/geodesic/vertices";
 
@@ -49,6 +68,8 @@ export interface GeodesicModelQueries {
   tiedVertexCount(): number;
   /** Visits them in registry insertion order. One scan of the arcs per call (allocates a count map), O(arcs); not for a per-step path. */
   forEachTiedVertex(fn: (vertexId: string) => void): void;
+  /** The endpoint roles attached to the emitter whose arcs connect emitters: the ends a tie can use. Reads the arc index; not a scan. */
+  tieableEnds(emitterId: string): readonly GeodesicEndpointRef[];
   /** Every arc of the curve through this vertex, walked over shared vertices. */
   arcsOfCurve(vertexId: string): readonly string[];
   /** The arc's last rebuild failed during a carry, so it still shows its old path. */

@@ -13,6 +13,7 @@ import { defaultAppConfig } from "../../src/glue/appConfig";
 import { createRuntimeMenuState } from "../../src/runtime/runtimeMenuState";
 import type { RuntimeInputFrame } from "../../src/interaction/inputFrame";
 import { createTestClientSession } from "../support/clientSession";
+import { createTestToolsById } from "../support/tools";
 
 const canvas = {};
 
@@ -45,6 +46,7 @@ function createHarness(options: { readonly menuOpen?: boolean; readonly presenti
   const handlers = createDesktopInputHandlers({
     session,
     appConfig: defaultAppConfig,
+    toolsById: createTestToolsById(),
     camera: new THREE.PerspectiveCamera(),
     renderer: { domElement: canvas, xr: { isPresenting: options.presenting ?? false, getSession: () => null } },
     xrRig: { root: new THREE.Group() },

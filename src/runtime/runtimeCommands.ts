@@ -2,6 +2,7 @@
  * Defines RuntimeCommand, the closed discriminated union of every action the UI can request (a palette or menu press, a key, an API call), and RuntimeEffect, what a command asks the host to do beyond changing the session.
  * Commands and effects are plain immutable data. applyRuntimeCommand.ts turns a command into a new session state plus a list of effects; the rendering shell runs the effects in order. No renderer type appears here.
  */
+import type { ObjectActionEntry } from "../engine/moduleTypes";
 import type { TutorialPageSpec } from "../cell-complex/specs";
 import type { DebugSettings } from "../glue/debugSettings";
 import type { PortalPanelModeId } from "../glue/portalPanelMode";
@@ -18,7 +19,8 @@ export interface ShowGeodesicCannonActionsPayload {
   readonly geodesicIds?: readonly string[];
   readonly geodesicLabelsById?: Readonly<Record<string, string>>;
   readonly lockedGeodesicIds?: readonly string[];
-  readonly canTieAndDetach?: boolean;
+  /** The actions the tools contribute to the page, with their availability (design 013 section 8.3). */
+  readonly objectActions?: readonly ObjectActionEntry[];
 }
 
 /** Payload of the geometry computer page. */
@@ -63,7 +65,7 @@ export type RuntimeCommand =
   | { readonly kind: "step-goal-page"; readonly delta: -1 | 1 }
   // Tool and sign selection.
   | { readonly kind: "select-tool"; readonly toolId: RuntimeToolId }
-  /** A tool entered a mode of its own (rotate, aim, carry, tie-and-detach): close the menu and select that tool. Not gated and no session reset: the tool started itself. */
+  /** A tool entered a mode of its own (rotate, aim, carry): close the menu and select that tool. Not gated and no session reset: the tool started itself. */
   | { readonly kind: "enter-tool-mode"; readonly toolId: RuntimeToolId }
   /** Ends the tool in use without closing the menu page: selects no tool. */
   | { readonly kind: "clear-selected-tool" }
@@ -105,7 +107,7 @@ export type RuntimeCommand =
   // Geodesic cannon page actions.
   | { readonly kind: "add-geodesic-to-cannon"; readonly cannonId: string }
   | { readonly kind: "start-cannon-carry"; readonly cannonId: string }
-  | { readonly kind: "start-cannon-tie-and-detach"; readonly cannonId: string }
+  | { readonly kind: "start-object-action"; readonly objectKind: string; readonly objectId: string; readonly actionId: string }
   | { readonly kind: "start-cannon-rotation"; readonly cannonId: string; readonly geodesicId?: string }
   | { readonly kind: "start-cannon-aim"; readonly cannonId: string; readonly geodesicId?: string }
   | { readonly kind: "delete-geodesic-from-cannon"; readonly cannonId: string; readonly geodesicId: string }
@@ -147,7 +149,7 @@ export type RuntimeEffect =
   | { readonly kind: "arm-reload-confirmation-timer"; readonly windowMs: number }
   | { readonly kind: "add-geodesic-to-cannon"; readonly cannonId: string }
   | { readonly kind: "start-cannon-carry"; readonly cannonId: string }
-  | { readonly kind: "start-cannon-tie-and-detach"; readonly cannonId: string }
+  | { readonly kind: "start-object-action"; readonly objectKind: string; readonly objectId: string; readonly actionId: string }
   | { readonly kind: "start-cannon-rotation"; readonly cannonId: string; readonly geodesicId?: string }
   | { readonly kind: "start-cannon-aim"; readonly cannonId: string; readonly geodesicId?: string }
   | { readonly kind: "delete-geodesic-from-cannon"; readonly cannonId: string; readonly geodesicId: string }
