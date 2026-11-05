@@ -1308,6 +1308,11 @@ Then, in a likely order:
    Displacement messages (job 50) will be the first real case. A message can be added beside
    `submit` and `dispatch` without changing them.
 
+6. **Open: an angle at a crossing that vanishes.** A protractor angle centred on the crossing of two geodesics is deleted when the crossing
+   disappears, even for a moment (job 52 changed this). The code that hides it until the crossing returns remains, reached only by a
+   test (`getRememberedGeodesicIntersectionObject`). Which is meant, hide or delete? In the spirit of the corner rule of 2026-11-05, hiding
+   is the likely answer, but it is not decided.
+
 ## 18. Specified, not built
 
 Removed on 2026-11-05 (maintainer) because nothing used them. Each is small to rebuild when a planned item needs it; the code as it stood
