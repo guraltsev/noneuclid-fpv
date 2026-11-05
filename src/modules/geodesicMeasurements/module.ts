@@ -100,6 +100,7 @@ function lengthsTick(): ModuleTick {
         if (!moved && memo !== undefined && !digest.touches(memo)) continue;
         const refreshed = recorder.run((reader) =>
           refreshMeasuredGeodesicLengthObject({ registry: reader, world: ctx.world, measurement: length, playerCellId: body.cellId, playerPoint: body.position }),
+          memo,
         );
         if (refreshed === undefined) {
           memos.delete(length.id);
@@ -144,7 +145,7 @@ function anglesTick(): ModuleTick {
         const memo = memos.get(angle.id);
         // A record with no memo is refreshed once; after that only a write to something its last refresh read wakes it.
         if (memo !== undefined && !digest.touches(memo)) continue;
-        const refreshed = recorder.run((reader) => refreshProtractorAngleObject({ registry: reader, angle }));
+        const refreshed = recorder.run((reader) => refreshProtractorAngleObject({ registry: reader, angle }), memo);
         if (refreshed === undefined) {
           memos.delete(angle.id);
           ctx.objects.remove(angle.id);

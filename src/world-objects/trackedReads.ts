@@ -29,9 +29,9 @@ export interface ReadSet {
 export interface ReadRecorder {
   /** Pass this where the refresh function takes the registry. Writes pass through unrecorded (a refresh does not write). */
   readonly reader: RuntimeObjectRegistry;
-  /** Runs `fn` with the reader and returns its value; `lastReads()` is then the set of reads `fn` made. Not reentrant. */
-  run<T>(fn: (reader: RuntimeObjectRegistry) => T): T;
-  /** The read set of the last `run` (a fresh object per run, safe to keep). */
+  /** Runs `fn` with the reader and returns its value (`reuse`: a read set from an earlier run to refill instead of allocating a new one); `lastReads()` is then the set of reads `fn` made. Not reentrant. */
+  run<T>(fn: (reader: RuntimeObjectRegistry) => T, reuse?: ReadSet): T;
+  /** The read set of the last `run` (a fresh object per run unless `reuse` was given, in which case that object, emptied and refilled: the memo of a record is rewritten in place and allocates nothing). */
   lastReads(): ReadSet;
 }
 
@@ -79,29 +79,25 @@ export function createReadRecorder(registry: RuntimeObjectRegistry): ReadRecorde
       return (registry[name] as (...a: unknown[]) => unknown)(...args);
     });
   }
-  const bound = new Map<PropertyKey, unknown>();
-  const reader = new Proxy(registry, {
-    get(target, property) {
-      const override = overrides.get(property);
-      if (override !== undefined) return override;
-      const value = Reflect.get(target, property, target) as unknown;
-      if (typeof value !== "function") return value;
-      let fn = bound.get(property);
-      if (fn === undefined) {
-        fn = (value as (...a: unknown[]) => unknown).bind(target);
-        bound.set(property, fn);
-      }
-      return fn;
-    },
-  });
+  // The reader inherits every other method of the registry, so only the reads are intercepted and no per-access trap runs.
+  const reader = Object.assign(Object.create(registry) as RuntimeObjectRegistry, Object.fromEntries(overrides));
   const observeDerived = (kinds: readonly string[]): void => {
     if (!recording) return;
     for (const kind of kinds) current.kinds.add(kind);
   };
   return {
     reader,
-    run(fn) {
-      current = emptyReads();
+    run(fn, reuse) {
+      if (reuse === undefined) {
+        current = emptyReads();
+      } else {
+        current = reuse as MutableReadSet;
+        current.ids.clear();
+        current.kinds.clear();
+        current.segmentGeodesics.clear();
+        current.fetchedKinds.clear();
+        current.all = false;
+      }
       recording = true;
       setDerivedReadObserver(observeDerived);
       try {
