@@ -13,6 +13,7 @@ import { carryModule } from "../../src/modules/carry";
 import { carryOffsetSlot } from "../../src/modules/carry/api";
 import { curveShorteningModule } from "../../src/modules/curveShortening";
 import { geodesicMeasurementsModule } from "../../src/modules/geodesicMeasurements";
+import { angleReadKinds, lengthReadKinds } from "../../src/modules/geodesicMeasurements/module";
 import { geodesicModelModule } from "../../src/modules/geodesicModel";
 import { yawRigidTransform3 } from "../../src/math/rigidTransform3";
 import { createDefaultPlayerPose } from "../../src/movement/playerPose";
@@ -27,6 +28,7 @@ import {
   resolveProtractorEmitterGeodesicSelection,
 } from "../../src/world-objects/protractorTool";
 import { createRuntimeObjectRegistry, type RuntimeObjectRegistry } from "../../src/world-objects/runtimeObjectRegistry";
+import { createReadRecorder } from "../../src/world-objects/trackedReads";
 import { compileLargePortalWorld, createTorusTiedPairScenario } from "../fixtures/world-objects/geodesic";
 import { createTestEngine } from "../support/engine";
 
@@ -133,11 +135,28 @@ function expectRecordsMatchFresh(scene: Scene, lastSeen: Map<string, unknown>, l
     }
     if (stored.kind === "geodesicMeasurements/angle") {
       expect(stored, `${label}: angle ${id}`).toEqual(refreshProtractorAngleObject({ registry, angle: stored }));
+      expectReadsWithin(registry, (reader) => refreshProtractorAngleObject({ registry: reader, angle: stored }), angleReadKinds, label);
     } else if (stored.kind === "geodesicMeasurements/length") {
       expect(stored, `${label}: length ${id}`).toEqual(refreshMeasuredGeodesicLengthObject({ registry, world, measurement: stored, playerCellId: cellId, playerPoint }));
+      expectReadsWithin(
+        registry,
+        (reader) => refreshMeasuredGeodesicLengthObject({ registry: reader, world, measurement: stored, playerCellId: cellId, playerPoint }),
+        lengthReadKinds,
+        label,
+      );
     }
     lastSeen.set(id, stored);
   }
+}
+
+/** Every kind a refresh scans or fetches is a kind the tick subscribes to: otherwise a write of it would never wake the tick. */
+function expectReadsWithin(registry: RuntimeObjectRegistry, fn: (reader: RuntimeObjectRegistry) => unknown, subscribed: readonly string[], label: string): void {
+  const recorder = createReadRecorder(registry);
+  recorder.run(fn);
+  const reads = recorder.lastReads();
+  expect(reads.all, `${label}: a whole-registry query cannot be subscribed`).toBe(false);
+  for (const kind of [...reads.kinds, ...reads.fetchedKinds]) expect(subscribed, `${label}: read kind ${kind}`).toContain(kind);
+  if (reads.segmentGeodesics.size > 0) expect(subscribed).toContain("geodesicModel/segment");
 }
 
 interface Action {

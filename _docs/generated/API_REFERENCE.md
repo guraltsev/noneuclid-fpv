@@ -666,6 +666,7 @@ The derived cache (design 014 section 4): a value defined by a full `compute` ov
 | interface | `DerivedSpec` | The definition of a cache: what it depends on and how to build it from scratch. |
 | interface | `Derived` | A defined cache; `read` returns the current value, recomputing it first when it is stale. |
 | interface | `DerivedStats` | The cheap counters of one cache instance (design 014 section 5). |
+| function | `setDerivedReadObserver` | Installs (or, with `undefined`, removes) the observer told the declared kinds of every cache `read`, hit or miss. |
 | function | `setDerivedVerification` | `derived-verify`: every `everyReads`th read also runs `compute` and throws when the two differ. |
 | function | `defineDerived` | Defines a cache. |
 | function | `derivedStatsOf` | The caches that exist on this source's ring, for the debug API. |
@@ -1127,6 +1128,17 @@ Registry record types of the results of the player's tools: placed flags (signs)
 | interface | `ProtractorAngleObject` | Registry record for a persistent angle measurement. |
 | interface | `ProtractorAngleLabelHitbox` | Oriented box around an angle label used for aim picking, in the vertex cell's local frame. |
 | interface | `ProtractorDirectedGeodesic` | One side of an angle: a geodesic ray leaving the vertex. |
+
+### `world-objects/trackedReads.ts`
+
+Read tracking for pure refresh functions (design 014 D1, D9): the exact set of registry reads a refresh made, and the test of whether a range of the change ring touches it.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `ReadSet` | What one refresh read. |
+| interface | `ReadRecorder` | A recording reader and the read set of its last `run`. |
+| function | `createReadRecorder` | Wraps `registry` (or a guarded copy of it) in a recording reader. |
+| class | `ReadDigest` | The writes of a ring range, digested once per tick run so that each record's read set is tested against it in time proportional to the read set. |
 
 ### `world-objects/worldObjectOwner.ts`
 
