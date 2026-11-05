@@ -48,6 +48,7 @@ import {
   type GeodesicHighlightEndpointCommand,
   type GeodesicModelApi,
   type GeodesicModelOptions,
+  type GeodesicModelPublicApi,
   type GeodesicModelCommand,
   type GeodesicModelEvent,
   type GeodesicModelQueries,
@@ -243,7 +244,14 @@ export function geodesicModelModule(options: Partial<GeodesicModelOptions> = {})
         "geodesicModel/cutAtVertex": { run: cutAtVertex, moduleOnly: true },
         "geodesicModel/removePlainArcs": { run: removePlainArcs, moduleOnly: true },
       };
-      return { api, queries, commands, ticks: [crossingsTick] };
+      const publicApi: GeodesicModelPublicApi = {
+        tieAndDetach: (emitterId, first, second) => {
+          const tie: GeodesicTieAndDetachCommand = { kind: "geodesicModel/tieAndDetach", emitterId, first, second };
+          return context.submitPublicCommand(tie);
+        },
+        arcsOfCurve: queries.arcsOfCurve,
+      };
+      return { api, queries, commands, ticks: [crossingsTick], publicApi };
     },
   };
 }

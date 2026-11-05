@@ -5,7 +5,7 @@
  * Turning an emitter is a relation, "this participant is editing this emitter" (design 013 section 7): `beginEdit` holds it and opens the slot `geodesicEmitters/yaw`, `endEdit` ends it. What moves an emitter from another module's `bodies` tick is the `api`.
  */
 import { defineModuleToken } from "../../engine/moduleTypes";
-import type { EngineCommandBase } from "../../engine/moduleTypes";
+import type { CommandResult, EngineCommandBase } from "../../engine/moduleTypes";
 import type { RigidTransform3 } from "../../math/rigidTransform3";
 import type { GeodesicPortalTraversal } from "../../world-objects/geodesic/objects";
 
@@ -124,6 +124,15 @@ export type GeodesicEmittersCommand =
 export type GeodesicEmittersResult =
   | { readonly outcome: "placed" | "removed"; readonly emitterId: string; readonly arcIds: readonly string[] }
   | { readonly outcome: "shot" | "extended" | "geodesicDeleted"; readonly emitterId: string; readonly arcId: string };
+
+/** `api.geodesicEmitters`, for scripts: each function submits the command of its name as the local player and resolves with its result, a {@link GeodesicEmittersResult} in `value` or a refusal. */
+export type GeodesicEmittersPublicApi = {
+  place(cellId: string, point: GeodesicEmitterPlaceCommand["point"], yawRadians: number): Promise<CommandResult>;
+  shoot(emitterId: string, yawRadians: number, lengthMeters: number): Promise<CommandResult>;
+  extend(arcId: string, lengthMeters: number): Promise<CommandResult>;
+  deleteGeodesic(emitterId: string, arcId: string): Promise<CommandResult>;
+  remove(emitterId: string): Promise<CommandResult>;
+};
 
 /** The refusal codes of the module's commands. */
 export const geodesicEmittersRefusals = {

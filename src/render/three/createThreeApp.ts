@@ -103,7 +103,7 @@ import { runtimeObjectToDynamicObjectState } from "../../world-objects/runtimeOb
 import { isSimpleGeoCreatureObjectSpec } from "../../world-objects/simpleGeoCreature";
 import { type SimpleGeoCreatureRuntime, createSimpleGeoCreatureRuntime } from "./creatures/simpleGeoCreatureView";
 import { createObjectHost, createPlainWorldObject, type PlainWorldObject } from "../../world-objects/worldObjectOwner";
-import { setApiNamespace } from "../../runtime/publicApi";
+import { installModuleApis, setApiNamespace } from "../../runtime/publicApi";
 import { createDesktopToolIndicator } from "../dom/desktopToolIndicator";
 import { createFloatingObjectTooltip } from "../dom/floatingObjectTooltip";
 import { createAimCrossMarker } from "./aimCrossMarker";
@@ -380,6 +380,8 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     modules: createDefaultWorldModules(),
     isToolEnabled: (toolId) => isRuntimeToolEnabled(appConfig, toolId),
     writeGuard: hasActiveDebugOption(options.debugLevel, options.debugOptions, "module-write-guard"),
+    // Called by scripts only, so `worldClient` below exists by then.
+    submitPublicCommand: (command) => worldClient.submit(command),
   });
   function showWorldMessage(message: string, detail: EngineEventBase | { readonly code: string }): void {
     console.info(`[noneuclid] ${message}`);
@@ -982,6 +984,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   installRenderInspectionApi(runtimeObjectInstanceSync.inspection);
   geometryDebugHelpers.installIfAvailable();
   setApiNamespace("world", worldClient.api);
+  const uninstallModuleApis = installModuleApis(engine.publicApis);
   setApiNamespace("view", {
     screenshot() {
       if (renderer.xr.isPresenting) {
@@ -1615,6 +1618,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       uninstallGeometryDebugHelpers();
       setApiNamespace("view", undefined);
       setApiNamespace("world", undefined);
+      uninstallModuleApis();
       worldClient.dispose();
       geometrySession.dispose();
       debugOverlay.dispose();

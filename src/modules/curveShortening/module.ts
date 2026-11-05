@@ -85,7 +85,7 @@ export function curveShorteningModule(options: Partial<CurveShorteningOptions> =
         quiet.delete(record.end.anchorObjectId);
       }
 
-      return { api: queries, queries, commands: {}, ticks: [stepTick, wakeTick] };
+      return { api: queries, queries, commands: {}, ticks: [stepTick, wakeTick], publicApi: { isAtRest: queries.isAtRest } };
     },
   };
 }

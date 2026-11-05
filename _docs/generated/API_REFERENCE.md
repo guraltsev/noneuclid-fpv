@@ -1495,6 +1495,7 @@ The types of the world engine and of its modules (design 013 sections 5 and 9): 
 | interface | `ObjectKindDeclaration` | An object kind a module declares. |
 | interface | `ModuleTick` | Per-step work of a module, in a phase. |
 | interface | `ModuleDefinition` | The world part of a module. |
+| type | `ModulePublicApi` | What a module offers scripts: functions of plain data, in and out. |
 | interface | `ModuleInstance` | What a module's `create` returns. |
 | type | `AnyModuleDefinition` | Any module, whatever its command and API types. |
 | interface | `ModuleCreateContext` | What a module's `create` receives. |
@@ -1671,6 +1672,7 @@ The geodesic emitters' public face (design 013 sections 12.1 and 16): the emitte
 | interface | `GeodesicEmitterLiftCommand` | Module-only. |
 | type | `GeodesicEmittersCommand` | Every command of the module. |
 | type | `GeodesicEmittersResult` | What a command that succeeded answers with: `outcome` names the command, the ids are what it created or touched. |
+| type | `GeodesicEmittersPublicApi` | `api.geodesicEmitters`, for scripts: each function submits the command of its name as the local player and resolves with its result, a {@link GeodesicEmittersResult} in `value` or a refusal. |
 | const | `geodesicEmittersRefusals` | The refusal codes of the module's commands. |
 
 ### `modules/geodesicEmitters/client.ts`
@@ -1734,6 +1736,7 @@ The geodesic model's public face (design 013 sections 12.1 and 13.1): its token,
 | type | `VertexRemovalPreview` | What removing a vertex would give: a merged arc, a taut loop, a collapsed curve, or blocked. |
 | interface | `EmitterArcsRebuild` | What a rebuild of an emitter's arcs means for the emitter and its carrier. |
 | interface | `GeodesicModelApi` | For dependents only: the hot route of design 013 section 5.7, what runs many times a step (M1, M2) or once per frame on the fast channel. |
+| type | `GeodesicModelPublicApi` | `api.geodesicModel`, for scripts. |
 | const | `geodesicModelToken` | The geodesic model's token: `provides` of the module, `requires` of the modules that act on its curves. |
 | interface | `GeodesicTieAndDetachCommand` | Detaches two endpoint roles from an emitter and ties them at a new shared vertex, born at the emitter's beam point (the geometry does not change). |
 | interface | `GeodesicHighlightEndpointCommand` | Tool highlight of one endpoint's half of a geodesic (the segments' `highlightState`); transient. |
@@ -1852,6 +1855,7 @@ Holder of the public API object `window.noneuclid.api`: a plain object of namesp
 | type | `PublicApi` | The mutable API object: namespace name to an object of functions. |
 | interface | `NoneuclidGlobal` | The shape of `window.noneuclid`. |
 | function | `getPublicApi` | Returns `window.noneuclid.api`, creating `window.noneuclid` on first use. |
+| function | `installModuleApis` | Installs the modules' public functions as `api.<moduleId>`; the function it returns removes them, for the app's dispose. |
 | function | `setApiNamespace` | Installs (or, with `undefined`, removes) one namespace of the public API. |
 
 ### `runtime/runtimeCommands.ts`
@@ -3326,6 +3330,7 @@ The shell's side of its conversation with the world engine (design 013 sections 
 
 | Kind | Name | Summary |
 | --- | --- | --- |
+| const | `commandAnswerDeadlineMs` | How long an API caller waits for a step. |
 | interface | `WorldClientDeps` | What the world client needs from the shell. |
 | interface | `WorldClient` | Handle returned by {@link createWorldClient}. |
 | function | `createWorldClient` | Creates the world client over the shell's engine, session and command path. |

@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { ModuleCompositionError } from "../../src/engine/composeModules";
-import { defineModuleToken, type AnyModuleDefinition, type ModuleTick } from "../../src/engine/moduleTypes";
+import { defineModuleToken, type AnyModuleDefinition, type ModulePublicApi, type ModuleTick } from "../../src/engine/moduleTypes";
 import type { RuntimeToolId } from "../../src/glue/toolIds";
 import { createTestEngine } from "../support/engine";
 
@@ -157,6 +157,13 @@ describe("composeModules", () => {
         modules: [fake("one", { toolIds: ["one/tool" as RuntimeToolId], commands: { "one/go": { run, requiresTool: "one/tool" }, "one/aim": { run, requiresTool: "aim" } } })],
       }),
     ).not.toThrow();
+  });
+
+  it("rejects a publicApi name that is not a function", () => {
+    const publicApi = { read: () => 1, count: 2, nothing: undefined } as unknown as ModulePublicApi;
+    const module = fake("mod", { create: () => ({ api: {}, queries: {}, commands: {}, ticks: [], publicApi }) });
+
+    expect(problemsOf([module])).toEqual(["module mod: the publicApi name count is not a function", "module mod: the publicApi name nothing is not a function"]);
   });
 
   it("reports every problem at once", () => {

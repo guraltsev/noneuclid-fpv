@@ -41,7 +41,7 @@ let activeAssets: OwnedPreparedWorldAssets | undefined;
 let activeRunId = 0;
 
 // The public API object window.noneuclid.api lives here so that it survives app restarts; per-run namespaces
-// (debug, portal, geometry, view) are installed and removed by each app.
+// (debug, portal, geometry, view, world and one per module with a public API) are installed and removed by each app.
 setApiNamespace("app", {
   info: () => ({
     worldId: launchOptions.selectedWorldId,

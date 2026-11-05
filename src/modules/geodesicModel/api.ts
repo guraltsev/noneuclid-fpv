@@ -8,7 +8,7 @@
  * dynamics module acts on interior vertices only, and without one a tied curve stays as tied.
  */
 import { defineModuleToken } from "../../engine/moduleTypes";
-import type { EngineCommandBase, EngineEventBase } from "../../engine/moduleTypes";
+import type { CommandResult, EngineCommandBase, EngineEventBase } from "../../engine/moduleTypes";
 import type { GeodesicEmitterObject, GeodesicPortalTraversal } from "../../world-objects/geodesic/objects";
 
 declare module "../../glue/toolIds" {
@@ -121,6 +121,12 @@ export interface GeodesicModelApi extends GeodesicModelQueries {
   /** Fast channel. Rebuilds the arcs of an emitter that moved (`world-objects/geodesic/carryEnd.ts`). With `keepOnFailure`, the safety net of a carry in progress, a failed rebuild keeps the arc, marked stale. */
   rebuildArcsOfEmitter(input: { readonly emitterId: string; readonly activeArcId?: string; readonly keepOnFailure: boolean }): EmitterArcsRebuild;
 }
+
+/** `api.geodesicModel`, for scripts. `tieAndDetach` submits the command of its name as the local player and resolves with its result, `{ vertexId }` in `value` or a refusal; `arcsOfCurve` reads, as the query does. */
+export type GeodesicModelPublicApi = {
+  tieAndDetach(emitterId: string, first: GeodesicEndpointRef, second: GeodesicEndpointRef): Promise<CommandResult>;
+  arcsOfCurve(vertexId: string): readonly string[];
+};
 
 /** The geodesic model's token: `provides` of the module, `requires` of the modules that act on its curves. */
 export const geodesicModelToken = defineModuleToken<GeodesicModelApi, GeodesicModelQueries>("geodesicModel");

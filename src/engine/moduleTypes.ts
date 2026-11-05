@@ -126,6 +126,10 @@ export interface WorldEngine<Cmd extends EngineCommandBase = EngineCommandBase> 
   forEachEvent(fn: (event: EngineEventBase) => void): void;
   /** A module's read-only queries; never its `api`. */
   query<Q>(token: ModuleToken<unknown, Q>): Q;
+  /** The `publicApi` of each module that has one, by module id. The shell installs each as `api.<moduleId>` for the life of the app. */
+  readonly publicApis: ReadonlyMap<string, ModulePublicApi>;
+  /** Takes back a command no step has applied yet; it will never run. Does nothing for one already applied. */
+  withdraw(ticket: CommandTicket): void;
   /** Called by the client after it has read changes, events and results: clears the journals, events and results. */
   endFrame(): void;
 }
@@ -196,6 +200,9 @@ export interface ModuleDefinition<
   readonly create: (ctx: ModuleCreateContext) => ModuleInstance<Api, Cmd, Evt, Queries>;
 }
 
+/** What a module offers scripts: functions of plain data, in and out. */
+export type ModulePublicApi = { readonly [name: string]: (...args: never[]) => unknown };
+
 /** What a module's `create` returns. */
 export interface ModuleInstance<
   Api,
@@ -209,6 +216,8 @@ export interface ModuleInstance<
   readonly queries: Queries;
   readonly commands: CommandHandlers<Cmd>;
   readonly ticks: readonly ModuleTick[];
+  /** For scripts, as `api.<moduleId>` (design 013 section 9.1): reads, or wrappers that submit a command and resolve with its result. Never a write of its own. Composition fails when a name is not a function. */
+  readonly publicApi?: ModulePublicApi;
   /** Phantom: the events this module emits. */
   readonly __events?: Evt;
 }
@@ -222,6 +231,8 @@ export interface ModuleCreateContext {
   require<A>(token: ModuleToken<A, unknown>): A;
   readonly objects: RuntimeObjectRegistry;
   readonly getWorld: () => CompiledCellComplex;
+  /** For the wrappers of `publicApi` only: submits a command as the local player, with every check a client's command gets, and resolves with its result. */
+  submitPublicCommand(command: EngineCommandBase): Promise<CommandResult>;
 }
 
 /** One object, reused every step: never keep it across steps. */

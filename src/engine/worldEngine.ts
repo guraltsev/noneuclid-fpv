@@ -22,6 +22,7 @@ import type {
   EngineCommandBase,
   EngineEventBase,
   EngineIdSource,
+  ModulePublicApi,
   ParticipantRecord,
   WorldEngine,
   WorldBehindRealTimeEvent,
@@ -45,6 +46,8 @@ export interface WorldEngineOptions {
   readonly isToolEnabled?: (toolId: RuntimeToolId) => boolean;
   /** Check every module write against the module's declared kinds (design 013 section 9.6). Default: off. */
   readonly writeGuard?: boolean;
+  /** What the wrappers of a module's `publicApi` submit through: the client that answers its callers (the engine keeps no promise). Without it, an engine has no scripts and a wrapper throws. */
+  readonly submitPublicCommand?: (command: EngineCommandBase) => Promise<CommandResult>;
 }
 
 interface QueuedCommand {
@@ -85,10 +88,17 @@ export function createWorldEngine(options: WorldEngineOptions): WorldEngine {
     coreToolIds,
     objects: moduleObjects,
     getWorld: options.getWorld,
+    submitPublicCommand(command) {
+      if (options.submitPublicCommand === undefined) throw new Error(`no client takes public commands: ${command.kind}`);
+      return options.submitPublicCommand(command);
+    },
     wrapApi: (moduleId, api) => (guardOn ? runFunctionsInFrame(frames, moduleId, kindsOfModule.get(moduleId)!, api) : api),
   });
   const queriesByToken = new Map<string, unknown>();
+  const publicApis = new Map<string, ModulePublicApi>();
   for (const module of experience.modules) {
+    const { publicApi } = module.instance;
+    if (publicApi !== undefined) publicApis.set(module.definition.id, guardOn ? runFunctionsInFrame(frames, module.definition.id, null, publicApi) : publicApi);
     const token = module.definition.provides;
     if (token) {
       queriesByToken.set(token.id, guardOn ? runFunctionsInFrame(frames, module.definition.id, null, module.instance.queries) : module.instance.queries);
@@ -296,6 +306,10 @@ export function createWorldEngine(options: WorldEngineOptions): WorldEngine {
     query<Q>(token: { readonly id: string }): Q {
       if (!queriesByToken.has(token.id)) throw new Error(`no module in the experience provides ${token.id}`);
       return queriesByToken.get(token.id) as Q;
+    },
+    publicApis,
+    withdraw(ticket) {
+      queue = queue.filter((queued) => queued.ticket !== ticket);
     },
     endFrame() {
       registry.changes.clear();

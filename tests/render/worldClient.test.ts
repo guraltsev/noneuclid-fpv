@@ -3,13 +3,22 @@
  *
  * The shell's side of the tool-switch protocol (design 013 section 8.1): selecting a tool asks the world first, switches only when the world accepts, and shows the world's message and stays on the old tool when it refuses. An event's message is shown. Also `api.world`: `submit` resolves with the command's result after the next step, `participants` lists the bodies, and `stepIndex` counts the steps.
  */
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AnyModuleDefinition, CommandContext } from "../../src/engine/moduleTypes";
 import { applyRuntimeCommand } from "../../src/runtime/applyRuntimeCommand";
 import type { RuntimeCommand } from "../../src/runtime/runtimeCommands";
-import { createWorldClient } from "../../src/render/three/worldClient";
+import { commandAnswerDeadlineMs, createWorldClient } from "../../src/render/three/worldClient";
 import { createTestClientSession } from "../support/clientSession";
 import { createTestEngine, type TestEngineOptions } from "../support/engine";
+
+// A submitted command starts a deadline, and a unit test runs no real timer.
+beforeEach(() => {
+  vi.useFakeTimers();
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 function setup(options: TestEngineOptions = {}) {
   const engine = createTestEngine(options);
@@ -94,6 +103,104 @@ describe("the event sink", () => {
     frame();
 
     expect(messages).toEqual(["The notice was posted."]);
+  });
+});
+
+describe("a caller who waits for an answer", () => {
+  const submitted = { kind: "world/requestTool", toolId: "aim" } as const;
+
+  it("is answered with a refusal when the app goes, a world change and a restart included", async () => {
+    const { client } = setup();
+
+    const pending = client.submit(submitted);
+    client.dispose();
+
+    expect(await pending).toEqual({ ok: false, refusal: { code: "world/disposed", message: "The world was closed." } });
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("is answered at once after the app has gone, through a function kept from before", async () => {
+    const { engine, client, frame } = setup();
+    const keptSubmit = client.api.submit as (command: unknown) => Promise<unknown>;
+    client.dispose();
+
+    expect(await keptSubmit(submitted)).toMatchObject({ ok: false, refusal: { code: "world/disposed" } });
+    const before = engine.read.stepIndex;
+    frame();
+    expect(engine.read.stepIndex).toBe(before + 1);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("is told the world ran no step, and the command is taken back and never runs", async () => {
+    let runs = 0;
+    const counting: AnyModuleDefinition = {
+      id: "counting",
+      requires: [],
+      objectKinds: [],
+      create: () => ({
+        api: {},
+        queries: {},
+        commands: { "counting/count": { run: () => { runs += 1; return { ok: true }; } } },
+        ticks: [],
+      }),
+    };
+    const { client, frame } = setup({ modules: [counting] });
+
+    const pending = client.submit({ kind: "counting/count" });
+    await vi.advanceTimersByTimeAsync(commandAnswerDeadlineMs);
+
+    expect(await pending).toMatchObject({ ok: false, refusal: { code: "world/noAnswer" } });
+    frame();
+    expect(runs).toBe(0);
+  });
+
+  it("has its deadline dropped once answered", async () => {
+    const { client, frame } = setup();
+
+    const pending = client.submit(submitted);
+    frame();
+
+    expect(await pending).toMatchObject({ ok: true });
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("keeps the answer when showing a message throws in the same frame", async () => {
+    const broken: AnyModuleDefinition = {
+      id: "notice",
+      requires: [],
+      objectKinds: [],
+      create: () => ({
+        api: {},
+        queries: {},
+        commands: {
+          "notice/post": {
+            run: (_command: never, ctx: CommandContext) => {
+              ctx.emit({ kind: "notice/posted", message: "The notice was posted." });
+              return { ok: true };
+            },
+          },
+        },
+        ticks: [],
+      }),
+    };
+    const engine = createTestEngine({ modules: [broken] });
+    const session = createTestClientSession();
+    const client = createWorldClient({
+      engine,
+      session,
+      dispatch: (command: RuntimeCommand) => void applyRuntimeCommand(session, command),
+      toolStarted: () => {},
+      showMessage: () => {
+        throw new Error("no screen");
+      },
+    });
+
+    const pending = client.submit({ kind: "notice/post" });
+    engine.step(1 / 60);
+    expect(() => client.afterStep()).toThrow("no screen");
+    engine.endFrame();
+
+    expect(await pending).toEqual({ ok: true });
   });
 });
 

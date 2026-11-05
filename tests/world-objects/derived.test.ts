@@ -190,6 +190,16 @@ describe("defineDerived", () => {
     expect(() => derived.read(registry)).toThrow(/differs from compute/);
   });
 
+  it("counts the reads it compared, so a run can show that it verified", () => {
+    const registry = createRuntimeObjectRegistry([mouse("m1", "a")]);
+    const { derived } = toyCache(() => true);
+    setDerivedVerification(2);
+
+    for (let read = 0; read < 5; read += 1) derived.read(registry);
+
+    expect(derivedStatsOf(registry)[0]).toMatchObject({ reads: 5, verifies: 2 });
+  });
+
   it("with verification off, does not compare", () => {
     const registry = createRuntimeObjectRegistry([mouse("m1", "a")]);
     const { derived } = toyCache(() => false);

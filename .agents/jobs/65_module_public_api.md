@@ -1,6 +1,6 @@
 # Job 65 - Give modules a public API and write the scenarios that were waiting for it
 
-Status: queued.
+Status: in progress.
 Resolves: the release scenarios left open by jobs 50, 53 and 54.
 
 ## Goal
