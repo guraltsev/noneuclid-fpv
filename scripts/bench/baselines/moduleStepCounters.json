@@ -3,13 +3,12 @@
     "steps": 120,
     "writes": 1559,
     "scans": {
-      "curve-shortening-pair": 120,
-      "geodesicModel/arc": 122,
-      "geodesicModel/crossing": 121,
+      "curve-shortening-pair": 1,
+      "geodesicModel/arc": 121,
       "geodesicModel/segment": 120,
       "geodesicModel/vertex": 1,
-      "measured-geodesic-length": 242,
-      "protractor-angle": 242
+      "measured-geodesic-length": 1,
+      "protractor-angle": 1
     }
   },
   "flow+dependents": {
@@ -17,26 +16,25 @@
     "writes": 1918,
     "scans": {
       "*": 120,
-      "curve-shortening-pair": 120,
-      "geodesicModel/arc": 836,
-      "geodesicModel/crossing": 121,
+      "curve-shortening-pair": 1,
+      "geodesicModel/arc": 120,
       "geodesicModel/segment": 120,
       "geodesicModel/vertex": 1,
-      "measured-geodesic-length": 242,
-      "protractor-angle": 242
+      "measured-geodesic-length": 121,
+      "protractor-angle": 240
     }
   },
   "manyArcs": {
     "steps": 120,
     "writes": 127420,
     "scans": {
-      "curve-shortening-pair": 120,
-      "geodesicModel/arc": 122,
-      "geodesicModel/crossing": 121,
+      "curve-shortening-pair": 1,
+      "geodesicModel/arc": 121,
+      "geodesicModel/crossing": 120,
       "geodesicModel/segment": 120,
       "geodesicModel/vertex": 1,
-      "measured-geodesic-length": 242,
-      "protractor-angle": 242
+      "measured-geodesic-length": 1,
+      "protractor-angle": 1
     }
   }
 }

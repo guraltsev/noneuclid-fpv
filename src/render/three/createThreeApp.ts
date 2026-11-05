@@ -94,6 +94,7 @@ import { advanceCurveShorteningPairs } from "../../world-objects/geodesic/curveS
 import { pruneMissingGeodesicIntersectionObjects } from "../../world-objects/geodesic/intersections";
 import { isGeodesicMarmotObjectSpec } from "../../world-objects/geodesicMarmot";
 import { type GeodesicMarmotRuntime, createGeodesicMarmotRuntime } from "./creatures/geodesicMarmotView";
+import { derivedStatsOf, setDerivedVerification } from "../../world-objects/derived";
 import { createRuntimeObjectRegistry, createRuntimeStaticAssetObject } from "../../world-objects/runtimeObjectRegistry";
 import { runtimeObjectToDynamicObjectState } from "../../world-objects/runtimeObjectBase";
 import { isSimpleGeoCreatureObjectSpec } from "../../world-objects/simpleGeoCreature";
@@ -360,6 +361,8 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   // The world: the registry of world objects and the engine that owns it (design 013). The shell is a client of the
   // engine: it publishes the player's body, submits commands, steps the world once per frame and reads it back.
   const runtimeObjectRegistry = createRuntimeObjectRegistry();
+  // `derived-verify`: every 64th derived-cache read also recomputes and compares (the module-level switch of world-objects/derived).
+  setDerivedVerification(hasActiveDebugOption(options.debugLevel, options.debugOptions, "derived-verify") ? 64 : 0);
   const engine = createWorldEngine({
     registry: runtimeObjectRegistry,
     // The active world is replaced by a geometry commit; `activeWorld` exists only after the geometry-commit factory below.
@@ -948,6 +951,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     placeObjectAt: debugPlaceObjectAt,
     playerPose: debugPlayerPose,
     kindScans: () => runtimeObjectRegistry.getKindScanCounts(),
+    derivedStats: () => derivedStatsOf(runtimeObjectRegistry),
     setPlayerPose: debugSetPlayerPose,
   });
   installRenderInspectionApi(runtimeObjectInstanceSync.inspection);
@@ -1493,6 +1497,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       placeObjectAt: debugPlaceObjectAt,
       playerPose: debugPlayerPose,
       kindScans: () => runtimeObjectRegistry.getKindScanCounts(),
+    derivedStats: () => derivedStatsOf(runtimeObjectRegistry),
       setPlayerPose: debugSetPlayerPose,
     });
     geometryDebugHelpers.installIfAvailable();

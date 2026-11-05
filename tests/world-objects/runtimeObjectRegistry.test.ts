@@ -53,6 +53,28 @@ describe("runtimeObjectRegistry", () => {
     expect(registry.getKindScanCounts()).toEqual({ "geodesic-cannon": 1 });
   });
 
+  it("returns the same frozen kind list until a write of that kind, and counts only the builds", () => {
+    const registry = createRuntimeObjectRegistry([emitter("e1", "a"), creature("m1", "a")]);
+
+    const first = registry.getObjectsOfKind("geodesic-cannon");
+    expect(registry.getObjectsOfKind("geodesic-cannon")).toBe(first);
+    expect(Object.isFrozen(first)).toBe(true);
+    expect(registry.getKindScanCounts()).toEqual({ "geodesic-cannon": 1 });
+
+    registry.update(creature("m1", "b"));
+    expect(registry.getObjectsOfKind("geodesic-cannon")).toBe(first);
+
+    registry.add(emitter("e2", "a"));
+    const second = registry.getObjectsOfKind("geodesic-cannon");
+    expect(second).not.toBe(first);
+    expect(second.map((object) => object.id)).toEqual(["e1", "e2"]);
+    expect(first.map((object) => object.id)).toEqual(["e1"]);
+
+    registry.remove("e1");
+    expect(registry.getObjectsOfKind("geodesic-cannon").map((object) => object.id)).toEqual(["e2"]);
+    expect(registry.getKindScanCounts()).toEqual({ "geodesic-cannon": 3 });
+  });
+
   it("counts a getAll rebuild once, not the cached return, and again after a write", () => {
     const registry = createRuntimeObjectRegistry([emitter("e1", "a")]);
 

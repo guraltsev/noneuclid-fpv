@@ -29,7 +29,8 @@ import {
   resolveProtractorEmitterGeodesicSelection,
 } from "../../src/world-objects/protractorTool";
 import type { GeodesicCannonObject } from "../../src/world-objects/geodesic/objects";
-import type { RuntimeObjectRegistry } from "../../src/world-objects/runtimeObjectRegistry";
+import { defineDerived } from "../../src/world-objects/derived";
+import type { RuntimeObjectReader, RuntimeObjectRegistry, RuntimeWorldObject } from "../../src/world-objects/runtimeObjectRegistry";
 import { createManyArcsFlowScenario, createTorusLoopBenchmarkScene, createTorusTiedPairScenario } from "../../tests/fixtures/world-objects/geodesic";
 
 const deltaSeconds = 1 / 90;
@@ -42,6 +43,9 @@ const idleAllocationSteps = 20_000;
 const allocationSlackBytesPerStep = 16;
 const playerPoint = { x: 0, y: 0, z: 0 };
 const manyArcsExtraArcs = 32;
+/** Reads of a derived cache in the hit scene (design 014 V1), and the most a hit may allocate: a counter failure above it. */
+const cacheHitReads = 200_000;
+const cacheHitMaxBytesPerRead = 1;
 
 interface Scene {
   readonly world: CompiledCellComplex;
@@ -84,6 +88,14 @@ function main(): void {
   // Counters are exact: measured once, compared first, and they decide the exit code before any clock is read.
   const counters = measureAllCounters();
   printCounters(counters);
+  // V1, the idle read hits: allocation is exact enough to gate like a counter.
+  const cacheHitBytes = measureCacheHitBytesPerRead(gc);
+  console.info(`cache hit         ${cacheHitBytes.toFixed(3)} bytes/read`);
+  if (args.includes("--check") && cacheHitBytes > cacheHitMaxBytesPerRead) {
+    console.error(`cache hit allocates ${cacheHitBytes.toFixed(3)} bytes/read, over ${cacheHitMaxBytesPerRead}`);
+    console.error("check: FAILED (counters)");
+    process.exit(1);
+  }
   if (args.includes("--record-counters")) {
     fs.mkdirSync(baselineDir, { recursive: true });
     fs.writeFileSync(countersPath, `${JSON.stringify(counters, null, 2)}\n`);
@@ -371,6 +383,24 @@ function measureBareEngineBytesPerStep(gc: () => void): number {
   }
   const after = process.memoryUsage().heapUsed;
   return Math.max(0, after - before) / idleAllocationSteps;
+}
+
+/** V1: bytes allocated per read of a toy derived cache over the idle scene when nothing has changed since the last read (the hit path). */
+function measureCacheHitBytesPerRead(gc: () => void): number {
+  const { registry } = createIdleScene();
+  const cannons = defineDerived<RuntimeObjectReader, RuntimeWorldObject, readonly string[]>({
+    id: "bench/cannonIds",
+    kinds: ["geodesic-cannon"],
+    compute: (source) => Object.freeze(source.getObjectsOfKind("geodesic-cannon").map((object) => object.id)),
+  });
+  let sink = 0;
+  for (let i = 0; i < 1_000; i += 1) sink += cannons.read(registry).length;
+  gc();
+  const before = process.memoryUsage().heapUsed;
+  for (let i = 0; i < cacheHitReads; i += 1) sink += cannons.read(registry).length;
+  const after = process.memoryUsage().heapUsed;
+  if (sink < 0) throw new Error("unreachable");
+  return Math.max(0, after - before) / cacheHitReads;
 }
 
 function measureRound(gc: () => void): Results {

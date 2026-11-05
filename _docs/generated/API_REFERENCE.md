@@ -656,6 +656,20 @@ Motion of the simple geodesic creatures (the mouse and the butterfly), with no r
 | function | `butterflyVerticalOscillationRateHz` | Returns the butterfly's instantaneous vertical bob rate in Hz at `elapsedSeconds`, or 0 for non-butterflies. |
 | function | `butterflyVerticalOscillationHeightMagnitudeMeters` | Returns the butterfly's vertical bob amplitude in meters (10% of its collision height, capped at 0.08 m), or 0 for non-butterflies. |
 
+### `world-objects/derived.ts`
+
+The derived cache (design 014 section 4): a value defined by a full `compute` over a source, invalidated by relevant entries on the change ring and recomputed on the next read.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `DerivedSource` | What a cache reads from: the registry and its guarded copy both fit, and share one `changes`. |
+| interface | `DerivedSpec` | The definition of a cache: what it depends on and how to build it from scratch. |
+| interface | `Derived` | A defined cache; `read` returns the current value, recomputing it first when it is stale. |
+| interface | `DerivedStats` | The cheap counters of one cache instance (design 014 section 5). |
+| function | `setDerivedVerification` | `derived-verify`: every `everyReads`th read also runs `compute` and throws when the two differ. |
+| function | `defineDerived` | Defines a cache. |
+| function | `derivedStatsOf` | The caches that exist on this source's ring, for the debug API. |
+
 ### `world-objects/geodesic/anchors.ts`
 
 Anchors of geodesic intervals: which registry objects can hold an endpoint, and where the beam of one starts in its cell frame.

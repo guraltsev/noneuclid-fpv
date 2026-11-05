@@ -26,6 +26,7 @@ import { type VisiblePortalPathRenderState } from "./renderState";
 import { type VisiblePortalPathDebugSummary, type VisiblePortalPathLookupResult, describeVisiblePortalPath } from "../../visibility/visiblePortalPaths";
 import { type ComputeVisiblePortalPathsResult, type VisiblePortalPath } from "./visiblePortalPaths";
 import { rigidTransformToThreeMatrix } from "./worldAxes";
+import type { DerivedStats } from "../../world-objects/derived";
 
 /** Console API installed as window.noneuclidPortalDebug (by createPortalDebugRuntime) for inspecting portal paths, visibility, and clip polygons. Paths are resolved relative to the player's current root cell. */
 export interface PortalDebugHelpers {
@@ -98,6 +99,8 @@ export interface GeneralDebugHelpers {
   playerPose(): PlayerPoseDebugDump;
   /** How often each kind was scanned to build a list so far (`"*"` counts whole-registry rebuilds); a fresh object. */
   kindScans(): Readonly<Record<string, number>>;
+  /** Per derived cache on the world's change ring: reads, full recomputations and ring entries scanned; a fresh array. */
+  derivedStats(): readonly DerivedStats[];
   /** Puts the player at `cellId`, cell-local (x, y) meters on the floor, with the given yaw and pitch in degrees (pitch keeps its value when omitted); throws for an unknown cell or a non-finite number; returns the pose set. */
   setPlayerPose(cellId: string, x: number, y: number, yawDegrees: number, pitchDegrees?: number): PlayerPoseDebugDump;
 }
@@ -123,6 +126,7 @@ export interface GeneralDebugHelperCallbacks {
   readonly placeObjectAt: (id: string, cellId: string, x: number, y: number, yawDegrees: number) => boolean;
   readonly playerPose: () => PlayerPoseDebugDump;
   readonly kindScans: () => Readonly<Record<string, number>>;
+  readonly derivedStats: () => readonly DerivedStats[];
   readonly setPlayerPose: (cellId: string, x: number, y: number, yawDegrees: number, pitchDegrees?: number) => PlayerPoseDebugDump;
 }
 
@@ -334,6 +338,7 @@ export function installGeneralDebugHelpers(callbacks: GeneralDebugHelperCallback
     placeObjectAt: callbacks.placeObjectAt,
     playerPose: callbacks.playerPose,
     kindScans: callbacks.kindScans,
+    derivedStats: callbacks.derivedStats,
     setPlayerPose: callbacks.setPlayerPose,
   };
 
@@ -352,6 +357,7 @@ export function installGeneralDebugHelpers(callbacks: GeneralDebugHelperCallback
     placeObjectAt: callbacks.placeObjectAt,
     playerPose: callbacks.playerPose,
     kindScans: callbacks.kindScans,
+    derivedStats: callbacks.derivedStats,
     setPlayerPose: callbacks.setPlayerPose,
   });
 }

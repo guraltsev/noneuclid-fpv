@@ -85,9 +85,9 @@ export interface RuntimeObjectRegistry {
   getTooltipObjectsInCell(cellId: string): readonly RuntimeWorldObject[];
   /** Every registered object across all cells. */
   getAll(): readonly RuntimeWorldObject[];
-  /** Objects of one kind, in insertion order (a fresh array). */
+  /** Objects of one kind, in insertion order: a frozen snapshot, the same array until a write of that kind (it never tracks later writes). */
   getObjectsOfKind<K extends RuntimeWorldObject["kind"]>(kind: K): readonly (RuntimeWorldObject & { readonly kind: K })[];
-  /** Kind scans so far, keyed by kind (`"*"` for `getAll` rebuilds): how often a kind was walked to build a list. A fresh object; for the bench and `debug.kindScans()`. */
+  /** Kind scans so far, keyed by kind (`"*"` for `getAll` rebuilds): how often a kind was walked to build a list (a cached list counts once). A fresh object; for the bench and `debug.kindScans()`. */
   getKindScanCounts(): Readonly<Record<string, number>>;
   /** Number of objects of one kind: the size of the per-kind id set. No allocation. */
   countOfKind(kind: RuntimeWorldObject["kind"]): number;
@@ -169,6 +169,7 @@ export function createRuntimeObjectRegistry(
   const changes = createRuntimeObjectChangeJournal<RuntimeWorldObject>();
   const ownedIds = new Set<string>();
   const kindScanCounts = new Map<string, number>();
+  const kindLists = new Map<string, readonly RuntimeWorldObject[]>();
   let version = 0;
 
   // Query caches: each array is built on first request, frozen, and shared until a change touches it.
@@ -217,6 +218,8 @@ export function createRuntimeObjectRegistry(
     }
 
     objectsById.set(next.id, next);
+    kindLists.delete(previous.kind);
+    kindLists.delete(next.kind);
     version += 1;
     if (previous.kind !== next.kind) {
       changes.record(ChangeOp.Removed, previous, previous);
@@ -238,6 +241,7 @@ export function createRuntimeObjectRegistry(
 
       version += 1;
       objectsById.set(object.id, object);
+      kindLists.delete(object.kind);
       indexObject(object);
       indexKinds(object);
       changes.record(ChangeOp.Added, object);
@@ -268,6 +272,7 @@ export function createRuntimeObjectRegistry(
       unindexObject(object);
       unindexKinds(object);
       objectsById.delete(id);
+      kindLists.delete(object.kind);
       version += 1;
       changes.record(ChangeOp.Removed, object, object);
       invalidateQueries(object.cellId);
@@ -358,10 +363,17 @@ export function createRuntimeObjectRegistry(
       return allObjects;
     },
     getObjectsOfKind<K extends RuntimeWorldObject["kind"]>(kind: K) {
-      kindScanCounts.set(kind, (kindScanCounts.get(kind) ?? 0) + 1);
-      return [...(objectIdsByKind.get(kind) ?? [])]
-        .map((id) => objectsById.get(id))
-        .filter((object): object is RuntimeWorldObject & { readonly kind: K } => object !== undefined);
+      let list = kindLists.get(kind);
+      if (list === undefined) {
+        kindScanCounts.set(kind, (kindScanCounts.get(kind) ?? 0) + 1);
+        list = Object.freeze(
+          [...(objectIdsByKind.get(kind) ?? [])]
+            .map((id) => objectsById.get(id))
+            .filter((object): object is RuntimeWorldObject => object !== undefined),
+        );
+        kindLists.set(kind, list);
+      }
+      return list as readonly (RuntimeWorldObject & { readonly kind: K })[];
     },
     getKindScanCounts() {
       return Object.fromEntries(kindScanCounts);
