@@ -49,6 +49,15 @@ interface Instance<T extends JournalRecord, V> {
 const instancesByRing = new WeakMap<ChangeRing<JournalRecord>, Map<unknown, Instance<JournalRecord, unknown>>>();
 
 let computing = false;
+let readObserver: ((kinds: readonly string[]) => void) | undefined;
+
+/**
+ * Installs (or, with `undefined`, removes) the observer told the declared kinds of every cache `read`, hit or miss.
+ * The read tracker (`trackedReads.ts`) uses it so that a read answered from a cache still counts as a read of the cache's kinds. Idle cost: one comparison per read.
+ */
+export function setDerivedReadObserver(observer: ((kinds: readonly string[]) => void) | undefined): void {
+  readObserver = observer;
+}
 let verifyEvery = 0;
 let verifyCountdown = 0;
 
@@ -106,6 +115,7 @@ export function defineDerived<S extends DerivedSource<T>, T extends JournalRecor
       const ring = source.changes.ring;
       const instance = instanceFor(ring);
       instance.reads += 1;
+      if (readObserver !== undefined) readObserver(kindList);
       if (instance.hasValue && instance.cursor === ring.headSeq) {
         if (verifyEvery > 0) verify(source, instance);
         return instance.value as V;
