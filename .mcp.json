@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "know": {
+      "command": "sh",
+      "args": [
+        "${CLAUDE_PROJECT_DIR:-.}/_scripts/know_mcp",
+        "--runtime",
+        "claude-code"
+      ]
+    }
+  }
+}

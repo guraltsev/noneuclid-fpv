@@ -30,8 +30,9 @@ When you begin investigating an unfamiliar failure or subsystem, call `mcp__know
 what you are looking at.
 When you discover a non-obvious, reusable project fact, root cause, constraint, or failed approach, save it immediately
 with `mcp__know__know_write`. Do not ask for approval. Record evidence and uncertainty; never invent evidence.
-When you delegate to a subagent, tell it to end its report with any such findings, and save what it reports. A subagent
-gets no brief, so give it the notes that apply to its task.
+A subagent gets no brief, so give it the notes that apply to its task. It can use the same tools, also in a Git worktree:
+tell it to save its findings and rate the notes it opens itself. If it has no such tools, tell it to end its report with its
+findings, and save what it reports.
 When a task is finished, for each note you opened call `mcp__know__know_assess` once with an outcome (`used`,
 `helpful`, `not_needed`, `irrelevant`, `misleading`, `stale`) and a one-line reason. Report the negative outcomes as
 readily as the positive ones: an honest `not_needed` is more useful than silence.

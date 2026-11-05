@@ -1,0 +1,55 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/_scripts/know_hook",
+              "UserPromptSubmit",
+              "--runtime",
+              "claude-code"
+            ],
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/_scripts/know_hook",
+              "PreCompact",
+              "--runtime",
+              "claude-code"
+            ],
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/_scripts/know_hook",
+              "SessionEnd",
+              "--runtime",
+              "claude-code"
+            ],
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
