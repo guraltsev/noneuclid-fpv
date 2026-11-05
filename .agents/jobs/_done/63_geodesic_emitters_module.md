@@ -1,7 +1,7 @@
 # Job 63 - Create the geodesic emitters module: renames, place, shoot, extend, delete
 
-Status: in progress.
-Resolves: nothing fully; with job 64, the emitter part of issue [84](../../_issues/84_behaviors_are_hard_wired_into_the_shell_and_need_a_plugin_system.md).
+Status: done, needs review on 2026-11-05.
+Resolves: nothing fully; with job 64, the emitter part of issue [84](../../../_issues/84_behaviors_are_hard_wired_into_the_shell_and_need_a_plugin_system.md).
 
 ## Goal
 
