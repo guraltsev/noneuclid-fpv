@@ -4,7 +4,7 @@
  * The module decides what is shown and enabled (config-gated sections, disabled buttons, tutorial text per input device, integer-meter limits for the geometry computer) but performs no rendering and holds no state; any page whose payload is missing falls back to the main page.
  */
 import type { ObjectActionEntry } from "../engine/moduleTypes";
-import { appConfigCatalog, defaultAppConfig, getEnabledMainTools, type AppConfig, type ConfigurableToolId } from "../glue/appConfig";
+import { appConfigCatalog, getEnabledMainTools, type AppConfig, type ConfigurableToolId } from "../glue/appConfig";
 import { formatBodyForInputMode } from "./inputModeText";
 import { worldCatalog } from "../authoring/worldCatalog";
 import { helpHubHomeGuidance } from "../world-objects/helpHubCopy";
@@ -252,10 +252,10 @@ export interface PaletteDefinition {
  */
 export function createPaletteDefinition(
   state: RuntimeMenuState,
-  appConfig: AppConfig = defaultAppConfig,
-  inputMode: InputMode = "desktop",
-  nowMs: number = Date.now(),
-  toolsById: ToolsById = new Map(),
+  appConfig: AppConfig,
+  inputMode: InputMode,
+  nowMs: number,
+  toolsById: ToolsById,
 ): PaletteDefinition {
   const reloadConfirmationActive = (state.reloadConfirmUntilMs ?? 0) > nowMs;
 

@@ -76,6 +76,8 @@ export interface GeodesicModelQueries {
   curveOfArc(arcId: string): readonly string[];
   /** The arcs with an end on the emitter, in registry order. Read from the arc index. */
   arcsOnEmitter(emitterId: string): readonly string[];
+  /** The emitter the arc leaves from: the one at its start, else the one at its end; undefined with neither, or for an id that is no arc. */
+  emitterOfArc(arcId: string): string | undefined;
   /** The arc's last rebuild failed during a carry, so it still shows its old path. */
   isStale(arcId: string): boolean;
 }

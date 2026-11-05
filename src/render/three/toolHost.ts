@@ -61,7 +61,7 @@ export interface ToolHostDeps {
   syncDesktopPalette(): void;
   /** The client's selection: an object and one of its geodesics. */
   selectObject(objectId: string, geodesicId: string): void;
-  /** Shows an object's menu page. */
+  /** Shows an object's menu page, or closes the menu when the object has none. */
   showObjectPage(objectId: string): void;
 }
 
@@ -171,12 +171,14 @@ export function createToolHost(deps: ToolHostDeps): ToolHost {
         submit(command: EngineCommandBase) {
           pending.push({ ticket: engine.submit(localParticipantId, command), toolId });
         },
+        commandInFlight: () => pending.some((entry) => entry.toolId === toolId),
         getToolState: <T>(moduleId: string) => session.get().moduleToolState[moduleId] as T | undefined,
         setToolState(moduleId, state) {
           deps.dispatch({ kind: "set-module-tool-state", moduleId, state });
           deps.syncDesktopPalette();
         },
         endTool() {
+          if (session.get().menuState.selectedTool !== toolId) return;
           deps.dispatch({ kind: "close-menu" });
           deps.dispatch({ kind: "clear-selected-tool" });
         },

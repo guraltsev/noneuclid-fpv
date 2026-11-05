@@ -5,14 +5,13 @@ import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex"
 import { transformPoint3, yawRigidTransform3 } from "../../math/rigidTransform3";
 import { addVec3, distanceSquaredVec3, scaleVec3, type Vec3 } from "../../math/vec3";
 import type { RuntimeObjectRegistry, RuntimeWorldObject } from "../runtimeObjectRegistry";
-import { createGeodesicArcObject, directionFromYaw, emitterConnectionToleranceMeters, type GeodesicVertexObject, GEODESIC_MIN_LENGTH_METERS, type GeodesicEmitterObject, type GeodesicCarryPortalTransition, type GeodesicEndRole, type GeodesicArcObject, type GeodesicPortalTraversal, type GeodesicTraceBuildResult, getGeodesicCannonEmitterPoint, getOppositeEndRole, intersectionTolerance, isGeodesicVertexObject, type LiftedGeodesicEndpoint, minGeodesicSegmentLengthMeters, type TraceGeodesicSegmentResult, withoutStale } from "./objects";
+import { createGeodesicArcObject, directionFromYaw, emitterConnectionToleranceMeters, type GeodesicVertexObject, GEODESIC_MIN_LENGTH_METERS, type GeodesicEmitterObject, type GeodesicCarryPortalTransition, type GeodesicEndRole, type GeodesicArcObject, type GeodesicPortalTraversal, type GeodesicSegmentObject, type GeodesicTraceBuildResult, getGeodesicCannonEmitterPoint, getOppositeEndRole, intersectionTolerance, isGeodesicVertexObject, type LiftedGeodesicEndpoint, minGeodesicSegmentLengthMeters, type TraceGeodesicSegmentResult, withoutStale } from "./objects";
 import { canObjectAttachGeodesics } from "./anchors";
 import { applyAnchorCrossingTraversals, collectPortalWordFromTraces, portalTraversalFromCarryTransition, portalWordAfterAnchorCrossing, samePortalWord } from "./portalWord";
 import { reduceAdjacentInversePortalTraversals } from "./objects";
 import { traceGeodesicPathForConnectionMode, traceTerminalToBuildTerminal } from "./trace";
 import {
   getGeodesicEndpointAttachmentsForAnchor,
-  isAimableFreeGeodesic,
   liftGeodesicEndpointWithAnchors,
   portalWordMatchesCurrentEndpointCells,
   removeUnusedFreeGeodesicEnds,
@@ -20,7 +19,6 @@ import {
 } from "./endpoints";
 import {
   buildDerivedSegmentsFromTraces,
-  canConnectGeodesicSegmentAtDistance,
   getGeodesicSegments,
   nextGeodesicNumber,
   removeGeodesicIntervalAndDerivedObjects,
@@ -377,43 +375,26 @@ export function rebuildDerivedGeodesicSegmentsDetailed(input: {
 /**
  * Splits a free geodesic at a point on one of its segments, ending the first part at a newly placed emitter.
  *
- * Preconditions: the interval is an aimable free geodesic (emitter at one role, free end at the other; see
- * `isAimableFreeGeodesic`), the segment belongs to it, `placedEmitterId` is a cannon in the registry, and the clamped
- * cut distance leaves a long enough prefix (`canConnectGeodesicSegmentAtDistance`). Otherwise returns `[]` and changes
- * nothing. The original interval is shortened so its free role now attaches to the placed emitter (its portal word becomes
+ * Preconditions, which the caller has checked: the interval is an aimable free geodesic (emitter at one role, free end at the other; see
+ * `isAimableFreeGeodesic`), the segment belongs to it, `placed` is in the registry, and the cut distance lies on the segment and leaves
+ * a long enough prefix (`canConnectGeodesicSegmentAtDistance`).
+ * The original interval is shortened so its free role now attaches to the placed emitter (its portal word becomes
  * the word of the prefix traces); the remainder (if at least `minGeodesicSegmentLengthMeters`) becomes a new interval from
- * the placed emitter to the old free end, rebuilt along the same direction. Returns the surviving intervals
- * (prefix first, continuation second if created). Mutates the registry.
+ * the placed emitter to the old free end, rebuilt along the same direction. Mutates the registry.
  */
 export function splitGeodesicIntervalAtSegmentHit(input: {
   readonly world: CompiledCellComplex;
   readonly registry: RuntimeObjectRegistry;
-  readonly geodesicId: string;
-  readonly segmentId: string;
+  readonly interval: GeodesicArcObject;
+  readonly segment: GeodesicSegmentObject;
   readonly distanceAlongSegmentMeters: number;
-  readonly placedEmitterId: string;
+  readonly placed: GeodesicEmitterObject;
   readonly createContinuationGeodesicId: (sourceGeodesicId: string, sideIndex: number) => string;
-}): readonly GeodesicArcObject[] {
-  const interval = input.registry.get(input.geodesicId);
-  const segment = input.registry.get(input.segmentId);
-  const placed = input.registry.get(input.placedEmitterId);
-  if (
-    interval?.kind !== "geodesicModel/arc" ||
-    segment?.kind !== "geodesicModel/segment" ||
-    segment.geodesicId !== input.geodesicId ||
-    placed?.kind !== "geodesicEmitters/emitter" ||
-    !isAimableFreeGeodesic(input.registry, interval)
-  ) {
-    return [];
-  }
+}): void {
+  const { interval, segment, placed, distanceAlongSegmentMeters: clampedDistance } = input;
+  const geodesicId = interval.id;
   // Cut point: arc length `prefixLengthMeters` from the geodesic's emitter-side start (all earlier segments plus the distance in this one).
-  // The prefix must be at least the minimum length, otherwise the new emitter would sit on the old one.
-  const clampedDistance = Math.min(segment.lengthMeters, Math.max(0, input.distanceAlongSegmentMeters));
-  if (!canConnectGeodesicSegmentAtDistance(clampedDistance)) {
-    return [];
-  }
-
-  const segments = getGeodesicSegments(input.registry, input.geodesicId);
+  const segments = getGeodesicSegments(input.registry, geodesicId);
   const totalLengthMeters = totalGeodesicLengthFromSegments(segments);
   const prefixLengthMeters = totalLengthThroughSegment(segments, segment, clampedDistance);
   const continuationLengthMeters = totalLengthMeters - prefixLengthMeters;
@@ -422,11 +403,8 @@ export function splitGeodesicIntervalAtSegmentHit(input: {
     ? "start"
     : "end";
   const sourceRole = getOppositeEndRole(freeRole);
-  const sourceAnchor = input.registry.get(interval[sourceRole].anchorObjectId);
-  const freeEnd = input.registry.get(interval[freeRole].anchorObjectId);
-  if (sourceAnchor?.kind !== "geodesicEmitters/emitter" || freeEnd?.kind !== "geodesicModel/vertex") {
-    return [];
-  }
+  const sourceAnchor = input.registry.get(interval[sourceRole].anchorObjectId) as GeodesicEmitterObject;
+  const freeEnd = input.registry.get(interval[freeRole].anchorObjectId) as GeodesicVertexObject;
 
   // Prefix path = the whole segments before the hit plus the hit segment truncated at the cut point, ending at the new emitter.
   // Its portal word is the word of the shortened geodesic (portal-hit terminals of the whole segments).
@@ -442,7 +420,7 @@ export function splitGeodesicIntervalAtSegmentHit(input: {
   });
   const prefixPortalWord = collectPortalWordFromTraces(input.world, prefixTraces);
   const continuationId = continuationLengthMeters >= minGeodesicSegmentLengthMeters - intersectionTolerance
-    ? input.createContinuationGeodesicId(input.geodesicId, 0)
+    ? input.createContinuationGeodesicId(geodesicId, 0)
     : undefined;
   // The continuation takes over the old free end: placed emitter -> old free end. Its word/geometry is filled in by rebuildContinuationFromCut.
   if (continuationId) {
@@ -469,7 +447,7 @@ export function splitGeodesicIntervalAtSegmentHit(input: {
   });
   replaceDerivedSegmentsFromTraces({
     registry: input.registry,
-    geodesicId: input.geodesicId,
+    geodesicId,
     traces: prefixTraces,
   });
 
@@ -485,8 +463,6 @@ export function splitGeodesicIntervalAtSegmentHit(input: {
     });
   }
   removeUnusedFreeGeodesicEnds(input.registry);
-  return [input.registry.get(input.geodesicId), continuationId ? input.registry.get(continuationId) : undefined]
-    .filter((object): object is GeodesicArcObject => object?.kind === "geodesicModel/arc");
 }
 
 /**

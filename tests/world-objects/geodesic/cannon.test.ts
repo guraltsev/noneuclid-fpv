@@ -51,7 +51,7 @@ describe("geodesic cannon world objects: cannon", () => {
       localPose: yawRigidTransform3(0, { x: -1.5, y: 0, z: 0 }),
     });
     registry.add(cannon);
-    const first = shootGeodesic({ world, registry, cannon, geodesicId: "g-a" });
+    const first = shootGeodesic({ maxLengthMeters: 2, world, registry, cannon, geodesicId: "g-a" });
 
     const result = placeGeodesicCannonOnGeodesic({
       world,
@@ -60,7 +60,8 @@ describe("geodesic cannon world objects: cannon", () => {
       segmentId: first.id,
       distanceAlongSegmentMeters: 1,
       aimYawRadians: Math.PI / 2,
-      id: "cannon-b",
+      createId: () => "cannon-b",
+      createContinuationGeodesicId: (id) => `${id}:continuation:cannon-b`,
     });
 
     expect(result.placed).toBe(true);
@@ -78,8 +79,8 @@ describe("geodesic cannon world objects: cannon", () => {
     expect(getGeodesicEndpointAttachmentsForAnchor(registry, "cannon-b").map((attachment) => attachment.geodesicId).sort())
       .toEqual(["g-a", continuationId]);
     expect(getCannonGeodesicYaw(registry, "cannon-b", "g-a")).toBeCloseTo(Math.PI);
-    expect(extendGeodesic({ world, registry, geodesicId: "g-a" })).toBeUndefined();
-    expect(extendGeodesic({ world, registry, geodesicId: continuationId })).toBeDefined();
+    expect(extendGeodesic({ maxLengthMeters: 2, world, registry, geodesicId: "g-a" })).toBeUndefined();
+    expect(extendGeodesic({ maxLengthMeters: 2, world, registry, geodesicId: continuationId })).toBeDefined();
   });
 
   it("refuses to place an emitter where splitting would create a tiny segment", () => {
@@ -91,7 +92,7 @@ describe("geodesic cannon world objects: cannon", () => {
       localPose: yawRigidTransform3(0, { x: -1.5, y: 0, z: 0 }),
     });
     registry.add(cannon);
-    const segment = shootGeodesic({ world, registry, cannon, geodesicId: "g-a" });
+    const segment = shootGeodesic({ maxLengthMeters: 2, world, registry, cannon, geodesicId: "g-a" });
 
     const result = placeGeodesicCannonOnGeodesic({
       world,
@@ -100,7 +101,8 @@ describe("geodesic cannon world objects: cannon", () => {
       segmentId: segment.id,
       distanceAlongSegmentMeters: minGeodesicSegmentLengthMeters / 2,
       aimYawRadians: 0,
-      id: "cannon-b",
+      createId: () => "cannon-b",
+      createContinuationGeodesicId: (id) => `${id}:continuation:cannon-b`,
     });
 
     expect(result.placed).toBe(false);
@@ -117,13 +119,14 @@ describe("geodesic cannon world objects: cannon", () => {
       localPose: yawRigidTransform3(0, { x: -1.5, y: 0, z: 0 }),
     });
     registry.add(cannon);
-    const first = shootGeodesic({ world, registry, cannon, geodesicId: "g-a" });
+    const first = shootGeodesic({ maxLengthMeters: 2, world, registry, cannon, geodesicId: "g-a" });
     const updatedCannon = registry.get("cannon-a");
     if (updatedCannon?.kind !== "geodesicEmitters/emitter") {
       throw new Error("Expected updated geodesic cannon.");
     }
 
     shootGeodesic({
+      maxLengthMeters: 2,
       world,
       registry,
       cannon: {
@@ -141,7 +144,8 @@ describe("geodesic cannon world objects: cannon", () => {
       segmentId: first.id,
       distanceAlongSegmentMeters: 1,
       aimYawRadians: Math.PI / 2,
-      id: "cannon-b",
+      createId: () => "cannon-b",
+      createContinuationGeodesicId: (id) => `${id}:continuation:cannon-b`,
     });
 
     expect(result.placed).toBe(true);

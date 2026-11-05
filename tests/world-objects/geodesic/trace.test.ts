@@ -58,8 +58,8 @@ describe("geodesic cannon world objects: trace", () => {
     });
     registry.add(cannon);
 
-    const first = shootGeodesic({ world, registry, cannon, geodesicId: "g-a" });
-    const second = extendGeodesic({ world, registry, geodesicId: "g-a" });
+    const first = shootGeodesic({ maxLengthMeters: 2, world, registry, cannon, geodesicId: "g-a" });
+    const second = extendGeodesic({ maxLengthMeters: 2, world, registry, geodesicId: "g-a" });
 
     expect(cannon.collision).toEqual({
       radius: 0.3,
@@ -109,12 +109,12 @@ describe("geodesic cannon world objects: trace", () => {
     });
     registry.add(cannon);
 
-    const first = shootGeodesic({ world, registry, cannon, geodesicId: "g-a" });
+    const first = shootGeodesic({ maxLengthMeters: 2, world, registry, cannon, geodesicId: "g-a" });
     const updatedCannon = registry.get("cannon-a");
     if (updatedCannon?.kind !== "geodesicEmitters/emitter") {
       throw new Error("Expected updated geodesic cannon.");
     }
-    const second = shootGeodesic({ world, registry, cannon: updatedCannon, geodesicId: "g-b" });
+    const second = shootGeodesic({ maxLengthMeters: 2, world, registry, cannon: updatedCannon, geodesicId: "g-b" });
 
     expect(first.tooltip?.label).toBe("Geodesic G1");
     expect(second.geodesicNumber).toBe(2);
@@ -139,8 +139,8 @@ describe("geodesic cannon world objects: trace", () => {
     registry.add(firstCannon);
     registry.add(secondCannon);
 
-    const first = shootGeodesic({ world, registry, cannon: firstCannon, geodesicId: "g-a" });
-    const second = shootGeodesic({ world, registry, cannon: secondCannon, geodesicId: "g-b" });
+    const first = shootGeodesic({ maxLengthMeters: 2, world, registry, cannon: firstCannon, geodesicId: "g-a" });
+    const second = shootGeodesic({ maxLengthMeters: 2, world, registry, cannon: secondCannon, geodesicId: "g-b" });
 
     expect(first.geodesicNumber).toBe(1);
     expect(first.tooltip?.label).toBe("Geodesic G1");
@@ -181,7 +181,7 @@ describe("geodesic cannon world objects: trace", () => {
       return cannon;
     };
     for (const geodesicId of ["g-a", "g-b", "g-c"]) {
-      shootGeodesic({ world, registry, cannon: currentCannon(), geodesicId });
+      shootGeodesic({ maxLengthMeters: 2, world, registry, cannon: currentCannon(), geodesicId });
     }
     expect(["g-a", "g-b", "g-c"].map((id) => resolveGeodesicNumber(registry, id))).toEqual([1, 2, 3]);
 
@@ -190,7 +190,7 @@ describe("geodesic cannon world objects: trace", () => {
 
     expect(resolveGeodesicNumber(registry, "g-c")).toBe(3);
     expect(getGeodesicSegments(registry, "g-c").every((segment) => segment.geodesicNumber === 3)).toBe(true);
-    const fourth = shootGeodesic({ world, registry, cannon: currentCannon(), geodesicId: "g-d" });
+    const fourth = shootGeodesic({ maxLengthMeters: 2, world, registry, cannon: currentCannon(), geodesicId: "g-d" });
     expect(fourth.geodesicNumber).toBe(1);
   });
 
@@ -204,7 +204,7 @@ describe("geodesic cannon world objects: trace", () => {
     });
     registry.add(cannon);
 
-    const first = shootGeodesic({ world, registry, cannon, geodesicId: "g-a" });
+    const first = shootGeodesic({ maxLengthMeters: 2, world, registry, cannon, geodesicId: "g-a" });
 
     expect(first.start.x).toBeCloseTo(-1.5 + geodesicRayBeamStartOffsetMeters);
     expect(first.start.y).toBeCloseTo(0);
@@ -273,7 +273,7 @@ describe("geodesic cannon world objects: trace", () => {
       terminal: result.terminal,
     });
 
-    expect(extendGeodesic({ world, registry, geodesicId: "g-a" })).toBeUndefined();
+    expect(extendGeodesic({ maxLengthMeters: 2, world, registry, geodesicId: "g-a" })).toBeUndefined();
   });
 
   it("rebuilds a rotated geodesic to its remembered length after clearing a forbidden zone", () => {
@@ -457,7 +457,7 @@ describe("geodesic cannon world objects: trace", () => {
     expect(third?.segmentIndex).toBe(1);
     expect(third?.terminal.kind).toBe("wall-hit");
     expect(getGeodesicSegments(registry, "g-a")).toHaveLength(2);
-    expect(extendGeodesic({ world, registry, geodesicId: "g-a" })).toBeUndefined();
+    expect(extendGeodesic({ maxLengthMeters: 2, world, registry, geodesicId: "g-a" })).toBeUndefined();
   });
 
   it("rejects zero directions", () => {

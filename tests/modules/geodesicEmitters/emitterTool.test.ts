@@ -26,6 +26,7 @@ function setup(scene: { readonly world: ReturnType<typeof compileLargePortalWorl
     pickTargets: () => (aim.pick === undefined ? [] : [aim.pick]),
     currentPick: () => aim.pick,
     aimYawRadians: () => aim.yaw,
+    commandInFlight: () => submitted.length > 0,
     submit: (command) => void submitted.push({ ticket: engine.submit("local", command), command }),
     getToolState: <T,>() => toolState as T | undefined,
     setToolState: (_moduleId, next) => void (toolState = next),
@@ -36,20 +37,22 @@ function setup(scene: { readonly world: ReturnType<typeof compileLargePortalWorl
     query: (token) => engine.query(token),
     showMessage: (message) => void log.messages.push(message),
   };
-  /** Steps the world until nothing is in flight, handing each result to the tool as the shell does after a step. */
+  /** One step, handing each result to the tool as the shell does after a step. */
+  function stepOnce(): void {
+    engine.step(0);
+    for (const entry of submitted.splice(0)) tool.onResult?.(context, engine.resultOf(entry.ticket) as CommandResult);
+    engine.endFrame();
+  }
+  /** Steps the world until nothing is in flight. */
   function settle(): void {
-    while (submitted.length > 0) {
-      engine.step(0);
-      for (const entry of submitted.splice(0)) tool.onResult?.(context, engine.resultOf(entry.ticket) as CommandResult);
-      engine.endFrame();
-    }
+    while (submitted.length > 0) stepOnce();
   }
   function click(pick: AimPick, yaw = 0): boolean {
     aim.pick = pick;
     aim.yaw = yaw;
     return tool.onPrimaryAction(context);
   }
-  return { engine, registry, tool, context, log, aim, submitted, settle, click };
+  return { engine, registry, tool, context, log, aim, submitted, stepOnce, settle, click };
 }
 
 const floorAt = (x: number, y: number): AimPick => ({ objectKind: "floor", cellId: "a", point: { x, y, z: 0 }, withinRange: true });
@@ -161,15 +164,96 @@ describe("the emitter's page", () => {
     expect(log.pages).toEqual([emitterId]);
   });
 
-  it("closes the menu when the world refuses, for an emitter that is gone", () => {
+  it("shows the refusal and the page as it now is, for an emitter that is gone", () => {
     const { context, settle, log } = setup();
 
     requestNewGeodesic(context, "gone");
     settle();
 
     expect(log.messages).toEqual(["That is not an emitter."]);
+    expect(log.ended).toBe(0);
+    expect(log.pages).toEqual(["gone"]);
+  });
+});
+
+describe("a press while the world has not answered", () => {
+  /** An emitter at (3, 2.5) with its first geodesic, the tool ended. */
+  function withEmitter() {
+    const scene = setup();
+    scene.click(floorAt(3, 2.5));
+    scene.settle();
+    const emitter = scene.registry.getObjectsOfKind("geodesicEmitters/emitter")[0]!;
+    scene.log.ended = 0;
+    return { ...scene, emitter, arcId: getEmitterGeodesicIds(scene.registry, emitter.id)[0]! };
+  }
+
+  it("adds one geodesic and keeps the page open when Add geodesic is pressed twice", () => {
+    const { registry, context, settle, log, emitter } = withEmitter();
+
+    requestNewGeodesic(context, emitter.id);
+    requestNewGeodesic(context, emitter.id);
+    settle();
+
+    expect(getEmitterGeodesicIds(registry, emitter.id)).toHaveLength(2);
+    expect(log.ended).toBe(0);
+    expect(log.pages).toEqual([emitter.id]);
+  });
+
+  it("places one emitter when the floor is pressed again elsewhere", () => {
+    const { registry, click, settle, log } = setup();
+
+    click(floorAt(3, 2.5));
+    click(floorAt(1, 1));
+    settle();
+
+    expect(registry.getObjectsOfKind("geodesicEmitters/emitter")).toHaveLength(1);
+    expect(registry.getObjectsOfKind("geodesicModel/arc")).toHaveLength(1);
     expect(log.ended).toBe(1);
-    expect(log.pages).toEqual([]);
+  });
+
+  it("shows no refusal when the same spot is pressed again", () => {
+    const { registry, click, settle, log } = setup();
+
+    click(floorAt(3, 2.5));
+    click(floorAt(3, 2.5));
+    settle();
+
+    expect(registry.getObjectsOfKind("geodesicEmitters/emitter")).toHaveLength(1);
+    expect(log.messages).toEqual([]);
+  });
+
+  it("adds nothing when the new emitter is pressed between the two answers", () => {
+    const { registry, click, stepOnce, settle } = setup();
+
+    click(floorAt(3, 2.5));
+    stepOnce();
+    const emitter = registry.getObjectsOfKind("geodesicEmitters/emitter")[0]!;
+    click({ objectId: emitter.id, objectKind: emitter.kind, cellId: "a", point: { x: 3, y: 2.5, z: 1 }, withinRange: true });
+    settle();
+
+    expect(getEmitterGeodesicIds(registry, emitter.id)).toHaveLength(1);
+  });
+
+  it("deletes once, with no refusal, when delete is pressed twice", () => {
+    const { registry, context, settle, log, emitter, arcId } = withEmitter();
+
+    requestGeodesicDeletion(context, emitter.id, arcId);
+    requestGeodesicDeletion(context, emitter.id, arcId);
+    settle();
+
+    expect(registry.get(arcId)).toBeUndefined();
+    expect(log.messages).toEqual([]);
+    expect(log.pages).toEqual([emitter.id]);
+  });
+
+  it("lengthens once when a geodesic is pressed twice", () => {
+    const { registry, context, settle, arcId } = withEmitter();
+
+    requestGeodesicExtension(context, arcId);
+    requestGeodesicExtension(context, arcId);
+    settle();
+
+    expect(totalGeodesicLength(registry, arcId)).toBeCloseTo(2 * defaultTraceLengthMeters, 6);
   });
 });
 

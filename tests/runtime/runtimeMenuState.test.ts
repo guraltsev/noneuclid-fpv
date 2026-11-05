@@ -28,18 +28,19 @@ import {
   showRuntimeMenuQuestionTutorial,
   showRuntimeMenuTutorial,
 } from "../../src/runtime/runtimeMenuState";
-import { createPaletteDefinition, questionHelpHubBody } from "../../src/ui/paletteDefinition";
+import { questionHelpHubBody } from "../../src/ui/paletteDefinition";
+import { createTestPaletteDefinition } from "../support/tools";
 
 describe("paged help fallback titles", () => {
   it("uses the right title for an empty goal or tutorial page list", () => {
     const base = createRuntimeMenuState({ selectedWorldId: "cube" });
-    const goal = createPaletteDefinition({
+    const goal = createTestPaletteDefinition({
       ...base,
       isOpen: true,
       page: "goal",
       goalOptions: { objectId: "g", pages: [], pageIndex: 0 },
     });
-    const tutorial = createPaletteDefinition({
+    const tutorial = createTestPaletteDefinition({
       ...base,
       isOpen: true,
       page: "tutorial",
@@ -84,7 +85,7 @@ describe("runtimeMenuState", () => {
     const state = setRuntimeMenuSelectedTool(createRuntimeMenuState({
       selectedWorldId: "cube",
     }), "protractor");
-    const definition = createPaletteDefinition(state);
+    const definition = createTestPaletteDefinition(state);
 
     expect(state.selectedTool).toBe("protractor");
     expect(definition.content.kind).toBe("main");
@@ -98,7 +99,7 @@ describe("runtimeMenuState", () => {
     const state = setRuntimeMenuSelectedTool(createRuntimeMenuState({
       selectedWorldId: "cube",
     }), "measure-length");
-    const definition = createPaletteDefinition(state);
+    const definition = createTestPaletteDefinition(state);
 
     expect(state.selectedTool).toBe("measure-length");
     expect(definition.content.kind).toBe("main");
@@ -119,7 +120,7 @@ describe("runtimeMenuState", () => {
     }), true);
 
     expect(createDebugSettingsFromRuntimeMenuState(state).debugOptions).toContain("aim-collision-outlines");
-    expect(createPaletteDefinition(showRuntimeMenuDebugSettings(state)).content).toMatchObject({
+    expect(createTestPaletteDefinition(showRuntimeMenuDebugSettings(state)).content).toMatchObject({
       kind: "debug-settings",
       aimCollisionOutlinesEnabled: true,
     });
@@ -155,7 +156,7 @@ describe("runtimeMenuState", () => {
   });
 
   it("treats the sign editor as an object-specific menu that closes when backing out", () => {
-    const definition = createPaletteDefinition(showRuntimeMenuEditSign(createRuntimeMenuState({
+    const definition = createTestPaletteDefinition(showRuntimeMenuEditSign(createRuntimeMenuState({
       selectedWorldId: "cube",
     }), {
       flagId: "sign-a",
@@ -167,7 +168,7 @@ describe("runtimeMenuState", () => {
   });
 
   it("creates a geodesic ray emitter action menu with aim enabled", () => {
-    const definition = createPaletteDefinition(showRuntimeMenuGeodesicCannonActions(createRuntimeMenuState({
+    const definition = createTestPaletteDefinition(showRuntimeMenuGeodesicCannonActions(createRuntimeMenuState({
       selectedWorldId: "cube",
     }), {
       cannonId: "cannon-a",
@@ -189,7 +190,7 @@ describe("runtimeMenuState", () => {
   });
 
   it("lists the actions the tools contribute to the emitter page", () => {
-    const definition = createPaletteDefinition(showRuntimeMenuGeodesicCannonActions(createRuntimeMenuState({
+    const definition = createTestPaletteDefinition(showRuntimeMenuGeodesicCannonActions(createRuntimeMenuState({
       selectedWorldId: "cube",
     }), {
       cannonId: "cannon-a",
@@ -205,7 +206,7 @@ describe("runtimeMenuState", () => {
   });
 
   it("uses explicit global geodesic labels in emitter action menus", () => {
-    const definition = createPaletteDefinition(showRuntimeMenuGeodesicCannonActions(createRuntimeMenuState({
+    const definition = createTestPaletteDefinition(showRuntimeMenuGeodesicCannonActions(createRuntimeMenuState({
       selectedWorldId: "cube",
     }), {
       cannonId: "cannon-b",
@@ -223,7 +224,7 @@ describe("runtimeMenuState", () => {
   });
 
   it("marks connected geodesic rows with a connection symbol label", () => {
-    const definition = createPaletteDefinition(showRuntimeMenuGeodesicCannonActions(createRuntimeMenuState({
+    const definition = createTestPaletteDefinition(showRuntimeMenuGeodesicCannonActions(createRuntimeMenuState({
       selectedWorldId: "cube",
     }), {
       cannonId: "cannon-b",
@@ -247,7 +248,7 @@ describe("runtimeMenuState", () => {
   });
 
   it("creates a geometry computer action menu with world deformation controls", () => {
-    const definition = createPaletteDefinition(showRuntimeMenuGeometryComputerActions(createRuntimeMenuState({
+    const definition = createTestPaletteDefinition(showRuntimeMenuGeometryComputerActions(createRuntimeMenuState({
       selectedWorldId: "torus",
     }), {
       computerId: "torus-geometry-computer",
@@ -291,8 +292,8 @@ describe("runtimeMenuState", () => {
       ],
     });
 
-    const firstPage = createPaletteDefinition(state);
-    const secondPage = createPaletteDefinition(setRuntimeMenuTutorialPageIndex(state, 1));
+    const firstPage = createTestPaletteDefinition(state);
+    const secondPage = createTestPaletteDefinition(setRuntimeMenuTutorialPageIndex(state, 1));
 
     expect(firstPage.pageId).toBe("tutorial");
     expect(firstPage.rightAction.id).toBe("back");
@@ -323,9 +324,9 @@ describe("runtimeMenuState", () => {
       goalPages: [{ title: "Goal", body: "Find a portal." }],
     });
 
-    const hub = createPaletteDefinition(state);
-    const tutorial = createPaletteDefinition(showRuntimeMenuQuestionTutorial(state));
-    const goal = createPaletteDefinition(showRuntimeMenuGoal(state));
+    const hub = createTestPaletteDefinition(state);
+    const tutorial = createTestPaletteDefinition(showRuntimeMenuQuestionTutorial(state));
+    const goal = createTestPaletteDefinition(showRuntimeMenuGoal(state));
 
     expect(hub.pageId).toBe("question-help");
     expect(hub.content).toMatchObject({
@@ -350,9 +351,9 @@ describe("runtimeMenuState", () => {
         { title: "Bonus", body: "Return home." },
       ],
     });
-    const secondPage = createPaletteDefinition(setRuntimeMenuGoalPageIndex(state, 1));
+    const secondPage = createTestPaletteDefinition(setRuntimeMenuGoalPageIndex(state, 1));
 
-    expect(createPaletteDefinition(state).content).toMatchObject({
+    expect(createTestPaletteDefinition(state).content).toMatchObject({
       kind: "goal",
       title: "Goal",
       pageLabel: "1 / 2",
@@ -379,11 +380,11 @@ describe("runtimeMenuState", () => {
       }],
     });
 
-    expect(createPaletteDefinition(state, undefined, "desktop").content).toMatchObject({
+    expect(createTestPaletteDefinition(state, undefined, "desktop").content).toMatchObject({
       kind: "tutorial",
       body: "Left click uses the selected/default action. Right click opens tools and object menus.",
     });
-    expect(createPaletteDefinition(state, undefined, "xr").content).toMatchObject({
+    expect(createTestPaletteDefinition(state, undefined, "xr").content).toMatchObject({
       kind: "tutorial",
       body: "Trigger uses the selected/default action. Side trigger opens tools and object menus.",
     });

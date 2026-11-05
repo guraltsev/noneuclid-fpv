@@ -65,7 +65,7 @@ function createPlace(model: GeodesicModelQueries) {
       cellId: command.cellId,
       point: command.point,
       aimYawRadians: command.yawRadians,
-      id: ctx.ids.next("emitter"),
+      createId: () => ctx.ids.next("emitter"),
       createContinuationGeodesicId: () => reserveArcId(ctx),
     });
     if (!placed.placed || placed.object === undefined) {
@@ -93,17 +93,16 @@ function shoot(command: GeodesicEmitterShootCommand, ctx: CommandContext): Comma
   return answer({ outcome: "shot", emitterId: emitter.id, arcId });
 }
 
-function extend(command: GeodesicEmitterExtendCommand, ctx: CommandContext): CommandResult {
-  const arc = ctx.objects.get(command.arcId);
-  const emitter = arc?.kind !== "geodesicModel/arc"
-    ? undefined
-    : emitterAt(ctx.objects, arc.start.anchorObjectId) ?? emitterAt(ctx.objects, arc.end.anchorObjectId);
-  if (emitter === undefined) return refuse(geodesicEmittersRefusals.notAttached, "That geodesic has no emitter.");
-  if (!isLongEnough(command.lengthMeters)) return tooShort;
-  // `extendGeodesic` writes only once it knows the geodesic can go on.
-  const extended = extendGeodesic({ world: ctx.world, registry: ctx.objects, geodesicId: command.arcId, maxLengthMeters: command.lengthMeters });
-  if (extended === undefined) return refuse(geodesicEmittersRefusals.blocked, "That geodesic cannot go any further.");
-  return answer({ outcome: "extended", emitterId: emitter.id, arcId: command.arcId });
+function createExtend(model: GeodesicModelQueries) {
+  return (command: GeodesicEmitterExtendCommand, ctx: CommandContext): CommandResult => {
+    const emitterId = model.emitterOfArc(command.arcId);
+    if (emitterId === undefined) return refuse(geodesicEmittersRefusals.notAttached, "That geodesic has no emitter.");
+    if (!isLongEnough(command.lengthMeters)) return tooShort;
+    // `extendGeodesic` writes only once it knows the geodesic can go on.
+    const extended = extendGeodesic({ world: ctx.world, registry: ctx.objects, geodesicId: command.arcId, maxLengthMeters: command.lengthMeters });
+    if (extended === undefined) return refuse(geodesicEmittersRefusals.blocked, "That geodesic cannot go any further.");
+    return answer({ outcome: "extended", emitterId, arcId: command.arcId });
+  };
 }
 
 function createDeleteGeodesic(model: GeodesicModelQueries) {
@@ -113,8 +112,8 @@ function createDeleteGeodesic(model: GeodesicModelQueries) {
       return refuse(geodesicEmittersRefusals.notAttached, "That geodesic is not on this emitter.");
     }
     const removal: GeodesicRemoveCurveCommand = { kind: "geodesicModel/removeCurve", arcIds: [command.arcId] };
-    const removed = ctx.dispatch(removal);
-    return removed.ok ? answer({ outcome: "geodesicDeleted", emitterId: command.emitterId, arcId: command.arcId }) : removed;
+    ctx.dispatch(removal);
+    return answer({ outcome: "geodesicDeleted", emitterId: command.emitterId, arcId: command.arcId });
   };
 }
 
@@ -123,8 +122,7 @@ function createRemove(model: GeodesicModelQueries) {
     if (emitterAt(ctx.objects, command.emitterId) === undefined) return notAnEmitter;
     const arcIds = [...new Set(model.arcsOnEmitter(command.emitterId).flatMap((arcId) => (model.isTied(arcId) ? model.curveOfArc(arcId) : [arcId])))];
     const removal: GeodesicRemoveCurveCommand = { kind: "geodesicModel/removeCurve", arcIds };
-    const removed = ctx.dispatch(removal);
-    if (!removed.ok) return removed;
+    ctx.dispatch(removal);
     ctx.objects.remove(command.emitterId);
     return answer({ outcome: "removed", emitterId: command.emitterId, arcIds });
   };
@@ -144,7 +142,7 @@ export function geodesicEmittersModule(): GeodesicEmittersModuleDefinition {
       const commands: CommandHandlers<GeodesicEmittersCommand> = {
         "geodesicEmitters/place": { run: createPlace(model), requiresTool: geodesicEmitterToolId },
         "geodesicEmitters/shoot": { run: shoot, requiresTool: geodesicEmitterToolId },
-        "geodesicEmitters/extend": { run: extend, requiresTool: geodesicEmitterToolId },
+        "geodesicEmitters/extend": { run: createExtend(model), requiresTool: geodesicEmitterToolId },
         "geodesicEmitters/deleteGeodesic": { run: createDeleteGeodesic(model), requiresTool: geodesicEmitterToolId },
         "geodesicEmitters/remove": { run: createRemove(model), requiresTool: geodesicEmitterToolId },
       };

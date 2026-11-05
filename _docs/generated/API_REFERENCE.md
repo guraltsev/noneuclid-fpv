@@ -702,7 +702,7 @@ Emitter (cannon) operations: shooting, extending and re-aiming geodesics, connec
 | interface | `ShootGeodesicInput` | Input for `shootGeodesic`: aim a cannon's geodesic along the cannon's yaw and trace it for `maxLengthMeters`. |
 | interface | `ExtendGeodesicInput` | Input for `extendGeodesic`: lengthen an aimable free geodesic by `maxLengthMeters` along its emitter tangent. |
 | interface | `RebuildGeodesicToLengthInput` | Input for `rebuildGeodesicToLength`: re-shoot a geodesic from its cannon with a new total length. |
-| interface | `PlaceGeodesicCannonAtFloorPointRequest` | Request for `placeGeodesicCannonAtFloorPoint`: put a new cannon with id `id` on the floor of `cellId`. |
+| interface | `PlaceGeodesicCannonAtFloorPointRequest` | Request for `placeGeodesicCannonAtFloorPoint`: put a new cannon on the floor of `cellId`. |
 | interface | `PlaceGeodesicCannonOnGeodesicRequest` | Request for `placeGeodesicCannonOnGeodesic`: put a new cannon on a segment of an existing free geodesic, splitting it there. |
 | interface | `PlaceGeodesicCannonAtGeodesicVertexRequest` | Request for `placeGeodesicCannonAtGeodesicVertex`: put a cannon at a point where geodesics cross in a cell, cutting each passing geodesic there. |
 | interface | `PlaceGeodesicEmitterAtPointRequest` | Request for `placeGeodesicEmitterAtPoint`: put a new emitter at a point of a cell, whatever is there. |

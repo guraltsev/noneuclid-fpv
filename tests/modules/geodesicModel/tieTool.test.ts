@@ -38,6 +38,7 @@ function setup() {
     pickTargets: () => picks.current,
     currentPick: () => picks.current[0],
     aimYawRadians: () => 0,
+    commandInFlight: () => false,
     selectObject: () => undefined,
     showObjectPage: () => undefined,
     submit: (command) => void submitted.push({ ticket: engine.submit("local", command), command }),

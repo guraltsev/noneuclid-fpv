@@ -1,7 +1,8 @@
 /**
  * The geodesic emitters' client part (design 013 sections 8.3 and 9.1): the emitter tool, and the requests the emitter's menu page and a click on a geodesic make.
  * All of it changes the world only by `ToolContext.submit` and reads through `ToolContext.read` and `query`. The tool resolves its aim first and sends cell-local data; a click on the floor places an emitter and, once the world has answered, shoots its first geodesic.
- * The client tool state, `moduleToolState.geodesicEmitters`, says that a menu page waits for the answer; a refusal is shown and the tool stays.
+ * While a command of the tool is in flight, a press does nothing: a floor click is two commands, and the second press of a double click must not start anything. So at most one answer is awaited, and the client tool state, `moduleToolState.geodesicEmitters`, says whether a menu page waits for it.
+ * A refusal is shown: the tool stays, and a waiting page is shown again as the world now has it.
  */
 import type { CommandResult, ToolContext, ToolDescriptor, ModuleClient } from "../../engine/moduleTypes";
 import { defaultTraceLengthMeters } from "../../world-objects/geodesic/objects";
@@ -34,6 +35,7 @@ function randomYawRadians(): number {
 }
 
 function primaryAction(tool: ToolContext): boolean {
+  if (tool.commandInFlight()) return true;
   const pick = tool.currentPick();
   if (pick === undefined) return true;
   if (pick.objectKind === geodesicEmitterKind) {
@@ -54,7 +56,7 @@ function onResult(tool: ToolContext, result: CommandResult): void {
   if (pageEmitterId !== undefined) tool.setToolState(moduleId, undefined);
   if (!result.ok) {
     tool.showMessage(result.refusal.message);
-    if (pageEmitterId !== undefined) tool.endTool();
+    if (pageEmitterId !== undefined) tool.showObjectPage(pageEmitterId);
     return;
   }
 
@@ -86,19 +88,19 @@ function onResult(tool: ToolContext, result: CommandResult): void {
     case "geodesicDeleted":
       if (pageEmitterId !== undefined) tool.showObjectPage(pageEmitterId);
       return;
-    case "removed":
-      return;
   }
 }
 
 /** The emitter's menu page asks for a new geodesic; the page shows it when the world has answered. */
 export function requestNewGeodesic(tool: ToolContext, emitterId: string): void {
+  if (tool.commandInFlight()) return;
   tool.setToolState(moduleId, { pageEmitterId: emitterId } satisfies EmitterToolState);
   shootFrom(tool, emitterId, randomYawRadians());
 }
 
 /** The emitter's menu page asks to delete a geodesic; the page shows the emitter without it when the world has answered. */
 export function requestGeodesicDeletion(tool: ToolContext, emitterId: string, arcId: string): void {
+  if (tool.commandInFlight()) return;
   tool.setToolState(moduleId, { pageEmitterId: emitterId } satisfies EmitterToolState);
   const deletion: GeodesicEmitterDeleteGeodesicCommand = { kind: "geodesicEmitters/deleteGeodesic", emitterId, arcId };
   tool.submit(deletion);
@@ -108,6 +110,7 @@ export function requestGeodesicDeletion(tool: ToolContext, emitterId: string, ar
 export function requestGeodesicExtension(tool: ToolContext, arcId: string): boolean {
   const model = tool.query(geodesicModelToken);
   if (model.connectsEmitters(arcId) || model.isTied(arcId)) return false;
+  if (tool.commandInFlight()) return true;
   const extension: GeodesicEmitterExtendCommand = { kind: "geodesicEmitters/extend", arcId, lengthMeters: defaultTraceLengthMeters };
   tool.submit(extension);
   return true;

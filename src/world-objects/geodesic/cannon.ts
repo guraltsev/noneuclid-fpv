@@ -12,7 +12,6 @@ import {
   createGeodesicVertexObject,
   createGeodesicEmitterObject,
   createGeodesicArcObject,
-  defaultTraceLengthMeters,
   directionFromYaw,
   emitterConnectionToleranceMeters,
   type GeodesicEmitterObject,
@@ -61,8 +60,8 @@ export interface ShootGeodesicInput {
   readonly cannon: GeodesicEmitterObject;
   /** Id of the geodesic interval to create (or to re-aim if it already exists). */
   readonly geodesicId: string;
-  /** Total chord length to trace in meters; defaults to `defaultTraceLengthMeters` (2). */
-  readonly maxLengthMeters?: number;
+  /** Total chord length to trace in meters. */
+  readonly maxLengthMeters: number;
   /** If true (default), a trace that ends at another emitter attaches the free end to it, producing a connected geodesic. */
   readonly connectEmitters?: boolean;
 }
@@ -75,8 +74,8 @@ export interface ExtendGeodesicInput {
   readonly registry: RuntimeObjectRegistry;
   /** Id of the geodesic interval to extend. */
   readonly geodesicId: string;
-  /** Extra length in meters added beyond the current total; defaults to `defaultTraceLengthMeters` (2). */
-  readonly maxLengthMeters?: number;
+  /** Extra length in meters added beyond the current total. */
+  readonly maxLengthMeters: number;
   readonly connectEmitters?: boolean;
 }
 
@@ -100,7 +99,7 @@ export interface RebuildGeodesicToLengthInput {
   readonly rebuildConnected?: boolean;
 }
 
-/** Request for `placeGeodesicCannonAtFloorPoint`: put a new cannon with id `id` on the floor of `cellId`. */
+/** Request for `placeGeodesicCannonAtFloorPoint`: put a new cannon on the floor of `cellId`. `createId` is called only once the placement is certain, so a refusal spends no id. */
 export interface PlaceGeodesicCannonAtFloorPointRequest {
   readonly world: CompiledCellComplex;
   readonly registry: RuntimeObjectRegistry;
@@ -108,7 +107,7 @@ export interface PlaceGeodesicCannonAtFloorPointRequest {
   /** Floor position in `cellId`'s frame (meters); only x and y are used, z is forced to 0. */
   readonly floorPoint: Vec3;
   readonly aimYawRadians: number;
-  readonly id: string;
+  readonly createId: () => string;
 }
 
 /** Request for `placeGeodesicCannonOnGeodesic`: put a new cannon on a segment of an existing free geodesic, splitting it there. */
@@ -122,7 +121,9 @@ export interface PlaceGeodesicCannonOnGeodesicRequest {
   /** Distance from the segment start to the placement point, meters; clamped to `[0, segment.lengthMeters]`. */
   readonly distanceAlongSegmentMeters: number;
   readonly aimYawRadians: number;
-  readonly id: string;
+  readonly createId: () => string;
+  /** Id factory for the geodesic that continues beyond the new cannon. */
+  readonly createContinuationGeodesicId: (sourceGeodesicId: string, sideIndex: number) => string;
 }
 
 /** Request for `placeGeodesicCannonAtGeodesicVertex`: put a cannon at a point where geodesics cross in a cell, cutting each passing geodesic there. */
@@ -133,7 +134,7 @@ export interface PlaceGeodesicCannonAtGeodesicVertexRequest {
   /** Vertex position in `cellId`'s frame, meters (z ignored). */
   readonly vertexPoint: Vec3;
   readonly aimYawRadians: number;
-  readonly id: string;
+  readonly createId: () => string;
   /** Id factory for the geodesic that continues beyond the new cannon; `sideIndex` counts continuations created so far in this request. */
   readonly createContinuationGeodesicId: (sourceGeodesicId: string, sideIndex: number) => string;
 }
@@ -146,8 +147,8 @@ export interface PlaceGeodesicEmitterAtPointRequest {
   /** The point in `cellId`'s frame, meters (the height is ignored). */
   readonly point: Vec3;
   readonly aimYawRadians: number;
-  readonly id: string;
-  /** Id factory for a geodesic that continues beyond the new emitter from a crossing. */
+  readonly createId: () => string;
+  /** Id factory for a geodesic that continues beyond the new emitter from a cut. */
   readonly createContinuationGeodesicId: (sourceGeodesicId: string, sideIndex: number) => string;
 }
 
@@ -191,7 +192,7 @@ const pointOnGeodesicToleranceMeters = 1e-6;
  * (`placeGeodesicCannonOnGeodesic`), anywhere else it stands on the floor (`placeGeodesicCannonAtFloorPoint`). Refused placements change nothing.
  */
 export function placeGeodesicEmitterAtPoint(request: PlaceGeodesicEmitterAtPointRequest): PlaceGeodesicEmitterResult {
-  const { world, registry, cellId, point, aimYawRadians, id } = request;
+  const { world, registry, cellId, point, aimYawRadians, createId, createContinuationGeodesicId } = request;
   if (hasCrossingAtPoint(registry, cellId, point)) {
     return placeGeodesicCannonAtGeodesicVertex({
       world,
@@ -199,8 +200,8 @@ export function placeGeodesicEmitterAtPoint(request: PlaceGeodesicEmitterAtPoint
       cellId,
       vertexPoint: point,
       aimYawRadians,
-      id,
-      createContinuationGeodesicId: request.createContinuationGeodesicId,
+      createId,
+      createContinuationGeodesicId,
     });
   }
   const hit = findSegmentAtPoint(registry, cellId, point);
@@ -212,10 +213,11 @@ export function placeGeodesicEmitterAtPoint(request: PlaceGeodesicEmitterAtPoint
       segmentId: hit.segment.id,
       distanceAlongSegmentMeters: hit.distanceAlongSegmentMeters,
       aimYawRadians,
-      id,
+      createId,
+      createContinuationGeodesicId,
     });
   }
-  return placeGeodesicCannonAtFloorPoint({ world, registry, cellId, floorPoint: point, aimYawRadians, id });
+  return placeGeodesicCannonAtFloorPoint({ world, registry, cellId, floorPoint: point, aimYawRadians, createId });
 }
 
 function hasCrossingAtPoint(registry: RuntimeObjectRegistry, cellId: string, point: Vec3): boolean {
@@ -263,8 +265,9 @@ export function placeGeodesicCannonAtFloorPoint(
     return { placed: false, reason: "missing-cell" };
   }
 
+  // The checks below read the candidate's place, not its id.
   const candidate = createGeodesicEmitterObject({
-    id: request.id,
+    id: "",
     cellId: request.cellId,
     localPose: yawRigidTransform3(request.aimYawRadians, {
       x: request.floorPoint.x,
@@ -289,8 +292,9 @@ export function placeGeodesicCannonAtFloorPoint(
     }
   }
 
-  request.registry.add(candidate);
-  return { placed: true, object: candidate };
+  const placed = { ...candidate, id: request.createId() };
+  request.registry.add(placed);
+  return { placed: true, object: placed };
 }
 
 // ---- Shooting, extending, rebuilding by length ----
@@ -308,7 +312,7 @@ export function shootGeodesic(input: ShootGeodesicInput): GeodesicSegmentObject 
   const aimYawRadians = sanitizeYaw(input.cannon.aimYawRadians);
   const direction = directionFromYaw(aimYawRadians);
   const start = getGeodesicCannonEmitterPoint(input.cannon);
-  const targetPoint = addVec3(start, scaleVec3(direction, input.maxLengthMeters ?? defaultTraceLengthMeters));
+  const targetPoint = addVec3(start, scaleVec3(direction, input.maxLengthMeters));
   let interval = input.registry.get(input.geodesicId);
   if (interval?.kind !== "geodesicModel/arc") {
     const freeEndId = `${input.geodesicId}:free-end`;
@@ -378,7 +382,7 @@ export function extendGeodesic(input: ExtendGeodesicInput): GeodesicSegmentObjec
   const yaw = tangent?.yawRadians ?? emitter.aimYawRadians;
   const targetPoint = addVec3(
     getGeodesicCannonEmitterPoint(emitter),
-    scaleVec3(directionFromYaw(yaw), getGeodesicTotalLengthMeters(input.registry, input.geodesicId) + (input.maxLengthMeters ?? defaultTraceLengthMeters)),
+    scaleVec3(directionFromYaw(yaw), getGeodesicTotalLengthMeters(input.registry, input.geodesicId) + input.maxLengthMeters),
   );
   const result = aimFreeGeodesicFromEndpoint({
     world: input.world,
@@ -736,7 +740,7 @@ export function placeGeodesicCannonOnGeodesic(
     cellId: segment.cellId,
     floorPoint,
     aimYawRadians: request.aimYawRadians,
-    id: request.id,
+    createId: request.createId,
   });
   if (!result.placed || !result.object) {
     return result;
@@ -745,11 +749,11 @@ export function placeGeodesicCannonOnGeodesic(
   splitGeodesicIntervalAtSegmentHit({
     world: request.world,
     registry: request.registry,
-    geodesicId: request.geodesicId,
-    segmentId: request.segmentId,
+    interval,
+    segment,
     distanceAlongSegmentMeters: clampedDistance,
-    placedEmitterId: result.object.id,
-    createContinuationGeodesicId: (sourceGeodesicId) => `${sourceGeodesicId}:continuation:${result.object?.id ?? request.id}`,
+    placed: result.object,
+    createContinuationGeodesicId: request.createContinuationGeodesicId,
   });
 
   const placed = request.registry.get(result.object.id);
@@ -785,7 +789,7 @@ export function placeGeodesicCannonAtGeodesicVertex(
     cellId: request.cellId,
     floorPoint,
     aimYawRadians: request.aimYawRadians,
-    id: request.id,
+    createId: request.createId,
   });
   if (!result.placed || !result.object) {
     return result;

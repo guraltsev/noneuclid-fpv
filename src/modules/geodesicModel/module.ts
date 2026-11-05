@@ -19,7 +19,7 @@ import {
   isTied,
   tiedVertexCount,
 } from "../../world-objects/geodesic/endpoints";
-import { arcConnectsEmitters, removeGeodesic } from "../../world-objects/geodesic/lifecycle";
+import { arcConnectsEmitters, getGeodesicConnection, removeGeodesic } from "../../world-objects/geodesic/lifecycle";
 import { pruneMissingGeodesicIntersectionObjects, updateGeodesicIntersectionObjects } from "../../world-objects/geodesic/intersections";
 import { getGeodesicSegments } from "../../world-objects/geodesic/segments";
 import {
@@ -155,6 +155,7 @@ export function geodesicModelModule(options: Partial<GeodesicModelOptions> = {})
         arcsOfCurve: (vertexId) => arcsOfCurve(objects, vertexId),
         curveOfArc: (arcId) => arcsOfCurveContaining(objects, arcId),
         arcsOnEmitter: (emitterId) => getEmitterGeodesicIds(objects, emitterId),
+        emitterOfArc: (arcId) => getGeodesicConnection(objects, arcId)?.outgoingEmitterId,
         isStale: (arcId) => isStale(objects, arcId),
         tieableEnds: (emitterId) => getGeodesicEndpointAttachmentsForAnchor(objects, emitterId).filter((end) => arcConnectsEmitters(objects, end.geodesicId)),
       };

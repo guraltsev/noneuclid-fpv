@@ -123,6 +123,14 @@ describe("createRuntimeObjectActions", () => {
     expect(commands).toContainEqual({ kind: "clear-selected-tool" });
   });
 
+  it("closes the menu when a tool asks for the page of an emitter that is gone", () => {
+    const { actions, commands } = createHarness(undefined);
+
+    actions.showObjectPage("gone");
+
+    expect(commands).toEqual([{ kind: "close-menu" }]);
+  });
+
   it("places nothing when the aim hits something other than the floor", () => {
     const { actions, registry, commands } = createHarness({ ...floorTarget, kind: "object" });
 

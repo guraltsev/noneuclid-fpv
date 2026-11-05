@@ -75,7 +75,6 @@ export interface RuntimeObjectActionsDeps {
   logVerboseAimClick(target: AimTarget | undefined): void;
   /** Finds the interactable runtime object under the (optional) ray. */
   findFocusedRuntimeObject(ray?: RootAimRay): FocusedRuntimeObject | undefined;
-  /** Extends the focused geodesic from the aim; true when something was extended. */
   /** Asks the world to lengthen a free geodesic; false, asking nothing, when a click on it means nothing. */
   extendGeodesic(arcId: string): boolean;
   /** Display name ("G1", ...) of a geodesic. */
@@ -124,7 +123,7 @@ export interface RuntimeObjectActionsDeps {
 
 /** What the shell calls: the aim actions, the sign editing keys, going home and resetting, and the debug helpers. */
 export interface RuntimeObjectActions {
-  /** Shows an emitter's menu page, with its current geodesics. */
+  /** Shows an emitter's menu page, with its current geodesics; closes the menu for an id that is no emitter. */
   showObjectPage(objectId: string): void;
   /** Appends a character to the sign being edited (A-Z, 0-9, space, newline; anything else is ignored). */
   appendEditingSignCharacter(character: string): void;
@@ -518,10 +517,11 @@ export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): Runt
     dispatchRuntimeCommand({ kind: "open-menu" });
   }
 
-  // The menu page of an emitter, with its current geodesics; the active geodesic stays if it is still on the emitter. The one object page a tool can ask for.
+  // The menu page of an emitter, with its current geodesics; the active geodesic stays if it is still on the emitter. The one object page a tool can ask for: with no such emitter the page it showed is stale, so the menu closes.
   function showObjectPage(objectId: string): void {
     const object = runtimeObjectRegistry.get(objectId);
     if (object?.kind !== "geodesicEmitters/emitter") {
+      dispatchRuntimeCommand({ kind: "close-menu" });
       return;
     }
     dispatchRuntimeCommand({ kind: "set-cannon-tool-state", state: {

@@ -11,10 +11,13 @@ import type { CommandResult, ModuleClient, ToolDescriptor } from "../../src/engi
 import type { RuntimeToolId } from "../../src/glue/toolIds";
 import type { AimTarget } from "../../src/interaction/aimTarget";
 import { applyRuntimeCommand } from "../../src/runtime/applyRuntimeCommand";
+import { geodesicEmittersClient, geodesicEmittersModule } from "../../src/modules/geodesicEmitters";
+import { geodesicModelModule } from "../../src/modules/geodesicModel";
 import { createToolHost, type CoreToolActions } from "../../src/render/three/toolHost";
+import type { RuntimeCommand } from "../../src/runtime/runtimeCommands";
 import { threeDirectionToWorld } from "../../src/render/three/worldAxes";
 import type { RuntimeWorldObject } from "../../src/world-objects/runtimeObjectRegistry";
-import { createSegment } from "../fixtures/world-objects/geodesic";
+import { compileLargePortalWorld, createSegment } from "../fixtures/world-objects/geodesic";
 import { createTestClientSession } from "../support/clientSession";
 import { createTestEngine } from "../support/engine";
 
@@ -138,7 +141,7 @@ describe("the tool host and a tool's commands", () => {
 
     expect(log.results).toHaveLength(1);
     expect(log.results[0]).toMatchObject({ ok: true });
-    expect(log.palette).toBeGreaterThan(paletteBefore);
+    expect(log.palette).toBe(paletteBefore + 1);
   });
 
   it("takes the marks off and drops the tool state when the tool ends", () => {
@@ -222,6 +225,80 @@ describe("the tool lookup", () => {
     ]);
     const twice: ModuleClient = { tools: [host.toolsById.get("place-flag") as ToolDescriptor] };
     expect(() => createToolHost({ ...dummyDeps(), clients: [twice] })).toThrow("the tool place-flag is described twice");
+  });
+});
+
+describe("a tool's answer arriving later", () => {
+  function setupEnding() {
+    const deps = dummyDeps();
+    const dispatch = (command: RuntimeCommand): void => void applyRuntimeCommand(deps.session, command);
+    const ending: ToolDescriptor = {
+      id: probeId,
+      ownerModuleId: "probe",
+      label: "Probe",
+      helpTitle: "Probe",
+      helpBody: "",
+      helpRows: [],
+      indicatorColor: "#000000",
+      iconId: "ray",
+      showsAimCross: false,
+      entry: { kind: "main-tool" },
+      onPrimaryAction: (tool) => (tool.submit({ kind: "world/requestTool", toolId: "aim" } as never), true),
+      onResult: (tool) => tool.endTool(),
+    };
+    const host = createToolHost({ ...deps, dispatch, clients: [{ tools: [ending] }] });
+    return { host, dispatch, session: deps.session, engine: deps.engine };
+  }
+
+  it("ends the tool that issued the command", () => {
+    const { host, dispatch, session, engine } = setupEnding();
+    dispatch({ kind: "select-tool", toolId: probeId });
+
+    host.dispatchPrimaryAction(true, false);
+    engine.step(0);
+    host.afterStep();
+
+    expect(session.get().menuState.selectedTool).toBe("none");
+  });
+
+  it("leaves alone the tool the person switched to while the command was in flight", () => {
+    const { host, dispatch, session, engine } = setupEnding();
+    dispatch({ kind: "select-tool", toolId: probeId });
+
+    host.dispatchPrimaryAction(true, false);
+    dispatch({ kind: "select-tool", toolId: "place-flag" });
+    engine.step(0);
+    host.afterStep();
+
+    expect(session.get().menuState.selectedTool).toBe("place-flag");
+  });
+
+  it("holds a second press of the real emitter tool until both answers are in", () => {
+    const world = compileLargePortalWorld();
+    const engine = createTestEngine({ getWorld: () => world, modules: [geodesicModelModule(), geodesicEmittersModule()] });
+    const deps = dummyDeps();
+    const dispatch = (command: RuntimeCommand): void => void applyRuntimeCommand(deps.session, command);
+    const target = (x: number) => ({ kind: "floor", cellId: "a", localPoint: { x, y: 2.5, z: 0 } }) as AimTarget;
+    let aimed = target(3);
+    const host = createToolHost({ ...deps, engine, dispatch, clients: [geodesicEmittersClient()], resolveCurrentAimTarget: () => aimed });
+    host.setFrame({ ray: { origin: new THREE.Vector3(), direction: new THREE.Vector3(1, 0, 0), quaternion: new THREE.Quaternion() }, yawDeltaRadians: 0, primaryActionRequested: true });
+    dispatch({ kind: "select-tool", toolId: "geodesicEmitters/emitter" });
+    const frame = (): void => {
+      engine.step(0);
+      host.afterStep();
+      engine.endFrame();
+    };
+
+    host.dispatchPrimaryAction(true, false);
+    aimed = target(1);
+    host.dispatchPrimaryAction(true, false);
+    frame();
+    host.dispatchPrimaryAction(true, false);
+    frame();
+
+    expect(engine.registry.getObjectsOfKind("geodesicEmitters/emitter")).toHaveLength(1);
+    expect(engine.registry.getObjectsOfKind("geodesicModel/arc")).toHaveLength(1);
+    expect(deps.session.get().menuState.selectedTool).toBe("none");
   });
 });
 

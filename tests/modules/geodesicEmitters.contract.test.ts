@@ -86,6 +86,7 @@ describe("geodesicEmitters/place", () => {
 
     expect(placed.arcIds).toHaveLength(2);
     expect(placed.arcIds[0]).toBe(arcId);
+    expect(placed.arcIds[1]).toMatch(/^geodesicModel\/arc:\d+$/);
     expect(getEmitterGeodesicIds(registry, placed.emitterId)).toEqual(placed.arcIds);
     expect(totalGeodesicLength(registry, arcId)).toBeCloseTo(1, 6);
     expect(totalGeodesicLength(registry, arcId) + totalGeodesicLength(registry, placed.arcIds[1]!)).toBeCloseTo(lengthBefore, 6);
@@ -98,6 +99,14 @@ describe("geodesicEmitters/place", () => {
 
     expect(placed.arcIds).toEqual([]);
     expect(totalGeodesicLength(registry, arcId)).toBeCloseTo(3, 6);
+  });
+
+  it("spends no id on a refusal", () => {
+    const { value, expectRefused } = setup();
+
+    expectRefused({ kind: "geodesicEmitters/place", cellId: "nowhere", point: { x: 3, y: 2.5, z: 0 }, yawRadians: 0 }, geodesicEmittersRefusals.blocked);
+
+    expect(value({ kind: "geodesicEmitters/place", cellId: "a", point: { x: 3, y: 2.5, z: 0 }, yawRadians: 0 })).toMatchObject({ emitterId: "geodesicEmitters/emitter:0" });
   });
 
   it("is refused as too short so near the start of a segment", () => {
@@ -132,7 +141,7 @@ describe("geodesicEmitters/place", () => {
     const placed = value<{ emitterId: string; arcIds: readonly string[] }>({ kind: "geodesicEmitters/place", cellId: crossing.cellId, point, yawRadians: 0 });
 
     expect(placed.arcIds).toHaveLength(4);
-    expect(placed.arcIds.every((arcId) => arcId.startsWith("geodesicModel/arc:"))).toBe(true);
+    expect(placed.arcIds.every((arcId) => /^geodesicModel\/arc:\d+$/.test(arcId))).toBe(true);
   });
 });
 

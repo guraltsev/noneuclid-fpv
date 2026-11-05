@@ -95,17 +95,25 @@ describe("display numbers are stored on the arc", () => {
     const { world, registry } = shootThree();
     registry.add(createGeodesicEmitterObject({ id: "placed", cellId: "a", localPose: yawRigidTransform3(0, { x: -0.5, y: 0, z: 0 }) }));
 
-    const surviving = splitGeodesicIntervalAtSegmentHit({
+    const interval = registry.get("g-b");
+    const segment = registry.get("g-b:segment:0");
+    const placed = registry.get("placed");
+    if (interval?.kind !== "geodesicModel/arc" || segment?.kind !== "geodesicModel/segment" || placed?.kind !== "geodesicEmitters/emitter") {
+      throw new Error("Expected the arc, its segment and the emitter.");
+    }
+
+    splitGeodesicIntervalAtSegmentHit({
       world,
       registry,
-      geodesicId: "g-b",
-      segmentId: "g-b:segment:0",
+      interval,
+      segment,
       distanceAlongSegmentMeters: 0.8,
-      placedEmitterId: "placed",
+      placed,
       createContinuationGeodesicId: (id) => `${id}:rest`,
     });
 
-    expect(surviving.map((arc) => arc.id)).toEqual(["g-b", "g-b:rest"]);
+    expect(registry.get("g-b")?.kind).toBe("geodesicModel/arc");
+    expect(registry.get("g-b:rest")?.kind).toBe("geodesicModel/arc");
     expect(resolveGeodesicNumber(registry, "g-b")).toBe(2);
     expect(resolveGeodesicNumber(registry, "g-b:rest")).toBe(4);
     expect(getGeodesicSegments(registry, "g-b:rest").every((segment) => segment.geodesicNumber === 4)).toBe(true);

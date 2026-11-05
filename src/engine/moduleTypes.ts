@@ -301,15 +301,17 @@ export interface ToolContext {
   aimYawRadians(): number | undefined;
   /** Submits a command for the local participant; its result arrives through the tool's `onResult` after the next step. */
   submit(command: EngineCommandBase): void;
+  /** This tool has a command the world has not answered. An answer that submits the next command of a sequence keeps it true, so a press that must not overlap one simply checks this. */
+  commandInFlight(): boolean;
   /** The client tool state of a module (`moduleToolState[moduleId]` of the client session), or undefined while its tool is idle. */
   getToolState<T>(moduleId: string): T | undefined;
   /** Replaces the client tool state of a module; undefined clears it. */
   setToolState(moduleId: string, state: unknown): void;
-  /** Ends the tool: closes the menu and selects no tool. */
+  /** Ends this tool, if it is still the selected one: closes the menu and selects no tool. An answer arriving after the person chose another tool ends nothing. */
   endTool(): void;
   /** Makes the object and one of its geodesics the client's selection, which the object's menu page and its modes start from. */
   selectObject(objectId: string, geodesicId: string): void;
-  /** Shows the object's menu page, with its current state. */
+  /** Shows the object's menu page, with its current state; closes the menu when the object has no page, for example because it is gone. */
   showObjectPage(objectId: string): void;
   readonly read: WorldReadView;
   /** A module's read-only queries (design 013 section 5.7); never its `api`. */
