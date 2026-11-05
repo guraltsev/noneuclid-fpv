@@ -1,6 +1,7 @@
 # 014 - Derived state: caches, invalidation and allocation guards
 
-Status: **proposed** (2026-11-04), reviewed against the code on 2026-11-04 (section 11). Only what is marked **Agreed** is
+Status: **proposed** (2026-11-04), reviewed against the code on 2026-11-04 (section 11), built by jobs 56 to 60 and merged on
+2026-11-05. Section 9's amendments are applied to 013. Only what is marked **Agreed** is
 agreed; the rest stands until the maintainer says otherwise. It builds on
 [013](013-world-engine-clients-and-modules.md) (change journal 6.2, derive pass 6.4, caches 9.3) and proposes amendments
 to it, listed in section 9. It does not edit 013. Jobs 51 to 60 follow this note where the two differ.
@@ -422,3 +423,4 @@ derive ticks and the frame view still need ordered entries, so it would add a se
 | 2026-11-04 | Corrected (maintainer): the "connected" colour stays; only the "moving" colour and the aiming rule are abolished (D2). |
 | 2026-11-04 | Agreed (maintainer): a keyed table has no silent default for which keys a change invalidates; it passes `affected`, and the dumb choice is the named function `invalidateAllKeys`, so unoptimised tables can be found by search. |
 | 2026-11-04 | Reviewed against the code at the maintainer's request (section 11). Proposed, not yet agreed: D9 to D13, the corrections to D1, D8 and sections 3 to 7, and the new job order of section 8. Measurements added (1.1). |
+| 2026-11-05 | Agreed (maintainer): measurements follow D3, a full refresh when a kind they read is written. The read tracker added after job 55 (`trackedReads.ts`, with a global cache-read observer) was deleted: a fourth mechanism beside D9's three, with no measured need. |

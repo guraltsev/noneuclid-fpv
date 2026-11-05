@@ -5,8 +5,9 @@
 > (maintainer): the split between world state and client state and the module system are one design. It is the core of
 > [012](012-engine-api.md) and details its P1 to P3, P7, P8 and P17. Status rules as in 012:
 > **Agreed** (decided by the maintainer), **Proposed** (under discussion), **Open**, **Rejected**. Every item below is
-> Proposed unless marked otherwise. Claims about the code were checked on 2026-11-03 (branch `design/012-engine-api`,
-> commit `8b27549`); re-check them before relying on them.
+> Proposed unless marked otherwise. Jobs 48 to 60 built most of it and were merged on 2026-11-05; this text was then
+> aligned with the code and with [014](014-derived-state-and-caches.md). "Implemented" does not mean **Agreed**: what was
+> Proposed stays Proposed until the maintainer decides. Section 2 is kept as the state before the wave.
 
 This document designs three things that only make sense together:
 
@@ -37,9 +38,13 @@ decisions of its own.
 | 2026-11-03 | Performance is enforced by a bench with a `--check` mode against a committed baseline, run in every job's acceptance. No CI is added. | **Agreed** (maintainer) |
 | 2026-11-03 | **Naming**: every name a module contributes is `<moduleId>/<noun>`, nouns from the mathematical model; renaming is part of the jobs (section 10). | **Agreed** (maintainer) |
 | 2026-11-03 | The tie tool's selection highlight stays on the segments, behind a model API call, until a client overlay replaces it. | **Agreed** (maintainer) |
-| 2026-11-02 | When a flow touches a forbidden-zone singularity, the geodesic is destroyed. **Implemented** (job 55): the default experience destroys the curve; `"unresolve"` stays available. | **Agreed** (maintainer, earlier) |
+| 2026-11-02 | When a flow touches a forbidden-zone singularity, the geodesic is destroyed. Implemented by job 55. | **Agreed** (maintainer, earlier) |
+| 2026-11-05 | **A blocked curve is destroyed, whatever blocked it**, not only at a forbidden zone, until a better behaviour exists. The maintainer does not want `unresolved` as a resting state. | **Agreed** (maintainer) |
+| 2026-11-05 | **Simulation time belongs to the simulation** (012 P8): ticks of length \(h\), default \(1/90\) s, maximum \(1/30\) s. The shell never passes frame time. The local body stays outside the ticks, published at draw time, until locomotion moves into the engine. Not built yet: the code still steps once per frame. | **Agreed** (maintainer) |
+| 2026-11-05 | **Measurements are refreshed completely when a kind they read is written** (014's default). The per-record read tracker of `trackedReads.ts` was deleted: it was a fourth mechanism with no design and no measured need. | **Agreed** (maintainer) |
+| 2026-11-05 | **The next batch is `geodesicEmitters`**, with the time change and `publicApi` (section 16). | **Agreed** (maintainer) |
 
-## 2. Where the code stands (checked 2026-11-03)
+## 2. Where the code stood before this wave (checked 2026-11-03)
 
 **State.** `AppSessionState` (`src/runtime/appSession.ts:29-50`, job 46) holds everything mutable in one record.
 Classified by the line of this document:
@@ -143,9 +148,9 @@ export interface WorldEngine<Cmd extends EngineCommandBase> {
   submit(participantId: string, command: Cmd): CommandTicket;
   /** Set a control slot of a participant; the latest value before a step is the one sampled. */
   setControl(participantId: string, slot: string, value: PlainData): void;
-  /** Direct write D1 (section 5.7): the owner of a participant replaces its body. Refused for a non-owner. */
-  publishBody(participantId: string, body: ParticipantBody): void;
-  /** Advance the world by `deltaSeconds` (any value from 0 to the cap; 012 P8). */
+  /** Direct write D1 (section 5.7): the owner of a participant replaces its body. False for a non-owner, and nothing changes. */
+  publishBody(participantId: string, body: ParticipantBody): boolean;
+  /** Advance the world by one tick of `deltaSeconds` (012 P8: the simulation's tick length, never frame time; 0 is legal). */
   step(deltaSeconds: number): void;
   /** Read-only world state, valid until the next step (section 6.6). */
   readonly read: WorldReadView;
@@ -157,6 +162,8 @@ export interface WorldEngine<Cmd extends EngineCommandBase> {
   query<Q>(token: ModuleToken<unknown, Q>): Q;
   /** Called by the client after it has read changes, events and results. */
   endFrame(): void;
+  /** Legacy writers only (section 14): the engine's id source, until their module allocates its own ids. */
+  readonly ids: EngineIdSource;
 }
 ```
 
@@ -180,13 +187,14 @@ It does **not** own: rendering, picking caches, input devices, the menu, the sel
 1. **Commands**: apply the queued commands in arrival order. Each handler returns a result; results are stored by
    ticket. A refused command changes nothing.
 2. **Control slots**: sample the latest values.
-3. **Bodies**: locomotion and dynamics of participants (today the shell moves the player and publishes the pose; it
-   moves into this phase after this wave, section 16); attachments follow their carriers (carry, section 7).
+3. **Bodies**: ticks of the phase `bodies`: locomotion and dynamics of participants (today the shell moves the player and
+   publishes the pose; it moves into this phase after this wave, section 16); attachments follow their carriers (carry, section 7).
 4. **Module simulate ticks** (the flow; later creatures).
 5. **Module derive pass** (crossings, measured lengths, angles).
 6. **Finalize**: the step's events are final.
 7. **Deformation**, if a job is ready (012 P8, P9): carry everything across, emit `world/geometryChanged`, one more
-   derive pass in the new geometry.
+   derive pass in the new geometry. **Not built**: the shell commits a deformation at the start of its frame, outside the
+   step, until the deformation job (section 16).
 
 Rendering is not part of a step; the client reads the result.
 
@@ -205,10 +213,12 @@ Rendering is not part of a step; the client reads the result.
 
   `code` is a stable string for programs (`"geodesicModel/notConnected"`, `"world/capabilityMissing"`); `message` is a
   sentence for people ("You have not found a protractor yet."). Handlers never throw for a refusal; a thrown exception
-  is a bug, contained by the shell's frame error guard and reported as `{ code: "world/internalError" }`.
+  is a bug: `step` finishes, stores `{ code: "world/internalError" }` as the result, then rethrows to the shell's frame error
+  guard. The client still reads the result in that frame (issue 87).
 - **Timing**: a command is applied at the next step. In the app, a click submits during the frame's input or tool phase
   and the step runs later in the same frame, so the result is there before the UI phase. Commands submitted between
-  frames (palette clicks) apply in the next frame's step, at most one frame later. Tests write
+  frames (palette clicks) apply in the next frame's step, at most one frame later. With ticks (012 P8) a frame may run no
+  step, and a result then waits for the next tick, at most \(h\) later. Tests write
   `const t = engine.submit(p, cmd); engine.step(0); engine.resultOf(t)`: a step of zero seconds is legal and only
   applies commands and derives.
 - **API**: `window.noneuclid.api.world.submit(command)` submits for the local participant and resolves with the result
@@ -305,7 +315,9 @@ export interface WorldReadView {
 
 ### 6.2 The change journal
 
-The registry records every write in `src/world-objects/runtimeObjectChangeJournal.ts`, exposed as `registry.changes`:
+The registry records every write in `src/world-objects/runtimeObjectChangeJournal.ts`, exposed as `registry.changes`. The
+journal below is the frame's view of a **ring** with absolute sequence numbers and `beforeAt`, `registry.changes.ring`
+(014 section 3): the frame view keeps this interface, and everything that reads across frames reads the ring.
 
 ```ts
 export const enum ChangeOp { Added = 0, Updated = 1, Removed = 2 }
@@ -334,17 +346,17 @@ Participants are not registry objects: they are few and change every frame. The 
 
 ### 6.3 Who clears it
 
-`engine.endFrame()` clears the journals, events and results, and resets module cursors. The shell calls it at the end of
-its frame, after views, label runtimes and the UI have read them. Writes between frames (legacy direct writes, section
-14) stay in the journal until the next frame's readers have seen them.
+`engine.endFrame()` clears the frame views, events and results, and moves the frame start of the ring. It does not reset
+tick cursors. The shell calls it at the end of its frame, after views, label runtimes and the UI have read them. A write made
+after `step` and before `endFrame`, or between frames (legacy direct writes, section 14), reaches the next derive pass.
 
 ### 6.4 The derive pass
 
 Run at step phase 5 (and phase 7 after a deformation):
 
-- each derive tick keeps a cursor (the journal length when it last ran). It wakes when `wants(ctx)` is true, or when
-  `lastIndexOfKind(k) >= cursor` for a `k` in its `subscribes`; it reads `[cursor, length)`, filtering by kind; then the
-  cursor moves to `length`;
+- each derive tick keeps a cursor, a sequence number of the ring. It wakes when `wants(ctx)` is true, or when
+  `lastSeqOfKind(k) >= cursor` for a `k` in its `subscribes`; it reads `[changesFrom, changesTo)` through
+  `ctx.objects.changes.ring`, filtering by kind. A pass that does not wake a tick still moves its cursor to the head;
 - a module's `onEvents` handlers run before its derive ticks, over the events since their own cursor;
 - ticks run in module order, then in the order of the module's `ticks` array; a tick sees every earlier tick's writes
   (rule 9 of 9.2 forbids subscribing to a later writer).
@@ -367,17 +379,21 @@ Each kind of client need has one channel:
 | One-off transitions (a sound, a notice) | events | one per transition; poses are state, never events (012 P7) |
 | Answer to a command | `resultOf` | once per command |
 
-The frame, with one step per drawn frame (012 P8):
+The frame (**Agreed**, 012 P8 of 2026-11-05; **not built**: today the shell runs one step per frame with the frame time,
+capped at 0.1 s):
 
 1. Sample input; `submit` commands, `setControl` slots, `publishBody` for the local body (D1, section 5.7).
-2. `engine.step(dt)`.
-3. Build the render snapshot from `engine.read` and the journal (012 P7, client side, unchanged) and draw.
-4. Label runtimes and the UI read; `engine.endFrame()`.
+2. Convert elapsed real time into ticks with an accumulator and run that many `engine.step(h)`: none, one or several.
+3. Label runtimes and the UI read; build the render snapshot from `engine.read` and the journal (012 P7, client side,
+   unchanged) and draw.
+4. `engine.endFrame()`.
 
-So what is drawn is the state of the step just run, in the same frame as the input that caused it, with no blending and
-no added VR latency. The camera and the VR head and hand poses never pass through a command: the client that owns a
-body publishes it (D1), and the headset's pose at draw time is client state applied on top of it. A client view that
-needs three.js lives in `src/render/three/...` and syncs from the journal.
+So what is drawn is the state of the latest tick. The camera and the VR head and hand poses never pass through a command:
+the client that owns a body publishes it (D1), and the headset's pose at draw time is client state applied on top of it, so
+ticks add no VR latency. Until locomotion moves into the engine (section 16), the local player moves on frames and the world
+moves on ticks. `afterStep` hooks of the shell run once per frame, not once per tick: they replay every event since `endFrame`, so
+running them per tick would deliver events twice. A client view that needs three.js lives in `src/render/three/...` and syncs
+from the journal.
 
 *Proposed* (the 012 P7 candidate, to be measured in the later prototype): with the engine in a worker or on a network,
 `engine.read` keeps this interface and stays synchronous, but is backed by a local replica fed by the journal. Clients do
@@ -401,13 +417,15 @@ not change, and a frame never waits for the engine; it draws the newest complete
 
 - `carry/attach { objectId }`: refused if the object is not carriable (`world-objects/carry.ts` contract), out of reach,
   or already carried by someone (`"carry/alreadyCarried"`, message "Already carried by Ana.") — first come, first
-  served (012 P5). On success the participant's record gains the attachment and the slot `carry/offset` opens.
+  served (012 P5). On success the participant's record gains the attachment and the slot `carry/offset` opens. Today the
+  shell lifts the emitter before the world answers; that is issue 88.
 - Each step, phase 3, the carried object moves by the carry contract of job 47 (displacement messages from the offset,
-  bounded steps, re-homing, wall stop, junction drop).
+  bounded steps, re-homing, wall stop; job 47 made a junction a wall). The module also has the commands and events
+  `carry/drop`, `carry/moved` and `carry/released`.
 - The carried emitter drags the end nodes of its geodesics, tied curves included (13.1).
 - `carry/detach`: release is only a detach (P4).
-- Junction drop (P4 agreed): the engine ends the attachment itself and emits `carry/dropped { participantId, objectId,
-  reason }`; the client leaves its carry tool.
+- When the engine ends an attachment itself, it emits `carry/dropped { participantId, objectId, reason }` and the client leaves
+  its carry tool.
 
 The client carry tool keeps only its UI (the prompt, which hand). `CarryRecord` leaves the client session; `arrived`
 (the leash state) becomes a field of the attachment, because it changes how the object moves.
@@ -540,7 +558,7 @@ export type CommandHandlers<C extends EngineCommandBase> = {
   };
 };
 
-export type ModulePhase = "simulate" | "derive";
+export type ModulePhase = "bodies" | "simulate" | "derive";
 
 /** An object kind a module declares. Exactly one module declares each kind. */
 export interface ObjectKindDeclaration {
@@ -578,8 +596,6 @@ export interface ModuleInstance<Api, Cmd extends EngineCommandBase, Evt extends 
   readonly onEvents?: { readonly [kind: string]: (event: EngineEventBase, ctx: StepContext) => void };
   readonly toolGates?: readonly ToolGate[];
   readonly publicApi?: { readonly [name: string]: (...args: never[]) => unknown };  // api.<moduleId>, plain data; reads or submits only (5.7)
-  readonly transformGeometry?: (ctx: GeometryCommitContext) => void;               // step phase 7
-  readonly reset?: () => void;                                                      // world load
   readonly __events?: Evt;                                                          // phantom
 }
 
@@ -607,11 +623,6 @@ export interface StepContext {
   readonly ids: EngineIdSource;
 }
 
-/** Step phase 7. `world` is the new geometry. */
-export interface GeometryCommitContext extends StepContext {
-  readonly previousWorld: CompiledCellComplex;
-}
-
 export interface CommandContext {
   readonly participantId: string;
   readonly world: CompiledCellComplex;
@@ -627,9 +638,11 @@ export interface CommandContext {
 /** "<moduleId>/<family>:<serial>" (section 10), serials in the engine. No Date.now(). */
 export interface EngineIdSource { next(family: string): string }
 
-export type CommandOf<M> = M extends ModuleDefinition<unknown, infer C, EngineEventBase> ? C : never;
-export type ExperienceCommand<Ms extends readonly ModuleDefinition<unknown, EngineCommandBase, EngineEventBase>[]> = CommandOf<Ms[number]>;
 ```
+
+`reset` and `transformGeometry` are not built (014 section 9): nothing needs them yet. The deformation job adds the second. The
+code adds `writesCoreKinds` (the carry module, until the emitter kind has a module) and `forEachParticipant`, `setAttachments` on
+the contexts; `src/engine/moduleTypes.ts` is the reference.
 
 The **client part** of a module is a separate export (`client.ts` in the module directory):
 
@@ -676,7 +689,7 @@ engine; the shell composes the client parts.
 | Per-participant world state | attachments and control slots of the participant record | a carry |
 | Client tool state | client session `moduleToolState[moduleId]`, changed by the client command `set-module-tool-state` | tie picks |
 | Configuration | factory options, fixed for the run | `onBlocked: "unresolve"` |
-| Caches (derived) | module-private, labelled derived, rebuildable from the registry, cleared by `reset()` | stable ids of crossing markers |
+| Caches (derived) | a cache or a memo of 014 (section 2, D9); a cache needs no reset | the arc index; the flow's `quiet` |
 
 A module keeps no other mutable state. So the world has one holder of real state (the engine: registry plus
 participants) and each client one (its session).
@@ -743,7 +756,8 @@ kinds, control slots and id families. The engine's own names use the prefix `wor
 
 - `moduleId` is camelCase; `noun` is camelCase and is the word of `_docs/MATHEMATICAL_MODEL.md`. Commands are verbs
   (`tieAndDetach`), events past participles (`vertexTied`).
-- Object ids are `<moduleId>/<family>:<serial>` (`"geodesicModel/vertex:12"`).
+- Object ids are `<moduleId>/<family>:<serial>` (`"geodesicModel/vertex:12"`). Not yet for arcs and measurements, which legacy
+  writers still allocate (`geodesic:<n>`): they follow when their tools move into modules.
 - A core kind keeps its string until the job that moves it into a module renames it.
 - `docs:check` (job 51) checks string literals of kinds, tool ids, commands, events and slots under `src/modules/`
   against `^[a-z][A-Za-z0-9]*/[a-z][A-Za-z0-9]*$` with the module's directory as prefix; composition checks the same
@@ -809,22 +823,22 @@ src/engine/                    world engine core; imports no module
   participants.ts              participant records, attachments, control slots, participant journal
   moduleTypes.ts               section 9.1
   composeModules.ts            checks of 9.2, topological order, flat tick arrays, handler map
-  moduleTicks.ts               simulate and derive passes, cursors, write guard
-  toolGates.ts                 world/requestTool, the configuration gate, revocation
-  ids.ts                       EngineIdSource
+  moduleTicks.ts               bodies, simulate and derive passes, cursors
+  writeGuard.ts                the write guard
+  toolGates.ts                 the configuration gate, revocation (world/requestTool itself is in worldEngine.ts)
+  ids.ts, coreIds.ts           EngineIdSource
 src/modules/
   geodesicModel/
     api.ts                     token, API type, command and event types: the only file other modules may import
     index.ts                   world factory
     client.ts                  client factory: the tie tool descriptor
-    module.ts                  world definition over world-objects/geodesic; the tie command
-    crossingsTick.ts           (job 52)
+    module.ts                  world definition over world-objects/geodesic; the tie command; the crossings tick
     tieTool.ts                 (job 54)
   geodesicMeasurements/        (job 52)
   curveShortening/
     api.ts, index.ts, module.ts
     flow.ts                    the flow, moved from world-objects/geodesic/curveShortening.ts
-    policies.ts                onBlocked and speedLaw
+    policies.ts                speedLaw
   carry/                       (job 50) attach, detach, the carry/offset slot, over world-objects/carry.ts
 src/runtime/experience.ts      the default experience: world modules and their client parts
 src/runtime/clientSession.ts   the client session (renamed from appSession.ts in job 49)
@@ -921,7 +935,7 @@ export interface GeodesicModelQueries {
   tiedVertexCount(): number;
   /** Visits them in registry insertion order. No allocation. */
   forEachTiedVertex(fn: (vertexId: string) => void): void;
-  /** Every arc of the curve through this vertex, walked over shared vertices. */
+  /** Every arc of the curve through this vertex, walked over shared vertices. Answered by the arc index (014), as are the two above. */
   arcsOfCurve(vertexId: string): readonly string[];
   /** The arc's last rebuild failed during a carry, so it still shows its old path (13.1). */
   isStale(arcId: string): boolean;
@@ -1059,13 +1073,15 @@ today's code, moved. The one timing change: the first flow step is in the step t
 moves it stays one chord, and a dragged curve is rigid once merged. That is accepted for the simplest algorithm. Inserting
 vertices (below) restores the bend. In the app each tie makes one vertex, so a flow has no neighbour today.
 
-**Quiet vertices.** The flow keeps a private set `quiet` of vertices with nothing to do: taut closed loops and blocked
+**Quiet vertices.** The flow keeps a private memo `quiet` of vertices with nothing to do: taut closed loops and blocked
 vertices. A derive tick `curveShortening/wake` (`subscribes: ["geodesicModel/arc"]`) removes from `quiet` every vertex whose
-arc changed, so a dragged loop or an unblocked vertex acts again. `quiet` is a cache, not world state: it is empty after a
-load or a geometry commit (`reset`, `transformGeometry`), and the vertices go quiet again in one step.
+arc changed, so a dragged loop or an unblocked vertex acts again. `quiet` is a memo, not world state (014 section 9): it empties
+through the `wake` tick alone, because a geometry commit deletes every arc that does not connect emitters and the tick sees
+those removals, and a load makes a new engine.
 
 - Requires `geodesicModelToken`; provides `curveDynamicsToken` (so a stick-at-corner module can replace it).
-- Options `{ onBlocked: "unresolve"; speedLaw: "constant" }`; `"destroy"` in job 55.
+- Options `{ onBlocked; speedLaw: "constant" }`. The default experience uses `onBlocked: "destroy"`, for every reason a vertex
+  can be blocked (section 1, 2026-11-05).
 
 ```ts
 export const curveDynamicsToken = defineModuleToken<CurveDynamicsApi, CurveDynamicsApi>("curveDynamics");
@@ -1117,6 +1133,10 @@ too large. Rule for the wave:
   when their module is built.
 
 ## 15. Jobs
+
+**Done** (merged 2026-11-05), kept as history: the job files in `.agents/jobs/_done/` and the batch reports in
+`.agents/jobs/_reports/` say what was built. Job 51 failed once and returned on design 014, with jobs 56 to 60 before job 52.
+Not done from these lists: the release scenarios of jobs 50, 53 and 54, which wait for `publicApi` (section 16).
 
 Numbered after the last job (47). Each leaves typecheck, tests, smoke and `docs:check` green, and runs
 `npm run bench -- moduleStep --check` in its "Done when". The job files are `.agents/jobs/48_...` to `55_...`; the summaries below
@@ -1266,16 +1286,23 @@ are their specification.
 
 ## 16. After this wave
 
-In a likely order:
+**Next batch** (agreed 2026-11-05; jobs to be written):
 
+- **time** (012 P8): ticks of length \(h\), an accumulator in the shell, no caps on the flow;
+- **`geodesicEmitters`**: the emitter kind (`geodesicEmitters/emitter`), place, shoot, aim, rotate and carry as commands, rotate and
+  aim as edit attachments with slots. Closes issues 88 and 89, and ends the carry module's `writesCoreKinds`;
+- **`publicApi`** on modules, then job 45 rewritten: emitters can be created through the API, so manual checks become release
+  scenarios;
+- **measurement tools** and **flags** as modules.
+
+Then, in a likely order:
+
+- **deformation commit inside the step** (phase 7; 012 P8, P9), with job 30;
+- **creatures** (simulate ticks replacing `dynamicObjectRuntimes`);
 - **locomotion into the engine**: movement control slots (`world/moveIntent`, `world/look`; 012 P1), step phase 3,
   locomotion models (P16); the shell stops moving the body;
-- **deformation commit inside the step** (phase 7; 012 P8, P9);
-- **`geodesicEmitters`**: the emitter kind (`geodesicEmitters/emitter`), shoot, aim, rotate as edit attachments with
-  slots, the remaining `legacyWorldWriters`;
 - **a more physical curve shortening** (13.2): `speedLaw: "tension"`, then intermediate vertices (`geodesicModel/insertVertex`,
-  `refinement`), which also gives merged curves their bends back;
-- **flags**, **creatures** (simulate ticks replacing `dynamicObjectRuntimes`), **measurement tools**;
+  `refinement`), which also gives merged curves their bends back; a better answer than destroying a blocked curve;
 - the geometry tools moved into a P15 manifold layer; `world-objects/geodesic/` under `src/modules/geodesicModel/`;
 - **the P7 prototype**: the engine in a worker on a Quest, fed by the journals, measured against the main thread;
 - the static cull as an optional accelerator module (012 section 6);
@@ -1287,7 +1314,7 @@ In a likely order:
 2. Closed: lifting an emitter keeps a tied curve; the emitter drags its end node and the flow never acts on an end node
    (13.1).
 3. Closed: in VR, as on desktop, the client does not switch tool until the world confirms. To be measured when a network exists.
-4. Closed: section 16 keeps its order.
+4. Closed: section 16 keeps its order. Reordered on 2026-11-05 (maintainer): the emitters come first.
 5. **Messages, bubbling and a message bus: deferred to a later design** (maintainer, 2026-11-03); not in this wave, and no
    job depends on them. The notes below are input for that design. The design has commands (one
    handler, before the fact, may refuse) and events (broadcast, after the fact). A message would be addressed to an
@@ -1319,3 +1346,5 @@ In a likely order:
 | 2026-11-03 | Agreed (maintainer): carrying an emitter drags the end node of a tied curve, and the flow never acts on an end node; the two are independent. Replaces job 51's "skip driven arcs". Proposed: `arcFollowsEmitter`, whole-curve removal, the `stale` field. |
 | 2026-11-03 | Agreed (maintainer): no final locked state; the flow stops by a natural condition; a vertex at rest always merges; the simplest algorithm now, extensible to tension and intermediate vertices. Replaces `drivenBy`, `setDriver`, the flow object, claiming and the `started` and `finished` events. Proposed: `quiet`, `SpeedLaw`, the rename to `arcConnectsEmitters`. |
 | 2026-11-03 | Agreed (maintainer): no tool switch until confirmed, in VR too; section 16 keeps its order; a chord into a forbidden zone removes the whole tied curve; the `stale` skip; plain shot geodesics are still deleted on lift. Job files 48 to 55 written. |
+| 2026-11-05 | Jobs 48 to 60 merged. Text aligned with the code and with 014's section 9 amendments (ring, cursors, `quiet` as a memo, no `reset` or `transformGeometry`). Status of Proposed items unchanged. |
+| 2026-11-05 | Agreed (maintainer): a blocked curve is destroyed for any reason, for now; time as in 012 P8 with \(h = 1/90\) s by default and at most \(1/30\) s; the read tracker removed in favour of a full refresh; section 16 reordered, the emitters first. |

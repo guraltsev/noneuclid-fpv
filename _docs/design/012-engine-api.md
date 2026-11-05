@@ -585,11 +585,13 @@ concrete): three cheap commitments now** that keep every option open:
 
 **Agreed (2026-11-05, maintainer; supersedes the 2026-10-30 "host chooses the step size" and "fixed tick everywhere
 rejected"): simulation time is a property of the simulation, not of the frame.** The simulation advances in ticks of a
-configurable length \(h\) (a world / experience setting; default to be chosen, for example 1/90 s). The shell never
+configurable length \(h\) (a world / experience setting; default \(1/90\) s, maximum \(1/30\) s). The shell never
 passes its frame time to the simulation. It shows what the simulation is doing, at whatever frame rate it manages.
 
 - The shell converts elapsed real time into ticks (an accumulator) and draws the latest published snapshot. Smoothing
   the residual fraction of a tick is a drawing concern; the player's own view may be sampled at draw time.
+- **Agreed (2026-11-05): the local player stays outside the ticks** until locomotion moves into the engine: the body is
+  published at draw time, so ticks add no VR latency, and for now the player moves on frames while the world moves on ticks.
 - **Load policy, one place.** When ticks are expensive, the simulation may raise \(h\) up to a configured maximum, so
   that simulated time keeps up with real time: choppy but correct, never a backlog of queued ticks that is paid back
   later. The policy is a setting of the simulation, not a per-frame decision of the shell. If even the maximum \(h\) is
@@ -997,3 +999,4 @@ cleanups) and job 46 (one state holder and one command path; **Agreed 2026-11-01
 | 2026-11-03 | Design 013 revised (maintainer): the first module is a geodesic model built on geometry tools such as homotopy; tying belongs to the model; the flow is a dependent module that claims tied vertices. |
 | 2026-11-03 | Agreed (maintainer): the world/client split and the module system are one design, in 013 (renamed "World engine, clients and modules"). P3 refined: menu and selected tool are client state, tools send commands with a confirmation protocol, lasting relations such as carry are world state. P7: the engine runs on the main thread, worker-ready; the Quest prototype comes later. |
 | 2026-11-05 | Agreed (maintainer): P8 revised. Simulation time is configurable and owned by the simulation; the shell never feeds frame time to it and only shows the state. Under heavy load the tick length may grow (choppy but correct) instead of lagging and queuing ticks. Principle 3 reworded. Found while checking the curve shortening rate: the legacy flow uses wall-clock `dt` capped at 0.1 s. Still to do: align 013 (`step`, the flow's `speedLaw` cap) and the queued engine jobs. |
+| 2026-11-05 | Agreed (maintainer): P8 details. Default \(h = 1/90\) s, maximum \(1/30\) s; the local player stays outside the ticks until locomotion moves into the engine. 013 aligned. Next batch: `geodesicEmitters`, with time and `publicApi`. |
