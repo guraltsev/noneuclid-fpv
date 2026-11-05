@@ -101,7 +101,7 @@ directions. `tests/world-objects/runtimeObjectChangeJournal.test.ts` pins the re
 ### Deviations
 
 - Step 1 also touched files outside the clients, because a client holding a reader cannot call a function that asks for the writer:
-  all of `interaction/aimTarget.ts`, and 13 read functions in `world-objects/` (`endpoints.ts`, `lifecycle.ts`, `segments.ts`,
+  all of `interaction/aimTarget.ts`, and 14 read functions in `world-objects/` (`endpoints.ts`, `lifecycle.ts`, `segments.ts`,
   `protractorTool.ts`) now take `RuntimeObjectReader`.
 - Existing tests changed. The job asks for tests of the check but does not name these changes:
   - "reports a client importing a world-objects mutator unless it is a legacy writer" tested the deleted import rule and is replaced.
