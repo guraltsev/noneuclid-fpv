@@ -1,6 +1,6 @@
 # Job 58 - Add the derived cache, cached kind lists and their guards
 
-Status: queued.
+Status: in progress.
 Resolves: part of issue [86](../../_issues/86_derived_state_is_recomputed_by_scanning_the_world.md).
 
 ## Goal
@@ -155,3 +155,32 @@ Job 59 adds the first real cache, the arc index. In this job the primitive is te
 - `read` on a hit runs one comparison, the bench shows 0 bytes per hit, and the harness catches a wrong `relevant`.
 - `debug.derivedStats()` and the `derived-verify` option work in the app.
 - All checks are green.
+
+## Report
+
+### Done
+- `src/world-objects/derived.ts`: `defineDerived`, `derivedStatsOf`, `setDerivedVerification`, as specified (ring-keyed `WeakMap`, hit = one comparison, `computing` flag, headSeq write check, `deepEqual` for arrays, plain objects, `Map`, `Set`).
+- `getObjectsOfKind` is cached and frozen per kind (`kindLists`, dropped in `add`, `remove` and `replaceObject`); a scan is counted only when a list is built; comment updated.
+- Debug option `derived-verify` (`debugOptions.ts`); `createThreeApp.ts` calls `setDerivedVerification(active ? 64 : 0)` next to the engine's `writeGuard`; `debug.derivedStats()` added the way `kindScans` was (interface, callbacks, both install sites, namespace).
+- Tests: `tests/world-objects/derived.test.ts` (all Step 1 cases, plus the harness passing for a correct `relevant` and failing for a wrong one), `tests/support/derivedFuzz.ts`, kind-list tests in `tests/world-objects/runtimeObjectRegistry.test.ts`.
+- Bench: `measureCacheHitBytesPerRead` in `moduleStep.bench.ts` (toy `defineDerived` over the idle scene, 200,000 reads after warm-up); prints `cache hit ... bytes/read`; `--check` exits 1 above 1 byte per read. Measured 0.000 to 0.136 bytes/read (heap noise).
+- `moduleStepCounters.json` re-recorded; every number fell or stayed (arc scans 836 to 120 in flow+dependents; measured-geodesic-length, protractor-angle, curve-shortening-pair 120 to 1 or 121 to 240; the `crossing` key vanished in flow and fell 121 to 120 in manyArcs). `moduleStep.json` untouched.
+- Commits: 3bf3997 (code, tests, bench, counters, regenerated docs); the report commit follows it.
+
+### Deviations
+None. The hit-bytes gate is its own check in `main` (not a field of `Results`) so the timing baseline file keeps its shape.
+
+### Uncertain
+- Dead-code justification: `defineDerived` has no production caller until job 59 (the arc index); it is reached today by the tests, the fuzz harness and the bench only. `derivedStatsOf` and `setDerivedVerification` are used by the app.
+- Verify mode counts its countdown globally across all caches (every 64th read overall), and also fires on hits. The job says "every `everyReads`th read"; per-cache counting would be the other reading.
+- Idea, not done: `derivedStatsOf` allocates a fresh array per call (debug only); fine.
+- Timing: `--check` exited 3 twice (flow+dependents, then flow, about 5 to 10 percent over the recorded `Leibniz` baseline, which is machine noise on this host). `bench:ab -- cd24b8d` settled it: base median flow 17.22 / flow+dependents 33.81, head 16.72 / 33.50 us/step, "bench:ab: ok". The cache adds no cost to those scenes since nothing reads one yet.
+
+### Not done
+Nothing.
+
+### Checks
+- Baseline `npm run typecheck`, `npm test`: green (1374 tests).
+- Final `npm run typecheck`: green; `npm test`: 1388 passed; `npm run docs:check`: ok (after `docs:generate`, and after adding JSDoc to three exported interfaces the doc test required).
+- `npm run smoke -- --world cube,torus-moduli`: SMOKE OK (2 pages).
+- `npm run bench -- moduleStep --check`: counters passed; timing exit 3 twice (see Uncertain); `bench:ab -- cd24b8d`: ok.
