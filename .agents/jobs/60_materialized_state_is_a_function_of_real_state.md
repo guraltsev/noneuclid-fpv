@@ -1,6 +1,6 @@
 # Job 60 - Make stored segments a function of real state, and test that
 
-Status: queued.
+Status: in progress.
 Resolves: part of issue [86](../../_issues/86_derived_state_is_recomputed_by_scanning_the_world.md).
 
 ## Goal
@@ -98,3 +98,32 @@ written during it.
 - `grep -rn "getGlobalGeodesicNumbers\|pushUniqueId" src tests` is empty, and `grep -n "getAll" src/world-objects/geodesic/segments.ts` is empty.
 - A geodesic keeps its number through a segment rebuild, and the oracle runs in the three scenes.
 - All checks are green.
+
+## Report
+
+### Done
+- `GeodesicArcObject.geodesicNumber?` and an optional `geodesicNumber` input of `createGeodesicArcObject` (`objects.ts`). The segment keeps its field, documented as a copy.
+- `nextGeodesicNumber(registry)` in `segments.ts` (scans the arcs); `resolveGeodesicNumber` now only reads the arc's number, else 1. Deleted `getGlobalGeodesicNumbers`, `pushUniqueId` and the "resolve before the old segments go" comment in `replaceDerivedSegmentsFromTraces`. `segments.ts` no longer calls `getAll`.
+- Number assigned at creation: `cannon.ts` (shoot) and `intervals.ts` (continuation) pass `nextGeodesicNumber(registry)`; `vertices.ts` passes the number of the arc whose id survives (`mergedId`).
+- Tests added to `tests/world-objects/geodesic/segments.test.ts`: number kept after `removeGeodesicSegments` and a rebuild (also after another geodesic is deleted); the continuation of a split takes the next free number (4 with G1..G3 present); a flow merge keeps the surviving arc's number (arcs numbered 3 and 5, merged arc is `g1` = 3); `resolveGeodesicNumber` leaves `getVersion()` unchanged.
+- Oracle `tests/support/segmentOracle.ts` (`expectSegmentsAreRealizedFromArcs`), called at the end of: the flow test "shortens over many ticks and ends as the straight stable chord" (`curveShortening.test.ts`, run to the merge), "keeps each arc's class when the emitter crosses a portal" (`tiedCarry.test.ts`), and "ties through the command, emits vertexTied ..." (`geodesicModel.contract.test.ts`). Checked that it bites: a 1e-3 change of a stored length makes all three fail. All three scenes pass with no finding and no skipped scene or condition.
+- Regenerated `_docs/generated/API_REFERENCE.md` and `ARCHITECTURE_REFERENCE.md` (`docs:generate`).
+- Commit: a65f31d (code, tests, docs); the job file with this Report in a second commit.
+
+### Deviations
+- Changed test: `trace.test.ts`, "preserves existing global geodesic numbers when lower numbers are absent". Setup changed from `createRuntimeObjectRegistry([createSegment({ id: "g-b:segment:0", geodesicId: "g-b", geodesicNumber: 2 })])` to `createRuntimeObjectRegistry([createGeodesicArcObject({ id: "g-b", startAnchorObjectId: "e1", endAnchorObjectId: "e2", startCellId: "a", geodesicNumber: 2 })])`. Assertions: `resolveGeodesicNumber(registry, "g-b")` is 2 (unchanged); `resolveGeodesicNumber(registry, "g-c")` is 1 became `nextGeodesicNumber(registry)` is 1. The now-unused `createSegment` import was removed from that file and `createGeodesicArcObject`, `nextGeodesicNumber` imported. No other assertion changed.
+- The job says to export `withAnchoredTargetTerminal` from `intervals.ts`. It is defined and already exported in `segments.ts` (`intervals.ts` only imports it), so the oracle imports it from `segments.ts`; no logic is copied and `intervals.ts` is untouched for this.
+- `moduleStepCounters.json` was re-recorded as the job says; the file did not change (`git diff` empty), so `writes` and every scan are identical.
+
+### Uncertain
+- `npm run test:release` failed in this environment: `tests/app/appCommands.release.test.ts` (reload) and `tests/app/appLoading.release.test.ts` (configs "full" and "002") with "CDP command Runtime.enable got no response within 6000 ms" (browser start-up timeouts; the first run had 2 failures, the second 3). No release test touches geodesic numbers, the smoke run (`--world cube,torus-moduli`) was OK and `npm test` is green, so I believe it is load/timing in this worktree, but I did not run the release suite on the base commit to confirm.
+- No counter rose. `bench -- moduleStep --check` exited 3 twice (timing only: flow and flow+dependents step time, on a loaded machine); `bench:ab -- 78f0878` settled it: ok (median flow 51.21 base vs 39.76 head, flow+dependents 103.45 vs 72.73 us/step).
+- Test fixtures that create arcs by hand without a number all show G1 now (previously they got sequential numbers by encounter). No existing assertion depended on it.
+
+### Not done
+- Nothing skipped.
+
+### Checks
+- Baseline `npm run typecheck`/`npm test`: green before changes (geodesic suite 118 tests).
+- After: `npm run typecheck` clean; `npm test` 165 files, 1401 tests pass (after `docs:generate`; before it only `documentation.test.ts` failed on stale generated docs); `npm run docs:check` ok; `npm run smoke -- --world cube,torus-moduli` SMOKE OK (2 pages); `npm run test:release` 3 CDP-timeout failures (see Uncertain); `bench -- moduleStep --check` exit 3 twice, counters fine; `bench:ab -- 78f0878` ok.
+- `grep -rn "getGlobalGeodesicNumbers\|pushUniqueId" src tests` is empty; `grep -n "getAll" src/world-objects/geodesic/segments.ts` is empty.
