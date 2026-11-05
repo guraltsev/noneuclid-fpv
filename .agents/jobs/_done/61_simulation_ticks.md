@@ -1,6 +1,6 @@
 # Job 61 - Run the world in ticks owned by the simulation
 
-Status: in progress.
+Status: done, needs review on 2026-11-05.
 Resolves: nothing filed; implements 012 P8 of 2026-11-05.
 
 ## Goal
