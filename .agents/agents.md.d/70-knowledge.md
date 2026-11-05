@@ -12,9 +12,15 @@ When you begin investigating an unfamiliar failure or subsystem, call `mcp__know
 what you are looking at.
 When you discover a non-obvious, reusable project fact, root cause, constraint, or failed approach, save it immediately
 with `mcp__know__know_write`. Do not ask for approval. Record evidence and uncertainty; never invent evidence.
+When you delegate to a subagent, tell it to end its report with any such findings, and save what it reports. A subagent
+gets no brief, so give it the notes that apply to its task.
 When a task is finished, for each note you opened call `mcp__know__know_assess` once with an outcome (`used`,
 `helpful`, `not_needed`, `irrelevant`, `misleading`, `stale`) and a one-line reason. Report the negative outcomes as
 readily as the positive ones: an honest `not_needed` is more useful than silence.
+When you finish a substantial piece of work in which you found things you did not save, run `_scripts/know_session_job`
+once (no arguments). It has a small model review the unread part of this session and save what you missed as candidate
+notes. It costs a model call, so use it after real discoveries, not after every task; `know_write` is still the way to
+save a fact you already know.
 Current source code and tests outrank notes.
 If no <project-knowledge> block arrived at the start of the session (hooks may not be active), call `know_search` before
 you start a task.
