@@ -9,7 +9,7 @@
  * `tests/render/scenePaletteAdapter.test.ts` instead, since none of it is decided here.
  */
 import { describe, expect, it } from "vitest";
-import { normalizeAppConfig } from "../../src/glue/appConfig";
+import { defaultAppConfig, normalizeAppConfig } from "../../src/glue/appConfig";
 import {
   createRuntimeMenuState,
   showRuntimeMenuEditSign,
@@ -29,10 +29,11 @@ import {
   type SettingsPaletteContent,
   type TutorialPaletteContent,
 } from "../../src/ui/paletteDefinition";
+import { createTestToolsById } from "../support/tools";
 
 describe("createPaletteDefinition", () => {
   it("lists only the app config's enabled main tools, with no default tool", () => {
-    const definition = createPaletteDefinition(createRuntimeMenuState({ selectedWorldId: "cube" }));
+    const definition = createPaletteDefinition(createRuntimeMenuState({ selectedWorldId: "cube" }), defaultAppConfig, "desktop", 0, createTestToolsById());
     const content = definition.content as MainPaletteContent;
 
     expect(content.kind).toBe("main");
@@ -41,6 +42,20 @@ describe("createPaletteDefinition", () => {
     expect(toolIds).toContain("geodesicEmitters/emitter");
     expect(toolIds).toContain("measure-length");
     expect(toolIds).not.toContain("aim");
+  });
+
+  it("takes the main list from the tools whose entry says so, in the config's order", () => {
+    const tools = new Map(createTestToolsById());
+    const sign = tools.get("place-flag")!;
+    tools.set("place-flag", { ...sign, entry: { kind: "sub-mode" } });
+
+    const definition = createPaletteDefinition(createRuntimeMenuState({ selectedWorldId: "cube" }), defaultAppConfig, "desktop", 0, tools);
+
+    expect((definition.content as MainPaletteContent).toolOptions).toEqual([
+      { id: "geodesicEmitters/emitter", label: "Geodesic emitter" },
+      { id: "measure-length", label: "Length" },
+      { id: "protractor", label: "Protractor" },
+    ]);
   });
 
   it("lists every placed-flag type as a place-flag option", () => {

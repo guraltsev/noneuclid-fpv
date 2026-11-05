@@ -301,9 +301,9 @@ export function layerViolations(modules) {
  * - `{ module, allowedImporters, reason }`: any module that imports `module` and is not listed is a violation.
  * - `{ module, mayImportOnly, reason }`: any import of `module` whose path does not start with one of the prefixes
  *   (or equal a listed file) is a violation.
- * - `{ fromPrefix, toPrefix, onlyVia, exceptFromPrefixes?, reason }`: an import from a file under `fromPrefix` of a file
- *   under `toPrefix` is a violation unless the target is in `onlyVia` (entries ending in `/` are prefixes) or the
- *   importer is under an `exceptFromPrefixes` entry.
+ * - `{ fromPrefix, toPrefix, onlyVia, alsoViaFrom?, exceptFromPrefixes?, reason }`: an import from a file under `fromPrefix` of a file
+ *   under `toPrefix` is a violation unless the target is in `onlyVia` (entries ending in `/` are prefixes), the importer is
+ *   under a prefix of `alsoViaFrom` that lists the target, or the importer is under an `exceptFromPrefixes` entry.
  *
  * {@link moduleImportRuleViolations} also applies the rules generated from the directories of `src/modules/` (design 013
  * section 12.2).
@@ -333,9 +333,11 @@ export const moduleImportRules = [
       "world-objects/geodesic/trace.ts",
       "world-objects/geodesic/objects.ts",
     ],
-    // The carry module runs the emitter's carry contract (moveEmitterAlongRoute and the rebuild of carryEnd.ts), which stays in world-objects code until the emitter module (design 013 sections 7 and 16).
+    // The emitters are the world part over these two files, which stay in place (design 013 section 16).
+    alsoViaFrom: { "modules/geodesicEmitters/": ["world-objects/geodesic/cannon.ts", "world-objects/geodesic/carryEnd.ts"] },
+    // The carry module runs the emitter's carry contract (moveEmitterAlongRoute and the rebuild of carryEnd.ts), which stays in world-objects code until job 64 (design 013 sections 7 and 16).
     exceptFromPrefixes: ["modules/geodesicModel/", "modules/carry/"],
-    reason: "modules reach the piecewise-geodesic implementation only through the geodesicModel module, except for its stateless geometry tools (design 013 section 13.1); the carry module also runs the emitter's carry contract until the emitter module exists",
+    reason: "modules reach the piecewise-geodesic implementation only through the geodesicModel module, except for its stateless geometry tools (design 013 section 13.1); the emitters also use cannon.ts and carryEnd.ts, and the carry module runs the emitter's carry contract",
   },
   {
     fromPrefix: "render/",
@@ -523,7 +525,7 @@ function pathMatchesEntry(modulePath, entry) {
   return modulePath === entry || (entry.endsWith("/") && modulePath.startsWith(entry));
 }
 
-/** Violations of the `{ fromPrefix, toPrefix, onlyVia, exceptFromPrefixes?, reason }` rules among `rules` (rules of the other shapes are skipped). */
+/** Violations of the `{ fromPrefix, toPrefix, onlyVia, alsoViaFrom?, exceptFromPrefixes?, reason }` rules among `rules` (rules of the other shapes are skipped). */
 export function prefixImportRuleViolations(modules, rules) {
   const violations = [];
   for (const rule of rules) {
@@ -534,6 +536,7 @@ export function prefixImportRuleViolations(modules, rules) {
       for (const dep of mod.imports) {
         if (!dep.startsWith(rule.toPrefix)) continue;
         if (rule.onlyVia.some((allowed) => pathMatchesEntry(dep, allowed))) continue;
+        if (Object.entries(rule.alsoViaFrom ?? {}).some(([prefix, targets]) => mod.path.startsWith(prefix) && targets.includes(dep))) continue;
         violations.push({ from: mod.path, to: dep, reason: rule.reason });
       }
     }

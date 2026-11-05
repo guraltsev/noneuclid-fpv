@@ -705,8 +705,10 @@ Emitter (cannon) operations: shooting, extending and re-aiming geodesics, connec
 | interface | `PlaceGeodesicCannonAtFloorPointRequest` | Request for `placeGeodesicCannonAtFloorPoint`: put a new cannon with id `id` on the floor of `cellId`. |
 | interface | `PlaceGeodesicCannonOnGeodesicRequest` | Request for `placeGeodesicCannonOnGeodesic`: put a new cannon on a segment of an existing free geodesic, splitting it there. |
 | interface | `PlaceGeodesicCannonAtGeodesicVertexRequest` | Request for `placeGeodesicCannonAtGeodesicVertex`: put a cannon at a point where geodesics cross in a cell, cutting each passing geodesic there. |
+| interface | `PlaceGeodesicEmitterAtPointRequest` | Request for `placeGeodesicEmitterAtPoint`: put a new emitter at a point of a cell, whatever is there. |
 | interface | `ConnectGeodesicToEmitterRequest` | Request for `connectGeodesicToEmitter`: close a free geodesic onto a second emitter. |
 | interface | `RebuildConnectedGeodesicBetweenEmittersRequest` | Request for `rebuildConnectedGeodesicBetweenEmitters`: recompute a connected geodesic after one of its emitters moved. |
+| function | `placeGeodesicEmitterAtPoint` | Places a new emitter at `point`, deciding from what is there: on a crossing marker it cuts every geodesic passing (`placeGeodesicCannonAtGeodesicVertex`), on a segment it cuts that geodesic (`placeGeodesicCannonOnGeodes… |
 | function | `placeGeodesicCannonAtFloorPoint` | Adds a new cannon standing on the floor at `floorPoint` unless the spot is blocked. |
 | function | `shootGeodesic` | Emits (or re-aims) a free geodesic from a cannon along its yaw and returns its first derived segment. |
 | function | `extendGeodesic` | Lengthens an aimable free geodesic by re-aiming it from its emitter along the current tangent, and returns its new last segment. |
@@ -1441,7 +1443,7 @@ The names the engine knows without any module: the object kinds of the registry'
 | Kind | Name | Summary |
 | --- | --- | --- |
 | const | `coreObjectKinds` | Kinds of the core union of the registry. |
-| const | `moduleOwnedCoreKinds` | Kinds of the registry's core union that a module declares as its own (design 013 section 13.1): the geodesic model and the geodesic measurements keep their declaring files in `world-objects/geodesic/objects.ts` and in t… |
+| const | `moduleOwnedCoreKinds` | Kinds of the registry's core union that a module declares as its own (design 013 section 13.1): the emitters, the geodesic model and the geodesic measurements keep their declaring files in `world-objects/geodesic/object… |
 | const | `coreToolIds` | Ids of the tools the shell defines itself. |
 
 ### `engine/ids.ts`
@@ -1646,6 +1648,49 @@ The policies of the curve shortening flow (design 013 section 13.2): how far a v
 | const | `curveShorteningSpeedMetersPerSecond` | Speed (meters per second) at which a vertex moves along its descent direction; the exact line search never overshoots the minimum. |
 | function | `speedLawNamed` | The speed law an option names. |
 
+### `modules/geodesicEmitters/api.ts`
+
+The geodesic emitters' public face (design 013 sections 12.1 and 16): the emitter tool's id, the plain-data shapes of the module's commands and their results, and the stable refusal codes.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| const | `geodesicEmitterToolId` | The id of the emitter tool. |
+| const | `geodesicEmitterKind` | The object kind of an emitter. |
+| interface | `GeodesicEmitterPlaceCommand` | Places an emitter at `point` of the cell `cellId` (cell-local meters, the height is ignored), facing `yawRadians`. |
+| interface | `GeodesicEmitterShootCommand` | Starts a new geodesic of `lengthMeters` from an emitter along `yawRadians`; the emitter then faces that way. |
+| interface | `GeodesicEmitterExtendCommand` | Lengthens a free geodesic by `lengthMeters` along its tangent at the emitter. |
+| interface | `GeodesicEmitterDeleteGeodesicCommand` | Deletes one geodesic of an emitter. |
+| interface | `GeodesicEmitterRemoveCommand` | Removes an emitter and every geodesic on it; a tied arc takes its whole curve. |
+| type | `GeodesicEmittersCommand` | Every command of the module. |
+| type | `GeodesicEmittersResult` | What a command that succeeded answers with: `outcome` names the command, the ids are what it created or touched. |
+| const | `geodesicEmittersRefusals` | The refusal codes of the module's commands. |
+
+### `modules/geodesicEmitters/client.ts`
+
+The geodesic emitters' client part (design 013 sections 8.3 and 9.1): the emitter tool, and the requests the emitter's menu page and a click on a geodesic make.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| function | `requestNewGeodesic` | The emitter's menu page asks for a new geodesic; the page shows it when the world has answered. |
+| function | `requestGeodesicDeletion` | The emitter's menu page asks to delete a geodesic; the page shows the emitter without it when the world has answered. |
+| function | `requestGeodesicExtension` | A click on a free geodesic asks to lengthen it. |
+| function | `geodesicEmittersClient` | Creates the client part. |
+
+### `modules/geodesicEmitters/index.ts`
+
+The geodesic emitters module's factories (design 013 section 12.1): `geodesicEmittersModule` is the world part, `geodesicEmittersClient` the client part (the emitter tool).
+
+_No exports._
+
+### `modules/geodesicEmitters/module.ts`
+
+The geodesic emitters module (design 013 section 16): an emitter and what a person does to create or remove it and its geodesics, as commands.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| type | `GeodesicEmittersModuleDefinition` | The module as the engine's list takes it. |
+| function | `geodesicEmittersModule` | Creates the geodesic emitters module. |
+
 ### `modules/geodesicMeasurements/index.ts`
 
 The geodesic measurements module's world factory (design 013 section 12.1): the length and angle labels as records derived from the geodesic model.
@@ -1685,6 +1730,7 @@ The geodesic model's public face (design 013 sections 12.1 and 13.1): its token,
 | interface | `GeodesicHighlightEndpointCommand` | Tool highlight of one endpoint's half of a geodesic (the segments' `highlightState`); transient. |
 | interface | `GeodesicRemoveVertexCommand` | Module-only. |
 | interface | `GeodesicRemoveCurveCommand` | Module-only. |
+| interface | `GeodesicReserveArcIdCommand` | Module-only. |
 | type | `GeodesicModelCommand` | Every command of the module. |
 | interface | `GeodesicVertexTiedEvent` | Two endpoint roles were tied at a new vertex. |
 | type | `GeodesicModelEvent` | Every event of the module. |
@@ -1766,7 +1812,7 @@ The client session: the one record that holds how one person is interacting with
 
 ### `runtime/coreTools.ts`
 
-The descriptors of the tools the shell defines itself (design 013 section 8.3): sign, geodesic ray, length, protractor, and the emitter's carry, rotate and aim sub-modes.
+The descriptors of the tools the shell defines itself (design 013 section 8.3): sign, length, protractor, and the emitter's carry, rotate and aim sub-modes.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
@@ -2402,7 +2448,7 @@ Render sources and per-frame render records for geodesic cannons, geodesic segme
 
 ### `render/three/geodesicCannonTools.ts`
 
-Geodesic emitter (cannon) tools: place, rotate, aim, carry, and delete geodesics.
+Geodesic emitter (cannon) sub-modes of the shell: rotate, aim and carry.
 
 | Kind | Name | Summary |
 | --- | --- | --- |

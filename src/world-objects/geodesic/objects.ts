@@ -288,7 +288,7 @@ export interface TraceGeodesicSegmentResult {
  * Result of the cannon placement functions: the placed (registry) cannon, or `placed: false` with a coarse `reason`.
  *
  * `reason` is overloaded: besides real collisions, `"missing-cell"` is also returned when the segment/vertex to split does not exist and
- * `"cell-collision"` when the split point is too close to a segment start or the split failed.
+ * `"too-short"` when the split point is too close to a segment start, and `"cell-collision"` when the geodesic cannot be split.
  */
 export interface PlaceGeodesicEmitterResult {
   /** Whether a cannon was added to the registry. */
@@ -296,7 +296,7 @@ export interface PlaceGeodesicEmitterResult {
   /** The cannon as stored in the registry (set when `placed`). */
   readonly object?: GeodesicEmitterObject;
   /** Why placement was refused (set when `!placed`). */
-  readonly reason?: "missing-cell" | "cell-collision" | "runtime-object-collision";
+  readonly reason?: "missing-cell" | "cell-collision" | "runtime-object-collision" | "too-short";
 }
 
 // ---- Constants ----

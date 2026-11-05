@@ -138,6 +138,19 @@ export interface PlaceGeodesicCannonAtGeodesicVertexRequest {
   readonly createContinuationGeodesicId: (sourceGeodesicId: string, sideIndex: number) => string;
 }
 
+/** Request for `placeGeodesicEmitterAtPoint`: put a new emitter at a point of a cell, whatever is there. */
+export interface PlaceGeodesicEmitterAtPointRequest {
+  readonly world: CompiledCellComplex;
+  readonly registry: RuntimeObjectRegistry;
+  readonly cellId: string;
+  /** The point in `cellId`'s frame, meters (the height is ignored). */
+  readonly point: Vec3;
+  readonly aimYawRadians: number;
+  readonly id: string;
+  /** Id factory for a geodesic that continues beyond the new emitter from a crossing. */
+  readonly createContinuationGeodesicId: (sourceGeodesicId: string, sideIndex: number) => string;
+}
+
 /** Request for `connectGeodesicToEmitter`: close a free geodesic onto a second emitter. */
 export interface ConnectGeodesicToEmitterRequest {
   readonly world: CompiledCellComplex;
@@ -168,6 +181,71 @@ export interface RebuildConnectedGeodesicBetweenEmittersRequest {
   readonly preserveGeodesicOnRebuildFailure?: boolean;
   /** If true, the rebuild may realize a different portal word than the expected one (the carried endpoint may leave the expected cell chain). */
   readonly allowOutOfBoundsCarriedEndpoint?: boolean;
+}
+
+// How near (meters, horizontally) a point must be to a crossing or a segment to mean that object: the client sends the object's own point, so a click on the floor beside one stays on the floor.
+const pointOnGeodesicToleranceMeters = 1e-6;
+
+/**
+ * Places a new emitter at `point`, deciding from what is there: on a crossing marker it cuts every geodesic passing (`placeGeodesicCannonAtGeodesicVertex`), on a segment it cuts that geodesic
+ * (`placeGeodesicCannonOnGeodesic`), anywhere else it stands on the floor (`placeGeodesicCannonAtFloorPoint`). Refused placements change nothing.
+ */
+export function placeGeodesicEmitterAtPoint(request: PlaceGeodesicEmitterAtPointRequest): PlaceGeodesicEmitterResult {
+  const { world, registry, cellId, point, aimYawRadians, id } = request;
+  if (hasCrossingAtPoint(registry, cellId, point)) {
+    return placeGeodesicCannonAtGeodesicVertex({
+      world,
+      registry,
+      cellId,
+      vertexPoint: point,
+      aimYawRadians,
+      id,
+      createContinuationGeodesicId: request.createContinuationGeodesicId,
+    });
+  }
+  const hit = findSegmentAtPoint(registry, cellId, point);
+  if (hit) {
+    return placeGeodesicCannonOnGeodesic({
+      world,
+      registry,
+      geodesicId: hit.segment.geodesicId,
+      segmentId: hit.segment.id,
+      distanceAlongSegmentMeters: hit.distanceAlongSegmentMeters,
+      aimYawRadians,
+      id,
+    });
+  }
+  return placeGeodesicCannonAtFloorPoint({ world, registry, cellId, floorPoint: point, aimYawRadians, id });
+}
+
+function hasCrossingAtPoint(registry: RuntimeObjectRegistry, cellId: string, point: Vec3): boolean {
+  return registry.getObjectsInCell(cellId).some((object) => {
+    if (object.kind !== "geodesicModel/crossing") {
+      return false;
+    }
+    const crossing = object.aimStickyTarget?.localPoint ?? object.localPose.translation;
+    return Math.hypot(crossing.x - point.x, crossing.y - point.y) <= pointOnGeodesicToleranceMeters;
+  });
+}
+
+// The segment of the cell through the point. Where two halves of a geodesic meet the point is on both: the one that ends there is taken, so the cut has a segment behind it.
+function findSegmentAtPoint(
+  registry: RuntimeObjectRegistry,
+  cellId: string,
+  point: Vec3,
+): { readonly segment: GeodesicSegmentObject; readonly distanceAlongSegmentMeters: number } | undefined {
+  let found: { readonly segment: GeodesicSegmentObject; readonly distanceAlongSegmentMeters: number } | undefined;
+  for (const segment of registry.getObjectsInCell(cellId).filter(isGeodesicSegmentObject)) {
+    const distanceAlongSegmentMeters = distanceAlongSegment(segment, { x: point.x, y: point.y, z: segment.start.z });
+    const onSegment = distanceAlongSegmentMeters >= -pointOnGeodesicToleranceMeters &&
+      distanceAlongSegmentMeters <= segment.lengthMeters + pointOnGeodesicToleranceMeters;
+    const projected = addVec3(segment.start, scaleVec3(segment.direction, distanceAlongSegmentMeters));
+    if (onSegment && Math.hypot(projected.x - point.x, projected.y - point.y) <= pointOnGeodesicToleranceMeters &&
+      (found === undefined || distanceAlongSegmentMeters > found.distanceAlongSegmentMeters)) {
+      found = { segment, distanceAlongSegmentMeters };
+    }
+  }
+  return found;
 }
 
 /**
@@ -627,9 +705,9 @@ function emitterAtPose(emitter: GeodesicEmitterObject, cellId: string, localPose
  *
  * The point is `distanceAlongSegmentMeters` (clamped to the segment) along the segment; it must be at least `minGeodesicSegmentLengthMeters`
  * from the segment start. The cannon is first placed on the floor below the point (`placeGeodesicCannonAtFloorPoint`), then
- * `splitGeodesicIntervalAtSegmentHit` is applied; if the split is refused the cannon is removed again.
- * Returns the stored cannon on success. Failure reasons are coarse: `"missing-cell"` for an unknown/foreign segment, `"cell-collision"`
- * for a too-near cut or refused split, or the collision reasons of the floor placement. Mutates the registry; does not throw.
+ * `splitGeodesicIntervalAtSegmentHit` is applied. Everything that could refuse the split is checked first, so a refusal changes nothing.
+ * Returns the stored cannon on success. Failure reasons: `"missing-cell"` for an unknown/foreign segment, `"too-short"` for a too-near cut,
+ * `"cell-collision"` for a geodesic that is not an aimable free one, or the collision reasons of the floor placement. Mutates the registry; does not throw.
  */
 export function placeGeodesicCannonOnGeodesic(
   request: PlaceGeodesicCannonOnGeodesicRequest,
@@ -641,6 +719,10 @@ export function placeGeodesicCannonOnGeodesic(
 
   const clampedDistance = Math.min(segment.lengthMeters, Math.max(0, request.distanceAlongSegmentMeters));
   if (!canConnectGeodesicSegmentAtDistance(clampedDistance)) {
+    return { placed: false, reason: "too-short" };
+  }
+  const interval = request.registry.get(request.geodesicId);
+  if (interval?.kind !== "geodesicModel/arc" || !isAimableFreeGeodesic(request.registry, interval)) {
     return { placed: false, reason: "cell-collision" };
   }
   const floorPoint = {
@@ -660,7 +742,7 @@ export function placeGeodesicCannonOnGeodesic(
     return result;
   }
 
-  const split = splitGeodesicIntervalAtSegmentHit({
+  splitGeodesicIntervalAtSegmentHit({
     world: request.world,
     registry: request.registry,
     geodesicId: request.geodesicId,
@@ -669,10 +751,6 @@ export function placeGeodesicCannonOnGeodesic(
     placedEmitterId: result.object.id,
     createContinuationGeodesicId: (sourceGeodesicId) => `${sourceGeodesicId}:continuation:${result.object?.id ?? request.id}`,
   });
-  if (split.length === 0) {
-    request.registry.remove(result.object.id);
-    return { placed: false, reason: "cell-collision" };
-  }
 
   const placed = request.registry.get(result.object.id);
   return placed?.kind === "geodesicEmitters/emitter" ? { placed: true, object: placed } : result;

@@ -72,6 +72,10 @@ export interface GeodesicModelQueries {
   tieableEnds(emitterId: string): readonly GeodesicEndpointRef[];
   /** Every arc of the curve through this vertex, walked over shared vertices. */
   arcsOfCurve(vertexId: string): readonly string[];
+  /** Every arc of the curve this arc belongs to, the arc itself included. */
+  curveOfArc(arcId: string): readonly string[];
+  /** The arcs with an end on the emitter, in registry order. Read from the arc index. */
+  arcsOnEmitter(emitterId: string): readonly string[];
   /** The arc's last rebuild failed during a carry, so it still shows its old path. */
   isStale(arcId: string): boolean;
 }
@@ -132,12 +136,18 @@ export interface GeodesicRemoveCurveCommand extends EngineCommandBase {
   readonly arcIds: readonly string[];
 }
 
+/** Module-only. Names a new arc: the result is `{ arcId }`, of the family `geodesicModel/arc`. A module that shoots an arc takes its id here, because the family is the model's. */
+export interface GeodesicReserveArcIdCommand extends EngineCommandBase {
+  readonly kind: "geodesicModel/reserveArcId";
+}
+
 /** Every command of the module. */
 export type GeodesicModelCommand =
   | GeodesicTieAndDetachCommand
   | GeodesicHighlightEndpointCommand
   | GeodesicRemoveVertexCommand
-  | GeodesicRemoveCurveCommand;
+  | GeodesicRemoveCurveCommand
+  | GeodesicReserveArcIdCommand;
 
 /** Two endpoint roles were tied at a new vertex. */
 export interface GeodesicVertexTiedEvent extends EngineEventBase {

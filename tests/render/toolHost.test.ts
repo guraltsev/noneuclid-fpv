@@ -5,11 +5,16 @@
  * the primary action goes to the selected tool's descriptor (every frame for the tools that update from the input, otherwise only on a primary action with no menu open), and to the focused object with no tool; a command a tool submits gets its result handed back to that tool after the step;
  * an ended tool takes its marks off and loses its tool state; an object action asks the world for its tool only when the tool is available.
  */
+import * as THREE from "three";
 import { describe, expect, it, vi } from "vitest";
 import type { CommandResult, ModuleClient, ToolDescriptor } from "../../src/engine/moduleTypes";
 import type { RuntimeToolId } from "../../src/glue/toolIds";
+import type { AimTarget } from "../../src/interaction/aimTarget";
 import { applyRuntimeCommand } from "../../src/runtime/applyRuntimeCommand";
 import { createToolHost, type CoreToolActions } from "../../src/render/three/toolHost";
+import { threeDirectionToWorld } from "../../src/render/three/worldAxes";
+import type { RuntimeWorldObject } from "../../src/world-objects/runtimeObjectRegistry";
+import { createSegment } from "../fixtures/world-objects/geodesic";
 import { createTestClientSession } from "../support/clientSession";
 import { createTestEngine } from "../support/engine";
 
@@ -18,7 +23,7 @@ const probeId = "probe/tool" as RuntimeToolId;
 function setup(options: { readonly available?: boolean } = {}) {
   const engine = createTestEngine();
   const session = createTestClientSession();
-  const log = { primary: 0, ended: 0, results: [] as CommandResult[], started: [] as (string | undefined)[], requested: [] as string[], palette: 0, focused: 0, objectSyncs: 0 };
+  const log = { primary: 0, ended: 0, results: [] as CommandResult[], started: [] as (string | undefined)[], requested: [] as string[], palette: 0, focused: 0 };
   const probe: ToolDescriptor = {
     id: probeId,
     ownerModuleId: "probe",
@@ -49,7 +54,6 @@ function setup(options: { readonly available?: boolean } = {}) {
   const client: ModuleClient = { tools: [probe] };
   const core: CoreToolActions = {
     placeFlag: vi.fn(),
-    useGeodesicCannon: vi.fn(),
     measureLength: vi.fn(),
     protractor: vi.fn(),
     protractorPrompt: () => "select: vertex",
@@ -64,12 +68,14 @@ function setup(options: { readonly available?: boolean } = {}) {
     clients: [client],
     core,
     resolveCurrentAimTargets: () => [],
+    resolveCurrentAimTarget: () => undefined,
     targetIsWithinInteractionRange: () => true,
     useFocusedObject: () => (log.focused += 1, true),
     requestTool: (toolId, objectId) => void log.requested.push(`${toolId}:${objectId}`),
     showMessage: () => undefined,
     syncDesktopPalette: () => void (log.palette += 1),
-    syncWorldObjects: () => void (log.objectSyncs += 1),
+    selectObject: () => undefined,
+    showObjectPage: () => undefined,
   });
   const select = (toolId: RuntimeToolId): void => void applyRuntimeCommand(session, { kind: "select-tool", toolId });
   return { host, engine, session, core, log, select };
@@ -126,12 +132,13 @@ describe("the tool host and a tool's commands", () => {
     select(probeId);
     host.dispatchPrimaryAction(true, false);
     expect(log.results).toEqual([]);
+    const paletteBefore = log.palette;
     engine.step(0);
     host.afterStep();
 
     expect(log.results).toHaveLength(1);
     expect(log.results[0]).toMatchObject({ ok: true });
-    expect(log.objectSyncs).toBe(1);
+    expect(log.palette).toBeGreaterThan(paletteBefore);
   });
 
   it("takes the marks off and drops the tool state when the tool ends", () => {
@@ -207,7 +214,6 @@ describe("the tool lookup", () => {
     expect([...host.toolsById.keys()].sort()).toEqual([
       "geodesicEmitters/aim",
       "geodesicEmitters/carry",
-      "geodesicEmitters/emitter",
       "geodesicEmitters/rotate",
       "measure-length",
       "place-flag",
@@ -216,6 +222,43 @@ describe("the tool lookup", () => {
     ]);
     const twice: ModuleClient = { tools: [host.toolsById.get("place-flag") as ToolDescriptor] };
     expect(() => createToolHost({ ...dummyDeps(), clients: [twice] })).toThrow("the tool place-flag is described twice");
+  });
+});
+
+describe("what the host tells a tool about the aim", () => {
+  function hostAiming(target: AimTarget, direction = new THREE.Vector3(1, 0, 0)) {
+    const host = createToolHost({ ...dummyDeps(), resolveCurrentAimTargets: () => [target], resolveCurrentAimTarget: () => target });
+    host.setFrame({ ray: { origin: new THREE.Vector3(), direction, quaternion: new THREE.Quaternion() }, yawDeltaRadians: 0, primaryActionRequested: false });
+    return host.contextOf("place-flag");
+  }
+  const aimed = { kind: "object", cellId: "image-cell", localPoint: { x: 9, y: 9, z: 9 } } as AimTarget;
+
+  it("says where a segment is hit in the segment's own cell, on the segment", () => {
+    const segment = createSegment({ cellId: "a", start: { x: 1, y: 1, z: 1.2 }, direction: { x: 1, y: 0, z: 0 }, lengthMeters: 2 });
+
+    const pick = hostAiming({ ...aimed, object: segment, geodesicSegmentDistanceMeters: 0.5 }).currentPick();
+
+    expect(pick).toMatchObject({ cellId: "a", point: { x: 1.5, y: 1, z: 1.2 } });
+  });
+
+  it("says where a crossing is from the crossing's own point", () => {
+    const crossing = { kind: "geodesicModel/crossing", id: "x", cellId: "a", aimStickyTarget: { localPoint: { x: 2, y: 3, z: 1 } } } as unknown as RuntimeWorldObject;
+
+    expect(hostAiming({ ...aimed, object: crossing }).currentPick()).toMatchObject({ cellId: "a", point: { x: 2, y: 3, z: 1 } });
+  });
+
+  it("leaves the floor at the aim point of the hit cell", () => {
+    const { object: _none, ...floor } = { ...aimed, kind: "floor" as const, object: undefined };
+
+    expect(hostAiming(floor as AimTarget).currentPick()).toMatchObject({ objectKind: "floor", cellId: "image-cell", point: { x: 9, y: 9, z: 9 } });
+  });
+
+  it("gives the horizontal direction of the ray, and none for a vertical ray", () => {
+    const direction = new THREE.Vector3(1, 0, -1).normalize();
+    const forward = threeDirectionToWorld(direction);
+
+    expect(hostAiming(aimed, direction).aimYawRadians()).toBeCloseTo(Math.atan2(forward.y, forward.x), 12);
+    expect(hostAiming(aimed, new THREE.Vector3(0, -1, 0)).aimYawRadians()).toBeUndefined();
   });
 });
 
@@ -228,13 +271,15 @@ function dummyDeps(): Parameters<typeof createToolHost>[0] {
     session,
     dispatch: noop,
     clients: [],
-    core: { placeFlag: noop, useGeodesicCannon: noop, measureLength: noop, protractor: noop, protractorPrompt: () => "", carry: () => false, rotate: () => false, aim: () => false },
+    core: { placeFlag: noop, measureLength: noop, protractor: noop, protractorPrompt: () => "", carry: () => false, rotate: () => false, aim: () => false },
     resolveCurrentAimTargets: () => [],
+    resolveCurrentAimTarget: () => undefined,
     targetIsWithinInteractionRange: () => true,
     useFocusedObject: () => false,
     requestTool: noop,
     showMessage: noop,
     syncDesktopPalette: noop,
-    syncWorldObjects: noop,
+    selectObject: noop,
+    showObjectPage: noop,
   };
 }

@@ -1,5 +1,5 @@
 /**
- * The descriptors of the tools the shell defines itself (design 013 section 8.3): sign, geodesic ray, length, protractor, and the emitter's carry, rotate and aim sub-modes.
+ * The descriptors of the tools the shell defines itself (design 013 section 8.3): sign, length, protractor, and the emitter's carry, rotate and aim sub-modes.
  * Their behavior stays in the shell (carry, rotate and aim update from the input each frame, section 16); a descriptor only calls the handler the shell passes in. The tools modules contribute come from the modules' client parts.
  * "none" and "aim" are not tools with descriptors: with neither selected the primary action acts on the focused object.
  */
@@ -8,7 +8,6 @@ import type { ToolDescriptor } from "../engine/moduleTypes";
 /** What the shell does for each core tool; each handler reads the current frame's input itself. */
 export interface CoreToolHandlers {
   placeFlag(): void;
-  useGeodesicCannon(): void;
   measureLength(): void;
   protractor(): void;
   /** The protractor's prompt, from its picks. */
@@ -23,10 +22,11 @@ export interface CoreToolHandlers {
 
 /** The descriptors of the core tools. */
 export function createCoreToolDescriptors(handlers: CoreToolHandlers): readonly ToolDescriptor[] {
-  const base = { ownerModuleId: "core", entry: { kind: "main-tool" } } as const;
+  const mainTool = { ownerModuleId: "core", entry: { kind: "main-tool" } } as const;
+  const subMode = { ownerModuleId: "core", entry: { kind: "sub-mode" } } as const;
   return [
     {
-      ...base,
+      ...mainTool,
       id: "place-flag",
       label: "Sign",
       helpTitle: "Sign tool",
@@ -38,20 +38,7 @@ export function createCoreToolDescriptors(handlers: CoreToolHandlers): readonly 
       onPrimaryAction: () => (handlers.placeFlag(), true),
     },
     {
-      ...base,
-      id: "geodesicEmitters/emitter",
-      label: "Geodesic emitter",
-      badgeLabel: "Ray",
-      helpTitle: "Ray tool",
-      helpBody: "Places geodesic emitters and starts locally straight rays.",
-      helpRows: [{ input: "primary", label: "place or continue ray" }, { input: "context-menu", label: "open choices" }],
-      indicatorColor: "#facc15",
-      iconId: "ray",
-      showsAimCross: true,
-      onPrimaryAction: () => (handlers.useGeodesicCannon(), true),
-    },
-    {
-      ...base,
+      ...mainTool,
       id: "measure-length",
       label: "Length",
       helpTitle: "Length tool",
@@ -64,7 +51,7 @@ export function createCoreToolDescriptors(handlers: CoreToolHandlers): readonly 
       onPrimaryAction: () => (handlers.measureLength(), true),
     },
     {
-      ...base,
+      ...mainTool,
       id: "protractor",
       label: "Protractor",
       helpTitle: "Protractor tool",
@@ -77,7 +64,7 @@ export function createCoreToolDescriptors(handlers: CoreToolHandlers): readonly 
       onPrimaryAction: () => (handlers.protractor(), true),
     },
     {
-      ...base,
+      ...subMode,
       id: "geodesicEmitters/carry",
       label: "Carry",
       helpTitle: "Carry emitter",
@@ -90,7 +77,7 @@ export function createCoreToolDescriptors(handlers: CoreToolHandlers): readonly 
       onPrimaryAction: () => handlers.carry(),
     },
     {
-      ...base,
+      ...subMode,
       id: "geodesicEmitters/rotate",
       label: "Turn",
       badgeLabel: "Rotate",
@@ -104,7 +91,7 @@ export function createCoreToolDescriptors(handlers: CoreToolHandlers): readonly 
       onPrimaryAction: () => handlers.rotate(),
     },
     {
-      ...base,
+      ...subMode,
       id: "geodesicEmitters/aim",
       label: "Aim ray",
       badgeLabel: "Aim",

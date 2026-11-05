@@ -131,6 +131,8 @@ import {
 } from "./frameDiagnostics";
 import { type FrameRenderSnapshot } from "./frameRenderSnapshot";
 import { createGeodesicRuntimeRenderSources } from "./geodesicCannonRenderer";
+import { requestGeodesicDeletion, requestGeodesicExtension, requestNewGeodesic } from "../../modules/geodesicEmitters/client";
+import { geodesicEmitterToolId } from "../../modules/geodesicEmitters/api";
 import { createGeodesicCannonTools } from "./geodesicCannonTools";
 import { createPortalFramePass } from "./portalFramePass";
 import { createGeodesicDebugDumps } from "./geodesicDebugDumps";
@@ -749,16 +751,15 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     syncSelectableHitboxDebug: requestSelectableHitboxDebugSync,
   });
 
+  // The emitter tool's context, for the buttons of the emitter's page and a click on a geodesic with no tool selected. Called from events, after the tool host below exists.
+  const emitterTool = () => toolHost.contextOf(geodesicEmitterToolId);
+
   const {
-    tryUseGeodesicCannonToolFromAim,
-    tryExtendFocusedGeodesicFromAim,
-    addGeodesicToCannon,
     startGeodesicCannonRotation,
     startGeodesicCannonAim,
     startGeodesicCannonCarry,
     tryStartFocusedGeodesicCannonCarry,
     finishGeodesicCannonCarry,
-    deleteGeodesicFromCannon,
     updateCarriedGeodesicCannonPose,
     afterWorldStep: afterCarryWorldStep,
     updateActiveGeodesicCannonRotation,
@@ -775,11 +776,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     session,
     dispatch: dispatchRuntimeCommand,
     resolveCurrentAimTarget,
-    targetIsWithinInteractionRange,
-    logVerboseAimClick,
     findFocusedRuntimeObject,
-    getGeodesicLabelsById,
-    objectActionsFor: (objectKind, objectId) => toolHost.objectActionsFor(objectKind, objectId),
     syncDesktopPalette,
     syncSelectableHitboxDebug: requestSelectableHitboxDebugSync,
     removeMeasuredGeodesicLengthsForGeodesic,
@@ -795,6 +792,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     tryUseMeasureLengthToolFromAim,
     tryUseProtractorToolFromAim,
     tryUseFocusedObjectPrimaryInteraction,
+    showObjectPage,
     openContextMenuFromAim,
     applyDesktopScenePaletteToggle,
     resetPlayerToHome,
@@ -820,7 +818,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     targetIsWithinInteractionRange,
     logVerboseAimClick,
     findFocusedRuntimeObject,
-    tryExtendFocusedGeodesicFromAim,
+    extendGeodesic: (arcId) => requestGeodesicExtension(emitterTool(), arcId),
     getGeodesicDisplayName,
     getGeodesicLabelsById,
     getConnectedGeodesicIds,
@@ -856,7 +854,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     clients: createDefaultClientModules(),
     core: {
       placeFlag: tryPlaceFlagFromAim,
-      useGeodesicCannon: tryUseGeodesicCannonToolFromAim,
       measureLength: tryUseMeasureLengthToolFromAim,
       protractor: tryUseProtractorToolFromAim,
       protractorPrompt: getProtractorToolPrompt,
@@ -874,14 +871,14 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       },
     },
     resolveCurrentAimTargets,
+    resolveCurrentAimTarget,
     targetIsWithinInteractionRange,
     useFocusedObject: tryUseFocusedObjectPrimaryInteraction,
     requestTool: (toolId, objectId) => worldClient.requestTool(toolId, objectId),
     showMessage: (message) => showWorldMessage(message, { code: "tool/message" }),
     syncDesktopPalette,
-    syncWorldObjects() {
-      requestSelectableHitboxDebugSync();
-    },
+    selectObject: (objectId, geodesicId) => dispatchRuntimeCommand({ kind: "set-cannon-tool-state", state: { selectedCannonId: objectId, activeGeodesicId: geodesicId } }),
+    showObjectPage,
   });
 
   const {
@@ -923,12 +920,12 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     applyMenuComfortState,
     requestAppRestart: xrSession.requestAppRestart,
     teleportPlayerHome,
-    addGeodesicToCannon,
+    addGeodesicToCannon: (cannonId) => requestNewGeodesic(emitterTool(), cannonId),
     startGeodesicCannonCarry,
     startObjectAction: (objectKind, objectId, actionId) => toolHost.startObjectAction(objectKind, objectId, actionId),
     startGeodesicCannonRotation,
     startGeodesicCannonAim,
-    deleteGeodesicFromCannon,
+    deleteGeodesicFromCannon: (cannonId, geodesicId) => requestGeodesicDeletion(emitterTool(), cannonId, geodesicId),
     stepGeometryComputerPendingTarget,
     startGeometryComputerDeformation,
     appendEditingSignCharacter,

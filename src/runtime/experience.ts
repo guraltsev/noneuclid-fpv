@@ -5,6 +5,7 @@
 import type { AnyModuleDefinition, ModuleClient } from "../engine/moduleTypes";
 import type { SimulationClockOptions } from "../engine/worldEngine";
 import { carryModule } from "../modules/carry";
+import { geodesicEmittersClient, geodesicEmittersModule } from "../modules/geodesicEmitters";
 import { geodesicMeasurementsModule } from "../modules/geodesicMeasurements";
 import { curveShorteningModule } from "../modules/curveShortening";
 import { geodesicModelClient, geodesicModelModule } from "../modules/geodesicModel";
@@ -14,10 +15,10 @@ export const defaultSimulationClockOptions: SimulationClockOptions = { tickSecon
 
 /** The world modules of the default experience. */
 export function createDefaultWorldModules(): readonly AnyModuleDefinition[] {
-  return [geodesicModelModule(), geodesicMeasurementsModule(), carryModule(), curveShorteningModule()];
+  return [geodesicModelModule(), geodesicMeasurementsModule(), geodesicEmittersModule(), carryModule(), curveShorteningModule()];
 }
 
 /** The client parts of the default experience's modules (only the modules with tools have one). */
 export function createDefaultClientModules(): readonly ModuleClient[] {
-  return [geodesicModelClient()];
+  return [geodesicModelClient(), geodesicEmittersClient()];
 }

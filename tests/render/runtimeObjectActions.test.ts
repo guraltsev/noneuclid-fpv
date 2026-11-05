@@ -83,7 +83,7 @@ function createHarness(target: AimTarget | undefined, sessionOverrides: Partial<
     targetIsWithinInteractionRange: () => true,
     logVerboseAimClick: none,
     findFocusedRuntimeObject: () => undefined,
-    tryExtendFocusedGeodesicFromAim: () => false,
+    extendGeodesic: () => false,
     getGeodesicDisplayName: (geodesicId) => geodesicId,
     getGeodesicLabelsById: () => ({}),
     getConnectedGeodesicIds: () => [],

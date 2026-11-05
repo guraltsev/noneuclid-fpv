@@ -193,7 +193,7 @@ export interface ModuleDefinition<
   readonly requires: readonly ModuleToken<unknown, unknown>[];
   readonly objectKinds: readonly ObjectKindDeclaration[];
   /**
-   * Kinds of the core union that this module also writes, because the module that will own them does not exist yet (the emitter and geodesic kinds, until `geodesicEmitters`, design 013 job 51). Only the write guard reads it; it empties as the owners arrive.
+   * Kinds of the core union that this module also writes, because code that writes them still runs in this module's frame (the carry module's emitter and geodesic kinds, the emitters' geodesic kinds, the measurements a removed arc takes with it). Only the write guard reads it.
    */
   readonly writesCoreKinds?: readonly string[];
   /** Tool ids this module defines; the engine knows them for gating. */
@@ -295,6 +295,10 @@ export interface AimPick {
 export interface ToolContext {
   /** Picks along the current aim ray (desktop: camera; XR: the hand ray), nearest first. A read-only query. */
   pickTargets(): readonly AimPick[];
+  /** The pick the person has selected along the ray: the first, or the one they cycled to. */
+  currentPick(): AimPick | undefined;
+  /** The horizontal direction of the aim ray in radians, or undefined for a (near-)vertical ray. */
+  aimYawRadians(): number | undefined;
   /** Submits a command for the local participant; its result arrives through the tool's `onResult` after the next step. */
   submit(command: EngineCommandBase): void;
   /** The client tool state of a module (`moduleToolState[moduleId]` of the client session), or undefined while its tool is idle. */
@@ -303,6 +307,10 @@ export interface ToolContext {
   setToolState(moduleId: string, state: unknown): void;
   /** Ends the tool: closes the menu and selects no tool. */
   endTool(): void;
+  /** Makes the object and one of its geodesics the client's selection, which the object's menu page and its modes start from. */
+  selectObject(objectId: string, geodesicId: string): void;
+  /** Shows the object's menu page, with its current state. */
+  showObjectPage(objectId: string): void;
   readonly read: WorldReadView;
   /** A module's read-only queries (design 013 section 5.7); never its `api`. */
   query<Q>(token: ModuleToken<unknown, Q>): Q;
@@ -346,9 +354,10 @@ export interface ToolDescriptor {
   readonly showsAimCross: boolean;
   /** `onPrimaryAction` runs every frame, not only on a primary action while no menu is open (the tools that update from the input each frame). */
   readonly runsEveryFrame?: boolean;
-  /** Where the tool is started from: the main tool list, or an action on an object's menu page. */
+  /** Where the tool is started from: the main tool list, an action on an object's menu page, or (`sub-mode`) the shell, from a button of its own. */
   readonly entry:
     | { readonly kind: "main-tool" }
+    | { readonly kind: "sub-mode" }
     | {
         readonly kind: "object-action";
         readonly objectKind: string;

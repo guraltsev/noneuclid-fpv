@@ -14,14 +14,16 @@ import {
   showRuntimeMenuGeodesicCannonActions,
   showRuntimeMenuGeometryComputerActions,
 } from "../../src/runtime/runtimeMenuState";
+import { defaultAppConfig } from "../../src/glue/appConfig";
 import { publicAssetUrl } from "../../src/glue/assetUrls";
 import { createScenePaletteAdapter } from "../../src/render/three/palette/scenePaletteAdapter";
 import { createPaletteDefinition } from "../../src/ui/paletteDefinition";
+import { createTestToolsById } from "../support/tools";
 
 describe("scenePaletteAdapter", () => {
   it("maps each main tool and its nested options to the right icon", () => {
     const adapter = createScenePaletteAdapter(createNoopOptions());
-    adapter.setDefinition(createPaletteDefinition(createRuntimeMenuState({ selectedWorldId: "cube" })));
+    adapter.setDefinition(createPaletteDefinition(createRuntimeMenuState({ selectedWorldId: "cube" }), defaultAppConfig, "desktop", 0, createTestToolsById()));
 
     const itemIds = collectPaletteItemIds(adapter.root);
     const imageSources = collectPaletteImageSources(adapter.root);

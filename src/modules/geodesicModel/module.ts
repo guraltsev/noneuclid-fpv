@@ -4,14 +4,16 @@
  *
  * The module declares the four geodesic kinds (arc, vertex, segment, crossing), provides the token `geodesicModel` with the queries clients and dependents
  * read and the hot operations only dependents hold (`previewVertexMove`, `commitVertexMove`, `previewVertexRemoval`), and handles the commands `tieAndDetach`,
- * `highlightEndpoint`, and the module-only `removeVertex` and `removeCurve`. Its one tick, `crossings`, is a derive tick that recomputes the crossing markers when segments change. The
+ * `highlightEndpoint`, and the module-only `removeVertex`, `removeCurve` and `reserveArcId`. Its one tick, `crossings`, is a derive tick that recomputes the crossing markers when segments change. The
  * tie command requires the tie tool (defined here, with its client part in `client.ts`) unless the experience leaves the tool out. Each command is atomic: on refusal nothing changes.
  */
 import type { CommandContext, CommandHandlers, CommandResult, ModuleDefinition, ModuleTick, ObjectKindDeclaration } from "../../engine/moduleTypes";
 import {
   arcsAtVertex,
   arcsOfCurve,
+  arcsOfCurveContaining,
   forEachTiedVertex,
+  getEmitterGeodesicIds,
   getGeodesicEndpointAttachmentsForAnchor,
   isStale,
   isTied,
@@ -137,6 +139,8 @@ export function geodesicModelModule(options: Partial<GeodesicModelOptions> = {})
     provides: geodesicModelToken,
     requires: [],
     objectKinds,
+    // Removing an arc deletes its measurements in this module's frame (issue 94).
+    writesCoreKinds: ["geodesicMeasurements/length", "geodesicMeasurements/angle"],
     toolIds: tieTool ? [geodesicTieToolId] : [],
     create: (context) => {
       const { objects } = context;
@@ -149,6 +153,8 @@ export function geodesicModelModule(options: Partial<GeodesicModelOptions> = {})
         tiedVertexCount: () => tiedVertexCount(objects),
         forEachTiedVertex: (fn) => forEachTiedVertex(objects, fn),
         arcsOfCurve: (vertexId) => arcsOfCurve(objects, vertexId),
+        curveOfArc: (arcId) => arcsOfCurveContaining(objects, arcId),
+        arcsOnEmitter: (emitterId) => getEmitterGeodesicIds(objects, emitterId),
         isStale: (arcId) => isStale(objects, arcId),
         tieableEnds: (emitterId) => getGeodesicEndpointAttachmentsForAnchor(objects, emitterId).filter((end) => arcConnectsEmitters(objects, end.geodesicId)),
       };
@@ -163,6 +169,7 @@ export function geodesicModelModule(options: Partial<GeodesicModelOptions> = {})
         "geodesicModel/highlightEndpoint": { run: highlightEndpoint },
         "geodesicModel/removeVertex": { run: removeVertexCommand, moduleOnly: true },
         "geodesicModel/removeCurve": { run: removeCurve, moduleOnly: true },
+        "geodesicModel/reserveArcId": { run: (_command, ctx) => ({ ok: true, value: { arcId: ctx.ids.next("arc") } }), moduleOnly: true },
       };
       return { api, queries, commands, ticks: [crossingsTick] };
     },

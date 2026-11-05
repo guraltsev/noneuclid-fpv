@@ -10,6 +10,7 @@ import { worldCatalog } from "../authoring/worldCatalog";
 import { helpHubHomeGuidance } from "../world-objects/helpHubCopy";
 import { portalPanelModeDefinitions } from "../glue/portalPanelMode";
 import type { RuntimeMenuConsoleLogLevelId, RuntimeMenuPageId, RuntimeMenuState } from "../runtime/runtimeMenuState";
+import type { ToolsById } from "../runtime/toolRegistry";
 import type { RuntimeDebugOverlayItemId, RuntimeToolId } from "../glue/toolIds";
 import type { InputMode } from "./inputIntents";
 import { placedFlagMaxMessageLength } from "../world-objects/placedFlags";
@@ -254,6 +255,7 @@ export function createPaletteDefinition(
   appConfig: AppConfig = defaultAppConfig,
   inputMode: InputMode = "desktop",
   nowMs: number = Date.now(),
+  toolsById: ToolsById = new Map(),
 ): PaletteDefinition {
   const reloadConfirmationActive = (state.reloadConfirmUntilMs ?? 0) > nowMs;
 
@@ -440,7 +442,7 @@ export function createPaletteDefinition(
       kind: "main",
       selectedTool: state.selectedTool,
       placeFlagType: state.placeFlagOptions.flagType,
-      toolOptions: createToolOptions(appConfig),
+      toolOptions: createToolOptions(appConfig, toolsById),
     },
   };
 }
@@ -463,7 +465,7 @@ export interface PaletteDefinitionCache {
  * immutably, so reference equality of `state` is a complete change test; the clock enters only through the
  * reload-confirmation flag, which is part of the key.
  */
-export function createPaletteDefinitionCache(appConfig: AppConfig): PaletteDefinitionCache {
+export function createPaletteDefinitionCache(appConfig: AppConfig, toolsById: ToolsById): PaletteDefinitionCache {
   let lastState: RuntimeMenuState | undefined;
   let lastInputMode: InputMode | undefined;
   let lastReloadConfirmationActive = false;
@@ -484,7 +486,7 @@ export function createPaletteDefinitionCache(appConfig: AppConfig): PaletteDefin
         lastState = state;
         lastInputMode = inputMode;
         lastReloadConfirmationActive = reloadConfirmationActive;
-        definition = createPaletteDefinition(state, appConfig, inputMode, nowMs);
+        definition = createPaletteDefinition(state, appConfig, inputMode, nowMs, toolsById);
         version += 1;
         result = { definition, version };
       }
@@ -543,19 +545,13 @@ function resolveTutorialBodyForInputMode(
   return page.xrBody ?? formatBodyForInputMode(page.body, "xr");
 }
 
-function createToolOptions(appConfig: AppConfig): MainPaletteContent["toolOptions"] {
-  return getEnabledMainTools(appConfig).map((id) => ({
-    id,
-    label: toolLabels[id],
-  }));
+// The tools the config enables that have an entry on the main list, in the config's order.
+function createToolOptions(appConfig: AppConfig, toolsById: ToolsById): MainPaletteContent["toolOptions"] {
+  return getEnabledMainTools(appConfig).flatMap((id) => {
+    const tool = toolsById.get(id);
+    return tool?.entry.kind === "main-tool" ? [{ id, label: tool.label }] : [];
+  });
 }
-
-const toolLabels = {
-  "place-flag": "Sign",
-  "geodesicEmitters/emitter": "Geodesic emitter",
-  "measure-length": "Length",
-  protractor: "Protractor",
-} as const satisfies Record<ConfigurableToolId, string>;
 
 function createGeometryComputerActionsContent(
   options: NonNullable<RuntimeMenuState["geometryComputerOptions"]>,

@@ -70,11 +70,7 @@ function createHarness(
       applyRuntimeCommand(session, command);
     },
     resolveCurrentAimTarget: () => (aim.rootPoint ? ({ kind: "floor", rootPoint: aim.rootPoint } as unknown as AimTarget) : undefined),
-    targetIsWithinInteractionRange: () => false,
-    logVerboseAimClick: nothing,
     findFocusedRuntimeObject: () => undefined,
-    getGeodesicLabelsById: () => ({}),
-    objectActionsFor: () => [],
     syncDesktopPalette: nothing,
     syncSelectableHitboxDebug: nothing,
     removeMeasuredGeodesicLengthsForGeodesic: nothing,

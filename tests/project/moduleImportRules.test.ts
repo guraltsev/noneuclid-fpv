@@ -27,6 +27,7 @@ interface PrefixRule {
   readonly fromPrefix: string;
   readonly toPrefix: string;
   readonly onlyVia: readonly string[];
+  readonly alsoViaFrom?: Readonly<Record<string, readonly string[]>>;
   readonly exceptFromPrefixes?: readonly string[];
   readonly reason: string;
 }
@@ -180,6 +181,35 @@ describe("module import rules", () => {
     );
 
     expect(prefixImportRuleViolations(modules, [rule])).toEqual([{ from: "a/bad.ts", to: "b/internal.ts", reason: "test rule" }]);
+  });
+
+  it("lets alsoViaFrom open a target to the importers under one prefix only", async () => {
+    const { prefixImportRuleViolations } = await loadLib();
+    const rule: PrefixRule = { fromPrefix: "a/", toPrefix: "b/", onlyVia: ["b/api.ts"], alsoViaFrom: { "a/one/": ["b/open.ts"] }, reason: "test rule" };
+    const modules = modulesOf(
+      { path: "a/one/x.ts", imports: ["b/open.ts", "b/closed.ts"] },
+      { path: "a/two/y.ts", imports: ["b/open.ts"] },
+    );
+
+    expect(prefixImportRuleViolations(modules, [rule])).toEqual([
+      { from: "a/one/x.ts", to: "b/closed.ts", reason: "test rule" },
+      { from: "a/two/y.ts", to: "b/open.ts", reason: "test rule" },
+    ]);
+  });
+
+  it("lets the emitters reach cannon.ts and carryEnd.ts, and no other module", async () => {
+    const { moduleImportRuleViolations } = await loadLib();
+    const violations = moduleImportRuleViolations(
+      modulesOf(
+        { path: "modules/geodesicEmitters/module.ts", imports: ["world-objects/geodesic/cannon.ts", "world-objects/geodesic/carryEnd.ts", "world-objects/geodesic/segments.ts"] },
+        { path: "modules/curveShortening/module.ts", imports: ["world-objects/geodesic/cannon.ts"] },
+      ),
+    );
+
+    expect(violations.map((violation: { readonly from: string; readonly to: string }) => [violation.from, violation.to])).toEqual([
+      ["modules/geodesicEmitters/module.ts", "world-objects/geodesic/segments.ts"],
+      ["modules/curveShortening/module.ts", "world-objects/geodesic/cannon.ts"],
+    ]);
   });
 
   it("lets a module reach another module only through its api.ts, and its own files freely", async () => {

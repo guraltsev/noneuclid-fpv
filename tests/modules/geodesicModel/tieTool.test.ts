@@ -36,6 +36,10 @@ function setup() {
   const state = { toolState: undefined as unknown, ended: 0 };
   const context: ToolContext = {
     pickTargets: () => picks.current,
+    currentPick: () => picks.current[0],
+    aimYawRadians: () => 0,
+    selectObject: () => undefined,
+    showObjectPage: () => undefined,
     submit: (command) => void submitted.push({ ticket: engine.submit("local", command), command }),
     getToolState: <T,>() => state.toolState as T | undefined,
     setToolState: (_moduleId, next) => void (state.toolState = next),

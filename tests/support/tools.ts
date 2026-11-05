@@ -10,7 +10,6 @@ export function createTestToolsById(): ToolsById {
   return createToolsById(
     createCoreToolDescriptors({
       placeFlag: () => undefined,
-      useGeodesicCannon: () => undefined,
       measureLength: () => undefined,
       protractor: () => undefined,
       protractorPrompt: () => "select: vertex",

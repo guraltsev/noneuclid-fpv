@@ -76,7 +76,8 @@ export interface RuntimeObjectActionsDeps {
   /** Finds the interactable runtime object under the (optional) ray. */
   findFocusedRuntimeObject(ray?: RootAimRay): FocusedRuntimeObject | undefined;
   /** Extends the focused geodesic from the aim; true when something was extended. */
-  tryExtendFocusedGeodesicFromAim(ray?: RootAimRay): boolean;
+  /** Asks the world to lengthen a free geodesic; false, asking nothing, when a click on it means nothing. */
+  extendGeodesic(arcId: string): boolean;
   /** Display name ("G1", ...) of a geodesic. */
   getGeodesicDisplayName(geodesicId: string): string;
   /** Maps geodesic ids to their display names for menus. */
@@ -123,6 +124,8 @@ export interface RuntimeObjectActionsDeps {
 
 /** What the shell calls: the aim actions, the sign editing keys, going home and resetting, and the debug helpers. */
 export interface RuntimeObjectActions {
+  /** Shows an emitter's menu page, with its current geodesics. */
+  showObjectPage(objectId: string): void;
   /** Appends a character to the sign being edited (A-Z, 0-9, space, newline; anything else is ignored). */
   appendEditingSignCharacter(character: string): void;
   /** Removes the last character of the sign being edited. */
@@ -172,7 +175,7 @@ export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): Runt
     targetIsWithinInteractionRange,
     logVerboseAimClick,
     findFocusedRuntimeObject,
-    tryExtendFocusedGeodesicFromAim,
+    extendGeodesic,
     getGeodesicDisplayName,
     getGeodesicLabelsById,
     getConnectedGeodesicIds,
@@ -481,7 +484,8 @@ export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): Runt
       case "asset":
         return tryOpenFocusedQuestionHelp(target.object);
       case "geodesicModel/segment":
-        return tryExtendFocusedGeodesicFromAim(ray);
+        logVerboseAimClick(target);
+        return extendGeodesic(target.object.geodesicId);
       case "geodesicMeasurements/length":
         return tryRemoveFocusedMeasuredGeodesicLength(ray);
       case "geodesicMeasurements/angle":
@@ -514,6 +518,32 @@ export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): Runt
     dispatchRuntimeCommand({ kind: "open-menu" });
   }
 
+  // The menu page of an emitter, with its current geodesics; the active geodesic stays if it is still on the emitter. The one object page a tool can ask for.
+  function showObjectPage(objectId: string): void {
+    const object = runtimeObjectRegistry.get(objectId);
+    if (object?.kind !== "geodesicEmitters/emitter") {
+      return;
+    }
+    dispatchRuntimeCommand({ kind: "set-cannon-tool-state", state: {
+      selectedCannonId: object.id,
+      activeGeodesicId: resolveCannonGeodesicId(
+        runtimeObjectRegistry,
+        object,
+        undefined,
+        session.get().cannonToolState.activeGeodesicId,
+      ),
+    } });
+    const geodesicIds = getEmitterGeodesicIds(runtimeObjectRegistry, object.id);
+    dispatchRuntimeCommand({
+      kind: "show-geodesic-cannon-actions",
+      cannonId: object.id,
+      geodesicIds,
+      geodesicLabelsById: getGeodesicLabelsById(geodesicIds),
+      connectedGeodesicIds: getConnectedGeodesicIds(geodesicIds),
+      objectActions: objectActionsFor("geodesicEmitters/emitter", object.id),
+    });
+  }
+
   function tryOpenFocusedObjectMenu(ray?: RootAimRay): boolean {
     const focused = findFocusedRuntimeObject(ray);
     if (!focused) {
@@ -530,24 +560,7 @@ export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): Runt
     }
 
     if (focused.object.kind === "geodesicEmitters/emitter" && isRuntimeToolEnabled(appConfig, "geodesicEmitters/emitter")) {
-      dispatchRuntimeCommand({ kind: "set-cannon-tool-state", state: {
-        selectedCannonId: focused.object.id,
-        activeGeodesicId: resolveCannonGeodesicId(
-          runtimeObjectRegistry,
-          focused.object,
-          undefined,
-          session.get().cannonToolState.activeGeodesicId,
-        ),
-      } });
-      const geodesicIds = getEmitterGeodesicIds(runtimeObjectRegistry, focused.object.id);
-      dispatchRuntimeCommand({
-        kind: "show-geodesic-cannon-actions",
-        cannonId: focused.object.id,
-        geodesicIds,
-        geodesicLabelsById: getGeodesicLabelsById(geodesicIds),
-        connectedGeodesicIds: getConnectedGeodesicIds(geodesicIds),
-        objectActions: objectActionsFor("geodesicEmitters/emitter", focused.object.id),
-      });
+      showObjectPage(focused.object.id);
       return true;
     }
 
@@ -589,6 +602,7 @@ export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): Runt
     tryUseMeasureLengthToolFromAim,
     tryUseProtractorToolFromAim,
     tryUseFocusedObjectPrimaryInteraction,
+    showObjectPage,
     openContextMenuFromAim,
     applyDesktopScenePaletteToggle,
     resetPlayerToHome,

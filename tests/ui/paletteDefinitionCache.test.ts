@@ -14,7 +14,7 @@ const createInitialRuntimeMenuState = () => createRuntimeMenuState({ selectedWor
 
 describe("createPaletteDefinitionCache", () => {
   it("returns the same definition and version for the same state, mode and clock flag", () => {
-    const cache = createPaletteDefinitionCache(defaultAppConfig);
+    const cache = createPaletteDefinitionCache(defaultAppConfig, new Map());
     const state = createInitialRuntimeMenuState();
     const first = cache.get(state, "desktop", 0);
     const second = cache.get(state, "desktop", 5);
@@ -24,7 +24,7 @@ describe("createPaletteDefinitionCache", () => {
   });
 
   it("bumps the version for a new state object or a different input mode", () => {
-    const cache = createPaletteDefinitionCache(defaultAppConfig);
+    const cache = createPaletteDefinitionCache(defaultAppConfig, new Map());
     const state = createInitialRuntimeMenuState();
     const first = cache.get(state, "desktop", 0);
     const second = cache.get({ ...state }, "desktop", 0);
@@ -35,7 +35,7 @@ describe("createPaletteDefinitionCache", () => {
   });
 
   it("rebuilds when the reload confirmation expires for the same state object", () => {
-    const cache = createPaletteDefinitionCache(defaultAppConfig);
+    const cache = createPaletteDefinitionCache(defaultAppConfig, new Map());
     const state = { ...createInitialRuntimeMenuState(), reloadConfirmUntilMs: 1000 };
     const active = cache.get(state, "desktop", 500);
     const expired = cache.get(state, "desktop", 1500);
