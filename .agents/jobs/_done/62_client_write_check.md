@@ -1,7 +1,7 @@
 # Job 62 - Make the client write check measure writes
 
-Status: in progress.
-Resolves: issue [91](../../_issues/91_legacy_world_writers_list_does_not_measure_writes.md).
+Status: done, needs review on 2026-11-05.
+Resolves: issue [91](../../../_issues/91_legacy_world_writers_list_does_not_measure_writes.md).
 
 ## Goal
 
