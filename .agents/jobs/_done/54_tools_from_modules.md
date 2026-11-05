@@ -1,6 +1,6 @@
 # Job 54 - Build tools from module descriptors
 
-Status: in progress.
+Status: done, needs review on 2026-11-04.
 Resolves: part of issue [84](../../_issues/84_behaviors_are_hard_wired_into_the_shell_and_need_a_plugin_system.md) (requirements 1, 6).
 
 ## Goal

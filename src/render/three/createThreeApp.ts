@@ -63,6 +63,7 @@
  */
 import type { EngineEventBase } from "../../engine/moduleTypes";
 import { createToolHost } from "./toolHost";
+import type { RootAimRay } from "./rootAimRay";
 import { createWorldClient } from "./worldClient";
 import { createDefaultClientModules, createDefaultWorldModules } from "../../runtime/experience";
 import { createLocalPlayerParticipant, createWorldEngine, publishLocalPlayerPose, readLocalPlayerPose } from "../../engine/worldEngine";
@@ -844,6 +845,12 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   });
 
   // The tools: the shell's own, as handlers, and the modules' as descriptors from the experience's client parts. One lookup (`toolHost.toolsById`) serves every place that varies by tool.
+  // One frame input, rewritten each frame, so the per-frame tool dispatch allocates nothing.
+  const toolFrameInput: { ray: RootAimRay | undefined; yawDeltaRadians: number; primaryActionRequested: boolean } = {
+    ray: undefined,
+    yawDeltaRadians: 0,
+    primaryActionRequested: false,
+  };
   const toolHost = createToolHost({
     engine,
     session,
@@ -1257,7 +1264,10 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
         : tryStartFocusedGeodesicCannonCarry(activeAimRay);
     }
 
-    toolHost.setFrame({ ray: activeAimRay, yawDeltaRadians: frame.yawDeltaRadians, primaryActionRequested: frame.primaryActionRequested });
+    toolFrameInput.ray = activeAimRay;
+    toolFrameInput.yawDeltaRadians = frame.yawDeltaRadians;
+    toolFrameInput.primaryActionRequested = frame.primaryActionRequested;
+    toolHost.setFrame(toolFrameInput);
     primaryActionConsumed = toolHost.dispatchPrimaryAction(worldPrimaryActionRequested, primaryActionConsumed);
 
     if (primaryActionConsumed) {
