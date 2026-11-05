@@ -154,4 +154,4 @@ lower numbers of jobs 18, 24, 30, 34 and 35.
 | [57](_done/57_change_ring.md) | Keep every change readable: a ring behind the journal, cursors that survive endFrame | done, needs review | - |  |
 | [58](_done/58_derived_cache.md) | Add the derived cache, cached kind lists and their guards | done, needs review | - |  |
 | [59](_done/59_arc_index.md) | Answer every arc-end question from one cache, the arc index | done, needs review | - |  |
-| [60](60_materialized_state_is_a_function_of_real_state.md) | Make stored segments a function of real state, and test that | queued | - |  |
+| [60](_done/60_materialized_state_is_a_function_of_real_state.md) | Make stored segments a function of real state, and test that | done, needs review | - |  |
