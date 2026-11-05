@@ -1,6 +1,6 @@
 # Job 53 - Move curve shortening into a module with no lifecycle
 
-Status: in progress.
+Status: done, needs review on 2026-11-04.
 Resolves: part of issue [84](../../_issues/84_behaviors_are_hard_wired_into_the_shell_and_need_a_plugin_system.md) (requirements 1, 3, 6).
 
 ## Goal

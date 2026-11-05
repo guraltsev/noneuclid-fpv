@@ -147,7 +147,7 @@ lower numbers of jobs 18, 24, 30, 34 and 35.
 | [00](00_coordinate_jobs_51_60.md) | Coordinate jobs 51-60 (derived state, then the geodesic and flow modules): order, gates, fresh-context reviews, batch report | queued | [84](../../_issues/84_behaviors_are_hard_wired_into_the_shell_and_need_a_plugin_system.md), [86](../../_issues/86_derived_state_is_recomputed_by_scanning_the_world.md) |  |
 | [51](_done/51_geodesic_model_module_and_renames.md) | Restore the geodesic model module and abolish the "moving" state | done, needs review | - |  |
 | [52](_done/52_derived_state_through_the_journal.md) | Derive crossings, lengths and angles from the change ring | done, needs review | - |  |
-| [53](53_curve_shortening_module.md) | Move curve shortening into a module with no lifecycle | queued | - |  |
+| [53](_done/53_curve_shortening_module.md) | Move curve shortening into a module with no lifecycle | done, needs review | - |  |
 | [54](54_tools_from_modules.md) | Build tools from module descriptors | queued | - |  |
 | [55](55_destroy_policy.md) | Add the "destroy" policy for blocked curves | queued | [84](../../_issues/84_behaviors_are_hard_wired_into_the_shell_and_need_a_plugin_system.md), [86](../../_issues/86_derived_state_is_recomputed_by_scanning_the_world.md) |  |
 | [56](_done/56_bench_counters_and_ab_gate.md) | Make the performance gate exact: scan counters, a many-arcs scene and an A/B tool | done, needs review | - |  |
