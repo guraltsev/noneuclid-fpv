@@ -22,6 +22,7 @@ test:report: unit 155 files / 1206 tests, process 3 / 18, release 7 / 11, hygien
 | Test files / tests (unit, process, release) | 155/1206, 3/18, 7/11 | |
 
 ## Manual checks for the maintainer
+- Job 59: run the app with the `derived-verify` debug option, carry an emitter, shoot a geodesic, tie two ends, let the flow run to the merge; no "differs from compute" error must appear in the console.
 
 ## Questions for the maintainer
 
@@ -47,3 +48,10 @@ Counters re-recorded (all fell or stayed, `writes` unchanged): arc scans flow+de
 Timing: `--check` exit 3; `bench:ab -- cd24b8d` exit 0 (flow 17.22 base / 16.72 head; flow+dep 33.81 / 33.50).
 Release tier: one `appLoading.release` failure (config "001") in the first full run; passed alone and in a second full run (15/15). Second unreproducible release failure in the batch (job 56 too); both under load, treated as flake.
 Review (fresh agent): fixed in one repair round: (a) a throwing compute on a cache that already had a value left `hasValue` true with a current cursor, so the next read returned the stale value; now `hasValue=false` on throw, test added; (b) mis-indented `derivedStats` line. Not fixed (maintainer): global (not per-cache) verify countdown; duplicate-id throw not asked for; no test of the debug option wiring; `defineDerived` has no production caller until job 59 (job-justified).
+
+## Job 59 notes
+Start 8ef58b9; commit 3752f2c + close. Tests after: 165 files / 1397 tests. `git diff 8ef58b9 -- tests/` shows only added lines.
+Counters (scans per flow run, before -> after): geodesicModel/arc flow 121 -> 3, flow+dependents 120 -> 2, manyArcs 121 -> 3 (limit 6); `"*"` in flow+dependents 120 -> 0; writes unchanged.
+**Counter rise, flagged:** geodesicModel/vertex 1 -> 2 in flow and manyArcs. The job text does not name it. Cause: the one vertex pass each index compute makes (required by the Decisions, for tied-vertex order), and the flow computes the index twice (before and after the merge). The review confirmed it is not avoidable within the Decisions. Treated as a pass because a revert would give up 118 arc scans for one vertex scan; the coordinator's "rise = red" rule was applied by judgement, not by the letter. Maintainer: approve, or change the Decisions (compute `tiedVertexIds` lazily).
+Timing: `--check` exit 3; `bench:ab -- 8ef58b9` exit 0 (flow 17.89 base / 18.23 head; flow+dep 35.36 / 32.36).
+Review (fresh agent): no decision violated. `computeArcIndex` is exported for the oracle fuzz test only (kept: the oracle needs a plain compute). V3 test asserts reads > 50 not > 100 (82 measured); recorded as a Deviation. Latent: the index stores the arcs' own attachment objects; an update that kept the anchor but changed `geodesicId` would go stale (nothing does this today).

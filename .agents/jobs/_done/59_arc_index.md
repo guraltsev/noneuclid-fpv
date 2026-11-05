@@ -1,6 +1,6 @@
 # Job 59 - Answer every arc-end question from one cache, the arc index
 
-Status: in progress.
+Status: done, needs review on 2026-11-04.
 Resolves: part of issue [86](../../_issues/86_derived_state_is_recomputed_by_scanning_the_world.md).
 
 ## Goal
