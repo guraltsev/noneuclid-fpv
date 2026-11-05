@@ -1,6 +1,6 @@
 # Job 00 - Coordinate jobs 61-66 (time, emitters, public API, measurement tools and flags)
 
-Status: queued; do not start until the maintainer has reviewed the `## Decisions` of the jobs.
+Status: started 2026-11-05 at the maintainer's word.
 Coordinates: jobs [61](61_simulation_ticks.md), [62](62_client_write_check.md), [63](63_geodesic_emitters_module.md),
 [64](64_emitter_edits_and_length.md), [65](65_module_public_api.md) and [66](66_measurement_tools_and_flags.md), which implement
 the next batch of design [013](../../_docs/design/013-world-engine-clients-and-modules.md), section 16.
@@ -40,5 +40,5 @@ Stop rule: if a job fails, mark the jobs that need it `skipped on <date>: needs 
 
 - **61:** the `flow` and `flow+dependents` counters may change only as the job says.
 - **63:** the rename commit passes `npm test` alone, with only names changed.
-- **64:** `grep -rn "enter-tool-mode" src tests` is empty; the carry tests' assertions on motion are unchanged.
+- **64:** `grep -rn "enter-tool-mode" src tests` is empty; the carry tests' assertions on motion are unchanged; carry and aim run on the fast channel, with no `dispatch` on their per-frame path.
 - **Every job:** the count of direct client writes from job 62's check only falls.

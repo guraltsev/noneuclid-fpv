@@ -1,7 +1,7 @@
 /**
- * The world engine (design 013 section 5): the owner of world state, which changes only inside `step`, from queued commands and control slots.
+ * The world engine (design 013 section 5): the owner of world state, which changes only inside `step`, from queued commands, and inside `applyControls`, from control slots.
  * It holds the participants, the engine-allocated ids, the composed modules and their step order, the events and the command results; the registry of world objects stays where it is and the engine owns the frame end of its change journal: `endFrame` moves the journal's frame start (it erases no entry) and sets how far back the ring is retained, from the lowest derive cursor. Clients (the shell, tests, scripts) use the `WorldEngine` interface of moduleTypes.ts only.
- * One step: apply queued commands, sample control slots, bodies ticks (phase 3: attachments follow their carriers; locomotion joins later), simulate ticks, derive pass, (deformation: empty until it moves in). Everything crossing the interface is plain data, and `read` hands out the engine's own records by reference.
+ * Once per frame, `applyControls` runs the bodies ticks: attachments follow their carriers at frame rate, whether or not the frame has a tick (the fast channel, section 5.4). One step: apply queued commands, simulate ticks, derive pass, (deformation: empty until it moves in). Everything crossing the interface is plain data, and `read` hands out the engine's own records by reference.
  */
 import type { CompiledCellComplex } from "../cell-complex/compileCellComplex";
 import type { RuntimeToolId } from "../glue/toolIds";
@@ -54,6 +54,10 @@ interface QueuedCommand {
 
 function refuse(code: string, message: string): CommandResult {
   return { ok: false, refusal: { code, message } };
+}
+
+function assertDuration(name: string, seconds: number): void {
+  if (!(seconds >= 0) || !Number.isFinite(seconds)) throw new RangeError(`${name} needs a finite, non-negative duration, got ${seconds}`);
 }
 
 /** Creates the engine; throws a `ModuleCompositionError` when the module list is invalid. */
@@ -252,14 +256,17 @@ export function createWorldEngine(options: WorldEngineOptions): WorldEngine {
     },
     setControl: (participantId, slot, value) => controls.set(participantId, slot, value),
     publishBody: (participantId, body) => participants.publishBody(participantId, body),
+    applyControls(seconds) {
+      assertDuration("applyControls", seconds);
+      stepContext.deltaSeconds = seconds;
+      ticks.runBodies();
+    },
     step(deltaSeconds) {
-      if (!(deltaSeconds >= 0) || !Number.isFinite(deltaSeconds)) throw new RangeError(`step needs a finite, non-negative duration, got ${deltaSeconds}`);
+      assertDuration("step", deltaSeconds);
       stepIndex += 1;
       stepContext.deltaSeconds = deltaSeconds;
       firstError = undefined;
       applyQueuedCommands();
-      controls.sample();
-      ticks.runBodies();
       ticks.runSimulate();
       ticks.runDerive();
       if (firstError !== undefined) {

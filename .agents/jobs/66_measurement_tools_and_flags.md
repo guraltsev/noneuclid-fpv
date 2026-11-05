@@ -23,6 +23,8 @@ Job 64.
   are refreshed after a load. The contract test of 013 section 11 is written here.
 - New module `placedFlags`: kind `placedFlags/flag`, commands `place`, `setMessage`, `remove`, a client part with the tool. It needs no ticks.
 - `trackReads` stays on by default (014 D14).
+- **An angle whose crossing vanishes is hidden, not deleted** (013 section 17, item 6). It returns with the crossing, and is deleted 3 s of world time after
+  the aiming stops if the crossing has not returned. "The aiming stops" means the last edit or carry of either geodesic's emitter ended; with no such edit, the 3 s run from the moment the crossing vanished. Use the remembered-centre code. Test both ways: the crossing returns in time; it does not.
 - The flag branch of `geometryCommit.ts` stays until the deformation job.
 
 ## Steps

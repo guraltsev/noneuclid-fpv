@@ -1483,7 +1483,7 @@ The types of the world engine and of its modules (design 013 sections 5 and 9): 
 | interface | `ModuleToken` | A typed name for an exported module API. |
 | function | `defineModuleToken` | Creates a token. |
 | type | `CommandHandlers` | One handler per command kind; the mapped type makes the set exhaustive. |
-| type | `ModulePhase` | The kinds of per-step work: bodies ticks (step phase 3) move what follows a participant, simulate ticks change the world, derive ticks recompute what follows from the journal. |
+| type | `ModulePhase` | The kinds of work: bodies ticks move what follows a participant, once per frame in `applyControls`; simulate ticks change the world and derive ticks recompute what follows from the journal, in each step. |
 | interface | `ObjectKindDeclaration` | An object kind a module declares. |
 | interface | `ModuleTick` | Per-step work of a module, in a phase. |
 | interface | `ModuleDefinition` | The world part of a module. |
@@ -1526,7 +1526,7 @@ Tool gates and the confirmation protocol's world side (design 013 section 8).
 
 ### `engine/worldEngine.ts`
 
-The world engine (design 013 section 5): the owner of world state, which changes only inside `step`, from queued commands and control slots.
+The world engine (design 013 section 5): the owner of world state, which changes only inside `step`, from queued commands, and inside `applyControls`, from control slots.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
@@ -1562,7 +1562,7 @@ The carry module's public face (design 013 sections 7 and 12.1): the names of it
 | interface | `CarryDropCommand` | Module-only: the carry ends by the carry rules themselves (the hand's leash). |
 | type | `CarryCommand` | Every command of the module. |
 | type | `CarryDropReason` | Why the world ended a carry: the hand's leash released the object (too far, or unreachable), or the object no longer exists. |
-| interface | `CarryMovedEvent` | The carried object moved this step; the geodesics it anchors were rebuilt, so what depends on them needs a refresh. |
+| interface | `CarryMovedEvent` | The carried object moved this frame; the geodesics it anchors were rebuilt, so what depends on them needs a refresh. |
 | interface | `CarryReleasedEvent` | A carry ended, however it ended (detach or drop): the final rebuild ran. |
 | interface | `CarryDroppedEvent` | The world ended the carry (design 013 section 7); the client leaves its carry tool. |
 | type | `CarryEvent` | Every event of the module. |

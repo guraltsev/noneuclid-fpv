@@ -1,6 +1,6 @@
 /**
  * The carry module (design 013 section 7): who carries what is world state.
- * `carry/attach` and `carry/detach` are commands; the hand sets the `carry/offset` slot each frame; in step phase 3 the carried emitter moves toward the hand by the carry contract (`world-objects/carry.ts`: displacement steps, re-homing, wall and zone stops) and the geodesics it anchors are rebuilt (the emitter's rule, `world-objects/geodesic/carryEnd.ts`), so the flow of phase 4 sees them rebuilt.
+ * `carry/attach` and `carry/detach` are commands; the hand sets the `carry/offset` slot each frame; in `applyControls`, once per frame, the carried emitter moves toward the hand by the carry contract (`world-objects/carry.ts`: displacement steps, re-homing, wall and zone stops) and the geodesics it anchors are rebuilt (the emitter's rule, `world-objects/geodesic/carryEnd.ts`), so the flow of the frame's steps sees them rebuilt.
  * The hand's leash policy stays `src/interaction/handCarry.ts`; the module applies it with the loose leash the carrier sends in the slot, and ends the carry itself when the policy says release (`carry/dropped`).
  * The module holds no state of its own: the relation is an attachment of the participant, the hand is a control slot.
  */
@@ -141,7 +141,7 @@ function drop(command: CarryDropCommand, ctx: CommandContext): CommandResult {
   return { ok: true };
 }
 
-/** Phase 3: the emitter a participant carries moves toward the participant's hand. */
+/** Once per frame: the emitter a participant carries moves toward the participant's hand. */
 function followCarrier(ctx: StepContext, participant: ParticipantRecord): void {
   const carry = participantAttachment(participant, carryAttachmentKind);
   if (carry === undefined) return;
@@ -218,8 +218,9 @@ export function carryModule(): CarryModuleDefinition {
     id: "carry",
     requires: [],
     objectKinds: [],
-    // Until the emitter has its module (`geodesicEmitters`), the carry moves an emitter and rebuilds the geodesics it anchors itself.
-    writesCoreKinds: ["geodesic-cannon", "geodesicModel/arc", "geodesicModel/vertex", "geodesicModel/segment", "geodesicModel/crossing"],
+    // Until the emitter has its module (`geodesicEmitters`), the carry moves an emitter and rebuilds the geodesics it anchors itself. A rebuild that collapses
+    // a locked geodesic deletes the geodesic's measurements too (issue 94).
+    writesCoreKinds: ["geodesic-cannon", "geodesicModel/arc", "geodesicModel/vertex", "geodesicModel/segment", "geodesicModel/crossing", "geodesicMeasurements/length", "geodesicMeasurements/angle"],
     create: () => {
       // The step context for the callback below: set around one pass, so the callback is created once and a step allocates nothing for it.
       let stepContext: StepContext | undefined;

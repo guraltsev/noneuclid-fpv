@@ -33,7 +33,7 @@ import { rebuildDerivedGeodesicSegments } from "../../../src/world-objects/geode
 import { rebuildConnectedGeodesicBetweenEmitters } from "../../../src/world-objects/geodesic/cannon";
 import { yawRigidTransform3 } from "../../../src/math/rigidTransform3";
 import { expectSegmentsAreRealizedFromArcs } from "../../support/segmentOracle";
-import { createTestEngine } from "../../support/engine";
+import { createTestEngine, runFrame } from "../../support/engine";
 import {
   compileLargeWorld,
   compileRotatedFreeLoopWorld,
@@ -692,7 +692,7 @@ describe("curve shortening flow while an emitter is carried", () => {
     expect(submit({ kind: "carry/attach", objectId: "e1" })).toEqual({ ok: true });
     engine.setControl("local", carryOffsetSlot, { x: -2.5, y: 1, leashMeters: 5 });
     for (let step = 0; step < 30; step += 1) {
-      engine.step(frame60Hz);
+      runFrame(engine, frame60Hz);
       engine.endFrame();
     }
     expect(registry.get("e1")?.localPose.translation.y).toBeGreaterThan(0.5);

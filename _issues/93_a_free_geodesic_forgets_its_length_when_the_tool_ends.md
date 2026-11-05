@@ -11,6 +11,8 @@ Jobs: [64](../.agents/jobs/64_emitter_edits_and_length.md).
 A free geodesic that is aimed or rotated through a corner is not destroyed. It stops at the corner, it remembers its length, and it
 extends again as soon as the corner is cleared. A later job adds a glow on the corner while a geodesic is stopped there.
 
+The same holds at a wall (maintainer, 2026-11-05): a geodesic is a laser with a certain power, and what stands in the way does not change the power.
+
 ## What the code does
 
 - Within one rotate or aim session the rule holds: the geodesic stops at the zone and grows back, because each rebuild uses
@@ -28,4 +30,4 @@ The one path that destroyed such a geodesic, `breakOnForbiddenZone` on the carry
 
 - The intended length is stored on the arc, as real state, and survives the end of the tool.
 - A test: end the tool while stopped at a corner, start it again, clear the corner, and the geodesic has its full length.
-- The same holds for a stop at a wall, unless the maintainer decides otherwise.
+- The same holds for a stop at a wall.

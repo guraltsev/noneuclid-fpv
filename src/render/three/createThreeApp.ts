@@ -1284,8 +1284,12 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     for (const runtime of placedFlagRuntimes.values()) {
       runtime.syncParent(cellMeshes);
     }
-    // The world engine's step: queued commands, then (as modules arrive) their ticks. Contained like any phase.
-    frameErrorGuard.runPhase("world engine", () => engine.step(frame.resetRequested ? 0 : deltaSeconds));
+    // The world engine: the fast channel first (what follows a participant keeps up with this frame), then the step: queued commands and the modules' ticks. Contained like any phase.
+    frameErrorGuard.runPhase("world engine", () => {
+      const worldSeconds = frame.resetRequested ? 0 : deltaSeconds;
+      engine.applyControls(worldSeconds);
+      engine.step(worldSeconds);
+    });
     // A separate phase: a step that rethrows a handler's error has still stored its results, which the client must read before `endFrame` clears them.
     frameErrorGuard.runPhase("world client", () => {
       worldClient.afterStep();

@@ -2,7 +2,7 @@
  * `tests/modules/carry.test.ts` — unit tier.
  *
  * The carry module (design 013 section 7) driven through the world engine alone, with no tool and no renderer: who carries what is the participant's attachment,
- * `carry/attach` and `carry/detach` are commands, the hand is the `carry/offset` control slot, the move runs in step phase 3, and the hand's leash ends a carry
+ * `carry/attach` and `carry/detach` are commands, the hand is the `carry/offset` control slot, the move runs in `applyControls`, and the hand's leash ends a carry
  * with a `carry/dropped` event. The rules of the move itself are in `tests/world-objects/carry.test.ts`; the tool built on this is in `tests/render/geodesicCannonCarry.test.ts`.
  */
 import { describe, expect, it } from "vitest";
@@ -20,7 +20,7 @@ import { createGeodesicCannonObject } from "../../src/world-objects/geodesic/obj
 import { createRuntimeObjectRegistry, type RuntimeObjectRegistry } from "../../src/world-objects/runtimeObjectRegistry";
 import { getRuntimeObjectInteractionRangeMeters } from "../../src/world-objects/interactionRange";
 import { compileLargePortalWorld } from "../fixtures/world-objects/geodesic";
-import { createTestEngine } from "../support/engine";
+import { createTestEngine, runFrame } from "../support/engine";
 
 const frameSeconds = 1 / 60;
 
@@ -49,14 +49,14 @@ function setup(options: { readonly participants?: readonly ParticipantRecord[]; 
   /** Submits as `who`, steps, returns the result and keeps the step's events. */
   function run(who: string, command: CarryCommand, seconds = 0) {
     const ticket = engine.submit(who, command);
-    engine.step(seconds);
+    runFrame(engine, seconds);
     const result = engine.resultOf(ticket);
     engine.forEachEvent((event) => events.push(event));
     engine.endFrame();
     return result;
   }
   function step(seconds: number): void {
-    engine.step(seconds);
+    runFrame(engine, seconds);
     engine.forEachEvent((event) => events.push(event));
     engine.endFrame();
   }
@@ -149,7 +149,30 @@ describe("carry/attach and carry/detach", () => {
   });
 });
 
-describe("the carry move in step phase 3", () => {
+describe("the carry move, once per frame", () => {
+  it("follows the hand in a frame without a tick", () => {
+    const { engine, registry, run, hand } = setup();
+    run("local", { kind: "carry/attach", objectId: "cannon-b" });
+    const before = registry.get("cannon-b")!.localPose.translation;
+    hand(5.6, 2.5);
+
+    engine.applyControls(frameSeconds);
+
+    expect(registry.get("cannon-b")!.localPose.translation).not.toEqual(before);
+  });
+
+  it("rebuilds once per frame however many ticks the frame runs", () => {
+    const { engine, run, hand, events } = setup();
+    run("local", { kind: "carry/attach", objectId: "cannon-b" });
+    hand(5.6, 2.5);
+
+    engine.applyControls(frameSeconds);
+    for (let tick = 0; tick < 3; tick += 1) engine.step(frameSeconds / 3);
+    engine.forEachEvent((event) => events.push(event));
+
+    expect(events.filter((event) => event.kind === "carry/moved")).toHaveLength(1);
+  });
+
   it("moves the emitter before the simulate ticks and keeps its geodesic joined", () => {
     const seen: number[] = [];
     const watcher = {

@@ -34,6 +34,12 @@ export function createDerivingTestEngine(registry: RuntimeObjectRegistry, option
   return createTestEngine({ registry, modules: [geodesicModelModule(), geodesicMeasurementsModule()], ...options });
 }
 
+/** One frame as the app runs it: the fast channel, then a step of the same length. Tests of what follows a participant use this; `step` alone moves no attachment. */
+export function runFrame(engine: Pick<WorldEngine, "applyControls" | "step">, seconds: number): void {
+  engine.applyControls(seconds);
+  engine.step(seconds);
+}
+
 /** Runs one derive pass: a zero-length step, which applies no command here and wakes every derive tick whose subscribed kinds were written since its last run. Tests that read crossings, lengths or angles right after a mutation call it first. */
 export function runDerivePass(engine: Pick<WorldEngine, "step">): void {
   engine.step(0);

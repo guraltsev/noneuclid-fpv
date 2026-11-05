@@ -47,7 +47,7 @@ export type CarryCommand = CarryAttachCommand | CarryDetachCommand | CarryDropCo
 /** Why the world ended a carry: the hand's leash released the object (too far, or unreachable), or the object no longer exists. */
 export type CarryDropReason = "leash" | "missing";
 
-/** The carried object moved this step; the geodesics it anchors were rebuilt, so what depends on them needs a refresh. */
+/** The carried object moved this frame; the geodesics it anchors were rebuilt, so what depends on them needs a refresh. */
 export interface CarryMovedEvent extends EngineEventBase {
   readonly kind: "carry/moved";
   readonly participantId: string;

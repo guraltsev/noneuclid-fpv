@@ -30,7 +30,7 @@ import {
 import { createRuntimeObjectRegistry, type RuntimeObjectRegistry } from "../../src/world-objects/runtimeObjectRegistry";
 import { createReadRecorder } from "../../src/world-objects/trackedReads";
 import { compileLargePortalWorld, createTorusTiedPairScenario } from "../fixtures/world-objects/geodesic";
-import { createTestEngine } from "../support/engine";
+import { createTestEngine, runFrame } from "../support/engine";
 
 interface Scene {
   readonly registry: RuntimeObjectRegistry;
@@ -199,7 +199,7 @@ function runSequence(scene: Scene, actions: readonly Action[]): void {
       if (registry.get(geodesicId) !== undefined) removeGeodesic(registry, geodesicId);
     }
     engine.setControl("local", carryOffsetSlot, { x: hand.x, y: hand.y, leashMeters: 8 });
-    engine.step(dt);
+    runFrame(engine, dt);
     engine.endFrame();
     expectRecordsMatchFresh(scene, lastSeen, `step ${index} (${step.kind})`);
   });
@@ -208,6 +208,11 @@ function runSequence(scene: Scene, actions: readonly Action[]): void {
 describe("the measurement ticks against fresh refreshes", () => {
   it("match fresh refreshes for locked geodesics through carries of any cannon", () => {
     fc.assert(fc.property(fc.array(action, { minLength: 4, maxLength: 24 }), (actions) => runSequence(lockedScene(), actions)), { seed: 20261104, numRuns: 40 });
+  });
+
+  it("match fresh refreshes when a carry collapses a measured locked geodesic", () => {
+    const action = (kind: Action["kind"], cannon: number): Action => ({ kind, cannon, x: 0, y: 0 });
+    runSequence(lockedScene(), [action("attach", 2), action("nudge", 0), action("attach", 0), action("attach", 0), action("attach", 0), action("attach", 0)]);
   });
 
   it("match fresh refreshes for a tied, flowing pair through carries and flow steps", () => {

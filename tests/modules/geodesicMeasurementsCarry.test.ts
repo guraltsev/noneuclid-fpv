@@ -23,7 +23,7 @@ import {
 import { createMeasuredGeodesicLengthObject, refreshMeasuredGeodesicLengthObject } from "../../src/world-objects/measureLengthTool";
 import { createRuntimeObjectRegistry } from "../../src/world-objects/runtimeObjectRegistry";
 import { compileLargePortalWorld } from "../fixtures/world-objects/geodesic";
-import { createTestEngine, runDerivePass } from "../support/engine";
+import { createTestEngine, runDerivePass, runFrame } from "../support/engine";
 
 /** Cannon P with two locked geodesics ending on cannons Q and R, and an angle between them centred on P. */
 function lockedPairWithAngle() {
@@ -69,7 +69,7 @@ describe("an angle centred on a carried cannon", () => {
 
     for (let step = 0; step < 4; step += 1) {
       engine.setControl("local", carryOffsetSlot, { x: 3, y: 3.2, leashMeters: 5 });
-      engine.step(1 / 60);
+      runFrame(engine, 1 / 60);
       engine.endFrame();
       const stored = registry.get("angle");
       if (stored?.kind !== "geodesicMeasurements/angle") throw new Error("the angle was removed");
@@ -94,7 +94,7 @@ function carryAndCompare(objectId: string, target: { x: number; y: number }, wit
   engine.endFrame();
   for (let step = 0; step < 4; step += 1) {
     engine.setControl("local", carryOffsetSlot, { x: target.x, y: target.y, leashMeters: 5 });
-    engine.step(1 / 60);
+    runFrame(engine, 1 / 60);
     engine.endFrame();
     const stored = registry.get("angle");
     if (stored?.kind !== "geodesicMeasurements/angle") throw new Error("the angle was removed");

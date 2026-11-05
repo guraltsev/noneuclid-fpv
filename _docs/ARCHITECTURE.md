@@ -145,7 +145,7 @@ Order of work in each frame (`renderFrame`; the engine's journals, events and re
 4. Resolve the active aim ray (camera centre ray or controller ray), update carried emitters, and dispatch the primary
    action to the selected tool through the one tool lookup, `toolsById` (`src/render/three/toolHost.ts#createToolHost`; the shell's tools: place flag, emit geodesic, measure, protractor, carry, rotate, aim; the modules' tools, such as the tie tool, come from their client parts), or to the
    focused object's own interaction when no tool is selected.
-5. Advance the world: creature runtimes, then the engine's step (`engine.step`: queued commands, then the module ticks, among them the curve shortening flow, and the derive pass that refreshes crossings, measurements and angles).
+5. Advance the world: creature runtimes, then the fast channel (`engine.applyControls`: what follows a participant, such as a carried emitter), then the engine's step (`engine.step`: queued commands, then the module ticks, among them the curve shortening flow, and the derive pass that refreshes crossings, measurements and angles).
 6. Place the camera(s); for XR also the per-eye culling cameras.
 7. **Portal visibility and instances**: compute visible portal paths from the camera, update the instanced cell meshes
    (one draw per cell archetype, one instance per visible path). This pass builds one frame snapshot (rendered root

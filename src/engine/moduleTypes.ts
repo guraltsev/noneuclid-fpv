@@ -99,10 +99,12 @@ export interface EngineIdSource {
 export interface WorldEngine<Cmd extends EngineCommandBase = EngineCommandBase> {
   /** Queues a command from a participant; it is applied at the start of the next step. */
   submit(participantId: string, command: Cmd): CommandTicket;
-  /** Sets a control slot; the latest value before a step is the one sampled. A value for a closed slot is ignored. */
+  /** Sets a control slot, the fast channel (design 013 section 5.4); the latest value before `applyControls` is the one used. A value for a closed slot is ignored. */
   setControl(participantId: string, slot: string, value: PlainData): void;
   /** Direct write D1 (design 013 section 5.7): replaces the body of a participant this device owns. Returns false, changing nothing, for any other participant. */
   publishBody(participantId: string, body: ParticipantBody): boolean;
+  /** Once per frame, before the frame's steps: runs the bodies ticks on the control slots, so what follows a participant keeps up with the frame whether or not a tick falls in it. `seconds` is the frame time the participant's own body moved in. */
+  applyControls(seconds: number): void;
   /** Advances the world by `deltaSeconds` (0 is legal: it applies commands and derives). */
   step(deltaSeconds: number): void;
   /** Read-only world state. */
@@ -142,7 +144,7 @@ export type CommandHandlers<C extends EngineCommandBase> = {
   };
 };
 
-/** The kinds of per-step work: bodies ticks (step phase 3) move what follows a participant, simulate ticks change the world, derive ticks recompute what follows from the journal. */
+/** The kinds of work: bodies ticks move what follows a participant, once per frame in `applyControls`; simulate ticks change the world and derive ticks recompute what follows from the journal, in each step. */
 export type ModulePhase = "bodies" | "simulate" | "derive";
 
 /** An object kind a module declares. Exactly one module declares each kind. */

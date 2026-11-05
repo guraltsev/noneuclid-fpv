@@ -1,6 +1,6 @@
 /**
  * Participants and control slots of the world engine (design 013 sections 5.1 and 5.4).
- * A participant is someone acting in the world; its record is immutable and a body write replaces it. Control slots are latest-value-wins inputs, opened and closed by commands and sampled once per step.
+ * A participant is someone acting in the world; its record is immutable and a body write replaces it. Control slots are the fast channel: latest-value-wins inputs, opened and closed by commands, read once per frame by `applyControls`.
  */
 import type { ParticipantAttachment, ParticipantBody, ParticipantRecord, PlainData } from "./moduleTypes";
 
@@ -56,43 +56,32 @@ export function createParticipantTable(initial: readonly ParticipantRecord[]): P
   };
 }
 
-interface ControlSlot {
-  pending: PlainData | undefined;
-  value: PlainData | undefined;
-}
-
 /** The control slots of one engine, keyed by participant and slot name. */
 export interface ControlSlots {
   open(participantId: string, slot: string): void;
   close(participantId: string, slot: string): void;
-  /** Sets the pending value of an open slot; ignored for a closed one. */
+  /** Replaces the value of an open slot; ignored for a closed one. */
   set(participantId: string, slot: string, value: PlainData): void;
-  /** The value sampled at the last step. */
+  /** The latest value, undefined while none was set. */
   get(participantId: string, slot: string): PlainData | undefined;
-  /** Phase 2 of a step: the latest values become the sampled ones. */
-  sample(): void;
 }
 
 /** Creates an empty slot table. */
 export function createControlSlots(): ControlSlots {
-  const slots = new Map<string, ControlSlot>();
+  const slots = new Map<string, PlainData | undefined>();
   const keyOf = (participantId: string, slot: string): string => `${participantId}\u0000${slot}`;
   return {
     open(participantId, slot) {
       const key = keyOf(participantId, slot);
-      if (!slots.has(key)) slots.set(key, { pending: undefined, value: undefined });
+      if (!slots.has(key)) slots.set(key, undefined);
     },
     close(participantId, slot) {
       slots.delete(keyOf(participantId, slot));
     },
     set(participantId, slot, value) {
-      const entry = slots.get(keyOf(participantId, slot));
-      if (entry) entry.pending = value;
+      const key = keyOf(participantId, slot);
+      if (slots.has(key)) slots.set(key, value);
     },
-    get: (participantId, slot) => slots.get(keyOf(participantId, slot))?.value,
-    sample() {
-      if (slots.size === 0) return;
-      for (const entry of slots.values()) entry.value = entry.pending;
-    },
+    get: (participantId, slot) => slots.get(keyOf(participantId, slot)),
   };
 }

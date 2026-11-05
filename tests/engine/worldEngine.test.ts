@@ -578,7 +578,7 @@ describe("the access rule", () => {
 });
 
 describe("attachments and the bodies phase", () => {
-  it("runs bodies ticks after the control slots are sampled and before the simulate ticks", () => {
+  it("runs bodies ticks in applyControls and never in a step", () => {
     const order: string[] = [];
     const engine = createTestEngine({
       modules: [
@@ -590,8 +590,38 @@ describe("attachments and the bodies phase", () => {
         }),
       ],
     });
-    engine.step(1 / 60);
-    expect(order).toEqual(["bodies", "simulate"]);
+    engine.step(1 / 90);
+    expect(order).toEqual(["simulate"]);
+    order.length = 0;
+
+    engine.applyControls(1 / 60);
+    expect(order).toEqual(["bodies"]);
+  });
+
+  it("gives bodies ticks the latest control value and the time of the frame", () => {
+    const seen: unknown[] = [];
+    const engine = createTestEngine({
+      modules: [
+        fake("a", {
+          commands: { "a/open": { run: (_command, ctx) => (ctx.openControl(ctx.participantId, "a/hand"), ok) } },
+          ticks: [{ id: "a/body", phase: "bodies", writes: [], run: (ctx) => void seen.push([ctx.control("local", "a/hand"), ctx.deltaSeconds]) }],
+        }),
+      ],
+    });
+    engine.submit("local", { kind: "a/open" });
+    engine.step(0);
+
+    engine.setControl("local", "a/hand", 1);
+    engine.setControl("local", "a/hand", 2);
+    engine.applyControls(1 / 120);
+
+    expect(seen).toEqual([[2, 1 / 120]]);
+  });
+
+  it("refuses a duration that is not finite and non-negative", () => {
+    const engine = createTestEngine();
+    expect(() => engine.applyControls(-1)).toThrow(RangeError);
+    expect(() => engine.applyControls(Number.NaN)).toThrow(RangeError);
   });
 
   it("replaces attachments through the context and keeps them over a body write", () => {

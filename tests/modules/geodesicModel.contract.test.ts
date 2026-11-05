@@ -33,7 +33,7 @@ import {
   createCarryPortalTraversal,
   totalGeodesicLength,
 } from "../fixtures/world-objects/geodesic";
-import { createTestEngine } from "../support/engine";
+import { createTestEngine, runFrame } from "../support/engine";
 import { expectSegmentsAreRealizedFromArcs } from "../support/segmentOracle";
 
 type ProbeCommand = EngineCommandBase & { readonly kind: "probe/run"; readonly inner: GeodesicModelCommand };
@@ -406,7 +406,7 @@ describe("geodesicModel: with the carry module", () => {
 
     expect(submit({ kind: "carry/attach", objectId: "e1" })).toEqual({ ok: true });
     engine.setControl("local", carryOffsetSlot, { x: -2.5, y: 1, leashMeters: 5 });
-    engine.step(1);
+    runFrame(engine, 1);
     engine.endFrame();
     expect(submit({ kind: "carry/detach" })).toEqual({ ok: true });
 

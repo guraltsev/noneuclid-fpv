@@ -5,6 +5,7 @@
 import type { WorldEngine } from "../../src/engine/moduleTypes";
 import type { GeodesicCannonToolsDeps } from "../../src/render/three/geodesicCannonTools";
 import { createGeodesicCannonTools } from "../../src/render/three/geodesicCannonTools";
+import { runFrame } from "./engine";
 
 /** The duration of the step behind an update that names no time: long enough that the glide is limited by the carry contract's step budget only. */
 export const unlimitedStepSeconds = 1000;
@@ -19,7 +20,7 @@ type DrivenTools = Omit<Tools, "updateCarriedGeodesicCannonPose"> & {
 /** `tools` with the carry operations followed by a world step; `engine` is the one the tools were built with. */
 export function driveCarryTools(tools: Tools, engine: WorldEngine): DrivenTools {
   const settle = (seconds: number): void => {
-    engine.step(seconds);
+    runFrame(engine, seconds);
     tools.afterWorldStep();
     engine.endFrame();
   };

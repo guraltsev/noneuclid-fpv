@@ -46,6 +46,9 @@ decisions of its own.
 | 2026-11-05 | **Engine hooks with no user are deleted** and listed in section 18, so that the design work survives: `onEvents`, module tool gates, revocation, the participant journal, `deviceId`, `ctx.stepIndex`, create-context `ids`. | **Agreed** (maintainer) |
 | 2026-11-05 | **A free geodesic is not destroyed at a corner.** Aimed or rotated through one, it stops there, remembers its length and extends as soon as the corner is cleared. A later effect makes the corner glow. The length is world state (issue 93). | **Agreed** (maintainer) |
 | 2026-11-05 | **The next batch is `geodesicEmitters`**, with the time change and `publicApi` (section 16). | **Agreed** (maintainer) |
+| 2026-11-05 | **There is a fast channel for quick updates, quicker than messages; carrying uses it, and aiming should.** | **Agreed** (maintainer), frame-rate slots included; two details of section 5.4 proposed; built for carrying |
+| 2026-11-05 | **A geodesic is a laser with a certain power**: a free geodesic keeps its intended length, at a wall as at a corner. | **Agreed** (maintainer) |
+| 2026-11-05 | **An angle whose crossing vanishes is hidden, not deleted**, and is deleted 3 s after the aiming stops if the crossing has not returned (section 17, item 6). | **Agreed** (maintainer) |
 
 ## 2. Where the code stood before this wave (checked 2026-11-03)
 
@@ -149,10 +152,12 @@ Consequences:
 export interface WorldEngine<Cmd extends EngineCommandBase> {
   /** Queue a command from a participant; it is applied at the start of the next step. */
   submit(participantId: string, command: Cmd): CommandTicket;
-  /** Set a control slot of a participant; the latest value before a step is the one sampled. */
+  /** Set a control slot of a participant, the fast channel (section 5.4); the latest value before `applyControls` is the one used. */
   setControl(participantId: string, slot: string, value: PlainData): void;
   /** Direct write D1 (section 5.7): the owner of a participant replaces its body. False for a non-owner, and nothing changes. */
   publishBody(participantId: string, body: ParticipantBody): boolean;
+  /** Once per frame, before the frame's steps: run the bodies ticks on the control slots (section 5.4). `seconds` is the frame time the body moved in. */
+  applyControls(seconds: number): void;
   /** Advance the world by one tick of `deltaSeconds` (012 P8: the simulation's tick length, never frame time; 0 is legal). */
   step(deltaSeconds: number): void;
   /** Read-only world state, valid until the next step (section 6.6). */
@@ -189,9 +194,10 @@ It does **not** own: rendering, picking caches, input devices, the menu, the sel
 
 1. **Commands**: apply the queued commands in arrival order. Each handler returns a result; results are stored by
    ticket. A refused command changes nothing.
-2. **Control slots**: sample the latest values.
-3. **Bodies**: ticks of the phase `bodies`: locomotion and dynamics of participants (today the shell moves the player and
-   publishes the pose; it moves into this phase after this wave, section 16); attachments follow their carriers (carry, section 7).
+2. **Control slots**: *moved out of the step (agreed 2026-11-05)*: see 5.4.
+3. **Bodies**: *moved out of the step (agreed 2026-11-05)*: the ticks of the phase `bodies` run once per frame in `applyControls`, just
+   before the frame's steps (5.4). Attachments follow their carriers there (carry, section 7). Where locomotion goes, when it moves into the
+   engine (section 16), is decided then.
 4. **Module simulate ticks** (the flow; later creatures).
 5. **Module derive pass** (crossings, measured lengths, angles).
 6. **Finalize**: the step's events are final.
@@ -227,13 +233,41 @@ Rendering is not part of a step; the client reads the result.
 - **API**: `window.noneuclid.api.world.submit(command)` submits for the local participant and resolves with the result
   after the next step, so scenario scripts and agents can `await` it.
 
-### 5.4 Control slots
+### 5.4 Control slots: the fast channel
 
-- A slot is named `<moduleId>/<noun>` (or `world/<noun>` for the engine's own), holds plain data, and is sampled at
-  phase 2. Absolute values or rates, never deltas (012 P1 refinement 2).
+**Agreed** (maintainer, 2026-11-05): quick updates have a channel quicker than messages; carrying uses it, and aiming should. Slots run once per
+frame, outside the step, whatever \(h\) is: this channel bypasses the simulation's rate. Built for carrying. Still **proposed**: the rules below on a
+frame with no tick and on the `api`.
+
+- **Fast interactions do not go through the simulation unless they must** (maintainer, 2026-11-05). Carrying, aiming and rotating run on the fast
+  channel, not in ticks. An interaction goes through a tick only when it needs what a tick provides: simulated time, or acting together with what the
+  simulation is doing at that moment. Being world state is not such a need: the fast channel changes world state too.
+- A slot is named `<moduleId>/<noun>` (or `world/<noun>` for the engine's own) and holds plain data: absolute values or rates, never
+  deltas (012 P1 refinement 2). Latest value wins: nothing queues, and nothing answers.
 - Slots are opened and closed by commands: `carry/attach` opens `carry/offset` for that participant; `carry/detach`
-  closes it. A value set on a closed slot is ignored.
-- Movement slots (`world/moveIntent`, `world/look`) come after this wave (section 16); until then the shell moves the body itself.
+  closes it. A value set on a closed slot is ignored. So the world decides once, when the slot opens, and each update after that needs no
+  decision.
+- **Slots run at frame rate, not at tick rate.** `engine.applyControls(seconds)`, once per frame before the frame's steps, runs the `bodies`
+  ticks, which read the slots. What follows a hand keeps up with the hand in every frame.
+- **Why a frame and not a tick.** Measured on 2026-11-05, the channel's own cost is not the problem: a slot write and read adds
+  0.04 µs, a dispatched command 0.03 µs, a direct call 0.01 µs, against about 20 µs for a carry step, nearly all of it the geodesic rebuild. A
+  faster pipe would gain nothing. What is slow is the wait for a tick. With the default \(h = 1/90\) s, a 120 Hz display has no tick in one frame of
+  four, so an object following a hand on ticks would stutter against the hand (from the arithmetic, not seen on a headset). Matching \(h\) to the
+  display, which is not decided, would remove most of that, but not all: frame times jitter around \(h\), rates can be unknown or change, and fast displays pass any
+  limit on \(h\). The channel does not depend on the clock tracking the display. Running once per frame also means that a frame of three ticks
+  rebuilds once, not three times.
+- **Time.** `seconds` is the frame time, the time the participant's own body moved in (012 P8 keeps the player outside the ticks). What follows a
+  body shares the body's clock. This is the one frame time the engine takes. A replay records it with the slot values, as it records bodies.
+- **A frame with no tick runs the fast channel and nothing else.** Commands, crossings, lengths and angles wait for the next tick, at most \(h\) later.
+  Deriving in every frame would pay that cost at frame rate, and most on the slowest device, where ticks are furthest apart.
+- **The fast channel is paid in every frame, so the slowest headset sets its budget.** Ticks may run far below the frame rate on a Quest 2, which is much
+  slower than the development machine, while the frame deadline does not move (about 13.9 ms at 72 Hz, for everything). The figures above are from the
+  development machine; nothing has been measured on a Quest 2. The channel holds only what the hand must see this frame, and per-frame work added to it is
+  measured on a Quest 2.
+- **Between modules, the fast path is the `api`.** A `bodies` tick that moves another module's object calls that module's `api`, not
+  `ctx.dispatch`. Dispatch is for what can be refused; a slot's update has already been allowed.
+- Rotate and aim use the same channel (section 7, job 64). Movement slots (`world/moveIntent`, `world/look`) come after this wave (section 16);
+  until then the shell moves the body itself.
 
 ### 5.5 Events
 
@@ -255,8 +289,8 @@ A client changes the world in one of three ways, tried in this order:
 
 1. **A command**, the default: everything a person or a script does (shoot, tie, delete, pick up, select a tool). It is
    validated, can be refused, and is replayable. It costs no latency: the step runs later in the same frame.
-2. **A control slot**, for a continuous input that changes every frame and has no result of its own (`carry/offset`).
-   Opened and closed by commands (5.4).
+2. **A control slot**, the fast channel, for a continuous input that changes every frame and has no result of its own
+   (`carry/offset`). Opened and closed by commands, and applied once per frame (5.4).
 3. **A direct write**, only if it is on the list below. Nothing else may write.
 
 | Id | Direct write | Who | Why a command does not fit | Ends |
@@ -383,12 +417,13 @@ The frame (**Agreed**, 012 P8 of 2026-11-05; **not built**: today the shell runs
 capped at 0.1 s):
 
 1. Sample input; `submit` commands, `setControl` slots, `publishBody` for the local body (D1, section 5.7).
-2. Convert elapsed real time into ticks with an accumulator and run that many `engine.step(h)`: none, one or several.
-3. Label runtimes and the UI read; build the render snapshot from `engine.read` and the journal (012 P7, client side,
+2. `engine.applyControls(frameSeconds)`: the fast channel (5.4). Built.
+3. Convert elapsed real time into ticks with an accumulator and run that many `engine.step(h)`: none, one or several.
+4. Label runtimes and the UI read; build the render snapshot from `engine.read` and the journal (012 P7, client side,
    unchanged) and draw.
-4. `engine.endFrame()`.
+5. `engine.endFrame()`.
 
-So what is drawn is the state of the latest tick. The camera and the VR head and hand poses never pass through a command:
+So what is drawn is the state of the latest tick, with what follows a participant up to date with the frame. The camera and the VR head and hand poses never pass through a command:
 the client that owns a body publishes it (D1), and the headset's pose at draw time is client state applied on top of it, so
 ticks add no VR latency. Until locomotion moves into the engine (section 16), the local player moves on frames and the world
 moves on ticks. `afterStep` hooks of the shell run once per frame, not once per tick: they replay every event since `endFrame`, so
@@ -419,7 +454,7 @@ not change, and a frame never waits for the engine; it draws the newest complete
   or already carried by someone (`"carry/alreadyCarried"`, message "Already carried by Ana.") — first come, first
   served (012 P5). On success the participant's record gains the attachment and the slot `carry/offset` opens. Today the
   shell lifts the emitter before the world answers; that is issue 88.
-- Each step, phase 3, the carried object moves by the carry contract of job 47 (displacement messages from the offset,
+- Each frame, in `applyControls` (5.4), the carried object moves by the carry contract of job 47 (displacement messages from the offset,
   bounded steps, re-homing, wall stop; job 47 made a junction a wall). The module also has the commands and events
   `carry/drop`, `carry/moved` and `carry/released`.
 - The carried emitter drags the end nodes of its geodesics, tied curves included (13.1).
@@ -431,7 +466,7 @@ The client carry tool keeps only its UI (the prompt, which hand). `CarryRecord` 
 (the leash state) becomes a field of the attachment, because it changes how the object moves.
 
 Rotate and aim of an emitter are the same kind of relation ("Ana is editing emitter C", with a slot for the aim) and
-follow in the emitter module (section 16).
+follow in the emitter module (section 16). They use the fast channel too, so moving them into the world does not make aiming lag.
 
 ## 8. Tools and the confirmation protocol
 
@@ -1306,12 +1341,12 @@ Then, in a likely order:
    - **Client or world?** Bubbling a pick to its owner can be a client matter; intercepting a removal is world behaviour.
 
    Displacement messages (job 50) will be the first real case. A message can be added beside
-   `submit` and `dispatch` without changing them.
+   `submit` and `dispatch` without changing them. Carrying no longer needs one: it uses the fast channel (5.4).
 
-6. **Open: an angle at a crossing that vanishes.** A protractor angle centred on the crossing of two geodesics is deleted when the crossing
-   disappears, even for a moment (job 52 changed this). The code that hides it until the crossing returns remains, reached only by a
-   test (`getRememberedGeodesicIntersectionObject`). Which is meant, hide or delete? In the spirit of the corner rule of 2026-11-05, hiding
-   is the likely answer, but it is not decided.
+6. Closed (maintainer, 2026-11-05): **an angle at a crossing that vanishes is hidden, not deleted.** If the crossing returns, so does the angle.
+   If it has not returned 3 s after the aiming stops, the angle is deleted. Job 66 builds it on the remembered-centre code
+   (`getRememberedGeodesicIntersectionObject`), reached only by a test until then. "The aiming stops" means the last edit or carry of
+   either geodesic's emitter ended; with no such edit (a crossing lost to the flow), the 3 s run from the moment it vanished; the time is world time.
 
 ## 18. Specified, not built
 
@@ -1345,4 +1380,9 @@ is at commit 41f3606.
 | 2026-11-03 | Agreed (maintainer): no tool switch until confirmed, in VR too; section 16 keeps its order; a chord into a forbidden zone removes the whole tied curve; the `stale` skip; plain shot geodesics are still deleted on lift. Job files 48 to 55 written. |
 | 2026-11-05 | Jobs 48 to 60 merged. Text aligned with the code and with 014's section 9 amendments (ring, cursors, `quiet` as a memo, no `reset` or `transformGeometry`). Status of Proposed items unchanged. |
 | 2026-11-05 | Agreed (maintainer): `unresolve` deleted; the unused engine hooks deleted and listed in section 18; a free geodesic stops at a corner, remembers its length and extends when clear (issue 93); a corner glow later. |
+| 2026-11-05 | Agreed (maintainer): ticks never run faster than the display; \(h\) grows from the cost of the ticks, before frames are missed; the maximum stays \(1/30\) s unless it becomes an issue; the meaning of "the aiming stops" in section 17, item 6. |
+| 2026-11-05 | Maintainer's warning: ticks may run far below the frame rate on a Quest 2. So the proposal that a frame with no tick runs `step(0)` is withdrawn: such a frame runs the fast channel only, and commands and derived values wait for the next tick. The channel's budget is the slowest headset (5.4). |
+| 2026-11-05 | Agreed (maintainer): fast interactions do not go through the simulation unless they must (5.4). |
+| 2026-11-05 | Agreed (maintainer): the fast channel stays at frame rate, outside the step, with its frame time, whatever \(h\) is. 5.4's reason corrected: the 120 Hz gap comes from the default \(h\). |
+| 2026-11-05 | Agreed (maintainer): the fast channel; a geodesic as a laser with a certain power (intended length at walls as at corners); an angle whose crossing vanishes is hidden, then deleted 3 s after the aiming stops; jobs 61 and 64 decisions accepted (at most 3 ticks a frame; rotate and aim as one edit relation). Proposed: section 5.4's mechanism, frame-rate slots through `applyControls`, built for carrying; phases 2 and 3 leave the step; a frame with no tick runs `step(0)`; the `api`, not `dispatch`, between modules on this path. |
 | 2026-11-05 | Agreed (maintainer): a blocked curve is destroyed for any reason, for now; time as in 012 P8 with \(h = 1/90\) s by default and at most \(1/30\) s; read tracking on by default for measurements; section 16 reordered, the emitters first. |

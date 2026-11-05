@@ -1,6 +1,6 @@
 /**
  * The bodies, simulate and derive passes over the composed modules (design 013 sections 5.2 and 6.4).
- * Bodies ticks (step phase 3) and simulate ticks (phase 4) run in module order, each unless its `isIdle` says so. In the derive pass a derive tick wakes when `wants` is true or when the ring holds a write of a subscribed kind at or after its cursor, reads the sequence range `[cursor, headSeq)`, and then moves its cursor to `headSeq`; a tick that does not wake moves its cursor to `headSeq` too, since it had nothing to read and must not hold the ring back.
+ * Bodies ticks (once per frame, `applyControls`) and simulate ticks (in each step) run in module order, each unless its `isIdle` says so. In the derive pass a derive tick wakes when `wants` is true or when the ring holds a write of a subscribed kind at or after its cursor, reads the sequence range `[cursor, headSeq)`, and then moves its cursor to `headSeq`; a tick that does not wake moves its cursor to `headSeq` too, since it had nothing to read and must not hold the ring back.
  * Cursors are absolute sequence numbers of the change ring and live here. Derive cursors survive `endFrame` (which only moves the journal's frame start). `lowestCursor` tells the engine how far back the ring must be retained. An idle pass allocates nothing.
  */
 import type { JournalRecord, RuntimeObjectChangeJournal } from "../world-objects/runtimeObjectChangeJournal";
@@ -24,7 +24,7 @@ export interface TickRunnerDeps {
 
 /** The passes of one engine. */
 export interface TickRunner {
-  /** Step phase 3: ticks that move what follows a participant. */
+  /** `applyControls`: ticks that move what follows a participant. */
   runBodies(): void;
   runSimulate(): void;
   runDerive(): void;
