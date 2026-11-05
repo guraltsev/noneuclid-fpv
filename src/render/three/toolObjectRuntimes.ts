@@ -201,15 +201,6 @@ export function createToolObjectRuntimes(deps: ToolObjectRuntimesDeps) {
     syncSelectableHitboxDebug();
   }
 
-  function removeMeasuredGeodesicLengthsForGeodesic(geodesicId: string): void {
-    for (const object of runtimeObjectRegistry.getAll()) {
-      if (object.kind === "geodesicMeasurements/length" && object.geodesicId === geodesicId) {
-        runtimeObjectRegistry.remove(object.id);
-        removeMeasuredGeodesicLengthRuntime(object.id);
-      }
-    }
-  }
-
   function removeProtractorAngles(): void {
     for (const object of runtimeObjectRegistry.getAll()) {
       if (object.kind === "geodesicMeasurements/angle") {
@@ -220,32 +211,6 @@ export function createToolObjectRuntimes(deps: ToolObjectRuntimesDeps) {
     deps.dispatch({ kind: "set-protractor-tool-state", state: {} });
     clearProtractorToolFeedback();
     syncSelectableHitboxDebug();
-  }
-
-  function removeProtractorAnglesForGeodesic(geodesicId: string): void {
-    for (const object of runtimeObjectRegistry.getAll()) {
-      if (
-        object.kind === "geodesicMeasurements/angle" &&
-        (object.first.geodesicId === geodesicId || object.second.geodesicId === geodesicId)
-      ) {
-        runtimeObjectRegistry.remove(object.id);
-        removeProtractorAngleRuntime(object.id);
-      }
-    }
-  }
-
-  function removeProtractorAnglesForMissingVertices(vertexIds: readonly string[]): void {
-    if (vertexIds.length === 0) {
-      return;
-    }
-
-    const missingVertexIds = new Set(vertexIds);
-    for (const object of runtimeObjectRegistry.getAll()) {
-      if (object.kind === "geodesicMeasurements/angle" && missingVertexIds.has(object.centerObjectId)) {
-        runtimeObjectRegistry.remove(object.id);
-        removeProtractorAngleRuntime(object.id);
-      }
-    }
   }
 
   // Where the label runtimes read the world: every length or angle record written since the frame began (design 013 section 6.3). The derive ticks of the geodesic measurements module write
@@ -280,10 +245,7 @@ export function createToolObjectRuntimes(deps: ToolObjectRuntimesDeps) {
     removeProtractorAngleRuntime,
     removePlacedFlags,
     removeMeasuredGeodesicLengths,
-    removeMeasuredGeodesicLengthsForGeodesic,
     removeProtractorAngles,
-    removeProtractorAnglesForGeodesic,
-    removeProtractorAnglesForMissingVertices,
     syncLabelRuntimesFromJournal,
   };
 }

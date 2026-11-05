@@ -150,8 +150,6 @@ export function reduceRuntimeCommand(state: ClientSessionState, command: Runtime
         { kind: "switch-tool-session", toolId: command.toolId },
         syncPalette,
       );
-    case "enter-tool-mode":
-      return withMenu(closeRuntimeMenu(setRuntimeMenuSelectedTool(menu, command.toolId)), syncPalette);
     case "clear-selected-tool":
       return withMenu(setRuntimeMenuSelectedTool(menu, "none"), syncPalette);
     case "choose-place-flag-type":
@@ -268,14 +266,11 @@ export function reduceRuntimeCommand(state: ClientSessionState, command: Runtime
     case "add-geodesic-to-cannon":
       return toolEnabled("geodesicEmitters/emitter") ? effectsOnly({ ...command }) : nothing;
     case "start-cannon-carry":
-      return toolEnabled("geodesicEmitters/carry") ? effectsOnly({ ...command }) : nothing;
     case "start-object-action":
-      // The world decides whether the action's tool is allowed (the tool request); nothing is checked here.
-      return effectsOnly({ ...command });
     case "start-cannon-rotation":
-      return toolEnabled("geodesicEmitters/rotate") ? effectsOnly({ ...command }) : nothing;
     case "start-cannon-aim":
-      return toolEnabled("geodesicEmitters/aim") ? effectsOnly({ ...command }) : nothing;
+      // The world decides whether the tool is allowed (the tool request); nothing is checked here.
+      return effectsOnly({ ...command });
     case "delete-geodesic-from-cannon":
     case "step-geometry-computer-target":
     case "start-geometry-computer-deformation":

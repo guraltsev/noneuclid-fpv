@@ -1,9 +1,12 @@
 /**
  * The descriptors of the tools the shell defines itself (design 013 section 8.3): sign, length, protractor, and the emitter's carry, rotate and aim sub-modes.
- * Their behavior stays in the shell (carry, rotate and aim update from the input each frame, section 16); a descriptor only calls the handler the shell passes in. The tools modules contribute come from the modules' client parts.
+ * Their behavior stays in the shell (carry, rotate and aim are the client's sources for the world's control slots, section 7); a descriptor only calls the handler the shell passes in. The tools modules contribute come from the modules' client parts.
  * "none" and "aim" are not tools with descriptors: with neither selected the primary action acts on the focused object.
  */
-import type { ToolDescriptor } from "../engine/moduleTypes";
+import type { CommandResult, ToolDescriptor } from "../engine/moduleTypes";
+
+/** The emitter's sub-modes. */
+export type EmitterModeToolId = "geodesicEmitters/carry" | "geodesicEmitters/rotate" | "geodesicEmitters/aim";
 
 /** What the shell does for each core tool; each handler reads the current frame's input itself. */
 export interface CoreToolHandlers {
@@ -18,6 +21,8 @@ export interface CoreToolHandlers {
   rotate(): boolean;
   /** Aim, every frame; true when the primary action was requested. */
   aim(): boolean;
+  /** The world answered a command of one of the emitter's sub-modes. */
+  emitterModeResult(toolId: EmitterModeToolId, result: CommandResult): void;
 }
 
 /** The descriptors of the core tools. */
@@ -75,6 +80,7 @@ export function createCoreToolDescriptors(handlers: CoreToolHandlers): readonly 
       showsAimCross: false,
       runsEveryFrame: true,
       onPrimaryAction: () => handlers.carry(),
+      onResult: (_tool, result) => handlers.emitterModeResult("geodesicEmitters/carry", result),
     },
     {
       ...subMode,
@@ -89,6 +95,7 @@ export function createCoreToolDescriptors(handlers: CoreToolHandlers): readonly 
       showsAimCross: false,
       runsEveryFrame: true,
       onPrimaryAction: () => handlers.rotate(),
+      onResult: (_tool, result) => handlers.emitterModeResult("geodesicEmitters/rotate", result),
     },
     {
       ...subMode,
@@ -103,6 +110,7 @@ export function createCoreToolDescriptors(handlers: CoreToolHandlers): readonly 
       showsAimCross: true,
       runsEveryFrame: true,
       onPrimaryAction: () => handlers.aim(),
+      onResult: (_tool, result) => handlers.emitterModeResult("geodesicEmitters/aim", result),
     },
   ];
 }

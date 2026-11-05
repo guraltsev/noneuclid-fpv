@@ -27,12 +27,12 @@ import {
   type CarriedPlace,
   type CarryMove,
 } from "../../src/world-objects/carry";
-import { shootGeodesic, moveEmitterAlongRoute } from "../../src/world-objects/geodesic/cannon";
+import { shootGeodesic } from "../../src/world-objects/geodesic/cannon";
 import { arcConnectsEmitters } from "../../src/world-objects/geodesic/lifecycle";
 import { createGeodesicEmitterObject, emitterConnectionToleranceMeters } from "../../src/world-objects/geodesic/objects";
 import { collectGeodesicPortalWord } from "../../src/world-objects/geodesic/segments";
 import { createRuntimeObjectRegistry } from "../../src/world-objects/runtimeObjectRegistry";
-import { compileLargePortalWorld } from "../fixtures/world-objects/geodesic";
+import { compileLargePortalWorld, moveEmitterWithItsArcs as moveEmitterAlongRoute } from "../fixtures/world-objects/geodesic";
 
 const cubeWorld = (): CompiledCellComplex => compileCellComplex(cube);
 

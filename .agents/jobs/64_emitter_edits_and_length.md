@@ -1,6 +1,6 @@
 # Job 64 - Rotate, aim and carry through the world; a free geodesic keeps its length
 
-Status: queued.
+Status: in progress.
 Resolves: issues [88](../../_issues/88_carry_changes_the_world_before_the_world_answers.md),
 [89](../../_issues/89_rotate_aim_and_carry_bypass_the_tool_gates.md) and
 [93](../../_issues/93_a_free_geodesic_forgets_its_length_when_the_tool_ends.md).

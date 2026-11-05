@@ -13,6 +13,7 @@ import { curveDynamicsToken, type CurveShorteningEvent } from "../../../src/modu
 import { curveShorteningSpeedMetersPerSecond } from "../../../src/modules/curveShortening/policies";
 import { carryOffsetSlot, type CarryAttachCommand, type CarryDetachCommand } from "../../../src/modules/carry/api";
 import { carryModule } from "../../../src/modules/carry";
+import { geodesicEmittersModule } from "../../../src/modules/geodesicEmitters";
 import { curveShorteningModule } from "../../../src/modules/curveShortening";
 import { createDefaultPlayerPose } from "../../../src/movement/playerPose";
 import { geodesicModelToken, type GeodesicTieAndDetachCommand } from "../../../src/modules/geodesicModel/api";
@@ -31,6 +32,8 @@ import { getGeodesicEndpointAttachmentsForAnchor, isTied } from "../../../src/wo
 import { getGeodesicSegments } from "../../../src/world-objects/geodesic/segments";
 import { rebuildDerivedGeodesicSegments } from "../../../src/world-objects/geodesic/intervals";
 import { rebuildConnectedGeodesicBetweenEmitters } from "../../../src/world-objects/geodesic/cannon";
+import { geodesicMeasurementsModule } from "../../../src/modules/geodesicMeasurements";
+import { createMeasuredGeodesicLengthObject } from "../../../src/world-objects/measureLengthTool";
 import { yawRigidTransform3 } from "../../../src/math/rigidTransform3";
 import { expectSegmentsAreRealizedFromArcs } from "../../support/segmentOracle";
 import { createSimulationClock } from "../../../src/engine/simulationClock";
@@ -490,6 +493,25 @@ describe("curve shortening flow when a vertex cannot move", () => {
   });
 });
 
+describe("a flow that collapses a measured curve", () => {
+  it("leaves the measurements to their own ticks, with the write guard on", () => {
+    const { world, registry } = createChainScenario({ x: 0, y: 0 }, { x: 0.1, y: 0 }, [{ x: 0.05, y: 1 }]);
+    const engine = createTestEngine({ registry, getWorld: () => world, modules: [geodesicModelModule(), geodesicMeasurementsModule(), curveShorteningModule()] });
+    const length = createMeasuredGeodesicLengthObject({ id: "length", registry, geodesicId: "g0", playerCellId: "a", playerPoint: { x: 0, y: 0, z: 0 } });
+    if (length === undefined) throw new Error("Expected the length.");
+    registry.add(length);
+
+    let ticks = 0;
+    while (registry.getObjectsOfKind("geodesicModel/arc").length > 0 && ticks < 2000) {
+      stepFlow(engine, frame60Hz);
+      ticks += 1;
+    }
+
+    expect(registry.getObjectsOfKind("geodesicModel/arc")).toHaveLength(0);
+    expect(registry.get("length")).toBeUndefined();
+  });
+});
+
 describe("curve shortening flow across portals and around junction disks", () => {
   it("flows three vertices through the torus seam to the straight chord of its class", () => {
     const world = compileTorusLoopWorld();
@@ -702,7 +724,7 @@ describe("curve shortening flow while an emitter is carried", () => {
     const engine = createTestEngine({
       registry,
       getWorld: () => world,
-      modules: [geodesicModelModule(), carryModule(), curveShorteningModule()],
+      modules: [geodesicModelModule(), geodesicEmittersModule(), carryModule(), curveShorteningModule()],
       playerPose: { ...createDefaultPlayerPose("a"), position: { x: -1.5, y: 0, z: 0 } },
     });
     const submit = (command: CarryAttachCommand | CarryDetachCommand) => {

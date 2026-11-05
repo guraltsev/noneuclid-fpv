@@ -9,11 +9,11 @@
  */
 import { describe, expect, it } from "vitest";
 import { yawRigidTransform3 } from "../../../src/math/rigidTransform3";
-import { moveEmitterAlongRoute, shootGeodesic } from "../../../src/world-objects/geodesic/cannon";
+import { shootGeodesic } from "../../../src/world-objects/geodesic/cannon";
 import { createGeodesicEmitterObject } from "../../../src/world-objects/geodesic/objects";
 import { collectGeodesicPortalWord } from "../../../src/world-objects/geodesic/segments";
 import { createRuntimeObjectRegistry } from "../../../src/world-objects/runtimeObjectRegistry";
-import { compileLargePortalWorld, createCarryPortalTraversal } from "../../fixtures/world-objects/geodesic";
+import { compileLargePortalWorld, createCarryPortalTraversal, moveEmitterWithItsArcs as moveEmitterAlongRoute } from "../../fixtures/world-objects/geodesic";
 
 function connectedPair() {
   const world = compileLargePortalWorld();

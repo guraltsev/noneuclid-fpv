@@ -10,7 +10,7 @@
  * `tests/render/geodesicCannonCarry.test.ts` keeps the release, re-homing, glow and yaw behaviour.
  */
 import { createTestEngine } from "../support/engine";
-import { driveCarryTools } from "../support/carryTools";
+import { createModeToolHost, driveCarryTools } from "../support/carryTools";
 import { createDefaultWorldModules } from "../../src/runtime/experience";
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
@@ -18,6 +18,7 @@ import { type CompiledCellComplex } from "../../src/cell-complex/compileCellComp
 import { yawRigidTransform3 } from "../../src/math/rigidTransform3";
 import { createDefaultPlayerPose, type PlayerPose } from "../../src/movement/playerPose";
 import { applyRuntimeCommand } from "../../src/runtime/applyRuntimeCommand";
+import type { RuntimeCommand } from "../../src/runtime/runtimeCommands";
 import { createTestClientSession } from "../support/clientSession";
 import { handCarryLeashMeters } from "../../src/interaction/handCarry";
 import { carryMaxSpeedMetersPerSecond } from "../../src/world-objects/carry";
@@ -34,26 +35,24 @@ function createHarness(world: CompiledCellComplex, registry: RuntimeObjectRegist
   const session = createTestClientSession();
   const engine = createTestEngine({ registry, playerPose, getWorld: () => world, modules: createDefaultWorldModules() });
   const nothing = (): void => {};
+  const dispatch = (command: RuntimeCommand): void => {
+    applyRuntimeCommand(session, command);
+  };
+  const host = createModeToolHost({ engine, session, dispatch, settle: (toolId, result) => rawTools.settleEmitterMode(toolId, result) });
   const rawTools = createGeodesicCannonTools({
     renderer: { xr: { isPresenting: false } } as unknown as THREE.WebGLRenderer,
     controls: { requestPointerLock: () => Promise.resolve() } as never,
-    runtimeObjectRegistry: registry,
     getWorld: () => world,
     session,
     engine,
-    dispatch: (command) => {
-      applyRuntimeCommand(session, command);
-    },
+    dispatch,
+    toolContext: (toolId) => host.contextOf(toolId),
     resolveCurrentAimTarget: () => undefined,
     findFocusedRuntimeObject: () => undefined,
     syncDesktopPalette: nothing,
-    syncSelectableHitboxDebug: nothing,
-    removeMeasuredGeodesicLengthsForGeodesic: nothing,
-    removeProtractorAnglesForGeodesic: nothing,
-    removeProtractorAnglesForMissingVertices: nothing,
   });
   // The shell steps the world after the tools have run; the harness steps it after each carry call.
-  const tools = driveCarryTools(rawTools, engine);
+  const tools = driveCarryTools(rawTools, engine, host);
 
   return { tools, selectedTool: () => session.get().menuState.selectedTool };
 }

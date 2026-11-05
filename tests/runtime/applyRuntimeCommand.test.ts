@@ -247,13 +247,6 @@ describe("applyRuntimeCommand: tools and signs", () => {
     expect(reduce({ kind: "select-tool", toolId: "protractor" }, off)).toEqual({ state: off, effects: [] });
   });
 
-  it("enters a tool mode: menu closed with that tool, no session reset and no gate", () => {
-    const off = stateWith({ isOpen: true }, disabled({ tools: { geodesicEmitters: false } }));
-    const result = reduce({ kind: "enter-tool-mode", toolId: "geodesicEmitters/carry" }, off);
-
-    expect(result.state.menuState).toMatchObject({ isOpen: false, selectedTool: "geodesicEmitters/carry" });
-    expect(result.effects).toEqual([sync]);
-  });
 
   it("clears the selected tool without closing the page", () => {
     const result = reduce({ kind: "clear-selected-tool" }, stateWith({ isOpen: true, selectedTool: "measure-length" }));
@@ -410,13 +403,13 @@ describe("applyRuntimeCommand: cannon and geometry computer actions", () => {
     ]);
   });
 
-  it("ignores cannon actions when emitters are disabled, but still deletes", () => {
+  it("ignores a new ray while emitters are disabled, but deletes, and leaves modes to the world", () => {
     const off = stateWith({}, disabled({ tools: { geodesicEmitters: false } }));
 
     expect(reduce({ kind: "add-geodesic-to-cannon", cannonId: "c" }, off).effects).toEqual([]);
-    expect(reduce({ kind: "start-cannon-carry", cannonId: "c" }, off).effects).toEqual([]);
-    expect(reduce({ kind: "start-cannon-rotation", cannonId: "c" }, off).effects).toEqual([]);
-    expect(reduce({ kind: "start-cannon-aim", cannonId: "c" }, off).effects).toEqual([]);
+    expect(reduce({ kind: "start-cannon-carry", cannonId: "c" }, off).effects).toEqual([{ kind: "start-cannon-carry", cannonId: "c" }]);
+    expect(reduce({ kind: "start-cannon-rotation", cannonId: "c" }, off).effects).toEqual([{ kind: "start-cannon-rotation", cannonId: "c" }]);
+    expect(reduce({ kind: "start-cannon-aim", cannonId: "c" }, off).effects).toEqual([{ kind: "start-cannon-aim", cannonId: "c" }]);
     expect(reduce({ kind: "delete-geodesic-from-cannon", cannonId: "c", geodesicId: "g" }, off).effects).toEqual([
       { kind: "delete-geodesic-from-cannon", cannonId: "c", geodesicId: "g" },
     ]);

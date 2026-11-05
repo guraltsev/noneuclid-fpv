@@ -24,9 +24,9 @@ import {
 /**
  * Deletes an interval together with everything derived from or pointing at it.
  *
- * Removes its segments, the interval, measurements and protractor angles referring to it, intersection markers
- * involving it, emitter list entries, and any free ends left unreferenced; then refreshes intersection markers.
- * No-op for unknown ids (the sweeps simply find nothing).
+ * Removes its segments, the interval, intersection markers involving it and any free ends left unreferenced; everything it
+ * writes is the geodesic model's. Lengths and angles that refer to it are the measurements' to remove: their derive ticks do,
+ * when they see the segments gone. No-op for unknown ids (the sweeps simply find nothing).
  */
 export function removeGeodesicIntervalAndDerivedObjects(
   registry: RuntimeObjectRegistry,
@@ -37,16 +37,6 @@ export function removeGeodesicIntervalAndDerivedObjects(
   const interval = registry.get(geodesicId);
   if (interval?.kind === "geodesicModel/arc") {
     doomed.push(interval);
-  }
-  for (const object of registry.getObjectsOfKind("geodesicMeasurements/length")) {
-    if (object.geodesicId === geodesicId) {
-      doomed.push(object);
-    }
-  }
-  for (const object of registry.getObjectsOfKind("geodesicMeasurements/angle")) {
-    if (object.first.geodesicId === geodesicId || object.second.geodesicId === geodesicId) {
-      doomed.push(object);
-    }
   }
   for (const object of registry.getObjectsOfKind("geodesicModel/crossing")) {
     if (object.geodesicIds.includes(geodesicId)) {

@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 import type { CompiledCellComplex } from "../../src/cell-complex/compileCellComplex";
 import type { WorldEngine } from "../../src/engine/moduleTypes";
 import { carryModule } from "../../src/modules/carry";
+import { geodesicEmittersModule } from "../../src/modules/geodesicEmitters";
 import { carryOffsetSlot } from "../../src/modules/carry/api";
 import { curveShorteningModule } from "../../src/modules/curveShortening";
 import { geodesicMeasurementsModule } from "../../src/modules/geodesicMeasurements";
@@ -88,7 +89,7 @@ function connectedScene(): Scene {
   const engine = createTestEngine({
     registry,
     getWorld: () => world,
-    modules: [geodesicModelModule(), geodesicMeasurementsModule(), carryModule()],
+    modules: [geodesicModelModule(), geodesicMeasurementsModule(), geodesicEmittersModule(), carryModule()],
     playerPose: { ...createDefaultPlayerPose("a"), position: playerPoint },
   });
   engine.step(0);
@@ -107,7 +108,7 @@ function flowScene(): Scene {
   const engine = createTestEngine({
     registry,
     getWorld: () => world,
-    modules: [geodesicModelModule(), geodesicMeasurementsModule(), carryModule(), curveShorteningModule({})],
+    modules: [geodesicModelModule(), geodesicMeasurementsModule(), geodesicEmittersModule(), carryModule(), curveShorteningModule({})],
     playerPose: { ...createDefaultPlayerPose("torus-room"), position: playerPoint },
   });
   engine.step(0);

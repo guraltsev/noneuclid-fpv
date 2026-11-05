@@ -54,16 +54,15 @@ export type CommandTicket = number;
 export type ParticipantBody = PlayerPose;
 
 /**
- * A relation the world holds between a participant and an object (design 013 section 7). Today only carrying (`kind` "carry"); the module that owns the kind changes it, through the contexts' `setAttachments`.
- * `arrived` is part of the relation because it changes how the object moves: false while the object still glides to the carrier, true from the first frame it is at the carrier.
- * The two optional fields are what the carry module needs to rebuild the object's geodesics: the geodesic the carrier works on and the length a regrown one should have.
+ * A relation the world holds between a participant and an object (design 013 section 7): carrying (`kind` "carry") and editing an emitter (`geodesicEmitters/edit`); the module that owns the kind changes it, through the contexts' `setAttachments`.
+ * `arrived` is part of a carry because it changes how the object moves: false while the object still glides to the carrier, true from the first frame it is at the carrier.
+ * `activeGeodesicId` is the geodesic the participant works on: the one a carry rebuilds first, the one an edit turns.
  */
 export interface ParticipantAttachment {
   readonly kind: string;
   readonly objectId: string;
-  readonly arrived: boolean;
+  readonly arrived?: boolean;
   readonly activeGeodesicId?: string;
-  readonly rotationTargetLengthMeters?: number;
 }
 
 /** The attachment of `kind` that `participant` holds, or undefined. */
@@ -192,10 +191,6 @@ export interface ModuleDefinition<
   readonly provides?: ModuleToken<Api, Queries>;
   readonly requires: readonly ModuleToken<unknown, unknown>[];
   readonly objectKinds: readonly ObjectKindDeclaration[];
-  /**
-   * Kinds of the core union that this module also writes, because code that writes them still runs in this module's frame (the carry module's emitter and geodesic kinds, the emitters' geodesic kinds, the measurements a removed arc takes with it). Only the write guard reads it.
-   */
-  readonly writesCoreKinds?: readonly string[];
   /** Tool ids this module defines; the engine knows them for gating. */
   readonly toolIds?: readonly RuntimeToolId[];
   readonly create: (ctx: ModuleCreateContext) => ModuleInstance<Api, Cmd, Evt, Queries>;

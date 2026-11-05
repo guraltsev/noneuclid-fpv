@@ -7,6 +7,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { carryModule } from "../../src/modules/carry";
+import { geodesicEmittersModule } from "../../src/modules/geodesicEmitters";
 import { carryOffsetSlot } from "../../src/modules/carry/api";
 import { geodesicMeasurementsModule } from "../../src/modules/geodesicMeasurements";
 import { geodesicModelModule } from "../../src/modules/geodesicModel";
@@ -44,7 +45,7 @@ function connectedPairWithAngle() {
   const engine = createTestEngine({
     registry,
     getWorld: () => world,
-    modules: [geodesicModelModule(), geodesicMeasurementsModule(), carryModule()],
+    modules: [geodesicModelModule(), geodesicMeasurementsModule(), geodesicEmittersModule(), carryModule()],
     playerPose: { ...createDefaultPlayerPose("a"), position: { x: 2.5, y: 2.5, z: 0 } },
   });
   runDerivePass(engine);

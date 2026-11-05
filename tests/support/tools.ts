@@ -20,6 +20,7 @@ export function createTestToolsById(): ToolsById {
       carry: () => false,
       rotate: () => false,
       aim: () => false,
+      emitterModeResult: () => undefined,
     }),
     createDefaultClientModules(),
   );

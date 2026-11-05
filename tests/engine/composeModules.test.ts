@@ -77,9 +77,6 @@ describe("composeModules", () => {
     expect(twice).toContain("the object kind geodesicModel/arc is declared twice, by geodesicModel and by other");
   });
 
-  it("rejects a writesCoreKinds entry that is not a core kind", () => {
-    expect(problemsOf([fake("one", { writesCoreKinds: ["one/thing"] })])).toContain("module one lists one/thing in writesCoreKinds, which is not a core kind");
-  });
 
   it("rejects two handlers for one command kind and two modules defining one tool id", () => {
     const run = () => ({ ok: true as const });

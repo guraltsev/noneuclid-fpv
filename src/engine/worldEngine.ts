@@ -7,7 +7,7 @@ import type { CompiledCellComplex } from "../cell-complex/compileCellComplex";
 import type { RuntimeToolId } from "../glue/toolIds";
 import type { PlayerPose } from "../movement/playerPose";
 import type { RuntimeObjectRegistry } from "../world-objects/runtimeObjectRegistry";
-import { composeModules, contributedNamePattern, writableKindsOf, type ComposedHandler } from "./composeModules";
+import { composeModules, contributedNamePattern, declaredKindsOf, type ComposedHandler } from "./composeModules";
 import { coreObjectKinds, coreToolIds, moduleOwnedCoreKinds } from "./coreIds";
 import { createEngineIdSource } from "./ids";
 import { createTickRunner, type MutableStepContext } from "./moduleTicks";
@@ -78,14 +78,14 @@ export function createWorldEngine(options: WorldEngineOptions): WorldEngine {
     },
   };
 
-  const declaredKindsOf = new Map(definitions.map((definition) => [definition.id, writableKindsOf(definition)]));
+  const kindsOfModule = new Map(definitions.map((definition) => [definition.id, declaredKindsOf(definition)]));
   const experience = composeModules(definitions, {
     coreObjectKinds,
     moduleOwnedCoreKinds,
     coreToolIds,
     objects: moduleObjects,
     getWorld: options.getWorld,
-    wrapApi: (moduleId, api) => (guardOn ? runFunctionsInFrame(frames, moduleId, declaredKindsOf.get(moduleId)!, api) : api),
+    wrapApi: (moduleId, api) => (guardOn ? runFunctionsInFrame(frames, moduleId, kindsOfModule.get(moduleId)!, api) : api),
   });
   const queriesByToken = new Map<string, unknown>();
   for (const module of experience.modules) {
@@ -140,7 +140,7 @@ export function createWorldEngine(options: WorldEngineOptions): WorldEngine {
   function runHandler(handler: ComposedHandler, command: EngineCommandBase, participantId: string): CommandResult {
     const savedParticipantId = currentParticipantId;
     currentParticipantId = participantId;
-    frames.push(handler.moduleId, declaredKindsOf.get(handler.moduleId) ?? new Set<string>());
+    frames.push(handler.moduleId, kindsOfModule.get(handler.moduleId) ?? new Set<string>());
     try {
       return handler.run(command as never, commandContext);
     } finally {

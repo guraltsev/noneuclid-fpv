@@ -1,36 +1,35 @@
 /**
- * What an emitter does to its geodesics when it has been carried: rebuild after a move and the final rebuild when the carry ends.
- * These are rules of the emitter, not of whoever carries it: a hand, a bot and a script all end a carry the same way, by calling these functions with the registry, and the carrier only refreshes what it draws.
+ * What an emitter does to its geodesics when it has been carried: the rebuild after a move and the final rebuild when the carry ends.
+ * These are rules of the emitter, not of whoever carries it: a hand, a bot and a script all end a carry the same way, and the carrier only refreshes what it draws.
  *
- * Pure with respect to rendering. Each function changes the registry and returns what a carrier needs to go on: the geodesic it regrew and the crossings that vanished.
+ * Pure with respect to rendering. It writes arcs only, so the geodesic model can run it; it returns what the emitter and its carrier need to go on: the geodesic it regrew and the yaw that geodesic left along.
  */
 import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex";
 import type { RuntimeObjectRegistry } from "../runtimeObjectRegistry";
 import { rebuildConnectedGeodesicBetweenEmitters, rebuildGeodesicToLength } from "./cannon";
-import { pruneMissingGeodesicIntersectionObjects } from "./intersections";
 import { getEmitterGeodesicIds, isTied } from "./endpoints";
 import { arcFollowsEmitter, collectFollowingArcIdsForEmitter } from "./lifecycle";
-import { collectGeodesicPortalWord, getGeodesicSegments, resolveEmitterLaunchYaw } from "./segments";
+import { collectGeodesicPortalWord, resolveEmitterLaunchYaw } from "./segments";
 
-/** What a rebuild of an emitter's geodesics means for the carrier. */
+/** What a rebuild of an emitter's geodesics means for the emitter and its carrier. */
 export interface EmitterGeodesicRebuild {
   /** Set when the emitter's plain (free) active geodesic was regrown from it: that geodesic is the emitter's active one. */
   readonly regrownActiveGeodesicId?: string;
+  /** The yaw the regrown geodesic left along, which the emitter then faces. */
+  readonly launchYawRadians?: number;
 }
 
 /**
  * Rebuilds the geodesics that depend on an emitter after it moved. Three cases: the connected geodesics incident to the emitter (rebuilt as
- * connected geodesics between emitters), else the emitter's connected active geodesic, else its plain active geodesic regrown from it.
+ * connected geodesics between emitters), else the emitter's connected active geodesic, else its plain active geodesic regrown from it, to its intended length.
  * `preserveGeodesicOnRebuildFailure` keeps a geodesic whose rebuild failed (the safety net of the carry in progress); the final rebuild at
- * the end of a carry leaves it off. `activeGeodesicId` names the active geodesic when the emitter does not record one; the
- * `rotationTargetLengthMeters` replaces the geodesic's current length when a regrown geodesic should have another.
+ * the end of a carry leaves it off. `activeGeodesicId` names the active geodesic when the emitter does not record one.
  */
 export function rebuildEmitterGeodesics(input: {
   readonly world: CompiledCellComplex;
   readonly registry: RuntimeObjectRegistry;
   readonly emitterId: string;
   readonly activeGeodesicId?: string;
-  readonly rotationTargetLengthMeters?: number;
   readonly preserveGeodesicOnRebuildFailure?: boolean;
 }): EmitterGeodesicRebuild {
   const { world, registry } = input;
@@ -66,50 +65,21 @@ export function rebuildEmitterGeodesics(input: {
     rebuildConnected(geodesicId);
     return {};
   }
-  // A tied arc is never regrown: its curve is not a ray from the emitter.
-  if (geodesicId && !isTied(registry, geodesicId)) {
+  // A tied arc is never regrown: its curve is not a ray from the emitter. An arc that is gone, lifted away, has nothing to regrow.
+  const arc = geodesicId === undefined ? undefined : registry.get(geodesicId);
+  if (geodesicId && arc?.kind === "geodesicModel/arc" && arc.intendedLengthMeters !== undefined && !isTied(registry, geodesicId)) {
+    const launchYawRadians = resolveEmitterLaunchYaw(registry, cannon, geodesicId);
     rebuildGeodesicToLength({
       world,
       registry,
       cannon,
       geodesicId,
-      launchYawRadians: resolveEmitterLaunchYaw(registry, cannon, geodesicId),
-      totalLengthMeters: input.rotationTargetLengthMeters ?? geodesicTotalLengthMeters(registry, geodesicId),
+      launchYawRadians,
+      totalLengthMeters: arc.intendedLengthMeters,
       connectEmitters: false,
-      rebuildConnected: true,
     });
-    return { regrownActiveGeodesicId: geodesicId };
+    return { regrownActiveGeodesicId: geodesicId, launchYawRadians };
   }
 
   return {};
-}
-
-/** What releasing a carried emitter touched. */
-export interface CarriedEmitterRelease extends EmitterGeodesicRebuild {
-  /** Intersection objects that vanished with the rebuilt geodesics (the vertices of angles that depended on them). */
-  readonly prunedIntersectionIds: readonly string[];
-}
-
-/**
- * The emitter has stopped being carried, whether the hand put it down or let it go: its geodesics are rebuilt one last time
- * without the safety net of the carry, and the intersection objects whose geodesics no longer exist are pruned. Nothing else is recomputed.
- */
-export function releaseCarriedEmitter(input: {
-  readonly world: CompiledCellComplex;
-  readonly registry: RuntimeObjectRegistry;
-  readonly emitterId: string;
-  readonly activeGeodesicId?: string;
-  readonly rotationTargetLengthMeters?: number;
-}): CarriedEmitterRelease {
-  if (input.registry.get(input.emitterId)?.kind !== "geodesicEmitters/emitter") {
-    return { prunedIntersectionIds: [] };
-  }
-
-  const rebuild = rebuildEmitterGeodesics(input);
-
-  return { ...rebuild, prunedIntersectionIds: pruneMissingGeodesicIntersectionObjects(input.registry) };
-}
-
-function geodesicTotalLengthMeters(registry: RuntimeObjectRegistry, geodesicId: string): number {
-  return getGeodesicSegments(registry, geodesicId).reduce((total, segment) => total + segment.lengthMeters, 0);
 }

@@ -11,8 +11,8 @@ import { describe, expect, it } from "vitest";
 import { yawRigidTransform3 } from "../../../src/math/rigidTransform3";
 import { expectSegmentsAreRealizedFromArcs } from "../../support/segmentOracle";
 import { createRuntimeObjectRegistry } from "../../../src/world-objects/runtimeObjectRegistry";
-import { moveEmitterAlongRoute, rebuildConnectedGeodesicBetweenEmitters, shootGeodesic } from "../../../src/world-objects/geodesic/cannon";
-import { rebuildEmitterGeodesics, releaseCarriedEmitter } from "../../../src/world-objects/geodesic/carryEnd";
+import { rebuildConnectedGeodesicBetweenEmitters, shootGeodesic } from "../../../src/world-objects/geodesic/cannon";
+import { rebuildEmitterGeodesics } from "../../../src/world-objects/geodesic/carryEnd";
 import { arcsOfCurve, isStale, isTied } from "../../../src/world-objects/geodesic/endpoints";
 import { arcFollowsEmitter, removePlainGeodesicsFromCannon } from "../../../src/world-objects/geodesic/lifecycle";
 import {
@@ -29,6 +29,7 @@ import {
   createSymmetricPairScenario,
   createTorusTiedPairScenario,
   totalGeodesicLength,
+  moveEmitterWithItsArcs as moveEmitterAlongRoute,
 } from "../../fixtures/world-objects/geodesic";
 
 function emitterOf(registry: ReturnType<typeof createRuntimeObjectRegistry>, id: string) {
@@ -167,7 +168,7 @@ describe("a tied curve that cannot follow its emitter", () => {
     expect(isStale(registry, "g-b")).toBe(true);
     expect(registry.get("g-a")?.kind).toBe("geodesicModel/arc");
 
-    releaseCarriedEmitter({ world, registry, emitterId: "cannon-b" });
+    rebuildEmitterGeodesics({ world, registry, emitterId: "cannon-b" });
 
     expect(registry.get("g-a")).toBeUndefined();
     expect(registry.get("g-b")).toBeUndefined();

@@ -43,10 +43,8 @@ export interface ComposedHandler {
 export interface ComposedModule {
   readonly definition: AnyModuleDefinition;
   readonly instance: ModuleInstance<unknown, never, EngineEventBase, unknown>;
-  /** Kinds this module declares. */
+  /** Kinds this module declares, the only ones the write guard lets it write. */
   readonly declaredKinds: ReadonlySet<string>;
-  /** Kinds the write guard lets this module write: the declared kinds and its `writesCoreKinds`. */
-  readonly writableKinds: ReadonlySet<string>;
   /** Ids of the modules whose tokens this module requires, directly. */
   readonly requiredModuleIds: ReadonlySet<string>;
 }
@@ -113,8 +111,7 @@ export function composeModules(definitions: readonly AnyModuleDefinition[], opti
     modules.push({
       definition,
       instance,
-      declaredKinds: new Set(definition.objectKinds.map((declaration) => declaration.kind)),
-      writableKinds: writableKindsOf(definition),
+      declaredKinds: declaredKindsOf(definition),
       requiredModuleIds: new Set(definition.requires.flatMap((token) => providerOfToken.get(token.id)?.id ?? [])),
     });
   }
@@ -129,9 +126,9 @@ export function composeModules(definitions: readonly AnyModuleDefinition[], opti
   return { modules, handlers, moduleToolIds };
 }
 
-/** The kinds the write guard lets a module write. */
-export function writableKindsOf(definition: AnyModuleDefinition): ReadonlySet<string> {
-  return new Set([...definition.objectKinds.map((declaration) => declaration.kind), ...(definition.writesCoreKinds ?? [])]);
+/** The kinds a module declares: what the write guard lets it write. */
+export function declaredKindsOf(definition: AnyModuleDefinition): ReadonlySet<string> {
+  return new Set(definition.objectKinds.map((declaration) => declaration.kind));
 }
 
 /** Topological order of `requires`, ties broken by list order; undefined (with a problem) when a token has no provider or the modules form a cycle. Records rules 1 to 4. */
@@ -220,9 +217,6 @@ function checkDefinitions(definitions: readonly AnyModuleDefinition[], options: 
       }
       declaredBy.set(declaration.kind, definition.id);
       checkName(definition.id, "object kind", declaration.kind, problems);
-    }
-    for (const kind of definition.writesCoreKinds ?? []) {
-      if (!core.has(kind)) problems.push(`module ${definition.id} lists ${kind} in writesCoreKinds, which is not a core kind`);
     }
     for (const toolId of definition.toolIds ?? []) {
       checkName(definition.id, "tool id", toolId, problems);

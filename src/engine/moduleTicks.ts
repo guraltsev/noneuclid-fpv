@@ -51,7 +51,7 @@ export function createTickRunner(modules: readonly ComposedModule[], deps: TickR
   const ring = journal.ring;
   const runtimes: ModuleRuntime[] = modules.map((module) => ({
     moduleId: module.definition.id,
-    writable: module.writableKinds,
+    writable: module.declaredKinds,
     bodies: module.instance.ticks.filter((tick) => tick.phase === "bodies"),
     simulate: module.instance.ticks.filter((tick) => tick.phase === "simulate"),
     derive: module.instance.ticks.filter((tick) => tick.phase === "derive").map((tick) => ({ tick, cursor: ring.baseSeq })),

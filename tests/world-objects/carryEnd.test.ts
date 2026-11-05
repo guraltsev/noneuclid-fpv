@@ -10,8 +10,9 @@ import { cube } from "../../src/authoring/exampleWorlds";
 import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
 import { vec3 } from "../../src/math/vec3";
 import { yawRigidTransform3 } from "../../src/math/rigidTransform3";
-import { rebuildEmitterGeodesics, releaseCarriedEmitter } from "../../src/world-objects/geodesic/carryEnd";
-import { moveEmitterAlongRoute, shootGeodesic } from "../../src/world-objects/geodesic/cannon";
+import { rebuildEmitterGeodesics } from "../../src/world-objects/geodesic/carryEnd";
+import { shootGeodesic } from "../../src/world-objects/geodesic/cannon";
+import { moveEmitterWithItsArcs as moveEmitterAlongRoute } from "../fixtures/world-objects/geodesic";
 import { arcConnectsEmitters } from "../../src/world-objects/geodesic/lifecycle";
 import { createGeodesicEmitterObject } from "../../src/world-objects/geodesic/objects";
 import { collectGeodesicPortalWord } from "../../src/world-objects/geodesic/segments";
@@ -81,9 +82,8 @@ describe("releasing a carried emitter", () => {
     const { world, registry } = connectedCube();
     nudgeCarriedEmitter(registry);
 
-    const release = releaseCarriedEmitter({ world, registry, emitterId: "cannon-b" });
+    rebuildEmitterGeodesics({ world, registry, emitterId: "cannon-b" });
 
-    expect(release.prunedIntersectionIds).toEqual([]);
     expect(arcConnectsEmitters(registry, "g-a")).toBe(true);
     const word = collectGeodesicPortalWord(registry, "g-a");
     word.slice(1).forEach((traversal, index) => expect(traversal.sourceCellId).toBe(word[index].targetCellId));
@@ -95,9 +95,7 @@ describe("releasing a carried emitter", () => {
     registry.add(createGeodesicEmitterObject({ id: "lone", cellId: "top", localPose: yawRigidTransform3(0, vec3(1, 1, 0)) }));
     const before = registry.get("lone");
 
-    const release = releaseCarriedEmitter({ world, registry, emitterId: "lone" });
-
-    expect(release.prunedIntersectionIds).toEqual([]);
+    expect(rebuildEmitterGeodesics({ world, registry, emitterId: "lone" })).toEqual({});
     expect(registry.get("lone")).toBe(before);
   });
 });

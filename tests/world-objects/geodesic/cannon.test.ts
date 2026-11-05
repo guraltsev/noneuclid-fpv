@@ -39,6 +39,7 @@ import {
   getCannonGeodesicYaw,
   compileLargeWorld,
   compileTorusLoopWorld,
+  bareRegistryCuts,
 } from "../../fixtures/world-objects/geodesic";
 
 describe("geodesic cannon world objects: cannon", () => {
@@ -61,7 +62,7 @@ describe("geodesic cannon world objects: cannon", () => {
       distanceAlongSegmentMeters: 1,
       aimYawRadians: Math.PI / 2,
       createId: () => "cannon-b",
-      createContinuationGeodesicId: (id) => `${id}:continuation:cannon-b`,
+      cuts: bareRegistryCuts(world, registry),
     });
 
     expect(result.placed).toBe(true);
@@ -102,7 +103,7 @@ describe("geodesic cannon world objects: cannon", () => {
       distanceAlongSegmentMeters: minGeodesicSegmentLengthMeters / 2,
       aimYawRadians: 0,
       createId: () => "cannon-b",
-      createContinuationGeodesicId: (id) => `${id}:continuation:cannon-b`,
+      cuts: bareRegistryCuts(world, registry),
     });
 
     expect(result.placed).toBe(false);
@@ -145,7 +146,7 @@ describe("geodesic cannon world objects: cannon", () => {
       distanceAlongSegmentMeters: 1,
       aimYawRadians: Math.PI / 2,
       createId: () => "cannon-b",
-      createContinuationGeodesicId: (id) => `${id}:continuation:cannon-b`,
+      cuts: bareRegistryCuts(world, registry),
     });
 
     expect(result.placed).toBe(true);

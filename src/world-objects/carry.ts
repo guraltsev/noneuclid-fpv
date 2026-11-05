@@ -24,8 +24,8 @@
  *     this reaction and a change in this one function.
  * - Release is a detach and nothing else on the carrier's side, and so is the decision to let go of a distant object, which is the
  *   carrier's policy (`src/interaction/handCarry.ts` for the hand), not the object's. What the emitter does to its geodesics when the carry
- *   ends (the final rebuild without the carry's safety net, pruning what vanished) is a rule of the emitter, in `geodesic/carryEnd.ts`
- *   (`releaseCarriedEmitter`); every carrier ends a carry through it.
+ *   ends (the final rebuild without the carry's safety net) is a rule of the emitter, in `geodesic/carryEnd.ts`
+ *   (`rebuildEmitterGeodesics`); every carrier ends a carry through it.
  * - Carriers should not carry an object another carrier holds; if they do, the steps interleave, which is safe (every step is checked
  *   on its own) but erratic. The contract stays stateless and keeps no table of carriers.
  *

@@ -4,8 +4,8 @@
  * geometric helpers. Not a test file itself; see `tests.md` §3.
  */
 import { expect } from "vitest";
-import { compileCellComplex } from "../../../src/cell-complex/compileCellComplex";
-import { createRuntimeObjectRegistry } from "../../../src/world-objects/runtimeObjectRegistry";
+import { compileCellComplex, type CompiledCellComplex } from "../../../src/cell-complex/compileCellComplex";
+import { createRuntimeObjectRegistry, type RuntimeObjectRegistry } from "../../../src/world-objects/runtimeObjectRegistry";
 import { curveDynamicsToken } from "../../../src/modules/curveShortening/api";
 import { curveShorteningModule } from "../../../src/modules/curveShortening";
 import { geodesicModelModule } from "../../../src/modules/geodesicModel";
@@ -19,11 +19,43 @@ import {
 } from "../../../src/world-objects/geodesic/objects";
 import { getEmitterGeodesicIds } from "../../../src/world-objects/geodesic/endpoints";
 import { getGeodesicSegments, resolveEmitterLaunchYaw } from "../../../src/world-objects/geodesic/segments";
-import { rebuildConnectedGeodesicBetweenEmitters } from "../../../src/world-objects/geodesic/cannon";
-import { rebuildDerivedGeodesicSegments } from "../../../src/world-objects/geodesic/intervals";
+import {
+  cutGeodesicsAtVertex,
+  followAnchorRoute,
+  moveEmitterAlongRoute,
+  rebuildConnectedGeodesicBetweenEmitters,
+  type GeodesicEmitterCuts,
+  type MoveEmitterAlongRouteInput,
+  type MoveEmitterAlongRouteResult,
+} from "../../../src/world-objects/geodesic/cannon";
+import { rebuildDerivedGeodesicSegments, splitGeodesicIntervalAtSegmentHit } from "../../../src/world-objects/geodesic/intervals";
 import { createTestEngine } from "../../support/engine";
 import { yawRigidTransform3 } from "../../../src/math/rigidTransform3";
 import { walkDevelopedSegment } from "../../../src/cell-complex/segmentWalk";
+
+/** `moveEmitterAlongRoute` on a bare registry, with the geodesic model's half of the move done on the same registry. */
+export function moveEmitterWithItsArcs(input: Omit<MoveEmitterAlongRouteInput, "followRoute">): MoveEmitterAlongRouteResult {
+  return moveEmitterAlongRoute({ ...input, followRoute: (route) => followAnchorRoute(input.registry, input.emitterId, route) });
+}
+
+/** The cuts of a placement on a bare registry: the geodesic model's half done on the same registry; a continuation's id says what it continues and at which emitter. */
+export function bareRegistryCuts(world: CompiledCellComplex, registry: RuntimeObjectRegistry): GeodesicEmitterCuts {
+  const emitterAt = (id: string) => {
+    const emitter = registry.get(id);
+    if (emitter?.kind !== "geodesicEmitters/emitter") throw new Error(`Expected the emitter "${id}".`);
+    return emitter;
+  };
+  return {
+    cutAtSegment({ emitterId, arcId, segmentId, distanceAlongSegmentMeters }) {
+      const interval = registry.get(arcId);
+      const segment = registry.get(segmentId);
+      if (interval?.kind !== "geodesicModel/arc" || segment?.kind !== "geodesicModel/segment") throw new Error("Expected the arc and its segment.");
+      splitGeodesicIntervalAtSegmentHit({ world, registry, interval, segment, distanceAlongSegmentMeters, placed: emitterAt(emitterId), createContinuationGeodesicId: (id) => `${id}:continuation:${emitterId}` });
+    },
+    cutAtVertex: ({ emitterId, cellId, vertexPoint }) =>
+      cutGeodesicsAtVertex({ world, registry, emitter: emitterAt(emitterId), cellId, vertexPoint, createContinuationGeodesicId: (id) => `${id}:continuation:${emitterId}` }),
+  };
+}
 
 export function createSegment(overrides: Partial<GeodesicSegmentObject> = {}): GeodesicSegmentObject {
   return {

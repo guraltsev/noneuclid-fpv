@@ -197,18 +197,21 @@ describe("module import rules", () => {
     ]);
   });
 
-  it("lets the emitters reach cannon.ts and carryEnd.ts, and no other module", async () => {
+  it("lets the emitters reach cannon.ts, and no other module", async () => {
     const { moduleImportRuleViolations } = await loadLib();
     const violations = moduleImportRuleViolations(
       modulesOf(
         { path: "modules/geodesicEmitters/module.ts", imports: ["world-objects/geodesic/cannon.ts", "world-objects/geodesic/carryEnd.ts", "world-objects/geodesic/segments.ts"] },
         { path: "modules/curveShortening/module.ts", imports: ["world-objects/geodesic/cannon.ts"] },
+        { path: "modules/carry/module.ts", imports: ["world-objects/geodesic/cannon.ts"] },
       ),
     );
 
     expect(violations.map((violation: { readonly from: string; readonly to: string }) => [violation.from, violation.to])).toEqual([
+      ["modules/geodesicEmitters/module.ts", "world-objects/geodesic/carryEnd.ts"],
       ["modules/geodesicEmitters/module.ts", "world-objects/geodesic/segments.ts"],
       ["modules/curveShortening/module.ts", "world-objects/geodesic/cannon.ts"],
+      ["modules/carry/module.ts", "world-objects/geodesic/cannon.ts"],
     ]);
   });
 

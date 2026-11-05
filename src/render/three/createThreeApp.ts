@@ -729,10 +729,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     removeProtractorAngleRuntime,
     removePlacedFlags,
     removeMeasuredGeodesicLengths,
-    removeMeasuredGeodesicLengthsForGeodesic,
     removeProtractorAngles,
-    removeProtractorAnglesForGeodesic,
-    removeProtractorAnglesForMissingVertices,
     syncLabelRuntimesFromJournal,
   } = createToolObjectRuntimes({
     assets: options.assets,
@@ -758,6 +755,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     startGeodesicCannonRotation,
     startGeodesicCannonAim,
     startGeodesicCannonCarry,
+    settleEmitterMode,
     tryStartFocusedGeodesicCannonCarry,
     finishGeodesicCannonCarry,
     updateCarriedGeodesicCannonPose,
@@ -771,17 +769,14 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     engine,
     renderer,
     controls,
-    runtimeObjectRegistry,
     getWorld: activeWorld,
     session,
     dispatch: dispatchRuntimeCommand,
+    // Called from events and the frame, after the tool host below exists.
+    toolContext: (toolId) => toolHost.contextOf(toolId),
     resolveCurrentAimTarget,
     findFocusedRuntimeObject,
     syncDesktopPalette,
-    syncSelectableHitboxDebug: requestSelectableHitboxDebugSync,
-    removeMeasuredGeodesicLengthsForGeodesic,
-    removeProtractorAnglesForGeodesic,
-    removeProtractorAnglesForMissingVertices,
   });
 
   const {
@@ -869,6 +864,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
         updateActiveGeodesicCannonAim(primaryActionRequested, ray);
         return primaryActionRequested;
       },
+      emitterModeResult: settleEmitterMode,
     },
     resolveCurrentAimTargets,
     resolveCurrentAimTarget,
@@ -1173,11 +1169,10 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       normalFovDegrees: camera.fov,
     });
     const rotatingGeodesicCannon = currentMenuState().selectedTool === "geodesicEmitters/rotate";
-    const aimingGeodesicCannon = currentMenuState().selectedTool === "geodesicEmitters/aim";
     const effectiveHeadLocalMeters = rotatingGeodesicCannon && xrActive
       ? freezeXrHeadHeightDuringGeodesicCannonRotation(headLocalMeters)
       : headLocalMeters;
-    resetGeodesicCannonRotationTracking({ rotating: rotatingGeodesicCannon, aiming: aimingGeodesicCannon });
+    resetGeodesicCannonRotationTracking(rotatingGeodesicCannon);
     const frameAfterInputMs = performance.now();
     const frameBeforeMoveMs = frameAfterInputMs;
     const previousCellId = readLocalPlayerPose(engine).cellId;

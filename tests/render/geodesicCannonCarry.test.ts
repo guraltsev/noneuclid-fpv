@@ -28,11 +28,12 @@
 import { publishLocalPlayerPose, readLocalPlayerPose } from "../../src/engine/worldEngine";
 import { participantAttachment } from "../../src/engine/moduleTypes";
 import { createTestEngine } from "../support/engine";
-import { driveCarryTools } from "../support/carryTools";
+import { createModeToolHost, driveCarryTools } from "../support/carryTools";
 import { createDefaultWorldModules } from "../../src/runtime/experience";
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import { applyRuntimeCommand } from "../../src/runtime/applyRuntimeCommand";
+import type { RuntimeCommand } from "../../src/runtime/runtimeCommands";
 import { createTestClientSession } from "../support/clientSession";
 import { transformPoint3, yawRigidTransform3 } from "../../src/math/rigidTransform3";
 import { createGeodesicEmitterObject } from "../../src/world-objects/geodesic/objects";
@@ -59,26 +60,24 @@ function createHarness(
   const nothing = (): void => {};
   // Where the aim ray hits, in the player's frame; none by default.
   const aim: { rootPoint?: { x: number; y: number; z: number } } = {};
+  const dispatch = (command: RuntimeCommand): void => {
+    applyRuntimeCommand(session, command);
+  };
+  const host = createModeToolHost({ engine, session, dispatch, settle: (toolId, result) => rawTools.settleEmitterMode(toolId, result) });
   const rawTools = createGeodesicCannonTools({
     renderer: { xr: { isPresenting: false } } as unknown as THREE.WebGLRenderer,
     controls: { requestPointerLock: () => Promise.resolve() } as never,
-    runtimeObjectRegistry: registry,
     getWorld: () => world,
     session,
     engine,
-    dispatch: (command) => {
-      applyRuntimeCommand(session, command);
-    },
+    dispatch,
+    toolContext: (toolId) => host.contextOf(toolId),
     resolveCurrentAimTarget: () => (aim.rootPoint ? ({ kind: "floor", rootPoint: aim.rootPoint } as unknown as AimTarget) : undefined),
     findFocusedRuntimeObject: () => undefined,
     syncDesktopPalette: nothing,
-    syncSelectableHitboxDebug: nothing,
-    removeMeasuredGeodesicLengthsForGeodesic: nothing,
-    removeProtractorAnglesForGeodesic: nothing,
-    removeProtractorAnglesForMissingVertices: nothing,
   });
   // The shell steps the world after the tools have run; the harness steps it after each carry call.
-  const tools = driveCarryTools(rawTools, engine);
+  const tools = driveCarryTools(rawTools, engine, host);
 
   // The player stands in `cellId` at (x, y); how they got there does not matter to the tools.
   function walkInto(cellId: string, x: number, y: number): void {
@@ -252,7 +251,7 @@ describe("leaving the carry tool puts the emitter down in the world", () => {
     expect(participantAttachment(engine.read.participant("local"), "carry")).toBeUndefined();
   });
 
-  it("leaves the tool when the world refuses the pickup", () => {
+  it("does not enter the tool when the world refuses the pickup", () => {
     const { engine, session, tools } = setupCube("right", -2.4, -3);
     engine.publishBody("local", { ...readLocalPlayerPose(engine), cellId: "top", position: { x: 0, y: 0, z: 0 } });
 
@@ -293,16 +292,12 @@ describe("aiming an emitter from a cell other than its own", () => {
     return emitter.aimYawRadians;
   }
 
-  function startAiming(session: ReturnType<typeof createHarness>["session"]): void {
-    applyRuntimeCommand(session, { kind: "set-cannon-tool-state", state: { selectedCannonId: "cannon-a" } });
-    applyRuntimeCommand(session, { kind: "enter-tool-mode", toolId: "geodesicEmitters/aim" });
-  }
 
   it("turns the emitter toward the aimed point when the player is across a portal", () => {
     const { registry, tools, session, aim, toB } = setupTurnedPair();
     const faceTurn = Math.atan2(toB.rotation.m10, toB.rotation.m00);
     expect(Math.abs(faceTurn)).toBeGreaterThan(1);
-    startAiming(session);
+    tools.startGeodesicCannonAim("cannon-a");
     // The player is in b, 1.5 m from the emitter, which appears there at `image`; the aimed point is due east of it in b's frame.
     const image = transformPoint3(toB, { x: 4, y: 2.5, z: 0 });
     aim.rootPoint = { x: image.x + 2, y: image.y, z: 0 };
@@ -316,7 +311,7 @@ describe("aiming an emitter from a cell other than its own", () => {
 
   it("stops aiming when the emitter is out of reach", () => {
     const { tools, walkInto, session, aim } = setupTurnedPair();
-    startAiming(session);
+    tools.startGeodesicCannonAim("cannon-a");
     walkInto("b", 2.5, 4.5);
     aim.rootPoint = { x: 0, y: 0, z: 0 };
 

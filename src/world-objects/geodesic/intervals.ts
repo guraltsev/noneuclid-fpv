@@ -223,6 +223,8 @@ export function aimFreeGeodesicFromEndpoint(input: {
   readonly emitterEndRole: GeodesicEndRole;
   readonly targetPointInEmitterCell: Vec3;
   readonly connectEmitters?: boolean;
+  /** The arc's new intended length; absent, it keeps the one it has. */
+  readonly intendedLengthMeters?: number;
 }): GeodesicTraceBuildResult | undefined {
   const interval = input.registry.get(input.geodesicId);
   if (interval?.kind !== "geodesicModel/arc") {
@@ -284,6 +286,7 @@ export function aimFreeGeodesicFromEndpoint(input: {
     startCellId: emitter.cellId,
     cellId: emitter.cellId,
     portalWord,
+    ...(input.intendedLengthMeters === undefined ? {} : { intendedLengthMeters: input.intendedLengthMeters }),
   };
   input.registry.update(nextInterval);
   if ((input.connectEmitters ?? true) && tail.terminal.kind === "emitter-hit") {
@@ -380,7 +383,7 @@ export function rebuildDerivedGeodesicSegmentsDetailed(input: {
  * a long enough prefix (`canConnectGeodesicSegmentAtDistance`).
  * The original interval is shortened so its free role now attaches to the placed emitter (its portal word becomes
  * the word of the prefix traces); the remainder (if at least `minGeodesicSegmentLengthMeters`) becomes a new interval from
- * the placed emitter to the old free end, rebuilt along the same direction. Mutates the registry.
+ * the placed emitter to the old free end, rebuilt along the same direction, and it takes over what is left of the intended length. Mutates the registry.
  */
 export function splitGeodesicIntervalAtSegmentHit(input: {
   readonly world: CompiledCellComplex;
@@ -430,6 +433,7 @@ export function splitGeodesicIntervalAtSegmentHit(input: {
       endAnchorObjectId: freeEnd.id,
       startCellId: placed.cellId,
       geodesicNumber: nextGeodesicNumber(input.registry),
+      intendedLengthMeters: (interval.intendedLengthMeters ?? totalLengthMeters) - prefixLengthMeters,
     }));
   }
   // Shorten the original interval: its free role now attaches to the placed emitter, and its portal word becomes the prefix word.

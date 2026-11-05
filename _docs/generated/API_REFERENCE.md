@@ -702,6 +702,7 @@ Emitter (cannon) operations: shooting, extending and re-aiming geodesics, connec
 | interface | `ShootGeodesicInput` | Input for `shootGeodesic`: aim a cannon's geodesic along the cannon's yaw and trace it for `maxLengthMeters`. |
 | interface | `ExtendGeodesicInput` | Input for `extendGeodesic`: lengthen an aimable free geodesic by `maxLengthMeters` along its emitter tangent. |
 | interface | `RebuildGeodesicToLengthInput` | Input for `rebuildGeodesicToLength`: re-shoot a geodesic from its cannon with a new total length. |
+| interface | `GeodesicEmitterCuts` | Where a cut of geodesics by a new emitter is done: arcs are the geodesic model's, so the emitter's side hands these over and writes only the emitter. |
 | interface | `PlaceGeodesicCannonAtFloorPointRequest` | Request for `placeGeodesicCannonAtFloorPoint`: put a new cannon on the floor of `cellId`. |
 | interface | `PlaceGeodesicCannonOnGeodesicRequest` | Request for `placeGeodesicCannonOnGeodesic`: put a new cannon on a segment of an existing free geodesic, splitting it there. |
 | interface | `PlaceGeodesicCannonAtGeodesicVertexRequest` | Request for `placeGeodesicCannonAtGeodesicVertex`: put a cannon at a point where geodesics cross in a cell, cutting each passing geodesic there. |
@@ -712,14 +713,18 @@ Emitter (cannon) operations: shooting, extending and re-aiming geodesics, connec
 | function | `placeGeodesicCannonAtFloorPoint` | Adds a new cannon standing on the floor at `floorPoint` unless the spot is blocked. |
 | function | `shootGeodesic` | Emits (or re-aims) a free geodesic from a cannon along its yaw and returns its first derived segment. |
 | function | `extendGeodesic` | Lengthens an aimable free geodesic by re-aiming it from its emitter along the current tangent, and returns its new last segment. |
-| function | `rebuildGeodesicToLength` | Re-shoots a geodesic from its cannon so that its total length is `totalLengthMeters`, returning the new segments. |
+| function | `rebuildGeodesicToLength` | Re-shoots a free geodesic from its cannon so that it traces to `totalLengthMeters`, returning the new segments. |
+| function | `resolveCannonSnappedToEmitter` | The cannon re-aimed at the nearest emitter that lies within `emitterConnectionToleranceMeters` of the first straight piece (an unconnected single-cell trace), so a geodesic aimed almost exactly at an emitter is snapped … |
+| function | `resolveCannonForGeodesic` | The cannon facing `launchYawRadians`, or the cannon itself when it already does. |
 | function | `connectGeodesicToEmitter` | Tries to close a free geodesic onto the emitter `incomingEmitterId`, producing a connected geodesic. |
 | function | `rebuildConnectedGeodesicBetweenEmitters` | Recomputes a connected geodesic after one of its emitters moved, keeping its homotopy class when possible. |
 | interface | `MoveEmitterAlongRouteInput` | Input for {@link moveEmitterAlongRoute}. |
 | interface | `MoveEmitterAlongRouteResult` | What {@link moveEmitterAlongRoute} did: whether the emitter moved, and which connected geodesics could not be kept consistent with it. |
 | function | `moveEmitterAlongRoute` | Moves an emitter and keeps every connected geodesic that ends on it consistent: the emitter's new cell and pose are stored and each such geodesic's portal word is extended by the portals the emitter crossed. |
+| function | `followAnchorRoute` | The geodesic model's half of a move: folds `route` into the portal word of every connected geodesic of the emitter, which is already stored at its new place, and lists those that could not follow. |
 | function | `placeGeodesicCannonOnGeodesic` | Places a new cannon at a point of a free geodesic and splits the geodesic there into two intervals. |
-| function | `placeGeodesicCannonAtGeodesicVertex` | Places a cannon at a vertex where segments pass and cuts every passing geodesic there, connecting the pieces to the new cannon. |
+| function | `placeGeodesicCannonAtGeodesicVertex` | Places a cannon at a vertex where segments pass and has `request.cuts` cut every passing geodesic there (`cutGeodesicsAtVertex`). |
+| function | `cutGeodesicsAtVertex` | The geodesic model's half of a placement at a vertex: cuts every geodesic passing `vertexPoint` at the emitter already standing there. |
 
 ### `world-objects/geodesic/cannonToolState.ts`
 
@@ -731,14 +736,12 @@ The editing state of the geodesic emitter (cannon) tools, as plain data: which c
 
 ### `world-objects/geodesic/carryEnd.ts`
 
-What an emitter does to its geodesics when it has been carried: rebuild after a move and the final rebuild when the carry ends.
+What an emitter does to its geodesics when it has been carried: the rebuild after a move and the final rebuild when the carry ends.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
-| interface | `EmitterGeodesicRebuild` | What a rebuild of an emitter's geodesics means for the carrier. |
+| interface | `EmitterGeodesicRebuild` | What a rebuild of an emitter's geodesics means for the emitter and its carrier. |
 | function | `rebuildEmitterGeodesics` | Rebuilds the geodesics that depend on an emitter after it moved. |
-| interface | `CarriedEmitterRelease` | What releasing a carried emitter touched. |
-| function | `releaseCarriedEmitter` | The emitter has stopped being carried, whether the hand put it down or let it go: its geodesics are rebuilt one last time without the safety net of the carry, and the intersection objects whose geodesics no longer exist… |
 
 ### `world-objects/geodesic/development.ts`
 
@@ -1434,7 +1437,7 @@ Composition of an experience's modules, once at engine creation (design 013 sect
 | interface | `ComposedExperience` | The result of composition. |
 | interface | `ComposeOptions` | What composition needs of the engine. |
 | function | `composeModules` | Checks, orders and creates the modules; throws a {@link ModuleCompositionError} listing every problem. |
-| function | `writableKindsOf` | The kinds the write guard lets a module write. |
+| function | `declaredKindsOf` | The kinds a module declares: what the write guard lets it write. |
 
 ### `engine/coreIds.ts`
 
@@ -1479,7 +1482,7 @@ The types of the world engine and of its modules (design 013 sections 5 and 9): 
 | type | `CommandResult` | The answer to a command: accepted (with an optional value) or refused with a stable code and a sentence for people. |
 | type | `CommandTicket` | What `submit` returns: pass it to `resultOf` after the step that applied the command. |
 | type | `ParticipantBody` | Where a participant is: the same record as the player pose (cell, cell-local position, yaw, pitch). |
-| interface | `ParticipantAttachment` | A relation the world holds between a participant and an object (design 013 section 7). |
+| interface | `ParticipantAttachment` | A relation the world holds between a participant and an object (design 013 section 7): carrying (`kind` "carry") and editing an emitter (`geodesicEmitters/edit`); the module that owns the kind changes it, through the co… |
 | function | `participantAttachment` | The attachment of `kind` that `participant` holds, or undefined. |
 | interface | `ParticipantRecord` | Someone acting in the world. |
 | interface | `WorldReadView` | The read-only world state clients use between steps. |
@@ -1656,11 +1659,18 @@ The geodesic emitters' public face (design 013 sections 12.1 and 16): the emitte
 | --- | --- | --- |
 | const | `geodesicEmitterToolId` | The id of the emitter tool. |
 | const | `geodesicEmitterKind` | The object kind of an emitter. |
+| const | `geodesicEmitterEditAttachmentKind` | The kind of the attachment an edit holds on a participant: the emitter is `objectId`, the geodesic it turns is `activeGeodesicId`. |
+| const | `geodesicEmitterYawSlot` | The control slot of an edit: the absolute yaw of the emitter, in radians in the frame of its cell. |
+| interface | `GeodesicEmittersApi` | For dependents only: what moves an emitter on the fast channel (design 013 section 5.4). |
+| const | `geodesicEmittersToken` | The emitters' token: `provides` of the module, `requires` of what moves an emitter. |
 | interface | `GeodesicEmitterPlaceCommand` | Places an emitter at `point` of the cell `cellId` (cell-local meters, the height is ignored), facing `yawRadians`. |
 | interface | `GeodesicEmitterShootCommand` | Starts a new geodesic of `lengthMeters` from an emitter along `yawRadians`; the emitter then faces that way. |
 | interface | `GeodesicEmitterExtendCommand` | Lengthens a free geodesic by `lengthMeters` along its tangent at the emitter. |
 | interface | `GeodesicEmitterDeleteGeodesicCommand` | Deletes one geodesic of an emitter. |
 | interface | `GeodesicEmitterRemoveCommand` | Removes an emitter and every geodesic on it; a tied arc takes its whole curve. |
+| interface | `GeodesicEmitterBeginEditCommand` | The issuing participant begins to edit an emitter: the attachment is held and the slot `geodesicEmitters/yaw` opens. |
+| interface | `GeodesicEmitterEndEditCommand` | Ends the issuing participant's edit: the geodesic is traced once more and connects to an emitter it reaches, snapping onto one that lies almost on its ray. |
+| interface | `GeodesicEmitterLiftCommand` | Module-only. |
 | type | `GeodesicEmittersCommand` | Every command of the module. |
 | type | `GeodesicEmittersResult` | What a command that succeeded answers with: `outcome` names the command, the ids are what it created or touched. |
 | const | `geodesicEmittersRefusals` | The refusal codes of the module's commands. |
@@ -1678,7 +1688,7 @@ The geodesic emitters' client part (design 013 sections 8.3 and 9.1): the emitte
 
 ### `modules/geodesicEmitters/index.ts`
 
-The geodesic emitters module's factories (design 013 section 12.1): `geodesicEmittersModule` is the world part, `geodesicEmittersClient` the client part (the emitter tool).
+The geodesic emitters module's factories (design 013 section 12.1): `geodesicEmittersModule` is the world part, `geodesicEmittersClient` the client part (the emitter tool); the rotate and aim tools are the shell's yaw sources.
 
 _No exports._
 
@@ -1724,13 +1734,18 @@ The geodesic model's public face (design 013 sections 12.1 and 13.1): its token,
 | interface | `GeodesicModelQueries` | What clients and dependents receive: reads only, which never change the registry. |
 | interface | `VertexMovePreview` | The result of `previewVertexMove`. |
 | type | `VertexRemovalPreview` | What removing a vertex would give: a merged arc, a taut loop, a collapsed curve, or blocked. |
-| interface | `GeodesicModelApi` | For dependents only: the hot route M1, M2 of design 013 section 5.7. |
+| interface | `EmitterArcsRebuild` | What a rebuild of an emitter's arcs means for the emitter and its carrier. |
+| interface | `GeodesicModelApi` | For dependents only: the hot route of design 013 section 5.7, what runs many times a step (M1, M2) or once per frame on the fast channel. |
 | const | `geodesicModelToken` | The geodesic model's token: `provides` of the module, `requires` of the modules that act on its curves. |
 | interface | `GeodesicTieAndDetachCommand` | Detaches two endpoint roles from an emitter and ties them at a new shared vertex, born at the emitter's beam point (the geometry does not change). |
 | interface | `GeodesicHighlightEndpointCommand` | Tool highlight of one endpoint's half of a geodesic (the segments' `highlightState`); transient. |
 | interface | `GeodesicRemoveVertexCommand` | Module-only. |
 | interface | `GeodesicRemoveCurveCommand` | Module-only. |
-| interface | `GeodesicReserveArcIdCommand` | Module-only. |
+| interface | `GeodesicShootArcCommand` | Module-only. |
+| interface | `GeodesicExtendArcCommand` | Module-only. |
+| interface | `GeodesicCutAtSegmentCommand` | Module-only. |
+| interface | `GeodesicCutAtVertexCommand` | Module-only. |
+| interface | `GeodesicRemovePlainArcsCommand` | Module-only. |
 | type | `GeodesicModelCommand` | Every command of the module. |
 | interface | `GeodesicVertexTiedEvent` | Two endpoint roles were tied at a new vertex. |
 | type | `GeodesicModelEvent` | Every event of the module. |
@@ -1816,6 +1831,7 @@ The descriptors of the tools the shell defines itself (design 013 section 8.3): 
 
 | Kind | Name | Summary |
 | --- | --- | --- |
+| type | `EmitterModeToolId` | The emitter's sub-modes. |
 | interface | `CoreToolHandlers` | What the shell does for each core tool; each handler reads the current frame's input itself. |
 | function | `createCoreToolDescriptors` | The descriptors of the core tools. |
 

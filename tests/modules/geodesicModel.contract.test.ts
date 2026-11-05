@@ -15,6 +15,7 @@ import { yawRigidTransform3 } from "../../src/math/rigidTransform3";
 import { geodesicModelToken, type ArcEnd, type GeodesicModelApi, type GeodesicModelCommand } from "../../src/modules/geodesicModel/api";
 import { geodesicModelModule } from "../../src/modules/geodesicModel";
 import { carryModule } from "../../src/modules/carry";
+import { geodesicEmittersModule } from "../../src/modules/geodesicEmitters";
 import { carryOffsetSlot } from "../../src/modules/carry/api";
 import { createDefaultPlayerPose } from "../../src/movement/playerPose";
 import { rebuildConnectedGeodesicBetweenEmitters } from "../../src/world-objects/geodesic/cannon";
@@ -392,7 +393,7 @@ describe("geodesicModel: with the carry module", () => {
     const engine = createTestEngine({
       registry,
       getWorld: () => world,
-      modules: [geodesicModelModule(), carryModule()],
+      modules: [geodesicModelModule(), geodesicEmittersModule(), carryModule()],
       playerPose: { ...createDefaultPlayerPose("a"), position: { x: -1.5, y: 0, z: 0 } },
     });
     const vertexBefore = registry.get("v");

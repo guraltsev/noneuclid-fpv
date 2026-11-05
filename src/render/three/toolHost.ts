@@ -10,7 +10,7 @@ import type { AimTarget } from "../../interaction/aimTarget";
 import type { RuntimeToolId } from "../../glue/toolIds";
 import { geometryTolerance } from "../../math/tolerances";
 import type { ClientSession } from "../../runtime/clientSession";
-import { createCoreToolDescriptors } from "../../runtime/coreTools";
+import { createCoreToolDescriptors, type EmitterModeToolId } from "../../runtime/coreTools";
 import type { RuntimeCommand } from "../../runtime/runtimeCommands";
 import { createToolsById, findObjectActionTool, objectActionsFor, type ToolsById } from "../../runtime/toolRegistry";
 import { getDistanceAlongGeodesicSegment } from "./carriedGeodesicCannon";
@@ -28,6 +28,8 @@ export interface CoreToolActions {
   rotate(yawDeltaRadians: number, primaryActionRequested: boolean): boolean;
   /** Updates the aim from the frame's ray; true when the primary action was requested. */
   aim(primaryActionRequested: boolean, ray: RootAimRay | undefined): boolean;
+  /** The world answered a command of one of the emitter's sub-modes. */
+  emitterModeResult(toolId: EmitterModeToolId, result: CommandResult): void;
 }
 
 /** One frame's input to the tools. */
@@ -106,6 +108,7 @@ export function createToolHost(deps: ToolHostDeps): ToolHost {
       carry: () => deps.core.carry(frame.primaryActionRequested),
       rotate: () => deps.core.rotate(frame.yawDeltaRadians, frame.primaryActionRequested),
       aim: () => deps.core.aim(frame.primaryActionRequested, frame.ray),
+      emitterModeResult: (toolId, result) => deps.core.emitterModeResult(toolId, result),
     }),
     deps.clients,
   );

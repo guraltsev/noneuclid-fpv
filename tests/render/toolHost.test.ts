@@ -63,6 +63,7 @@ function setup(options: { readonly available?: boolean } = {}) {
     carry: vi.fn(() => false),
     rotate: vi.fn(() => false),
     aim: vi.fn(() => false),
+    emitterModeResult: vi.fn(),
   };
   const host = createToolHost({
     engine,
@@ -348,7 +349,7 @@ function dummyDeps(): Parameters<typeof createToolHost>[0] {
     session,
     dispatch: noop,
     clients: [],
-    core: { placeFlag: noop, measureLength: noop, protractor: noop, protractorPrompt: () => "", carry: () => false, rotate: () => false, aim: () => false },
+    core: { placeFlag: noop, measureLength: noop, protractor: noop, protractorPrompt: () => "", carry: () => false, rotate: () => false, aim: () => false, emitterModeResult: noop },
     resolveCurrentAimTargets: () => [],
     resolveCurrentAimTarget: () => undefined,
     targetIsWithinInteractionRange: () => true,

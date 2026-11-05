@@ -2,7 +2,7 @@
  * The carry module (design 013 section 7): who carries what is world state.
  * `carry/attach` and `carry/detach` are commands; the hand sets the `carry/offset` slot each frame; in `applyControls`, once per frame, the carried emitter moves toward the hand by the carry contract (`world-objects/carry.ts`: displacement steps, re-homing, wall and zone stops) and the geodesics it anchors are rebuilt (the emitter's rule, `world-objects/geodesic/carryEnd.ts`), so the flow of the frame's steps sees them rebuilt.
  * The hand's leash policy stays `src/interaction/handCarry.ts`; the module applies it with the loose leash the carrier sends in the slot, and ends the carry itself when the policy says release (`carry/dropped`).
- * The module holds no state of its own: the relation is an attachment of the participant, the hand is a control slot.
+ * The module holds no state of its own: the relation is an attachment of the participant, the hand is a control slot. It writes no object: the emitter moves through the emitters' `api`, not by a command, because carrying uses the fast channel (design 013 section 5.4).
  */
 import { decideHandCarry, handCarryArrived, handCarryLeashSlackMeters } from "../../interaction/handCarry";
 import type { CommandContext, CommandHandlers, CommandResult, ModuleDefinition, ModuleTick, ParticipantAttachment, ParticipantRecord, PlainData, StepContext } from "../../engine/moduleTypes";
@@ -10,12 +10,17 @@ import { participantAttachment } from "../../engine/moduleTypes";
 import { getDynamicObjectCollisionBounds } from "../../movement/collision";
 import { yawRigidTransform3 } from "../../math/rigidTransform3";
 import { canBeCarried, carryMaxSpeedMetersPerSecond, carryTowardTarget, locateCarrierTarget, remainingToTarget } from "../../world-objects/carry";
-import { moveEmitterAlongRoute } from "../../world-objects/geodesic/cannon";
-import { rebuildEmitterGeodesics, releaseCarriedEmitter } from "../../world-objects/geodesic/carryEnd";
 import type { GeodesicEmitterObject } from "../../world-objects/geodesic/objects";
 import { getRuntimeObjectInteractionRangeMeters } from "../../world-objects/interactionRange";
 import { runtimeObjectToDynamicObjectState } from "../../world-objects/runtimeObjectBase";
 import type { RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
+import {
+  geodesicEmitterEditAttachmentKind,
+  geodesicEmittersRefusals,
+  geodesicEmittersToken,
+  type GeodesicEmitterLiftCommand,
+  type GeodesicEmittersApi,
+} from "../geodesicEmitters/api";
 import {
   carryAttachmentKind,
   carryOffsetSlot,
@@ -34,6 +39,9 @@ import {
 export type CarryModuleDefinition = ModuleDefinition<undefined, CarryCommand, CarryEvent>;
 
 type Cannon = GeodesicEmitterObject;
+
+/** The tool the carry's commands name for the gates. */
+const carryToolId = "geodesicEmitters/carry" as const;
 
 function refuse(code: string, message: string): CommandResult {
   return { ok: false, refusal: { code, message } };
@@ -62,21 +70,14 @@ function asCannon(object: RuntimeWorldObject | undefined): Cannon | undefined {
 /**
  * Ends the carry of `participant`: the emitter's final rebuild (without the safety net of the carry in progress), the attachment and the slot go, and `carry/released` tells the clients what to refresh.
  */
-function endCarry(ctx: CommandContext, participant: ParticipantRecord, carry: ParticipantAttachment): void {
-  const release = releaseCarriedEmitter({
-    world: ctx.world,
-    registry: ctx.objects,
-    emitterId: carry.objectId,
-    activeGeodesicId: carry.activeGeodesicId,
-    rotationTargetLengthMeters: carry.rotationTargetLengthMeters,
-  });
+function endCarry(ctx: CommandContext, emitters: GeodesicEmittersApi, participant: ParticipantRecord, carry: ParticipantAttachment): void {
+  const release = emitters.settleGeodesics(carry.objectId, carry.activeGeodesicId);
   ctx.setAttachments(participant.id, withoutCarry(participant));
   ctx.closeControl(participant.id, carryOffsetSlot);
   const released: CarryReleasedEvent = {
     kind: "carry/released",
     participantId: participant.id,
     objectId: carry.objectId,
-    prunedIntersectionIds: release.prunedIntersectionIds,
     ...(release.regrownActiveGeodesicId === undefined ? {} : { regrownActiveGeodesicId: release.regrownActiveGeodesicId }),
   };
   ctx.emit(released);
@@ -94,12 +95,15 @@ function attach(command: CarryAttachCommand, ctx: CommandContext): CommandResult
   const cannon = asCannon(ctx.objects.get(command.objectId));
   if (cannon === undefined || !canBeCarried(cannon)) return refuse(carryRefusals.notCarriable, "That cannot be carried.");
 
-  // First come, first served.
+  // First come, first served, between carriers and with whoever edits the emitter.
   let carrier: string | undefined;
+  let editor: string | undefined;
   ctx.forEachParticipant((other) => {
     if (carrier === undefined && participantAttachment(other, carryAttachmentKind)?.objectId === cannon.id) carrier = other.id;
+    if (editor === undefined && participantAttachment(other, geodesicEmitterEditAttachmentKind)?.objectId === cannon.id) editor = other.id;
   });
   if (carrier !== undefined) return refuse(carryRefusals.alreadyCarried, `Already carried by ${carrier}.`);
+  if (editor !== undefined) return refuse(geodesicEmittersRefusals.alreadyEdited, `Being edited by ${editor}.`);
 
   // In reach: along the straight development from the body to the object, within the pickup range (plus the lag the hand's leash allows).
   const body = participant.body;
@@ -112,37 +116,44 @@ function attach(command: CarryAttachCommand, ctx: CommandContext): CommandResult
     return refuse(carryRefusals.outOfReach, "That is too far away to pick up.");
   }
 
+  // Accepted: the emitter leaves the floor. The active geodesic may be one of those that stay on it.
+  const lifting: GeodesicEmitterLiftCommand = { kind: "geodesicEmitters/lift", emitterId: cannon.id };
+  ctx.dispatch(lifting);
+  const activeGeodesicId = command.activeGeodesicId !== undefined && ctx.objects.get(command.activeGeodesicId) !== undefined ? command.activeGeodesicId : undefined;
   const carry: ParticipantAttachment = {
     kind: carryAttachmentKind,
     objectId: cannon.id,
     arrived: false,
-    ...(command.activeGeodesicId === undefined ? {} : { activeGeodesicId: command.activeGeodesicId }),
-    ...(command.rotationTargetLengthMeters === undefined ? {} : { rotationTargetLengthMeters: command.rotationTargetLengthMeters }),
+    ...(activeGeodesicId === undefined ? {} : { activeGeodesicId }),
   };
   ctx.setAttachments(participant.id, withCarry(participant, carry));
   ctx.openControl(participant.id, carryOffsetSlot);
   return { ok: true };
 }
 
-function detach(_command: unknown, ctx: CommandContext): CommandResult {
-  const participant = ctx.participant(ctx.participantId);
-  const carry = participantAttachment(participant, carryAttachmentKind);
-  if (participant !== undefined && carry !== undefined) endCarry(ctx, participant, carry);
-  return { ok: true };
+function createDetach(emitters: GeodesicEmittersApi) {
+  return (_command: unknown, ctx: CommandContext): CommandResult => {
+    const participant = ctx.participant(ctx.participantId);
+    const carry = participantAttachment(participant, carryAttachmentKind);
+    if (participant !== undefined && carry !== undefined) endCarry(ctx, emitters, participant, carry);
+    return { ok: true };
+  };
 }
 
-function drop(command: CarryDropCommand, ctx: CommandContext): CommandResult {
-  const participant = ctx.participant(command.participantId);
-  const carry = participantAttachment(participant, carryAttachmentKind);
-  if (participant === undefined || carry === undefined) return { ok: true };
-  const dropped: CarryDroppedEvent = { kind: "carry/dropped", participantId: participant.id, objectId: carry.objectId, reason: command.reason };
-  ctx.emit(dropped);
-  endCarry(ctx, participant, carry);
-  return { ok: true };
+function createDrop(emitters: GeodesicEmittersApi) {
+  return (command: CarryDropCommand, ctx: CommandContext): CommandResult => {
+    const participant = ctx.participant(command.participantId);
+    const carry = participantAttachment(participant, carryAttachmentKind);
+    if (participant === undefined || carry === undefined) return { ok: true };
+    const dropped: CarryDroppedEvent = { kind: "carry/dropped", participantId: participant.id, objectId: carry.objectId, reason: command.reason };
+    ctx.emit(dropped);
+    endCarry(ctx, emitters, participant, carry);
+    return { ok: true };
+  };
 }
 
 /** Once per frame: the emitter a participant carries moves toward the participant's hand. */
-function followCarrier(ctx: StepContext, participant: ParticipantRecord): void {
+function followCarrier(ctx: StepContext, emitters: GeodesicEmittersApi, participant: ParticipantRecord): void {
   const carry = participantAttachment(participant, carryAttachmentKind);
   if (carry === undefined) return;
   const cannon = asCannon(ctx.objects.get(carry.objectId));
@@ -166,8 +177,7 @@ function followCarrier(ctx: StepContext, participant: ParticipantRecord): void {
     maxTravelMeters: carryMaxSpeedMetersPerSecond * ctx.deltaSeconds,
     commit: (move) => {
       const placedCellId = move.placement.cellId;
-      const moved = moveEmitterAlongRoute({
-        registry: ctx.objects,
+      const moved = emitters.moveAlong({
         emitterId: cannon.id,
         cellId: placedCellId,
         localPose: yawRigidTransform3(move.placement.yawRadians, move.placement.position),
@@ -183,14 +193,7 @@ function followCarrier(ctx: StepContext, participant: ParticipantRecord): void {
 
   let current = carry;
   if (advance.steps > 0) {
-    const rebuild = rebuildEmitterGeodesics({
-      world: ctx.world,
-      registry: ctx.objects,
-      emitterId: cannon.id,
-      activeGeodesicId: carry.activeGeodesicId,
-      rotationTargetLengthMeters: carry.rotationTargetLengthMeters,
-      preserveGeodesicOnRebuildFailure: true,
-    });
+    const rebuild = emitters.rebuildGeodesics(cannon.id, carry.activeGeodesicId);
     if (rebuild.regrownActiveGeodesicId !== undefined) current = { ...current, activeGeodesicId: rebuild.regrownActiveGeodesicId };
     const moved: CarryMovedEvent = {
       kind: "carry/moved",
@@ -211,19 +214,17 @@ function followCarrier(ctx: StepContext, participant: ParticipantRecord): void {
   }
 }
 
-/** Creates the carry module. */
+/** Creates the carry module. It requires the emitters, the only things that can be carried. */
 export function carryModule(): CarryModuleDefinition {
   return {
     id: "carry",
-    requires: [],
+    requires: [geodesicEmittersToken],
     objectKinds: [],
-    // Until job 64 the carry moves an emitter and rebuilds the geodesics it anchors itself. A rebuild that collapses
-    // a connected geodesic deletes the geodesic's measurements too (issue 94).
-    writesCoreKinds: ["geodesicEmitters/emitter", "geodesicModel/arc", "geodesicModel/vertex", "geodesicModel/segment", "geodesicModel/crossing", "geodesicMeasurements/length", "geodesicMeasurements/angle"],
-    create: () => {
+    create: (context) => {
+      const emitters = context.require(geodesicEmittersToken);
       // The step context for the callback below: set around one pass, so the callback is created once and a step allocates nothing for it.
       let stepContext: StepContext | undefined;
-      const follow = (participant: ParticipantRecord): void => followCarrier(stepContext!, participant);
+      const follow = (participant: ParticipantRecord): void => followCarrier(stepContext!, emitters, participant);
       const ticks: ModuleTick[] = [
         {
           id: "carry/follow",
@@ -240,9 +241,9 @@ export function carryModule(): CarryModuleDefinition {
         },
       ];
       const commands: CommandHandlers<CarryCommand> = {
-        "carry/attach": { run: attach },
-        "carry/detach": { run: detach },
-        "carry/drop": { run: drop, moduleOnly: true },
+        "carry/attach": { run: attach, requiresTool: carryToolId },
+        "carry/detach": { run: createDetach(emitters), requiresTool: carryToolId },
+        "carry/drop": { run: createDrop(emitters), moduleOnly: true },
       };
       return { api: undefined, queries: {}, commands, ticks };
     },

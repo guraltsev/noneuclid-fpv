@@ -649,22 +649,12 @@ describe("attachments and the bodies phase", () => {
     expect(engine.read.participant("local")?.attachments).toEqual([attachment]);
   });
 
-  it("lets a module write a core kind only if it lists it in writesCoreKinds", () => {
+  it("refuses a module's write of a core kind it does not own", () => {
     const flag = thing("flag-1", "placed-flag");
-    const engineFor = (writesCoreKinds?: readonly string[]) =>
-      createTestEngine({
-        modules: [{ ...fake("a", { commands: { "a/add": { run: (_command, ctx) => (ctx.objects.add(flag), ok) } } }), writesCoreKinds }],
-      });
+    const refusing = createTestEngine({ modules: [fake("a", { commands: { "a/add": { run: (_command, ctx) => (ctx.objects.add(flag), ok) } } })] });
 
-    const refusing = engineFor();
     const refused = refusing.submit("local", { kind: "a/add" });
     expect(() => refusing.step(0)).toThrow(/does not declare/);
     expect(refusing.resultOf(refused)).toMatchObject({ ok: false, refusal: { code: "world/internalError" } });
-
-    const allowing = engineFor(["placed-flag"]);
-    const accepted = allowing.submit("local", { kind: "a/add" });
-    allowing.step(0);
-    expect(allowing.resultOf(accepted)).toEqual({ ok: true });
-    expect(allowing.registry.get("flag-1")).toBeDefined();
   });
 });

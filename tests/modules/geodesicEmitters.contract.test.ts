@@ -21,6 +21,8 @@ import {
 } from "../../src/world-objects/protractorTool";
 import { createRuntimeObjectRegistry, type RuntimeObjectRegistry } from "../../src/world-objects/runtimeObjectRegistry";
 import { compileLargePortalWorld, createTorusConnectedPairScenario, createTorusTiedPairScenario, totalGeodesicLength } from "../fixtures/world-objects/geodesic";
+import { removeGeodesic } from "../../src/world-objects/geodesic/lifecycle";
+import { refreshMeasuredGeodesicLengthObject } from "../../src/world-objects/measureLengthTool";
 import { createTestEngine, runDerivePass } from "../support/engine";
 
 const modules = () => [geodesicModelModule(), geodesicMeasurementsModule(), geodesicEmittersModule()];
@@ -56,6 +58,44 @@ function withShotGeodesic() {
   const { arcId } = scene.value<{ arcId: string }>({ kind: "geodesicEmitters/shoot", emitterId, yawRadians: 0, lengthMeters: 3 });
   return { ...scene, emitterId, arcId };
 }
+
+describe("a deleted geodesic's measurements", () => {
+  it("go in the step that deletes it, by their own tick, with the write guard on", () => {
+    const { engine, registry, run, arcId } = withShotGeodesic();
+    const length = createMeasuredGeodesicLengthObject({ id: "length", registry, geodesicId: arcId, playerCellId: "a", playerPoint: { x: 3, y: 2.5, z: 0 } });
+    if (length === undefined) throw new Error("Expected the length.");
+    registry.add(length);
+    const emitterId = (registry.get(arcId) as { readonly start: { readonly anchorObjectId: string } }).start.anchorObjectId;
+    const ticket = engine.submit("local", { kind: "geodesicEmitters/deleteGeodesic", emitterId, arcId } as EngineCommandBase);
+
+    // A frame with no tick has not applied the command yet.
+    engine.applyControls(1 / 60);
+    expect(registry.get("length")).toBeDefined();
+    engine.step(1 / 60);
+    expect(engine.resultOf(ticket)).toMatchObject({ ok: true });
+    expect(registry.get(arcId)).toBeUndefined();
+    expect(registry.get("length")).toBeUndefined();
+    expect(run({ kind: "geodesicEmitters/deleteGeodesic", emitterId, arcId })).toMatchObject({ ok: false });
+  });
+
+  it("outlive an arc removed outside a tick until the next one, and nothing reads them wrongly", () => {
+    const { registry, arcId, engine } = withShotGeodesic();
+    const length = createMeasuredGeodesicLengthObject({ id: "length", registry, geodesicId: arcId, playerCellId: "a", playerPoint: { x: 3, y: 2.5, z: 0 } });
+    if (length === undefined) throw new Error("Expected the length.");
+    registry.add(length);
+
+    removeGeodesic(registry, arcId);
+    expect(registry.get("length")).toBeDefined();
+
+    // A frame with no tick reads the record whose arc is gone: the refresher says it is gone, and nothing throws.
+    engine.applyControls(1 / 60);
+    expect(registry.get("length")).toBeDefined();
+    expect(refreshMeasuredGeodesicLengthObject({ registry, measurement: length, playerCellId: "a", playerPoint: { x: 3, y: 2.5, z: 0 } })).toBeUndefined();
+
+    runDerivePass(engine);
+    expect(registry.get("length")).toBeUndefined();
+  });
+});
 
 describe("geodesicEmitters/place", () => {
   it("puts an emitter on the floor, with no geodesic, and answers with its id", () => {

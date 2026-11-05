@@ -333,11 +333,10 @@ export const moduleImportRules = [
       "world-objects/geodesic/trace.ts",
       "world-objects/geodesic/objects.ts",
     ],
-    // The emitters are the world part over these two files, which stay in place (design 013 section 16).
-    alsoViaFrom: { "modules/geodesicEmitters/": ["world-objects/geodesic/cannon.ts", "world-objects/geodesic/carryEnd.ts"] },
-    // The carry module runs the emitter's carry contract (moveEmitterAlongRoute and the rebuild of carryEnd.ts), which stays in world-objects code until job 64 (design 013 sections 7 and 16).
-    exceptFromPrefixes: ["modules/geodesicModel/", "modules/carry/"],
-    reason: "modules reach the piecewise-geodesic implementation only through the geodesicModel module, except for its stateless geometry tools (design 013 section 13.1); the emitters also use cannon.ts and carryEnd.ts, and the carry module runs the emitter's carry contract",
+    // The emitters are the world part over this file, which stays in place (design 013 section 16).
+    alsoViaFrom: { "modules/geodesicEmitters/": ["world-objects/geodesic/cannon.ts"] },
+    exceptFromPrefixes: ["modules/geodesicModel/"],
+    reason: "modules reach the piecewise-geodesic implementation only through the geodesicModel module, except for its stateless geometry tools (design 013 section 13.1); the emitters also use cannon.ts",
   },
   {
     fromPrefix: "render/",
@@ -364,7 +363,6 @@ export const legacyWorldWriters = [
   "render/three/createThreeApp.ts",
   "render/three/creatures/geodesicMarmotView.ts",
   "render/three/creatures/simpleGeoCreatureView.ts",
-  "render/three/geodesicCannonTools.ts",
   "render/three/geometryCommit.ts",
   "render/three/runtimeObjectActions.ts",
   "render/three/toolObjectRuntimes.ts",
