@@ -132,7 +132,8 @@ geometries** (section 2), which are far in the future. Requirements:
    no three.js, and runs in Node, a worker or the browser (or, eventually, in a higher-performance language).
 2. Everything is a command: typed plain data, with a result or an error. UI actions, bot actions and tests produce the
    same commands. Command logs can be replayed.
-3. Time is explicit (a `step(dt)`-style advance), not wall clock.
+3. Time is simulation time owned by the engine (a configurable tick length, P8), never wall clock and never the frame
+   time of the renderer.
 4. Queries return plain data and never mutate. Events are a stream clients can subscribe to.
 5. A participant is generic: the local player, a remote player, a bot and a creature follow the same movement and
    collision rules; only the source of their commands differs.
@@ -582,19 +583,30 @@ concrete): three cheap commitments now** that keep every option open:
 
 ### P8. Time: host-chosen steps and a fixed order inside a step
 
-**Agreed (2026-10-30): the host chooses the step size.** The engine is correct for any `dt` up to a cap.
+**Agreed (2026-11-05, maintainer; supersedes the 2026-10-30 "host chooses the step size" and "fixed tick everywhere
+rejected"): simulation time is a property of the simulation, not of the frame.** The simulation advances in ticks of a
+configurable length \(h\) (a world / experience setting; default to be chosen, for example 1/90 s). The shell never
+passes its frame time to the simulation. It shows what the simulation is doing, at whatever frame rate it manages.
 
-- The desktop and Quest app step once per drawn frame with that frame's `dt` (as today): no blending, no added VR
-  latency.
-- Tests step as they like ("step 0.1 s ten times, then assert").
-- A multiplayer authority may use a fixed tick (decided with P5). Blending across portals (two poses in different
-  cells cannot be blended directly; the snapshot then gives the previous pose in the current cell's frame) is needed
-  only for drawing other participants.
-- Replays record each step's `dt` and repeat the same steps.
-- The engine guarantees results independent of step size up to tolerance, enforced by property tests (many small
-  steps land where one large step does).
-- Instead of capping `dt` as today (`maxSimulationStepSeconds`, which loses time after a hitch), a host may split a
-  long frame into several capped steps; catching up or dropping time is host policy.
+- The shell converts elapsed real time into ticks (an accumulator) and draws the latest published snapshot. Smoothing
+  the residual fraction of a tick is a drawing concern; the player's own view may be sampled at draw time.
+- **Load policy, one place.** When ticks are expensive, the simulation may raise \(h\) up to a configured maximum, so
+  that simulated time keeps up with real time: choppy but correct, never a backlog of queued ticks that is paid back
+  later. The policy is a setting of the simulation, not a per-frame decision of the shell. If even the maximum \(h\) is
+  too slow, simulated time falls behind real time (no queue) and a notice is emitted (to be confirmed).
+- There is no cap that discards time after a slow frame (`maxSimulationStepSeconds` and the flow's own 0.1 s cap are
+  retired with the engine path).
+- **Correctness under a changing \(h\)** is why the engine guarantees results independent of step size up to
+  tolerance, enforced by property tests (many small steps land where one large step does). Flows that need sub-steps
+  take them inside a tick (see "flows are integrated numerically" above).
+- Tests step as they like ("step 0.1 s ten times, then assert"): `step` still takes a duration, validated against the
+  configured bounds, and the shell is not the only caller.
+- Replays record the tick lengths and repeat the same steps. A multiplayer authority uses the same mechanism (decided
+  with P5). Blending across portals (two poses in different cells cannot be blended directly; the snapshot then gives
+  the previous pose in the current cell's frame) is needed only for drawing other participants.
+- Consequence for today's code: the curve shortening flow in the render loop is driven by wall-clock `dt`, capped at
+  0.1 s, so below about 10 fps it runs slower than real time. This is fixed by moving the flow into the engine step,
+  not by patching the legacy call.
 
 **Agreed (2026-10-30): the order of work inside one step.**
 
@@ -984,3 +996,4 @@ cleanups) and job 46 (one state holder and one command path; **Agreed 2026-11-01
 | 2026-11-03 | P17 refined by design 013 (issue 84). Agreed there: piecewise-geodesic geometry and the curve shortening flow are separate modules; ordering by fixed phases, then dependencies; performance enforced by a bench check in job acceptance. |
 | 2026-11-03 | Design 013 revised (maintainer): the first module is a geodesic model built on geometry tools such as homotopy; tying belongs to the model; the flow is a dependent module that claims tied vertices. |
 | 2026-11-03 | Agreed (maintainer): the world/client split and the module system are one design, in 013 (renamed "World engine, clients and modules"). P3 refined: menu and selected tool are client state, tools send commands with a confirmation protocol, lasting relations such as carry are world state. P7: the engine runs on the main thread, worker-ready; the Quest prototype comes later. |
+| 2026-11-05 | Agreed (maintainer): P8 revised. Simulation time is configurable and owned by the simulation; the shell never feeds frame time to it and only shows the state. Under heavy load the tick length may grow (choppy but correct) instead of lagging and queuing ticks. Principle 3 reworded. Found while checking the curve shortening rate: the legacy flow uses wall-clock `dt` capped at 0.1 s. Still to do: align 013 (`step`, the flow's `speedLaw` cap) and the queued engine jobs. |
