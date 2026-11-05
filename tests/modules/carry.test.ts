@@ -18,6 +18,7 @@ import { geodesicModelModule } from "../../src/modules/geodesicModel";
 import { geodesicEmittersModule } from "../../src/modules/geodesicEmitters";
 import { shootGeodesic } from "../../src/world-objects/geodesic/cannon";
 import { getGeodesicConnection } from "../../src/world-objects/geodesic/lifecycle";
+import { getGeodesicSegments } from "../../src/world-objects/geodesic/segments";
 import { createGeodesicEmitterObject } from "../../src/world-objects/geodesic/objects";
 import { createRuntimeObjectRegistry, type RuntimeObjectRegistry } from "../../src/world-objects/runtimeObjectRegistry";
 import { getRuntimeObjectInteractionRangeMeters } from "../../src/world-objects/interactionRange";
@@ -141,6 +142,27 @@ describe("lifting an emitter", () => {
     expect(run("local", { kind: "carry/attach", objectId: "cannon-c" })).toMatchObject({ ok: false, refusal: { code: "geodesicEmitters/alreadyEdited" } });
 
     expect(registry.get("g-plain")).toBeDefined();
+  });
+
+  it("regrows a plain geodesic shot during the carry to its intended length", () => {
+    const { registry, run, step, hand } = setup();
+    registry.add(createGeodesicEmitterObject({ id: "cannon-c", cellId: "a", localPose: yawRigidTransform3(0, { x: 3, y: 2.5, z: 0 }) }));
+    run("local", { kind: "carry/attach", objectId: "cannon-c" });
+    const shot = run("local", { kind: "geodesicEmitters/shoot", emitterId: "cannon-c", yawRadians: Math.PI / 2, lengthMeters: 1.5 } as never);
+    if (shot?.ok !== true) throw new Error("Expected the shot.");
+    const { arcId } = shot.value as { readonly arcId: string };
+
+    hand(3, 1);
+    step(frameSeconds);
+    hand(3, 1);
+    step(frameSeconds);
+
+    expect(registry.get(arcId)).toMatchObject({ intendedLengthMeters: 1.5 });
+    expect(getGeodesicSegments(registry, arcId).reduce((total, segment) => total + segment.lengthMeters, 0)).toBeCloseTo(1.5);
+    const start = getGeodesicSegments(registry, arcId)[0]!.start;
+    const carried = registry.get("cannon-c");
+    expect(start.y).toBeCloseTo(carried?.localPose.translation.y ?? Number.NaN);
+    expect(carried?.localPose.translation.y).toBeLessThan(2.5);
   });
 
   it("needs the carry tool: with it disabled the command is refused", () => {
