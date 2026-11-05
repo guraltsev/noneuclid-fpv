@@ -158,3 +158,5 @@ At 4b0f825:
 - HEAD against the tree, with esbuild `transformSync` on each file: 24 of 24 changed `src` files emit identical JavaScript, so the job
   changes no behaviour.
 - `grep -rn "legacyWorldWriters" scripts` shows the list and the check in `scripts/docs/lib.mjs`.
+
+- Coordinator gate at 3048970: all green, counters unchanged. Timing alarm (flow, flow+dependents) not cleared: `bench:ab -- 44c037a` exit 1, medians flow 20.21 to 22.52, flow+dependents 32.36 to 32.51 us/step, rounds overlapping, on a machine reading slow for the base as well. Emitted JavaScript of the code commit is identical; the follow-up is types only. Treated as noise; see the batch report.
