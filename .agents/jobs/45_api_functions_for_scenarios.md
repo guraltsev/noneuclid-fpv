@@ -9,6 +9,12 @@ Resolves: nothing fully. It converts class-B manual checks into scenarios.
 
 This text predates the engine wave; rewrite it before running it. The engine split happened, so question 2 is obsolete. Rewrite this job after `geodesicEmitters`: it is the batch's way to create emitters and to turn manual checks into scenarios.
 
+## Status update 2026-11-05, after job 65
+
+Job 65 built `ModuleInstance.publicApi` and covered the `geodesic.fire` and `geodesic.tie` part of the row `tool.select`, `geodesic.fire`, `geodesic.tie`, `carry.pickUp`, `carry.drop`, and the row's "create objects" for emitters only (the row `objects.spawn` itself, for other objects, is not covered):
+`api.geodesicEmitters.place`, `shoot`, `extend`, `deleteGeodesic`, `remove`; `api.geodesicModel.tieAndDetach`, `arcsOfCurve`; `api.curveShortening.isAtRest`. The audit's checks 19 and 20 and the part of 21 that reads no picture are now scenarios in `tests/app/moduleApi.release.test.ts`.
+Not decided by job 65, and still waiting for the maintainer: every other row (`player.*`, `sim.*`, `app.changeWorld` resolving when loaded, `world.reset`, `tool.select`, `carry.pickUp`, `carry.drop`, `aim.pick`, `objects.spawn`, `ui.paletteState`, `view.rendererInfo`, `debug.injectFrameError`, the fallback option). The carry scenario uses no new function: it presses G and W through the DevTools input domain, after the existing `debug.setPlayerPose`. `tool.select` is what the check "a world refusal shown to the person" needs (job 65's Report).
+
 ## Goal
 
 Add to `window.noneuclid.api` the queries and commands that the class-B checks of the audit need, as real public

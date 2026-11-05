@@ -470,17 +470,21 @@ Transports a scenario can run over (the runner picks one):
 Scenarios live in `tests/app/<feature>.release.test.ts` and are functions of an `api` argument. The runner, the shared
 DevTools client and the wait-for-condition helper live in `tests/support/scenario/`.
 
-What the API does not offer yet, and what scenarios therefore cannot do (checked 2026-10-31):
+A module's `publicApi` (design 013 section 9.1) is installed as `api.<moduleId>` for the life of the app: `api.geodesicEmitters` (`place`, `shoot`, `extend`, `deleteGeodesic`, `remove`), `api.geodesicModel` (`tieAndDetach`, `arcsOfCurve`), `api.curveShortening` (`isAtRest`). A function that submits a command resolves with its result after the next tick, with `world/disposed` when the app goes, and with `world/noAnswer`, the command taken back, when no step ran for 30 s (a hidden page draws no frames). The scenario runner does not retry such a function after a lost answer, since its first try may have run.
+
+What the API does not offer can still be done as a person does it: `ScenarioApp.keyDown`, `keyUp` and `pressKey` are the real keyboard through the DevTools input domain (`tests/app/moduleApi.release.test.ts` picks an emitter up with G and walks it through a portal with W). `tests/fixtures/scenario-site/` holds what the release tier's server adds to the built site, such as an app configuration no deployment ships.
+
+What the API does not offer yet, and what scenarios therefore cannot do (checked 2026-11-05):
 
 - **No step command.** The frame loop advances with wall-clock `dt` capped at 0.1 s; there is no pause, step or frame
   counter (012 P8 agrees host-chosen steps). Until then, scenarios wait for conditions bounded by frames and assert with
   tolerance.
 - **No read of the player's pose in every build.** `portal.dumpCameraPose` exists only with the `portal-path-debug`
   option; the last movement result is not readable at all.
-- **No commands to move or place the player, select a tool, fire, tie, carry, pick, create objects, or reset.**
-  `debug.placeObjectAt` only moves existing owned objects.
+- **No commands to move the player, select a tool, carry, pick, create objects other than emitters and geodesics, or reset.**
+  `debug.placeObjectAt` only moves existing owned objects; `debug.setPlayerPose` puts the player somewhere and is not a decided API.
 - **`app.changeWorld` does not report when the world has loaded.**
-- **Ids come from `Date.now()`**, so they differ between runs; scenarios must not assert ids.
+- **Some ids come from `Date.now()`**, so they differ between runs; scenarios must not assert them. The ids of an engine's own objects (`geodesicEmitters/emitter:<n>`) are serials.
 
 These functions belong to the engine API and are agreed in [012](design/012-engine-api.md) before they are added
 (§6.3). Job 45 lists them as a proposal; until each is agreed, the checks that need it stay manual and are counted as

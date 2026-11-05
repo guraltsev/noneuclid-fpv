@@ -3,8 +3,10 @@
  * drive it through `window.noneuclid.api` alone: `api.ns.fn(...)` calls the API function and returns its plain
  * result (a page exception rejects with its message, never a raw DevTools stack); `api.waitFor(query, predicate)`
  * calls `query` (an `api` call, or a few of them) again as soon as it returns and rejects after a bounded number
- * of attempts, so a scenario never waits on wall-clock time or a fixed sleep; `screenshot()` and `close()` round
- * out the handle. `close()` applies the browser
+ * of attempts, so a scenario never waits on wall-clock time or a fixed sleep; `keyDown(code)`, `keyUp(code)` and
+ * `pressKey(code)` are a person's keyboard, through the DevTools input domain, for what the API does not offer;
+ * `consoleLines()` reads what the page has logged; `screenshot()` and `close()` round out the handle. `close()`
+ * applies the browser
  * smoke's failure rules (`scripts/lib/cdpClient.mjs`) to the page's console and network activity since it opened,
  * so a scenario that never explicitly checks for a frame error or a failed request still fails on one.
  *
@@ -99,14 +101,25 @@ export interface ScenarioApp {
   readonly api: ScenarioApi;
   readonly waitFor: ScenarioApi["waitFor"];
   screenshot(): Promise<Buffer>;
+  /** Holds a key down, as a person does; `code` is a `KeyboardEvent.code`, such as `"KeyW"`. */
+  keyDown(code: string): Promise<void>;
+  /** Lets a held key go. */
+  keyUp(code: string): Promise<void>;
+  /** Presses a key and lets it go. */
+  pressKey(code: string): Promise<void>;
+  /** The text of what the page has logged since it opened (since the last reconnect, if a connection was lost). */
+  consoleLines(): readonly string[];
   /** Closes the page; throws if the page's console or network activity since it opened broke the smoke's failure rules. */
   close(): Promise<void>;
 }
 
-/** Which world and app config to load the page with; both are optional (the app's own defaults apply). */
+/** Which world, app config and debug settings to load the page with; all are optional (the app's own defaults apply). */
 export interface OpenAppOptions {
   readonly world?: string;
   readonly config?: string;
+  readonly debugLevel?: string;
+  /** A comma-separated list of debug option ids; they need a `debugLevel` other than `off`. */
+  readonly debugOptions?: string;
 }
 
 const defaultWaitForFrames = 600;
@@ -132,6 +145,8 @@ function buildSceneUrl(siteUrl: string, options: OpenAppOptions): string {
   const url = new URL(siteUrl);
   if (options.config) url.searchParams.set("config", options.config);
   if (options.world) url.searchParams.set("world", options.world);
+  if (options.debugLevel) url.searchParams.set("debugLevel", options.debugLevel);
+  if (options.debugOptions) url.searchParams.set("debugOptions", options.debugOptions);
   return url.toString();
 }
 
@@ -142,6 +157,17 @@ async function evaluateRaw(box: SessionBox, expression: string): Promise<unknown
   }
   return result.result?.value;
 }
+
+/** The API functions that submit a world command. */
+const worldCommandFunctions: ReadonlySet<string> = new Set([
+  "world.submit",
+  "geodesicEmitters.place",
+  "geodesicEmitters.shoot",
+  "geodesicEmitters.extend",
+  "geodesicEmitters.deleteGeodesic",
+  "geodesicEmitters.remove",
+  "geodesicModel.tieAndDetach",
+]);
 
 async function callApiPath(box: SessionBox, pathSegments: readonly string[], args: readonly unknown[]): Promise<unknown> {
   // The page catches its own exception and reports it as plain data, so the call rejects with exactly the page
@@ -158,12 +184,16 @@ async function callApiPath(box: SessionBox, pathSegments: readonly string[], arg
   // A round trip has occasionally gone unanswered altogether (cdpClient.mjs's own command timeout then rejects it
   // cleanly instead of hanging forever; see `.agents/knowledge/scenario-runner-browser-limits.md`), unlike the poll
   // loops below, this single call had no recovery at all before: one reconnect-and-retry gives it the same chance,
-  // which is safe because every api call this runner makes (restart commands, state reads, debug queries) is
-  // idempotent — calling it twice after a lost response is never worse than calling it once.
+  // which is safe for restart commands, state reads and debug queries, which are idempotent: calling one twice after a
+  // lost response is never worse than calling it once. A function that submits a world command is not: its first
+  // try may have run, so a lost answer is a failure.
   let raw: unknown;
   try {
     raw = await evaluateRaw(box, expression);
   } catch (firstError) {
+    if (worldCommandFunctions.has(pathSegments.join("."))) {
+      throw firstError;
+    }
     await box.reconnect().catch(() => {});
     try {
       raw = await evaluateRaw(box, expression);
@@ -316,10 +346,21 @@ export async function openApp(options: OpenAppOptions = {}): Promise<ScenarioApp
     throw error;
   }
 
+  const sendKey = async (type: "keyDown" | "keyUp", code: string): Promise<void> => {
+    await box.current.send("Input.dispatchKeyEvent", { type, code });
+  };
+
   return {
     api,
     waitFor,
     screenshot: () => box.current.screenshot(),
+    keyDown: (code) => sendKey("keyDown", code),
+    keyUp: (code) => sendKey("keyUp", code),
+    async pressKey(code) {
+      await sendKey("keyDown", code);
+      await sendKey("keyUp", code);
+    },
+    consoleLines: () => box.current.events.consoleLines.map((line) => line.text),
     async close() {
       const reasons = collectFailureReasons(box.current.events, {});
       await closeThisPage();

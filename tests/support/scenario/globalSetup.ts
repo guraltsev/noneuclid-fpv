@@ -2,7 +2,8 @@
  * Global setup for the `release` Vitest project (`_docs/tests.md` §5, §6, §8.2, §8.5).
  *
  * Runs once for the whole `release` run: serves the built `dist/` under `/scenario/relocated/` (a sub-path, like
- * the smoke script, so nothing in a scenario assumes the site is at the root) and launches one headless
+ * the smoke script, so nothing in a scenario assumes the site is at the root), with the files of
+ * `tests/fixtures/scenario-site/` added (app configurations no deployment ships), and launches one headless
  * Chromium-based browser that every scenario file's `openApp()` (`tests/support/scenario/openApp.ts`) opens pages
  * in. The site URL and the browser's DevTools port are handed to scenario files through environment variables
  * (`sharedEnv.ts`); Vitest's global setup runs in the main process, before worker threads are spawned, so they see
@@ -41,7 +42,7 @@ interface CdpClientModule {
 }
 
 interface StaticServerModule {
-  startStaticServer(options: { readonly root: string; readonly base: string }): Promise<StaticServerHandle>;
+  startStaticServer(options: { readonly root: string; readonly base: string; readonly overlayRoot: string }): Promise<StaticServerHandle>;
 }
 
 /** Vitest global setup: returns the teardown function it runs once after every scenario file has finished. */
@@ -52,7 +53,11 @@ export default async function setup(): Promise<() => Promise<void>> {
   }
 
   const { startStaticServer } = (await import(/* @vite-ignore */ staticServerModulePath)) as StaticServerModule;
-  const server = await startStaticServer({ root: path.join(repoRoot, "dist"), base: "/scenario/relocated/" });
+  const server = await startStaticServer({
+    root: path.join(repoRoot, "dist"),
+    base: "/scenario/relocated/",
+    overlayRoot: path.join(repoRoot, "tests", "fixtures", "scenario-site"),
+  });
 
   const { spawnHeadlessBrowser, waitForBrowserPage } = (await import(/* @vite-ignore */ cdpClientModulePath)) as CdpClientModule;
   const browserHandle = spawnHeadlessBrowser();

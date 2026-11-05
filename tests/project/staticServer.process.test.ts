@@ -18,7 +18,7 @@ const modulePath = "../../scripts/smoke/staticServer.mjs";
 
 interface StaticServerModule {
   detectBaseFromIndexHtml(html: string): string;
-  startStaticServer(o: { root: string; base: string }): Promise<{ siteUrl: string; close(): Promise<void> }>;
+  startStaticServer(o: { root: string; base: string; overlayRoot?: string }): Promise<{ siteUrl: string; close(): Promise<void> }>;
 }
 const load = async () => (await import(/* @vite-ignore */ modulePath)) as StaticServerModule;
 
@@ -40,6 +40,21 @@ describe("static smoke server", () => {
   afterEach(async () => {
     await server.close();
     fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  it("adds the files of an overlay, which win over the site's", async () => {
+    const overlayRoot = fs.mkdtempSync(path.join(os.tmpdir(), "smoke-overlay-"));
+    fs.writeFileSync(path.join(overlayRoot, "extra.config.js"), "export default {};");
+    fs.writeFileSync(path.join(overlayRoot, "index.html"), "overlay");
+    const overlaid = await (await load()).startStaticServer({ root, base: "/base-x/", overlayRoot });
+    try {
+      expect(await (await fetch(`${overlaid.siteUrl}extra.config.js`)).text()).toBe("export default {};");
+      expect(await (await fetch(overlaid.siteUrl)).text()).toBe("overlay");
+      expect(await (await fetch(`${overlaid.siteUrl}assets/a.js`)).text()).toBe("export {};");
+    } finally {
+      await overlaid.close();
+      fs.rmSync(overlayRoot, { recursive: true, force: true });
+    }
   });
 
   it("detects the base", async () => {
