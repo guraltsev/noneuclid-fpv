@@ -110,6 +110,10 @@ directions. `tests/world-objects/runtimeObjectChangeJournal.test.ts` pins the re
 - Added beyond the steps: `npm run docs:writers` and its `writers` command (the coordinator asked for a repeatable method), and a row for
   it in `_docs/ARCHITECTURE.md`.
 - `Status` stays `in progress`: the standing brief leaves closing the job to the coordinator.
+- Review repair: the shrink test's committed copy lost the 8 read-only files as well as gaining 2. Adding 2 was forced by "Done when"; removing 8 was a choice, so that the copy stays the exact list.
+- Review repair: the job says no assertion changes, but the test of the deleted import rule and its `edges` assertion are gone; the new tests of the check replace it.
+- Review repair: a mutator use is any reference, type-only ones included (`typeof plain`, `Parameters<typeof clearFlags>`), not only a call or a value. The Decision says "call".
+- Review repair: `collectLockedGeodesicIds` and `collectAllGeodesicIds` in `runtime/worldGeometryComputedObjects.ts` only read and now take the reader.
 
 ### Uncertain
 
@@ -129,6 +133,9 @@ directions. `tests/world-objects/runtimeObjectChangeJournal.test.ts` pins the re
   forbids editing 013, so the maintainer needs to update them.
 - Timing: the bench check exits 3, see `### Checks`. The JavaScript is unchanged, so this job cannot be the cause, but only `bench:ab`
   would settle it.
+- **The count of 8, 24 and 16 is a lower bound (fresh review).** It leaves out every write made through an owner, so later jobs comparing with it will not see this debt move, all in listed files: `createThreeApp.ts:1286` (`runtime.update`, every frame) and `:1583` (`owner.dispose`); `geodesicMarmotView.ts:93,97,106,110` and `simpleGeoCreatureView.ts:112,116,128,132` (behaviour `update`, `place`, `transformGeometry`, `reset`); `geometryCommit.ts:109` (`objectHost.transformGeometry`); `runtimeObjectActions.ts:372,379,382` (`objectHost.placeAt`, `runtime.reset`, `owner.reset`). Owners publish through `claimOwnership`'s closure.
+- Further spellings the scan misses, from the reviewer's probes, none in use except the structural type at `runtimeObjectActions.ts:63`: `r["remove"]()`, a structural parameter `{ remove(id): void }`, `(r as any).remove`, `Reflect.get`, an interface that extends the registry and redeclares a write, a publisher function passed in, destructured top-level declarations and default exports in `world-objects/`, and a client holding the writer by inference. `main.ts` and client-side code in `modules/` and `interaction/` are not scanned at all.
+- `tests/project/moduleImportRules.test.ts:231` writes under `os.tmpdir()`, as four other tests in `tests/project` do, while AGENTS.md puts temporary files in `.temp/`.
 
 ### Not done
 

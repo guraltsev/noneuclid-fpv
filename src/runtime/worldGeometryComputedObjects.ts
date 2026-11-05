@@ -91,14 +91,14 @@ export function applyGeometryCommitComputedObjectPolicy(
   return freezeGeometryCommitComputedObjectPolicyResult(result);
 }
 
-function collectLockedGeodesicIds(registry: LegacyWorldWriter): Set<string> {
+function collectLockedGeodesicIds(registry: RuntimeObjectReader): Set<string> {
   return new Set(
     [...collectAllGeodesicIds(registry)]
       .filter((geodesicId) => arcConnectsEmitters(registry, geodesicId)),
   );
 }
 
-function collectAllGeodesicIds(registry: LegacyWorldWriter): Set<string> {
+function collectAllGeodesicIds(registry: RuntimeObjectReader): Set<string> {
   const geodesicIds = new Set<string>();
   for (const object of registry.getAll()) {
     if (object.kind === "geodesicModel/arc") {
