@@ -2,7 +2,7 @@
  * The geodesic measurements module (design 013 section 6.4, design 014 D9): the length labels and protractor angles the player's tools place, kept current by two derive ticks that read the change ring.
  * Both kinds are materialized records: they stay in the registry because clients draw them. The user creates them (the tools still do, until the tools come from modules); this module only keeps them true.
  *
- * Both ticks keep, for each record, a module-private memo of what its last refresh read (`world-objects/trackedReads.ts`: the ids it fetched, the kinds it scanned, the geodesics whose segments it listed), and refresh a record only when a write in the ring range hit that read set; a record with no memo is refreshed once. No list of "relevant" kinds or fields is written by hand: what a refresh reads is what it depends on.
+ * With the option `trackReads` (the default), both ticks keep, for each record, a module-private memo of what its last refresh read (`world-objects/trackedReads.ts`: the ids it fetched, the kinds it scanned, the geodesics whose segments it listed), and refresh a record only when a write in the ring range hit that read set; a record with no memo is refreshed once. No list of "relevant" kinds or fields is written by hand: what a refresh reads is what it depends on. Tracking costs a little per record and pays when many records are not touched by a change; without it, every record is refreshed on each wake.
  * Tick `lengths` subscribes to `lengthReadKinds` and also wakes when the local participant's cell or position changed (a length label faces the player and sits on the segment nearest to them; then every label is refreshed), refreshes with the pure refresher of `world-objects/measureLengthTool.ts`, and deletes a length whose geodesic is gone.
  * Tick `angles` subscribes to `angleReadKinds` (the kinds a protractor refresh can read). It removes the angles whose centre marker was removed, then refreshes the angles whose read set was hit, writing an angle only when it differs from the one in the registry; an angle that can no longer be resolved is deleted.
  * The module has no commands and no API: the ticks run after the geodesic model's (it requires its token), so a pass sees the crossings the same pass wrote.
@@ -19,6 +19,12 @@ import { geodesicModelToken } from "../geodesicModel/api";
 
 /** The module as the engine's list takes it. */
 export type GeodesicMeasurementsModuleDefinition = ModuleDefinition<undefined, never, never>;
+
+/** How the module is configured. */
+export interface GeodesicMeasurementsOptions {
+  /** Refresh only the records whose last reads were written (default true); false refreshes every record on each wake. */
+  readonly trackReads?: boolean;
+}
 
 const lengthKind = "geodesicMeasurements/length";
 const angleKind = "geodesicMeasurements/angle";
@@ -72,7 +78,7 @@ function pruneMemos(memos: Map<string, ReadSet>, registry: RuntimeObjectRegistry
   }
 }
 
-function lengthsTick(): ModuleTick {
+function lengthsTick(trackReads: boolean): ModuleTick {
   const seen: LengthInputs = { cellId: "", x: Number.NaN, y: Number.NaN, z: Number.NaN };
   // The reads of each length at its last refresh (design 014 D1: a memo of the tick, not a field of the object).
   const memos = new Map<string, ReadSet>();
@@ -93,21 +99,20 @@ function lengthsTick(): ModuleTick {
       seen.x = body.position.x;
       seen.y = body.position.y;
       seen.z = body.position.z;
-      digest.load(ctx.objects.changes.ring, ctx.changesFrom, ctx.changesTo);
+      if (trackReads) digest.load(ctx.objects.changes.ring, ctx.changesFrom, ctx.changesTo);
       const recorder = recorderFor(recorderCache, ctx.objects);
       for (const length of ctx.objects.getObjectsOfKind(lengthKind)) {
         const memo = memos.get(length.id);
-        if (!moved && memo !== undefined && !digest.touches(memo)) continue;
-        const refreshed = recorder.run((reader) =>
-          refreshMeasuredGeodesicLengthObject({ registry: reader, world: ctx.world, measurement: length, playerCellId: body.cellId, playerPoint: body.position }),
-          memo,
-        );
+        if (trackReads && !moved && memo !== undefined && !digest.touches(memo)) continue;
+        const refresh = (reader: RuntimeObjectRegistry) =>
+          refreshMeasuredGeodesicLengthObject({ registry: reader, world: ctx.world, measurement: length, playerCellId: body.cellId, playerPoint: body.position });
+        const refreshed = trackReads ? recorder.run(refresh, memo) : refresh(ctx.objects);
         if (refreshed === undefined) {
           memos.delete(length.id);
           ctx.objects.remove(length.id);
           continue;
         }
-        memos.set(length.id, readsWithOwnId(recorder, length.id));
+        if (trackReads) memos.set(length.id, readsWithOwnId(recorder, length.id));
         if (!deepEqual(refreshed, length)) ctx.objects.update(refreshed);
       }
       pruneMemos(memos, ctx.objects, lengthKind);
@@ -115,7 +120,7 @@ function lengthsTick(): ModuleTick {
   };
 }
 
-function anglesTick(): ModuleTick {
+function anglesTick(trackReads: boolean): ModuleTick {
   const memos = new Map<string, ReadSet>();
   const digest = new ReadDigest();
   const recorderCache: RecorderCache = {};
@@ -126,7 +131,7 @@ function anglesTick(): ModuleTick {
     subscribes: angleReadKinds,
     run(ctx) {
       const ring = ctx.objects.changes.ring;
-      digest.load(ring, ctx.changesFrom, ctx.changesTo);
+      if (trackReads) digest.load(ring, ctx.changesFrom, ctx.changesTo);
       let gone: Set<string> | undefined;
       for (let seq = ctx.changesFrom; seq < ctx.changesTo; seq += 1) {
         // A centre marker that was removed and not put back is gone: its angles go with it.
@@ -144,14 +149,15 @@ function anglesTick(): ModuleTick {
         }
         const memo = memos.get(angle.id);
         // A record with no memo is refreshed once; after that only a write to something its last refresh read wakes it.
-        if (memo !== undefined && !digest.touches(memo)) continue;
-        const refreshed = recorder.run((reader) => refreshProtractorAngleObject({ registry: reader, angle }), memo);
+        if (trackReads && memo !== undefined && !digest.touches(memo)) continue;
+        const refresh = (reader: RuntimeObjectRegistry) => refreshProtractorAngleObject({ registry: reader, angle });
+        const refreshed = trackReads ? recorder.run(refresh, memo) : refresh(ctx.objects);
         if (refreshed === undefined) {
           memos.delete(angle.id);
           ctx.objects.remove(angle.id);
           continue;
         }
-        memos.set(angle.id, readsWithOwnId(recorder, angle.id));
+        if (trackReads) memos.set(angle.id, readsWithOwnId(recorder, angle.id));
         if (!deepEqual(refreshed, angle)) ctx.objects.update(refreshed);
       }
       pruneMemos(memos, ctx.objects, angleKind);
@@ -163,7 +169,8 @@ function anglesTick(): ModuleTick {
  * Creates the geodesic measurements module.
  * It requires the geodesic model, whose arcs, segments and crossings its ticks read.
  */
-export function geodesicMeasurementsModule(): GeodesicMeasurementsModuleDefinition {
+export function geodesicMeasurementsModule(options: GeodesicMeasurementsOptions = {}): GeodesicMeasurementsModuleDefinition {
+  const trackReads = options.trackReads ?? true;
   return {
     id: "geodesicMeasurements",
     requires: [geodesicModelToken],
@@ -171,6 +178,6 @@ export function geodesicMeasurementsModule(): GeodesicMeasurementsModuleDefiniti
       { kind: lengthKind, label: "cheap-derived", persistence: "transient" },
       { kind: angleKind, label: "cheap-derived", persistence: "transient" },
     ],
-    create: () => ({ api: undefined, queries: undefined, commands: {}, ticks: [lengthsTick(), anglesTick()] }),
+    create: () => ({ api: undefined, queries: undefined, commands: {}, ticks: [lengthsTick(trackReads), anglesTick(trackReads)] }),
   };
 }

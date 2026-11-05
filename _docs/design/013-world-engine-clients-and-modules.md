@@ -41,7 +41,7 @@ decisions of its own.
 | 2026-11-02 | When a flow touches a forbidden-zone singularity, the geodesic is destroyed. Implemented by job 55. | **Agreed** (maintainer, earlier) |
 | 2026-11-05 | **A blocked curve is destroyed, whatever blocked it**, not only at a forbidden zone, until a better behaviour exists. The maintainer does not want `unresolved` as a resting state. | **Agreed** (maintainer) |
 | 2026-11-05 | **Simulation time belongs to the simulation** (012 P8): ticks of length \(h\), default \(1/90\) s, maximum \(1/30\) s. The shell never passes frame time. The local body stays outside the ticks, published at draw time, until locomotion moves into the engine. Not built yet: the code still steps once per frame. | **Agreed** (maintainer) |
-| 2026-11-05 | **Measurements are refreshed completely when a kind they read is written** (014's default). The per-record read tracker of `trackedReads.ts` was deleted: it was a fourth mechanism with no design and no measured need. | **Agreed** (maintainer) |
+| 2026-11-05 | **Read tracking for measurements is on by default** (`geodesicMeasurementsModule({ trackReads })`, `world-objects/trackedReads.ts`; 014 D14). It costs a little with few records and pays with many that a change does not touch, and the step is well within budget. | **Agreed** (maintainer) |
 | 2026-11-05 | **The next batch is `geodesicEmitters`**, with the time change and `publicApi` (section 16). | **Agreed** (maintainer) |
 
 ## 2. Where the code stood before this wave (checked 2026-11-03)
@@ -1347,4 +1347,4 @@ Then, in a likely order:
 | 2026-11-03 | Agreed (maintainer): no final locked state; the flow stops by a natural condition; a vertex at rest always merges; the simplest algorithm now, extensible to tension and intermediate vertices. Replaces `drivenBy`, `setDriver`, the flow object, claiming and the `started` and `finished` events. Proposed: `quiet`, `SpeedLaw`, the rename to `arcConnectsEmitters`. |
 | 2026-11-03 | Agreed (maintainer): no tool switch until confirmed, in VR too; section 16 keeps its order; a chord into a forbidden zone removes the whole tied curve; the `stale` skip; plain shot geodesics are still deleted on lift. Job files 48 to 55 written. |
 | 2026-11-05 | Jobs 48 to 60 merged. Text aligned with the code and with 014's section 9 amendments (ring, cursors, `quiet` as a memo, no `reset` or `transformGeometry`). Status of Proposed items unchanged. |
-| 2026-11-05 | Agreed (maintainer): a blocked curve is destroyed for any reason, for now; time as in 012 P8 with \(h = 1/90\) s by default and at most \(1/30\) s; the read tracker removed in favour of a full refresh; section 16 reordered, the emitters first. |
+| 2026-11-05 | Agreed (maintainer): a blocked curve is destroyed for any reason, for now; time as in 012 P8 with \(h = 1/90\) s by default and at most \(1/30\) s; read tracking on by default for measurements; section 16 reordered, the emitters first. |

@@ -60,6 +60,8 @@ interface Results {
   readonly flowMicroseconds: number;
   readonly flowDependentsMicroseconds: number;
   readonly manyArcsMicroseconds: number;
+  readonly manyLengthsTrackedMicroseconds: number;
+  readonly manyLengthsPlainMicroseconds: number;
   readonly idleBytesPerStep: number;
   readonly bareEngineBytesPerStep: number;
 }
@@ -126,6 +128,8 @@ function main(): void {
     flowMicroseconds: pick(...rounds.map((r) => r.flowMicroseconds)),
     flowDependentsMicroseconds: pick(...rounds.map((r) => r.flowDependentsMicroseconds)),
     manyArcsMicroseconds: pick(...rounds.map((r) => r.manyArcsMicroseconds)),
+    manyLengthsTrackedMicroseconds: pick(...rounds.map((r) => r.manyLengthsTrackedMicroseconds)),
+    manyLengthsPlainMicroseconds: pick(...rounds.map((r) => r.manyLengthsPlainMicroseconds)),
     idleBytesPerStep: pick(...rounds.map((r) => r.idleBytesPerStep)),
     bareEngineBytesPerStep: pick(...rounds.map((r) => r.bareEngineBytesPerStep)),
   };
@@ -135,6 +139,8 @@ function main(): void {
   console.info(`flow              ${results.flowMicroseconds.toFixed(2)} us/step`);
   console.info(`flow+dependents   ${results.flowDependentsMicroseconds.toFixed(2)} us/step`);
   console.info(`many arcs (no limit) ${results.manyArcsMicroseconds.toFixed(2)} us/step`);
+  console.info(`many lengths, tracked (no limit) ${results.manyLengthsTrackedMicroseconds.toFixed(2)} us/step`);
+  console.info(`many lengths, plain (no limit)   ${results.manyLengthsPlainMicroseconds.toFixed(2)} us/step`);
   console.info(`idle allocation   ${results.idleBytesPerStep.toFixed(1)} bytes/step`);
   console.info(`bare engine alloc ${results.bareEngineBytesPerStep.toFixed(1)} bytes/step`);
 
@@ -242,6 +248,13 @@ function createIdleScene(): Scene {
 function createManyArcsScene(): Scene {
   const { world, registry } = createManyArcsFlowScenario(manyArcsExtraArcs);
   return { world, registry, engine: createFlowEngine(world, registry, [geodesicModelModule(), curveShorteningModule()]) };
+}
+
+/** The many-arcs scene with a length on every arc the flow does not touch: what `trackReads` is for. */
+function createManyLengthsScene(trackReads: boolean): Scene {
+  const { world, registry } = createManyArcsFlowScenario(manyArcsExtraArcs);
+  for (let i = 0; i < manyArcsExtraArcs; i += 1) addLength(registry, world, `length-x${i}`, `xg${i}`);
+  return { world, registry, engine: createFlowEngine(world, registry, [geodesicModelModule(), geodesicMeasurementsModule({ trackReads }), curveShorteningModule()]) };
 }
 
 function createFlowEngine(world: CompiledCellComplex, registry: RuntimeObjectRegistry, modules: NonNullable<Parameters<typeof createWorldEngine>[0]["modules"]>): WorldEngine {
@@ -398,6 +411,8 @@ function measureRound(gc: () => void): Results {
     flowMicroseconds: median(Array.from({ length: trials }, () => timeFlow(() => createFlowScene(false)))),
     flowDependentsMicroseconds: median(Array.from({ length: trials }, () => timeFlow(() => createFlowScene(true)))),
     manyArcsMicroseconds: median(Array.from({ length: trials }, () => timeFlow(createManyArcsScene))),
+    manyLengthsTrackedMicroseconds: median(Array.from({ length: trials }, () => timeFlow(() => createManyLengthsScene(true)))),
+    manyLengthsPlainMicroseconds: median(Array.from({ length: trials }, () => timeFlow(() => createManyLengthsScene(false)))),
     idleBytesPerStep: measureIdleBytesPerStep(gc),
     bareEngineBytesPerStep: measureBareEngineBytesPerStep(gc),
   };
