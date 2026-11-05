@@ -13,7 +13,7 @@ import type { AssetObjectSpec } from "../cell-complex/specs";
 import { yawRigidTransform3 } from "../math/rigidTransform3";
 import type {
   GeodesicVertexObject,
-  GeodesicCannonObject,
+  GeodesicEmitterObject,
   GeodesicCrossingObject,
   GeodesicArcObject,
   GeodesicSegmentObject,
@@ -42,7 +42,7 @@ export type RuntimeWorldObject =
   | RuntimeCreatureObject
   | RuntimeStaticAssetObject
   | PlacedFlagObject
-  | GeodesicCannonObject
+  | GeodesicEmitterObject
   | GeodesicArcObject
   | GeodesicVertexObject
   | GeodesicSegmentObject
@@ -340,7 +340,7 @@ export function createRuntimeObjectRegistry(
       const queries = cellQueriesFor(cellId);
       return (queries.playerBlocking ??= Object.freeze(
         registry.getCollidableObjectsInCell(cellId).filter(
-          (object) => object.kind !== "geodesic-cannon" && !object.do_not_collide_with?.includes(userObjectClass),
+          (object) => object.kind !== "geodesicEmitters/emitter" && !object.do_not_collide_with?.includes(userObjectClass),
         ),
       ));
     },

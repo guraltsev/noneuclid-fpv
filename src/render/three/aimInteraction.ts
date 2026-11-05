@@ -35,7 +35,7 @@ export interface AimInteractionDeps {
   readonly renderer: THREE.WebGLRenderer;
   /** XR player rig; its root matrixWorld maps controller poses from the XR reference space into the scene. */
   readonly xrRig: ReturnType<typeof createXrPlayerRig>;
-  /** Registry of world objects tested for aim hits; also used to check whether a geodesic is locked. */
+  /** Registry of world objects tested for aim hits; also used to check whether a geodesic is connected. */
   readonly runtimeObjectRegistry: RuntimeObjectReader;
   /** Getter: the currently active (possibly deformed) compiled world. */
   getWorld(): CompiledCellComplex;
@@ -87,10 +87,10 @@ export function createAimInteraction(deps: AimInteractionDeps) {
     return getAimTargetCycleCandidates(resolveCurrentAimTargets(ray));
   }
 
-  // While the geodesic-cannon-aim tool is active, the geodesic being aimed is ignored so it cannot block its own aim.
+  // While the geodesicEmitters/aim tool is active, the geodesic being aimed is ignored so it cannot block its own aim.
   function resolveCurrentAimTargets(ray: RootAimRay): readonly AimTarget[] {
     const activeGeodesicId = deps.session.get().cannonToolState.activeGeodesicId;
-    const ignoredGeodesicIds = deps.session.get().menuState.selectedTool === "geodesic-cannon-aim" && activeGeodesicId
+    const ignoredGeodesicIds = deps.session.get().menuState.selectedTool === "geodesicEmitters/aim" && activeGeodesicId
       ? [activeGeodesicId]
       : undefined;
     const key = [
@@ -308,7 +308,7 @@ export function createAimInteraction(deps: AimInteractionDeps) {
     );
   }
 
-  // Focus message for the object; extension is offered only for unlocked geodesic segments that can be extended.
+  // Focus message for the object; extension is offered only for free geodesic segments that can be extended.
   function getWorldFocusMessageDefinition(object: RuntimeWorldObject) {
     return createWorldFocusMessageDefinition({
       object,

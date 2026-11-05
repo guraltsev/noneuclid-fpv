@@ -5,7 +5,7 @@
  * `PaletteDefinition` both the desktop DOM menu and the VR panel (`scenePaletteAdapter`) draw from: which
  * options a page offers, which are disabled, and which sections the app config hides. These tests check that
  * decision directly, without going through either renderer. The scene adapter's own rendering mechanism (icon
- * lookup, the on-screen sign keyboard's key choice, suppressing an action for a locked geodesic) is covered in
+ * lookup, the on-screen sign keyboard's key choice, suppressing an action for a connected geodesic) is covered in
  * `tests/render/scenePaletteAdapter.test.ts` instead, since none of it is decided here.
  */
 import { describe, expect, it } from "vitest";
@@ -38,7 +38,7 @@ describe("createPaletteDefinition", () => {
     expect(content.kind).toBe("main");
     const toolIds = content.toolOptions.map((tool) => tool.id);
     expect(toolIds).toContain("place-flag");
-    expect(toolIds).toContain("geodesic-cannon");
+    expect(toolIds).toContain("geodesicEmitters/emitter");
     expect(toolIds).toContain("measure-length");
     expect(toolIds).not.toContain("aim");
   });
@@ -71,19 +71,19 @@ describe("createPaletteDefinition", () => {
     expect(unavailable.objectActions.map((action) => action.enabled)).toEqual([false]);
   });
 
-  it("marks a locked geodesic with a connection-symbol label; an unlocked one with none", () => {
+  it("marks a connected geodesic with a connection-symbol label; a free one with none", () => {
     const state = createRuntimeMenuState({ selectedWorldId: "cube" });
     const content = createPaletteDefinition(showRuntimeMenuGeodesicCannonActions(state, {
       cannonId: "cannon-a",
       geodesicIds: ["g-a", "g-b"],
-      lockedGeodesicIds: ["g-a"],
+      connectedGeodesicIds: ["g-a"],
     })).content as GeodesicCannonActionsPaletteContent;
-    const [locked, unlocked] = content.geodesics;
+    const [connected, free] = content.geodesics;
 
-    expect(locked.locked).toBe(true);
-    expect(locked.connectionSymbolLabel).toBe("Locked geodesic segment between emitters");
-    expect(unlocked.locked).toBe(false);
-    expect(unlocked.connectionSymbolLabel).toBeUndefined();
+    expect(connected.connected).toBe(true);
+    expect(connected.connectionSymbolLabel).toBe("Locked geodesic segment between emitters");
+    expect(free.connected).toBe(false);
+    expect(free.connectionSymbolLabel).toBeUndefined();
   });
 
   it("hides the world and config picker sections exactly as the app config says to", () => {

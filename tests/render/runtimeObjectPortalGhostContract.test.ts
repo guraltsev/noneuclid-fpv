@@ -31,7 +31,7 @@ import {
 } from "../../src/render/three/runtimeObjectInstanceSync";
 import type { RuntimeObjectRenderSourceMesh } from "../../src/render/three/runtimeObjectRenderRecords";
 import type { VisiblePortalPath } from "../../src/render/three/visiblePortalPaths";
-import { createGeodesicCannonObject } from "../../src/world-objects/geodesic/objects";
+import { createGeodesicEmitterObject } from "../../src/world-objects/geodesic/objects";
 import type { GeodesicCrossingObject } from "../../src/world-objects/geodesic/objects";
 import { createPlacedFlagObject } from "../../src/world-objects/placedFlags";
 import {
@@ -70,9 +70,9 @@ const kinds: Record<Kind, KindCase> = {
   "placed-flag": {
     object: (cellId, x, y) => createPlacedFlagObject({ id: "subject", cellId, localPose: standing(x, y), flagType: "WoodenSign1" }),
   },
-  "geodesic-cannon": {
+  "geodesicEmitters/emitter": {
     object: (cellId, x, y) => ({
-      ...createGeodesicCannonObject({ id: "subject", cellId, localPose: standing(x, y) }),
+      ...createGeodesicEmitterObject({ id: "subject", cellId, localPose: standing(x, y) }),
       geodesicIds: ["g1"],
       activeGeodesicId: "g1",
     }),
@@ -293,7 +293,7 @@ describe("portal ghosts follow what is drawn, not the collision shape", () => {
 
 describe("the ghosts of an emitter that moves", () => {
   it("follow it: the copy beyond the portal moves with it and goes when it leaves", () => {
-    const emitter = kinds["geodesic-cannon"] as Extract<KindCase, { object: unknown }>;
+    const emitter = kinds["geodesicEmitters/emitter"] as Extract<KindCase, { object: unknown }>;
     const at = (x: number, y: number) => emitter.object("room-b", x, y);
     const { registry, sync, renderArchetypesByKey } = setup([at(-0.95, 0)]);
     const postKey = [...(sync.sync(frame()), renderArchetypesByKey.keys())].find((key) => key.startsWith("geodesic-ray:post"))!;
@@ -338,7 +338,7 @@ const poseAt = (x: number): PlayerPose => ({ cellId: "room-b", position: { x, y:
 /** What each source of the sync's records is checked by. A new source must be listed in `runtimeObjectRecordSources` and then here. */
 const sourceChecks: Record<RuntimeObjectRecordSource, { readonly coveredBy: string } | { readonly exempt: keyof typeof portalGhostExemptions }> = {
   "runtime-objects": { coveredBy: "the per-kind tests above" },
-  "geodesic-body-parts": { coveredBy: "the geodesic-cannon and geodesicModel/crossing kinds above" },
+  "geodesic-body-parts": { coveredBy: "the geodesicEmitters/emitter and geodesicModel/crossing kinds above" },
   "geodesic-segments": { exempt: "geodesicModel/segment" },
   "carry-highlight": { coveredBy: "tests/render/carryHighlight.test.ts (a shape across a portal is drawn on both sides)" },
   "player-rover": { coveredBy: "the player rover tests below" },

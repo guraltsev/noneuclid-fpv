@@ -11,7 +11,7 @@ import type { RuntimeDebugOverlayItemId, RuntimeToolId } from "./toolIds";
 import { publicUrl } from "./assetUrls";
 
 /** Id of a main-menu tool that an app config can switch on or off. */
-export type ConfigurableToolId = "place-flag" | "geodesic-cannon" | "measure-length" | "protractor";
+export type ConfigurableToolId = "place-flag" | "geodesicEmitters/emitter" | "measure-length" | "protractor";
 
 /** Which optional menu sections the app config enables. */
 export interface AppMenuConfig {
@@ -217,10 +217,10 @@ export function isRuntimeToolEnabled(config: AppConfig, toolId: RuntimeToolId): 
   switch (toolId) {
     case "place-flag":
       return config.tools.placeFlags;
-    case "geodesic-cannon":
-    case "geodesic-cannon-carry":
-    case "geodesic-cannon-rotate":
-    case "geodesic-cannon-aim":
+    case "geodesicEmitters/emitter":
+    case "geodesicEmitters/carry":
+    case "geodesicEmitters/rotate":
+    case "geodesicEmitters/aim":
     case "geodesicModel/tie":
       return config.tools.geodesicEmitters;
     case "measure-length":
@@ -238,7 +238,7 @@ export function isRuntimeToolEnabled(config: AppConfig, toolId: RuntimeToolId): 
 export function getEnabledMainTools(config: AppConfig): readonly ConfigurableToolId[] {
   return [
     ...(config.tools.placeFlags ? (["place-flag"] as const) : []),
-    ...(config.tools.geodesicEmitters ? (["geodesic-cannon"] as const) : []),
+    ...(config.tools.geodesicEmitters ? (["geodesicEmitters/emitter"] as const) : []),
     ...(config.tools.distances ? (["measure-length"] as const) : []),
     ...(config.tools.angles ? (["protractor"] as const) : []),
   ];

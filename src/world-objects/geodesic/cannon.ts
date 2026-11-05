@@ -1,5 +1,5 @@
 /**
- * Emitter (cannon) operations: shooting, extending and re-aiming geodesics, connecting a geodesic to an emitter, rebuilding locked geodesics between emitters, and placing cannons on the floor, on a geodesic or at a geodesic vertex.
+ * Emitter (cannon) operations: shooting, extending and re-aiming geodesics, connecting a geodesic to an emitter, rebuilding connected geodesics between emitters, and placing cannons on the floor, on a geodesic or at a geodesic vertex.
  */
 import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex";
 import { getDynamicObjectCollisionBounds, simpleCylinderIntersectsSimpleCylinder, testCellCollision } from "../../movement/collision";
@@ -10,12 +10,12 @@ import { runtimeObjectToDynamicObjectState } from "../runtimeObjectBase";
 import {
   canExtendGeodesicSegment,
   createGeodesicVertexObject,
-  createGeodesicCannonObject,
+  createGeodesicEmitterObject,
   createGeodesicArcObject,
   defaultTraceLengthMeters,
   directionFromYaw,
   emitterConnectionToleranceMeters,
-  type GeodesicCannonObject,
+  type GeodesicEmitterObject,
   type GeodesicCarryPortalTransition,
   type GeodesicEndRole,
   type GeodesicPortalTraversal,
@@ -26,7 +26,7 @@ import {
   intersectionTolerance,
   isGeodesicSegmentObject,
   minGeodesicSegmentLengthMeters,
-  type PlaceGeodesicCannonResult,
+  type PlaceGeodesicEmitterResult,
   sanitizeYaw,
 } from "./objects";
 import { findNearestEmitterHitOnTrace, traceGeodesicSegment } from "./trace";
@@ -46,9 +46,9 @@ import {
 import { arcConnectsEmitters, arcFollowsEmitter, collectFollowingArcIdsForEmitter, removeGeodesic } from "./lifecycle";
 import {
   aimFreeGeodesicFromEndpoint,
-  rebuildLockedGeodesicFromEndpointsAndPortalWordDetailed,
+  rebuildConnectedGeodesicFromEndpointsAndPortalWordDetailed,
   splitGeodesicIntervalAtSegmentHit,
-  updateLockedGeodesicPortalWordForCarriedAnchorTraversals,
+  updateConnectedGeodesicPortalWordForCarriedAnchorTraversals,
 } from "./intervals";
 
 /**
@@ -58,12 +58,12 @@ export interface ShootGeodesicInput {
   readonly world: CompiledCellComplex;
   readonly registry: RuntimeObjectRegistry;
   /** Emitter snapshot to shoot from; its pose, cell and `aimYawRadians` are written back to the registry copy. */
-  readonly cannon: GeodesicCannonObject;
+  readonly cannon: GeodesicEmitterObject;
   /** Id of the geodesic interval to create (or to re-aim if it already exists). */
   readonly geodesicId: string;
   /** Total chord length to trace in meters; defaults to `defaultTraceLengthMeters` (2). */
   readonly maxLengthMeters?: number;
-  /** If true (default), a trace that ends at another emitter attaches the free end to it, producing a locked geodesic. */
+  /** If true (default), a trace that ends at another emitter attaches the free end to it, producing a connected geodesic. */
   readonly connectEmitters?: boolean;
 }
 
@@ -86,7 +86,7 @@ export interface ExtendGeodesicInput {
 export interface RebuildGeodesicToLengthInput {
   readonly world: CompiledCellComplex;
   readonly registry: RuntimeObjectRegistry;
-  readonly cannon: GeodesicCannonObject;
+  readonly cannon: GeodesicEmitterObject;
   readonly geodesicId: string;
   /** Desired total length in meters; a non-positive or non-finite value clears the geodesic's segments and returns `[]`. */
   readonly totalLengthMeters: number;
@@ -96,8 +96,8 @@ export interface RebuildGeodesicToLengthInput {
   readonly connectEmitters?: boolean;
   /** If true, the cannon is first re-aimed at the nearest emitter lying on its straight ray (within tolerance). */
   readonly snapToEmitter?: boolean;
-  /** If false/absent, a locked (emitter-to-emitter) geodesic is returned unchanged instead of being re-shot. */
-  readonly rebuildLocked?: boolean;
+  /** If false/absent, a connected (emitter-to-emitter) geodesic is returned unchanged instead of being re-shot. */
+  readonly rebuildConnected?: boolean;
 }
 
 /** Request for `placeGeodesicCannonAtFloorPoint`: put a new cannon with id `id` on the floor of `cellId`. */
@@ -150,16 +150,16 @@ export interface ConnectGeodesicToEmitterRequest {
   readonly totalLengthMeters: number;
 }
 
-/** Request for `rebuildConnectedGeodesicBetweenEmitters`: recompute a locked geodesic after one of its emitters moved. */
+/** Request for `rebuildConnectedGeodesicBetweenEmitters`: recompute a connected geodesic after one of its emitters moved. */
 export interface RebuildConnectedGeodesicBetweenEmittersRequest {
   readonly world: CompiledCellComplex;
   readonly registry: RuntimeObjectRegistry;
-  /** The locked geodesic to rebuild. */
+  /** The connected geodesic to rebuild. */
   readonly geodesicId: string;
   /** Emitter that was just carried (moved); a portal crossing it made is folded into the portal word. Absent: rebuild with the stored word. */
   readonly carriedEmitterId?: string;
   /** Snapshot of the carried emitter before the move; used to infer which portal it crossed. */
-  readonly carriedEmitterBeforeMove?: GeodesicCannonObject;
+  readonly carriedEmitterBeforeMove?: GeodesicEmitterObject;
   /** Portal crossing reported by the mover; used when it matches the cells of the move. */
   readonly carriedEmitterPortalTransition?: GeodesicCarryPortalTransition;
   /** Explicit replacement portal word (highest precedence); must chain from the start anchor's cell to the end anchor's cell. */
@@ -179,13 +179,13 @@ export interface RebuildConnectedGeodesicBetweenEmittersRequest {
  */
 export function placeGeodesicCannonAtFloorPoint(
   request: PlaceGeodesicCannonAtFloorPointRequest,
-): PlaceGeodesicCannonResult {
+): PlaceGeodesicEmitterResult {
   const cell = request.world.cellsById.get(request.cellId);
   if (!cell) {
     return { placed: false, reason: "missing-cell" };
   }
 
-  const candidate = createGeodesicCannonObject({
+  const candidate = createGeodesicEmitterObject({
     id: request.id,
     cellId: request.cellId,
     localPose: yawRigidTransform3(request.aimYawRadians, {
@@ -260,7 +260,7 @@ export function shootGeodesic(input: ShootGeodesicInput): GeodesicSegmentObject 
     throw new Error(`Failed to shoot geodesic "${input.geodesicId}".`);
   }
   const currentCannon = input.registry.get(input.cannon.id);
-  const cannonForUpdate = currentCannon?.kind === "geodesic-cannon"
+  const cannonForUpdate = currentCannon?.kind === "geodesicEmitters/emitter"
     ? {
         ...currentCannon,
         cellId: input.cannon.cellId,
@@ -284,12 +284,12 @@ export function extendGeodesic(input: ExtendGeodesicInput): GeodesicSegmentObjec
   if (interval?.kind !== "geodesicModel/arc" || !isAimableFreeGeodesic(input.registry, interval)) {
     return undefined;
   }
-  const emitterRole: GeodesicEndRole = input.registry.get(interval.start.anchorObjectId)?.kind === "geodesic-cannon"
+  const emitterRole: GeodesicEndRole = input.registry.get(interval.start.anchorObjectId)?.kind === "geodesicEmitters/emitter"
     ? "start"
     : "end";
   const emitter = input.registry.get(interval[emitterRole].anchorObjectId);
   const tail = getGeodesicTail(input.registry, input.geodesicId);
-  if (emitter?.kind !== "geodesic-cannon" || !tail || !canExtendGeodesicSegment(tail)) {
+  if (emitter?.kind !== "geodesicEmitters/emitter" || !tail || !canExtendGeodesicSegment(tail)) {
     return undefined;
   }
   const tangent = resolveEndpointTangentAtAnchor({
@@ -316,20 +316,20 @@ export function extendGeodesic(input: ExtendGeodesicInput): GeodesicSegmentObjec
 /**
  * Re-shoots a geodesic from its cannon so that its total length is `totalLengthMeters`, returning the new segments.
  *
- * Locked geodesics are returned unchanged unless `rebuildLocked` is set. Never throws on bad lengths (clears and returns `[]`),
+ * Connected geodesics are returned unchanged unless `rebuildConnected` is set. Never throws on bad lengths (clears and returns `[]`),
  * but may throw via `shootGeodesic` if the shot yields nothing.
  */
 export function rebuildGeodesicToLength(input: RebuildGeodesicToLengthInput): readonly GeodesicSegmentObject[] {
-  if (!input.rebuildLocked && arcConnectsEmitters(input.registry, input.geodesicId)) {
+  if (!input.rebuildConnected && arcConnectsEmitters(input.registry, input.geodesicId)) {
     return getGeodesicSegments(input.registry, input.geodesicId);
   }
 
-  return rebuildUnlockedGeodesicToLength(input);
+  return reshootGeodesicToLength(input);
 }
 
 // Core of `rebuildGeodesicToLength`: optionally snap the aim to an emitter, delete the old segments, re-shoot, and optionally
 // delete the geodesic if it ended in a forbidden zone.
-function rebuildUnlockedGeodesicToLength(input: RebuildGeodesicToLengthInput): readonly GeodesicSegmentObject[] {
+function reshootGeodesicToLength(input: RebuildGeodesicToLengthInput): readonly GeodesicSegmentObject[] {
   if (!(input.totalLengthMeters > 0) || !Number.isFinite(input.totalLengthMeters)) {
     removeGeodesicSegments(input.registry, input.geodesicId);
     return [];
@@ -359,7 +359,7 @@ function rebuildUnlockedGeodesicToLength(input: RebuildGeodesicToLengthInput): r
 // Re-aims the cannon at the nearest emitter that lies within `emitterConnectionToleranceMeters` of the first straight piece
 // (an unconnected single-cell trace), so a geodesic aimed almost exactly at an emitter is snapped onto it.
 // Only the first cell's piece is examined; emitters beyond a portal are not candidates.
-function resolveCannonSnappedToEmitter(input: RebuildGeodesicToLengthInput): GeodesicCannonObject | undefined {
+function resolveCannonSnappedToEmitter(input: RebuildGeodesicToLengthInput): GeodesicEmitterObject | undefined {
   if (!(input.totalLengthMeters > 0) || !Number.isFinite(input.totalLengthMeters)) {
     return undefined;
   }
@@ -400,7 +400,7 @@ function resolveCannonSnappedToEmitter(input: RebuildGeodesicToLengthInput): Geo
   };
 }
 
-function resolveCannonForGeodesic(cannon: GeodesicCannonObject, launchYawRadians: number | undefined): GeodesicCannonObject {
+function resolveCannonForGeodesic(cannon: GeodesicEmitterObject, launchYawRadians: number | undefined): GeodesicEmitterObject {
   const aimYawRadians = sanitizeYaw(launchYawRadians ?? cannon.aimYawRadians);
   if (Math.abs(sanitizeYaw(cannon.aimYawRadians - aimYawRadians)) <= intersectionTolerance) {
     return cannon;
@@ -413,10 +413,10 @@ function resolveCannonForGeodesic(cannon: GeodesicCannonObject, launchYawRadians
   };
 }
 
-// ---- Connection and locking ----
+// ---- Connection ----
 
 /**
- * Tries to close a free geodesic onto the emitter `incomingEmitterId`, producing a locked geodesic.
+ * Tries to close a free geodesic onto the emitter `incomingEmitterId`, producing a connected geodesic.
  *
  * Interval path: re-aims along the emitter tangent for `totalLengthMeters` with emitter connection enabled and only keeps the
  * result if the trace ends exactly at `incomingEmitterId` (otherwise the free geodesic is re-aimed but no connection is made;
@@ -429,7 +429,7 @@ export function connectGeodesicToEmitter(
   const interval = request.registry.get(request.geodesicId);
   const incoming = request.registry.get(request.incomingEmitterId);
   if (interval?.kind === "geodesicModel/arc") {
-    if (incoming?.kind !== "geodesic-cannon") {
+    if (incoming?.kind !== "geodesicEmitters/emitter") {
       return getGeodesicSegments(request.registry, request.geodesicId);
     }
     const freeRole = request.registry.get(interval.start.anchorObjectId)?.kind === "geodesicModel/vertex"
@@ -442,7 +442,7 @@ export function connectGeodesicToEmitter(
       return getGeodesicSegments(request.registry, request.geodesicId);
     }
     const emitter = request.registry.get(interval[emitterRole].anchorObjectId);
-    if (emitter?.kind !== "geodesic-cannon") {
+    if (emitter?.kind !== "geodesicEmitters/emitter") {
       return getGeodesicSegments(request.registry, request.geodesicId);
     }
     const tangent = resolveEndpointTangentAtAnchor({
@@ -477,9 +477,9 @@ export function connectGeodesicToEmitter(
 }
 
 /**
- * Recomputes a locked geodesic after one of its emitters moved, keeping its homotopy class when possible.
+ * Recomputes a connected geodesic after one of its emitters moved, keeping its homotopy class when possible.
  *
- * Interval path: delegates to `rebuildLockedGeodesicFromEndpointsAndPortalWord`. On failure the geodesic is deleted if the new chord
+ * Interval path: delegates to `rebuildConnectedGeodesicFromEndpointsAndPortalWord`. On failure the geodesic is deleted if the new chord
  * would hit a forbidden zone (read off the single trace of the rebuild), kept as is when
  * `preserveGeodesicOnRebuildFailure`, and otherwise deleted. Returns the segments (empty when deleted).
  * A non-interval id changes nothing and returns its current segments.
@@ -497,7 +497,7 @@ export function rebuildConnectedGeodesicBetweenEmitters(
     }
     // A tied arc takes its whole curve with it when it has to go; the curve is read before the rebuild, which may delete a degenerate arc.
     const curveArcIds = isTied(request.registry, request.geodesicId) ? arcsOfCurveContaining(request.registry, request.geodesicId) : [request.geodesicId];
-    const { realization, result } = rebuildLockedGeodesicFromEndpointsAndPortalWordDetailed({
+    const { realization, result } = rebuildConnectedGeodesicFromEndpointsAndPortalWordDetailed({
       world: request.world,
       registry: request.registry,
       geodesicId: request.geodesicId,
@@ -542,29 +542,29 @@ export interface MoveEmitterAlongRouteInput {
   readonly route: readonly GeodesicPortalTraversal[];
 }
 
-/** What {@link moveEmitterAlongRoute} did: whether the emitter moved, and which locked geodesics could not be kept consistent with it. */
+/** What {@link moveEmitterAlongRoute} did: whether the emitter moved, and which connected geodesics could not be kept consistent with it. */
 export interface MoveEmitterAlongRouteResult {
   /** False when the emitter was unknown or the move was refused; then nothing was changed. */
   readonly moved: boolean;
-  /** Locked geodesics of the emitter whose portal word could not follow the move (the reason it was refused). */
+  /** Connected geodesics of the emitter whose portal word could not follow the move (the reason it was refused). */
   readonly brokenGeodesicIds: readonly string[];
 }
 
 /**
- * Moves an emitter and keeps every locked geodesic that ends on it consistent: the emitter's new cell and pose are stored and each such
+ * Moves an emitter and keeps every connected geodesic that ends on it consistent: the emitter's new cell and pose are stored and each such
  * geodesic's portal word is extended by the portals the emitter crossed. This is the one way to change the cell of an emitter that anchors
  * a geodesic, because the word (which way round the geodesic goes) and the cell it ends in must always agree; the geodesic is not retraced here.
  * All or nothing: if the route does not lead from the emitter's current cell to `cellId` (an empty route for a change of cell included), or the
- * word of any locked geodesic cannot follow, nothing is changed and the geodesics that could not follow are listed in `brokenGeodesicIds`.
+ * word of any connected geodesic cannot follow, nothing is changed and the geodesics that could not follow are listed in `brokenGeodesicIds`.
  * Does nothing and reports `moved: false` for an unknown emitter.
  */
 export function moveEmitterAlongRoute(input: MoveEmitterAlongRouteInput): MoveEmitterAlongRouteResult {
   const emitter = input.registry.get(input.emitterId);
-  if (emitter?.kind !== "geodesic-cannon") {
+  if (emitter?.kind !== "geodesicEmitters/emitter") {
     return { moved: false, brokenGeodesicIds: [] };
   }
 
-  const lockedGeodesics = collectFollowingArcIdsForEmitter(input.registry, emitter.id)
+  const connectedGeodesics = collectFollowingArcIdsForEmitter(input.registry, emitter.id)
     .map((geodesicId) => input.registry.get(geodesicId))
     .filter((geodesic): geodesic is NonNullable<typeof geodesic> => geodesic !== undefined);
   const first = input.route[0];
@@ -573,9 +573,9 @@ export function moveEmitterAlongRoute(input: MoveEmitterAlongRouteInput): MoveEm
     ? emitter.cellId === input.cellId
     : first?.sourceCellId === emitter.cellId && last.targetCellId === input.cellId;
   if (!routeExplainsMove) {
-    return lockedGeodesics.length === 0
+    return connectedGeodesics.length === 0
       ? moveWithoutGeodesics(input, emitter)
-      : { moved: false, brokenGeodesicIds: lockedGeodesics.map((geodesic) => geodesic.id) };
+      : { moved: false, brokenGeodesicIds: connectedGeodesics.map((geodesic) => geodesic.id) };
   }
 
   input.registry.update(emitterAtPose(emitter, input.cellId, input.localPose));
@@ -584,9 +584,9 @@ export function moveEmitterAlongRoute(input: MoveEmitterAlongRouteInput): MoveEm
   }
 
   // The word is checked against the anchor's cell as stored, so the emitter is stored first.
-  const brokenGeodesicIds = lockedGeodesics
+  const brokenGeodesicIds = connectedGeodesics
     .filter((geodesic) =>
-      updateLockedGeodesicPortalWordForCarriedAnchorTraversals({
+      updateConnectedGeodesicPortalWordForCarriedAnchorTraversals({
         registry: input.registry,
         geodesicId: geodesic.id,
         carriedAnchorObjectId: emitter.id,
@@ -600,22 +600,22 @@ export function moveEmitterAlongRoute(input: MoveEmitterAlongRouteInput): MoveEm
 
   // Put everything back, so that no half-applied move is stored.
   input.registry.update(emitter);
-  for (const geodesic of lockedGeodesics) {
+  for (const geodesic of connectedGeodesics) {
     input.registry.update(geodesic);
   }
 
   return { moved: false, brokenGeodesicIds };
 }
 
-// An emitter without locked geodesics has no word to keep in line, so any move is stored.
-function moveWithoutGeodesics(input: MoveEmitterAlongRouteInput, emitter: GeodesicCannonObject): MoveEmitterAlongRouteResult {
+// An emitter without connected geodesics has no word to keep in line, so any move is stored.
+function moveWithoutGeodesics(input: MoveEmitterAlongRouteInput, emitter: GeodesicEmitterObject): MoveEmitterAlongRouteResult {
   input.registry.update(emitterAtPose(emitter, input.cellId, input.localPose));
 
   return { moved: true, brokenGeodesicIds: [] };
 }
 
 // The emitter at a new cell and pose. Its default launch yaw equals the yaw of its pose (a face turned relative to the last one turns it).
-function emitterAtPose(emitter: GeodesicCannonObject, cellId: string, localPose: RigidTransform3): GeodesicCannonObject {
+function emitterAtPose(emitter: GeodesicEmitterObject, cellId: string, localPose: RigidTransform3): GeodesicEmitterObject {
   const poseYaw = Math.atan2(localPose.rotation.m10, localPose.rotation.m00);
   return { ...emitter, cellId, localPose, aimYawRadians: sanitizeYaw(poseYaw) };
 }
@@ -633,7 +633,7 @@ function emitterAtPose(emitter: GeodesicCannonObject, cellId: string, localPose:
  */
 export function placeGeodesicCannonOnGeodesic(
   request: PlaceGeodesicCannonOnGeodesicRequest,
-): PlaceGeodesicCannonResult {
+): PlaceGeodesicEmitterResult {
   const segment = request.registry.get(request.segmentId);
   if (segment?.kind !== "geodesicModel/segment" || segment.geodesicId !== request.geodesicId) {
     return { placed: false, reason: "missing-cell" };
@@ -675,7 +675,7 @@ export function placeGeodesicCannonOnGeodesic(
   }
 
   const placed = request.registry.get(result.object.id);
-  return placed?.kind === "geodesic-cannon" ? { placed: true, object: placed } : result;
+  return placed?.kind === "geodesicEmitters/emitter" ? { placed: true, object: placed } : result;
 }
 
 /**
@@ -690,7 +690,7 @@ export function placeGeodesicCannonOnGeodesic(
  */
 export function placeGeodesicCannonAtGeodesicVertex(
   request: PlaceGeodesicCannonAtGeodesicVertexRequest,
-): PlaceGeodesicCannonResult {
+): PlaceGeodesicEmitterResult {
   const connectedSegments = findSegmentsPassingThroughVertex(
     request.registry,
     request.cellId,
@@ -750,11 +750,11 @@ export function placeGeodesicCannonAtGeodesicVertex(
     );
     const yaw = Math.atan2(match.segment.direction.y, match.segment.direction.x);
     const placed = request.registry.get(result.object.id);
-    if (placed?.kind !== "geodesic-cannon") {
+    if (placed?.kind !== "geodesicEmitters/emitter") {
       break;
     }
 
-    const continuationSource = createGeodesicCannonObject({
+    const continuationSource = createGeodesicEmitterObject({
       ...placed,
       aimYawRadians: yaw,
     });
@@ -780,7 +780,7 @@ export function placeGeodesicCannonAtGeodesicVertex(
   }
 
   const placed = request.registry.get(result.object.id);
-  return placed?.kind === "geodesic-cannon" ? { placed: true, object: placed } : result;
+  return placed?.kind === "geodesicEmitters/emitter" ? { placed: true, object: placed } : result;
 }
 
 // A cut point must leave at least the minimum length on BOTH sides within the segment.

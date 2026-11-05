@@ -40,7 +40,7 @@ export function createToolIcon(
     return createSignIcon(signType ?? "WoodenSign1");
   }
 
-  if (toolId === "geodesic-cannon") {
+  if (toolId === "geodesicEmitters/emitter") {
     return createRayIcon();
   }
 
@@ -153,9 +153,9 @@ export function createUnlinkIcon(): Component<any> {
 }
 
 /**
- * Composite emitter-line-lock-line-emitter glyph shown in place of Aim for locked geodesics.
+ * Composite emitter-line-lock-line-emitter glyph shown in place of Aim for connected geodesics.
  */
-export function createLockedGeodesicSegmentStatus(): Container {
+export function createConnectedGeodesicSegmentStatus(): Container {
   const status = new Container({
     flexDirection: "row",
     alignItems: "center",
@@ -165,16 +165,16 @@ export function createLockedGeodesicSegmentStatus(): Container {
   });
 
   status.add(
-    createLockedGeodesicSegmentEmitter(),
-    createLockedGeodesicSegmentLine(),
+    createConnectedGeodesicSegmentEmitter(),
+    createConnectedGeodesicSegmentLine(),
     createLockIcon(),
-    createLockedGeodesicSegmentLine(),
-    createLockedGeodesicSegmentEmitter(),
+    createConnectedGeodesicSegmentLine(),
+    createConnectedGeodesicSegmentEmitter(),
   );
   return status;
 }
 
-function createLockedGeodesicSegmentEmitter(): Container {
+function createConnectedGeodesicSegmentEmitter(): Container {
   return new Container({
     width: 4,
     height: 24,
@@ -183,7 +183,7 @@ function createLockedGeodesicSegmentEmitter(): Container {
   });
 }
 
-function createLockedGeodesicSegmentLine(): Container {
+function createConnectedGeodesicSegmentLine(): Container {
   return new Container({
     width: 50,
     height: 3,

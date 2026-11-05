@@ -114,12 +114,12 @@ export interface GeodesicCannonActionsPaletteContent {
   /** The actions the tools contribute to the page (design 013 section 8.3), in order, each with its availability. */
   readonly objectActions: readonly ObjectActionEntry[];
   /**
-   * One entry per geodesic of the emitter; locked ones carry a connection label explaining they run between emitters.
+   * One entry per geodesic of the emitter; connected ones carry a connection label explaining they run between emitters.
    */
   readonly geodesics: readonly {
     readonly id: string;
     readonly label: string;
-    readonly locked: boolean;
+    readonly connected: boolean;
     readonly connectionSymbolLabel?: string;
     readonly deleteDisabled: boolean;
   }[];
@@ -369,7 +369,7 @@ export function createPaletteDefinition(
         geodesics: createGeodesicCannonEntries(
           state.geodesicCannonOptions.geodesicIds,
           state.geodesicCannonOptions.geodesicLabelsById,
-          state.geodesicCannonOptions.lockedGeodesicIds,
+          state.geodesicCannonOptions.connectedGeodesicIds,
         ),
       },
     };
@@ -552,7 +552,7 @@ function createToolOptions(appConfig: AppConfig): MainPaletteContent["toolOption
 
 const toolLabels = {
   "place-flag": "Sign",
-  "geodesic-cannon": "Geodesic emitter",
+  "geodesicEmitters/emitter": "Geodesic emitter",
   "measure-length": "Length",
   protractor: "Protractor",
 } as const satisfies Record<ConfigurableToolId, string>;
@@ -611,14 +611,14 @@ function createGeometryComputerActionsContent(
 function createGeodesicCannonEntries(
   geodesicIds: readonly string[],
   geodesicLabelsById: Readonly<Record<string, string>> | undefined,
-  lockedGeodesicIds: readonly string[] | undefined,
+  connectedGeodesicIds: readonly string[] | undefined,
 ): GeodesicCannonActionsPaletteContent["geodesics"] {
-  const lockedIds = new Set(lockedGeodesicIds ?? []);
+  const connectedIds = new Set(connectedGeodesicIds ?? []);
   return geodesicIds.map((geodesicId, index) => ({
     id: geodesicId,
     label: geodesicLabelsById?.[geodesicId] ?? `G${index + 1}`,
-    locked: lockedIds.has(geodesicId),
-    connectionSymbolLabel: lockedIds.has(geodesicId) ? "Locked geodesic segment between emitters" : undefined,
+    connected: connectedIds.has(geodesicId),
+    connectionSymbolLabel: connectedIds.has(geodesicId) ? "Locked geodesic segment between emitters" : undefined,
     deleteDisabled: false,
   }));
 }

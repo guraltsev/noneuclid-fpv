@@ -14,10 +14,10 @@ import { createRuntimeObjectRegistry } from "../../../src/world-objects/runtimeO
 import { moveEmitterAlongRoute, rebuildConnectedGeodesicBetweenEmitters, shootGeodesic } from "../../../src/world-objects/geodesic/cannon";
 import { rebuildEmitterGeodesics, releaseCarriedEmitter } from "../../../src/world-objects/geodesic/carryEnd";
 import { arcsOfCurve, isStale, isTied } from "../../../src/world-objects/geodesic/endpoints";
-import { arcFollowsEmitter, removeUnlockedGeodesicsFromCannon } from "../../../src/world-objects/geodesic/lifecycle";
+import { arcFollowsEmitter, removePlainGeodesicsFromCannon } from "../../../src/world-objects/geodesic/lifecycle";
 import {
   createGeodesicArcObject,
-  createGeodesicCannonObject,
+  createGeodesicEmitterObject,
   createGeodesicVertexObject,
   geodesicRayBeamHeightMeters,
   getGeodesicCannonEmitterPoint,
@@ -33,7 +33,7 @@ import {
 
 function emitterOf(registry: ReturnType<typeof createRuntimeObjectRegistry>, id: string) {
   const emitter = registry.get(id);
-  if (emitter?.kind !== "geodesic-cannon") {
+  if (emitter?.kind !== "geodesicEmitters/emitter") {
     throw new Error(`Expected the emitter ${id}.`);
   }
   return emitter;
@@ -46,7 +46,7 @@ describe("lifting the emitter of a tied curve", () => {
     expect(registry.get("g-plain")?.kind).toBe("geodesicModel/arc");
     expect(isTied(registry, "g-plain")).toBe(false);
 
-    const removed = removeUnlockedGeodesicsFromCannon(registry, "e1");
+    const removed = removePlainGeodesicsFromCannon(registry, "e1");
 
     expect(removed).toEqual(["g-plain"]);
     expect(registry.get("g-plain")).toBeUndefined();
@@ -178,5 +178,5 @@ describe("a tied curve that cannot follow its emitter", () => {
 });
 
 function createCannon(id: string, point: { readonly x: number; readonly y: number }) {
-  return createGeodesicCannonObject({ id, cellId: "a", localPose: yawRigidTransform3(0, { ...point, z: 0 }) });
+  return createGeodesicEmitterObject({ id, cellId: "a", localPose: yawRigidTransform3(0, { ...point, z: 0 }) });
 }

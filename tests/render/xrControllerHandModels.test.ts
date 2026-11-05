@@ -37,7 +37,7 @@ describe("xrControllerHandModels", () => {
       imageSource: publicAssetUrl("WoodenSign2/WoodenSign2.png"),
       label: "Sign",
     });
-    expect(resolveWristToolIndicatorVisual(toolsById.get("geodesic-cannon"), "WoodenSign1")).toMatchObject({
+    expect(resolveWristToolIndicatorVisual(toolsById.get("geodesicEmitters/emitter"), "WoodenSign1")).toMatchObject({
       icon: "image",
       imageSource: publicAssetUrl("flashlight/Lightsaber.png"),
       label: "Geodesic emitter",
@@ -52,12 +52,12 @@ describe("xrControllerHandModels", () => {
       imageSource: publicAssetUrl("icons/ruler.svg"),
       label: "Length",
     });
-    expect(resolveWristToolIndicatorVisual(toolsById.get("geodesic-cannon-rotate"), "WoodenSign1")).toMatchObject({
+    expect(resolveWristToolIndicatorVisual(toolsById.get("geodesicEmitters/rotate"), "WoodenSign1")).toMatchObject({
       icon: "image",
       imageSource: publicAssetUrl("icons/arrow-circle-inverted.png"),
       label: "Turn",
     });
-    expect(resolveWristToolIndicatorVisual(toolsById.get("geodesic-cannon-carry"), "WoodenSign1")).toMatchObject({
+    expect(resolveWristToolIndicatorVisual(toolsById.get("geodesicEmitters/carry"), "WoodenSign1")).toMatchObject({
       icon: "image",
       imageSource: publicAssetUrl("icons/carry.svg"),
       label: "Carry",

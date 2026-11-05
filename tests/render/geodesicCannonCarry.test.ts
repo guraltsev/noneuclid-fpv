@@ -1,7 +1,7 @@
 /**
  * `tests/render/geodesicCannonCarry.test.ts` — unit tier.
  *
- * Carrying a geodesic emitter that anchors a locked geodesic, driven through the real tool controller
+ * Carrying a geodesic emitter that anchors a connected geodesic, driven through the real tool controller
  * (`createGeodesicCannonTools`) with plain-value dependencies for the renderer and input.
  *
  * Three things make this behaviour subtle:
@@ -20,9 +20,9 @@
  *
  * - A face can be turned relative to its neighbour (on the cube, by a quarter turn). An emitter carried onto the next
  *   face keeps its physical direction, so its yaw turns with the face, and its default launch yaw stays equal to the yaw
- *   of its pose. (Picking an emitter up removes its free geodesics, so only locked geodesics are carried.)
+ *   of its pose. (Picking an emitter up removes its free geodesics, so only connected geodesics are carried.)
  *
- * The checks: the geodesic is still locked, still joins both emitters and ends in the emitter's cell, and the emitter
+ * The checks: the geodesic is still connected, still joins both emitters and ends in the emitter's cell, and the emitter
  * lives in the cell it is in. The geodesic-level rules are in `tests/world-objects/geodesic/carry.test.ts`.
  */
 import { publishLocalPlayerPose, readLocalPlayerPose } from "../../src/engine/worldEngine";
@@ -35,7 +35,7 @@ import { describe, expect, it } from "vitest";
 import { applyRuntimeCommand } from "../../src/runtime/applyRuntimeCommand";
 import { createTestClientSession } from "../support/clientSession";
 import { transformPoint3, yawRigidTransform3 } from "../../src/math/rigidTransform3";
-import { createGeodesicCannonObject } from "../../src/world-objects/geodesic/objects";
+import { createGeodesicEmitterObject } from "../../src/world-objects/geodesic/objects";
 import { shootGeodesic } from "../../src/world-objects/geodesic/cannon";
 import { getGeodesicSegments } from "../../src/world-objects/geodesic/segments";
 import { getGeodesicConnection, arcConnectsEmitters } from "../../src/world-objects/geodesic/lifecycle";
@@ -95,10 +95,10 @@ function createHarness(
 function setup() {
   const world = compileLargePortalWorld();
   const registry = createRuntimeObjectRegistry();
-  registry.add(createGeodesicCannonObject({ id: "cannon-a", cellId: "a", localPose: yawRigidTransform3(0, { x: 4, y: 2.5, z: 0 }) }));
-  registry.add(createGeodesicCannonObject({ id: "cannon-b", cellId: "b", localPose: yawRigidTransform3(Math.PI, { x: 1, y: 2.5, z: 0 }) }));
+  registry.add(createGeodesicEmitterObject({ id: "cannon-a", cellId: "a", localPose: yawRigidTransform3(0, { x: 4, y: 2.5, z: 0 }) }));
+  registry.add(createGeodesicEmitterObject({ id: "cannon-b", cellId: "b", localPose: yawRigidTransform3(Math.PI, { x: 1, y: 2.5, z: 0 }) }));
   const source = registry.get("cannon-a");
-  if (source?.kind !== "geodesic-cannon") {
+  if (source?.kind !== "geodesicEmitters/emitter") {
     throw new Error("Expected the source emitter.");
   }
   shootGeodesic({ world, registry, cannon: source, geodesicId: "g-a", maxLengthMeters: 3 });
@@ -106,23 +106,23 @@ function setup() {
   return createHarness(world, registry, { ...createDefaultPlayerPose("a"), position: { x: 4.5, y: 2.5, z: 0 } });
 }
 
-// The cube, with a locked geodesic from a cannon on the front face to one on the right face (3 segments), and the
+// The cube, with a connected geodesic from a cannon on the front face to one on the right face (3 segments), and the
 // player standing next to the second cannon.
 function setupCube(playerCell = "right", playerX = -2.4, playerY = -4.4) {
   const world = compileCellComplex(cube);
   const registry = createRuntimeObjectRegistry();
-  registry.add(createGeodesicCannonObject({
+  registry.add(createGeodesicEmitterObject({
     id: "cannon-a",
     cellId: "front",
     localPose: yawRigidTransform3(Math.atan2(-0.6299138870477234, 0.776664982411611), { x: 5.356468478410459, y: 1.3724895861593076, z: 0 }),
   }));
-  registry.add(createGeodesicCannonObject({
+  registry.add(createGeodesicEmitterObject({
     id: "cannon-b",
     cellId: "right",
     localPose: yawRigidTransform3(0, { x: -2.4644086473935514, y: -4.450135738386821, z: 0 }),
   }));
   const source = registry.get("cannon-a");
-  if (source?.kind !== "geodesic-cannon") {
+  if (source?.kind !== "geodesicEmitters/emitter") {
     throw new Error("Expected the source emitter.");
   }
   shootGeodesic({ world, registry, cannon: source, geodesicId: "g-a", maxLengthMeters: 12 });
@@ -139,7 +139,7 @@ function handAt(x: number, y: number): RootAimRay {
   };
 }
 
-describe("releasing a carried emitter of a locked geodesic", () => {
+describe("releasing a carried emitter of a connected geodesic", () => {
   it("keeps the geodesic when the emitter is let go beyond a portal of the player's cell", () => {
     const { registry, tools } = setup();
     expect(arcConnectsEmitters(registry, "g-a")).toBe(true);
@@ -152,7 +152,7 @@ describe("releasing a carried emitter of a locked geodesic", () => {
     tools.finishGeodesicCannonCarry();
 
     const released = registry.get("cannon-b");
-    expect(released).toMatchObject({ kind: "geodesic-cannon", cellId: "b" });
+    expect(released).toMatchObject({ kind: "geodesicEmitters/emitter", cellId: "b" });
     expect(registry.get("g-a")).toMatchObject({ kind: "geodesicModel/arc" });
     expect(arcConnectsEmitters(registry, "g-a")).toBe(true);
     expect(getGeodesicConnection(registry, "g-a")).toEqual({
@@ -174,7 +174,7 @@ describe("releasing a carried emitter of a locked geodesic", () => {
     tools.finishGeodesicCannonCarry();
 
     // The hand was on the bottom face, so the emitter ends there and the geodesic no longer visits back.
-    expect(registry.get("cannon-b")).toMatchObject({ kind: "geodesic-cannon", cellId: "bottom" });
+    expect(registry.get("cannon-b")).toMatchObject({ kind: "geodesicEmitters/emitter", cellId: "bottom" });
     expect(registry.get("g-a")).toMatchObject({ kind: "geodesicModel/arc" });
     expect(arcConnectsEmitters(registry, "g-a")).toBe(true);
     expect(getGeodesicConnection(registry, "g-a")).toMatchObject({ state: "connected" });
@@ -189,7 +189,7 @@ describe("releasing a carried emitter of a locked geodesic", () => {
     tools.updateCarriedGeodesicCannonPose(true, handAt(-2.4, 8.3));
     tools.finishGeodesicCannonCarry();
 
-    expect(registry.get("cannon-b")).toMatchObject({ kind: "geodesic-cannon", cellId: "top" });
+    expect(registry.get("cannon-b")).toMatchObject({ kind: "geodesicEmitters/emitter", cellId: "top" });
     expect(registry.get("g-a")).toMatchObject({ kind: "geodesicModel/arc" });
     expect(arcConnectsEmitters(registry, "g-a")).toBe(true);
     expect(getGeodesicConnection(registry, "g-a")).toMatchObject({ state: "connected" });
@@ -226,7 +226,7 @@ describe("releasing a carried emitter of a locked geodesic", () => {
     tools.updateCarriedGeodesicCannonPose(true, handAt(0.3, -8.4));
 
     const emitter = registry.get("cannon-b");
-    if (emitter?.kind !== "geodesic-cannon") {
+    if (emitter?.kind !== "geodesicEmitters/emitter") {
       throw new Error("Expected the emitter.");
     }
     const poseYaw = Math.atan2(emitter.localPose.rotation.m10, emitter.localPose.rotation.m00);
@@ -278,7 +278,7 @@ describe("aiming an emitter from a cell other than its own", () => {
       ],
     });
     const registry = createRuntimeObjectRegistry();
-    registry.add(createGeodesicCannonObject({ id: "cannon-a", cellId: "a", localPose: yawRigidTransform3(0, { x: 4, y: 2.5, z: 0 }) }));
+    registry.add(createGeodesicEmitterObject({ id: "cannon-a", cellId: "a", localPose: yawRigidTransform3(0, { x: 4, y: 2.5, z: 0 }) }));
     const portal = world.cellsById.get("a")?.portals[0];
     if (!portal) {
       throw new Error("Expected the portal.");
@@ -291,7 +291,7 @@ describe("aiming an emitter from a cell other than its own", () => {
 
   function aimYawOf(registry: RuntimeObjectRegistry, id: string): number {
     const emitter = registry.get(id);
-    if (emitter?.kind !== "geodesic-cannon") {
+    if (emitter?.kind !== "geodesicEmitters/emitter") {
       throw new Error("Expected the emitter.");
     }
     return emitter.aimYawRadians;
@@ -299,7 +299,7 @@ describe("aiming an emitter from a cell other than its own", () => {
 
   function startAiming(session: ReturnType<typeof createHarness>["session"]): void {
     applyRuntimeCommand(session, { kind: "set-cannon-tool-state", state: { selectedCannonId: "cannon-a" } });
-    applyRuntimeCommand(session, { kind: "enter-tool-mode", toolId: "geodesic-cannon-aim" });
+    applyRuntimeCommand(session, { kind: "enter-tool-mode", toolId: "geodesicEmitters/aim" });
   }
 
   it("turns the emitter toward the aimed point when the player is across a portal", () => {
@@ -313,7 +313,7 @@ describe("aiming an emitter from a cell other than its own", () => {
 
     tools.updateActiveGeodesicCannonAim(false, handAt(2.5, 0.5));
 
-    expect(session.get().menuState.selectedTool).toBe("geodesic-cannon-aim");
+    expect(session.get().menuState.selectedTool).toBe("geodesicEmitters/aim");
     // Due east in b's frame is yaw 0 there, which is -faceTurn in the emitter's own frame.
     expect(Math.cos(aimYawOf(registry, "cannon-a") - (0 - faceTurn))).toBeCloseTo(1, 6);
   });

@@ -21,7 +21,7 @@ import { createRuntimeObjectRegistry } from "../../../src/world-objects/runtimeO
 import { realizeIntervalChord } from "../../../src/world-objects/geodesic/intervals";
 import {
   createGeodesicVertexObject,
-  createGeodesicCannonObject,
+  createGeodesicEmitterObject,
   createGeodesicArcObject,
   geodesicRayBeamHeightMeters,
 } from "../../../src/world-objects/geodesic/objects";
@@ -32,7 +32,7 @@ describe("geodesic rebuild outcomes", () => {
   it("keeps every carried loop's segments and portal word after moving the shared emitter", () => {
     const { world, registry, words } = createTorusLoopBenchmarkScene();
     const before = registry.get("e");
-    if (before?.kind !== "geodesic-cannon") {
+    if (before?.kind !== "geodesicEmitters/emitter") {
       throw new Error("Expected the emitter.");
     }
     registry.update({ ...before, localPose: yawRigidTransform3(0, { x: -1.95, y: 1.95, z: 0 }) });
@@ -58,8 +58,8 @@ describe("geodesic rebuild outcomes", () => {
   it("deletes a carry rebuild that lands in a forbidden zone", () => {
     const world = compileLargePortalWorld();
     const registry = createRuntimeObjectRegistry();
-    registry.add(createGeodesicCannonObject({ id: "cannon-a", cellId: "a", localPose: yawRigidTransform3(0, { x: 1, y: 2.5, z: 0 }) }));
-    registry.add(createGeodesicCannonObject({ id: "cannon-b", cellId: "a", localPose: yawRigidTransform3(Math.PI, { x: 5, y: 0, z: 0 }) }));
+    registry.add(createGeodesicEmitterObject({ id: "cannon-a", cellId: "a", localPose: yawRigidTransform3(0, { x: 1, y: 2.5, z: 0 }) }));
+    registry.add(createGeodesicEmitterObject({ id: "cannon-b", cellId: "a", localPose: yawRigidTransform3(Math.PI, { x: 5, y: 0, z: 0 }) }));
     registry.add(createGeodesicArcObject({
       id: "g-a",
       startAnchorObjectId: "cannon-a",
@@ -83,8 +83,8 @@ describe("geodesic rebuild outcomes", () => {
   it("preserves a carry rebuild that fails when the caller asks to preserve it", () => {
     const world = compileLargePortalWorld();
     const registry = createRuntimeObjectRegistry();
-    registry.add(createGeodesicCannonObject({ id: "cannon-a", cellId: "a", localPose: yawRigidTransform3(0, { x: 1, y: 2.5, z: 0 }) }));
-    registry.add(createGeodesicCannonObject({ id: "cannon-b", cellId: "b", localPose: yawRigidTransform3(Math.PI, { x: 1, y: 2.5, z: 0 }) }));
+    registry.add(createGeodesicEmitterObject({ id: "cannon-a", cellId: "a", localPose: yawRigidTransform3(0, { x: 1, y: 2.5, z: 0 }) }));
+    registry.add(createGeodesicEmitterObject({ id: "cannon-b", cellId: "b", localPose: yawRigidTransform3(Math.PI, { x: 1, y: 2.5, z: 0 }) }));
     registry.add(createGeodesicArcObject({
       id: "g-a",
       startAnchorObjectId: "cannon-a",
@@ -95,7 +95,7 @@ describe("geodesic rebuild outcomes", () => {
 
     // The carried end is moved below the floor edge of cell b, so the straight chord from cannon-a hits the wall y = 0 before the portal.
     const carried = registry.get("cannon-b");
-    if (carried?.kind !== "geodesic-cannon") {
+    if (carried?.kind !== "geodesicEmitters/emitter") {
       throw new Error("Expected the carried emitter.");
     }
     registry.update({ ...carried, localPose: yawRigidTransform3(Math.PI, { x: 1, y: -3, z: 0 }) });
@@ -115,7 +115,7 @@ describe("geodesic rebuild outcomes", () => {
   it("classifies a straight chord as feasible, wall-blocked, or too short to realize", () => {
     const world = compileLargeWorld();
     const registry = createRuntimeObjectRegistry();
-    registry.add(createGeodesicCannonObject({ id: "cannon-a", cellId: "a", localPose: yawRigidTransform3(0, { x: -2, y: 0, z: 0 }) }));
+    registry.add(createGeodesicEmitterObject({ id: "cannon-a", cellId: "a", localPose: yawRigidTransform3(0, { x: -2, y: 0, z: 0 }) }));
     const realize = (freeEndPoint: { x: number; y: number }) => {
       registry.remove("tip");
       registry.remove("g-tip");
@@ -133,8 +133,8 @@ describe("geodesic rebuild outcomes", () => {
   it("reports the junction of a chord blocked by a forbidden zone", () => {
     const world = compileLargePortalWorld();
     const registry = createRuntimeObjectRegistry();
-    registry.add(createGeodesicCannonObject({ id: "cannon-a", cellId: "a", localPose: yawRigidTransform3(0, { x: 1, y: 2.5, z: 0 }) }));
-    registry.add(createGeodesicCannonObject({ id: "cannon-b", cellId: "a", localPose: yawRigidTransform3(Math.PI, { x: 5, y: 0, z: 0 }) }));
+    registry.add(createGeodesicEmitterObject({ id: "cannon-a", cellId: "a", localPose: yawRigidTransform3(0, { x: 1, y: 2.5, z: 0 }) }));
+    registry.add(createGeodesicEmitterObject({ id: "cannon-b", cellId: "a", localPose: yawRigidTransform3(Math.PI, { x: 5, y: 0, z: 0 }) }));
     const interval = createGeodesicArcObject({ id: "g-a", startAnchorObjectId: "cannon-a", endAnchorObjectId: "cannon-b", startCellId: "a" });
     registry.add(interval);
 

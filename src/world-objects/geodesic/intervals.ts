@@ -1,11 +1,11 @@
 /**
- * Interval rebuilds: realizing an interval's lifted chord, aiming free geodesics, splitting at a segment hit, rebuilding locked intervals after a carried anchor moved, and side-effect-free previews.
+ * Interval rebuilds: realizing an interval's lifted chord, aiming free geodesics, splitting at a segment hit, rebuilding connected intervals after a carried anchor moved, and side-effect-free previews.
  */
 import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex";
 import { transformPoint3, yawRigidTransform3 } from "../../math/rigidTransform3";
 import { addVec3, distanceSquaredVec3, scaleVec3, type Vec3 } from "../../math/vec3";
 import type { RuntimeObjectRegistry, RuntimeWorldObject } from "../runtimeObjectRegistry";
-import { createGeodesicArcObject, directionFromYaw, emitterConnectionToleranceMeters, type GeodesicVertexObject, GEODESIC_MIN_LENGTH_METERS, type GeodesicCannonObject, type GeodesicCarryPortalTransition, type GeodesicEndRole, type GeodesicArcObject, type GeodesicPortalTraversal, type GeodesicTraceBuildResult, getGeodesicCannonEmitterPoint, getOppositeEndRole, intersectionTolerance, isGeodesicVertexObject, type LiftedGeodesicEndpoint, minGeodesicSegmentLengthMeters, type TraceGeodesicSegmentResult, withoutStale } from "./objects";
+import { createGeodesicArcObject, directionFromYaw, emitterConnectionToleranceMeters, type GeodesicVertexObject, GEODESIC_MIN_LENGTH_METERS, type GeodesicEmitterObject, type GeodesicCarryPortalTransition, type GeodesicEndRole, type GeodesicArcObject, type GeodesicPortalTraversal, type GeodesicTraceBuildResult, getGeodesicCannonEmitterPoint, getOppositeEndRole, intersectionTolerance, isGeodesicVertexObject, type LiftedGeodesicEndpoint, minGeodesicSegmentLengthMeters, type TraceGeodesicSegmentResult, withoutStale } from "./objects";
 import { canObjectAttachGeodesics } from "./anchors";
 import { applyAnchorCrossingTraversals, collectPortalWordFromTraces, portalTraversalFromCarryTransition, portalWordAfterAnchorCrossing, samePortalWord } from "./portalWord";
 import { reduceAdjacentInversePortalTraversals } from "./objects";
@@ -97,7 +97,7 @@ export type IntervalChordRealization =
 /**
  * Lifts the interval's far endpoint into its start cell and traces the straight chord exactly once, without touching the registry.
  *
- * The one place where a chord is lifted, traced and classified; previews, rebuilds and the locked-carry rebuild are built on it, so a
+ * The one place where a chord is lifted, traced and classified; previews, rebuilds and the connected-carry rebuild are built on it, so a
  * chord is never traced twice, also when it fails. Anchors in `candidateAnchorsById` shadow the registry. The realized word must equal the
  * stored word unless `allowUnexpectedPortalWord`.
  */
@@ -213,7 +213,7 @@ function commitRealizedTraces(
  *
  * The free end is moved to wherever the new ray ends (cell, position), the interval's start cell and portal word are
  * recomputed from the actual trace, and segments are replaced. If `connectEmitters` (default true) and the ray ends at
- * another emitter, the free role is re-attached to that emitter and the interval is rebuilt as a locked geodesic.
+ * another emitter, the free role is re-attached to that emitter and the interval is rebuilt as a connected geodesic.
  * Returns `undefined` for non-interval ids, non-(emitter, free end) attachments, a free end shared with other
  * attachments, or a target within `intersectionTolerance` of the emitter (length is otherwise at least `minGeodesicSegmentLengthMeters`).
  * Mutates the registry.
@@ -235,7 +235,7 @@ export function aimFreeGeodesicFromEndpoint(input: {
   const freeAttachment = interval[freeRole];
   const emitter = input.registry.get(emitterAttachment.anchorObjectId);
   const freeEnd = input.registry.get(freeAttachment.anchorObjectId);
-  if (emitter?.kind !== "geodesic-cannon" || freeEnd?.kind !== "geodesicModel/vertex") {
+  if (emitter?.kind !== "geodesicEmitters/emitter" || freeEnd?.kind !== "geodesicModel/vertex") {
     return undefined;
   }
   // A free end shared with another attachment (e.g. a curve-shortening vertex) must not be dragged around.
@@ -401,7 +401,7 @@ export function splitGeodesicIntervalAtSegmentHit(input: {
     interval?.kind !== "geodesicModel/arc" ||
     segment?.kind !== "geodesicModel/segment" ||
     segment.geodesicId !== input.geodesicId ||
-    placed?.kind !== "geodesic-cannon" ||
+    placed?.kind !== "geodesicEmitters/emitter" ||
     !isAimableFreeGeodesic(input.registry, interval)
   ) {
     return [];
@@ -424,7 +424,7 @@ export function splitGeodesicIntervalAtSegmentHit(input: {
   const sourceRole = getOppositeEndRole(freeRole);
   const sourceAnchor = input.registry.get(interval[sourceRole].anchorObjectId);
   const freeEnd = input.registry.get(interval[freeRole].anchorObjectId);
-  if (sourceAnchor?.kind !== "geodesic-cannon" || freeEnd?.kind !== "geodesicModel/vertex") {
+  if (sourceAnchor?.kind !== "geodesicEmitters/emitter" || freeEnd?.kind !== "geodesicModel/vertex") {
     return [];
   }
 
@@ -490,7 +490,7 @@ export function splitGeodesicIntervalAtSegmentHit(input: {
 }
 
 /**
- * Rebuilds a locked (emitter-to-emitter) interval after an endpoint was carried, updating its portal word first.
+ * Rebuilds a connected (emitter-to-emitter) interval after an endpoint was carried, updating its portal word first.
  *
  * The new portal word is, in order of precedence: the explicit `carriedPortalWord`; otherwise the old word extended
  * by the portal the carried anchor crossed (inferred by `resolveCarriedPortalTraversalFromAnchorMotion` or taken from
@@ -499,25 +499,25 @@ export function splitGeodesicIntervalAtSegmentHit(input: {
  * `rebuildDerivedGeodesicSegments` runs (with `allowUnexpectedPortalWord = allowOutOfBoundsCarriedEndpoint`).
  * Returns `undefined` on failure; note the interval may already have been updated (and a degenerate one deleted).
  */
-export function rebuildLockedGeodesicFromEndpointsAndPortalWord(input: {
+export function rebuildConnectedGeodesicFromEndpointsAndPortalWord(input: {
   readonly world: CompiledCellComplex;
   readonly registry: RuntimeObjectRegistry;
   readonly geodesicId: string;
   readonly carriedAnchorObjectId?: string;
-  readonly carriedAnchorBeforeMove?: GeodesicCannonObject;
+  readonly carriedAnchorBeforeMove?: GeodesicEmitterObject;
   readonly carriedPortalTransition?: GeodesicCarryPortalTransition;
   readonly carriedPortalWord?: readonly GeodesicPortalTraversal[];
   readonly allowOutOfBoundsCarriedEndpoint?: boolean;
 }): GeodesicTraceBuildResult | undefined {
-  return rebuildLockedGeodesicFromEndpointsAndPortalWordDetailed(input).result;
+  return rebuildConnectedGeodesicFromEndpointsAndPortalWordDetailed(input).result;
 }
 
 /**
- * Like `rebuildLockedGeodesicFromEndpointsAndPortalWord`, and also returns how the chord was realized (`undefined` when `geodesicId` is
+ * Like `rebuildConnectedGeodesicFromEndpointsAndPortalWord`, and also returns how the chord was realized (`undefined` when `geodesicId` is
  * not an interval), so that the caller can tell a forbidden-zone failure from the other failures without tracing the chord again.
  */
-export function rebuildLockedGeodesicFromEndpointsAndPortalWordDetailed(
-  input: Parameters<typeof rebuildLockedGeodesicFromEndpointsAndPortalWord>[0],
+export function rebuildConnectedGeodesicFromEndpointsAndPortalWordDetailed(
+  input: Parameters<typeof rebuildConnectedGeodesicFromEndpointsAndPortalWord>[0],
 ): ReturnType<typeof rebuildDerivedGeodesicSegmentsDetailed> {
   const interval = input.registry.get(input.geodesicId);
   if (interval?.kind !== "geodesicModel/arc") {
@@ -565,13 +565,13 @@ export function rebuildLockedGeodesicFromEndpointsAndPortalWordDetailed(
  * reduced. Returns the new word, or `undefined` (nothing written) if the anchor is not an endpoint or the resulting word
  * does not chain between the endpoint anchors' current cells.
  */
-export function updateLockedGeodesicPortalWordForCarriedAnchorTraversal(input: {
+export function updateConnectedGeodesicPortalWordForCarriedAnchorTraversal(input: {
   readonly registry: RuntimeObjectRegistry;
   readonly geodesicId: string;
   readonly carriedAnchorObjectId: string;
   readonly traversal: GeodesicPortalTraversal;
 }): readonly GeodesicPortalTraversal[] | undefined {
-  return updateLockedGeodesicPortalWordForCarriedAnchorTraversals({
+  return updateConnectedGeodesicPortalWordForCarriedAnchorTraversals({
     registry: input.registry,
     geodesicId: input.geodesicId,
     carriedAnchorObjectId: input.carriedAnchorObjectId,
@@ -580,11 +580,11 @@ export function updateLockedGeodesicPortalWordForCarriedAnchorTraversal(input: {
 }
 
 /**
- * Same as {@link updateLockedGeodesicPortalWordForCarriedAnchorTraversal} for a chain of traversals the carried
+ * Same as {@link updateConnectedGeodesicPortalWordForCarriedAnchorTraversal} for a chain of traversals the carried
  * anchor made in one frame, in order. The word is folded through all of them and checked against the endpoint cells once
  * (the anchor already sits in the last target cell), then stored. Returns `undefined` and stores nothing on failure.
  */
-export function updateLockedGeodesicPortalWordForCarriedAnchorTraversals(input: {
+export function updateConnectedGeodesicPortalWordForCarriedAnchorTraversals(input: {
   readonly registry: RuntimeObjectRegistry;
   readonly geodesicId: string;
   readonly carriedAnchorObjectId: string;
@@ -672,7 +672,7 @@ function resolveCarriedIntervalPortalWord(input: {
   readonly interval: GeodesicArcObject;
   readonly registry: RuntimeObjectRegistry;
   readonly carriedAnchorObjectId?: string;
-  readonly carriedAnchorBeforeMove?: GeodesicCannonObject;
+  readonly carriedAnchorBeforeMove?: GeodesicEmitterObject;
   readonly carriedPortalTransition?: GeodesicCarryPortalTransition;
   readonly carriedPortalWord?: readonly GeodesicPortalTraversal[];
 }): readonly GeodesicPortalTraversal[] | undefined {
@@ -724,13 +724,13 @@ function resolveCarriedPortalTraversalFromAnchorMotion(
   world: CompiledCellComplex,
   registry: RuntimeObjectRegistry,
   carriedAnchorObjectId: string | undefined,
-  carriedAnchorBeforeMove: GeodesicCannonObject | undefined,
+  carriedAnchorBeforeMove: GeodesicEmitterObject | undefined,
 ): GeodesicPortalTraversal | undefined {
   if (!carriedAnchorObjectId || carriedAnchorBeforeMove?.id !== carriedAnchorObjectId) {
     return undefined;
   }
   const current = registry.get(carriedAnchorObjectId);
-  if (current?.kind !== "geodesic-cannon") {
+  if (current?.kind !== "geodesicEmitters/emitter") {
     return undefined;
   }
 
@@ -772,12 +772,12 @@ function resolveCarriedPortalTraversalFromAnchorMotion(
 function carriedTransitionMatchesAnchorMove(
   registry: RuntimeObjectRegistry,
   carriedAnchorObjectId: string,
-  carriedAnchorBeforeMove: GeodesicCannonObject | undefined,
+  carriedAnchorBeforeMove: GeodesicEmitterObject | undefined,
   transition: GeodesicCarryPortalTransition,
 ): boolean {
   const current = registry.get(carriedAnchorObjectId);
   if (
-    current?.kind !== "geodesic-cannon" ||
+    current?.kind !== "geodesicEmitters/emitter" ||
     carriedAnchorBeforeMove?.id !== carriedAnchorObjectId ||
     carriedAnchorBeforeMove.cellId !== transition.sourceCellId ||
     current.cellId !== transition.targetCellId
@@ -819,12 +819,12 @@ function traceTerminalToBuildTerminalForInterval(
 
 // Retraces the part of a split free geodesic beyond a newly placed emitter: from the placed emitter along the original yaw
 // for the remaining length, moving the old free end to the new terminal point. Deletes the continuation interval if no trace
-// came out; if the trace reaches an emitter, the free end is re-attached to that emitter (the interval becomes locked).
+// came out; if the trace reaches an emitter, the free end is re-attached to that emitter (the interval becomes connected).
 function rebuildContinuationFromCut(input: {
   readonly world: CompiledCellComplex;
   readonly registry: RuntimeObjectRegistry;
   readonly geodesicId: string;
-  readonly placed: GeodesicCannonObject;
+  readonly placed: GeodesicEmitterObject;
   readonly freeEnd: GeodesicVertexObject;
   readonly yawRadians: number;
   readonly lengthMeters: number;

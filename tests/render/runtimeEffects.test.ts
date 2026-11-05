@@ -89,9 +89,9 @@ describe("createRuntimeEffects", () => {
   it("routes an object action to the tool host", () => {
     const { effects, calls } = createHarness();
 
-    effects.run({ kind: "start-object-action", objectKind: "geodesic-cannon", objectId: "cannon-a", actionId: "tie" });
+    effects.run({ kind: "start-object-action", objectKind: "geodesicEmitters/emitter", objectId: "cannon-a", actionId: "tie" });
 
-    expect(calls.startObjectAction).toHaveBeenCalledWith("geodesic-cannon", "cannon-a", "tie");
+    expect(calls.startObjectAction).toHaveBeenCalledWith("geodesicEmitters/emitter", "cannon-a", "tie");
   });
 
   it("expires the reload confirmation once after its window", () => {

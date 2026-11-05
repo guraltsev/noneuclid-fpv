@@ -15,8 +15,8 @@ import { buildForbiddenZoneWireframe } from "./debugCollisionWireframes";
 /** Type guard: true for runtime objects rendered by the geodesic renderer (cannon, segment or intersection). */
 export function isGeodesicRuntimeRenderObject(
   object: RuntimeWorldObject,
-): object is Extract<RuntimeWorldObject, { readonly kind: "geodesic-cannon" | "geodesicModel/segment" | "geodesicModel/crossing" }> {
-  return object.kind === "geodesic-cannon" ||
+): object is Extract<RuntimeWorldObject, { readonly kind: "geodesicEmitters/emitter" | "geodesicModel/segment" | "geodesicModel/crossing" }> {
+  return object.kind === "geodesicEmitters/emitter" ||
     object.kind === "geodesicModel/segment" ||
     object.kind === "geodesicModel/crossing";
 }

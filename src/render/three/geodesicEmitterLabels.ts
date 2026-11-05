@@ -36,7 +36,7 @@ export function getGeodesicEmitterLabelKey(cannonId: string, geodesicId: string)
  */
 export function resolveGeodesicEmitterLabelPosition(
   registry: RuntimeObjectReader,
-  cannon: Extract<RuntimeWorldObject, { readonly kind: "geodesic-cannon" }>,
+  cannon: Extract<RuntimeWorldObject, { readonly kind: "geodesicEmitters/emitter" }>,
   geodesicId: string,
 ): THREE.Vector3 {
   const yawRadians = resolveEmitterLaunchYaw(registry, cannon, geodesicId);

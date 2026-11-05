@@ -33,7 +33,7 @@ const angleKind = "geodesicMeasurements/angle";
 export const lengthReadKinds: readonly string[] = ["geodesicModel/segment"];
 
 /** The kinds an angle can read: its centre (a cannon or a crossing marker), the segments of its legs, and the arc index (arcs and vertices). The `angles` tick subscribes to these; the oracle test checks every read set against them. */
-export const angleReadKinds: readonly string[] = ["geodesic-cannon", "geodesicModel/arc", "geodesicModel/crossing", "geodesicModel/segment", "geodesicModel/vertex"];
+export const angleReadKinds: readonly string[] = ["geodesicEmitters/emitter", "geodesicModel/arc", "geodesicModel/crossing", "geodesicModel/segment", "geodesicModel/vertex"];
 
 /** The local player's cell and position as the last `lengths` run saw them (NaN: never run). */
 interface LengthInputs {

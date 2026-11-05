@@ -612,7 +612,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   const {
     dumpGeodesicCreatures,
     dumpGeodesicPath,
-    dumpLockedGeodesicWords,
+    dumpConnectedGeodesicWords,
     dumpAllGeodesics,
     updateGeodesicCreatureDebug,
   } = createGeodesicDebugDumps({
@@ -763,7 +763,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     afterWorldStep: afterCarryWorldStep,
     updateActiveGeodesicCannonRotation,
     updateActiveGeodesicCannonAim,
-    getLockedGeodesicIds,
+    getConnectedGeodesicIds,
     freezeXrHeadHeightDuringGeodesicCannonRotation,
     resetGeodesicCannonRotationTracking,
   } = createGeodesicCannonTools({
@@ -823,7 +823,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     tryExtendFocusedGeodesicFromAim,
     getGeodesicDisplayName,
     getGeodesicLabelsById,
-    getLockedGeodesicIds,
+    getConnectedGeodesicIds,
     objectActionsFor: (objectKind, objectId) => toolHost.objectActionsFor(objectKind, objectId),
     createGeometryComputerMenuOptions,
     syncPlacedFlagRuntime,
@@ -979,7 +979,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     dumpGeodesicCreatures: dumpGeodesicCreatures,
     dumpAllGeodesics: dumpAllGeodesics,
     dumpGeodesicPath: dumpGeodesicPath,
-    dumpLockedGeodesicWords: dumpLockedGeodesicWords,
+    dumpConnectedGeodesicWords: dumpConnectedGeodesicWords,
     placeObjectAt: debugPlaceObjectAt,
     playerPose: debugPlayerPose,
     kindScans: () => runtimeObjectRegistry.getKindScanCounts(),
@@ -1175,8 +1175,8 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       deltaSeconds,
       normalFovDegrees: camera.fov,
     });
-    const rotatingGeodesicCannon = currentMenuState().selectedTool === "geodesic-cannon-rotate";
-    const aimingGeodesicCannon = currentMenuState().selectedTool === "geodesic-cannon-aim";
+    const rotatingGeodesicCannon = currentMenuState().selectedTool === "geodesicEmitters/rotate";
+    const aimingGeodesicCannon = currentMenuState().selectedTool === "geodesicEmitters/aim";
     const effectiveHeadLocalMeters = rotatingGeodesicCannon && xrActive
       ? freezeXrHeadHeightDuringGeodesicCannonRotation(headLocalMeters)
       : headLocalMeters;
@@ -1255,7 +1255,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     // menu is open). primaryActionConsumed stops the generic focused-object interaction.
     let primaryActionConsumed = false;
     if (frame.carryActionRequested && !currentMenuState().isOpen) {
-      primaryActionConsumed = currentMenuState().selectedTool === "geodesic-cannon-carry"
+      primaryActionConsumed = currentMenuState().selectedTool === "geodesicEmitters/carry"
         ? finishGeodesicCannonCarry()
         : tryStartFocusedGeodesicCannonCarry(activeAimRay);
     }
@@ -1474,7 +1474,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       dumpGeodesicCreatures: dumpGeodesicCreatures,
       dumpAllGeodesics: dumpAllGeodesics,
       dumpGeodesicPath: dumpGeodesicPath,
-      dumpLockedGeodesicWords: dumpLockedGeodesicWords,
+      dumpConnectedGeodesicWords: dumpConnectedGeodesicWords,
       placeObjectAt: debugPlaceObjectAt,
       playerPose: debugPlayerPose,
       kindScans: () => runtimeObjectRegistry.getKindScanCounts(),

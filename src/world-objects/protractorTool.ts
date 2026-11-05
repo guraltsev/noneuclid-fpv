@@ -8,7 +8,7 @@ import { dotVec3, type Vec3 } from "../math/vec3";
 import {
   geodesicRayBeamHeightMeters,
   type GeodesicEndRole,
-  type GeodesicCannonObject,
+  type GeodesicEmitterObject,
   type GeodesicCrossingObject,
   type GeodesicSegmentObject,
 } from "./geodesic/objects";
@@ -72,17 +72,17 @@ export interface ProtractorToolState {
  */
 export function resolveProtractorCenterSelection(
   registry: RuntimeObjectReader,
-  object: GeodesicCannonObject | GeodesicCrossingObject,
+  object: GeodesicEmitterObject | GeodesicCrossingObject,
 ): ProtractorCenterSelection {
   return {
     objectId: object.id,
     cellId: object.cellId,
     point: resolveProtractorCenterPoint(object),
-    geodesicIds: object.kind === "geodesic-cannon" ? getEmitterGeodesicIds(registry, object.id) : object.geodesicIds,
+    geodesicIds: object.kind === "geodesicEmitters/emitter" ? getEmitterGeodesicIds(registry, object.id) : object.geodesicIds,
   };
 }
 
-function resolveProtractorCenterPoint(object: GeodesicCannonObject | GeodesicCrossingObject): Vec3 {
+function resolveProtractorCenterPoint(object: GeodesicEmitterObject | GeodesicCrossingObject): Vec3 {
   if (object.aimStickyTarget?.localPoint) {
     return object.aimStickyTarget.localPoint;
   }
@@ -90,7 +90,7 @@ function resolveProtractorCenterPoint(object: GeodesicCannonObject | GeodesicCro
   return {
     x: object.localPose.translation.x,
     y: object.localPose.translation.y,
-    z: object.localPose.translation.z + (object.kind === "geodesic-cannon" ? geodesicRayBeamHeightMeters : 0),
+    z: object.localPose.translation.z + (object.kind === "geodesicEmitters/emitter" ? geodesicRayBeamHeightMeters : 0),
   };
 }
 
@@ -143,7 +143,7 @@ export function resolveProtractorDirectedGeodesicSelection(options: {
  */
 export function resolveProtractorEmitterGeodesicSelection(options: {
   readonly center: ProtractorCenterSelection;
-  readonly emitter: GeodesicCannonObject;
+  readonly emitter: GeodesicEmitterObject;
   readonly registry?: RuntimeObjectReader;
   readonly geodesicId?: string;
   readonly endRole?: GeodesicEndRole;
@@ -274,7 +274,7 @@ export function refreshProtractorAngleObject(options: {
   readonly angle: ProtractorAngleObject;
 }): ProtractorAngleObject | undefined {
   const centerObject = options.registry.get(options.angle.centerObjectId);
-  if (centerObject?.kind !== "geodesic-cannon" && centerObject?.kind !== "geodesicModel/crossing") {
+  if (centerObject?.kind !== "geodesicEmitters/emitter" && centerObject?.kind !== "geodesicModel/crossing") {
     const rememberedCenter = getRememberedGeodesicIntersectionObject(options.registry, options.angle.centerObjectId);
     return rememberedCenter ? {
       ...options.angle,
@@ -350,14 +350,14 @@ function resolveLiveProtractorDirectedGeodesic(
 function resolveEmitterSelectionObject(
   registry: RuntimeObjectRegistry,
   previous: ProtractorDirectedGeodesic,
-): GeodesicCannonObject | undefined {
+): GeodesicEmitterObject | undefined {
   const suffix = `:${previous.geodesicId}:emitter`;
   if (!previous.segmentId.endsWith(suffix)) {
     return undefined;
   }
 
   const object = registry.get(previous.segmentId.slice(0, -suffix.length));
-  return object?.kind === "geodesic-cannon" ? object : undefined;
+  return object?.kind === "geodesicEmitters/emitter" ? object : undefined;
 }
 
 function selectEmitterEndpointRole(options: {

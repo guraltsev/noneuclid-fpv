@@ -310,7 +310,7 @@ function intersectAimObject(
     ? intersectRayWithProtractorAngleLabelHitbox(object, origin, direction)
     : object.kind === "geodesicModel/segment"
     ? intersectRayWithSelectableSegment(object, origin, direction)
-    : object.kind === "geodesic-cannon"
+    : object.kind === "geodesicEmitters/emitter"
       ? intersectRayWithGeodesicEmitterAimCylinder(registry, origin, direction, object, ignoredGeodesicIds)
     : bounds
       ? intersectRayWithVerticalCylinder(origin, direction, bounds)
@@ -346,7 +346,7 @@ function resolveObjectAimTargets(
       hit = shifted ? { ...shifted, distance: shifted.distance + window.tMin } : undefined;
     }
 
-    const targetMaxDistanceMeters = object.kind === "geodesic-cannon" ? maxEmitterDistanceMeters : maxDistanceMeters;
+    const targetMaxDistanceMeters = object.kind === "geodesicEmitters/emitter" ? maxEmitterDistanceMeters : maxDistanceMeters;
     if (
       !hit ||
       hit.distance > targetMaxDistanceMeters ||
@@ -405,8 +405,8 @@ function isBetterAimTarget(candidate: AimTarget, current: AimTarget): boolean {
 function isGeodesicVsEmitterChoice(left: AimTarget, right: AimTarget): boolean {
   const leftKind = left.object?.kind;
   const rightKind = right.object?.kind;
-  return (isGeodesicAimObjectKind(leftKind) && rightKind === "geodesic-cannon") ||
-    (leftKind === "geodesic-cannon" && isGeodesicAimObjectKind(rightKind));
+  return (isGeodesicAimObjectKind(leftKind) && rightKind === "geodesicEmitters/emitter") ||
+    (leftKind === "geodesicEmitters/emitter" && isGeodesicAimObjectKind(rightKind));
 }
 
 function isGeodesicAimObjectKind(kind: RuntimeWorldObject["kind"] | undefined): boolean {
@@ -427,7 +427,7 @@ function getAimTargetPriority(target: AimTarget): number {
     return 1;
   }
 
-  if (target.object?.kind === "geodesic-cannon") {
+  if (target.object?.kind === "geodesicEmitters/emitter") {
     return 4;
   }
 
@@ -723,7 +723,7 @@ function resolveFloorAimTarget(
  * (collision radius + padding) / 2 and the half-height is padded by 0.1 m.
  */
 export function getGeodesicEmitterAimCylinderBounds(
-  emitter: Extract<RuntimeWorldObject, { readonly kind: "geodesic-cannon" }>,
+  emitter: Extract<RuntimeWorldObject, { readonly kind: "geodesicEmitters/emitter" }>,
 ): SimpleCylinderBounds | undefined {
   const bounds = getDynamicObjectCollisionBounds(runtimeObjectToDynamicObjectState(emitter));
   if (!bounds) {
@@ -743,7 +743,7 @@ export function getGeodesicEmitterAimCylinderBounds(
  * It sits above the cannon's base at beam height shifted down by 0.3 m.
  */
 export function getGeodesicEmitterAimSphereCenter(
-  emitter: Extract<RuntimeWorldObject, { readonly kind: "geodesic-cannon" }>,
+  emitter: Extract<RuntimeWorldObject, { readonly kind: "geodesicEmitters/emitter" }>,
 ): Vec3 {
   return {
     x: emitter.localPose.translation.x,
@@ -969,7 +969,7 @@ function intersectRayWithGeodesicEmitterAimCylinder(
   registry: RuntimeObjectReader,
   origin: Vec3,
   direction: Vec3,
-  emitter: Extract<RuntimeWorldObject, { readonly kind: "geodesic-cannon" }>,
+  emitter: Extract<RuntimeWorldObject, { readonly kind: "geodesicEmitters/emitter" }>,
   ignoredGeodesicIds: ReadonlySet<string>,
 ): ObjectAimHit | undefined {
   const bounds = getGeodesicEmitterAimCylinderBounds(emitter);
@@ -1000,7 +1000,7 @@ function intersectRayWithEmitterGeodesicHandles(
   registry: RuntimeObjectReader,
   origin: Vec3,
   direction: Vec3,
-  emitter: Extract<RuntimeWorldObject, { readonly kind: "geodesic-cannon" }>,
+  emitter: Extract<RuntimeWorldObject, { readonly kind: "geodesicEmitters/emitter" }>,
   ignoredGeodesicIds: ReadonlySet<string>,
 ): ObjectAimHit | undefined {
   const center = {
@@ -1054,7 +1054,7 @@ function intersectRayWithEmitterGeodesicHandles(
 // The emitter's first attached geodesic that is not ignored.
 function resolveDefaultEmitterGeodesicId(
   registry: RuntimeObjectReader,
-  emitter: Extract<RuntimeWorldObject, { readonly kind: "geodesic-cannon" }>,
+  emitter: Extract<RuntimeWorldObject, { readonly kind: "geodesicEmitters/emitter" }>,
   ignoredGeodesicIds: ReadonlySet<string>,
 ): string | undefined {
   return getEmitterGeodesicIds(registry, emitter.id).find((geodesicId) => !ignoredGeodesicIds.has(geodesicId));

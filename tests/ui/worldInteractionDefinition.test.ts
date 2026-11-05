@@ -29,7 +29,7 @@ describe("worldInteractionDefinition", () => {
   it("emits context menu for geodesic emitters", () => {
     const definition = createWorldFocusMessageDefinition({
       object: {
-        ...baseObjectFields("geodesic-cannon-a", "geodesic-cannon", "Geodesic emitter"),
+        ...baseObjectFields("geodesic-cannon-a", "geodesicEmitters/emitter", "Geodesic emitter"),
         geodesicIds: [],
         aimYawRadians: 0,
       } as RuntimeWorldObject,
@@ -61,7 +61,7 @@ describe("worldInteractionDefinition", () => {
       selectedTool: "none",
       canExtendGeodesic: true,
     });
-    const locked = createWorldFocusMessageDefinition({
+    const connected = createWorldFocusMessageDefinition({
       object: segment(),
       selectedTool: "none",
       canExtendGeodesic: false,
@@ -69,7 +69,7 @@ describe("worldInteractionDefinition", () => {
 
     expect(definition?.actions).toMatchObject([{ id: "extend-geodesic", intent: "primary", label: "Extend" }]);
     expect(formatWorldFocusMessageTextForLegacyFallback(definition, "desktop")).toBe("Geodesic G1\nLeft click - Extend");
-    expect(formatWorldFocusMessageTextForLegacyFallback(locked, "desktop")).toBe("Geodesic G1");
+    expect(formatWorldFocusMessageTextForLegacyFallback(connected, "desktop")).toBe("Geodesic G1");
   });
 
   it("emits tool-specific primary actions for geodesic segments", () => {

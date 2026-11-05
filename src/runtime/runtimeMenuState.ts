@@ -101,13 +101,13 @@ export interface RuntimeMenuState {
     readonly message: string;
   };
   /**
-   * Payload of the geodesic-cannon-actions page: cannon id, its geodesics with optional display labels, which are locked, and the actions the tools contribute (with their availability).
+   * Payload of the geodesic-cannon-actions page: cannon id, its geodesics with optional display labels, which are connected, and the actions the tools contribute (with their availability).
    */
   readonly geodesicCannonOptions?: {
     readonly cannonId: string;
     readonly geodesicIds: readonly string[];
     readonly geodesicLabelsById?: Readonly<Record<string, string>>;
-    readonly lockedGeodesicIds?: readonly string[];
+    readonly connectedGeodesicIds?: readonly string[];
     readonly objectActions?: readonly ObjectActionEntry[];
   };
   /**
@@ -282,7 +282,7 @@ export function showRuntimeMenuGeodesicCannonActions(
     readonly cannonId: string;
     readonly geodesicIds?: readonly string[];
     readonly geodesicLabelsById?: Readonly<Record<string, string>>;
-    readonly lockedGeodesicIds?: readonly string[];
+    readonly connectedGeodesicIds?: readonly string[];
     readonly objectActions?: readonly ObjectActionEntry[];
   },
 ): RuntimeMenuState {
@@ -294,7 +294,7 @@ export function showRuntimeMenuGeodesicCannonActions(
       cannonId: options.cannonId,
       geodesicIds: options.geodesicIds ?? [],
       geodesicLabelsById: options.geodesicLabelsById,
-      lockedGeodesicIds: options.lockedGeodesicIds,
+      connectedGeodesicIds: options.connectedGeodesicIds,
       objectActions: options.objectActions,
     },
   };

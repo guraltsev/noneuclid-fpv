@@ -22,7 +22,7 @@ import {
 } from "../../src/render/three/geodesicCannonRenderer";
 import { createFakePreparedAssets } from "../support/preparedAssets";
 import type {
-  GeodesicCannonObject,
+  GeodesicEmitterObject,
   GeodesicCrossingObject,
   GeodesicSegmentObject,
 } from "../../src/world-objects/geodesic/objects";
@@ -155,10 +155,10 @@ function createSegment(overrides: Partial<GeodesicSegmentObject> = {}): Geodesic
   };
 }
 
-function createRayEmitter(overrides: Partial<GeodesicCannonObject> = {}): GeodesicCannonObject {
+function createRayEmitter(overrides: Partial<GeodesicEmitterObject> = {}): GeodesicEmitterObject {
   return {
     id: "ray-emitter-a",
-    kind: "geodesic-cannon",
+    kind: "geodesicEmitters/emitter",
     cellId: "cell-a",
     localPose: yawRigidTransform3(0, { x: 0, y: 0, z: 0 }),
     collision: { radius: 0.3, height: 0.5 },

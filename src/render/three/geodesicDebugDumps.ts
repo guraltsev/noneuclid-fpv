@@ -62,7 +62,7 @@ export interface GeodesicDebugDumpsDeps {
  *
  * Returns `dumpGeodesicCreatures` (creature parenting and visibility table), `dumpGeodesicPath` (segments and portal word of
  * one geodesic; defaults to the active, selected, or aimed geodesic and returns `undefined` when none is found),
- * `dumpLockedGeodesicWords` (portal words of all locked geodesics), `dumpAllGeodesics` (full registry snapshot, also
+ * `dumpConnectedGeodesicWords` (portal words of all connected geodesics), `dumpAllGeodesics` (full registry snapshot, also
  * printed as copyable JSON), and `updateGeodesicCreatureDebug(deltaSeconds)` for per-frame use. The last accumulates time and,
  * in verbose mode, checks creatures every 0.1 s, warning on any issue and logging a healthy status at most every 5 s.
  * Holds only timer state; nothing to dispose.
@@ -108,7 +108,7 @@ export function createGeodesicDebugDumps(deps: GeodesicDebugDumpsDeps) {
     const start = segments[0]?.start;
     const dump: GeodesicPathDebugDump = {
       geodesicId,
-      locked: arcConnectsEmitters(runtimeObjectRegistry, geodesicId),
+      connected: arcConnectsEmitters(runtimeObjectRegistry, geodesicId),
       connection: getGeodesicConnection(runtimeObjectRegistry, geodesicId),
       startCellId: segments[0]?.cellId,
       start: start ? formatVec3(start) : undefined,
@@ -132,12 +132,12 @@ export function createGeodesicDebugDumps(deps: GeodesicDebugDumpsDeps) {
     return dump;
   }
 
-  function dumpLockedGeodesicWords(): readonly GeodesicWordDebugDump[] {
+  function dumpConnectedGeodesicWords(): readonly GeodesicWordDebugDump[] {
     const geodesicIds = collectKnownGeodesicIds()
       .filter((geodesicId) => arcConnectsEmitters(runtimeObjectRegistry, geodesicId))
       .sort();
     const dumps = geodesicIds.map(createGeodesicWordDebugDump);
-    console.info("[noneuclid] locked geodesic words", dumps);
+    console.info("[noneuclid] connected geodesic words", dumps);
     console.table(dumps.map((dump) => ({
       geodesicId: dump.geodesicId,
       startCellId: dump.startCellId,
@@ -166,7 +166,7 @@ export function createGeodesicDebugDumps(deps: GeodesicDebugDumpsDeps) {
       )
       .sort((left, right) => left.id.localeCompare(right.id));
     const anchors = objects
-      .filter((object) => object.kind === "geodesic-cannon" || object.kind === "geodesicModel/vertex")
+      .filter((object) => object.kind === "geodesicEmitters/emitter" || object.kind === "geodesicModel/vertex")
       .sort((left, right) => left.id.localeCompare(right.id));
 
     const dump: AllGeodesicsDebugDump = {
@@ -187,7 +187,7 @@ export function createGeodesicDebugDumps(deps: GeodesicDebugDumpsDeps) {
           portalWordText: formatGeodesicPortalWord(interval.portalWord),
           portalWord: interval.portalWord,
           connection: getGeodesicConnection(runtimeObjectRegistry, interval.id),
-          locked: arcConnectsEmitters(runtimeObjectRegistry, interval.id),
+          connected: arcConnectsEmitters(runtimeObjectRegistry, interval.id),
           segmentCount: intervalSegments.length,
           totalSegmentLengthMeters: roundedMeters(totalGeodesicLengthFromDebugSegments(intervalSegments)),
           segmentCells: [...new Set(intervalSegments.map((segment) => segment.cellId))],
@@ -211,7 +211,7 @@ export function createGeodesicDebugDumps(deps: GeodesicDebugDumpsDeps) {
         id: anchor.id,
         kind: anchor.kind,
         cellId: anchor.cellId,
-        point: formatVec3(anchor.kind === "geodesic-cannon" ? getGeodesicDebugAnchorPoint(anchor) : anchor.localPose.translation),
+        point: formatVec3(anchor.kind === "geodesicEmitters/emitter" ? getGeodesicDebugAnchorPoint(anchor) : anchor.localPose.translation),
         attachedEndpoints: objects
           .filter((object): object is Extract<RuntimeWorldObject, { readonly kind: "geodesicModel/arc" }> =>
             object.kind === "geodesicModel/arc"
@@ -249,7 +249,7 @@ export function createGeodesicDebugDumps(deps: GeodesicDebugDumpsDeps) {
       anchorKind: anchor?.kind,
       anchorCellId: anchor?.cellId,
       anchorPoint: anchor
-        ? formatVec3(anchor.kind === "geodesic-cannon" ? getGeodesicDebugAnchorPoint(anchor) : anchor.localPose.translation)
+        ? formatVec3(anchor.kind === "geodesicEmitters/emitter" ? getGeodesicDebugAnchorPoint(anchor) : anchor.localPose.translation)
         : undefined,
     };
   }
@@ -260,7 +260,7 @@ export function createGeodesicDebugDumps(deps: GeodesicDebugDumpsDeps) {
     const start = segments[0]?.start;
     return {
       geodesicId,
-      locked: arcConnectsEmitters(runtimeObjectRegistry, geodesicId),
+      connected: arcConnectsEmitters(runtimeObjectRegistry, geodesicId),
       connection: getGeodesicConnection(runtimeObjectRegistry, geodesicId),
       startCellId: segments[0]?.cellId,
       start: start ? formatVec3(start) : undefined,
@@ -295,7 +295,7 @@ export function createGeodesicDebugDumps(deps: GeodesicDebugDumpsDeps) {
 
     const cannonId = deps.session.get().cannonToolState.selectedCannonId;
     const selectedCannon = cannonId ? runtimeObjectRegistry.get(cannonId) : undefined;
-    if (selectedCannon?.kind === "geodesic-cannon") {
+    if (selectedCannon?.kind === "geodesicEmitters/emitter") {
       return getEmitterGeodesicIds(runtimeObjectRegistry, selectedCannon.id)[0];
     }
 
@@ -304,7 +304,7 @@ export function createGeodesicDebugDumps(deps: GeodesicDebugDumpsDeps) {
     if (object?.kind === "geodesicModel/segment") {
       return object.geodesicId;
     }
-    if (object?.kind === "geodesic-cannon") {
+    if (object?.kind === "geodesicEmitters/emitter") {
       return getEmitterGeodesicIds(runtimeObjectRegistry, object.id)[0];
     }
 
@@ -347,7 +347,7 @@ export function createGeodesicDebugDumps(deps: GeodesicDebugDumpsDeps) {
   return {
     dumpGeodesicCreatures,
     dumpGeodesicPath,
-    dumpLockedGeodesicWords,
+    dumpConnectedGeodesicWords,
     dumpAllGeodesics,
     updateGeodesicCreatureDebug,
   };

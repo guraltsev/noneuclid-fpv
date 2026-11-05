@@ -14,7 +14,7 @@ import { describe, expect, it } from "vitest";
 import { createRuntimeObjectRegistry } from "../../../src/world-objects/runtimeObjectRegistry";
 import {
   createGeodesicVertexObject,
-  createGeodesicCannonObject,
+  createGeodesicEmitterObject,
   createGeodesicArcObject,
   geodesicRayBeamHeightMeters,
   getGeodesicSegmentEnd,
@@ -39,7 +39,7 @@ describe("geodesic cannon world objects: intersections", () => {
   it("looks up tails and removes segment chains", () => {
     const world = compileWorld(false);
     const registry = createRuntimeObjectRegistry();
-    const cannon = createGeodesicCannonObject({
+    const cannon = createGeodesicEmitterObject({
       id: "cannon-a",
       cellId: "a",
       localPose: yawRigidTransform3(0, { x: 0.25, y: 1, z: 0 }),
@@ -52,17 +52,17 @@ describe("geodesic cannon world objects: intersections", () => {
     expect(getGeodesicSegments(registry, "g-a")).toHaveLength(2);
     removeGeodesic(registry, "g-a");
     expect(registry.getAll().filter((object) => object.kind === "geodesicModel/segment")).toHaveLength(0);
-    expect(registry.get("cannon-a")?.kind).toBe("geodesic-cannon");
+    expect(registry.get("cannon-a")?.kind).toBe("geodesicEmitters/emitter");
   });
 
   it("clears the old emitter attachment when an interval endpoint is detached", () => {
     const registry = createRuntimeObjectRegistry([
-      createGeodesicCannonObject({
+      createGeodesicEmitterObject({
         id: "cannon-a",
         cellId: "a",
         localPose: yawRigidTransform3(0, { x: 0, y: 0, z: 0 }),
       }),
-      createGeodesicCannonObject({
+      createGeodesicEmitterObject({
         id: "cannon-b",
         cellId: "a",
         localPose: yawRigidTransform3(Math.PI, { x: 1, y: 0, z: 0 }),
@@ -88,7 +88,7 @@ describe("geodesic cannon world objects: intersections", () => {
 
   it("lists no geodesic for an emitter once its interval is removed", () => {
     const registry = createRuntimeObjectRegistry([
-      createGeodesicCannonObject({
+      createGeodesicEmitterObject({
         id: "cannon-a",
         cellId: "a",
         localPose: yawRigidTransform3(0, { x: 0, y: 0, z: 0 }),
@@ -145,7 +145,7 @@ describe("geodesic cannon world objects: intersections", () => {
 
   it("creates a vertex balloon where geodesics intersect at an unrelated emitter", () => {
     const registry = createRuntimeObjectRegistry([
-      createGeodesicCannonObject({
+      createGeodesicEmitterObject({
         id: "cannon-a",
         cellId: "a",
         localPose: yawRigidTransform3(0, { x: 1, y: 1, z: 0 }),
@@ -325,7 +325,7 @@ describe("geodesic cannon world objects: intersections", () => {
 
   it("reports a crossing of two geodesics 0.2 m from an unrelated emitter", () => {
     const registry = createRuntimeObjectRegistry([
-      createGeodesicCannonObject({ id: "other", cellId: "a", localPose: yawRigidTransform3(0, { x: 1.2, y: 1, z: 0 }) }),
+      createGeodesicEmitterObject({ id: "other", cellId: "a", localPose: yawRigidTransform3(0, { x: 1.2, y: 1, z: 0 }) }),
       createSegment({ id: "g-a:segment:0", start: { x: 0, y: 1, z: geodesicRayBeamHeightMeters }, direction: { x: 1, y: 0, z: 0 }, lengthMeters: 2 }),
       createSegment({ id: "g-b:segment:0", geodesicId: "g-b", start: { x: 1, y: 0, z: geodesicRayBeamHeightMeters }, direction: { x: 0, y: 1, z: 0 }, lengthMeters: 2 }),
     ]);

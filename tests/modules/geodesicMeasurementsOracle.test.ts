@@ -1,7 +1,7 @@
 /**
  * `tests/modules/geodesicMeasurementsOracle.test.ts` — unit tier.
  *
- * The oracle fuzz of the measurement ticks (design 014 D8 for the materialized records): a world with several cannons, locked geodesics and a tied vertex, protractor angles and measured lengths on it, and a seeded random sequence of writes
+ * The oracle fuzz of the measurement ticks (design 014 D8 for the materialized records): a world with several cannons, connected geodesics and a tied vertex, protractor angles and measured lengths on it, and a seeded random sequence of writes
  * (carry any cannon, also toward and across a portal, detach, flow steps of the curve shortening module, removing a geodesic). After EVERY step each stored angle and length must equal a fresh `refresh...Object`, and a record that was removed must not be resolvable any more.
  * The read tracker decides when a record is refreshed, so a read it fails to record shows up here as a stale record. The test also checks that every kind a refresh reads is among the kinds the tick subscribes to.
  */
@@ -19,7 +19,7 @@ import { yawRigidTransform3 } from "../../src/math/rigidTransform3";
 import { createDefaultPlayerPose } from "../../src/movement/playerPose";
 import { shootGeodesic } from "../../src/world-objects/geodesic/cannon";
 import { removeGeodesic } from "../../src/world-objects/geodesic/lifecycle";
-import { createGeodesicCannonObject } from "../../src/world-objects/geodesic/objects";
+import { createGeodesicEmitterObject } from "../../src/world-objects/geodesic/objects";
 import { createMeasuredGeodesicLengthObject, refreshMeasuredGeodesicLengthObject } from "../../src/world-objects/measureLengthTool";
 import {
   createProtractorAngleObject,
@@ -50,7 +50,7 @@ interface Scene {
 
 function cannonOf(registry: RuntimeObjectRegistry, id: string) {
   const cannon = registry.get(id);
-  if (cannon?.kind !== "geodesic-cannon") throw new Error(`cannon ${id} missing`);
+  if (cannon?.kind !== "geodesicEmitters/emitter") throw new Error(`cannon ${id} missing`);
   return cannon;
 }
 
@@ -69,12 +69,12 @@ function addLength(scene: Pick<Scene, "registry" | "world" | "cellId" | "playerP
   scene.registry.add(length);
 }
 
-/** Three cannons in one cell, P with locked geodesics to Q and to R, Q with one to R, a portal on the east side. */
-function lockedScene(): Scene {
+/** Three cannons in one cell, P with connected geodesics to Q and to R, Q with one to R, a portal on the east side. */
+function connectedScene(): Scene {
   const world = compileLargePortalWorld();
   const registry = createRuntimeObjectRegistry();
   for (const [id, x, y] of [["P", 3, 2.5], ["Q", 4.2, 2.5], ["R", 3, 4]] as const) {
-    registry.add(createGeodesicCannonObject({ id, cellId: "a", localPose: yawRigidTransform3(0, { x, y, z: 0 }) }));
+    registry.add(createGeodesicEmitterObject({ id, cellId: "a", localPose: yawRigidTransform3(0, { x, y, z: 0 }) }));
   }
   const aim = (id: string, yaw: number, geodesicId: string, length: number) => {
     const cannon = cannonOf(registry, id);
@@ -100,7 +100,7 @@ function lockedScene(): Scene {
   return scene;
 }
 
-/** The torus pair of two locked arcs tied at a vertex, flowing under the curve shortening module; an angle at the cannon e1 and a length per arc. */
+/** The torus pair of two connected arcs tied at a vertex, flowing under the curve shortening module; an angle at the cannon e1 and a length per arc. */
 function flowScene(): Scene {
   const { world, registry } = createTorusTiedPairScenario();
   const playerPoint = { x: -2, y: 0, z: 0 };
@@ -206,13 +206,13 @@ function runSequence(scene: Scene, actions: readonly Action[]): void {
 }
 
 describe("the measurement ticks against fresh refreshes", () => {
-  it("match fresh refreshes for locked geodesics through carries of any cannon", () => {
-    fc.assert(fc.property(fc.array(action, { minLength: 4, maxLength: 24 }), (actions) => runSequence(lockedScene(), actions)), { seed: 20261104, numRuns: 40 });
+  it("match fresh refreshes for connected geodesics through carries of any cannon", () => {
+    fc.assert(fc.property(fc.array(action, { minLength: 4, maxLength: 24 }), (actions) => runSequence(connectedScene(), actions)), { seed: 20261104, numRuns: 40 });
   });
 
-  it("match fresh refreshes when a carry collapses a measured locked geodesic", () => {
+  it("match fresh refreshes when a carry collapses a measured connected geodesic", () => {
     const action = (kind: Action["kind"], cannon: number): Action => ({ kind, cannon, x: 0, y: 0 });
-    runSequence(lockedScene(), [action("attach", 2), action("nudge", 0), action("attach", 0), action("attach", 0), action("attach", 0), action("attach", 0)]);
+    runSequence(connectedScene(), [action("attach", 2), action("nudge", 0), action("attach", 0), action("attach", 0), action("attach", 0), action("attach", 0)]);
   });
 
   it("match fresh refreshes for a tied, flowing pair through carries and flow steps", () => {

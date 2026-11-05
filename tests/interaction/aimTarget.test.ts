@@ -19,7 +19,7 @@ import { createPlacedFlagObject } from "../../src/world-objects/placedFlags";
 import { createRuntimeObjectRegistry } from "../../src/world-objects/runtimeObjectRegistry";
 import {
   createGeodesicArcObject,
-  createGeodesicCannonObject,
+  createGeodesicEmitterObject,
   createGeodesicVertexObject,
   geodesicRayBeamHeightMeters,
   type GeodesicCrossingObject,
@@ -84,7 +84,7 @@ describe("resolveAimTarget", () => {
 
   it("selects geodesic emitters beyond the ordinary aim distance", () => {
     const world = compileCellComplex(largeRoomWorld());
-    const emitter = createGeodesicCannonObject({
+    const emitter = createGeodesicEmitterObject({
       id: "emitter-a",
       cellId: "room",
       localPose: yawRigidTransform3(0, { x: 40, y: 0, z: 0 }),
@@ -113,7 +113,7 @@ describe("resolveAimTarget", () => {
 
   it("misses geodesic emitters just outside the narrowed cylindrical aim outline", () => {
     const world = compileCellComplex(largeRoomWorld());
-    const emitter = createGeodesicCannonObject({
+    const emitter = createGeodesicEmitterObject({
       id: "emitter-a",
       cellId: "room",
       localPose: yawRigidTransform3(0, { x: 40, y: 0, z: 0 }),
@@ -198,8 +198,8 @@ describe("resolveAimTarget", () => {
     const world = compileCellComplex(singleRoomWorld());
     const segment = createGeodesicSegment({ geodesicId: "g-tied", connectionState: "open" });
     const registry = createRuntimeObjectRegistry([
-      createGeodesicCannonObject({ id: "e1", cellId: "room", localPose: yawRigidTransform3(0, { x: -3, y: 2, z: 0 }) }),
-      createGeodesicCannonObject({ id: "e2", cellId: "room", localPose: yawRigidTransform3(0, { x: 3, y: 2, z: 0 }) }),
+      createGeodesicEmitterObject({ id: "e1", cellId: "room", localPose: yawRigidTransform3(0, { x: -3, y: 2, z: 0 }) }),
+      createGeodesicEmitterObject({ id: "e2", cellId: "room", localPose: yawRigidTransform3(0, { x: 3, y: 2, z: 0 }) }),
       createGeodesicVertexObject({ id: "v", cellId: "room", point: { x: 0, y: 0, z: 1.08 } }),
       createGeodesicArcObject({ id: "g-tied", startAnchorObjectId: "e1", endAnchorObjectId: "v", startCellId: "room" }),
       createGeodesicArcObject({ id: "g-other", startAnchorObjectId: "v", endAnchorObjectId: "e2", startCellId: "room" }),
@@ -217,7 +217,7 @@ describe("resolveAimTarget", () => {
 
   it("resolves geodesic ray segments near an emitter with a missed hitbox", () => {
     const world = compileCellComplex(singleRoomWorld());
-    const cannon = createGeodesicCannonObject({
+    const cannon = createGeodesicEmitterObject({
       id: "cannon-a",
       cellId: "room",
       localPose: yawRigidTransform3(0, { x: 0, y: 0, z: 0 }),
@@ -244,7 +244,7 @@ describe("resolveAimTarget", () => {
 
   it("prioritizes geodesic emitters over overlapping geodesic ray segments", () => {
     const world = compileCellComplex(singleRoomWorld());
-    const cannon = createGeodesicCannonObject({
+    const cannon = createGeodesicEmitterObject({
       id: "cannon-a",
       cellId: "room",
       localPose: yawRigidTransform3(0, { x: 0, y: 0, z: 0 }),
@@ -271,7 +271,7 @@ describe("resolveAimTarget", () => {
 
   it("reports the aimed geodesic id on geodesic emitter handles", () => {
     const world = compileCellComplex(singleRoomWorld());
-    const cannon = createGeodesicCannonObject({
+    const cannon = createGeodesicEmitterObject({
       id: "cannon-a",
       cellId: "room",
       localPose: yawRigidTransform3(0, { x: 0, y: 0, z: 0 }),
@@ -308,7 +308,7 @@ describe("resolveAimTarget", () => {
 
   it("still resolves other geodesic emitter handles while one handle is ignored", () => {
     const world = compileCellComplex(singleRoomWorld());
-    const cannon = createGeodesicCannonObject({
+    const cannon = createGeodesicEmitterObject({
       id: "cannon-a",
       cellId: "room",
       localPose: yawRigidTransform3(0, { x: 0, y: 0, z: 0 }),
@@ -335,7 +335,7 @@ describe("resolveAimTarget", () => {
 
   it("reports the next available geodesic id past an ignored one aimed through the emitter", () => {
     const world = compileCellComplex(singleRoomWorld());
-    const cannon = createGeodesicCannonObject({
+    const cannon = createGeodesicEmitterObject({
       id: "cannon-a",
       cellId: "room",
       localPose: yawRigidTransform3(0, { x: 0, y: 0, z: 0 }),
@@ -362,7 +362,7 @@ describe("resolveAimTarget", () => {
 
   it("misses geodesic emitter handle capsules outside the narrowed radius", () => {
     const world = compileCellComplex(singleRoomWorld());
-    const cannon = createGeodesicCannonObject({
+    const cannon = createGeodesicEmitterObject({
       id: "cannon-a",
       cellId: "room",
       localPose: yawRigidTransform3(0, { x: 0, y: 0, z: 0 }),
@@ -396,7 +396,7 @@ describe("resolveAimTarget", () => {
 
   it("keeps short geodesic ray segments selectable near an emitter with a missed hitbox", () => {
     const world = compileCellComplex(singleRoomWorld());
-    const cannon = createGeodesicCannonObject({
+    const cannon = createGeodesicEmitterObject({
       id: "cannon-a",
       cellId: "room",
       localPose: yawRigidTransform3(0, { x: 0, y: 0, z: 0 }),
@@ -448,7 +448,7 @@ describe("resolveAimTarget", () => {
 
   it("prioritizes geodesic emitters over overlapping geodesic intersection balloons", () => {
     const world = compileCellComplex(singleRoomWorld());
-    const cannon = createGeodesicCannonObject({
+    const cannon = createGeodesicEmitterObject({
       id: "cannon-a",
       cellId: "room",
       localPose: yawRigidTransform3(0, { x: 0, y: 0, z: 0 }),
@@ -560,7 +560,7 @@ describe("resolveAimTarget", () => {
     if (!labelCenter) {
       throw new Error("Expected protractor angle label hitbox.");
     }
-    const cannon = createGeodesicCannonObject({
+    const cannon = createGeodesicEmitterObject({
       id: "cannon-a",
       cellId: "room",
       localPose: yawRigidTransform3(0, {

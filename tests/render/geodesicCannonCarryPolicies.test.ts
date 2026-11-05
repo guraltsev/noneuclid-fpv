@@ -23,7 +23,7 @@ import { handCarryLeashMeters } from "../../src/interaction/handCarry";
 import { carryMaxSpeedMetersPerSecond } from "../../src/world-objects/carry";
 import { shootGeodesic } from "../../src/world-objects/geodesic/cannon";
 import { arcConnectsEmitters } from "../../src/world-objects/geodesic/lifecycle";
-import { createGeodesicCannonObject, emitterConnectionToleranceMeters } from "../../src/world-objects/geodesic/objects";
+import { createGeodesicEmitterObject, emitterConnectionToleranceMeters } from "../../src/world-objects/geodesic/objects";
 import { createRuntimeObjectRegistry, type RuntimeObjectRegistry } from "../../src/world-objects/runtimeObjectRegistry";
 import { createGeodesicCannonTools } from "../../src/render/three/geodesicCannonTools";
 import { getRuntimeObjectInteractionRangeMeters, type RootAimRay } from "../../src/render/three/rootAimRay";
@@ -70,14 +70,14 @@ function handAt(x: number, y: number): RootAimRay {
   };
 }
 
-// Two rooms side by side with a locked geodesic from an emitter in `a` to one in `b`; the player stands in `a`.
+// Two rooms side by side with a connected geodesic from an emitter in `a` to one in `b`; the player stands in `a`.
 function setupRooms(playerX: number, playerY: number) {
   const world = compileLargePortalWorld();
   const registry = createRuntimeObjectRegistry();
-  registry.add(createGeodesicCannonObject({ id: "cannon-a", cellId: "a", localPose: yawRigidTransform3(0, { x: 4, y: 2.5, z: 0 }) }));
-  registry.add(createGeodesicCannonObject({ id: "cannon-b", cellId: "b", localPose: yawRigidTransform3(Math.PI, { x: 1, y: 2.5, z: 0 }) }));
+  registry.add(createGeodesicEmitterObject({ id: "cannon-a", cellId: "a", localPose: yawRigidTransform3(0, { x: 4, y: 2.5, z: 0 }) }));
+  registry.add(createGeodesicEmitterObject({ id: "cannon-b", cellId: "b", localPose: yawRigidTransform3(Math.PI, { x: 1, y: 2.5, z: 0 }) }));
   const source = registry.get("cannon-a");
-  if (source?.kind !== "geodesic-cannon") {
+  if (source?.kind !== "geodesicEmitters/emitter") {
     throw new Error("Expected the source emitter.");
   }
   shootGeodesic({ world, registry, cannon: source, geodesicId: "g-a", maxLengthMeters: 3 });
@@ -95,7 +95,7 @@ describe("the carry tool applies the agreed policies", () => {
     tools.finishGeodesicCannonCarry();
 
     const emitter = registry.get("cannon-b");
-    expect(emitter).toMatchObject({ kind: "geodesic-cannon", cellId: "a" });
+    expect(emitter).toMatchObject({ kind: "geodesicEmitters/emitter", cellId: "a" });
     expect(emitter?.localPose.translation.y).toBeGreaterThan(4.9);
     expect(emitter?.localPose.translation.y).toBeLessThan(5);
     expect(arcConnectsEmitters(registry, "g-a")).toBe(true);
@@ -106,22 +106,22 @@ describe("the carry tool applies the agreed policies", () => {
     // (0, 5): inside the exclusion zone (0.15 m) widened by the emitter's body, though the portal itself is open.
     const world = compileLargePortalWorld();
     const registry = createRuntimeObjectRegistry();
-    registry.add(createGeodesicCannonObject({ id: "lamp", cellId: "b", localPose: yawRigidTransform3(0, { x: 1.6, y: 4.7, z: 0 }) }));
+    registry.add(createGeodesicEmitterObject({ id: "lamp", cellId: "b", localPose: yawRigidTransform3(0, { x: 1.6, y: 4.7, z: 0 }) }));
     const { tools, selectedTool } = createHarness(world, registry, { ...createDefaultPlayerPose("a"), position: { x: 4.5, y: 3.5, z: 0 } });
     const stopX = Math.sqrt((0.15 + emitterConnectionToleranceMeters) ** 2 - 0.3 ** 2);
 
     tools.startGeodesicCannonCarry("lamp");
-    expect(selectedTool()).toBe("geodesic-cannon-carry");
+    expect(selectedTool()).toBe("geodesicEmitters/carry");
     tools.updateCarriedGeodesicCannonPose(true, handAt(4, 4.7));
 
     // It followed the hand for one step, then the next step would have swept the zone: it stops at the zone's edge and is still carried.
-    expect(selectedTool()).toBe("geodesic-cannon-carry");
-    expect(registry.get("lamp")).toMatchObject({ kind: "geodesic-cannon", cellId: "b" });
+    expect(selectedTool()).toBe("geodesicEmitters/carry");
+    expect(registry.get("lamp")).toMatchObject({ kind: "geodesicEmitters/emitter", cellId: "b" });
     expect(registry.get("lamp")?.localPose.translation.x).toBeCloseTo(stopX, 3);
     expect(registry.get("lamp")?.localPose.translation.y).toBeCloseTo(4.7, 6);
     // The hand stays where it is: another frame changes nothing and the carry goes on.
     tools.updateCarriedGeodesicCannonPose(true, handAt(4, 4.7));
-    expect(selectedTool()).toBe("geodesic-cannon-carry");
+    expect(selectedTool()).toBe("geodesicEmitters/carry");
     expect(registry.get("lamp")?.localPose.translation.x).toBeCloseTo(stopX, 3);
   });
 
@@ -134,12 +134,12 @@ describe("the carry tool applies the agreed policies", () => {
     tools.updateCarriedGeodesicCannonPose(true, handAt(4.9, 4.8));
 
     const emitter = registry.get("cannon-a");
-    expect(emitter).toMatchObject({ kind: "geodesic-cannon", cellId: "a" });
+    expect(emitter).toMatchObject({ kind: "geodesicEmitters/emitter", cellId: "a" });
     expect(Math.hypot((emitter?.localPose.translation.x ?? 0) - 5, (emitter?.localPose.translation.y ?? 0) - 5))
       .toBeGreaterThanOrEqual(0.15 + emitterConnectionToleranceMeters);
     expect(registry.get("g-a")).toBeDefined();
     expect(registry.get("cannon-b")).toBeDefined();
-    expect(selectedTool()).toBe("geodesic-cannon-carry");
+    expect(selectedTool()).toBe("geodesicEmitters/carry");
   });
 
   describe("the hand lets go of an emitter that is too far", () => {
@@ -158,7 +158,7 @@ describe("the carry tool applies the agreed policies", () => {
       const near = setupRooms(3.5, 2.5);
       near.tools.startGeodesicCannonCarry("cannon-b");
       near.tools.updateCarriedGeodesicCannonPose(true, handAt(6 - (leash(near.registry) - 0.1), 2.5), 0);
-      expect(near.selectedTool()).toBe("geodesic-cannon-carry");
+      expect(near.selectedTool()).toBe("geodesicEmitters/carry");
 
       const far = setupRooms(3.5, 2.5);
       far.tools.startGeodesicCannonCarry("cannon-b");
@@ -173,7 +173,7 @@ describe("the carry tool applies the agreed policies", () => {
       // 2.55 m from the emitter: just beyond the 2.5 m pickup range, within the loose leash; the emitter has not moved (no time passes).
       tools.updateCarriedGeodesicCannonPose(true, handAt(3.5, 3), 0);
 
-      expect(selectedTool()).toBe("geodesic-cannon-carry");
+      expect(selectedTool()).toBe("geodesicEmitters/carry");
     });
 
     it("holds at 1.5 m while gliding, but lets go at 1.5 m once the emitter has arrived", () => {
@@ -181,16 +181,16 @@ describe("the carry tool applies the agreed policies", () => {
       gliding.tools.startGeodesicCannonCarry("cannon-b");
       // The emitter (x = 6 in the frame of a) is 1.5 m from the hand and has not reached it: the loose leash applies.
       gliding.tools.updateCarriedGeodesicCannonPose(true, handAt(4.5, 2.5), 0);
-      expect(gliding.selectedTool()).toBe("geodesic-cannon-carry");
+      expect(gliding.selectedTool()).toBe("geodesicEmitters/carry");
 
       const held = setupRooms(3.5, 2.5);
       held.tools.startGeodesicCannonCarry("cannon-b");
       // Without a time limit the emitter follows the hand all the way: it has arrived, the tight leash applies from now on.
       held.tools.updateCarriedGeodesicCannonPose(true, handAt(4.5, 2.5));
-      expect(held.selectedTool()).toBe("geodesic-cannon-carry");
+      expect(held.selectedTool()).toBe("geodesicEmitters/carry");
       // Within 1 m of the arrived emitter the carry goes on; at 1.5 m (the emitter stuck, the hand gone) it is let go.
       held.tools.updateCarriedGeodesicCannonPose(true, handAt(4.5, 1.6), 0);
-      expect(held.selectedTool()).toBe("geodesic-cannon-carry");
+      expect(held.selectedTool()).toBe("geodesicEmitters/carry");
       held.tools.updateCarriedGeodesicCannonPose(true, handAt(4.5, 1), 0);
       expect(held.selectedTool()).toBe("none");
     });
@@ -205,7 +205,7 @@ describe("the carry tool applies the agreed policies", () => {
 
       expect(selectedTool()).toBe("none");
       const emitter = registry.get("cannon-b");
-      expect(emitter).toMatchObject({ kind: "geodesic-cannon" });
+      expect(emitter).toMatchObject({ kind: "geodesicEmitters/emitter" });
       expect(arcConnectsEmitters(registry, "g-a")).toBe(true);
       const travelled = Math.hypot((emitter?.cellId === "b" ? 5 : 0) + (emitter?.localPose.translation.x ?? 0) - 6, (emitter?.localPose.translation.y ?? 0) - 2.5);
       expect(travelled).toBeLessThanOrEqual(carryMaxSpeedMetersPerSecond * frameSeconds + 1e-6);
@@ -223,7 +223,7 @@ describe("the carry tool applies the agreed policies", () => {
       // The hand is exactly a pickup range from the emitter, as it is at the moment of a pickup at the edge of the range.
       for (let frame = 0; frame < 10; frame += 1) {
         tools.updateCarriedGeodesicCannonPose(true, handAt(6 - range, 2.5), 1 / 60);
-        expect(selectedTool()).toBe("geodesic-cannon-carry");
+        expect(selectedTool()).toBe("geodesicEmitters/carry");
       }
     });
   });

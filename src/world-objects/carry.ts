@@ -8,7 +8,7 @@
  * - Steps are applied in order and are never merged: the sum of the displacements is not the path, and one merged step can end in another cell,
  *   or another homotopy class, than the steps it replaces (a path that winds around a junction is not the straight line to its end).
  * - The reaction takes the world, the object and one step and returns a plain value; it changes nothing. The caller stores the result (for an
- *   emitter that anchors locked geodesics, only through `moveEmitterAlongRoute`, which refuses a move the portal word cannot follow).
+ *   emitter that anchors connected geodesics, only through `moveEmitterAlongRoute`, which refuses a move the portal word cannot follow).
  *   - The object is re-homed on every step: the new place is valid in the cell that contains it, and the route is the portals the straight walk
  *     of the step crossed, read off the walk, never inferred from positions.
  *   - Orientation: the object keeps its physical direction, so its yaw turns with the frames of the faces it crosses.
@@ -17,7 +17,7 @@
  *     sweep through it, is cut short just before the zone (`carryZoneMarginMeters`) and the reaction says it was stopped by the zone. The
  *     object is still carried, nothing is destroyed or detached because of a zone, and the hand can move on: the next step away from the
  *     zone is free. This replaces the earlier rules "drop at the last valid position on a swept junction" and "destroy on touch". Every
- *     step is a valid shorter step, so a locked geodesic stays chained. The zone geometry is the shared swept-collision code of the
+ *     step is a valid shorter step, so a connected geodesic stays chained. The zone geometry is the shared swept-collision code of the
  *     movement layer (`collectDevelopedObstacles`, `sweepDiscAgainstObstacle`), so creatures and carried emitters see the same zones; the
  *     difference is that a carried object stops where a creature slides. Walls stay as above (the anchor stops, not the body).
  *   - A later kick is not part of this contract: if touching a zone should ever end a carry and fling the object, that is a new outcome of

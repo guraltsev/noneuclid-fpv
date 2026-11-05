@@ -30,7 +30,7 @@ import type { VisiblePortalPath } from "../../src/render/three/visiblePortalPath
 import { rigidTransformToThreeMatrix, worldPointToThree } from "../../src/render/three/worldAxes";
 import type { RuntimeCreatureObject } from "../../src/world-objects/runtimeObjectBase";
 import { createGeodesicRuntimeRenderSources } from "../../src/render/three/geodesicCannonRenderer";
-import { createGeodesicCannonObject } from "../../src/world-objects/geodesic/objects";
+import { createGeodesicEmitterObject } from "../../src/world-objects/geodesic/objects";
 import { createRuntimeObjectRegistry } from "../../src/world-objects/runtimeObjectRegistry";
 import { createTestClientSession } from "../support/clientSession";
 
@@ -219,7 +219,7 @@ describe("the instance sync's highlight of the carried object", () => {
 
 describe("the highlight of a carried geodesic emitter", () => {
   it("is drawn on the emitter itself, through the geodesic branch, on every path", () => {
-    const emitter = createGeodesicCannonObject({ id: "cannon-b", cellId: "room-b", localPose: yawRigidTransform3(0, { x: 0.4, y: -0.2, z: 0 }) });
+    const emitter = createGeodesicEmitterObject({ id: "cannon-b", cellId: "room-b", localPose: yawRigidTransform3(0, { x: 0.4, y: -0.2, z: 0 }) });
     const registry = createRuntimeObjectRegistry([emitter]);
     const world = compileCellComplex(twoRooms());
     const geodesicRenderSources = createGeodesicRuntimeRenderSources();
@@ -266,7 +266,7 @@ describe("the highlight of a carried emitter that stands at a portal", () => {
   // room-b only, so seen from room-a its highlight is the room-b copy clipped at the portal. The highlight reaches 0.159 m, so it crosses the
   // portal: the part on room-a's side must be drawn too, as one whole shape, not cut off at the portal.
   it("is drawn whole in the viewer's room, not cut off at the portal", () => {
-    const emitter = createGeodesicCannonObject({ id: "cannon-b", cellId: "room-b", localPose: yawRigidTransform3(0, { x: -0.9, y: 0, z: 0 }) });
+    const emitter = createGeodesicEmitterObject({ id: "cannon-b", cellId: "room-b", localPose: yawRigidTransform3(0, { x: -0.9, y: 0, z: 0 }) });
     const registry = createRuntimeObjectRegistry([emitter]);
     const world = compileCellComplex(twoRooms());
     const geodesicRenderSources = createGeodesicRuntimeRenderSources();

@@ -105,7 +105,7 @@ export function buildProtractorAngleLabelBoxDebugMesh(
 
 /** Builds a group with a wireframe cylinder (the given bounds) and a wireframe sphere on top outlining a geodesic cannon's aim collision volume. */
 export function buildGeodesicEmitterAimCollisionOutlineDebugMesh(
-  object: Extract<RuntimeWorldObject, { readonly kind: "geodesic-cannon" }>,
+  object: Extract<RuntimeWorldObject, { readonly kind: "geodesicEmitters/emitter" }>,
   bounds: SimpleCylinderBounds,
 ): THREE.Group {
   const group = new THREE.Group();
@@ -300,7 +300,7 @@ export function buildAimCollisionOutlineDebugMesh(object: RuntimeWorldObject): T
     return buildGeodesicSegmentAimCollisionOutlineDebugMesh(object);
   }
 
-  if (object.kind === "geodesic-cannon") {
+  if (object.kind === "geodesicEmitters/emitter") {
     const bounds = getGeodesicEmitterAimCylinderBounds(object);
     return bounds ? buildGeodesicEmitterAimCollisionOutlineDebugMesh(object, bounds) : undefined;
   }

@@ -4,7 +4,7 @@
  * The carry contract (`src/world-objects/carry.ts`): an object that can be carried reacts to a stream of displacement steps.
  * The scenarios are those of design 012, P4: carrier and object in one cell; the object one and two portals away; the carrier crossing a portal
  * while carrying; the step sweeping across or ending in a junction's exclusion zone (the object stops short, as against a wall, and stays carried); the
- * step against a wall (the object stops short); a locked geodesic kept chained through all of it; the yaw turned with a quarter-turned face. Further tests pin down the rules of
+ * step against a wall (the object stops short); a connected geodesic kept chained through all of it; the yaw turned with a quarter-turned face. Further tests pin down the rules of
  * the stream: a long target is several steps in order, a lost frame changes nothing, pickup glides without jumping, and steps are never merged.
  * Two worlds: two square rooms side by side (`a` -> `b` through the whole side x = 5, walls elsewhere) and the cube (every side a portal,
  * every corner a junction, neighbouring faces quarter-turned).
@@ -29,7 +29,7 @@ import {
 } from "../../src/world-objects/carry";
 import { shootGeodesic, moveEmitterAlongRoute } from "../../src/world-objects/geodesic/cannon";
 import { arcConnectsEmitters } from "../../src/world-objects/geodesic/lifecycle";
-import { createGeodesicCannonObject, emitterConnectionToleranceMeters } from "../../src/world-objects/geodesic/objects";
+import { createGeodesicEmitterObject, emitterConnectionToleranceMeters } from "../../src/world-objects/geodesic/objects";
 import { collectGeodesicPortalWord } from "../../src/world-objects/geodesic/segments";
 import { createRuntimeObjectRegistry } from "../../src/world-objects/runtimeObjectRegistry";
 import { compileLargePortalWorld } from "../fixtures/world-objects/geodesic";
@@ -69,7 +69,7 @@ function carry(world: CompiledCellComplex, object: CarriedPlace, to: CellPoint, 
 
 describe("the capability", () => {
   it("is declared by the emitter's constructor and by nothing else by default", () => {
-    const emitter = createGeodesicCannonObject({ id: "e", cellId: "a", localPose: yawRigidTransform3(0, vec3(1, 1, 0)) });
+    const emitter = createGeodesicEmitterObject({ id: "e", cellId: "a", localPose: yawRigidTransform3(0, vec3(1, 1, 0)) });
 
     expect(canBeCarried(emitter)).toBe(true);
     expect(canBeCarried({})).toBe(false);
@@ -370,28 +370,28 @@ describe("the stream of steps", () => {
 });
 
 describe("pickup", () => {
-  // The cube, with a locked geodesic from an emitter on the front face to one on the right face, as in the carry tool's tests.
-  function lockedCube() {
+  // The cube, with a connected geodesic from an emitter on the front face to one on the right face, as in the carry tool's tests.
+  function connectedCube() {
     const world = cubeWorld();
     const registry = createRuntimeObjectRegistry();
-    registry.add(createGeodesicCannonObject({
+    registry.add(createGeodesicEmitterObject({
       id: "cannon-a",
       cellId: "front",
       localPose: yawRigidTransform3(Math.atan2(-0.6299138870477234, 0.776664982411611), vec3(5.356468478410459, 1.3724895861593076, 0)),
     }));
-    registry.add(createGeodesicCannonObject({
+    registry.add(createGeodesicEmitterObject({
       id: "cannon-b",
       cellId: "right",
       localPose: yawRigidTransform3(0, vec3(-2.4644086473935514, -4.450135738386821, 0)),
     }));
     const source = registry.get("cannon-a");
-    if (source?.kind !== "geodesic-cannon") {
+    if (source?.kind !== "geodesicEmitters/emitter") {
       throw new Error("Expected the source emitter.");
     }
     shootGeodesic({ world, registry, cannon: source, geodesicId: "g-a", maxLengthMeters: 12 });
     expect(arcConnectsEmitters(registry, "g-a")).toBe(true);
 
-    // Stores each move the way the tool does and checks that the locked geodesic's word still chains to the emitter's cell.
+    // Stores each move the way the tool does and checks that the connected geodesic's word still chains to the emitter's cell.
     const commit = (move: CarryMove): boolean => {
       const result = moveEmitterAlongRoute({
         registry,
@@ -409,7 +409,7 @@ describe("pickup", () => {
     };
     const placeOf = (): CarriedPlace => {
       const emitter = registry.get("cannon-b");
-      if (emitter?.kind !== "geodesic-cannon") {
+      if (emitter?.kind !== "geodesicEmitters/emitter") {
         throw new Error("Expected the carried emitter.");
       }
       return { cellId: emitter.cellId, position: emitter.localPose.translation, yawRadians: emitter.aimYawRadians };
@@ -418,7 +418,7 @@ describe("pickup", () => {
   }
 
   it("glides an emitter from another face to the hand under the speed cap, geodesic chained", () => {
-    const { world, registry, commit, placeOf } = lockedCube();
+    const { world, registry, commit, placeOf } = connectedCube();
     const hand = target("top", 1, 1);
     const frameSeconds = 1 / 60;
     const perFrame = carryMaxSpeedMetersPerSecond * frameSeconds;
@@ -442,12 +442,12 @@ describe("pickup", () => {
 
     expect(end).toBe("arrived");
     expect(frames).toBeGreaterThan(5);
-    expect(registry.get("cannon-b")).toMatchObject({ kind: "geodesic-cannon", cellId: "top" });
+    expect(registry.get("cannon-b")).toMatchObject({ kind: "geodesicEmitters/emitter", cellId: "top" });
     expect(arcConnectsEmitters(registry, "g-a")).toBe(true);
   });
 
   it("keeps the geodesic chained across two faces and turns the emitter with them", () => {
-    const { world, registry, commit, placeOf } = lockedCube();
+    const { world, registry, commit, placeOf } = connectedCube();
     const startYaw = placeOf().yawRadians;
     const hand = locateCarrierTarget(world, { cellId: "right", position: { x: -2.4, y: -4.4 } }, { x: -2.4, y: -9 });
     if (!hand) {

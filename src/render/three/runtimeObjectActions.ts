@@ -81,8 +81,8 @@ export interface RuntimeObjectActionsDeps {
   getGeodesicDisplayName(geodesicId: string): string;
   /** Maps geodesic ids to their display names for menus. */
   getGeodesicLabelsById(geodesicIds: readonly string[]): Readonly<Record<string, string>>;
-  /** Ids among the given geodesics that are locked. */
-  getLockedGeodesicIds(geodesicIds: readonly string[]): readonly string[];
+  /** Ids among the given geodesics that are connected. */
+  getConnectedGeodesicIds(geodesicIds: readonly string[]): readonly string[];
   /** The actions the tools contribute to the menu page of an object (design 013 section 8.3), with their availability now. */
   objectActionsFor(objectKind: string, objectId: string): readonly ObjectActionEntry[];
   /** Menu options of the geometry computer object with this id. */
@@ -175,7 +175,7 @@ export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): Runt
     tryExtendFocusedGeodesicFromAim,
     getGeodesicDisplayName,
     getGeodesicLabelsById,
-    getLockedGeodesicIds,
+    getConnectedGeodesicIds,
     objectActionsFor,
     createGeometryComputerMenuOptions,
     syncPlacedFlagRuntime,
@@ -400,7 +400,7 @@ export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): Runt
     }
 
     if (!protractor.center) {
-      if (target?.object?.kind !== "geodesic-cannon" && target?.object?.kind !== "geodesicModel/crossing") {
+      if (target?.object?.kind !== "geodesicEmitters/emitter" && target?.object?.kind !== "geodesicModel/crossing") {
         return;
       }
 
@@ -529,7 +529,7 @@ export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): Runt
       return true;
     }
 
-    if (focused.object.kind === "geodesic-cannon" && isRuntimeToolEnabled(appConfig, "geodesic-cannon")) {
+    if (focused.object.kind === "geodesicEmitters/emitter" && isRuntimeToolEnabled(appConfig, "geodesicEmitters/emitter")) {
       dispatchRuntimeCommand({ kind: "set-cannon-tool-state", state: {
         selectedCannonId: focused.object.id,
         activeGeodesicId: resolveCannonGeodesicId(
@@ -545,8 +545,8 @@ export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): Runt
         cannonId: focused.object.id,
         geodesicIds,
         geodesicLabelsById: getGeodesicLabelsById(geodesicIds),
-        lockedGeodesicIds: getLockedGeodesicIds(geodesicIds),
-        objectActions: objectActionsFor("geodesic-cannon", focused.object.id),
+        connectedGeodesicIds: getConnectedGeodesicIds(geodesicIds),
+        objectActions: objectActionsFor("geodesicEmitters/emitter", focused.object.id),
       });
       return true;
     }

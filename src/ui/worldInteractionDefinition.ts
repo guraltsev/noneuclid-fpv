@@ -1,6 +1,6 @@
 /**
  * Renderer-neutral description of what the player can do with the world object they are focusing: its title and a prioritized list of actions, each bound to an abstract input intent.
- * createWorldFocusMessageDefinition decides the actions from the object's kind and the active tool (for example, a geodesic segment offers Measure under the length tool, Select side under the protractor, otherwise Extend or a disabled Locked entry). Both the desktop focus tooltip and the VR panel render this one definition, and the help lens reuses it.
+ * createWorldFocusMessageDefinition decides the actions from the object's kind and the active tool (for example, a geodesic segment offers Measure under the length tool, Select side under the protractor, otherwise Extend or a disabled Connected entry). Both the desktop focus tooltip and the VR panel render this one definition, and the help lens reuses it.
  * Everything is a pure function of its inputs and returns fresh immutable records.
  */
 import type { RuntimeToolId } from "../glue/toolIds";
@@ -58,7 +58,7 @@ export interface CreateWorldFocusMessageDefinitionOptions {
   readonly object: RuntimeWorldObject;
   readonly selectedTool: RuntimeToolId;
   /**
-   * Whether the focused geodesic segment may be extended; when false and no measuring tool is active the segment shows a disabled "Locked" action.
+   * Whether the focused geodesic segment may be extended; when false and no measuring tool is active the segment shows a disabled "Connected" action.
    */
   readonly canExtendGeodesic?: boolean;
 }
@@ -96,7 +96,7 @@ export function createWorldFocusMessageDefinition(
         });
       }
       return withObjectHelp(options.object, { title, actions: [] });
-    case "geodesic-cannon":
+    case "geodesicEmitters/emitter":
       return withObjectHelp(options.object, {
         title,
         actions: [contextAction("open-object-menu", "Emitter menu")],

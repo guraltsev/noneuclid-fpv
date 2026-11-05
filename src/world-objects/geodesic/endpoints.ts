@@ -236,7 +236,7 @@ export function portalWordMatchesEndpointCellsWithAnchors(input: {
 export function isAimableFreeGeodesic(registry: RuntimeObjectRegistry, interval: GeodesicArcObject): boolean {
   const start = registry.get(interval.start.anchorObjectId);
   const end = registry.get(interval.end.anchorObjectId);
-  const hasOneEmitter = (start?.kind === "geodesic-cannon") !== (end?.kind === "geodesic-cannon");
+  const hasOneEmitter = (start?.kind === "geodesicEmitters/emitter") !== (end?.kind === "geodesicEmitters/emitter");
   const freeEnd = start?.kind === "geodesicModel/vertex" ? start : end?.kind === "geodesicModel/vertex" ? end : undefined;
   return hasOneEmitter && freeEnd !== undefined &&
     getGeodesicEndpointAttachmentsForAnchor(registry, freeEnd.id).length === 1;

@@ -23,7 +23,7 @@ export type CarryOffset = {
 export interface CarryAttachCommand extends EngineCommandBase {
   readonly kind: "carry/attach";
   readonly objectId: string;
-  /** The geodesic the carrier works on, rebuilt first when the carried emitter has no locked geodesic (the emitter's own rule, `world-objects/geodesic/carryEnd.ts`). */
+  /** The geodesic the carrier works on, rebuilt first when the carried emitter has no connected geodesic (the emitter's own rule, `world-objects/geodesic/carryEnd.ts`). */
   readonly activeGeodesicId?: string;
   /** The length a regrown plain active geodesic should have. */
   readonly rotationTargetLengthMeters?: number;

@@ -263,14 +263,14 @@ in the frame of $C_0$ (`src/world-objects/geodesic/endpoints.ts#liftGeodesicEndp
 last portal back to the first). Its length is $|\tilde b-a|$ (the minimum is
 `src/world-objects/geodesic/objects.ts#GEODESIC_MIN_LENGTH_METERS` $=0.15$ m). The direction at $a$ is the direction of
 $\tilde b-a$, and re-tracing from $a$ in that direction for length $|\tilde b-a|$ must reproduce the word —
-this is how `src/world-objects/geodesic/intervals.ts#rebuildLockedGeodesicFromEndpointsAndPortalWord` rebuilds a *locked*
+this is how `src/world-objects/geodesic/intervals.ts#rebuildConnectedGeodesicFromEndpointsAndPortalWord` rebuilds a *connected*
 geodesic when its endpoints move. The reverse word (`src/world-objects/geodesic/portalWord.ts#reverseGeodesicPortalWord`) reads
 the arc from the other end: reverse the order and swap source/target of each step.
 
 **Why words, not just positions.** In a quotient space such as the torus two anchors are joined by infinitely many
 geodesics, distinguished by the sequence of portals crossed. Keeping the word makes a rebuilt arc a continuous
 deformation of the previous one rather than a jump to a different homotopy class
-(`src/world-objects/geodesic/intervals.ts#updateLockedGeodesicPortalWordForCarriedAnchorTraversal` appends the crossed portal p when the `end`
+(`src/world-objects/geodesic/intervals.ts#updateConnectedGeodesicPortalWordForCarriedAnchorTraversal` appends the crossed portal p when the `end`
 anchor crosses it, prepends p⁻¹ when the `start` anchor crosses it, and does both when one anchor holds both ends of
 a loop. The loop's word then becomes the conjugate $p^{-1}wp$, the same loop read from the new base point. Words are
 always freely reduced.)
@@ -489,8 +489,8 @@ the statically culled path tables — in a Web Worker with an inline fallback
 The render loop polls once per frame; the swap is therefore atomic on the render thread.
 
 On commit the application shell transports the player and runtime objects through the per-cell maps and then applies
-`src/runtime/worldGeometryComputedObjects.ts#applyGeometryCommitComputedObjectPolicy`: unlocked geodesics (and the
-measurements built on them) are deleted, geodesics locked between two emitters are re-solved with their endpoints' new
+`src/runtime/worldGeometryComputedObjects.ts#applyGeometryCommitComputedObjectPolicy`: free geodesics (and the
+measurements built on them) are deleted, geodesics connecting two emitters are re-solved with their endpoints' new
 positions, and any that cannot be re-solved are deleted and reported. Tool selections tied to old geometry are cleared.
 
 ## 10. Tolerances and constants

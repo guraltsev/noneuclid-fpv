@@ -93,7 +93,7 @@ describe("the tool host dispatch", () => {
   it("runs the tools that update from the input every frame, with or without a primary action", () => {
     const { host, select, core } = setup();
 
-    select("geodesic-cannon-rotate");
+    select("geodesicEmitters/rotate");
     host.setFrame({ ray: undefined, yawDeltaRadians: 0.25, primaryActionRequested: false });
     expect(host.dispatchPrimaryAction(false, false)).toBe(false);
 
@@ -113,7 +113,7 @@ describe("the tool host dispatch", () => {
   it("keeps an earlier handler's consumption when the tool does not consume", () => {
     const { host, select } = setup();
 
-    select("geodesic-cannon-aim");
+    select("geodesicEmitters/aim");
 
     expect(host.dispatchPrimaryAction(true, true)).toBe(true);
   });
@@ -205,10 +205,10 @@ describe("the tool lookup", () => {
     const { host } = setup();
 
     expect([...host.toolsById.keys()].sort()).toEqual([
-      "geodesic-cannon",
-      "geodesic-cannon-aim",
-      "geodesic-cannon-carry",
-      "geodesic-cannon-rotate",
+      "geodesicEmitters/aim",
+      "geodesicEmitters/carry",
+      "geodesicEmitters/emitter",
+      "geodesicEmitters/rotate",
       "measure-length",
       "place-flag",
       probeId,

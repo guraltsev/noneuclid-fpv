@@ -9,7 +9,7 @@
  * (`geodesicRayBeamHeightMeters` above the emitter floor point).
  *
  * ## Objects (all live in a `RuntimeObjectRegistry`)
- * - `GeodesicCannonObject` (emitter): a placed object that geodesic endpoints can attach to.
+ * - `GeodesicEmitterObject` (emitter): a placed object that geodesic endpoints can attach to.
  * - `GeodesicVertexObject` (`geodesicModel/vertex`, formerly "free geodesic end"): an invisible anchor for an endpoint that is not on an emitter.
  * - `GeodesicArcObject` (`geodesicModel/arc`, formerly "geodesic interval"): THE authoritative geodesic. It has two endpoint attachments (`start`, `end`; each names an anchor object, an
  *   emitter or a free end) and a PORTAL WORD: the ordered list of portal traversals from `start` to `end`. Nothing else is stored.
@@ -35,7 +35,7 @@
  * an emitter; its INTERIOR VERTICES are `geodesicModel/vertex` objects shared by two or more arc ends. An arc is TIED (`isTied`) when it has an
  * end on such a vertex. An arc FOLLOWS an emitter (`arcFollowsEmitter`) when it has an end on it and connects emitters or is tied: carrying the
  * emitter keeps the arc and updates its word by the portal the emitter crossed (both ends of a loop on that emitter move, so its word is
- * conjugated: `w -> p^-1 w p`) (`rebuildLockedGeodesicFromEndpointsAndPortalWord`). An arc with an emitter and an unshared free end
+ * conjugated: `w -> p^-1 w p`) (`rebuildConnectedGeodesicFromEndpointsAndPortalWord`). An arc with an emitter and an unshared free end
  * is an aimable free geodesic (`aimFreeGeodesicFromEndpoint`, `extendGeodesic`, split by `splitGeodesicIntervalAtSegmentHit`).
  *
  * ## Curve shortening (issue 31/32)
@@ -64,8 +64,8 @@ import type { RuntimeWorldObjectBase } from "../runtimeObjectBase";
  * geometry: the authoritative geodesic data are the `GeodesicArcObject`s whose `start`/`end` attachments reference
  * this cannon's id (`getEmitterGeodesicIds` lists them); the cannon stores no copy of that list.
  */
-export interface GeodesicCannonObject extends RuntimeWorldObjectBase {
-  readonly kind: "geodesic-cannon";
+export interface GeodesicEmitterObject extends RuntimeWorldObjectBase {
+  readonly kind: "geodesicEmitters/emitter";
   /** Marker consumed by `canObjectAttachGeodesics`: this object may be the anchor of an interval endpoint. */
   readonly canAttachGeodesics?: true;
   /** Marker consumed by `canBeCarried` (src/world-objects/carry.ts): this object may be carried and reacts to displacement steps. */
@@ -266,8 +266,8 @@ export type GeodesicSegmentTerminal =
   | { readonly kind: "wall-hit"; readonly sideIndex: number }
   | { readonly kind: "forbidden-zone-hit"; readonly junctionId: string };
 
-/** Construction options for `createGeodesicCannonObject`; omitted optional fields get the defaults documented there. */
-export interface CreateGeodesicCannonOptions {
+/** Construction options for `createGeodesicEmitterObject`; omitted optional fields get the defaults documented there. */
+export interface CreateGeodesicEmitterOptions {
   readonly id: string;
   readonly cellId: string;
   readonly localPose: RigidTransform3;
@@ -290,11 +290,11 @@ export interface TraceGeodesicSegmentResult {
  * `reason` is overloaded: besides real collisions, `"missing-cell"` is also returned when the segment/vertex to split does not exist and
  * `"cell-collision"` when the split point is too close to a segment start or the split failed.
  */
-export interface PlaceGeodesicCannonResult {
+export interface PlaceGeodesicEmitterResult {
   /** Whether a cannon was added to the registry. */
   readonly placed: boolean;
   /** The cannon as stored in the registry (set when `placed`). */
-  readonly object?: GeodesicCannonObject;
+  readonly object?: GeodesicEmitterObject;
   /** Why placement was refused (set when `!placed`). */
   readonly reason?: "missing-cell" | "cell-collision" | "runtime-object-collision";
 }
@@ -368,12 +368,12 @@ export const emitterConnectionToleranceMeters = 0.3;
  * yaw rotation of that angle (so pitch/roll are discarded).
  * Pure; does not touch any registry.
  */
-export function createGeodesicCannonObject(options: CreateGeodesicCannonOptions): GeodesicCannonObject {
+export function createGeodesicEmitterObject(options: CreateGeodesicEmitterOptions): GeodesicEmitterObject {
   const aimYawRadians = sanitizeYaw(options.aimYawRadians ?? yawFromPose(options.localPose));
 
   return {
     id: options.id,
-    kind: "geodesic-cannon",
+    kind: "geodesicEmitters/emitter",
     canAttachGeodesics: true,
     canBeCarried: true,
     carryHighlight: cannonCarryHighlight,
@@ -483,7 +483,7 @@ export function canExtendGeodesicSegment(segment: GeodesicSegmentObject): boolea
 }
 
 /** Point where the cannon's beam starts, in the cannon's cell frame. */
-export function getGeodesicCannonEmitterPoint(cannon: GeodesicCannonObject): Vec3 {
+export function getGeodesicCannonEmitterPoint(cannon: GeodesicEmitterObject): Vec3 {
   return {
     x: cannon.localPose.translation.x,
     y: cannon.localPose.translation.y,

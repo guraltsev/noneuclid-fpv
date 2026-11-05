@@ -1,7 +1,7 @@
 /**
  * `tests/modules/curveShortening/curveShortening.test.ts` - unit tier.
  *
- * The curve shortening module (design 013 section 13.2) driven through the world engine with the module write guard on. Curve shortening is a flow: tying two locked endpoints at a shared vertex makes a piecewise-geodesic curve whose
+ * The curve shortening module (design 013 section 13.2) driven through the world engine with the module write guard on. Curve shortening is a flow: tying two connected endpoints at a shared vertex makes a piecewise-geodesic curve whose
  * tied vertices relax over many steps (each moves along the descent direction of the total length by an exact line search, the neighbouring arcs are re-realized as geodesic chords of their portal words, and a vertex whose turning angle is
  * below the tolerance is merged away). A curve has no lifecycle: the flow is at rest when every tied vertex is quiet. These tests check: tying through the command; one small step moving a vertex a bounded distance; the flow of a two-arc curve,
  * a curve of six arcs with five tied vertices, a torus loop pair and free loops reaching the known taut geometry within a tolerance; the total length never growing and the number of vertices never growing at any step; the same limit at 60 Hz
@@ -22,7 +22,7 @@ import { derivedStatsOf } from "../../../src/world-objects/derived";
 import { arcConnectsEmitters } from "../../../src/world-objects/geodesic/lifecycle";
 import {
   createGeodesicVertexObject,
-  createGeodesicCannonObject,
+  createGeodesicEmitterObject,
   createGeodesicArcObject,
   geodesicRayBeamHeightMeters,
   type GeodesicSegmentObject,
@@ -44,7 +44,7 @@ import {
   compileLargePortalWorld,
   createFlowTestEngine,
   createSymmetricPairScenario,
-  createTorusLockedPairScenario,
+  createTorusConnectedPairScenario,
   createTorusTiedPairScenario,
   runCurveShorteningUntilAtRest,
   totalGeodesicLength,
@@ -99,8 +99,8 @@ function flowEvents(events: readonly EngineEventBase[]): CurveShorteningEvent[] 
 function createChainScenario(start: { x: number; y: number }, end: { x: number; y: number }, vertices: readonly { x: number; y: number }[]) {
   const world = compileLargeWorld();
   const registry = createRuntimeObjectRegistry();
-  registry.add(createGeodesicCannonObject({ id: "e1", cellId: "a", localPose: yawRigidTransform3(0, { ...start, z: 0 }) }));
-  registry.add(createGeodesicCannonObject({ id: "e2", cellId: "a", localPose: yawRigidTransform3(0, { ...end, z: 0 }) }));
+  registry.add(createGeodesicEmitterObject({ id: "e1", cellId: "a", localPose: yawRigidTransform3(0, { ...start, z: 0 }) }));
+  registry.add(createGeodesicEmitterObject({ id: "e2", cellId: "a", localPose: yawRigidTransform3(0, { ...end, z: 0 }) }));
   const ids = vertices.map((_, index) => `v${index}`);
   vertices.forEach((point, index) => {
     registry.add(createGeodesicVertexObject({ id: ids[index], cellId: "a", point: { ...point, z: beamZ } }));
@@ -126,7 +126,7 @@ describe("geodesic cannon world objects: tie and detach", () => {
   it("detaches the two endpoint roles of a same-emitter loop onto one tied vertex", () => {
     const world = compileTorusLoopWorld();
     const registry = createRuntimeObjectRegistry();
-    registry.add(createGeodesicCannonObject({ id: "cannon-a", cellId: "torus-room", localPose: yawRigidTransform3(0, { x: 0, y: 0, z: 0 }) }));
+    registry.add(createGeodesicEmitterObject({ id: "cannon-a", cellId: "torus-room", localPose: yawRigidTransform3(0, { x: 0, y: 0, z: 0 }) }));
     registry.add(createGeodesicArcObject({
       id: "g-loop",
       startAnchorObjectId: "cannon-a",
@@ -159,12 +159,12 @@ describe("geodesic cannon world objects: tie and detach", () => {
     expect(getGeodesicSegments(registry, "g-loop").map((segment) => segment.connectionState)).toContain("open");
   });
 
-  it("tying two locked arcs at one emitter makes two tied arcs and a vertex at the emitter", () => {
+  it("tying two connected arcs at one emitter makes two tied arcs and a vertex at the emitter", () => {
     const world = compileLargeWorld();
     const registry = createRuntimeObjectRegistry();
-    registry.add(createGeodesicCannonObject({ id: "left", cellId: "a", localPose: yawRigidTransform3(0, { x: -2, y: 0, z: 0 }) }));
-    registry.add(createGeodesicCannonObject({ id: "middle", cellId: "a", localPose: yawRigidTransform3(0, { x: 0, y: 1, z: 0 }) }));
-    registry.add(createGeodesicCannonObject({ id: "right", cellId: "a", localPose: yawRigidTransform3(0, { x: 2, y: 0, z: 0 }) }));
+    registry.add(createGeodesicEmitterObject({ id: "left", cellId: "a", localPose: yawRigidTransform3(0, { x: -2, y: 0, z: 0 }) }));
+    registry.add(createGeodesicEmitterObject({ id: "middle", cellId: "a", localPose: yawRigidTransform3(0, { x: 0, y: 1, z: 0 }) }));
+    registry.add(createGeodesicEmitterObject({ id: "right", cellId: "a", localPose: yawRigidTransform3(0, { x: 2, y: 0, z: 0 }) }));
     registry.add(createGeodesicArcObject({ id: "g-lm", startAnchorObjectId: "left", endAnchorObjectId: "middle", startCellId: "a" }));
     registry.add(createGeodesicArcObject({ id: "g-mr", startAnchorObjectId: "middle", endAnchorObjectId: "right", startCellId: "a" }));
     rebuildConnectedGeodesicBetweenEmitters({ world, registry, geodesicId: "g-lm" });
@@ -194,7 +194,7 @@ describe("geodesic cannon world objects: tie and detach", () => {
   });
 
   it("flows the curve in the step that applied the tie", () => {
-    const { world, registry } = createTorusLockedPairScenario();
+    const { world, registry } = createTorusConnectedPairScenario();
     const engine = createFlowTestEngine(world, registry);
     const lengthBefore = totalCurveLength(registry);
 
@@ -329,7 +329,7 @@ describe("curve shortening flow of a two-arc curve", () => {
   it("leaves every emitter's pose and cell unchanged over many steps with no carry", () => {
     const { world, registry } = createTorusTiedPairScenario();
     const engine = createFlowTestEngine(world, registry);
-    const emittersBefore = registry.getObjectsOfKind("geodesic-cannon");
+    const emittersBefore = registry.getObjectsOfKind("geodesicEmitters/emitter");
 
     runCurveShorteningUntilAtRest(engine, { geodesicIds: ["g1", "g2"], deltaSeconds: frame60Hz, maxTicks: 4000 });
 
@@ -495,8 +495,8 @@ describe("curve shortening flow across portals and around junction disks", () =>
     const world = compileTorusLoopWorld();
     const registry = createRuntimeObjectRegistry();
     const seam = createCarryPortalTraversal(world, "torus-room", "right-left");
-    registry.add(createGeodesicCannonObject({ id: "e1", cellId: "torus-room", localPose: yawRigidTransform3(0, { x: 6, y: 0, z: 0 }) }));
-    registry.add(createGeodesicCannonObject({ id: "e2", cellId: "torus-room", localPose: yawRigidTransform3(0, { x: -5, y: 0, z: 0 }) }));
+    registry.add(createGeodesicEmitterObject({ id: "e1", cellId: "torus-room", localPose: yawRigidTransform3(0, { x: 6, y: 0, z: 0 }) }));
+    registry.add(createGeodesicEmitterObject({ id: "e2", cellId: "torus-room", localPose: yawRigidTransform3(0, { x: -5, y: 0, z: 0 }) }));
     const vertices = [{ id: "v0", x: 7, y: 2 }, { id: "v1", x: -7, y: -2 }, { id: "v2", x: -6, y: 1.5 }];
     for (const vertex of vertices) {
       registry.add(createGeodesicVertexObject({ id: vertex.id, cellId: "torus-room", point: { x: vertex.x, y: vertex.y, z: beamZ } }));
@@ -562,8 +562,8 @@ describe("the arc index during a flow", () => {
 function createWrapScenario() {
   const world = compileLargePortalWorld();
   const registry = createRuntimeObjectRegistry();
-  registry.add(createGeodesicCannonObject({ id: "e1", cellId: "a", localPose: yawRigidTransform3(0, { x: 4, y: 0.1, z: 0 }) }));
-  registry.add(createGeodesicCannonObject({ id: "e2", cellId: "b", localPose: yawRigidTransform3(0, { x: 2, y: 0.1, z: 0 }) }));
+  registry.add(createGeodesicEmitterObject({ id: "e1", cellId: "a", localPose: yawRigidTransform3(0, { x: 4, y: 0.1, z: 0 }) }));
+  registry.add(createGeodesicEmitterObject({ id: "e2", cellId: "b", localPose: yawRigidTransform3(0, { x: 2, y: 0.1, z: 0 }) }));
   registry.add(createGeodesicVertexObject({ id: "F", cellId: "a", point: { x: 4.5, y: 2.5, z: beamZ } }));
   registry.add(createGeodesicArcObject({ id: "g1", startAnchorObjectId: "e1", endAnchorObjectId: "F", startCellId: "a" }));
   registry.add(createGeodesicArcObject({

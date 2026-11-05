@@ -5,7 +5,7 @@ import { yawRigidTransform3 } from "../../math/rigidTransform3";
 import { addVec3, scaleVec3, type Vec3 } from "../../math/vec3";
 import type { RuntimeObjectReader, RuntimeObjectRegistry, RuntimeWorldObject } from "../runtimeObjectRegistry";
 import {
-  type GeodesicCannonObject,
+  type GeodesicEmitterObject,
   type GeodesicEndRole,
   type GeodesicHalfRole,
   type GeodesicArcObject,
@@ -193,7 +193,7 @@ export function resolveEndpointTangentAtAnchor(input: {
  */
 export function resolveEmitterLaunchYaw(
   registry: RuntimeObjectReader,
-  emitter: GeodesicCannonObject,
+  emitter: GeodesicEmitterObject,
   geodesicId: string,
 ): number {
   const interval = registry.get(geodesicId);
@@ -231,7 +231,7 @@ export function withAnchoredTargetTerminalForAnchors(
   const targetAnchor = candidateAnchorsById?.get(interval.end.anchorObjectId) ??
     registry.get(interval.end.anchorObjectId);
   const tail = traces.at(-1);
-  if (targetAnchor?.kind !== "geodesic-cannon" || !tail || tail.terminal.kind !== "open") {
+  if (targetAnchor?.kind !== "geodesicEmitters/emitter" || !tail || tail.terminal.kind !== "open") {
     return traces;
   }
 
@@ -301,7 +301,7 @@ function resolveDerivedSegmentConnectionState(
   }
   const start = registry.get(interval.start.anchorObjectId);
   const end = registry.get(interval.end.anchorObjectId);
-  return start?.kind === "geodesic-cannon" && end?.kind === "geodesic-cannon" ? "connected" : "open";
+  return start?.kind === "geodesicEmitters/emitter" && end?.kind === "geodesicEmitters/emitter" ? "connected" : "open";
 }
 
 /** Converts a derived segment back to the trace piece it was built from. */

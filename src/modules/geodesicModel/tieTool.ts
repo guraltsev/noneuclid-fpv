@@ -93,7 +93,7 @@ export function createTieToolDescriptor(): ToolDescriptor {
     showsAimCross: true,
     entry: {
       kind: "object-action",
-      objectKind: "geodesic-cannon",
+      objectKind: "geodesicEmitters/emitter",
       action: {
         actionId: "tie-and-detach",
         label: "Tie & detach",

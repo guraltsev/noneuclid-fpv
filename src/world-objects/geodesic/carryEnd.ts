@@ -17,13 +17,13 @@ import { collectGeodesicPortalWord, getGeodesicSegments, resolveEmitterLaunchYaw
 export interface EmitterGeodesicRebuild {
   /** Geodesics that were rebuilt; their overlays need a refresh. */
   readonly rebuiltGeodesicIds: readonly string[];
-  /** Set when the emitter's plain (unlocked) active geodesic was regrown from it: that geodesic is the emitter's active one. */
+  /** Set when the emitter's plain (free) active geodesic was regrown from it: that geodesic is the emitter's active one. */
   readonly regrownActiveGeodesicId?: string;
 }
 
 /**
- * Rebuilds the geodesics that depend on an emitter after it moved. Three cases: the locked geodesics incident to the emitter (rebuilt as
- * connected geodesics between emitters), else the emitter's locked active geodesic, else its plain active geodesic regrown from it.
+ * Rebuilds the geodesics that depend on an emitter after it moved. Three cases: the connected geodesics incident to the emitter (rebuilt as
+ * connected geodesics between emitters), else the emitter's connected active geodesic, else its plain active geodesic regrown from it.
  * `preserveGeodesicOnRebuildFailure` keeps a geodesic whose rebuild failed (the safety net of the carry in progress); the final rebuild at
  * the end of a carry leaves it off. `activeGeodesicId` names the active geodesic when the emitter does not record one; the
  * `rotationTargetLengthMeters` replaces the geodesic's current length when a regrown geodesic should have another.
@@ -38,35 +38,35 @@ export function rebuildEmitterGeodesics(input: {
 }): EmitterGeodesicRebuild {
   const { world, registry } = input;
   const cannon = registry.get(input.emitterId);
-  if (cannon?.kind !== "geodesic-cannon") {
+  if (cannon?.kind !== "geodesicEmitters/emitter") {
     return { rebuiltGeodesicIds: [] };
   }
 
   const geodesicId = input.activeGeodesicId ?? getEmitterGeodesicIds(registry, cannon.id)[0];
-  const lockedIncidentGeodesicIds = collectFollowingArcIdsForEmitter(registry, cannon.id);
-  if (lockedIncidentGeodesicIds.length === 0 && !geodesicId) {
+  const connectedIncidentGeodesicIds = collectFollowingArcIdsForEmitter(registry, cannon.id);
+  if (connectedIncidentGeodesicIds.length === 0 && !geodesicId) {
     return { rebuiltGeodesicIds: [] };
   }
 
-  const rebuildLocked = (lockedGeodesicId: string): void => {
+  const rebuildConnected = (connectedGeodesicId: string): void => {
     rebuildConnectedGeodesicBetweenEmitters({
       world,
       registry,
-      geodesicId: lockedGeodesicId,
+      geodesicId: connectedGeodesicId,
       carriedEmitterId: cannon.id,
-      carriedPortalWord: collectGeodesicPortalWord(registry, lockedGeodesicId),
+      carriedPortalWord: collectGeodesicPortalWord(registry, connectedGeodesicId),
       preserveGeodesicOnRebuildFailure: input.preserveGeodesicOnRebuildFailure,
     });
   };
 
-  if (lockedIncidentGeodesicIds.length > 0) {
-    for (const incidentGeodesicId of lockedIncidentGeodesicIds) {
-      rebuildLocked(incidentGeodesicId);
+  if (connectedIncidentGeodesicIds.length > 0) {
+    for (const incidentGeodesicId of connectedIncidentGeodesicIds) {
+      rebuildConnected(incidentGeodesicId);
     }
-    return { rebuiltGeodesicIds: lockedIncidentGeodesicIds };
+    return { rebuiltGeodesicIds: connectedIncidentGeodesicIds };
   }
   if (geodesicId && arcFollowsEmitter(registry, geodesicId, cannon.id)) {
-    rebuildLocked(geodesicId);
+    rebuildConnected(geodesicId);
     return { rebuiltGeodesicIds: [geodesicId] };
   }
   // A tied arc is never regrown: its curve is not a ray from the emitter.
@@ -79,7 +79,7 @@ export function rebuildEmitterGeodesics(input: {
       launchYawRadians: resolveEmitterLaunchYaw(registry, cannon, geodesicId),
       totalLengthMeters: input.rotationTargetLengthMeters ?? geodesicTotalLengthMeters(registry, geodesicId),
       connectEmitters: false,
-      rebuildLocked: true,
+      rebuildConnected: true,
     });
     return { rebuiltGeodesicIds: [geodesicId], regrownActiveGeodesicId: geodesicId };
   }
@@ -104,7 +104,7 @@ export function releaseCarriedEmitter(input: {
   readonly activeGeodesicId?: string;
   readonly rotationTargetLengthMeters?: number;
 }): CarriedEmitterRelease {
-  if (input.registry.get(input.emitterId)?.kind !== "geodesic-cannon") {
+  if (input.registry.get(input.emitterId)?.kind !== "geodesicEmitters/emitter") {
     return { rebuiltGeodesicIds: [], prunedIntersectionIds: [] };
   }
 

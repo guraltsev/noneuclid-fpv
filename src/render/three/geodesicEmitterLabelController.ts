@@ -87,7 +87,7 @@ export function createGeodesicEmitterLabelController(deps: GeodesicEmitterLabelC
     camera.getWorldQuaternion(cameraQuaternion);
 
     for (const object of runtimeObjectRegistry.getAll()) {
-      if (object.kind !== "geodesic-cannon") {
+      if (object.kind !== "geodesicEmitters/emitter") {
         continue;
       }
 
@@ -135,7 +135,7 @@ export function createGeodesicEmitterLabelController(deps: GeodesicEmitterLabelC
   // through the portals that a straight line from the player to the cannon crosses (at most two), with the map from the cannon's
   // frame to the player's. Undefined when no such line exists, so a cannon behind a wall gets no label.
   function resolveCannonAppearance(
-    cannon: Extract<RuntimeWorldObject, { readonly kind: "geodesic-cannon" }>,
+    cannon: Extract<RuntimeWorldObject, { readonly kind: "geodesicEmitters/emitter" }>,
   ): { readonly distanceMeters: number; readonly playerFrameFromCell?: RigidTransform3 } | undefined {
     const player = readLocalPlayerPose(deps.engine);
     if (cannon.cellId === player.cellId) {

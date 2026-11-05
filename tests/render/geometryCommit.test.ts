@@ -24,7 +24,7 @@ import {
   transformPlayerPoseForGeometryCommit,
 } from "../../src/render/three/geometryCommitTransforms";
 import { shootGeodesic } from "../../src/world-objects/geodesic/cannon";
-import { createGeodesicCannonObject } from "../../src/world-objects/geodesic/objects";
+import { createGeodesicEmitterObject } from "../../src/world-objects/geodesic/objects";
 import { getGeodesicSegments } from "../../src/world-objects/geodesic/segments";
 import { createObjectHost } from "../../src/world-objects/worldObjectOwner";
 import { createRuntimeObjectRegistry } from "../../src/world-objects/runtimeObjectRegistry";
@@ -91,7 +91,7 @@ describe("geometry commit transforms", () => {
   });
 
   it("moves an emitter with its map and drops one whose cell has no map", () => {
-    const cannon = createGeodesicCannonObject({ id: "cannon-a", cellId: "a", localPose: yawRigidTransform3(0, vec3(-1, 0, 0)) });
+    const cannon = createGeodesicEmitterObject({ id: "cannon-a", cellId: "a", localPose: yawRigidTransform3(0, vec3(-1, 0, 0)) });
 
     const moved = transformGeodesicCannonForGeometryCommit(cannon, mapsByCellId);
 
@@ -127,7 +127,7 @@ describe("geometry commit", () => {
 
   it("maps the player and emitters, drops open geodesics and swaps before afterSwap", () => {
     const { engine, runtimeObjectRegistry, commit, afterSwap } = setup();
-    const cannon = createGeodesicCannonObject({ id: "cannon-a", cellId: "a", localPose: yawRigidTransform3(0, vec3(-1.5, 0, 0)) });
+    const cannon = createGeodesicEmitterObject({ id: "cannon-a", cellId: "a", localPose: yawRigidTransform3(0, vec3(-1.5, 0, 0)) });
     runtimeObjectRegistry.add(cannon);
     shootGeodesic({ world, registry: runtimeObjectRegistry, cannon, geodesicId: "g-open", maxLengthMeters: 1.5 });
     expect(getGeodesicSegments(runtimeObjectRegistry, "g-open").length).toBeGreaterThan(0);

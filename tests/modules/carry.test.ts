@@ -16,7 +16,7 @@ import { carryOffsetSlot, type CarryCommand, type CarryOffset } from "../../src/
 import { carryModule } from "../../src/modules/carry";
 import { shootGeodesic } from "../../src/world-objects/geodesic/cannon";
 import { getGeodesicConnection } from "../../src/world-objects/geodesic/lifecycle";
-import { createGeodesicCannonObject } from "../../src/world-objects/geodesic/objects";
+import { createGeodesicEmitterObject } from "../../src/world-objects/geodesic/objects";
 import { createRuntimeObjectRegistry, type RuntimeObjectRegistry } from "../../src/world-objects/runtimeObjectRegistry";
 import { getRuntimeObjectInteractionRangeMeters } from "../../src/world-objects/interactionRange";
 import { compileLargePortalWorld } from "../fixtures/world-objects/geodesic";
@@ -30,14 +30,14 @@ function ana(): ParticipantRecord {
   return { id: "ana", kind: "remote-player", ownerId: "device-ana", body: { ...createDefaultPlayerPose("a"), position: { x: 3.5, y: 2.5, z: 0 } }, attachments: [] };
 }
 
-/** Rooms a and b glued side by side with a locked geodesic from an emitter in a to one in b; the local player stands in a at (3.5, 2.5). */
+/** Rooms a and b glued side by side with a connected geodesic from an emitter in a to one in b; the local player stands in a at (3.5, 2.5). */
 function setup(options: { readonly participants?: readonly ParticipantRecord[]; readonly extraModules?: readonly AnyModuleDefinition[] } = {}) {
   const world: CompiledCellComplex = compileLargePortalWorld();
   const registry: RuntimeObjectRegistry = createRuntimeObjectRegistry();
-  registry.add(createGeodesicCannonObject({ id: "cannon-a", cellId: "a", localPose: yawRigidTransform3(0, { x: 4, y: 2.5, z: 0 }) }));
-  registry.add(createGeodesicCannonObject({ id: "cannon-b", cellId: "b", localPose: yawRigidTransform3(Math.PI, { x: 1, y: 2.5, z: 0 }) }));
+  registry.add(createGeodesicEmitterObject({ id: "cannon-a", cellId: "a", localPose: yawRigidTransform3(0, { x: 4, y: 2.5, z: 0 }) }));
+  registry.add(createGeodesicEmitterObject({ id: "cannon-b", cellId: "b", localPose: yawRigidTransform3(Math.PI, { x: 1, y: 2.5, z: 0 }) }));
   const source = registry.get("cannon-a");
-  if (source?.kind !== "geodesic-cannon") throw new Error("Expected the source emitter.");
+  if (source?.kind !== "geodesicEmitters/emitter") throw new Error("Expected the source emitter.");
   shootGeodesic({ world, registry, cannon: source, geodesicId: "g-a", maxLengthMeters: 3 });
 
   const engine = createTestEngine({
@@ -226,7 +226,7 @@ describe("the carry move, once per frame", () => {
     expect(getGeodesicConnection(registry, "g-a")).toMatchObject({ incomingEmitterId: "cannon-b", state: "connected" });
   });
 
-  it("carries an emitter through a portal and keeps the geodesic locked and joined", () => {
+  it("carries an emitter through a portal and keeps the geodesic connected and joined", () => {
     const { registry, run, hand, step, events } = setup();
     run("local", { kind: "carry/attach", objectId: "cannon-b" });
 
@@ -234,7 +234,7 @@ describe("the carry move, once per frame", () => {
     hand(4.6, 3.2);
     for (let frame = 0; frame < 100; frame += 1) step(frameSeconds);
 
-    expect(registry.get("cannon-b")).toMatchObject({ kind: "geodesic-cannon", cellId: "a" });
+    expect(registry.get("cannon-b")).toMatchObject({ kind: "geodesicEmitters/emitter", cellId: "a" });
     expect(getGeodesicConnection(registry, "g-a")).toMatchObject({ outgoingEmitterId: "cannon-a", incomingEmitterId: "cannon-b", state: "connected" });
     expect(events.some((event) => event.kind === "carry/moved")).toBe(true);
   });
@@ -269,7 +269,7 @@ describe("the hand lets go", () => {
     expect(events).toContainEqual(expect.objectContaining({ kind: "carry/dropped", participantId: "local", objectId: "cannon-b", reason: "leash" }));
     expect(events).toContainEqual(expect.objectContaining({ kind: "carry/released", objectId: "cannon-b" }));
     expect(participantAttachment(engine.read.participant("local"), "carry")).toBeUndefined();
-    expect(registry.get("cannon-b")).toMatchObject({ kind: "geodesic-cannon" });
+    expect(registry.get("cannon-b")).toMatchObject({ kind: "geodesicEmitters/emitter" });
   });
 
   it("holds an emitter within the leash", () => {

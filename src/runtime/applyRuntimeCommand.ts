@@ -266,16 +266,16 @@ export function reduceRuntimeCommand(state: ClientSessionState, command: Runtime
       };
     }
     case "add-geodesic-to-cannon":
-      return toolEnabled("geodesic-cannon") ? effectsOnly({ ...command }) : nothing;
+      return toolEnabled("geodesicEmitters/emitter") ? effectsOnly({ ...command }) : nothing;
     case "start-cannon-carry":
-      return toolEnabled("geodesic-cannon-carry") ? effectsOnly({ ...command }) : nothing;
+      return toolEnabled("geodesicEmitters/carry") ? effectsOnly({ ...command }) : nothing;
     case "start-object-action":
       // The world decides whether the action's tool is allowed (the tool request); nothing is checked here.
       return effectsOnly({ ...command });
     case "start-cannon-rotation":
-      return toolEnabled("geodesic-cannon-rotate") ? effectsOnly({ ...command }) : nothing;
+      return toolEnabled("geodesicEmitters/rotate") ? effectsOnly({ ...command }) : nothing;
     case "start-cannon-aim":
-      return toolEnabled("geodesic-cannon-aim") ? effectsOnly({ ...command }) : nothing;
+      return toolEnabled("geodesicEmitters/aim") ? effectsOnly({ ...command }) : nothing;
     case "delete-geodesic-from-cannon":
     case "step-geometry-computer-target":
     case "start-geometry-computer-deformation":

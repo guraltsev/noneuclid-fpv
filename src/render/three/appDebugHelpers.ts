@@ -91,8 +91,8 @@ export interface GeneralDebugHelpers {
   DumpAllGeodesics(): AllGeodesicsDebugDump;
   dump_geodesic_path(geodesicId?: string): GeodesicPathDebugDump | undefined;
   DumpGeodesicPath(geodesicId?: string): GeodesicPathDebugDump | undefined;
-  dump_locked_geodesic_words(): readonly GeodesicWordDebugDump[];
-  DumpLockedGeodesicWords(): readonly GeodesicWordDebugDump[];
+  dump_connected_geodesic_words(): readonly GeodesicWordDebugDump[];
+  DumpConnectedGeodesicWords(): readonly GeodesicWordDebugDump[];
   /** Moves the owned object `id` to `cellId` at cell-local (x, y) meters with the given yaw in degrees; logs and returns whether the object has an owner. */
   placeObjectAt(id: string, cellId: string, x: number, y: number, yawDegrees: number): boolean;
   /** The player's pose: cell, cell-local feet position (meters) and view angles in degrees. */
@@ -122,7 +122,7 @@ export interface GeneralDebugHelperCallbacks {
   readonly dumpGeodesicCreatures: () => GeodesicCreatureDebugDump;
   readonly dumpAllGeodesics: () => AllGeodesicsDebugDump;
   readonly dumpGeodesicPath: (geodesicId?: string) => GeodesicPathDebugDump | undefined;
-  readonly dumpLockedGeodesicWords: () => readonly GeodesicWordDebugDump[];
+  readonly dumpConnectedGeodesicWords: () => readonly GeodesicWordDebugDump[];
   readonly placeObjectAt: (id: string, cellId: string, x: number, y: number, yawDegrees: number) => boolean;
   readonly playerPose: () => PlayerPoseDebugDump;
   readonly kindScans: () => Readonly<Record<string, number>>;
@@ -136,7 +136,7 @@ export type WindowWithGeneralDebugHelpers = typeof window & {
   dump_geodesic_creatures?: () => GeodesicCreatureDebugDump;
   dump_all_geodesics?: () => AllGeodesicsDebugDump;
   dump_geodesic_path?: (geodesicId?: string) => GeodesicPathDebugDump | undefined;
-  dump_locked_geodesic_words?: () => readonly GeodesicWordDebugDump[];
+  dump_connected_geodesic_words?: () => readonly GeodesicWordDebugDump[];
   placeObjectAt?: GeneralDebugHelpers["placeObjectAt"];
   noneuclidDebug?: GeneralDebugHelpers;
 };
@@ -196,10 +196,10 @@ export interface CameraPoseDebugDump {
   readonly projectionMatrix: readonly number[];
 }
 
-/** Description of one geodesic's lock state, portal word, and segments. */
+/** Description of one geodesic's connection state, portal word, and segments. */
 export interface GeodesicPathDebugDump {
   readonly geodesicId: string;
-  readonly locked: boolean;
+  readonly connected: boolean;
   readonly connection: ReturnType<typeof getGeodesicConnection>;
   readonly startCellId?: string;
   readonly start?: string;
@@ -221,10 +221,10 @@ export interface GeodesicPathDebugDump {
   }[];
 }
 
-/** Portal word of one locked geodesic with its individual transitions. */
+/** Portal word of one connected geodesic with its individual transitions. */
 export interface GeodesicWordDebugDump {
   readonly geodesicId: string;
-  readonly locked: boolean;
+  readonly connected: boolean;
   readonly connection: ReturnType<typeof getGeodesicConnection>;
   readonly startCellId?: string;
   readonly start?: string;
@@ -258,7 +258,7 @@ export interface AllGeodesicsDebugDump {
     readonly portalWordText: string;
     readonly portalWord: readonly GeodesicPortalTraversal[];
     readonly connection: ReturnType<typeof getGeodesicConnection>;
-    readonly locked: boolean;
+    readonly connected: boolean;
     readonly segmentCount: number;
     /** Sum of the interval's segment lengths in meters. */
     readonly totalSegmentLengthMeters: number;
@@ -327,8 +327,8 @@ export function installGeneralDebugHelpers(callbacks: GeneralDebugHelperCallback
     DumpAllGeodesics: callbacks.dumpAllGeodesics,
     dump_geodesic_path: callbacks.dumpGeodesicPath,
     DumpGeodesicPath: callbacks.dumpGeodesicPath,
-    dump_locked_geodesic_words: callbacks.dumpLockedGeodesicWords,
-    DumpLockedGeodesicWords: callbacks.dumpLockedGeodesicWords,
+    dump_connected_geodesic_words: callbacks.dumpConnectedGeodesicWords,
+    DumpConnectedGeodesicWords: callbacks.dumpConnectedGeodesicWords,
     placeObjectAt: callbacks.placeObjectAt,
     playerPose: callbacks.playerPose,
     kindScans: callbacks.kindScans,
@@ -340,14 +340,14 @@ export function installGeneralDebugHelpers(callbacks: GeneralDebugHelperCallback
   target.dump_geodesic_creatures = helpers.dump_geodesic_creatures;
   target.dump_all_geodesics = helpers.dump_all_geodesics;
   target.dump_geodesic_path = helpers.dump_geodesic_path;
-  target.dump_locked_geodesic_words = helpers.dump_locked_geodesic_words;
+  target.dump_connected_geodesic_words = helpers.dump_connected_geodesic_words;
   target.placeObjectAt = helpers.placeObjectAt;
   target.noneuclidDebug = helpers;
   setApiNamespace("debug", {
     dumpGeodesicCreatures: callbacks.dumpGeodesicCreatures,
     dumpAllGeodesics: callbacks.dumpAllGeodesics,
     dumpGeodesicPath: callbacks.dumpGeodesicPath,
-    dumpLockedGeodesicWords: callbacks.dumpLockedGeodesicWords,
+    dumpConnectedGeodesicWords: callbacks.dumpConnectedGeodesicWords,
     placeObjectAt: callbacks.placeObjectAt,
     playerPose: callbacks.playerPose,
     kindScans: callbacks.kindScans,
@@ -365,7 +365,7 @@ export function uninstallGeneralDebugHelpers(): void {
   delete target.dump_geodesic_creatures;
   delete target.dump_all_geodesics;
   delete target.dump_geodesic_path;
-  delete target.dump_locked_geodesic_words;
+  delete target.dump_connected_geodesic_words;
   delete target.placeObjectAt;
   delete target.noneuclidDebug;
 }
@@ -628,7 +628,7 @@ export function totalGeodesicLengthFromDebugSegments(
 
 /** Returns the cannon anchor position in its cell's local frame, raised to the geodesic beam height (meters, z up). */
 export function getGeodesicDebugAnchorPoint(
-  anchor: Extract<RuntimeWorldObject, { readonly kind: "geodesic-cannon" }>,
+  anchor: Extract<RuntimeWorldObject, { readonly kind: "geodesicEmitters/emitter" }>,
 ): Vec3 {
   return {
     x: anchor.localPose.translation.x,

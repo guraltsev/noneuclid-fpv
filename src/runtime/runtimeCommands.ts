@@ -18,7 +18,7 @@ export interface ShowGeodesicCannonActionsPayload {
   readonly cannonId: string;
   readonly geodesicIds?: readonly string[];
   readonly geodesicLabelsById?: Readonly<Record<string, string>>;
-  readonly lockedGeodesicIds?: readonly string[];
+  readonly connectedGeodesicIds?: readonly string[];
   /** The actions the tools contribute to the page, with their availability (design 013 section 8.3). */
   readonly objectActions?: readonly ObjectActionEntry[];
 }

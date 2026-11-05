@@ -4,7 +4,7 @@
  *
  * The module owns the active world bundle (the current snapshot plus the render data derived from it); every other reader goes through
  * `active()`. A commit runs the steps in this order: map the player and the objects using the previous world, re-solve the derived
- * objects (locked geodesics, measured lengths, protractor angles), swap the bundle, then `afterSwap` (the shell's rebuild of meshes,
+ * objects (connected geodesics, measured lengths, protractor angles), swap the bundle, then `afterSwap` (the shell's rebuild of meshes,
  * portal instances, tool feedback and diagnostics for the new world).
  * Positions are cell-local meters and yaws are radians. Runs on the frame loop only, before input is read.
  */
@@ -117,7 +117,7 @@ export function createGeometryCommit(deps: GeometryCommitDeps): GeometryCommit {
         }
         runtimeObjectRegistry.update(nextFlag);
         deps.syncPlacedFlagRuntime(nextFlag);
-      } else if (object.kind === "geodesic-cannon") {
+      } else if (object.kind === "geodesicEmitters/emitter") {
         const transformed = transformGeodesicCannonForGeometryCommit(object, mapByCellId);
         if (!transformed) {
           runtimeObjectRegistry.remove(object.id);

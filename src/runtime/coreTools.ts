@@ -39,7 +39,7 @@ export function createCoreToolDescriptors(handlers: CoreToolHandlers): readonly 
     },
     {
       ...base,
-      id: "geodesic-cannon",
+      id: "geodesicEmitters/emitter",
       label: "Geodesic emitter",
       badgeLabel: "Ray",
       helpTitle: "Ray tool",
@@ -78,7 +78,7 @@ export function createCoreToolDescriptors(handlers: CoreToolHandlers): readonly 
     },
     {
       ...base,
-      id: "geodesic-cannon-carry",
+      id: "geodesicEmitters/carry",
       label: "Carry",
       helpTitle: "Carry emitter",
       helpBody: "Moves the selected geodesic emitter while preserving its editable rays.",
@@ -91,7 +91,7 @@ export function createCoreToolDescriptors(handlers: CoreToolHandlers): readonly 
     },
     {
       ...base,
-      id: "geodesic-cannon-rotate",
+      id: "geodesicEmitters/rotate",
       label: "Turn",
       badgeLabel: "Rotate",
       helpTitle: "Rotate ray",
@@ -105,7 +105,7 @@ export function createCoreToolDescriptors(handlers: CoreToolHandlers): readonly 
     },
     {
       ...base,
-      id: "geodesic-cannon-aim",
+      id: "geodesicEmitters/aim",
       label: "Aim ray",
       badgeLabel: "Aim",
       helpTitle: "Aim ray",

@@ -4,7 +4,7 @@
  * with a `scenePaletteItemId` (and `scenePaletteAction` where it is clickable) that the input layer reads back.
  * This file covers only what the adapter itself decides that `PaletteDefinition` does not: which icon goes with
  * which tool and action, the on-screen sign-editing keyboard's key choice and cursor/preview layout, and
- * suppressing an action for a locked geodesic. Which options a page offers and which are disabled is
+ * suppressing an action for a connected geodesic. Which options a page offers and which are disabled is
  * `createPaletteDefinition`'s decision, covered directly in `tests/ui/paletteDefinition.test.ts`.
  */
 import { describe, expect, it } from "vitest";
@@ -64,11 +64,11 @@ describe("scenePaletteAdapter", () => {
     adapter.dispose();
   });
 
-  it("renders locked geodesic emitter actions with a lock segment marker", () => {
+  it("renders connected geodesic emitter actions with a lock segment marker", () => {
     const adapter = createScenePaletteAdapter(createNoopOptions());
     adapter.setDefinition(createPaletteDefinition(showRuntimeMenuGeodesicCannonActions(
       createRuntimeMenuState({ selectedWorldId: "cube" }),
-      { cannonId: "cannon-a", geodesicIds: ["g-a"], lockedGeodesicIds: ["g-a"] },
+      { cannonId: "cannon-a", geodesicIds: ["g-a"], connectedGeodesicIds: ["g-a"] },
     )));
 
     const itemIds = collectPaletteItemIds(adapter.root);

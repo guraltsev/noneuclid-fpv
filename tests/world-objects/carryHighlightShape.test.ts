@@ -8,7 +8,7 @@
 import { describe, expect, it } from "vitest";
 import { yawRigidTransform3 } from "../../src/math/rigidTransform3";
 import { carryHighlightMarginMeters, carryHighlightShapeOf, type CarryHighlightShape } from "../../src/world-objects/carryHighlightShape";
-import { cannonCarryHighlight, cannonModelHalfExtentsMeters, createGeodesicCannonObject } from "../../src/world-objects/geodesic/objects";
+import { cannonCarryHighlight, cannonModelHalfExtentsMeters, createGeodesicEmitterObject } from "../../src/world-objects/geodesic/objects";
 
 // Whether a point of the object's frame lies inside the ellipsoid.
 function inside(shape: CarryHighlightShape, point: { x: number; y: number; z: number }): boolean {
@@ -19,7 +19,7 @@ function inside(shape: CarryHighlightShape, point: { x: number; y: number; z: nu
 }
 
 describe("the emitter's carry highlight", () => {
-  const emitter = createGeodesicCannonObject({ id: "cannon", cellId: "room", localPose: yawRigidTransform3(0, { x: 0, y: 0, z: 0 }) });
+  const emitter = createGeodesicEmitterObject({ id: "cannon", cellId: "room", localPose: yawRigidTransform3(0, { x: 0, y: 0, z: 0 }) });
   const shape = carryHighlightShapeOf(emitter);
 
   it("is an ellipsoid, taller than it is wide, declared by the emitter itself", () => {

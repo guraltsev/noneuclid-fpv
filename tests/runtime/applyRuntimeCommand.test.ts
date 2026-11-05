@@ -249,9 +249,9 @@ describe("applyRuntimeCommand: tools and signs", () => {
 
   it("enters a tool mode: menu closed with that tool, no session reset and no gate", () => {
     const off = stateWith({ isOpen: true }, disabled({ tools: { geodesicEmitters: false } }));
-    const result = reduce({ kind: "enter-tool-mode", toolId: "geodesic-cannon-carry" }, off);
+    const result = reduce({ kind: "enter-tool-mode", toolId: "geodesicEmitters/carry" }, off);
 
-    expect(result.state.menuState).toMatchObject({ isOpen: false, selectedTool: "geodesic-cannon-carry" });
+    expect(result.state.menuState).toMatchObject({ isOpen: false, selectedTool: "geodesicEmitters/carry" });
     expect(result.effects).toEqual([sync]);
   });
 
@@ -400,7 +400,7 @@ describe("applyRuntimeCommand: cannon and geometry computer actions", () => {
   it("forwards each cannon action to the host when its tool is enabled", () => {
     expect(reduce({ kind: "add-geodesic-to-cannon", cannonId: "c" }).effects).toEqual([{ kind: "add-geodesic-to-cannon", cannonId: "c" }]);
     expect(reduce({ kind: "start-cannon-carry", cannonId: "c" }).effects).toEqual([{ kind: "start-cannon-carry", cannonId: "c" }]);
-    const objectAction = { kind: "start-object-action", objectKind: "geodesic-cannon", objectId: "c", actionId: "tie-and-detach" } as const;
+    const objectAction = { kind: "start-object-action", objectKind: "geodesicEmitters/emitter", objectId: "c", actionId: "tie-and-detach" } as const;
     expect(reduce(objectAction).effects).toEqual([objectAction]);
     expect(reduce({ kind: "start-cannon-rotation", cannonId: "c", geodesicId: "g" }).effects).toEqual([
       { kind: "start-cannon-rotation", cannonId: "c", geodesicId: "g" },

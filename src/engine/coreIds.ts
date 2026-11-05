@@ -11,7 +11,7 @@ const coreObjectKindTable: Record<RuntimeWorldObject["kind"], true> = {
   "geo-butterfly": true,
   asset: true,
   "placed-flag": true,
-  "geodesic-cannon": true,
+  "geodesicEmitters/emitter": true,
   "geodesicModel/arc": true,
   "geodesicModel/vertex": true,
   "geodesicModel/segment": true,
@@ -24,12 +24,12 @@ const coreToolIdTable: Record<CoreToolId, true> = {
   none: true,
   aim: true,
   "place-flag": true,
-  "geodesic-cannon": true,
+  "geodesicEmitters/emitter": true,
   "measure-length": true,
   protractor: true,
-  "geodesic-cannon-carry": true,
-  "geodesic-cannon-rotate": true,
-  "geodesic-cannon-aim": true,
+  "geodesicEmitters/carry": true,
+  "geodesicEmitters/rotate": true,
+  "geodesicEmitters/aim": true,
 };
 
 /** Kinds of the core union of the registry. */

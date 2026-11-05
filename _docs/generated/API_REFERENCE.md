@@ -695,7 +695,7 @@ The arc index (design 014 section 7.1): which arc ends sit on each anchor, built
 
 ### `world-objects/geodesic/cannon.ts`
 
-Emitter (cannon) operations: shooting, extending and re-aiming geodesics, connecting a geodesic to an emitter, rebuilding locked geodesics between emitters, and placing cannons on the floor, on a geodesic or at a geodesic vertex.
+Emitter (cannon) operations: shooting, extending and re-aiming geodesics, connecting a geodesic to an emitter, rebuilding connected geodesics between emitters, and placing cannons on the floor, on a geodesic or at a geodesic vertex.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
@@ -706,16 +706,16 @@ Emitter (cannon) operations: shooting, extending and re-aiming geodesics, connec
 | interface | `PlaceGeodesicCannonOnGeodesicRequest` | Request for `placeGeodesicCannonOnGeodesic`: put a new cannon on a segment of an existing free geodesic, splitting it there. |
 | interface | `PlaceGeodesicCannonAtGeodesicVertexRequest` | Request for `placeGeodesicCannonAtGeodesicVertex`: put a cannon at a point where geodesics cross in a cell, cutting each passing geodesic there. |
 | interface | `ConnectGeodesicToEmitterRequest` | Request for `connectGeodesicToEmitter`: close a free geodesic onto a second emitter. |
-| interface | `RebuildConnectedGeodesicBetweenEmittersRequest` | Request for `rebuildConnectedGeodesicBetweenEmitters`: recompute a locked geodesic after one of its emitters moved. |
+| interface | `RebuildConnectedGeodesicBetweenEmittersRequest` | Request for `rebuildConnectedGeodesicBetweenEmitters`: recompute a connected geodesic after one of its emitters moved. |
 | function | `placeGeodesicCannonAtFloorPoint` | Adds a new cannon standing on the floor at `floorPoint` unless the spot is blocked. |
 | function | `shootGeodesic` | Emits (or re-aims) a free geodesic from a cannon along its yaw and returns its first derived segment. |
 | function | `extendGeodesic` | Lengthens an aimable free geodesic by re-aiming it from its emitter along the current tangent, and returns its new last segment. |
 | function | `rebuildGeodesicToLength` | Re-shoots a geodesic from its cannon so that its total length is `totalLengthMeters`, returning the new segments. |
-| function | `connectGeodesicToEmitter` | Tries to close a free geodesic onto the emitter `incomingEmitterId`, producing a locked geodesic. |
-| function | `rebuildConnectedGeodesicBetweenEmitters` | Recomputes a locked geodesic after one of its emitters moved, keeping its homotopy class when possible. |
+| function | `connectGeodesicToEmitter` | Tries to close a free geodesic onto the emitter `incomingEmitterId`, producing a connected geodesic. |
+| function | `rebuildConnectedGeodesicBetweenEmitters` | Recomputes a connected geodesic after one of its emitters moved, keeping its homotopy class when possible. |
 | interface | `MoveEmitterAlongRouteInput` | Input for {@link moveEmitterAlongRoute}. |
-| interface | `MoveEmitterAlongRouteResult` | What {@link moveEmitterAlongRoute} did: whether the emitter moved, and which locked geodesics could not be kept consistent with it. |
-| function | `moveEmitterAlongRoute` | Moves an emitter and keeps every locked geodesic that ends on it consistent: the emitter's new cell and pose are stored and each such geodesic's portal word is extended by the portals the emitter crossed. |
+| interface | `MoveEmitterAlongRouteResult` | What {@link moveEmitterAlongRoute} did: whether the emitter moved, and which connected geodesics could not be kept consistent with it. |
+| function | `moveEmitterAlongRoute` | Moves an emitter and keeps every connected geodesic that ends on it consistent: the emitter's new cell and pose are stored and each such geodesic's portal word is extended by the portals the emitter crossed. |
 | function | `placeGeodesicCannonOnGeodesic` | Places a new cannon at a point of a free geodesic and splits the geodesic there into two intervals. |
 | function | `placeGeodesicCannonAtGeodesicVertex` | Places a cannon at a vertex where segments pass and cuts every passing geodesic there, connecting the pieces to the new cannon. |
 
@@ -784,7 +784,7 @@ Geodesic intersection markers: crossings of segments in the same cell, stable ma
 
 ### `world-objects/geodesic/intervals.ts`
 
-Interval rebuilds: realizing an interval's lifted chord, aiming free geodesics, splitting at a segment hit, rebuilding locked intervals after a carried anchor moved, and side-effect-free previews.
+Interval rebuilds: realizing an interval's lifted chord, aiming free geodesics, splitting at a segment hit, rebuilding connected intervals after a carried anchor moved, and side-effect-free previews.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
@@ -795,10 +795,10 @@ Interval rebuilds: realizing an interval's lifted chord, aiming free geodesics, 
 | function | `rebuildDerivedGeodesicSegments` | Regenerates an interval's segments from its endpoint anchors and portal word (the fundamental "development" step). |
 | function | `rebuildDerivedGeodesicSegmentsDetailed` | Like `rebuildDerivedGeodesicSegments`, and also returns how the chord was realized, so a caller can tell why a rebuild failed (for example a forbidden-zone hit) without tracing the chord again. |
 | function | `splitGeodesicIntervalAtSegmentHit` | Splits a free geodesic at a point on one of its segments, ending the first part at a newly placed emitter. |
-| function | `rebuildLockedGeodesicFromEndpointsAndPortalWord` | Rebuilds a locked (emitter-to-emitter) interval after an endpoint was carried, updating its portal word first. |
-| function | `rebuildLockedGeodesicFromEndpointsAndPortalWordDetailed` | Like `rebuildLockedGeodesicFromEndpointsAndPortalWord`, and also returns how the chord was realized (`undefined` when `geodesicId` is not an interval), so that the caller can tell a forbidden-zone failure from the other… |
-| function | `updateLockedGeodesicPortalWordForCarriedAnchorTraversal` | Extends an interval's stored portal word with one portal crossing made by a carried anchor, and saves it. |
-| function | `updateLockedGeodesicPortalWordForCarriedAnchorTraversals` | Same as {@link updateLockedGeodesicPortalWordForCarriedAnchorTraversal} for a chain of traversals the carried anchor made in one frame, in order. |
+| function | `rebuildConnectedGeodesicFromEndpointsAndPortalWord` | Rebuilds a connected (emitter-to-emitter) interval after an endpoint was carried, updating its portal word first. |
+| function | `rebuildConnectedGeodesicFromEndpointsAndPortalWordDetailed` | Like `rebuildConnectedGeodesicFromEndpointsAndPortalWord`, and also returns how the chord was realized (`undefined` when `geodesicId` is not an interval), so that the caller can tell a forbidden-zone failure from the ot… |
+| function | `updateConnectedGeodesicPortalWordForCarriedAnchorTraversal` | Extends an interval's stored portal word with one portal crossing made by a carried anchor, and saves it. |
+| function | `updateConnectedGeodesicPortalWordForCarriedAnchorTraversals` | Same as {@link updateConnectedGeodesicPortalWordForCarriedAnchorTraversal} for a chain of traversals the carried anchor made in one frame, in order. |
 | function | `previewRebuildGeodesicInterval` | Computes the segments an interval would have, without touching the registry (rollback-safe). |
 | interface | `GeodesicIntervalPreview` | A previewed interval: the build result plus the traces it was built from, so that a caller can commit them without tracing again. |
 
@@ -813,7 +813,7 @@ Queries whether an arc connects emitters or follows one, and removal of geodesic
 | function | `arcFollowsEmitter` | The arc follows the emitter when it has an end on it and either connects emitters or its other end is a shared vertex (a tied arc). |
 | function | `collectFollowingArcIdsForEmitter` | Lists the ids of arcs that follow the emitter (see `arcFollowsEmitter`), in registry order. |
 | function | `removeGeodesic` | Removes a geodesic and its derived objects (an interval via `removeGeodesicIntervalAndDerivedObjects`; any other id only has stale segments and emitter cache entries removed), then refreshes intersections. |
-| function | `removeUnlockedGeodesicsFromCannon` | Removes every geodesic of the cannon that does not follow it (a plain shot geodesic with an unshared free end) and returns the removed ids (empty if the id is not a cannon). |
+| function | `removePlainGeodesicsFromCannon` | Removes every geodesic of the cannon that does not follow it (a plain shot geodesic with an unshared free end) and returns the removed ids (empty if the id is not a cannon). |
 
 ### `world-objects/geodesic/objects.ts`
 
@@ -821,7 +821,7 @@ Geodesic emitters ("cannons"), geodesic arcs and curve shortening on a glued cel
 
 | Kind | Name | Summary |
 | --- | --- | --- |
-| interface | `GeodesicCannonObject` | A geodesic emitter ("cannon"): a placeable runtime object that geodesic intervals attach their endpoints to. |
+| interface | `GeodesicEmitterObject` | A geodesic emitter ("cannon"): a placeable runtime object that geodesic intervals attach their endpoints to. |
 | interface | `GeodesicEmitterAttachment` | How an interval geodesic attaches to emitters, derived from its endpoint attachments by `getGeodesicConnection`. |
 | interface | `GeodesicPortalTraversal` | One crossing of a portal, recorded by the ids on both sides; a sequence of these is a portal word. |
 | interface | `GeodesicCarryPortalTransition` | A `GeodesicPortalTraversal` that also carries the portal's rigid transform, reported when a carried emitter crosses a portal. |
@@ -836,9 +836,9 @@ Geodesic emitters ("cannons"), geodesic arcs and curve shortening on a glued cel
 | interface | `GeodesicSegmentObject` | A derived, per-cell straight piece of a geodesic: a ray inside one cell from `start` along `direction` for `lengthMeters`. |
 | interface | `GeodesicCrossingObject` | A computed marker where two distinct geodesics' segments cross in the same cell. |
 | type | `GeodesicSegmentTerminal` | How a single per-cell segment ends. |
-| interface | `CreateGeodesicCannonOptions` | Construction options for `createGeodesicCannonObject`; omitted optional fields get the defaults documented there. |
+| interface | `CreateGeodesicEmitterOptions` | Construction options for `createGeodesicEmitterObject`; omitted optional fields get the defaults documented there. |
 | interface | `TraceGeodesicSegmentResult` | One traced piece: the cell, the (normalized) ray used, the length actually travelled, and why it stopped. |
-| interface | `PlaceGeodesicCannonResult` | Result of the cannon placement functions: the placed (registry) cannon, or `placed: false` with a coarse `reason`. |
+| interface | `PlaceGeodesicEmitterResult` | Result of the cannon placement functions: the placed (registry) cannon, or `placed: false` with a coarse `reason`. |
 | const | `cannonModelHalfExtentsMeters` | Half-extents in meters of the visible emitter model in the emitter's frame (z up, the box centred at `(0, 0, half.z)`), measured from the assets the renderer draws (`geodesicCannonRenderer.ts`), not guessed: - `flashlig… |
 | const | `cannonCarryHighlightLooseness` | Factor by which the emitter's highlight ellipsoid exceeds the model's half-extents, so it is a loose fit and not skin-tight. |
 | const | `cannonCarryHighlight` | Carry highlight of an emitter: an ellipsoid hugging the visible model (`cannonModelHalfExtentsMeters`) a little loosely, so it is thin and a bit taller than wide, centred at half the model's height: semi-axes `(0.159, 0… |
@@ -849,7 +849,7 @@ Geodesic emitters ("cannons"), geodesic arcs and curve shortening on a glued cel
 | const | `intersectionTolerance` | Numerical tolerance for ray/side parallelism, hit parameters and length comparisons (meters / unitless). |
 | const | `minGeodesicSegmentLengthMeters` | Smallest segment/continuation length (meters) worth creating when splitting or building free geodesics. |
 | const | `emitterConnectionToleranceMeters` | Perpendicular distance (meters) within which a ray counts as hitting an emitter; equal to the cannon collision radius. |
-| function | `createGeodesicCannonObject` | Builds a geodesic emitter object from options, filling defaults. |
+| function | `createGeodesicEmitterObject` | Builds a geodesic emitter object from options, filling defaults. |
 | function | `isGeodesicSegmentObject` | Type guard: true when the object is a `GeodesicSegmentObject` (`kind === "geodesicModel/segment"`). |
 | function | `isGeodesicVertexObject` | Type guard: true when the object is a `GeodesicVertexObject`. |
 | function | `createGeodesicVertexObject` | Builds a free-end anchor at `point` (cell-local meters, including its beam height in z) in cell `cellId`. |
@@ -1319,7 +1319,7 @@ Identifiers of the player's tools and of the debug-overlay items, with the canon
 | Kind | Name | Summary |
 | --- | --- | --- |
 | type | `RuntimeDebugOverlayItemId` | Item that can be shown in the on-screen debug overlay. |
-| type | `CoreToolId` | Tool of the shell that the player can have active, including the geodesic-cannon sub-modes. |
+| type | `CoreToolId` | Tool of the shell that the player can have active, including the emitter's sub-modes. |
 | interface | `ModuleToolIds` | The tool ids that modules define (design 013 section 8.3): each module adds its ids by interface merging, in its `api.ts`, as `interface ModuleToolIds { geodesicModelTie: "geodesicModel/tie" }` (the property name is fre… |
 | type | `RuntimeToolId` | Tool the player can have active: a core tool or one that a module defines. |
 | const | `defaultRuntimeDebugOverlayItems` | Overlay items shown when a launch does not choose any, in canonical order. |
@@ -1881,7 +1881,7 @@ Policy for derived objects (geodesics, measured geodesic lengths, protractor ang
 | interface | `GeometryCommitComputedObjectPolicyCallbacks` | Optional renderer hooks invoked as the policy removes dependent objects so visuals can follow. |
 | interface | `ApplyGeometryCommitComputedObjectPolicyOptions` | Inputs for applying the post-commit policy. |
 | interface | `GeometryCommitComputedObjectPolicyResult` | Ids (deduplicated, in first-seen order) of the objects the policy removed, rebuilt or pruned. |
-| function | `applyGeometryCommitComputedObjectPolicy` | Applies the post-commit policy to the registry (delete unlocked geodesics, re-solve locked ones, prune stale intersections) and returns what changed. |
+| function | `applyGeometryCommitComputedObjectPolicy` | Applies the post-commit policy to the registry (delete free geodesics, re-solve connected ones, prune stale intersections) and returns what changed. |
 
 ### `runtime/worldGeometryDeformationFamilies.ts`
 
@@ -2082,8 +2082,8 @@ Browser-console debug surface for the app: window-level helper installation, the
 | type | `WindowWithGeometryDebugHelpers` | The window object augmented with the optional geometry debug global. |
 | type | `PortalPathCheckResultWithVisibility` | Result of checking a portal path string, extended with the lookup result against the latest visible-path computation. |
 | interface | `CameraPoseDebugDump` | Snapshot of the player/camera pose returned by dumpCameraPose; angles in both radians and degrees, matrices as 16-element column-major arrays (Three.js order). |
-| interface | `GeodesicPathDebugDump` | Description of one geodesic's lock state, portal word, and segments. |
-| interface | `GeodesicWordDebugDump` | Portal word of one locked geodesic with its individual transitions. |
+| interface | `GeodesicPathDebugDump` | Description of one geodesic's connection state, portal word, and segments. |
+| interface | `GeodesicWordDebugDump` | Portal word of one connected geodesic with its individual transitions. |
 | interface | `AllGeodesicsDebugDump` | Whole-world geodesic inventory: intervals, segments and anchors (the vertices of a curve under the curve shortening flow are anchors). |
 | interface | `EndpointDebugDump` | Identifies one geodesic endpoint and the anchor object it is attached to. |
 | function | `installPortalDebugHelpers` | Publishes the helpers as window.noneuclidPortalDebug, replacing any previous object; pair with uninstallPortalDebugHelpers on teardown. |
@@ -2538,7 +2538,7 @@ Icon factories of the in-scene palette panel: each wraps an Image, a lucide icon
 | function | `createToolIcon` | Icon for a tool id; unknown ids get an invisible 64x64 placeholder. |
 | function | `createGeodesicCannonActionIcon` | Icon of a geodesic cannon header action: a plus for "add-geodesic", the carry or aim image otherwise. |
 | function | `createUnlinkIcon` | Unlink image (24 px) used by the tie-and-detach action. |
-| function | `createLockedGeodesicSegmentStatus` | Composite emitter-line-lock-line-emitter glyph shown in place of Aim for locked geodesics. |
+| function | `createConnectedGeodesicSegmentStatus` | Composite emitter-line-lock-line-emitter glyph shown in place of Aim for connected geodesics. |
 | function | `createSignImage` | Square image of a sign type at `size` pixels. |
 | function | `createHeaderIcon` | Lucide icon for a header action id; "none" has no icon. |
 
@@ -2565,7 +2565,7 @@ Geodesic cannon palette page: a scrollable list with one row per geodesic.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
-| function | `buildGeodesicCannonActionsContent` | Geodesic cannon page: a scrollable list with one row per geodesic (label, locked-status icon or Aim button, delete button). |
+| function | `buildGeodesicCannonActionsContent` | Geodesic cannon page: a scrollable list with one row per geodesic (label, connected-status icon or Aim button, delete button). |
 
 ### `render/three/palette/pages/geometryComputer.ts`
 

@@ -82,7 +82,7 @@ function toolTooltip(toolId: string): string | undefined {
   switch (toolId) {
     case "place-flag":
       return "Place sign";
-    case "geodesic-cannon":
+    case "geodesicEmitters/emitter":
       return "Create and terminate straight lines";
     case "measure-length":
       return "Measure length";

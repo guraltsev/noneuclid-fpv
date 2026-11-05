@@ -1,6 +1,6 @@
 /**
  * Policy for derived objects (geodesics, measured geodesic lengths, protractor angles, geodesic intersection markers) when a newly deformed world geometry is committed.
- * A geodesic traced in the old geometry is generally not a geodesic of the new one, so unlocked geodesics are deleted together with the measurements and angles that depend on them. Locked geodesics (connecting two emitters) are re-solved with rebuildConnectedGeodesicBetweenEmitters in the new world; if that finds no connection they are deleted and reported as failed. Measurements and angles of the surviving geodesics are not touched here: the derive ticks of the geodesic measurements module recompute them in the next engine step. Orphaned intersection objects are pruned.
+ * A geodesic traced in the old geometry is generally not a geodesic of the new one, so free geodesics are deleted together with the measurements and angles that depend on them. Connected geodesics (connecting two emitters) are re-solved with rebuildConnectedGeodesicBetweenEmitters in the new world; if that finds no connection they are deleted and reported as failed. Measurements and angles of the surviving geodesics are not touched here: the derive ticks of the geodesic measurements module recompute them in the next engine step. Orphaned intersection objects are pruned.
  * The function mutates the runtime object registry in place and reports what changed through renderer-agnostic callbacks and a result record of id lists; it does not touch the renderer itself.
  */
 import type { CompiledCellComplex } from "../cell-complex/compileCellComplex";
@@ -21,7 +21,7 @@ export interface GeometryCommitComputedObjectPolicyCallbacks {
 
 /** Inputs for applying the post-commit policy. */
 export interface ApplyGeometryCommitComputedObjectPolicyOptions {
-  /** Newly committed compiled world in which locked geodesics are re-solved. */
+  /** Newly committed compiled world in which connected geodesics are re-solved. */
   readonly world: CompiledCellComplex;
   /** Runtime object registry that is mutated in place. */
   readonly registry: LegacyWorldWriter;
@@ -35,26 +35,26 @@ export interface GeometryCommitComputedObjectPolicyResult {
   readonly removedGeodesicIds: readonly string[];
   readonly rebuiltGeodesicIds: readonly string[];
   /**
-   * Locked geodesics that could not be re-solved in the new geometry; these are also listed in removedGeodesicIds.
+   * Connected geodesics that could not be re-solved in the new geometry; these are also listed in removedGeodesicIds.
    */
-  readonly failedLockedGeodesicIds: readonly string[];
+  readonly failedConnectedGeodesicIds: readonly string[];
   readonly removedMeasuredGeodesicLengthIds: readonly string[];
   readonly removedProtractorAngleIds: readonly string[];
   readonly prunedIntersectionIds: readonly string[];
 }
 
 /**
- * Applies the post-commit policy to the registry (delete unlocked geodesics, re-solve locked ones, prune stale intersections) and returns what changed.
+ * Applies the post-commit policy to the registry (delete free geodesics, re-solve connected ones, prune stale intersections) and returns what changed.
  */
 export function applyGeometryCommitComputedObjectPolicy(
   options: ApplyGeometryCommitComputedObjectPolicyOptions,
 ): GeometryCommitComputedObjectPolicyResult {
   const result = createGeometryCommitComputedObjectPolicyResultBuilder();
-  const lockedGeodesicIds = collectLockedGeodesicIds(options.registry);
+  const connectedGeodesicIds = collectConnectedGeodesicIds(options.registry);
   const allGeodesicIds = collectAllGeodesicIds(options.registry);
 
   for (const geodesicId of allGeodesicIds) {
-    if (lockedGeodesicIds.has(geodesicId)) {
+    if (connectedGeodesicIds.has(geodesicId)) {
       continue;
     }
 
@@ -64,7 +64,7 @@ export function applyGeometryCommitComputedObjectPolicy(
     result.removedGeodesicIds.add(geodesicId);
   }
 
-  for (const geodesicId of lockedGeodesicIds) {
+  for (const geodesicId of connectedGeodesicIds) {
     const rebuilt = rebuildConnectedGeodesicBetweenEmitters({
       world: options.world,
       registry: options.registry,
@@ -74,7 +74,7 @@ export function applyGeometryCommitComputedObjectPolicy(
       removeProtractorAnglesForGeodesic(options, geodesicId, result);
       removeMeasuredGeodesicLengthsForGeodesic(options, geodesicId, result);
       removeGeodesic(options.registry, geodesicId);
-      result.failedLockedGeodesicIds.add(geodesicId);
+      result.failedConnectedGeodesicIds.add(geodesicId);
       result.removedGeodesicIds.add(geodesicId);
       continue;
     }
@@ -91,7 +91,7 @@ export function applyGeometryCommitComputedObjectPolicy(
   return freezeGeometryCommitComputedObjectPolicyResult(result);
 }
 
-function collectLockedGeodesicIds(registry: RuntimeObjectReader): Set<string> {
+function collectConnectedGeodesicIds(registry: RuntimeObjectReader): Set<string> {
   return new Set(
     [...collectAllGeodesicIds(registry)]
       .filter((geodesicId) => arcConnectsEmitters(registry, geodesicId)),
@@ -169,7 +169,7 @@ function removeProtractorAnglesForMissingVertices(
 interface GeometryCommitComputedObjectPolicyResultBuilder {
   readonly removedGeodesicIds: Set<string>;
   readonly rebuiltGeodesicIds: Set<string>;
-  readonly failedLockedGeodesicIds: Set<string>;
+  readonly failedConnectedGeodesicIds: Set<string>;
   readonly removedMeasuredGeodesicLengthIds: Set<string>;
   readonly removedProtractorAngleIds: Set<string>;
   readonly prunedIntersectionIds: Set<string>;
@@ -179,7 +179,7 @@ function createGeometryCommitComputedObjectPolicyResultBuilder(): GeometryCommit
   return {
     removedGeodesicIds: new Set(),
     rebuiltGeodesicIds: new Set(),
-    failedLockedGeodesicIds: new Set(),
+    failedConnectedGeodesicIds: new Set(),
     removedMeasuredGeodesicLengthIds: new Set(),
     removedProtractorAngleIds: new Set(),
     prunedIntersectionIds: new Set(),
@@ -192,7 +192,7 @@ function freezeGeometryCommitComputedObjectPolicyResult(
   return {
     removedGeodesicIds: [...result.removedGeodesicIds],
     rebuiltGeodesicIds: [...result.rebuiltGeodesicIds],
-    failedLockedGeodesicIds: [...result.failedLockedGeodesicIds],
+    failedConnectedGeodesicIds: [...result.failedConnectedGeodesicIds],
     removedMeasuredGeodesicLengthIds: [...result.removedMeasuredGeodesicLengthIds],
     removedProtractorAngleIds: [...result.removedProtractorAngleIds],
     prunedIntersectionIds: [...result.prunedIntersectionIds],

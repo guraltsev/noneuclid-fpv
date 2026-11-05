@@ -183,8 +183,8 @@ describe("runtimeMenuState", () => {
     expect(definition.content.addAction).toEqual({ label: "Add geodesic", disabled: false });
     expect(definition.content.objectActions).toEqual([]);
     expect(definition.content.geodesics).toEqual([
-      { id: "g-a", label: "G1", locked: false, connectionSymbolLabel: undefined, deleteDisabled: false },
-      { id: "g-b", label: "G2", locked: false, connectionSymbolLabel: undefined, deleteDisabled: false },
+      { id: "g-a", label: "G1", connected: false, connectionSymbolLabel: undefined, deleteDisabled: false },
+      { id: "g-b", label: "G2", connected: false, connectionSymbolLabel: undefined, deleteDisabled: false },
     ]);
   });
 
@@ -218,17 +218,17 @@ describe("runtimeMenuState", () => {
       throw new Error("Expected geodesic cannon actions.");
     }
     expect(definition.content.geodesics).toEqual([
-      { id: "g-b", label: "G2", locked: false, connectionSymbolLabel: undefined, deleteDisabled: false },
+      { id: "g-b", label: "G2", connected: false, connectionSymbolLabel: undefined, deleteDisabled: false },
     ]);
   });
 
-  it("marks locked geodesic rows with a connection symbol label", () => {
+  it("marks connected geodesic rows with a connection symbol label", () => {
     const definition = createPaletteDefinition(showRuntimeMenuGeodesicCannonActions(createRuntimeMenuState({
       selectedWorldId: "cube",
     }), {
       cannonId: "cannon-b",
       geodesicIds: ["g-b"],
-      lockedGeodesicIds: ["g-b"],
+      connectedGeodesicIds: ["g-b"],
     }));
 
     expect(definition.content.kind).toBe("geodesic-cannon-actions");
@@ -239,7 +239,7 @@ describe("runtimeMenuState", () => {
       {
         id: "g-b",
         label: "G1",
-        locked: true,
+        connected: true,
         connectionSymbolLabel: "Locked geodesic segment between emitters",
         deleteDisabled: false,
       },

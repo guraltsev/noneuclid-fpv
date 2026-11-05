@@ -16,16 +16,16 @@ import {
   type GeodesicEmitterLabel,
 } from "../../src/render/three/geodesicEmitterLabelController";
 import { yawRigidTransform3 } from "../../src/math/rigidTransform3";
-import type { GeodesicCannonObject } from "../../src/world-objects/geodesic/objects";
+import type { GeodesicEmitterObject } from "../../src/world-objects/geodesic/objects";
 import { createRuntimeObjectRegistry } from "../../src/world-objects/runtimeObjectRegistry";
 import { resolveGeodesicEmitterLabelPosition } from "../../src/render/three/geodesicEmitterLabels";
 import { installFakeCanvas2d } from "../support/fakeCanvas2d";
 import { addGeodesicLeavingEmitter, compileLargePortalWorld } from "../fixtures/world-objects/geodesic";
 
-function cannon(id: string, cellId = "a", x = 0, y = 0): GeodesicCannonObject {
+function cannon(id: string, cellId = "a", x = 0, y = 0): GeodesicEmitterObject {
   return {
     id,
-    kind: "geodesic-cannon",
+    kind: "geodesicEmitters/emitter",
     cellId,
     localPose: yawRigidTransform3(0, { x, y, z: 0 }),
     portalRenderable: true,
@@ -60,7 +60,7 @@ describe("geodesicEmitterLabelController sweep", () => {
 });
 
 describe("geodesicEmitterLabelController placement", () => {
-  function setup(cannons: readonly GeodesicCannonObject[]) {
+  function setup(cannons: readonly GeodesicEmitterObject[]) {
     installFakeCanvas2d();
     const labels = new Map<string, GeodesicEmitterLabel>();
     const registry = createRuntimeObjectRegistry(cannons);

@@ -12,6 +12,7 @@ import { yawRigidTransform3 } from "../../math/rigidTransform3";
 import { canBeCarried, carryMaxSpeedMetersPerSecond, carryTowardTarget, locateCarrierTarget, remainingToTarget } from "../../world-objects/carry";
 import { moveEmitterAlongRoute } from "../../world-objects/geodesic/cannon";
 import { rebuildEmitterGeodesics, releaseCarriedEmitter } from "../../world-objects/geodesic/carryEnd";
+import type { GeodesicEmitterObject } from "../../world-objects/geodesic/objects";
 import { getRuntimeObjectInteractionRangeMeters } from "../../world-objects/interactionRange";
 import { runtimeObjectToDynamicObjectState } from "../../world-objects/runtimeObjectBase";
 import type { RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
@@ -32,7 +33,7 @@ import {
 /** The module as the engine's list takes it. */
 export type CarryModuleDefinition = ModuleDefinition<undefined, CarryCommand, CarryEvent>;
 
-type Cannon = Extract<RuntimeWorldObject, { readonly kind: "geodesic-cannon" }>;
+type Cannon = GeodesicEmitterObject;
 
 function refuse(code: string, message: string): CommandResult {
   return { ok: false, refusal: { code, message } };
@@ -55,7 +56,7 @@ function withCarry(participant: ParticipantRecord, carry: ParticipantAttachment)
 }
 
 function asCannon(object: RuntimeWorldObject | undefined): Cannon | undefined {
-  return object?.kind === "geodesic-cannon" ? object : undefined;
+  return object?.kind === "geodesicEmitters/emitter" ? object : undefined;
 }
 
 /**
@@ -219,8 +220,8 @@ export function carryModule(): CarryModuleDefinition {
     requires: [],
     objectKinds: [],
     // Until the emitter has its module (`geodesicEmitters`), the carry moves an emitter and rebuilds the geodesics it anchors itself. A rebuild that collapses
-    // a locked geodesic deletes the geodesic's measurements too (issue 94).
-    writesCoreKinds: ["geodesic-cannon", "geodesicModel/arc", "geodesicModel/vertex", "geodesicModel/segment", "geodesicModel/crossing", "geodesicMeasurements/length", "geodesicMeasurements/angle"],
+    // a connected geodesic deletes the geodesic's measurements too (issue 94).
+    writesCoreKinds: ["geodesicEmitters/emitter", "geodesicModel/arc", "geodesicModel/vertex", "geodesicModel/segment", "geodesicModel/crossing", "geodesicMeasurements/length", "geodesicMeasurements/angle"],
     create: () => {
       // The step context for the callback below: set around one pass, so the callback is created once and a step allocates nothing for it.
       let stepContext: StepContext | undefined;
