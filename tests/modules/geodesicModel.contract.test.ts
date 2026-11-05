@@ -34,6 +34,7 @@ import {
   totalGeodesicLength,
 } from "../fixtures/world-objects/geodesic";
 import { createTestEngine } from "../support/engine";
+import { expectSegmentsAreRealizedFromArcs } from "../support/segmentOracle";
 
 type ProbeCommand = EngineCommandBase & { readonly kind: "probe/run"; readonly inner: GeodesicModelCommand };
 
@@ -162,6 +163,7 @@ describe("geodesicModel: tying", () => {
     expect(totalGeodesicLength(registry, "g1") + totalGeodesicLength(registry, "g2")).toBeCloseTo(lengthBefore, 9);
     expect(model.queries.isTied("g1")).toBe(true);
     expect(model.queries.tiedVertexCount()).toBe(1);
+    expectSegmentsAreRealizedFromArcs(world, registry);
   });
 
   it("refuses with the documented codes and changes nothing", () => {

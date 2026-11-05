@@ -9,6 +9,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { yawRigidTransform3 } from "../../../src/math/rigidTransform3";
+import { expectSegmentsAreRealizedFromArcs } from "../../support/segmentOracle";
 import { createRuntimeObjectRegistry } from "../../../src/world-objects/runtimeObjectRegistry";
 import { moveEmitterAlongRoute, rebuildConnectedGeodesicBetweenEmitters, shootGeodesic } from "../../../src/world-objects/geodesic/cannon";
 import { rebuildEmitterGeodesics, releaseCarriedEmitter } from "../../../src/world-objects/geodesic/carryEnd";
@@ -110,6 +111,7 @@ describe("carrying the emitter of a tied curve", () => {
     expect(isTied(registry, "g1")).toBe(true);
     expect(isTied(registry, "g2")).toBe(true);
     expect(registry.get("free")?.kind).toBe("geodesicModel/vertex");
+    expectSegmentsAreRealizedFromArcs(world, registry);
   });
 });
 

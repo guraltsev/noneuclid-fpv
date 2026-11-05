@@ -375,6 +375,7 @@ export function previewVertexRemoval(
     endAnchorObjectId: anchorB.id,
     startCellId: anchorA.cellId,
     portalWord: word,
+    geodesicNumber: (mergedId === firstArc.id ? firstArc : secondArc).geodesicNumber,
   });
   const preview = previewRebuildGeodesicInterval({ world, registry, interval: merged });
   if (!preview) {

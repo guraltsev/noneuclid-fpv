@@ -167,6 +167,8 @@ export interface GeodesicArcObject extends RuntimeWorldObjectBase {
   readonly startCellId: string;
   /** Ordered `start` -> `end` list of portals crossed; it fixes the homotopy class of the geodesic (empty when both ends are in one cell and the path stays inside it). */
   readonly portalWord: readonly GeodesicPortalTraversal[];
+  /** Display number ("G1", "G2", ...), assigned once when the arc is created (`nextGeodesicNumber`); real state, never recomputed. Absent only in test fixtures. */
+  readonly geodesicNumber?: number;
   /** Transient: set while the last rebuild of this arc failed during a carry, so it still shows its old path; the next successful rebuild clears it (`isStale`). */
   readonly stale?: true;
 }
@@ -234,7 +236,7 @@ export interface GeodesicSegmentObject extends RuntimeWorldObjectBase {
   readonly kind: "geodesicModel/segment";
   /** Id of the owning `GeodesicArcObject`. */
   readonly geodesicId: string;
-  /** Display number ("G1", "G2", ...) assigned by `getGlobalGeodesicNumbers`; optional cache. */
+  /** Copy of the owning arc's `geodesicNumber` (display number "G1", "G2", ...), kept so tooltips and labels read it directly. */
   readonly geodesicNumber?: number;
   /** 0-based position along the geodesic from its `start`; segments sort by this. */
   readonly segmentIndex: number;
@@ -471,6 +473,8 @@ export function createGeodesicArcObject(input: {
   readonly endAnchorObjectId: string;
   readonly startCellId: string;
   readonly portalWord?: readonly GeodesicPortalTraversal[];
+  /** Display number, assigned once at creation (see `nextGeodesicNumber`). */
+  readonly geodesicNumber?: number;
 }): GeodesicArcObject {
   return {
     id: input.id,
@@ -480,6 +484,7 @@ export function createGeodesicArcObject(input: {
     portalRenderable: false,
     startCellId: input.startCellId,
     portalWord: reduceAdjacentInversePortalTraversals(input.portalWord ?? []),
+    ...(input.geodesicNumber === undefined ? {} : { geodesicNumber: input.geodesicNumber }),
     start: {
       geodesicId: input.id,
       role: "start",

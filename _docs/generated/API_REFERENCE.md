@@ -913,7 +913,8 @@ Derived geodesic segments: lookup by geodesic, building segments from traces wit
 | function | `removeGeodesicIntervalAndDerivedObjects` | Deletes an interval together with everything derived from or pointing at it. |
 | function | `getGeodesicSegments` | Returns the derived segments of a geodesic sorted by `segmentIndex` (empty if none). |
 | function | `getGeodesicTail` | Returns the last (highest `segmentIndex`) segment of a geodesic, or `undefined` if it has none. |
-| function | `resolveGeodesicNumber` | Returns the 1-based display number of a geodesic, defaulting to 1 when it has none. |
+| function | `resolveGeodesicNumber` | Returns the 1-based display number of a geodesic: its arc's `geodesicNumber`, or 1 (an arc without one exists only in test fixtures). |
+| function | `nextGeodesicNumber` | The smallest positive integer not used as a `geodesicNumber` by any arc. |
 | function | `splitDerivedSegmentsIntoEndpointHalves` | Labels segments with `halfRole`, cutting the one that straddles the midpoint of the total length into two. |
 | function | `resolveEndpointTangentAtAnchor` | Yaw (radians) of the geodesic's tangent at the anchor of the given role, pointing away from the anchor along the geodesic. |
 | function | `resolveEmitterLaunchYaw` | Launch yaw (radians, in the emitter's cell frame) of a geodesic at an emitter: the tangent of the geodesic where it attaches to the emitter, or the emitter's default `aimYawRadians` when the geodesic has no segments yet… |

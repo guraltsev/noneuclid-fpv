@@ -86,14 +86,25 @@ export function getGeodesicTail(
   return getGeodesicSegments(registry, geodesicId).at(-1);
 }
 
-/** Returns the 1-based display number of a geodesic, defaulting to 1 when it has none. */
+/** Returns the 1-based display number of a geodesic: its arc's `geodesicNumber`, or 1 (an arc without one exists only in test fixtures). Only reads. */
 export function resolveGeodesicNumber(registry: RuntimeObjectRegistry, geodesicId: string): number {
-  for (const segment of registry.getSegmentsOfGeodesic(geodesicId)) {
-    if (segment.geodesicNumber !== undefined) {
-      return segment.geodesicNumber;
+  const arc = registry.get(geodesicId);
+  return arc?.kind === "geodesicModel/arc" ? arc.geodesicNumber ?? 1 : 1;
+}
+
+/** The smallest positive integer not used as a `geodesicNumber` by any arc. Scans the arcs; call it once per shot or split. */
+export function nextGeodesicNumber(registry: RuntimeObjectRegistry): number {
+  const used = new Set<number>();
+  for (const arc of registry.getObjectsOfKind("geodesicModel/arc")) {
+    if (arc.geodesicNumber !== undefined) {
+      used.add(arc.geodesicNumber);
     }
   }
-  return getGlobalGeodesicNumbers(registry, geodesicId).get(geodesicId) ?? 1;
+  let next = 1;
+  while (used.has(next)) {
+    next += 1;
+  }
+  return next;
 }
 
 /**
@@ -250,7 +261,6 @@ export function replaceDerivedSegmentsFromTraces(input: {
   readonly geodesicId: string;
   readonly traces: readonly TraceGeodesicSegmentResult[];
 }): readonly GeodesicSegmentObject[] {
-  // Resolve the display number before the old segments go, so a rebuilt geodesic keeps its number.
   const geodesicNumber = resolveGeodesicNumber(input.registry, input.geodesicId);
   removeGeodesicSegments(input.registry, input.geodesicId);
   const splitSegments = buildDerivedSegmentsFromTraces({ ...input, geodesicNumber });
@@ -409,60 +419,4 @@ export function removeGeodesicSegments(registry: RuntimeObjectRegistry, geodesic
     registry.remove(segment.id);
   }
   requestGeodesicIntersectionUpdate(registry);
-}
-
-// Assigns display numbers: already numbered segments keep theirs; the remaining ids (cannon lists, segments, intervals, then the requested id)
-// get the smallest unused positive integers in encounter order. Pure function of the registry, recomputed on every call.
-function getGlobalGeodesicNumbers(
-  registry: RuntimeObjectRegistry,
-  requestedGeodesicId: string,
-): ReadonlyMap<string, number> {
-  const numbersById = new Map<string, number>();
-  const usedNumbers = new Set<number>();
-  const ids: string[] = [];
-  const seenIds = new Set<string>();
-  const numberedSegments = [...registry.getObjectsOfKind("geodesicModel/segment")]
-    .filter((segment) => segment.geodesicNumber !== undefined)
-    .sort((left, right) => left.geodesicNumber! - right.geodesicNumber!);
-
-  for (const segment of numberedSegments) {
-    if (!numbersById.has(segment.geodesicId) && segment.geodesicNumber !== undefined) {
-      numbersById.set(segment.geodesicId, segment.geodesicNumber);
-      usedNumbers.add(segment.geodesicNumber);
-    }
-    pushUniqueId(ids, seenIds, segment.geodesicId);
-  }
-
-  for (const object of registry.getAll()) {
-    if (object.kind === "geodesicModel/segment") {
-      pushUniqueId(ids, seenIds, object.geodesicId);
-    } else if (object.kind === "geodesicModel/arc") {
-      pushUniqueId(ids, seenIds, object.id);
-    }
-  }
-
-  pushUniqueId(ids, seenIds, requestedGeodesicId);
-  let nextNumber = 1;
-  for (const geodesicId of ids) {
-    if (numbersById.has(geodesicId)) {
-      continue;
-    }
-
-    while (usedNumbers.has(nextNumber)) {
-      nextNumber += 1;
-    }
-    numbersById.set(geodesicId, nextNumber);
-    usedNumbers.add(nextNumber);
-  }
-
-  return numbersById;
-}
-
-function pushUniqueId(ids: string[], seenIds: Set<string>, geodesicId: string): void {
-  if (seenIds.has(geodesicId)) {
-    return;
-  }
-
-  seenIds.add(geodesicId);
-  ids.push(geodesicId);
 }

@@ -38,6 +38,7 @@ import {
   getGeodesicSegments,
   getGeodesicTail,
   getGeodesicTotalLengthMeters,
+  nextGeodesicNumber,
   removeGeodesicSegments,
   resolveEndpointTangentAtAnchor,
   totalGeodesicLengthFromSegments,
@@ -250,6 +251,7 @@ function shootGeodesicNow(input: ShootGeodesicInput): GeodesicSegmentObject {
       startAnchorObjectId: input.cannon.id,
       endAnchorObjectId: freeEndId,
       startCellId: input.cannon.cellId,
+      geodesicNumber: nextGeodesicNumber(input.registry),
     }));
   }
   const result = aimFreeGeodesicFromEndpoint({

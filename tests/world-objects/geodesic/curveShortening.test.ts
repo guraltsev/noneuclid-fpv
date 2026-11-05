@@ -32,6 +32,7 @@ import { getGeodesicSegments } from "../../../src/world-objects/geodesic/segment
 import { rebuildDerivedGeodesicSegments } from "../../../src/world-objects/geodesic/intervals";
 import { rebuildConnectedGeodesicBetweenEmitters } from "../../../src/world-objects/geodesic/cannon";
 import { yawRigidTransform3 } from "../../../src/math/rigidTransform3";
+import { expectSegmentsAreRealizedFromArcs } from "../../support/segmentOracle";
 import {
   compileLargeWorld,
   compileRotatedFreeLoopWorld,
@@ -196,6 +197,7 @@ describe("curve shortening flow of a two-arc pair", () => {
     expect(arcConnectsEmitters(registry, "g1")).toBe(true);
     expect(totalGeodesicLength(registry, "g1")).toBeCloseTo(4, 2);
     expect(maxSideViolation(world, registry)).toBeLessThan(1e-6);
+    expectSegmentsAreRealizedFromArcs(world, registry);
   });
 
   it("reaches the same limit at 60 Hz and 240 Hz", () => {

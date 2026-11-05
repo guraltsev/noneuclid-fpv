@@ -23,6 +23,7 @@ import {
   buildDerivedSegmentsFromTraces,
   canConnectGeodesicSegmentAtDistance,
   getGeodesicSegments,
+  nextGeodesicNumber,
   removeGeodesicIntervalAndDerivedObjects,
   replaceDerivedSegmentsFromTraces,
   segmentToTrace,
@@ -467,6 +468,7 @@ function splitGeodesicIntervalAtSegmentHitNow(input: Parameters<typeof splitGeod
       startAnchorObjectId: placed.id,
       endAnchorObjectId: freeEnd.id,
       startCellId: placed.cellId,
+      geodesicNumber: nextGeodesicNumber(input.registry),
     }));
   }
   // Shorten the original interval: its free role now attaches to the placed emitter, and its portal word becomes the prefix word.
