@@ -72,14 +72,14 @@ function anglesTick(): ModuleTick {
     id: "geodesicMeasurements/angles",
     phase: "derive",
     writes: [angleKind],
-    subscribes: ["geodesicModel/arc", "geodesicModel/crossing"],
+    subscribes: ["geodesicModel/arc", "geodesicModel/crossing", "geodesic-cannon"],
     run(ctx) {
       const ring = ctx.objects.changes.ring;
       const changedIds = new Set<string>();
       let gone: Set<string> | undefined;
       for (let seq = ctx.changesFrom; seq < ctx.changesTo; seq += 1) {
         const kind = ring.kindAt(seq);
-        if (kind !== "geodesicModel/arc" && kind !== "geodesicModel/crossing") continue;
+        if (kind !== "geodesicModel/arc" && kind !== "geodesicModel/crossing" && kind !== "geodesic-cannon") continue;
         const id = ring.idAt(seq);
         changedIds.add(id);
         // A centre marker that was removed and not put back is gone: its angles go with it.
