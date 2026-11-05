@@ -162,6 +162,6 @@ lower numbers of jobs 18, 24, 30, 34 and 35.
 | [61](_done/61_simulation_ticks.md) | Run the world in ticks owned by the simulation | done, needs review | - |  |
 | [62](_done/62_client_write_check.md) | Make the client write check measure writes | done, needs review | [91](../../_issues/91_legacy_world_writers_list_does_not_measure_writes.md) |  |
 | [63](_done/63_geodesic_emitters_module.md) | Create the geodesic emitters module: renames, place, shoot, extend, delete | done, needs review | - |  |
-| [64](64_emitter_edits_and_length.md) | Rotate, aim and carry through the world; a free geodesic keeps its length | queued | [88](../../_issues/88_carry_changes_the_world_before_the_world_answers.md), [89](../../_issues/89_rotate_aim_and_carry_bypass_the_tool_gates.md), [93](../../_issues/93_a_free_geodesic_forgets_its_length_when_the_tool_ends.md) |  |
+| [64](_done/64_emitter_edits_and_length.md) | Rotate, aim and carry through the world; a free geodesic keeps its length | done, needs review | [88](../../_issues/88_carry_changes_the_world_before_the_world_answers.md), [89](../../_issues/89_rotate_aim_and_carry_bypass_the_tool_gates.md), [93](../../_issues/93_a_free_geodesic_forgets_its_length_when_the_tool_ends.md) |  |
 | [65](65_module_public_api.md) | Give modules a public API and write the scenarios that were waiting for it | queued | - |  |
 | [66](66_measurement_tools_and_flags.md) | Move the measurement tools and the flags into modules | queued | [92](../../_issues/92_measurement_kinds_are_declared_transient.md) |  |
