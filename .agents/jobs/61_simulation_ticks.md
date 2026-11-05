@@ -73,7 +73,10 @@ Do not move the player, creatures or tools onto ticks. Do not change the order o
 
 ### Done
 
-Commit e6d28cc (implementation, tests, documents); this Report is the commit after it.
+Commit e6d28cc (implementation, tests, documents); the Report is cb1ec69; the repair round after a fresh review is the commit after that.
+
+Repair round: the medians look at 10 samples, not 9, and take the mean of the two middle ones, so a cadence alternating two periods keeps one \(h\) (frames of \(1/60\) and \(1/30\) s: 25 ms, no change in 7160 frames; before, it flipped in nearly every frame). The cost median
+shares the code. Tests added for both cadences and for alternating tick costs. The guards on the options and on `advance`, and their test, are deleted: only tests reached them. The comparator is hoisted, and `sorted` is written by index instead of `length = 0`, so it keeps its storage.
 
 - `src/engine/simulationClock.ts` (new, pure): `createSimulationClock({ tickSeconds, maxTickSeconds, tickBudgetShare })` with `advance(elapsedSeconds, lastTicksCostSeconds)` returning `{ ticks, tickSeconds, behindSeconds }`, and
   `takeBehindNotice()`. Re-exported from `worldEngine.ts`, because render and runtime may import only the engine's public face.
@@ -92,7 +95,7 @@ Done when: `grep -n "engine.step" src/render/three/createThreeApp.ts` shows line
 ### Deviations
 
 - Existing test changed, as Decision "`constantSpeedLaw` uses `deltaSeconds` as given" requires: "is a single frame's worth of motion per step whatever the frame time is" pinned the deleted cap (`step(5)` moves at most \(1.5 \cdot 0.1\) m). It is replaced by
-  "takes a step's duration as given: a long step moves a vertex as far as its speed allows".
+  "takes a step's duration as given: a long step moves a vertex as far as its speed allows". The replacement also changed the input, `stepFlow(engine, 5)` to `stepFlow(engine, 1)`.
 - `takeBehindNotice()` and `engine.noticeBehindRealTime` are additions to the interfaces the job names. `advance` keeps the exact return the job gives; the once-per-second limit needs real time, which the engine must not receive, so it sits in the clock, and an
   event of the kind `world/...` can only enter the event list through the engine.
 - "`engine.step` rejects a duration above `maxTickSeconds` only in the shell's use": there is no separate check. The clock never returns a longer tick (tested at frame periods up to 2 s), and `step` takes any non-negative duration.
@@ -105,10 +108,18 @@ Done when: `grep -n "engine.step" src/render/three/createThreeApp.ts` shows line
 - **Tick cost, how I read "a share of the frame".** \(h\) is at least the median cost of one tick divided by `tickBudgetShare`, so the ticks take that share of real time on average. Read literally per frame, a frame with a tick would exceed the share whenever one tick costs more than
   the share of a frame, and \(h\) would park at the maximum even with most frames free. A single tick costing more than a frame still misses that frame at any \(h\). A Quest 2 run would show whether this is the right reading.
 - **Rounding to the nearest tick.** The clock rounds the accumulated time to whole ticks instead of flooring it, so the world may run up to half a tick ahead of real time. With a floor, a real display at \(h\) equal to the period would jitter between 0 and 2 ticks per frame. This is my choice; no Decision covers it.
-- **Constants I chose:** a median over 9 samples (it takes 5 frames to move \(h\), about 70 ms at 72 Hz) and a recovery rate of 0.5 per second (about 2 s from \(1/30\) to \(1/90\) s). "One odd frame does not move \(h\)" also holds for one expensive tick, by the same median.
+- **Constants I chose:** a median over 10 samples (5 odd frames move \(h\) halfway, 6 fully, about 80 ms at 72 Hz) and a recovery rate of 0.5 per second (about 2 s from \(1/30\) to \(1/90\) s). "One odd frame does not move \(h\)" also holds for one expensive tick, by the same median.
 - **The flow test's margin is small:** 4.1 percent against the 5 allowed, for the scenario `createSymmetricPairScenario(2, 2)`. The difference is mostly the 0.1 s of simulated time per frame at 5 Hz, since rest is only seen at the end of a frame; a shorter curve would exceed 5 percent (`(2, 1.5)`: 1.10 s against 1.01 s, 8.8 percent).
 - **A hidden tab** counts as dropped time: coming back gives one notice with the whole gap. In the software-rendered smoke run the notice appeared with 3.28 s and 0.24 s. It goes to the console and diagnostics only; there is no on-screen message system.
 - **Stale design text I may not edit:** 013 section 6.5 ("not built: today the shell runs one step per frame"), 013 section 13.2 (`min(deltaSeconds, maxCurveShorteningDeltaSeconds)`), 012 P8 ("`step` ... validated against the configured bounds") and the notice "to be confirmed" in 012 P8.
+- **`engine.noticeBehindRealTime` is a client-to-engine path outside commands, slots and `publishBody`:** it is not on the list in 013 section 5.7. Found in review; the design should either list it or give the notice another way in.
+- **`defaultSimulationClockOptions` is a constant nothing can override yet:** "options of the experience" holds in name only until an experience can choose them.
+- **`ClockAdvance.behindSeconds` is read only by tests.** The job requires it, but the shell reads `takeBehindNotice` instead.
+- **Below 30 fps \(h\) is shorter than the frame period,** because `maxTickSeconds` wins over the rule that \(h\) is never shorter than a frame.
+- **Time lost with no report:** frame time is lost without any `behindSeconds` when a frame throws before `advance`, and the remaining ticks are lost when `engine.step` throws.
+- **`carry/detach` is resubmitted in frames with no tick** (from the review, not reproduced). It is harmless: the command is idempotent.
+- **Jitter still gives frames of 0 and 2 ticks:** with 1 ms Gaussian jitter at 72 Hz, measured with the final clock on 100000 frames, 2.8 percent of frames have 0 ticks and 2.8 percent have 2.
+- **`runClockFrame` in `tests/support` is a copy of the shell loop,** so the real loop is covered only by smoke.
 - One `npm run typecheck` during the work crashed inside node with a native stack trace; the same command run again right away, and every later run, passed. Not investigated; it did not look related to the code.
 
 ### Not done
@@ -131,3 +142,4 @@ The bench figures come from this machine, which is much faster than a Quest 2; t
   `npm run test:release` exit 0 (7 files, 16 tests); `npm run bench -- moduleStep --check` exit 0, "check: ok".
 - Bench counters unchanged: `flow` steps 120, writes 1557; `flow+dependents` steps 120, writes 1797; `manyArcs` writes 126897. Timing: flow 16.57, flow+dependents 28.27 us/step. `moduleStepCounters.json` and the baseline were not written.
 - Smoke was run once, after all the changes to `createThreeApp.ts`, which were made in one pass, not after each edit.
+- Repair round, which does not touch `createThreeApp.ts`: REPAIRCHECKS

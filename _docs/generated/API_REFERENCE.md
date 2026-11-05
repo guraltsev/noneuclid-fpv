@@ -1523,7 +1523,7 @@ The simulation clock (design 012 P8, 013 section 6.5): turns elapsed real time i
 | interface | `SimulationClockOptions` | The clock's settings; they are options of the experience. |
 | interface | `ClockAdvance` | What one frame runs. |
 | interface | `SimulationClock` | Handle returned by {@link createSimulationClock}. |
-| function | `createSimulationClock` | Creates a clock; throws a `RangeError` on options that cannot work. |
+| function | `createSimulationClock` | Creates a clock. |
 
 ### `engine/toolGates.ts`
 

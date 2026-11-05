@@ -73,6 +73,26 @@ describe("a steady display", () => {
     expect(after.ticks).toBe(1);
   });
 
+  it.each([
+    ["1/60 and 1/30 s", 1 / 60, 1 / 30],
+    ["1/72 and 2/72 s", 1 / 72, 2 / 72],
+  ])("keeps one tick length on a cadence alternating %s", (_name, short, long) => {
+    const clock = newClock();
+    const lengths = new Set<number>();
+    let simulated = 0;
+    let real = 0;
+    for (let frame = 0; frame < 2000; frame += 1) {
+      const elapsed = frame % 2 === 0 ? short : long;
+      const advance = clock.advance(elapsed, 0);
+      real += elapsed;
+      simulated += advance.ticks * advance.tickSeconds;
+      if (frame >= 20) lengths.add(advance.tickSeconds);
+    }
+
+    expect([...lengths]).toEqual([(short + long) / 2]);
+    expect(Math.abs(simulated - real)).toBeLessThanOrEqual((short + long) / 2);
+  });
+
   it("does not take a frame of no elapsed time for a fast display", () => {
     const clock = newClock();
     runFrames(clock, 1 / 60, 20);
@@ -120,6 +140,24 @@ describe("the cost of the ticks", () => {
     clock.advance(1 / 72, 0.05);
 
     expect(clock.advance(1 / 72, 0).tickSeconds).toBe(before);
+  });
+
+  it("keeps one tick length when the ticks alternate between two costs", () => {
+    const clock = newClock();
+    const lengths = new Set<number>();
+    let lastCost = 0;
+    let ticksRun = 0;
+    for (let frame = 0; frame < 400; frame += 1) {
+      const advance = clock.advance(1 / 90, lastCost);
+      if (advance.ticks > 0) {
+        lastCost = ticksRun % 2 === 0 ? 0.006 : 0.008;
+        ticksRun += 1;
+      }
+      if (frame >= 200) lengths.add(advance.tickSeconds);
+    }
+
+    expect(lengths.size).toBe(1);
+    expect([...lengths][0]).toBeCloseTo(0.007 * 3, 9);
   });
 
   it("does not count a frame with no tick as a cheap one", () => {
@@ -214,14 +252,5 @@ describe("the notice of dropped time", () => {
     }
 
     expect(notices.filter((seconds) => seconds > 0).length).toBe(5);
-  });
-});
-
-describe("the options", () => {
-  it("refuses what cannot work", () => {
-    expect(() => createSimulationClock({ ...defaultSimulationClockOptions, tickSeconds: 0 })).toThrow(RangeError);
-    expect(() => createSimulationClock({ ...defaultSimulationClockOptions, maxTickSeconds: 1 / 200 })).toThrow(RangeError);
-    expect(() => createSimulationClock({ ...defaultSimulationClockOptions, tickBudgetShare: 0 })).toThrow(RangeError);
-    expect(() => newClock().advance(-1, 0)).toThrow(RangeError);
   });
 });

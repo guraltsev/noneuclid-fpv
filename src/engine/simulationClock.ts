@@ -37,8 +37,8 @@ export interface SimulationClock {
 /** The most ticks one frame runs (confirmed by the maintainer, 2026-11-05). */
 const maxTicksPerFrame = 3;
 
-/** How many samples a median looks at; an odd number, so that it takes five odd frames in nine to move it. */
-const medianWindow = 9;
+/** How many samples a median looks at. An even number: a cadence alternating two periods, a display missing every second vsync, then fills it half and half at every frame, and its median stays the mean of the two. */
+const medianWindow = 10;
 
 /** How fast the length the ticks' cost asked for comes back once they fit, as a rate per second: from \(1/30\) to \(1/90\) s in about two seconds. */
 const loadRecoveryPerSecond = 0.5;
@@ -46,7 +46,9 @@ const loadRecoveryPerSecond = 0.5;
 /** Shortest real time between two notices, in seconds. */
 const behindNoticeIntervalSeconds = 1;
 
-/** The lower median of the last {@link medianWindow} samples; 0 before the first. */
+const ascending = (a: number, b: number): number => a - b;
+
+/** The median of the last {@link medianWindow} samples, the mean of the two middle ones when their number is even; 0 before the first. */
 function createRecentMedian() {
   const samples: number[] = [];
   const sorted: number[] = [];
@@ -58,21 +60,17 @@ function createRecentMedian() {
     },
     median(): number {
       if (samples.length === 0) return 0;
-      sorted.length = 0;
-      for (let index = 0; index < samples.length; index += 1) sorted.push(samples[index]!);
-      sorted.sort((a, b) => a - b);
-      return sorted[(sorted.length - 1) >> 1]!;
+      // Written by index: `sorted` keeps its storage from frame to frame, and is never longer than `samples`.
+      for (let index = 0; index < samples.length; index += 1) sorted[index] = samples[index]!;
+      sorted.sort(ascending);
+      return (sorted[(sorted.length - 1) >> 1]! + sorted[sorted.length >> 1]!) / 2;
     },
   };
 }
 
-/** Creates a clock; throws a `RangeError` on options that cannot work. */
+/** Creates a clock. */
 export function createSimulationClock(options: SimulationClockOptions): SimulationClock {
   const { tickSeconds, maxTickSeconds, tickBudgetShare } = options;
-  if (!(tickSeconds > 0) || !(maxTickSeconds >= tickSeconds) || !Number.isFinite(maxTickSeconds)) {
-    throw new RangeError(`The clock needs 0 < tickSeconds <= maxTickSeconds, got ${tickSeconds} and ${maxTickSeconds}`);
-  }
-  if (!(tickBudgetShare > 0 && tickBudgetShare <= 1)) throw new RangeError(`The clock needs a tickBudgetShare in (0, 1], got ${tickBudgetShare}`);
 
   const framePeriods = createRecentMedian();
   const tickCosts = createRecentMedian();
@@ -98,7 +96,6 @@ export function createSimulationClock(options: SimulationClockOptions): Simulati
 
   return {
     advance(elapsedSeconds, lastTicksCostSeconds) {
-      if (!(elapsedSeconds >= 0) || !Number.isFinite(elapsedSeconds)) throw new RangeError(`advance needs a finite, non-negative duration, got ${elapsedSeconds}`);
       if (elapsedSeconds > 0) framePeriods.push(elapsedSeconds);
       if (ticksOfLastFrame > 0) tickCosts.push(lastTicksCostSeconds / ticksOfLastFrame);
       secondsSinceNotice += elapsedSeconds;
