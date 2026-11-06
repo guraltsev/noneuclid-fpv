@@ -597,6 +597,8 @@ passes its frame time to the simulation. It shows what the simulation is doing, 
   frame time the engine takes.
 - **Agreed (2026-11-05, maintainer): ticks never run faster than the display**, so \(h\) is never shorter than a frame, and \(h\) grows from the cost of the
   ticks, before frames are missed. The maximum stays \(1/30\) s unless it becomes an issue.
+- **Agreed (2026-11-05, maintainer): the cost of the ticks is measured over \(1/2\) s.** It is the ticks' share of the last half second of real time, so
+  one expensive frame does not move \(h\).
 - **Load policy, one place.** When ticks are expensive, the simulation may raise \(h\) up to a configured maximum, so
   that simulated time keeps up with real time: choppy but correct, never a backlog of queued ticks that is paid back
   later. The policy is a setting of the simulation, not a per-frame decision of the shell. If even the maximum \(h\) is
@@ -1007,3 +1009,4 @@ cleanups) and job 46 (one state holder and one command path; **Agreed 2026-11-01
 | 2026-11-05 | Agreed (maintainer): ticks never faster than the display; \(h\) grows from tick cost, before frames are missed; maximum \(1/30\) s unless it becomes an issue. |
 | 2026-11-05 | Agreed (maintainer): slots and the bodies phase run once per frame, on the body's clock (013 section 5.4). |
 | 2026-11-05 | Agreed (maintainer): P8 details. Default \(h = 1/90\) s, maximum \(1/30\) s; the local player stays outside the ticks until locomotion moves into the engine. 013 aligned. Next batch: `geodesicEmitters`, with time and `publicApi`. |
+| 2026-11-05 | Agreed (maintainer): the ticks' cost that makes \(h\) grow is their share of real time over the last \(1/2\) s. |
