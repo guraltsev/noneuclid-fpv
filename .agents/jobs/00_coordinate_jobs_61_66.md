@@ -2,7 +2,7 @@
 
 Status: started 2026-11-05 at the maintainer's word.
 Coordinates: jobs [61](_done/61_simulation_ticks.md), [62](_done/62_client_write_check.md), [63](_done/63_geodesic_emitters_module.md),
-[64](_done/64_emitter_edits_and_length.md), [65](65_module_public_api.md) and [66](66_measurement_tools_and_flags.md), which implement
+[64](_done/64_emitter_edits_and_length.md), [65](_done/65_module_public_api.md) and [66](66_measurement_tools_and_flags.md), which implement
 the next batch of design [013](../../_docs/design/013-world-engine-clients-and-modules.md), section 16.
 
 ## Goal
