@@ -32,7 +32,7 @@ describe("xrControllerHandModels", () => {
 
   it("maps runtime tool state to a right-wrist indicator visual", () => {
     expect(resolveWristToolIndicatorVisual(toolsById.get("aim"), "WoodenSign1")).toBeUndefined();
-    expect(resolveWristToolIndicatorVisual(toolsById.get("place-flag"), "WoodenSign2")).toMatchObject({
+    expect(resolveWristToolIndicatorVisual(toolsById.get("placedFlags/flag"), "WoodenSign2")).toMatchObject({
       icon: "image",
       imageSource: publicAssetUrl("WoodenSign2/WoodenSign2.png"),
       label: "Sign",
@@ -42,12 +42,12 @@ describe("xrControllerHandModels", () => {
       imageSource: publicAssetUrl("flashlight/Lightsaber.png"),
       label: "Geodesic emitter",
     });
-    expect(resolveWristToolIndicatorVisual(toolsById.get("protractor"), "WoodenSign1")).toMatchObject({
+    expect(resolveWristToolIndicatorVisual(toolsById.get("geodesicMeasurements/protractor"), "WoodenSign1")).toMatchObject({
       icon: "image",
       imageSource: publicAssetUrl("icons/protractor.png"),
       label: "Protractor",
     });
-    expect(resolveWristToolIndicatorVisual(toolsById.get("measure-length"), "WoodenSign1")).toMatchObject({
+    expect(resolveWristToolIndicatorVisual(toolsById.get("geodesicMeasurements/length"), "WoodenSign1")).toMatchObject({
       icon: "image",
       imageSource: publicAssetUrl("icons/ruler.svg"),
       label: "Length",

@@ -71,7 +71,7 @@ describe("the crossings tick", () => {
     runDerivePass(engine);
     expect(registry.changes.ring.headSeq).toBe(head);
 
-    registry.add({ id: "flag", kind: "placed-flag", cellId: "a", localPose: createSegment().localPose, portalRenderable: true, flagType: "WoodenSign1", message: "" });
+    registry.add({ id: "flag", kind: "placedFlags/flag", cellId: "a", localPose: createSegment().localPose, portalRenderable: true, flagType: "WoodenSign1", message: "" });
     runDerivePass(engine);
     expect(registry.changes.ring.headSeq).toBe(head + 1);
 

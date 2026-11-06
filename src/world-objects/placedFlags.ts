@@ -116,7 +116,7 @@ export function defaultPlacedFlagMessage(
 export function createPlacedFlagObject(options: CreatePlacedFlagOptions): PlacedFlagObject {
   return {
     id: options.id,
-    kind: "placed-flag",
+    kind: "placedFlags/flag",
     cellId: options.cellId,
     localPose: options.localPose,
     collision: options.collision ?? defaultFlagCollision,
@@ -173,7 +173,7 @@ export function placeFlagAtFloorPoint(request: PlaceFlagAtFloorPointRequest): Pl
     flagType: request.flagType,
     message: defaultPlacedFlagMessage(
       request.flagType,
-      request.registry.getAll().filter((object): object is PlacedFlagObject => object.kind === "placed-flag"),
+      request.registry.getAll().filter((object): object is PlacedFlagObject => object.kind === "placedFlags/flag"),
     ),
   });
   const candidateState = placedFlagToDynamicObjectState(candidate);

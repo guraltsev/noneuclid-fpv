@@ -89,7 +89,7 @@ describe("the tool host dispatch", () => {
   it("gives the primary action to the selected tool's descriptor when no menu is open", () => {
     const { host, select, core, log } = setup();
 
-    select("place-flag");
+    select("placedFlags/flag");
     expect(host.dispatchPrimaryAction(false, false)).toBe(false);
     expect(core.placeFlag).not.toHaveBeenCalled();
     expect(host.dispatchPrimaryAction(true, false)).toBe(true);
@@ -165,7 +165,7 @@ describe("the tool host and a tool's commands", () => {
     expect(log.palette).toBe(1);
 
     expect(host.promptOf(probeId)).toBe("state 1");
-    expect(host.promptOf("place-flag")).toBeUndefined();
+    expect(host.promptOf("placedFlags/flag")).toBeUndefined();
   });
 
   it("starts the tool with the object it was started from", () => {
@@ -219,13 +219,13 @@ describe("the tool lookup", () => {
       "geodesicEmitters/aim",
       "geodesicEmitters/carry",
       "geodesicEmitters/rotate",
-      "measure-length",
-      "place-flag",
+      "geodesicMeasurements/length",
+      "geodesicMeasurements/protractor",
+      "placedFlags/flag",
       probeId,
-      "protractor",
     ]);
-    const twice: ModuleClient = { tools: [host.toolsById.get("place-flag") as ToolDescriptor] };
-    expect(() => createToolHost({ ...dummyDeps(), clients: [twice] })).toThrow("the tool place-flag is described twice");
+    const twice: ModuleClient = { tools: [host.toolsById.get("placedFlags/flag") as ToolDescriptor] };
+    expect(() => createToolHost({ ...dummyDeps(), clients: [twice] })).toThrow("the tool placedFlags/flag is described twice");
   });
 });
 
@@ -267,11 +267,11 @@ describe("a tool's answer arriving later", () => {
     dispatch({ kind: "select-tool", toolId: probeId });
 
     host.dispatchPrimaryAction(true, false);
-    dispatch({ kind: "select-tool", toolId: "place-flag" });
+    dispatch({ kind: "select-tool", toolId: "placedFlags/flag" });
     engine.step(0);
     host.afterStep();
 
-    expect(session.get().menuState.selectedTool).toBe("place-flag");
+    expect(session.get().menuState.selectedTool).toBe("placedFlags/flag");
   });
 
   it("holds a second press of the real emitter tool until both answers are in", () => {
@@ -307,7 +307,7 @@ describe("what the host tells a tool about the aim", () => {
   function hostAiming(target: AimTarget, direction = new THREE.Vector3(1, 0, 0)) {
     const host = createToolHost({ ...dummyDeps(), resolveCurrentAimTargets: () => [target], resolveCurrentAimTarget: () => target });
     host.setFrame({ ray: { origin: new THREE.Vector3(), direction, quaternion: new THREE.Quaternion() }, yawDeltaRadians: 0, primaryActionRequested: false });
-    return host.contextOf("place-flag");
+    return host.contextOf("placedFlags/flag");
   }
   const aimed = { kind: "object", cellId: "image-cell", localPoint: { x: 9, y: 9, z: 9 } } as AimTarget;
 

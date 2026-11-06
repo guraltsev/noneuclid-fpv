@@ -197,11 +197,11 @@ describe("starting an emitter's mode", () => {
     const version = registry.getVersion();
 
     tools[start]("cannon");
-    dispatch({ kind: "select-tool", toolId: "protractor" });
+    dispatch({ kind: "select-tool", toolId: "geodesicMeasurements/protractor" });
     tick();
     tick();
 
-    expect(selected()).toBe("protractor");
+    expect(selected()).toBe("geodesicMeasurements/protractor");
     expect(engine.read.participant("local")?.attachments).toEqual([]);
     expect(registry.getVersion()).toBe(version);
   });
@@ -211,11 +211,11 @@ describe("starting an emitter's mode", () => {
 
     tools[start]("cannon");
     tick();
-    dispatch({ kind: "select-tool", toolId: "protractor" });
+    dispatch({ kind: "select-tool", toolId: "geodesicMeasurements/protractor" });
     tick();
     tick();
 
-    expect(selected()).toBe("protractor");
+    expect(selected()).toBe("geodesicMeasurements/protractor");
     expect(engine.read.participant("local")?.attachments).toEqual([]);
   });
 
@@ -224,7 +224,7 @@ describe("starting an emitter's mode", () => {
 
     tools.startGeodesicCannonCarry("cannon");
     tick();
-    dispatch({ kind: "select-tool", toolId: "protractor" });
+    dispatch({ kind: "select-tool", toolId: "geodesicMeasurements/protractor" });
     tick();
     tick();
 
@@ -306,11 +306,11 @@ describe("rotating and aiming", () => {
   it("tells the world when the tool was left some other way", () => {
     const { tools, tick, dispatch, selected, attachment } = rotating();
 
-    dispatch({ kind: "select-tool", toolId: "protractor" });
+    dispatch({ kind: "select-tool", toolId: "geodesicMeasurements/protractor" });
     tools.updateCarriedGeodesicCannonPose(false, undefined);
     tick();
 
-    expect(selected()).toBe("protractor");
+    expect(selected()).toBe("geodesicMeasurements/protractor");
     expect(attachment("geodesicEmitters/edit")).toBeUndefined();
   });
 

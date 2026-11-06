@@ -83,7 +83,7 @@ export function createToolObjectRuntimes(deps: ToolObjectRuntimesDeps) {
   } = deps;
 
   function syncPlacedFlagRuntime(flag: RuntimeWorldObject): void {
-    if (flag.kind !== "placed-flag") {
+    if (flag.kind !== "placedFlags/flag") {
       return;
     }
 
@@ -184,7 +184,7 @@ export function createToolObjectRuntimes(deps: ToolObjectRuntimesDeps) {
 
   function removePlacedFlags(): void {
     for (const object of runtimeObjectRegistry.getAll()) {
-      if (object.kind === "placed-flag") {
+      if (object.kind === "placedFlags/flag") {
         runtimeObjectRegistry.remove(object.id);
         removePlacedFlagRuntime(object.id);
       }

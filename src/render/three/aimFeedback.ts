@@ -211,7 +211,7 @@ export function createAimFeedback(deps: AimFeedbackDeps): AimFeedback {
 
   function updateProtractorToolFeedback(activeAimRay: RootAimRay | undefined): void {
     const protractor = session.get().protractorToolState;
-    if (currentMenuState().selectedTool !== "protractor" || currentMenuState().isOpen) {
+    if (currentMenuState().selectedTool !== "geodesicMeasurements/protractor" || currentMenuState().isOpen) {
       clearProtractorToolFeedback();
       return;
     }

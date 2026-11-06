@@ -410,12 +410,12 @@ describe("the realtime view", () => {
 
 describe("tool requests and gates", () => {
   it("accepts a tool the configuration enables and refuses one it disables, with a message", () => {
-    const engine = createTestEngine({ isToolEnabled: (toolId) => toolId !== "protractor" });
-    const accepted = engine.submit("local", requestTool("measure-length"));
-    const refused = engine.submit("local", requestTool("protractor"));
+    const engine = createTestEngine({ isToolEnabled: (toolId) => toolId !== "geodesicMeasurements/protractor" });
+    const accepted = engine.submit("local", requestTool("geodesicMeasurements/length"));
+    const refused = engine.submit("local", requestTool("geodesicMeasurements/protractor"));
     const unknown = engine.submit("local", requestTool("no-such-tool" as RuntimeToolId));
     engine.step(0);
-    expect(engine.resultOf(accepted)).toEqual({ ok: true, value: { toolId: "measure-length" } });
+    expect(engine.resultOf(accepted)).toEqual({ ok: true, value: { toolId: "geodesicMeasurements/length" } });
     expect(engine.resultOf(refused)).toEqual({ ok: false, refusal: { code: "world/toolDisabled", message: "This tool is not available in this world." } });
     expect(engine.resultOf(unknown)).toMatchObject({ ok: false, refusal: { code: "world/unknownTool" } });
   });
@@ -650,7 +650,7 @@ describe("attachments and the bodies phase", () => {
   });
 
   it("refuses a module's write of a core kind it does not own", () => {
-    const flag = thing("flag-1", "placed-flag");
+    const flag = thing("flag-1", "placedFlags/flag");
     const refusing = createTestEngine({ modules: [fake("a", { commands: { "a/add": { run: (_command, ctx) => (ctx.objects.add(flag), ok) } } })] });
 
     const refused = refusing.submit("local", { kind: "a/add" });

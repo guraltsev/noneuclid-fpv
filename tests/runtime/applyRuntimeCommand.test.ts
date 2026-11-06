@@ -114,14 +114,14 @@ describe("applyRuntimeCommand: navigation", () => {
   });
 
   it("cancels the menu and the tool: closed, no tool, tool sessions ended, then redraw", () => {
-    const result = reduce({ kind: "cancel-menu-and-tool" }, stateWith({ isOpen: true, selectedTool: "protractor" }));
+    const result = reduce({ kind: "cancel-menu-and-tool" }, stateWith({ isOpen: true, selectedTool: "geodesicMeasurements/protractor" }));
 
     expect(result.state.menuState).toMatchObject({ isOpen: false, selectedTool: "none" });
     expect(result.effects).toEqual([{ kind: "end-tool-session" }, sync]);
   });
 
   it("cancels from a top-level page on the right action", () => {
-    const result = reduce({ kind: "menu-right-action" }, stateWith({ isOpen: true, page: "main", selectedTool: "protractor" }));
+    const result = reduce({ kind: "menu-right-action" }, stateWith({ isOpen: true, page: "main", selectedTool: "geodesicMeasurements/protractor" }));
 
     expect(result.state.menuState).toMatchObject({ isOpen: false, selectedTool: "none" });
     expect(result.effects[0]).toEqual({ kind: "end-tool-session" });
@@ -235,21 +235,21 @@ describe("applyRuntimeCommand: navigation", () => {
 
 describe("applyRuntimeCommand: tools and signs", () => {
   it("selects a tool: menu closed with the tool, other tools' sessions switched off, then redraw", () => {
-    const result = reduce({ kind: "select-tool", toolId: "protractor" }, stateWith({ isOpen: true }));
+    const result = reduce({ kind: "select-tool", toolId: "geodesicMeasurements/protractor" }, stateWith({ isOpen: true }));
 
-    expect(result.state.menuState).toMatchObject({ isOpen: false, selectedTool: "protractor" });
-    expect(result.effects).toEqual([{ kind: "switch-tool-session", toolId: "protractor" }, sync]);
+    expect(result.state.menuState).toMatchObject({ isOpen: false, selectedTool: "geodesicMeasurements/protractor" });
+    expect(result.effects).toEqual([{ kind: "switch-tool-session", toolId: "geodesicMeasurements/protractor" }, sync]);
   });
 
   it("ignores a tool the app configuration disables", () => {
     const off = stateWith({ isOpen: true }, disabled({ tools: { angles: false } }));
 
-    expect(reduce({ kind: "select-tool", toolId: "protractor" }, off)).toEqual({ state: off, effects: [] });
+    expect(reduce({ kind: "select-tool", toolId: "geodesicMeasurements/protractor" }, off)).toEqual({ state: off, effects: [] });
   });
 
 
   it("clears the selected tool without closing the page", () => {
-    const result = reduce({ kind: "clear-selected-tool" }, stateWith({ isOpen: true, selectedTool: "measure-length" }));
+    const result = reduce({ kind: "clear-selected-tool" }, stateWith({ isOpen: true, selectedTool: "geodesicMeasurements/length" }));
 
     expect(result.state.menuState).toMatchObject({ isOpen: true, selectedTool: "none" });
     expect(result.effects).toEqual([sync]);
@@ -258,7 +258,7 @@ describe("applyRuntimeCommand: tools and signs", () => {
   it("chooses the place-flag type, selects the tool and closes the menu", () => {
     const result = reduce({ kind: "choose-place-flag-type", flagType: "WoodenSign2" }, stateWith({ isOpen: true }));
 
-    expect(result.state.menuState).toMatchObject({ isOpen: false, selectedTool: "place-flag" });
+    expect(result.state.menuState).toMatchObject({ isOpen: false, selectedTool: "placedFlags/flag" });
     expect(result.state.menuState.placeFlagOptions.flagType).toBe("WoodenSign2");
 
     const off = stateWith({}, disabled({ tools: { placeFlags: false } }));
@@ -468,7 +468,7 @@ describe("applyRuntimeCommand: tool and player state", () => {
   });
 
   it("records a pending tool request and clears it", () => {
-    const request = { toolId: "protractor" as const, ticket: 3 };
+    const request = { toolId: "geodesicMeasurements/protractor" as const, ticket: 3 };
     const pending = reduce({ kind: "set-pending-tool-request", request });
 
     expect(pending.state.pendingToolRequest).toBe(request);

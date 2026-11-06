@@ -37,23 +37,23 @@ describe("createPaletteDefinition", () => {
 
     expect(content.kind).toBe("main");
     const toolIds = content.toolOptions.map((tool) => tool.id);
-    expect(toolIds).toContain("place-flag");
+    expect(toolIds).toContain("placedFlags/flag");
     expect(toolIds).toContain("geodesicEmitters/emitter");
-    expect(toolIds).toContain("measure-length");
+    expect(toolIds).toContain("geodesicMeasurements/length");
     expect(toolIds).not.toContain("aim");
   });
 
   it("takes the main list from the tools whose entry says so, in the config's order", () => {
     const tools = new Map(createTestToolsById());
-    const sign = tools.get("place-flag")!;
-    tools.set("place-flag", { ...sign, entry: { kind: "sub-mode" } });
+    const sign = tools.get("placedFlags/flag")!;
+    tools.set("placedFlags/flag", { ...sign, entry: { kind: "sub-mode" } });
 
     const definition = createTestPaletteDefinition(createRuntimeMenuState({ selectedWorldId: "cube" }), defaultAppConfig, "desktop", 0, tools);
 
     expect((definition.content as MainPaletteContent).toolOptions).toEqual([
       { id: "geodesicEmitters/emitter", label: "Geodesic emitter" },
-      { id: "measure-length", label: "Length" },
-      { id: "protractor", label: "Protractor" },
+      { id: "geodesicMeasurements/length", label: "Length" },
+      { id: "geodesicMeasurements/protractor", label: "Protractor" },
     ]);
   });
 

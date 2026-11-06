@@ -115,7 +115,7 @@ describe("createRuntimeObjectActions", () => {
 
     actions.tryPlaceFlagFromAim(aimRay);
 
-    const flags = registry.getAll().filter((object) => object.kind === "placed-flag");
+    const flags = registry.getAll().filter((object) => object.kind === "placedFlags/flag");
     expect(flags).toHaveLength(1);
     expect(flags[0].cellId).toBe("room");
     expect(flags[0].localPose.translation).toEqual({ x: 1, y: 0.5, z: 0 });

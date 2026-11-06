@@ -41,7 +41,7 @@ export function buildMainContent(
       tool.label,
       content.selectedTool,
       options,
-      tool.id === "place-flag" ? content.placeFlagType : undefined,
+      tool.id === "placedFlags/flag" ? content.placeFlagType : undefined,
     ));
   }
 
@@ -70,7 +70,7 @@ function createToolTile(
   });
   button.userData.scenePaletteItemId = `tool:${toolId}`;
   button.add(createToolIcon(toolId, signType), createButtonText(label, 16));
-  if (toolId === "place-flag") {
+  if (toolId === "placedFlags/flag") {
     button.add(createSignOptionsButton(options));
   }
   return button;

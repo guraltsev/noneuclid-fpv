@@ -108,7 +108,7 @@ export function createGeometryCommit(deps: GeometryCommitDeps): GeometryCommit {
 
     deps.objectHost.transformGeometry(mapByCellId, snapshot.world);
     for (const object of runtimeObjectRegistry.getAll()) {
-      if (object.kind === "placed-flag") {
+      if (object.kind === "placedFlags/flag") {
         const nextFlag = transformPlacedFlagForGeometryCommit(object, mapByCellId, snapshot.world);
         if (!nextFlag) {
           runtimeObjectRegistry.remove(object.id);

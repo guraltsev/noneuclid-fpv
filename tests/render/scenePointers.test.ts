@@ -13,7 +13,7 @@ describe("scenePointers", () => {
       {
         id: "desktop-aimer",
         kind: "desktop-aimer",
-        hoveredTargetId: "tool:place-flag",
+        hoveredTargetId: "tool:placedFlags/flag",
         selectPressed: false,
         selectStarted: false,
         selectEnded: false,

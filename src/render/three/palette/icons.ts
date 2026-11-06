@@ -36,7 +36,7 @@ export function createToolIcon(
   toolId: RuntimeToolId,
   signType: PlacedFlagType | undefined,
 ): Component<any> {
-  if (toolId === "place-flag") {
+  if (toolId === "placedFlags/flag") {
     return createSignIcon(signType ?? "WoodenSign1");
   }
 
@@ -44,11 +44,11 @@ export function createToolIcon(
     return createRayIcon();
   }
 
-  if (toolId === "protractor") {
+  if (toolId === "geodesicMeasurements/protractor") {
     return createProtractorIcon();
   }
 
-  if (toolId === "measure-length") {
+  if (toolId === "geodesicMeasurements/length") {
     return createMeasureLengthIcon();
   }
 

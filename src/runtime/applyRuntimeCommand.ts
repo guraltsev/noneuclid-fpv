@@ -107,7 +107,7 @@ export function reduceRuntimeCommand(state: ClientSessionState, command: Runtime
     case "show-debug-settings":
       return config.menu.debugSectionEnabled ? withMenu(showRuntimeMenuDebugSettings(menu), syncPalette) : nothing;
     case "show-place-flag-options":
-      return toolEnabled("place-flag") ? withMenu(showRuntimeMenuPlaceFlagOptions(menu), syncPalette) : nothing;
+      return toolEnabled("placedFlags/flag") ? withMenu(showRuntimeMenuPlaceFlagOptions(menu), syncPalette) : nothing;
     case "show-edit-sign":
       return withMenu(showRuntimeMenuEditSign(menu, { flagId: command.flagId, message: command.message }), syncPalette);
     case "show-geodesic-cannon-actions": {
@@ -153,7 +153,7 @@ export function reduceRuntimeCommand(state: ClientSessionState, command: Runtime
     case "clear-selected-tool":
       return withMenu(setRuntimeMenuSelectedTool(menu, "none"), syncPalette);
     case "choose-place-flag-type":
-      return toolEnabled("place-flag")
+      return toolEnabled("placedFlags/flag")
         ? withMenu(closeRuntimeMenu(selectRuntimeMenuPlaceFlagToolType(menu, command.flagType)), syncPalette)
         : nothing;
     case "set-editing-flag":

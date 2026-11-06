@@ -223,7 +223,7 @@ describe("carry/attach and carry/detach", () => {
 
   it("refuses what cannot be carried, what is out of reach, and a second object", () => {
     const { registry, run } = setup();
-    registry.add({ ...(registry.get("cannon-a") as object), id: "flag", kind: "placed-flag" } as never);
+    registry.add({ ...(registry.get("cannon-a") as object), id: "flag", kind: "placedFlags/flag" } as never);
 
     expect(run("local", { kind: "carry/attach", objectId: "nothing" })).toMatchObject({ ok: false, refusal: { code: "carry/notCarriable" } });
     expect(run("local", { kind: "carry/attach", objectId: "flag" })).toMatchObject({ ok: false, refusal: { code: "carry/notCarriable" } });

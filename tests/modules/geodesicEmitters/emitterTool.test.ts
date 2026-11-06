@@ -110,7 +110,7 @@ describe("the emitter tool", () => {
     aim.pick = floorAt(3, 2.5);
     aim.yaw = undefined;
     expect(tool.onPrimaryAction(context)).toBe(true);
-    aim.pick = { objectId: "flag", objectKind: "placed-flag", cellId: "a", point: { x: 1, y: 1, z: 0 }, withinRange: true };
+    aim.pick = { objectId: "flag", objectKind: "placedFlags/flag", cellId: "a", point: { x: 1, y: 1, z: 0 }, withinRange: true };
     aim.yaw = 0;
     expect(tool.onPrimaryAction(context)).toBe(true);
     aim.pick = undefined;

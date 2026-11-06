@@ -234,7 +234,7 @@ export function createRuntimeObjectInstanceSync(deps: RuntimeObjectInstanceSyncD
   // A placed flag draws its own text planes plus the model archetypes shared by all flags of its type.
   function archetypeKeysForObject(object: RuntimeWorldObject, prefix: string): readonly string[] {
     const own = archetypeKeysByPrefix.get(prefix) ?? noKeys;
-    if (object.kind !== "placed-flag") {
+    if (object.kind !== "placedFlags/flag") {
       return own;
     }
 
@@ -304,7 +304,7 @@ export function createRuntimeObjectInstanceSync(deps: RuntimeObjectInstanceSyncD
       }
 
       addCachedOrCollect(`object:${object.id}`, root, () =>
-        object.kind === "placed-flag"
+        object.kind === "placedFlags/flag"
           ? collectPlacedFlagRenderSourceMeshes(object.id, object.flagType, root, runtimeObjectArchetypeKeyPrefix(object))
           : collectRuntimeObjectRenderSourceMeshes(object.id, root, runtimeObjectArchetypeKeyPrefix(object))
       );

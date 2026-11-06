@@ -11,7 +11,7 @@ import type { RuntimeDebugOverlayItemId, RuntimeToolId } from "./toolIds";
 import { publicUrl } from "./assetUrls";
 
 /** Id of a main-menu tool that an app config can switch on or off. */
-export type ConfigurableToolId = "place-flag" | "geodesicEmitters/emitter" | "measure-length" | "protractor";
+export type ConfigurableToolId = "placedFlags/flag" | "geodesicEmitters/emitter" | "geodesicMeasurements/length" | "geodesicMeasurements/protractor";
 
 /** Which optional menu sections the app config enables. */
 export interface AppMenuConfig {
@@ -215,7 +215,7 @@ export function normalizeAppConfig(rawConfig: unknown): AppConfig {
  */
 export function isRuntimeToolEnabled(config: AppConfig, toolId: RuntimeToolId): boolean {
   switch (toolId) {
-    case "place-flag":
+    case "placedFlags/flag":
       return config.tools.placeFlags;
     case "geodesicEmitters/emitter":
     case "geodesicEmitters/carry":
@@ -223,9 +223,9 @@ export function isRuntimeToolEnabled(config: AppConfig, toolId: RuntimeToolId): 
     case "geodesicEmitters/aim":
     case "geodesicModel/tie":
       return config.tools.geodesicEmitters;
-    case "measure-length":
+    case "geodesicMeasurements/length":
       return config.tools.distances;
-    case "protractor":
+    case "geodesicMeasurements/protractor":
       return config.tools.angles;
     default:
       return true;
@@ -237,10 +237,10 @@ export function isRuntimeToolEnabled(config: AppConfig, toolId: RuntimeToolId): 
  */
 export function getEnabledMainTools(config: AppConfig): readonly ConfigurableToolId[] {
   return [
-    ...(config.tools.placeFlags ? (["place-flag"] as const) : []),
+    ...(config.tools.placeFlags ? (["placedFlags/flag"] as const) : []),
     ...(config.tools.geodesicEmitters ? (["geodesicEmitters/emitter"] as const) : []),
-    ...(config.tools.distances ? (["measure-length"] as const) : []),
-    ...(config.tools.angles ? (["protractor"] as const) : []),
+    ...(config.tools.distances ? (["geodesicMeasurements/length"] as const) : []),
+    ...(config.tools.angles ? (["geodesicMeasurements/protractor"] as const) : []),
   ];
 }
 

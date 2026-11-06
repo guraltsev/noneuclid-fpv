@@ -227,7 +227,7 @@ export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): Runt
     }
 
     const flag = runtimeObjectRegistry.get(editState.flagId);
-    if (flag?.kind === "placed-flag") {
+    if (flag?.kind === "placedFlags/flag") {
       runtimeObjectRegistry.remove(editState.flagId);
       removePlacedFlagRuntime(editState.flagId);
     }
@@ -236,7 +236,7 @@ export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): Runt
 
   function setEditingSignMessage(flagId: string, message: string): void {
     const flag = runtimeObjectRegistry.get(flagId);
-    if (flag?.kind !== "placed-flag") {
+    if (flag?.kind !== "placedFlags/flag") {
       dispatchRuntimeCommand({ kind: "close-menu" });
       return;
     }
@@ -264,7 +264,7 @@ export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): Runt
       eyePosition: target.localEyePosition,
       floorPoint: target.localPoint,
       flagType: currentMenuState().placeFlagOptions.flagType,
-      id: engine.ids.next("placed-flag"),
+      id: engine.ids.next("placedFlags/flag"),
     });
 
     if (result.placed && result.object) {
@@ -551,9 +551,9 @@ export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): Runt
     }
 
     if (
-      focused.object.kind === "placed-flag" &&
+      focused.object.kind === "placedFlags/flag" &&
       focused.object.interactable?.action === "edit-flag" &&
-      isRuntimeToolEnabled(appConfig, "place-flag")
+      isRuntimeToolEnabled(appConfig, "placedFlags/flag")
     ) {
       dispatchRuntimeCommand({ kind: "show-edit-sign", flagId: focused.object.id, message: focused.object.message });
       return true;

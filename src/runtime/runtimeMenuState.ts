@@ -632,7 +632,7 @@ export function setRuntimeMenuPlaceFlagType(state: RuntimeMenuState, flagType: P
 
 /** Chooses a flag type and activates the place-flag tool in one step. */
 export function selectRuntimeMenuPlaceFlagToolType(state: RuntimeMenuState, flagType: PlacedFlagType): RuntimeMenuState {
-  return setRuntimeMenuSelectedTool(setRuntimeMenuPlaceFlagType(state, flagType), "place-flag");
+  return setRuntimeMenuSelectedTool(setRuntimeMenuPlaceFlagType(state, flagType), "placedFlags/flag");
 }
 
 /** Sets or clears the id of the flag being edited. */

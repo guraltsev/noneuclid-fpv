@@ -75,7 +75,7 @@ export function createWorldFocusMessageDefinition(
   }
 
   switch (options.object.kind) {
-    case "placed-flag":
+    case "placedFlags/flag":
       return withObjectHelp(options.object, {
         title,
         actions: [contextAction("edit-sign", "Edit")],
@@ -111,7 +111,7 @@ export function createWorldFocusMessageDefinition(
     case "geodesicModel/crossing":
       return withObjectHelp(options.object, {
         title,
-        actions: options.selectedTool === "protractor"
+        actions: options.selectedTool === "geodesicMeasurements/protractor"
           ? [primaryAction("select-protractor-vertex", "Select for protractor")]
           : [],
         helpTopicId: "geodesic-vertex",
@@ -169,11 +169,11 @@ export function formatWorldFocusMessageTextForLegacyFallback(
 function getGeodesicSegmentActions(
   options: CreateWorldFocusMessageDefinitionOptions,
 ): readonly WorldInteractionAction[] {
-  if (options.selectedTool === "measure-length") {
+  if (options.selectedTool === "geodesicMeasurements/length") {
     return [primaryAction("measure-length", "Measure length")];
   }
 
-  if (options.selectedTool === "protractor") {
+  if (options.selectedTool === "geodesicMeasurements/protractor") {
     return [primaryAction("select-protractor-side", "Select side")];
   }
 

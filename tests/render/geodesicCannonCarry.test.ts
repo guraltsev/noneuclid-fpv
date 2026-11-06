@@ -236,7 +236,7 @@ describe("releasing a carried emitter of a connected geodesic", () => {
 describe("leaving the carry tool puts the emitter down in the world", () => {
   const leavers = [
     ["clearing the selected tool", { kind: "clear-selected-tool" }],
-    ["selecting another tool", { kind: "select-tool", toolId: "protractor" }],
+    ["selecting another tool", { kind: "select-tool", toolId: "geodesicMeasurements/protractor" }],
     ["cancelling the menu and tool", { kind: "cancel-menu-and-tool" }],
   ] as const;
 

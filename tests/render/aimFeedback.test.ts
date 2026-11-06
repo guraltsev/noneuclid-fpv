@@ -146,7 +146,7 @@ describe("createAimFeedback", () => {
   });
 
   it("toggles the selected tool's help when the help key finds nothing focused", () => {
-    const { feedback, focus, helpUpdates } = createHarness({ menuState: { ...createRuntimeMenuState({ selectedWorldId: "test" }), selectedTool: "measure-length" } });
+    const { feedback, focus, helpUpdates } = createHarness({ menuState: { ...createRuntimeMenuState({ selectedWorldId: "test" }), selectedTool: "geodesicMeasurements/length" } });
     focus.object = undefined;
 
     feedback.updateTooltips(false, aimRay, undefined);

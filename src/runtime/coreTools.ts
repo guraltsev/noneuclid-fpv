@@ -32,7 +32,7 @@ export function createCoreToolDescriptors(handlers: CoreToolHandlers): readonly 
   return [
     {
       ...mainTool,
-      id: "place-flag",
+      id: "placedFlags/flag",
       label: "Sign",
       helpTitle: "Sign tool",
       helpBody: "Places a note on the floor where you aim.",
@@ -44,7 +44,7 @@ export function createCoreToolDescriptors(handlers: CoreToolHandlers): readonly 
     },
     {
       ...mainTool,
-      id: "measure-length",
+      id: "geodesicMeasurements/length",
       label: "Length",
       helpTitle: "Length tool",
       helpBody: "Measures total length along a selected geodesic.",
@@ -57,7 +57,7 @@ export function createCoreToolDescriptors(handlers: CoreToolHandlers): readonly 
     },
     {
       ...mainTool,
-      id: "protractor",
+      id: "geodesicMeasurements/protractor",
       label: "Protractor",
       helpTitle: "Protractor tool",
       helpBody: "Measures the angle between two geodesic sides at a vertex.",

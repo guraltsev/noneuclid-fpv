@@ -76,7 +76,7 @@ describe("runtimeMenuState", () => {
 
     const next = selectRuntimeMenuPlaceFlagToolType(state, "WoodenSign2");
 
-    expect(next.selectedTool).toBe("place-flag");
+    expect(next.selectedTool).toBe("placedFlags/flag");
     expect(next.placeFlagOptions.flagType).toBe("WoodenSign2");
     expect(next.page).toBe("place-flag-options");
   });
@@ -84,29 +84,29 @@ describe("runtimeMenuState", () => {
   it("selects the protractor tool from the main palette", () => {
     const state = setRuntimeMenuSelectedTool(createRuntimeMenuState({
       selectedWorldId: "cube",
-    }), "protractor");
+    }), "geodesicMeasurements/protractor");
     const definition = createTestPaletteDefinition(state);
 
-    expect(state.selectedTool).toBe("protractor");
+    expect(state.selectedTool).toBe("geodesicMeasurements/protractor");
     expect(definition.content.kind).toBe("main");
     if (definition.content.kind !== "main") {
       throw new Error("Expected main palette.");
     }
-    expect(definition.content.selectedTool).toBe("protractor");
+    expect(definition.content.selectedTool).toBe("geodesicMeasurements/protractor");
   });
 
   it("selects the measure length tool from the main palette", () => {
     const state = setRuntimeMenuSelectedTool(createRuntimeMenuState({
       selectedWorldId: "cube",
-    }), "measure-length");
+    }), "geodesicMeasurements/length");
     const definition = createTestPaletteDefinition(state);
 
-    expect(state.selectedTool).toBe("measure-length");
+    expect(state.selectedTool).toBe("geodesicMeasurements/length");
     expect(definition.content.kind).toBe("main");
     if (definition.content.kind !== "main") {
       throw new Error("Expected main palette.");
     }
-    expect(definition.content.selectedTool).toBe("measure-length");
+    expect(definition.content.selectedTool).toBe("geodesicMeasurements/length");
   });
 
   it("serializes the aim collision outline debug toggle", () => {
@@ -129,7 +129,7 @@ describe("runtimeMenuState", () => {
   it("clears the selected tool when backing out to the main menu", () => {
     const state = setRuntimeMenuSelectedTool(createRuntimeMenuState({
       selectedWorldId: "cube",
-    }), "place-flag");
+    }), "placedFlags/flag");
 
     const next = showRuntimeMenuMainPage(state);
 

@@ -19,7 +19,7 @@ export type PlacedFlagType = typeof placedFlagTypes[number];
  * Registry record for a placed sign: its type, sanitized message and font color.
  */
 export interface PlacedFlagObject extends RuntimeWorldObjectBase {
-  readonly kind: "placed-flag";
+  readonly kind: "placedFlags/flag";
   readonly flagType: PlacedFlagType;
   readonly message: string;
 }

@@ -43,7 +43,7 @@ describe("helpLensDefinition", () => {
     const help = createHelpLensDefinition({
       inputMode: "xr",
       toolsById,
-      selectedTool: "measure-length",
+      selectedTool: "geodesicMeasurements/length",
     });
 
     expect(help.title).toBe("Length tool");

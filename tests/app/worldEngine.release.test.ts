@@ -24,7 +24,7 @@ describe("api.world", () => {
     expect(participants.map((participant) => [participant.id, participant.kind])).toEqual([["local", "local-player"]]);
     expect(participants[0]!.body.cellId).toBe(pose.cellId);
 
-    expect(await app.api.world.submit({ kind: "world/requestTool", toolId: "protractor" })).toEqual({ ok: true, value: { toolId: "protractor" } });
+    expect(await app.api.world.submit({ kind: "world/requestTool", toolId: "geodesicMeasurements/protractor" })).toEqual({ ok: true, value: { toolId: "geodesicMeasurements/protractor" } });
     expect(await app.api.world.submit({ kind: "nothing/here" })).toMatchObject({ ok: false, refusal: { code: "world/unknownCommand" } });
   });
 

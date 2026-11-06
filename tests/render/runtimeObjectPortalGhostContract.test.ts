@@ -67,7 +67,7 @@ const kinds: Record<Kind, KindCase> = {
       localPose: standing(x, y),
     }),
   },
-  "placed-flag": {
+  "placedFlags/flag": {
     object: (cellId, x, y) => createPlacedFlagObject({ id: "subject", cellId, localPose: standing(x, y), flagType: "WoodenSign1" }),
   },
   "geodesicEmitters/emitter": {
@@ -160,7 +160,7 @@ function rootFor(object: RuntimeWorldObject, drawn: { readonly offsetX?: number;
   const model = new THREE.Mesh(drawn.measurable === false ? new THREE.BoxGeometry(0, 0.2, 0) : new THREE.BoxGeometry(0.2, 0.2, 0.2));
   model.position.x = drawn.offsetX ?? 0;
   root.add(model);
-  if (object.kind === "placed-flag") {
+  if (object.kind === "placedFlags/flag") {
     root.children[0].name = "fake-sign-board";
     for (const side of ["front", "back"]) {
       const plane = new THREE.Mesh(new THREE.PlaneGeometry(drawn.measurable === false ? 0 : 0.1, drawn.measurable === false ? 0 : 0.1));
@@ -251,7 +251,7 @@ describe("portal ghosts of every kind of runtime object", () => {
 });
 
 /** The kinds whose drawn part is the model of their own root (not a fixed geodesic part), with a collision cylinder the test can size. */
-const modelKinds = ["geodesci-marmot", "geo-mouse", "geo-butterfly", "asset", "placed-flag"] as const;
+const modelKinds = ["geodesci-marmot", "geo-mouse", "geo-butterfly", "asset", "placedFlags/flag"] as const;
 
 describe("portal ghosts follow what is drawn, not the collision shape", () => {
   for (const kind of modelKinds) {

@@ -9,9 +9,9 @@ export type RuntimeDebugOverlayItemId = "fps" | "location" | "portal-quantities"
 export type CoreToolId =
   | "none"
   | "aim"
-  | "place-flag"
-  | "measure-length"
-  | "protractor"
+  | "placedFlags/flag"
+  | "geodesicMeasurements/length"
+  | "geodesicMeasurements/protractor"
   | "geodesicEmitters/carry"
   | "geodesicEmitters/rotate"
   | "geodesicEmitters/aim";

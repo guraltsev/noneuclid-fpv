@@ -1,6 +1,6 @@
 # Job 66 - Move the measurement tools and the flags into modules
 
-Status: queued.
+Status: in progress.
 Resolves: issue [92](../../_issues/92_measurement_kinds_are_declared_transient.md).
 
 ## Goal

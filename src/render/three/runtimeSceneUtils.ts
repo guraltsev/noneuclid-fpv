@@ -178,7 +178,7 @@ export function buildCurrentCellForbiddenZoneWireframes(cell: CompiledPrismCell)
 
 /** Returns the render-archetype key prefix for a runtime object: kind and id, plus the flag type for placed flags. */
 export function runtimeObjectArchetypeKeyPrefix(object: RuntimeWorldObject): string {
-  if (object.kind === "placed-flag") {
+  if (object.kind === "placedFlags/flag") {
     return `placed-flag:${object.flagType}:${object.id}`;
   }
 

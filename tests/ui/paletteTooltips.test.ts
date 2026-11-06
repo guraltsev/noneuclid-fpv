@@ -25,8 +25,8 @@ describe("paletteTooltips", () => {
   });
 
   it("names tool tiles and sign controls", () => {
-    expect(resolvePaletteTooltipLabel("tool:measure-length")).toBe("Measure length");
-    expect(resolvePaletteTooltipLabel("tool:protractor")).toBe("Measure angle");
+    expect(resolvePaletteTooltipLabel("tool:geodesicMeasurements/length")).toBe("Measure length");
+    expect(resolvePaletteTooltipLabel("tool:geodesicMeasurements/protractor")).toBe("Measure angle");
     expect(resolvePaletteTooltipLabel("tool:geodesicEmitters/emitter")).toBe("Create and terminate straight lines");
     expect(resolvePaletteTooltipLabel("tool-options:place-sign")).toBe("Sign options");
     expect(resolvePaletteTooltipLabel("sign-type:WoodenSign1")).toBe("Choose sign type");
