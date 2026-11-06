@@ -164,4 +164,4 @@ lower numbers of jobs 18, 24, 30, 34 and 35.
 | [63](_done/63_geodesic_emitters_module.md) | Create the geodesic emitters module: renames, place, shoot, extend, delete | done, needs review | - |  |
 | [64](_done/64_emitter_edits_and_length.md) | Rotate, aim and carry through the world; a free geodesic keeps its length | done, needs review | [88](../../_issues/88_carry_changes_the_world_before_the_world_answers.md), [89](../../_issues/89_rotate_aim_and_carry_bypass_the_tool_gates.md), [93](../../_issues/93_a_free_geodesic_forgets_its_length_when_the_tool_ends.md) |  |
 | [65](_done/65_module_public_api.md) | Give modules a public API and write the scenarios that were waiting for it | done, needs review | - |  |
-| [66](66_measurement_tools_and_flags.md) | Move the measurement tools and the flags into modules | queued | [92](../../_issues/92_measurement_kinds_are_declared_transient.md) |  |
+| [66](_done/66_measurement_tools_and_flags.md) | Move the measurement tools and the flags into modules | done, needs review | [92](../../_issues/92_measurement_kinds_are_declared_transient.md) |  |
