@@ -3,7 +3,7 @@
  *
  * In the `torus-moduli` world, `window.noneuclid.api`'s `geometry` namespace (installed whenever the active world's
  * deformation is `torus-skew`; `src/render/three/createThreeApp.ts`) steps the live torus parameters toward a
- * requested target in small background-built increments (at most 0.08 m per rebuild;
+ * requested target in small background-built increments (one Teichmuller step of 1/375 per rebuild, 0.08 m at depth 15 m;
  * `src/runtime/deformations/torusSkewDeformation.ts`). `geometry.setTorusSkew` commits the requested value as the
  * session's target, reported by `geometry.state()`; `geometry.cancel()`, called right after, stops the stepping
  * and resets the target back to whatever is still current, short of a large target reached in a single step.
@@ -39,7 +39,7 @@ async function cancellingLeavesThePreviousGeometry(api: ScenarioApi): Promise<vo
   await api.geometry.cancel();
 
   const after = (await api.geometry.state()) as LiveGeometryDebugState;
-  // A single background rebuild step moves the skew by at most 0.08 m (torusSkewDeformation.ts), so two
+  // A single background rebuild step moves the skew by at most 0.08 m at depth 15 m (torusSkewDeformation.ts), so two
   // back-to-back API calls cannot have walked the full 10 m to the target before cancel() took effect.
   expect(Math.abs(skewXMetersOf(after.current) - farTargetSkewXMeters)).toBeGreaterThan(1);
   expect(skewXMetersOf(after.target)).toBe(skewXMetersOf(after.current));

@@ -31,10 +31,15 @@ export interface StaticWorldDeformationState {
 /** Union of all deformation parameter records, discriminated by kind; extend it when adding a family. */
 export type WorldDeformationState = StaticWorldDeformationState | TorusSkewDeformationState;
 
+/** Default step: today's worst case (0.04 m at b = 7.5 m), so no commit distorts more than before and no sweep is slower. */
+export const defaultMaxTeichmullerStep = 1 / 375;
+
 /** Step-size limits for moving a deformation state toward its target one rebuild at a time. */
 export interface DynamicGeometryStepOptions {
-  /** Maximum parameter-space distance (meters) a single step may travel. */
-  readonly maxStepMeters: number;
+  /**
+   * Maximum Teichmuller length of one step, ds = |d tau| / (2 Im tau). It bounds the dilatation of a commit's map by about e^(2 * maxTeichmullerStep).
+   */
+  readonly maxTeichmullerStep: number;
   /**
    * Distance at or below which the step jumps straight to the target; the torus family defaults it to 1e-9.
    */

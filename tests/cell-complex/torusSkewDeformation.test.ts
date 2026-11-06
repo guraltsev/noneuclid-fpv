@@ -21,6 +21,7 @@ import { type TorusSkewDeformationState } from "../../src/cell-complex/worldGeom
 import { createInitialWorldDeformationState } from "../../src/runtime/worldGeometryDeformationFamilies";
 import { torusModuli } from "../../src/authoring/exampleWorlds";
 import {
+  defaultMaxTeichmullerStep,
   deformationStatesEqual,
   transformPoseWithCellMaps,
   transformPositionedObjectSpecWithMap,
@@ -214,7 +215,7 @@ describe("torus skew base frame and width step", () => {
   };
 
   function runSteps(start: TorusSkewDeformationState, target: TorusSkewDeformationState) {
-    const options = { maxStepMeters: 0.08 };
+    const options = { maxTeichmullerStep: 1 / 375 };
     let state = start;
     let steps = 0;
     for (; steps < 1000 && !deformationStatesEqual(state, target); steps += 1) {
@@ -224,7 +225,7 @@ describe("torus skew base frame and width step", () => {
         next.skewXMeters - state.skewXMeters,
         next.depthMeters - state.depthMeters,
       );
-      expect(moved).toBeLessThanOrEqual(0.08 + 1e-12);
+      expect(moved).toBeLessThanOrEqual((2 * state.depthMeters) / 375 + 1e-12);
       state = next;
     }
     return { state, steps };
@@ -272,6 +273,43 @@ describe("torus skew base frame and width step", () => {
     const { state, steps } = runSteps(rest, target);
     expect(deformationStatesEqual(state, target)).toBe(true);
     expect(steps).toBeLessThan(1000);
+  });
+
+  it("bounds the dilatation of every commit", () => {
+    const target = { ...rest, skewXMeters: 30, depthMeters: 7.5 };
+    const options = { maxTeichmullerStep: defaultMaxTeichmullerStep };
+    let state = rest;
+    let steps = 0;
+    for (; steps < 5000 && !deformationStatesEqual(state, target); steps += 1) {
+      const next = nextTorusSkewStep(state, target, options);
+      // The linear map A with A u = u' and A v = v', for u = (w, 0) and v = (a, b).
+      const uOld = { x: state.widthMeters, y: 0 };
+      const vOld = { x: state.skewXMeters, y: state.depthMeters };
+      const uNew = { x: next.widthMeters, y: 0 };
+      const vNew = { x: next.skewXMeters, y: next.depthMeters };
+      const det = uOld.x * vOld.y - uOld.y * vOld.x;
+      const a11 = (uNew.x * vOld.y - vNew.x * uOld.y) / det;
+      const a12 = (vNew.x * uOld.x - uNew.x * vOld.x) / det;
+      const a21 = (uNew.y * vOld.y - vNew.y * uOld.y) / det;
+      const a22 = (vNew.y * uOld.x - uNew.y * vOld.x) / det;
+      const detA = a11 * a22 - a12 * a21;
+      const ratio = (a11 * a11 + a12 * a12 + a21 * a21 + a22 * a22) / detA;
+      // K + 1/K = ratio
+      const dilatation = (ratio + Math.sqrt(Math.max(ratio * ratio - 4, 0))) / 2;
+      expect(dilatation).toBeLessThanOrEqual(Math.exp(2.02 * defaultMaxTeichmullerStep));
+      state = next;
+    }
+    expect(deformationStatesEqual(state, target)).toBe(true);
+  });
+
+  it("steps twice as far at twice the depth", () => {
+    const length = (from: TorusSkewDeformationState, to: TorusSkewDeformationState) => {
+      const next = nextTorusSkewStep(from, to, { maxTeichmullerStep: 1 / 375 });
+      return Math.hypot(next.widthMeters - from.widthMeters, next.skewXMeters - from.skewXMeters, next.depthMeters - from.depthMeters);
+    };
+    expect(length(rest, { ...rest, skewXMeters: 30 })).toBeCloseTo(0.08, 9);
+    const deep = { ...rest, depthMeters: 30 };
+    expect(length(deep, { ...deep, skewXMeters: 30 })).toBeCloseTo(0.16, 9);
   });
 
   it("stays in range on the boundary b = w/2 while the width changes", () => {

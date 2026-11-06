@@ -1,6 +1,6 @@
 /**
  * Owns the live deformation of the cell complex during play: it tracks the committed deformation state (current), the requested target, and at most one in-flight background build.
- * Each step asks the family for nextStep(current, target) (at most maxStepMeters, default 0.08 m, in parameter space), builds the corresponding snapshot via a WorldGeometryBuildClient (a worker by default), validates the compiled result against the currently committed world, and parks it as the ready snapshot.
+ * Each step asks the family for nextStep(current, target) (at most maxTeichmullerStep, default 1/375, in Teichmuller length), builds the corresponding snapshot via a WorldGeometryBuildClient (a worker by default), validates the compiled result against the currently committed world, and parks it as the ready snapshot.
  * The renderer polls pollReadySnapshot() once per frame; polling is the only way the committed state advances, so each commit is an atomic swap on the render thread. After a commit the session immediately schedules the next step, so a distant target is approached through a sequence of small topology-preserving snapshots.
  * Consistency guarantees: snapshots are always rebuilt from baseSpec (never accumulated), requests carry ids and stale responses are dropped, failures and validation errors only set lastError and leave the committed world untouched, and cancel()/dispose() invalidate outstanding work.
  * The session never touches the player or objects; the committer uses family.createDynamicObjectMaps(previous, next, ...) to transport them.
@@ -14,6 +14,7 @@ import {
   type WorldDeformationFamilyRegistry,
 } from "./worldGeometryDeformationFamilies";
 import {
+  defaultMaxTeichmullerStep,
   deformationStatesEqual,
   type DynamicGeometryStepOptions,
   type WorldDeformationState,
@@ -111,14 +112,14 @@ export interface CreateWorldGeometrySessionOptions {
     readonly toleranceMeters: number;
     readonly maxKeptPathsPerRoot: number;
   };
-  /** Step limits; defaults to maxStepMeters 0.08 and snapToleranceMeters 1e-6. */
+  /** Step limits; defaults to maxTeichmullerStep 1/375 and snapToleranceMeters 1e-6. */
   readonly stepOptions?: DynamicGeometryStepOptions;
   /** Clock in milliseconds; defaults to performance.now() or Date.now(). */
   readonly nowMs?: () => number;
 }
 
 const defaultStepOptions: DynamicGeometryStepOptions = {
-  maxStepMeters: 0.08,
+  maxTeichmullerStep: defaultMaxTeichmullerStep,
   snapToleranceMeters: 1e-6,
 };
 

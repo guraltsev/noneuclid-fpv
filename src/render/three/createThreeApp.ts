@@ -501,10 +501,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     initialSnapshot: initialWorldSnapshot,
     familyRegistry: deformationFamilyRegistry,
     portalPathOptions,
-    stepOptions: {
-      maxStepMeters: 0.04,
-      snapToleranceMeters: 1e-6,
-    },
   });
   // The active world (snapshot plus derived render data) is owned by geometryCommit and replaced only by its commit, at the
   // start of a frame; every other reader goes through activeWorld()/activeStaticCull().

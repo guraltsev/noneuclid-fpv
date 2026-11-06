@@ -59,7 +59,7 @@ describe("world geometry session", () => {
 
   it("advances toward the target through the active family's nextStep", () => {
     const client = createDeferredBuildClient();
-    const session = createTestSession(client, { maxStepMeters: 0.05 });
+    const session = createTestSession(client, { maxTeichmullerStep: 1 / 600 });
 
     session.setTarget(skewState(0.2));
 
@@ -68,7 +68,7 @@ describe("world geometry session", () => {
 
   it("reaches a target with a different width without recording an error", async () => {
     const client = createDeferredBuildClient();
-    const session = createTestSession(client, { maxStepMeters: 1 });
+    const session = createTestSession(client, { maxTeichmullerStep: 1 / 30 });
 
     session.setTarget({ kind: "torus-skew", cellId: "torus-room", widthMeters: 40, depthMeters: 20, skewXMeters: 0 });
     expect(session.state.lastError).toBeUndefined();
@@ -87,9 +87,9 @@ describe("world geometry session", () => {
     expect(session.state.current).toMatchObject({ widthMeters: 40 });
   });
 
-  it("advances torus skew by at most maxStepMeters per committed snapshot", async () => {
+  it("advances torus skew by one Teichmuller step per committed snapshot", async () => {
     const client = createDeferredBuildClient();
-    const session = createTestSession(client, { maxStepMeters: 0.05 });
+    const session = createTestSession(client, { maxTeichmullerStep: 1 / 600 });
 
     session.setTarget(skewState(0.11));
     client.resolve(1, buildWorldGeometrySnapshotForRequest(client.requests[0]));
@@ -119,7 +119,7 @@ describe("world geometry session", () => {
 
   it("cancel prevents further queued steps", async () => {
     const client = createDeferredBuildClient();
-    const session = createTestSession(client, { maxStepMeters: 0.05 });
+    const session = createTestSession(client, { maxTeichmullerStep: 1 / 600 });
 
     session.setTarget(skewState(0.2));
     session.cancel();
@@ -133,7 +133,7 @@ describe("world geometry session", () => {
 
   it("schedules builds again on the first setTarget after a cancel", () => {
     const client = createDeferredBuildClient();
-    const session = createTestSession(client, { maxStepMeters: 0.05 });
+    const session = createTestSession(client, { maxTeichmullerStep: 1 / 600 });
 
     session.setTarget(skewState(0.2));
     session.cancel();
@@ -160,7 +160,7 @@ describe("world geometry session", () => {
 
 function createTestSession(
   buildClient: WorldGeometryBuildClient,
-  stepOptions: { readonly maxStepMeters: number } = { maxStepMeters: 0.05 },
+  stepOptions: { readonly maxTeichmullerStep: number } = { maxTeichmullerStep: 1 / 600 },
 ) {
   return createWorldGeometrySession({
     baseSpec: torus,

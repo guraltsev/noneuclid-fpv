@@ -2,7 +2,7 @@
  * Deformation family for the one-cell torus world: the cell "torus-room" is a prism whose footprint is a parallelogram with edge vectors u = (w, 0) and v = (a, b), and opposite sides glued by translation (side-0 with side-2, side-1 with side-3).
  * The state is width w (the shipped UI keeps it fixed, but the family allows a width change), skew a = skewXMeters in [0, 2w] and depth b = depthMeters in [w/2, 2w]; changing (a, b) changes the flat torus R^2/(Zu + Zv) while keeping the same combinatorics.
  * The per-cell map sends a point p = o_old + alpha u_old + beta v_old to o_new + alpha u_new + beta v_new, where o = -(u+v)/2 is the footprint's first vertex, and keeps the height z; directions map by the same linear part. So lattice coordinates (alpha, beta) are invariant, which is what carries players and objects across a commit.
- * Stepping moves (w, a, b) together along a straight segment in (w, a, b) space by at most maxStepMeters per rebuild (the allowed set is convex, so every point of the segment is allowed). Snapshot validation requires unchanged topology and equal lengths of opposite sides.
+ * Stepping moves (w, a, b) together along a straight segment in (w, a, b) space by at most 2 b maxTeichmullerStep meters per rebuild, a fixed Teichmuller length (the allowed set is convex, so every point of the segment is allowed). Snapshot validation requires unchanged topology and equal lengths of opposite sides.
  * The floor UV frame is the lattice frame of the current state with tile counts and rest vectors fixed from the base state; the floor is painted by rigid patches anchored on the tile lattice (see floorUv.ts), so pebbles keep their shape.
  */
 import type { CompiledCellComplex } from "../compileCellComplex";
@@ -186,14 +186,15 @@ export function createTorusSkewCellDeformationMaps(
 }
 
 /**
- * Moves (widthMeters, skewXMeters, depthMeters) together from current toward target along a straight segment by at most maxStepMeters in the Euclidean metric, snapping to the target when the remaining distance is within max(maxStepMeters, snapTolerance); the result is normalized (range-checked).
+ * Moves (widthMeters, skewXMeters, depthMeters) together from current toward target along a straight segment by at most 2 b maxTeichmullerStep meters in the Euclidean metric (a Teichmuller length of maxTeichmullerStep), snapping to the target when the remaining distance is within max(maxStepMeters, snapTolerance); the result is normalized (range-checked).
  */
 export function nextTorusSkewStep(
   current: TorusSkewDeformationState,
   target: TorusSkewDeformationState,
   options: DynamicGeometryStepOptions,
 ): TorusSkewDeformationState {
-  const maxStepMeters = Math.max(0, options.maxStepMeters);
+  // With tau = (a + ib)/w, a step of s meters has Teichmuller length s / (2b), so the allowed length in meters is 2 b maxTeichmullerStep.
+  const maxStepMeters = 2 * current.depthMeters * Math.max(0, options.maxTeichmullerStep);
   const snapToleranceMeters = options.snapToleranceMeters ?? 1e-9;
   const deltaW = target.widthMeters - current.widthMeters;
   const deltaA = target.skewXMeters - current.skewXMeters;
