@@ -82,7 +82,12 @@ const tieRefusals: Record<TieAtNewVertexRefusal, { readonly code: string; readon
   rebuildFailed: { code: geodesicModelRefusals.rebuildFailed, message: "The tied geodesics could not be rebuilt." },
 };
 
+function isEndpointRef(value: unknown): boolean {
+  return typeof value === "object" && value !== null;
+}
+
 function tieAndDetach(command: GeodesicTieAndDetachCommand, ctx: CommandContext): CommandResult {
+  if (!isEndpointRef(command.first) || !isEndpointRef(command.second)) return { ok: false, refusal: { ...tieRefusals.notAttached } };
   const tied = tieAtNewVertex(ctx.world, ctx.objects, {
     detachedEmitterId: command.emitterId,
     first: command.first,
@@ -90,7 +95,7 @@ function tieAndDetach(command: GeodesicTieAndDetachCommand, ctx: CommandContext)
     createVertexId: () => ctx.ids.next("vertex"),
   });
   if (!tied.ok) {
-    return { ok: false, refusal: tieRefusals[tied.reason] };
+    return { ok: false, refusal: { ...tieRefusals[tied.reason] } };
   }
   const event: GeodesicVertexTiedEvent = { kind: "geodesicModel/vertexTied", vertexId: tied.vertexId, arcIds: tied.arcIds };
   ctx.emit(event);

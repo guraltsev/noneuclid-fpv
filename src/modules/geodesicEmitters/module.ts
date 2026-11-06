@@ -56,8 +56,9 @@ function answer(value: GeodesicEmittersResult): CommandResult {
   return { ok: true, value: value as PlainData };
 }
 
-const notAnEmitter = refuse(geodesicEmittersRefusals.notAnEmitter, "That is not an emitter.");
-const tooShort = refuse(geodesicEmittersRefusals.tooShort, "That is too short for a geodesic.");
+// Functions, not constants: a result reaches an in-page caller by reference, and an edit there must not reach the next caller.
+const notAnEmitter = (): CommandResult => refuse(geodesicEmittersRefusals.notAnEmitter, "That is not an emitter.");
+const tooShort = (): CommandResult => refuse(geodesicEmittersRefusals.tooShort, "That is too short for a geodesic.");
 
 function emitterAt(objects: RuntimeObjectReader, id: string): GeodesicEmitterObject | undefined {
   const object = objects.get(id);
@@ -90,6 +91,7 @@ function cutsOf(ctx: CommandContext): GeodesicEmitterCuts {
 
 function createPlace(model: GeodesicModelQueries) {
   return (command: GeodesicEmitterPlaceCommand, ctx: CommandContext): CommandResult => {
+    if (typeof command.point !== "object" || command.point === null) return refuse(geodesicEmittersRefusals.blocked, "That is not a place.");
     const { x, y, z } = command.point;
     if (![x, y, z, command.yawRadians].every(Number.isFinite)) return refuse(geodesicEmittersRefusals.blocked, "That is not a place.");
     const placed = placeGeodesicEmitterAtPoint({
@@ -112,13 +114,13 @@ function createPlace(model: GeodesicModelQueries) {
 
 function shoot(command: GeodesicEmitterShootCommand, ctx: CommandContext): CommandResult {
   const emitter = emitterAt(ctx.objects, command.emitterId);
-  if (emitter === undefined) return notAnEmitter;
+  if (emitter === undefined) return notAnEmitter();
   if (!Number.isFinite(command.yawRadians)) return refuse(geodesicEmittersRefusals.blocked, "That is not a direction.");
-  if (!isLongEnough(command.lengthMeters)) return tooShort;
+  if (!isLongEnough(command.lengthMeters)) return tooShort();
   ctx.objects.update(facing(emitter, command.yawRadians));
   const shot: GeodesicShootArcCommand = { kind: "geodesicModel/shootArc", emitterId: emitter.id, lengthMeters: command.lengthMeters };
   const result = ctx.dispatch(shot);
-  if (!result.ok) return notAnEmitter;
+  if (!result.ok) return notAnEmitter();
   return answer({ outcome: "shot", emitterId: emitter.id, arcId: (result.value as { readonly arcId: string }).arcId });
 }
 
@@ -126,7 +128,7 @@ function createExtend(model: GeodesicModelQueries) {
   return (command: GeodesicEmitterExtendCommand, ctx: CommandContext): CommandResult => {
     const emitterId = model.emitterOfArc(command.arcId);
     if (emitterId === undefined) return refuse(geodesicEmittersRefusals.notAttached, "That geodesic has no emitter.");
-    if (!isLongEnough(command.lengthMeters)) return tooShort;
+    if (!isLongEnough(command.lengthMeters)) return tooShort();
     const extension: GeodesicExtendArcCommand = { kind: "geodesicModel/extendArc", arcId: command.arcId, lengthMeters: command.lengthMeters };
     const extended = ctx.dispatch(extension);
     if (!extended.ok) return refuse(geodesicEmittersRefusals.blocked, extended.refusal.message);
@@ -136,7 +138,7 @@ function createExtend(model: GeodesicModelQueries) {
 
 function createDeleteGeodesic(model: GeodesicModelQueries) {
   return (command: GeodesicEmitterDeleteGeodesicCommand, ctx: CommandContext): CommandResult => {
-    if (emitterAt(ctx.objects, command.emitterId) === undefined) return notAnEmitter;
+    if (emitterAt(ctx.objects, command.emitterId) === undefined) return notAnEmitter();
     if (!model.arcsOnEmitter(command.emitterId).includes(command.arcId)) {
       return refuse(geodesicEmittersRefusals.notAttached, "That geodesic is not on this emitter.");
     }
@@ -148,7 +150,7 @@ function createDeleteGeodesic(model: GeodesicModelQueries) {
 
 function createRemove(model: GeodesicModelQueries) {
   return (command: GeodesicEmitterRemoveCommand, ctx: CommandContext): CommandResult => {
-    if (emitterAt(ctx.objects, command.emitterId) === undefined) return notAnEmitter;
+    if (emitterAt(ctx.objects, command.emitterId) === undefined) return notAnEmitter();
     const arcIds = [...new Set(model.arcsOnEmitter(command.emitterId).flatMap((arcId) => (model.isTied(arcId) ? model.curveOfArc(arcId) : [arcId])))];
     const removal: GeodesicRemoveCurveCommand = { kind: "geodesicModel/removeCurve", arcIds };
     ctx.dispatch(removal);
@@ -170,7 +172,7 @@ function createBeginEdit(model: GeodesicModelQueries) {
   return (command: GeodesicEmitterBeginEditCommand, ctx: CommandContext): CommandResult => {
     const participant = ctx.participant(ctx.participantId);
     if (participant === undefined) return refuse("world/unknownParticipant", `There is no participant "${ctx.participantId}".`);
-    if (emitterAt(ctx.objects, command.emitterId) === undefined) return notAnEmitter;
+    if (emitterAt(ctx.objects, command.emitterId) === undefined) return notAnEmitter();
     const held = participantAttachment(participant, geodesicEmitterEditAttachmentKind);
     if (held !== undefined && held.objectId !== command.emitterId) return refuse(geodesicEmittersRefusals.alreadyEdited, "You are already editing an emitter.");
 

@@ -4,7 +4,7 @@
  * `ModuleInstance.publicApi` (design 013 section 9.1) through the default experience's modules, an engine with the write guard on and the shell's world client: which functions exist, that each wrapper submits its command with every check a client's command gets and resolves with the result, as plain data, and that a read runs in a read-only frame.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { AnyModuleDefinition, CommandResult } from "../../src/engine/moduleTypes";
+import { defineModuleToken, type AnyModuleDefinition, type CommandResult, type ModuleToken } from "../../src/engine/moduleTypes";
 import { createSimulationClock } from "../../src/engine/simulationClock";
 import { yawRigidTransform3 } from "../../src/math/rigidTransform3";
 import { geodesicEmittersModule } from "../../src/modules/geodesicEmitters";
@@ -175,6 +175,52 @@ describe("api.geodesicModel and api.curveShortening", () => {
   });
 });
 
+describe("what crosses the boundary", () => {
+  it("keeps a caller's edit of a refusal away from the next caller", async () => {
+    const { answered, emitters, model } = setup();
+    const end = { geodesicId: "g", role: "end", anchorObjectId: "e" } as const;
+    const edit = (result: CommandResult): void => {
+      const mutable = result as { ok: boolean; refusal?: { code: string } };
+      mutable.ok = true;
+      mutable.refusal!.code = "edited";
+    };
+
+    edit(await answered(() => emitters.remove("no-such-emitter")));
+    expect(await answered(() => emitters.remove("no-such-emitter"))).toMatchObject({ ok: false, refusal: { code: "geodesicEmitters/notAnEmitter" } });
+
+    const placed = await answered(() => emitters.place("a", { x: 3, y: 2.5, z: 0 }, 0));
+    const { emitterId } = valueOf<{ emitterId: string }>(placed);
+    edit(await answered(() => emitters.shoot(emitterId, 0, 0)));
+    expect(await answered(() => emitters.shoot(emitterId, 0, 0))).toMatchObject({ ok: false, refusal: { code: "geodesicEmitters/tooShort" } });
+
+    edit(await answered(() => model.tieAndDetach("e", end, { ...end, role: "start" })));
+    expect(await answered(() => model.tieAndDetach("e", end, { ...end, role: "start" }))).toMatchObject({ ok: false, refusal: { code: "geodesicModel/notAnEmitter" } });
+  });
+
+  it("refuses what is not plain data, in the frame of the call, and places nothing", async () => {
+    const { answered, emitters, model, engine } = setup();
+    const withFunction = { x: 3, y: 2.5, z: 0, f: () => 1 };
+    const notPlain = { ok: false, refusal: { code: "world/notPlainData" } };
+
+    expect(await answered(() => emitters.place("a", withFunction, 0))).toMatchObject(notPlain);
+    expect(await answered(() => emitters.place("a", undefined as never, 0))).toMatchObject(notPlain);
+    expect(await answered(() => model.tieAndDetach("e", undefined as never, undefined as never))).toMatchObject(notPlain);
+    expect(engine.read.objects.getObjectsOfKind("geodesicEmitters/emitter")).toEqual([]);
+  });
+
+  it("answers plain data of the wrong shape with a refusal and no frame error", async () => {
+    const { answered, emitters, model } = setup();
+    const end = { geodesicId: "g", role: "end", anchorObjectId: "e" } as const;
+
+    expect(await answered(() => emitters.place("a", null as never, 0))).toMatchObject({ ok: false, refusal: { code: "geodesicEmitters/blocked" } });
+    expect(await answered(() => emitters.place(7 as never, { x: 3, y: 2.5, z: 0 }, 0))).toMatchObject({ ok: false, refusal: { code: "geodesicEmitters/blocked" } });
+    expect(await answered(() => emitters.shoot("e", "0" as never, "5" as never))).toMatchObject({ ok: false, refusal: { code: "geodesicEmitters/notAnEmitter" } });
+    expect(await answered(() => emitters.remove({} as never))).toMatchObject({ ok: false, refusal: { code: "geodesicEmitters/notAnEmitter" } });
+    expect(await answered(() => model.tieAndDetach("e", null as never, end))).toMatchObject({ ok: false, refusal: { code: "geodesicModel/notAttached" } });
+    expect(await answered(() => model.tieAndDetach("e", {} as never, {} as never))).toMatchObject({ ok: false });
+  });
+});
+
 describe("a public function under the write guard", () => {
   it("may not write: it holds reads and wrappers, never a write of its own", () => {
     const writer: AnyModuleDefinition = {
@@ -192,5 +238,34 @@ describe("a public function under the write guard", () => {
     const engine = createTestEngine({ modules: [writer] });
 
     expect(() => (engine.publicApis.get("writer")!.write as () => void)()).toThrow(/write guard: a write of .* during a read-only call of module writer/);
+  });
+
+  it("may not write through a dependency's api either: what a read calls is still that read", () => {
+    const token = defineModuleToken<{ add(): void }>("emitters");
+    const provider: AnyModuleDefinition = {
+      id: "geodesicEmitters",
+      provides: token as ModuleToken<unknown, unknown>,
+      requires: [],
+      objectKinds: [{ kind: "geodesicEmitters/emitter", label: "real", persistence: "saved" }],
+      create: (context) => ({
+        api: { add: () => context.objects.add(createGeodesicEmitterObject({ id: "e", cellId: "a", localPose: yawRigidTransform3(0, { x: 0, y: 0, z: 0 }) })) },
+        queries: {},
+        commands: {},
+        ticks: [],
+      }),
+    };
+    const caller: AnyModuleDefinition = {
+      id: "caller",
+      requires: [token as ModuleToken<unknown, unknown>],
+      objectKinds: [],
+      create: (context) => {
+        const dependency = context.require(token as ModuleToken<{ add(): void }, unknown>);
+        return { api: {}, queries: {}, commands: {}, ticks: [], publicApi: { go: () => dependency.add() } };
+      },
+    };
+    const engine = createTestEngine({ modules: [provider, caller] });
+
+    expect(() => (engine.publicApis.get("caller")!.go as () => void)()).toThrow(/write guard: a write of .* during a read-only call of module caller/);
+    expect(engine.read.objects.get("e")).toBeUndefined();
   });
 });

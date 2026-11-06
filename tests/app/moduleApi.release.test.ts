@@ -2,7 +2,7 @@
  * `tests/app/moduleApi.release.test.ts` — release tier.
  *
  * Emitter scenes in the built app, built through the modules' public functions (`api.geodesicEmitters`, `api.geodesicModel`, `api.curveShortening`, design 013 section 9.1). The flow runs in the app's own frames. What these functions do not offer, the scenario does as a person does: `debug.setPlayerPose` puts the player next to an emitter, the G key picks it up and puts it down, and the W key walks, so the hand that carries is the app's own aim ray and the carry goes through the real tool, slot and tick.
- * Covers: a tie on a torus until the flow is at rest; the world's refusal when the configuration disables the emitters; a carry through a portal; a tied curve around a corner destroyed with its notice; a whole session under the `derived-verify` debug option; and the namespaces' lifetime across a world change.
+ * Covers: a tie on a torus until the flow is at rest; the world's refusal when the configuration disables the emitters; a carry through a portal; a tied curve around a corner destroyed with its notice; a session under the `derived-verify` debug option, which samples the one cache such a session reads; and the namespaces' lifetime across a world change and two overlapping ones.
  * Coordinates: a cube face and the torus are 15 m squares centred on the origin, the `front` face's `x = 7.5` side leads to the `x = -7.5` side of `right`, whose frame is that of `front` moved by 15 m along x. A yaw of `debug.setPlayerPose` is in degrees from +y; a yaw of a command is in radians from +x.
  */
 import { afterEach, describe, expect, it } from "vitest";
@@ -19,7 +19,7 @@ interface GeodesicDump {
     readonly totalSegmentLengthMeters: number;
     readonly segmentCells: readonly string[];
   }[];
-  readonly anchors: readonly { readonly id: string; readonly kind: string; readonly cellId: string }[];
+  readonly anchors: readonly { readonly id: string; readonly kind: string; readonly cellId: string; readonly point: string }[];
 }
 
 type Point = { readonly x: number; readonly y: number };
@@ -55,6 +55,12 @@ async function tieAt(api: ScenarioApi, emitterId: string, arcEndingThere: string
 
 async function untilAtRest(app: ScenarioApp): Promise<void> {
   await app.waitFor(() => app.api.curveShortening.isAtRest() as Promise<boolean>, (atRest) => atRest, { frames: 1500 });
+}
+
+/** Lets `ticks` world steps pass, so that whatever was still on its way has arrived. */
+async function letTheWorldSettle(app: ScenarioApp, ticks: number): Promise<void> {
+  const start = (await app.api.world.stepIndex()) as number;
+  await app.waitFor(() => app.api.world.stepIndex() as Promise<number>, (stepIndex) => stepIndex >= start + ticks);
 }
 
 /** G on the emitter the player looks at: the tool asks the world twice, and the carry has begun when it is selected. */
@@ -94,7 +100,6 @@ describe("emitter scenes through the modules' public functions", () => {
     const tiedAt = await placeEmitter(api, "torus-room", { x: 5, y: -3 });
     const direct = await shootTo(api, kept, { x: 5, y: 2 });
     const aroundTheTorus = await shootTo(api, tiedAt, { x: 10, y: -2 });
-    expect(await api.curveShortening.isAtRest()).toBe(true);
 
     const vertexId = await tieAt(api, tiedAt, direct, aroundTheTorus);
 
@@ -163,59 +168,107 @@ describe("emitter scenes through the modules' public functions", () => {
     const toTop = await shootTo(api, onRight, { x: -0.62, y: 4.72 });
 
     const vertexId = await tieAt(api, onRight, toRight, toTop);
-    expect(await api.curveShortening.isAtRest()).toBe(false);
-    await untilAtRest(app);
 
+    // Born at `onRight`, 3 m from the corner; the frame of each face holds the corner at another point.
+    const corner: Record<string, Point> = { front: { x: 7.5, y: 7.5 }, right: { x: -7.5, y: 7.5 }, top: { x: 7.5, y: -7.5 } };
+    let nearestToCorner = Number.POSITIVE_INFINITY;
+    await app.waitFor(
+      async () => {
+        const vertex = (await dumpOf(api)).anchors.find((anchor) => anchor.id === vertexId);
+        if (vertex !== undefined) {
+          const [x, y] = vertex.point.slice(1, -1).split(",").map(Number) as [number, number];
+          nearestToCorner = Math.min(nearestToCorner, Math.hypot(x - corner[vertex.cellId]!.x, y - corner[vertex.cellId]!.y));
+        }
+        return api.curveShortening.isAtRest() as Promise<boolean>;
+      },
+      (atRest) => atRest,
+      { frames: 1500 },
+    );
+    await letTheWorldSettle(app, 60);
+
+    // It was last seen about 0.16 m from the corner; polled once a frame, so the bound leaves room for a slow frame.
+    expect(nearestToCorner).toBeLessThan(1);
     expect(await api.geodesicModel.arcsOfCurve(vertexId)).toEqual([]);
     const { intervals, anchors } = await dumpOf(api);
     expect(intervals).toEqual([]);
     expect(anchors.map((anchor) => anchor.id).sort()).toEqual([onFront, onRight, onTop].sort());
-    const notices = await app.waitFor(
-      async () => app!.consoleLines().filter((line) => line.startsWith("[noneuclid] The tied geodesic could not shorten any further and was removed")),
-      (lines) => lines.length > 0,
-    );
-    expect(notices).toHaveLength(1);
+    const notices = app.consoleLines().filter((line) => line.includes("could not shorten any further"));
+    expect(notices).toEqual(["[noneuclid] The tied geodesic could not shorten any further and was removed (merge-blocked)."]);
   });
 
-  it("runs carry, shoot, tie and flow with every cache verified: no read differs from compute", async () => {
+  it("samples the arc index through carry, shoot, tie and flow: no read differs from compute", async () => {
     app = await openApp({ world: "torus-moduli", debugLevel: "basic", debugOptions: "derived-verify,module-write-guard" });
     const { api } = app;
-    const verifications = async (): Promise<number> => ((await api.debug.derivedStats()) as { verifies: number }[]).reduce((sum, stats) => sum + stats.verifies, 0);
+    // `derived-verify` compares one read in 64, whichever cache it falls on, and the arc index is the only cache this session reads: the flow reads it in every tick.
+    const verifications = async (): Promise<number> => {
+      const stats = (await api.debug.derivedStats()) as { id: string; verifies: number }[];
+      expect(stats.map((entry) => entry.id)).toEqual(["geodesicModel/arcIndex"]);
+      return stats[0]!.verifies;
+    };
+    /** A command is too few reads for a sample, so this waits for the first one taken with its result in the world. */
+    const untilSampledAfter = async (before: number): Promise<number> => app!.waitFor(verifications, (verifies) => verifies > before);
 
     const carried = await placeEmitter(api, "torus-room", { x: 0, y: -5 });
     const tiedAt = await placeEmitter(api, "torus-room", { x: 5, y: -3 });
     const direct = await shootTo(api, carried, { x: 5, y: 2 });
     const aroundTheTorus = await shootTo(api, tiedAt, { x: 10, y: -2 });
-
     await api.debug.setPlayerPose("torus-room", -1.2, -5, -90, -50);
+    await letTheWorldSettle(app, 1);
+
+    const beforeCarry = await verifications();
     await pickUp(app);
     await walkUntil(app, (dump) => dump.intervals.find((interval) => interval.id === direct)!.totalSegmentLengthMeters < 4.5);
     await putDown(app);
+    const afterCarry = await verifications();
+    expect(afterCarry).toBeGreaterThan(beforeCarry);
 
     await accepted(api.geodesicEmitters.shoot(tiedAt, Math.PI / 2, 2));
+    const afterShoot = await untilSampledAfter(afterCarry);
+
     await tieAt(api, tiedAt, direct, aroundTheTorus);
+    const afterTie = await untilSampledAfter(afterShoot);
+
     await untilAtRest(app);
+    const afterFlow = await verifications();
+    expect(afterFlow).toBeGreaterThan(afterTie);
 
     const { intervals } = await dumpOf(api);
     expect(intervals.filter((interval) => interval.start.anchorObjectId === carried && interval.end.anchorObjectId === carried)).toHaveLength(1);
-    expect(await verifications()).toBeGreaterThan(0);
     expect(app.consoleLines().filter((line) => line.includes("differs from compute"))).toEqual([]);
   });
 
   it("gives a world change its own namespaces and a fresh world", async () => {
     app = await openApp({ world: "cube" });
     const { api } = app;
-    expect(await placeEmitter(api, "front", { x: 1, y: 1 })).toBe("geodesicEmitters/emitter:0");
-    expect(await placeEmitter(api, "front", { x: 2, y: 2 })).toBe("geodesicEmitters/emitter:1");
+    await placeEmitter(api, "front", { x: 1, y: 1 });
 
     await api.app.changeWorld("torus-moduli");
+
+    // The old app is disposed in that call, and the new one takes frames to load.
+    await expect(api.world.stepIndex()).rejects.toThrow(/undefined/);
+    await expect(api.geodesicModel.arcsOfCurve("no-such-vertex")).rejects.toThrow(/undefined/);
+
     await app.waitFor(
       // `api.world` is gone while the new app loads.
       async () => (await api.world.participants().catch(() => [])) as { body: { cellId: string } }[],
       (participants) => participants[0]?.body.cellId === "torus-room",
     );
 
-    expect(await placeEmitter(api, "torus-room", { x: 1, y: 1 })).toBe("geodesicEmitters/emitter:0");
+    expect((await dumpOf(api)).anchors).toEqual([]);
+    await placeEmitter(api, "torus-room", { x: 1, y: 1 });
     expect((await dumpOf(api)).anchors).toHaveLength(1);
+  });
+
+  it("keeps the live app's namespaces through two overlapping world changes", async () => {
+    app = await openApp({ world: "001-basic-cube" });
+    const { api } = app;
+
+    await Promise.all([api.app.changeWorld("dodecahedron"), api.app.changeWorld("002-basic-tetrahedron")]);
+
+    await app.waitFor(() => api.curveShortening.isAtRest().catch(() => false) as Promise<boolean>, (installed) => installed);
+    await letTheWorldSettle(app, 60);
+    expect(await api.app.info()).toMatchObject({ worldId: "002-basic-tetrahedron" });
+    expect(await api.curveShortening.isAtRest()).toBe(true);
+    expect((await dumpOf(api)).anchors).toEqual([]);
   });
 });

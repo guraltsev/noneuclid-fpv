@@ -5,7 +5,7 @@
 
 This reference is produced from the source code. For the *meaning* of the modules — the mathematical model they implement — read [../MATHEMATICAL_MODEL.md](../MATHEMATICAL_MODEL.md) and [../ARCHITECTURE.md](../ARCHITECTURE.md). For every exported symbol see [API_REFERENCE.md](API_REFERENCE.md).
 
-**267 modules, 53,205 lines** under `src/`.
+**267 modules, 53,226 lines** under `src/`.
 
 ## Layers
 
@@ -24,11 +24,11 @@ A module belongs to the layer named by its first path segment under `src/`. "May
 | `glue` | 11 | 1,024 | `math`, `cell-complex`, `diagnostics`, `authoring` | Launch options, debug settings, tool ids, asset URLs, app configuration. |
 | `interaction` | 5 | 1,564 | `math`, `cell-complex`, `movement`, `world-objects`, `glue` | Renderer-free interaction logic: input frames, aim picking, VR locomotion, XR session state, carried-object portal transitions. |
 | `engine` | 10 | 1,662 | `math`, `cell-complex`, `diagnostics`, `movement`, `world-objects`, `glue`, `interaction` | The world engine core (design 013): step order, command queue, participants, module composition and ticks. Imports no module. |
-| `modules` | 19 | 2,080 | `math`, `cell-complex`, `diagnostics`, `movement`, `world-objects`, `glue`, `interaction`, `engine` | World modules (design 013): each owns a slice of world behaviour and exposes a typed api.ts to the others. |
-| `runtime` | 16 | 2,699 | `math`, `cell-complex`, `diagnostics`, `movement`, `world-objects`, `authoring`, `glue`, `engine`, `modules` | Application state, runtime menu state, command dispatch, geometry session/worker, server channel and public API. |
+| `modules` | 19 | 2,087 | `math`, `cell-complex`, `diagnostics`, `movement`, `world-objects`, `glue`, `interaction`, `engine` | World modules (design 013): each owns a slice of world behaviour and exposes a typed api.ts to the others. |
+| `runtime` | 16 | 2,709 | `math`, `cell-complex`, `diagnostics`, `movement`, `world-objects`, `authoring`, `glue`, `engine`, `modules` | Application state, runtime menu state, command dispatch, geometry session/worker, server channel and public API. |
 | `ui` | 6 | 1,270 | `math`, `cell-complex`, `world-objects`, `authoring`, `glue`, `engine`, `modules`, `runtime` | Renderer-neutral palette, help, tooltip and input-intent definitions. |
-| `render` | 117 | 24,693 | every lower layer | Three.js / DOM / WebXR rendering and input adapters (the application shell). |
-| `root` | 1 | 213 | every lower layer | Entry point. |
+| `render` | 117 | 24,696 | every lower layer | Three.js / DOM / WebXR rendering and input adapters (the application shell). |
+| `root` | 1 | 214 | every lower layer | Entry point. |
 
 ## Layer dependency graph
 
@@ -299,20 +299,20 @@ None: every import respects the intended layering.
 | `modules/geodesicEmitters/api.ts` | 145 | The geodesic emitters' public face (design 013 sections 12.1 and 16): the emitter tool's id, the plain-data shapes of the module's commands and their results, and the stable refusal codes. | `engine/moduleTypes`, `math/rigidTransform3`, `world-objects/geodesic/objects` |
 | `modules/geodesicEmitters/client.ts` | 141 | The geodesic emitters' client part (design 013 sections 8.3 and 9.1): the emitter tool, and the requests the emitter's menu page and a click on a geodesic make. | `engine/moduleTypes`, `modules/geodesicEmitters/api`, `modules/geodesicModel/api`, `world-objects/geodesic/objects` |
 | `modules/geodesicEmitters/index.ts` | 6 | The geodesic emitters module's factories (design 013 section 12.1): `geodesicEmittersModule` is the world part, `geodesicEmittersClient` the client part (the emitter tool); the rotate and aim tools are the shell's yaw s… | `modules/geodesicEmitters/client`, `modules/geodesicEmitters/module` |
-| `modules/geodesicEmitters/module.ts` | 322 | The geodesic emitters module (design 013 section 16): an emitter and what a person does to create or remove it and its geodesics, as commands. | `engine/moduleTypes`, `math/rigidTransform3`, `modules/geodesicEmitters/api`, `modules/geodesicModel/api`, `world-objects/geodesic/cannon`, `world-objects/geodesic/objects`, `world-objects/runtimeObjectRegistry` |
+| `modules/geodesicEmitters/module.ts` | 324 | The geodesic emitters module (design 013 section 16): an emitter and what a person does to create or remove it and its geodesics, as commands. | `engine/moduleTypes`, `math/rigidTransform3`, `modules/geodesicEmitters/api`, `modules/geodesicModel/api`, `world-objects/geodesic/cannon`, `world-objects/geodesic/objects`, `world-objects/runtimeObjectRegistry` |
 | `modules/geodesicMeasurements/index.ts` | 5 | The geodesic measurements module's world factory (design 013 section 12.1): the length and angle labels as records derived from the geodesic model. | `modules/geodesicMeasurements/module` |
 | `modules/geodesicMeasurements/module.ts` | 184 | The geodesic measurements module (design 013 section 6.4, design 014 D9): the length labels and protractor angles the player's tools place, kept current by two derive ticks that read the change ring. | `engine/moduleTypes`, `engine/participants`, `modules/geodesicModel/api`, `world-objects/derived`, `world-objects/measureLengthTool`, `world-objects/protractorTool`, `world-objects/runtimeObjectChangeJournal`, `world-objects/runtimeObjectRegistry`, `world-objects/trackedReads` |
 | `modules/geodesicModel/api.ts` | 232 | The geodesic model's public face (design 013 sections 12.1 and 13.1): its token, the read-only queries clients and dependents share, the operations only dependents hold, and the plain-data shapes of its commands and eve… | `engine/moduleTypes`, `world-objects/geodesic/objects`, `world-objects/geodesic/vertices` |
 | `modules/geodesicModel/client.ts` | 13 | The geodesic model's client part (design 013 sections 9.1 and 12.1): the tools the module contributes to the shell. | `engine/moduleTypes`, `modules/geodesicModel/api`, `modules/geodesicModel/tieTool` |
 | `modules/geodesicModel/index.ts` | 6 | The geodesic model module's factories (design 013 section 12.1): `geodesicModelModule` is the world part, `geodesicModelClient` the client part (the tie tool). | `modules/geodesicModel/client`, `modules/geodesicModel/module` |
-| `modules/geodesicModel/module.ts` | 258 | The geodesic model module (design 013 section 13.1): piecewise geodesics on the glued complex as a world module. | `engine/moduleTypes`, `modules/geodesicModel/api`, `world-objects/geodesic/cannon`, `world-objects/geodesic/carryEnd`, `world-objects/geodesic/endpoints`, `world-objects/geodesic/intersections`, `world-objects/geodesic/intervals`, `world-objects/geodesic/lifecycle`, `world-objects/geodesic/segments`, `world-objects/geodesic/vertices` |
+| `modules/geodesicModel/module.ts` | 263 | The geodesic model module (design 013 section 13.1): piecewise geodesics on the glued complex as a world module. | `engine/moduleTypes`, `modules/geodesicModel/api`, `world-objects/geodesic/cannon`, `world-objects/geodesic/carryEnd`, `world-objects/geodesic/endpoints`, `world-objects/geodesic/intersections`, `world-objects/geodesic/intervals`, `world-objects/geodesic/lifecycle`, `world-objects/geodesic/segments`, `world-objects/geodesic/vertices` |
 | `modules/geodesicModel/tieTool.ts` | 114 | The tie tool, the client part of `geodesicModel/tie` (design 013 sections 8.3 and 13.1): started from an emitter's menu page, it takes two endpoint roles of the emitter's geodesics that connect emitters, then asks the w… | `engine/moduleTypes`, `modules/geodesicModel/api` |
 
 ### `runtime`
 
 | Module | Lines | Summary | Imports |
 | --- | ---: | --- | --- |
-| `runtime/apiCall.ts` | 129 | Dispatch for the public API object (`window.noneuclid.api`): a call is a path of names through nested plain objects of functions, plus arguments, and its result is converted to plain JSON-safe data. | — |
+| `runtime/apiCall.ts` | 139 | Dispatch for the public API object (`window.noneuclid.api`): a call is a path of names through nested plain objects of functions, plus arguments, and its result is converted to plain JSON-safe data. | — |
 | `runtime/applyRuntimeCommand.ts` | 319 | The one command path: applyRuntimeCommand(session, command) changes the session through a pure reducer and returns the effects the host must run. | `glue/appConfig`, `glue/debugOptions`, `glue/debugSettings`, `glue/toolIds`, `runtime/clientSession`, `runtime/runtimeCommands`, `runtime/runtimeMenuState` |
 | `runtime/appState.ts` | 42 | Defines AppState, the initial immutable bundle of compiled world, player body and player pose that main.ts hands to the renderer, and the factory that builds it. | `cell-complex/compileCellComplex`, `movement/playerBody`, `movement/playerPose` |
 | `runtime/clientSession.ts` | 76 | The client session: the one record that holds how one person is interacting with a running world (menu, selected tool, tool picks, debug and comfort settings), and the cell that owns it. | `glue/appConfig`, `glue/debugSettings`, `glue/toolIds`, `glue/vrComfortOptions`, `runtime/runtimeMenuState`, `world-objects/geodesic/cannonToolState`, `world-objects/protractorTool` |
@@ -448,7 +448,7 @@ None: every import respects the intended layering.
 | `render/three/vrPaletteHeaderActions.ts` | 56 | Maps the palette definition's header actions onto the layout used by the in-scene (XR and desktop) palette header. | `ui/paletteDefinition` |
 | `render/three/vrPalettePlacement.ts` | 132 | Placement math for the XR palette: where the panel floats relative to the head and how it faces the viewer. | — |
 | `render/three/worldAxes.ts` | 91 | Conversion between the simulation's world frame and the Three.js scene frame. | `math/rigidTransform3`, `math/vec3` |
-| `render/three/worldClient.ts` | 130 | The shell's side of its conversation with the world engine (design 013 sections 5.3, 5.5 and 8.1): the tool-switch protocol (also for tools started from an object's menu page), the generic event sink and the `api.world`… | `engine/moduleTypes`, `engine/worldEngine`, `glue/toolIds`, `runtime/apiCall`, `runtime/clientSession`, `runtime/runtimeCommands` |
+| `render/three/worldClient.ts` | 133 | The shell's side of its conversation with the world engine (design 013 sections 5.3, 5.5 and 8.1): the tool-switch protocol (also for tools started from an object's menu page), the generic event sink and the `api.world`… | `engine/moduleTypes`, `engine/worldEngine`, `glue/toolIds`, `runtime/apiCall`, `runtime/clientSession`, `runtime/runtimeCommands` |
 | `render/three/worldResultBadge.ts` | 168 | Floating text badge ("pill" with an optional downward pointer) used as an in-world result label, for example for measured lengths and protractor angles. | `render/three/canvasDrawing` |
 | `render/three/xrControllerHandModels.ts` | 637 | Cosmetic low-poly hand models that follow XR controllers (or tracked hands), plus a small icon sprite near the right wrist showing the selected tool. | `engine/moduleTypes`, `glue/assetUrls`, `render/three/xrPlayerRig`, `world-objects/toolObjects` |
 | `render/three/xrControls.ts` | 242 | WebXR gamepad input -> `RuntimeInputFrame` (the XR input path for locomotion and actions). | `interaction/inputFrame`, `interaction/vrLocomotion`, `math/vec3`, `render/three/vrComfort` |
@@ -466,7 +466,7 @@ None: every import respects the intended layering.
 
 | Module | Lines | Summary | Imports |
 | --- | ---: | --- | --- |
-| `main.ts` | 213 | Browser entry point: reads launch options from the URL (then strips them from the visible address), loads the app config, and runs the load pipeline world spec -> compileCellComplex -> asset preload -> createThreeApp. | `authoring/worldCatalog`, `cell-complex/compileCellComplex`, `cell-complex/describeGeometry`, `diagnostics/runtimeDiagnostics`, `glue/appConfig`, `glue/debugOptions`, `glue/debugSettings`, `glue/launchOptionsUrl`, `glue/loadingStatus`, `glue/readLaunchOptions`, `render/three/createThreeApp`, `render/three/preloadWorldAssets`, `render/three/preparedWorldAssets`, `runtime/appState`, `runtime/publicApi`, `runtime/serverChannel` |
+| `main.ts` | 214 | Browser entry point: reads launch options from the URL (then strips them from the visible address), loads the app config, and runs the load pipeline world spec -> compileCellComplex -> asset preload -> createThreeApp. | `authoring/worldCatalog`, `cell-complex/compileCellComplex`, `cell-complex/describeGeometry`, `diagnostics/runtimeDiagnostics`, `glue/appConfig`, `glue/debugOptions`, `glue/debugSettings`, `glue/launchOptionsUrl`, `glue/loadingStatus`, `glue/readLaunchOptions`, `render/three/createThreeApp`, `render/three/preloadWorldAssets`, `render/three/preparedWorldAssets`, `runtime/appState`, `runtime/publicApi`, `runtime/serverChannel` |
 
 ## Reachability
 

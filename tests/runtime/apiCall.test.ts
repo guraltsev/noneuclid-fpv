@@ -9,7 +9,7 @@
  * plain-data conversion of maps, typed arrays, sets, errors, functions and cycles, and listing sorted nested names.
  */
 import { describe, expect, it } from "vitest";
-import { callApi, listApi, toPlainData } from "../../src/runtime/apiCall";
+import { callApi, isPlainData, listApi, toPlainData } from "../../src/runtime/apiCall";
 
 describe("callApi", () => {
   const api = {
@@ -62,6 +62,19 @@ describe("listApi", () => {
     const list = listApi(api);
     expect(Object.keys(list)).toEqual(["a", "b"]);
     expect(list).toEqual({ a: ["f"], b: ["a", "z"] });
+  });
+});
+
+describe("isPlainData", () => {
+  it("accepts JSON-safe data, also a value met twice, and nothing else", () => {
+    const shared = { x: 1 };
+    expect(isPlainData({ kind: "a/b", list: [1, "two", true, null], first: shared, second: shared })).toBe(true);
+
+    const cycle: Record<string, unknown> = {};
+    cycle.self = cycle;
+    for (const value of [undefined, () => 1, new Date(0), new Map(), { nested: [undefined] }, cycle]) {
+      expect(isPlainData(value)).toBe(false);
+    }
   });
 });
 

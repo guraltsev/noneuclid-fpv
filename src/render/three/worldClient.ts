@@ -6,7 +6,7 @@
 import type { RuntimeToolId } from "../../glue/toolIds";
 import { localParticipantId, type WorldEngine } from "../../engine/worldEngine";
 import type { CommandResult, EngineCommandBase, EngineEventBase, WorldRequestToolCommand } from "../../engine/moduleTypes";
-import type { ApiObject } from "../../runtime/apiCall";
+import { isPlainData, type ApiObject } from "../../runtime/apiCall";
 import type { ClientSession } from "../../runtime/clientSession";
 import type { RuntimeCommand } from "../../runtime/runtimeCommands";
 
@@ -29,9 +29,9 @@ export interface WorldClientDeps {
 export interface WorldClient {
   /** Asks the world whether the local player may switch to `toolId`; the switch happens in `afterStep` on acceptance. `objectId` is the object the tool is started from, handed to `toolStarted`. */
   requestTool(toolId: RuntimeToolId, objectId?: string): void;
-  /** Call once per frame, after the frame's last tick, also in a frame with no tick: settles the pending tool request, runs the event sink and answers waiting API callers. */
+  /** Call once per frame, after the frame's last tick, also in a frame with no tick: answers waiting API callers, settles the pending tool request and runs the event sink. */
   afterStep(): void;
-  /** Submits a command for the local player; resolves with its result after the next step. This is what `api.world.submit` and the wrappers of a module's `publicApi` call. */
+  /** Submits a command for the local player; resolves with its result after the next step, or at once with `world/notPlainData` when it is not plain data. This is what `api.world.submit` and the wrappers of a module's `publicApi` call. */
   submit(command: EngineCommandBase): Promise<CommandResult>;
   /** The `world` namespace of the public API: `submit(command)`, `participants()` and `stepIndex()`. */
   readonly api: ApiObject;
@@ -39,8 +39,10 @@ export interface WorldClient {
   dispose(): void;
 }
 
-const closed: CommandResult = { ok: false, refusal: { code: "world/disposed", message: "The world was closed." } };
-const noAnswer: CommandResult = { ok: false, refusal: { code: "world/noAnswer", message: "The world ran no step in time (a hidden page draws no frames), so the command was taken back." } };
+// Functions, not constants: a result reaches an in-page caller by reference, and an edit there must not reach the next caller.
+const closed = (): CommandResult => ({ ok: false, refusal: { code: "world/disposed", message: "The world was closed." } });
+const noAnswer = (): CommandResult => ({ ok: false, refusal: { code: "world/noAnswer", message: "The world ran no step in time (a hidden page draws no frames), so the command was taken back." } });
+const notPlainData = (): CommandResult => ({ ok: false, refusal: { code: "world/notPlainData", message: "A command holds plain data only." } });
 
 /** Creates the world client over the shell's engine, session and command path. */
 export function createWorldClient(deps: WorldClientDeps): WorldClient {
@@ -81,12 +83,13 @@ export function createWorldClient(deps: WorldClientDeps): WorldClient {
   }
 
   function submit(command: EngineCommandBase): Promise<CommandResult> {
-    if (disposed) return Promise.resolve(closed);
+    if (disposed) return Promise.resolve(closed());
+    if (!isPlainData(command)) return Promise.resolve(notPlainData());
     const ticket = engine.submit(localParticipantId, command);
     return new Promise((resolve) => {
       const deadline = setTimeout(() => {
         engine.withdraw(ticket);
-        answer(waiters.findIndex((waiter) => waiter.ticket === ticket), noAnswer);
+        answer(waiters.findIndex((waiter) => waiter.ticket === ticket), noAnswer());
       }, commandAnswerDeadlineMs);
       waiters.push({ ticket, deadline, resolve });
     });
@@ -123,7 +126,7 @@ export function createWorldClient(deps: WorldClientDeps): WorldClient {
     },
     dispose() {
       disposed = true;
-      while (waiters.length > 0) answer(0, closed);
+      while (waiters.length > 0) answer(0, closed());
     },
   };
 }

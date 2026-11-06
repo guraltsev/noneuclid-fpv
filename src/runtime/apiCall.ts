@@ -17,6 +17,16 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return proto === Object.prototype || proto === null;
 }
 
+/** True for JSON-safe data only: `null`, booleans, numbers, strings, and arrays and plain objects of these. A function, `undefined`, a class instance or a cycle is not. */
+export function isPlainData(value: unknown, ancestors: Set<object> = new Set()): boolean {
+  if (value === null || typeof value === "boolean" || typeof value === "number" || typeof value === "string") return true;
+  if (typeof value !== "object" || ancestors.has(value) || !(Array.isArray(value) || isPlainObject(value))) return false;
+  ancestors.add(value);
+  const plain = Object.values(value).every((entry) => isPlainData(entry, ancestors));
+  ancestors.delete(value);
+  return plain;
+}
+
 /**
  * Walks `path` through own properties of plain objects starting at `api`, calls the function found there with `args`, awaits it and returns its result as plain data.
  * Throws `Error("no such API function: a.b")` for an unknown segment, a forbidden segment (`__proto__`, `prototype`, `constructor`) or a non-function at the end.

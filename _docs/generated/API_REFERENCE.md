@@ -1792,6 +1792,7 @@ Dispatch for the public API object (`window.noneuclid.api`): a call is a path of
 | Kind | Name | Summary |
 | --- | --- | --- |
 | type | `ApiObject` | A nested object whose leaves are functions (namespaces of the API). |
+| function | `isPlainData` | True for JSON-safe data only: `null`, booleans, numbers, strings, and arrays and plain objects of these. |
 | function | `callApi` | Walks `path` through own properties of plain objects starting at `api`, calls the function found there with `args`, awaits it and returns its result as plain data. |
 | function | `listApi` | Returns the names of the API's functions as `{ namespace: [function names] }` (nested objects use dotted namespace names), sorted. |
 | function | `toPlainData` | Converts a value to JSON-safe plain data: a `Map` with all-string keys becomes an object, any other `Map` an array of `[key, value]`; a `Set` and typed arrays become arrays; an `Error` becomes `{ name, message }`; funct… |

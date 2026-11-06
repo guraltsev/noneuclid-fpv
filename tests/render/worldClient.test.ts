@@ -131,6 +131,16 @@ describe("a caller who waits for an answer", () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
+  it("gets a refusal of its own, whatever an earlier caller did to theirs", async () => {
+    const { client } = setup();
+    client.dispose();
+
+    const first = (await client.submit(submitted)) as { refusal: { code: string } };
+    first.refusal.code = "edited";
+
+    expect(await client.submit(submitted)).toMatchObject({ refusal: { code: "world/disposed" } });
+  });
+
   it("is told the world ran no step, and the command is taken back and never runs", async () => {
     let runs = 0;
     const counting: AnyModuleDefinition = {

@@ -10,7 +10,7 @@ export interface ModuleFrames {
   pop(): void;
   /** The module acting now, or undefined outside any module (client code, `create`). */
   activeModuleId(): string | undefined;
-  /** Throws unless the active frame may write `kind`. */
+  /** Throws unless the active frame may write `kind`, or when a read-only frame is anywhere below it: what a read calls is still that read. */
   assertMayWrite(kind: string): void;
 }
 
@@ -31,10 +31,10 @@ export function createModuleFrames(): ModuleFrames {
     activeModuleId: () => (size === 0 ? undefined : moduleIds[size - 1]),
     assertMayWrite(kind) {
       if (size === 0) return;
-      const writable = kinds[size - 1]!;
-      if (writable === null) {
-        throw new Error(`write guard: a write of "${kind}" during a read-only call of module ${moduleIds[size - 1]}`);
+      for (let frame = size - 1; frame >= 0; frame -= 1) {
+        if (kinds[frame] === null) throw new Error(`write guard: a write of "${kind}" during a read-only call of module ${moduleIds[frame]}`);
       }
+      const writable = kinds[size - 1]!;
       if (!writable.has(kind)) {
         throw new Error(`write guard: module ${moduleIds[size - 1]} wrote "${kind}", which it does not declare`);
       }
