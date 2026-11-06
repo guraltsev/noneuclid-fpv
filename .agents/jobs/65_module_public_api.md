@@ -111,3 +111,51 @@ Final, on the code of `bafc3c4`:
 - `npm run bench -- moduleStep --check`: **exit 3 on both runs** (first right after the release tier), timing only: flow 21.56 and 21.58, flow+dependents 40.79 and 40.20, many arcs 1882.23 and 1665.84, tracked 2126.77 and 1840.72, plain 2140.11 and 2025.48 us/step; idle allocation 0.4 bytes/step. No counter rose: writes 1557, 1797, 126897. `moduleStep.json` and `moduleStepCounters.json` are unchanged.
 - `npm run bench:ab -- 58406eb`: exit 0, "ok". Medians: base flow 22.13, flow+dependents 36.81; head 19.02, 35.10 us/step. The bench file is the same on both sides.
 - `npm run docs:writers`: 7 files, 19 direct write calls, 7 mutator uses, unchanged. `publicApi` adds no client write.
+
+### Repair round
+
+After a fresh review, on top of `95248d8`: commit `9181a41`. It supersedes what is said above where they differ.
+
+**Corrections to the Report above.**
+- "With the write guard on, a public function runs in a read-only frame, so a write of its own throws" was false in general. It now holds for everything called synchronously (item 6); a write after an `await` is still not caught.
+- "`main.ts` disposes the old app before it creates the new one, so an old dispose cannot delete a new namespace" was false for overlapping restarts (item 9). Now fixed.
+- "every cache verified" was false: see item 1. The evidence for issue 86 is weaker than the Report said.
+- The carry scenario's rule question is under Uncertain below; `_docs/tests.md` no longer says it is allowed.
+- Under Deviations and Checks: `tests/app/moduleApi.release.test.ts` now has 7 scenarios.
+
+**What was reproduced first** (the reviewer's `rev65/r.test.ts`, run at `95248d8`): the write through a dependency's `api` and the write after an `await`, both with no throw; a caller's edit reaching the next `remove` and `shoot` (`{"ok":true,"refusal":{"code":"hacked",...}}`) and the next `world/disposed`; `place` with a function in `point` accepted; `tieAndDetach("e", undefined, undefined)` and `place("a", undefined, 0)` giving `world/internalError` and a frame error; 5 verifies in 326 reads, 0 at the moment of the tie, engine only. Items 1 to 4 are facts of the test's text, seen by reading.
+
+**Item 9 reproduced in the built app, more strongly than the review read it.** `Promise.all([changeWorld(a), changeWorld(b)])`, three pairs of worlds: on `95248d8` no pair ever showed `api.world`, `debug` or a module namespace again, two through all 400 polls and the third until its probe timed out; with the fix they arrive in each pair, at poll 49 in the one I looked at. So this did not need a slow older run: two quick world changes were enough to lose the API. The fix is in the shell, and small: `main.ts` checks the run inside the task that calls `createThreeApp`, which is synchronous, so a superseded run creates no app and installs nothing. It covers every namespace, not only the modules'. Test: the new scenario "keeps the live app's namespaces through two overlapping world changes". `main.ts` has no unit seam (it runs on import). This scenario restarts twice in one page, which issue 83 warns about.
+
+**Fixes.**
+1. **`derived-verify`, renamed** "samples the arc index through carry, shoot, tie and flow: no read differs from compute". It reads `verifies` at each phase boundary, and asserts `geodesicModel/arcIndex` is the only cache read in the session. Carry and flow are asserted to rise during the phase. A single `shoot` or tie is too few reads for a sample of 1 in 64 (a first version saw +0 for the shoot and +1 for the tie), so for those the scenario waits for the first sample taken with the command's result in the world: that sample is a later read in the ticks after it (by reading, `isAtRest` of the flow's `isIdle`), not a read inside the command.
+   Counts from one run of the same code, with a temporary print that is not in the commit: before the carry 3; after the carry 11 (+8); after the shoot 12 (+1); after the tie 13 (+1); after the flow 28 (+15). In all, 1798 reads, 11 computes, 28 verifies.
+   **A check right after a recompute counts in `verifies` and cannot find a stale cache:** it compares two computes of the same state. At most 11 of the 28 can be that kind (one per compute), so at least 17 compared a kept value. The scenario cannot tell them apart phase by phase, so a phase's +1 may be one of those.
+   **This weakens the evidence for issue 86.** It shows one cache, about 1.6% of its reads, at least 17 real comparisons, no mismatch, in a real session with carry, shoot, tie and merge. It does not show every cache or every read; `derived.ts`'s oracle fuzz test remains the main evidence. The issue's text asks for "no 'differs from compute' error" in that session, and that holds as a sample. Whether that is enough to close it is the coordinator's call.
+2. **Corner.** The notice is compared whole, with `(merge-blocked)`, after 60 more ticks, so "exactly one" means that. The vertex is polled each frame and must have come within 1 m of the corner, from 3 m; it was last seen 0.16 m away in both measured runs.
+3. **World change.** Right after `changeWorld`, `api.world` and `api.geodesicModel` must be missing. After the load, `anchors` is empty: the old world's emitter is gone.
+4. The `isAtRest` before the tie is dropped: 0 equals 0 proves nothing.
+5. **`_docs/tests.md`:** the paragraph on driving what the API lacks as a person does, and the sentence on serial ids, are reverted. The scenario no longer asserts an id: a fresh engine is shown by an empty `anchors` in the new world, then one emitter after one `place`, where the old world held one.
+6. **Write guard.** `assertMayWrite` refuses when a read-only frame is anywhere on the stack, tested with a public function calling a dependency's `api`. This also covers `queries` frames, by the same code. The full suite with the guard on passes.
+7. **Shared results.** `notAnEmitter`, `tooShort`, `closed`, `noAnswer` are functions that answer a fresh object; a tie's refusal is copied. Tested for `remove`, `shoot`, the tie and `world/disposed`. `noAnswer` is the same code, not separately tested.
+8. **Plain data.** `worldClient.submit` refuses what is not plain data with `world/notPlainData` (`isPlainData` in `apiCall.ts`: a function, `undefined`, a class instance, a cycle), for wrappers and `api.world.submit` alike. A `null` `point` is refused with `blocked` and a `null` end of a tie with `notAttached`, since JSON turns `undefined` into `null`. Non-string ids reach refusals already. Tested, with no frame error. `isPlainData` walks the command, once per script call, never for a tool's command.
+10. The comment at `worldClient.ts` gives the new order.
+
+Tests in this round: unit `modulePublicApi.test.ts` +4, `worldClient.test.ts` +1, `apiCall.test.ts` +1; release +1. No existing assertion was weakened: the changes to `moduleApi.release.test.ts` are those listed above.
+
+**Uncertain, added.**
+- **For the maintainer: may the carry scenarios stay?** They use DevTools keys and `debug.setPlayerPose`. That conflicts with `_docs/tests.md` 6.1 as written ("only the public API", "written against the API, not the transport") and with 6.3, and they would not run on a headset. `consoleLines()` reads the console, which 6.1 does not list either; the corner notice depends on it, and on a console line being the only way a notice surfaces. Two scenarios depend on the keys: the portal carry, and the carry phase of the `derived-verify` session. If they must go, the checks of jobs 50 and 59 return to manual, or wait for job 45's `carry.*` and `player.*`.
+- **Serial ids:** `worldEngine.release.test.ts` asserts the form of an id with a pattern (job 63's); 8.5 says scenarios must not assert ids. Not changed.
+- **A public function that writes after an `await` cannot be caught by a stack of frames:** the frame pops when the function returns its promise. Proven by the probe; no shipped wrapper does it. The same holds for a `queries` function. Only review catches it.
+- **Read only by tests or scripts:** `DerivedStats.verifies` (read by `debug.derivedStats`, in scenarios only), and `commandAnswerDeadlineMs`'s export (read by a test; the module uses the constant itself). `tests.md` 6.3's third bullet says a query that exists only behind a debug option is not public enough for a scenario: `debug.derivedStats` is in every build, but `verifies` stays 0 unless `derived-verify` is on, so its meaning is behind the option. The throw "no client takes public commands" in `worldEngine.ts` is reached only by an engine without a client, in tests and the bench's engines, which call no wrapper.
+- **`api.world.participants()` returns live records,** by reference, to an in-page caller. Pre-existing; `callApi` copies for remote callers. Not changed.
+- **`api.world.submit` with plain data of the wrong shape** for commands with no wrapper (`geodesicModel/highlightEndpoint` with no `selection`, for instance) can still reach a handler's throw. Handlers throwing on bad shapes is the design's "a bug"; only the commands of the public functions were checked.
+- `isPlainData` refuses `undefined` in a field: `api.world.submit({ kind, arcId: undefined })` from an in-page script is now refused, though the same over JSON is not. No tool goes through this path.
+
+**Not done:** the bench, as asked. **Checks of this round,** on `9181a41`:
+- `npx tsc --noEmit`: exit 0, also before the commit.
+- `npm test`: exit 0, 178 files, 1650 tests.
+- `npm run docs:check`: exit 0, after `npm run docs:generate`.
+- `npm run build`, smoke on cube and torus-moduli: exit 0, SMOKE OK (2 pages), with the change to `main.ts`, one test file edit before the commit.
+- `npm run docs:writers`: 7 files, 19 direct write calls, 7 mutator uses.
+- **Release tier twice in a row** (`npm run test:release`, each with its build): run 1 exit 0, 8 files, 24 tests; run 2 exit 0, 8 files, 24 tests. No failure, no retry; issue 83 did not show, the new double restart included.
