@@ -17,6 +17,17 @@ Segment-versus-plane intersection.
 | interface | `IntersectionResult` | Generic hit/miss result with an optional hit distance in meters (only meaningful when `hit` is true). |
 | function | `intersectSegmentWithPlane` | Intersects the segment start->end with a plane, returning the hit point and its parameter t in [0, 1] when the segment crosses it. |
 
+### `math/latticeReduction.ts`
+
+Lagrange-Gauss reduction of a plane lattice basis and the lattice's covering radius.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `LatticeVector` | A vector of the plane. |
+| interface | `ReducedLatticeBasis` | A reduced basis of a plane lattice. |
+| function | `reduceLatticeBasis` | Reduces the basis (u, v), which must be linearly independent. |
+| function | `latticeCoveringRadius` | Distance from the farthest point of the plane to the nearest lattice point, for a reduced basis: the circumradius of its non-obtuse triangle. |
+
 ### `math/planes.ts`
 
 Oriented planes in 3D and point-versus-plane classification.
@@ -142,6 +153,19 @@ Derives the rigid gluing map of every portal from the geometry of the two sides 
 | --- | --- | --- |
 | function | `compilePortalTransforms` | Compiles every portal of every cell, returning for each cell id its CompiledPortal list in authored order. |
 
+### `cell-complex/deformations/torusModuli.ts`
+
+The modulus of a flat torus, for the geometry computer's readout.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| type | `TorusShape` | Named shape of a flat torus. |
+| interface | `TorusModulus` | The modulus of a flat torus folded to the fundamental domain, ignoring orientation: 0 <= re <= 1/2, re^2 + im^2 >= 1. |
+| interface | `TorusLatticeParameters` | The (a, b) parameters of a torus of width w. |
+| function | `reducedTorusModulus` | Reduces tau = (a + ib)/w. |
+| function | `torusShape` | Names the shape of a reduced modulus. |
+| function | `describeTorusRelation` | One line for the geometry computer: how a torus relates to the torus the world started with. |
+
 ### `cell-complex/deformations/torusSkewDeformation.ts`
 
 Deformation family for the one-cell torus world: the cell "torus-room" is a prism whose footprint is a parallelogram with edge vectors u = (w, 0) and v = (a, b), and opposite sides glued by translation (side-0 with side-2, side-1 with side-3).
@@ -152,7 +176,7 @@ Deformation family for the one-cell torus world: the cell "torus-room" is a pris
 | function | `createTorusSkewDeformationFamily` | Creates the "torus-skew" WorldDeformationFamily; applyToSpec rebuilds the parallelogram footprint and carries startingPosition and cell objects from the inferred base state to the requested one. |
 | function | `buildTorusParallelogramVertices` | Returns the four footprint vertices (counter-clockwise, centered at the origin) of the parallelogram spanned by u = (w, 0) and v = (a, b). |
 | function | `createTorusSkewCellDeformationMaps` | Builds the single-entry map {torus-room} that preserves lattice coordinates between the previous and next parallelogram frames and leaves z unchanged. |
-| function | `nextTorusSkewStep` | Moves (widthMeters, skewXMeters, depthMeters) together from current toward target along a straight segment by at most maxStepMeters in the Euclidean metric, snapping to the target when the remaining distance is within m… |
+| function | `nextTorusSkewStep` | Moves (widthMeters, skewXMeters, depthMeters) together from current toward target along a straight segment by at most 2 b maxTeichmullerStep meters in the Euclidean metric (a Teichmuller length of maxTeichmullerStep), s… |
 | function | `validateTorusSkewBaseSpec` | Returns errors unless the spec has exactly one cell, "torus-room", with 4 base vertices, positive finite height, portals side-0..side-3 on sides 0..3 paired 0<->2 and 1<->3 to itself, and a footprint that is the centred… |
 | function | `inferTorusSkewState` | Reads (w, a, b) from a base spec's torus-room footprint as w = \|v1 - v0\| and (a, b) = v3 - v0; throws if the cell is missing or the values are out of range. |
 
@@ -190,6 +214,10 @@ Floor texture coordinates.
 | interface | `FloorLatticeUvFrame` | A lattice frame for floor UVs: p = origin + alpha*u + beta*v (cell-local meters) and the tile counts per lattice vector. |
 | function | `floorLatticeUv` | UV (tilesAlongU*alpha, tilesAlongV*beta) of a cell-local floor point. |
 | function | `floorMetricUv` | UV (x/T, y/T) of a cell-local floor point, so one texture tile is T meters; T <= 0 or non-finite is treated as 1. |
+| interface | `FloorPatchField` | Plain numbers that describe the rigid floor patches of one state; JSON-safe, because it travels in `material.userData`. |
+| interface | `FloorPatchSample` | One patch that contributes to a floor point: its UV there and its normalized weight. |
+| function | `floorPatchField` | Builds the patch field of a frame; see the module header. |
+| function | `floorPatchSamples` | The patches that paint a floor point, with weights summing to 1. |
 | function | `floorTilesAlong` | Whole number of tiles, at least 1, that best fits a length: max(1, round(length / T)); T <= 0 gives 1. |
 
 ### `cell-complex/forbiddenZones.ts`
@@ -363,6 +391,7 @@ Family-independent vocabulary and helpers for live deformation of a cell complex
 | interface | `TorusSkewDeformationState` | Parameters (meters) of the torus-room parallelogram: horizontal edge w, skew a and depth b. |
 | interface | `StaticWorldDeformationState` | Deformation state of a world that is never deformed. |
 | type | `WorldDeformationState` | Union of all deformation parameter records, discriminated by kind; extend it when adding a family. |
+| const | `defaultMaxTeichmullerStep` | Default step: today's worst case (0.04 m at b = 7.5 m), so no commit distorts more than before and no sweep is slower. |
 | interface | `DynamicGeometryStepOptions` | Step-size limits for moving a deformation state toward its target one rebuild at a time. |
 | interface | `CellDeformationMap` | Spatial map between a cell's previous and next local frames (cell-local meters), used to carry points and headings across a geometry commit. |
 | interface | `WorldDeformationFamily` | Strategy object defining one family of deformations of a cell-complex spec, parameterized by its state type. |
@@ -2474,6 +2503,14 @@ Desktop placement of the in-scene palette: a panel floating 1.05 m in front of t
 | Kind | Name | Summary |
 | --- | --- | --- |
 | function | `resolveDesktopScenePalettePlacement` | Computes the palette pose for the desktop (non-XR) camera: 1.05 m along the camera's view direction, oriented to look back at the camera with the camera's up vector. |
+
+### `render/three/floorPatchMaterial.ts`
+
+Rigid floor patches for a textured floor material.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| function | `patchFloorPatchMaterial` | Installs the rigid floor patches on a material whose `userData.floorPatchField` is set, and leaves any other material alone. |
 
 ### `render/three/frameDiagnostics.ts`
 

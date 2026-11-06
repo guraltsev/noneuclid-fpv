@@ -214,7 +214,7 @@ tracked, not asserted as a pass/fail threshold here — `_docs/tests.md` §4.7).
 at the authored models (trees, benches, and similar).
 
 **Judge:** Floor textures and models look visually correct: no stretching or sliding beyond what the deformation
-itself causes, no missing-asset placeholders, acceptable quality on the Quest.
+itself causes, no missing-asset placeholders, acceptable quality on the Quest. In `torus-moduli`, at A = 15 the floor is the rest floor; at every other setting pebbles keep their shape, and blend bands are narrow and show no seam at the room's edges.
 
 **Failure:** Visible texture smearing or misalignment, a missing-asset placeholder, an obviously wrong model scale
 or orientation.

@@ -1,5 +1,7 @@
 # 81 - Floor texture slides under objects during deformation; tile size depends on cell span
 
+Note (2026-11-06): Issue 95 replaced whole-floor lattice UVs by rigid patches: the floor is now carried at patch level, not at every point.
+
 Status: closed on 2026-10-29. Fix landed in job 10 (235ec96); the maintainer checked the floor texture in the browser and confirmed it looks right.
 
 Priority: P1 (correctness, visible in `torus-moduli`). Related: issue 53 (pose transport), issue 82 (commit cost; this

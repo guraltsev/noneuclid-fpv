@@ -474,11 +474,7 @@ Because $A$ maps the lattice to the lattice, a body walking along a closed geode
 still walks along one of class $(p,q)$ after the commit. Emitter yaws are direction angles
 ($(\cos\psi,\sin\psi)$) and are carried as directions (`src/render/three/runtimeSceneUtils.ts#transformYawWithMap`).
 
-**Floor texture.** In the torus family the floor UV of a point with lattice coordinates $(\alpha,\beta)$ is
-$(n_U\alpha,\,n_V\beta)$, where $n_U=\max(1,\operatorname{round}(|u_0|/T))$ and $n_V$ likewise for $v_0$ are whole numbers
-fixed from the base state ($T$ is the material's `tileSizeMeters`). So the floor moves with the objects, which keep their
-$(\alpha,\beta)$, and a portal crossing adds an integer to the UV, so the repeating texture is seamless at every deformation
-(`src/cell-complex/floorUv.ts#floorLatticeUv`). Other worlds use metric UVs $(x/T,\,y/T)$, so one tile is $T$ meters
+**Floor texture.** The torus floor is painted by rigid patches anchored on the tile lattice. With $n_U=\max(1,\operatorname{round}(|u_0|/T))$ and $n_V$ likewise for $v_0$ fixed from the base state ($T$ is the material's `tileSizeMeters`), the anchors are $A(i,j)=o+i\,u/n_U+j\,v/n_V$, so every anchor has an integer UV. A patch at $A$ paints the point $p$ with UV $G(p-A)$, where $G$ is the constant map from meters to UV of the base state, so pebbles keep their shape at every deformation. Near $p$ the patches within radius $R=1.25\,r$ ($r$ the covering radius of the anchor lattice) are blended with weights $w_A=\max(k_A-0.02\,k_{\max},0)$, $k_A=\max(1-|p-A|^2/R^2,0)^{16}$, normalized to sum 1. The blend is seamless across $u$ and $v$ because the anchor lattice is invariant under them, and it equals the rest floor whenever the lattice equals the rest lattice, in particular after a Dehn twist ($a\mapsto a+w$). The floor is carried at patch level only: it is not carried at every point, so it may slide under objects between patches (`src/cell-complex/floorUv.ts#floorPatchSamples`, which the shader in `src/render/three/floorPatchMaterial.ts` transcribes). Steps of the geometry session have a fixed Teichmuller length $ds=|d\tau|/(2\operatorname{Im}\tau)$, `defaultMaxTeichmullerStep`$=1/375$, which bounds the dilatation of a commit's map by about $e^{2\,ds}$. Other worlds use metric UVs $(x/T,\,y/T)$, so one tile is $T$ meters
 (`src/cell-complex/floorUv.ts#floorMetricUv`).
 
 `src/runtime/worldGeometrySession.ts#createWorldGeometrySession` keeps the committed *current* state, the *target*, at most

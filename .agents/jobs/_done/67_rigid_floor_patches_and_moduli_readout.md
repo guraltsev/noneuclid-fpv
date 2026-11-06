@@ -1,7 +1,7 @@
 # Job 67 - Rigid floor patches, Teichmuller steps and a moduli readout for the torus
 
-Status: queued.
-Resolves: issue [95](../../_issues/95_torus_moduli_floor_shears_and_the_deformation_does_not_read_as_moduli_space.md) (parts 1 to 3; part 4 stays with [job 35](35_torus_family_as_teichmuller_space.md)).
+Status: done, needs review on 2026-11-06.
+Resolves: issue [95](../../../_issues/95_torus_moduli_floor_shears_and_the_deformation_does_not_read_as_moduli_space.md) (parts 1 to 3; part 4 stays with [job 35](../35_torus_family_as_teichmuller_space.md)).
 
 ## Goal
 
@@ -693,3 +693,32 @@ Risky points:
   `Status: done, needs review on <date>.`
 - [ ] Stage 5 is done, `_docs/generated/*` is regenerated, row 67 of `.agents/jobs/README.md` is updated, and this file has its `## Report` and has moved to `_done/` (fix its relative links: one more `../`).
 - [ ] Commit per stage, for example `Floor: rigid patches on the tile lattice (job 67)`. Follow rule 6 of the README.
+
+## Report
+
+### Done
+- Stage 1: `src/math/latticeReduction.ts`; `floorPatchField`, `floorPatchSamples`, `restU`/`restV` in `floorUv.ts` and `torusSkewDeformation.ts`. Tests 1 to 11. Commit 1bdbb1d.
+- Stage 2: `src/render/three/floorPatchMaterial.ts`; patch field stored in `buildFloorMesh`; `patchSinglePortalClipMaterial` keeps an earlier program key; `cloneMaterial` patches every clone. Tests 12 to 18. Commit e460498.
+- Stage 3: `maxTeichmullerStep` and `defaultMaxTeichmullerStep = 1/375` replace `maxStepMeters`; the `stepOptions` argument in `createThreeApp.ts` is deleted. Tests 19 and 20. Commit message "Torus: Teichmuller-length steps ... (stage 3)".
+- Stage 4: `torusModuli.ts`; `initial` in `LiveGeometryDebugState`; `startSkewXMeters` and `startDepthMeters` through `runtimeCommands.ts`, `runtimeMenuState.ts` and `geometryComputerMenu.ts`; two moduli labels on the palette page; goal and help text. Tests 21 to 24.
+- Stage 5: `_docs/MATHEMATICAL_MODEL.md` (Floor texture), `tests/manual_smoke.md` M11, note in closed issue 81, `_docs/generated/*` regenerated, README row 67.
+
+### Deviations
+- Step 1.4: added `restU` and `restV` to the frame literals in `tests/cell-complex/floorUv.test.ts`, `tests/render/buildCellMesh.test.ts` and `tests/render/cellRenderArchetypes.test.ts`.
+- Step 3.5: migrated `tests/cell-complex/torusSkewDeformation.test.ts` (`runSteps` options and bound), `tests/runtime/worldGeometrySession.test.ts` (1/600 and 1/30, helper type, test renamed) and the comments in `tests/app/torusDeformation.release.test.ts`. No `toMatchObject` value needed rounding.
+- Test 1: the (-7, 9) and (8, 9) check compares up to sign, so the expected pair is written (7, -9) and (8, 9).
+- The app used 0.04 m per step before; the default 1/375 gives 0.08 m at depth 15 m and 0.04 m at depth 7.5 m, as the job decided.
+- No test compared `LiveGeometryDebugState` exactly, so no test needed `initial`.
+
+### Uncertain
+- The look is unchecked. The browser sweep of step 2.6 was only half done: the rest view in `torus-moduli` renders the pebble floor (so the GLSL compiles and draws), but the headless tab did not step the deformation (`geometry.state` kept `current` at 0 after `geometry.setTorusSkew 8`), so no image at a = 15 or a = 8 exists. The maintainer's check of pebble shape and seams during a sweep stays open.
+- The three constants (1.25, 16, 0.02) were not tuned.
+- Frame time before and after stage 2 was not recorded.
+
+### Not done
+- Not pushed (the commits are local).
+- The `npm run serve` and `npm run edge` processes started for step 2.6 were not stopped (the sandbox denied the kill); stop them by hand.
+
+### Checks
+- `npm run typecheck`: pass. `npm test`: 187 files, 1745 tests pass. `npm run docs:check`: pass.
+- `npm run smoke -- --world torus-moduli` and `--world cube`: SMOKE OK.

@@ -1,6 +1,6 @@
 # 95 - The torus-moduli floor shears with the marking, and the deformation does not read as moduli space
 
-Status: open. Reported by the maintainer on 2026-11-05 ("the texture deforms terribly"). Analysed from the code at `f9aa317`;
+Status: open (job 67 landed parts 1 to 3 on 2026-11-06, awaiting the maintainer's check of the look: see its report; part 4 stays with job 35). Reported by the maintainer on 2026-11-05 ("the texture deforms terribly"). Analysed from the code at `f9aa317`;
 the design below was prototyped numerically outside the repository (see "How the design was checked"). Nothing is
 implemented.
 
