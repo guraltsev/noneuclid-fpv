@@ -158,7 +158,7 @@ lower numbers of jobs 18, 24, 30, 34 and 35.
 | [58](_done/58_derived_cache.md) | Add the derived cache, cached kind lists and their guards | done, needs review | - |  |
 | [59](_done/59_arc_index.md) | Answer every arc-end question from one cache, the arc index | done, needs review | - |  |
 | [60](_done/60_materialized_state_is_a_function_of_real_state.md) | Make stored segments a function of real state, and test that | done, needs review | - |  |
-| [00](00_coordinate_jobs_61_66.md) | Coordinate jobs 61-66 (time, emitters, public API, measurement tools and flags) | queued, Decisions await the maintainer | - |  |
+| [00](_done/00_coordinate_jobs_61_66.md) | Coordinate jobs 61-66 (time, emitters, public API, measurement tools and flags) | done, needs review | - |  |
 | [61](_done/61_simulation_ticks.md) | Run the world in ticks owned by the simulation | done, needs review | - |  |
 | [62](_done/62_client_write_check.md) | Make the client write check measure writes | done, needs review | [91](../../_issues/91_legacy_world_writers_list_does_not_measure_writes.md) |  |
 | [63](_done/63_geodesic_emitters_module.md) | Create the geodesic emitters module: renames, place, shoot, extend, delete | done, needs review | - |  |
