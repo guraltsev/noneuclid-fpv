@@ -3,6 +3,7 @@
  *
  * The arc index groups arc ends by anchor: attachments, ArcEnd records, distinct arc ids and tied vertices, in registry order, frozen. These tests check each list on a hand-built registry (an arc with both ends on one anchor, a closed loop), the order guarantees, the filter that ignores vertex moves and portal words, and the oracle fuzz against a full recompute.
  */
+import { createFixtureArc as createGeodesicArcObject } from "../../support/arcs";
 import { describe, expect, it } from "vitest";
 import { identityRigidTransform3 } from "../../../src/math/rigidTransform3";
 import { derivedStatsOf } from "../../../src/world-objects/derived";
@@ -17,8 +18,7 @@ import {
   tiedVertexCount,
 } from "../../../src/world-objects/geodesic/endpoints";
 import {
-  createGeodesicArcObject,
-  createGeodesicCannonObject,
+  createGeodesicEmitterObject,
   createGeodesicVertexObject,
   type GeodesicArcObject,
 } from "../../../src/world-objects/geodesic/objects";
@@ -28,7 +28,7 @@ import { expectDerivedMatchesCompute, type FuzzWrite } from "../../support/deriv
 const arc = (id: string, start: string, end: string): GeodesicArcObject =>
   createGeodesicArcObject({ id, startAnchorObjectId: start, endAnchorObjectId: end, startCellId: "a" });
 const vertex = (id: string) => createGeodesicVertexObject({ id, cellId: "a", point: { x: 0, y: 0, z: 0 } });
-const emitter = (id: string) => createGeodesicCannonObject({ id, cellId: "a", localPose: identityRigidTransform3 });
+const emitter = (id: string) => createGeodesicEmitterObject({ id, cellId: "a", localPose: identityRigidTransform3 });
 const computesOf = (registry: RuntimeObjectRegistry) => derivedStatsOf(registry).find((s) => s.id === "geodesicModel/arcIndex")!.computes;
 
 // e1 -g1-> v1 -g2-> v2 -g3-> e2, plus a loop g4 on v3 and an arc g5 from e1 to e1.
@@ -111,7 +111,7 @@ describe("arcIndex", () => {
   it("matches a full recompute under random writes", () => {
     const registry = chain();
     let serial = 0;
-    const anchors = () => registry.getAll().filter((o) => o.kind === "geodesicModel/vertex" || o.kind === "geodesic-cannon").map((o) => o.id);
+    const anchors = () => registry.getAll().filter((o) => o.kind === "geodesicModel/vertex" || o.kind === "geodesicEmitters/emitter").map((o) => o.id);
     const arcs = () => registry.getObjectsOfKind("geodesicModel/arc");
     const writes: FuzzWrite[] = [
       (r, pick) => {
@@ -149,7 +149,7 @@ describe("arcIndex", () => {
         if (vs.length > 0) r.remove(vs[pick(vs.length)]!.id);
       },
       (r, pick) => {
-        const es = r.getObjectsOfKind("geodesic-cannon");
+        const es = r.getObjectsOfKind("geodesicEmitters/emitter");
         if (es.length > 0) r.update({ ...es[pick(es.length)]!, aimYawRadians: pick(7) });
       },
     ];

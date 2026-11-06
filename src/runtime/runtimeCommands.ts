@@ -8,7 +8,6 @@ import type { DebugSettings } from "../glue/debugSettings";
 import type { PortalPanelModeId } from "../glue/portalPanelMode";
 import type { RuntimeDebugOverlayItemId, RuntimeToolId } from "../glue/toolIds";
 import type { GeodesicCannonToolState } from "../world-objects/geodesic/cannonToolState";
-import type { ProtractorToolState } from "../world-objects/protractorTool";
 import type { PlacedFlagType } from "../world-objects/toolObjects";
 import type { RuntimeMenuConsoleLogLevelId } from "./runtimeMenuState";
 import type { PendingToolRequest } from "./clientSession";
@@ -18,7 +17,7 @@ export interface ShowGeodesicCannonActionsPayload {
   readonly cannonId: string;
   readonly geodesicIds?: readonly string[];
   readonly geodesicLabelsById?: Readonly<Record<string, string>>;
-  readonly lockedGeodesicIds?: readonly string[];
+  readonly connectedGeodesicIds?: readonly string[];
   /** The actions the tools contribute to the page, with their availability (design 013 section 8.3). */
   readonly objectActions?: readonly ObjectActionEntry[];
 }
@@ -65,8 +64,6 @@ export type RuntimeCommand =
   | { readonly kind: "step-goal-page"; readonly delta: -1 | 1 }
   // Tool and sign selection.
   | { readonly kind: "select-tool"; readonly toolId: RuntimeToolId }
-  /** A tool entered a mode of its own (rotate, aim, carry): close the menu and select that tool. Not gated and no session reset: the tool started itself. */
-  | { readonly kind: "enter-tool-mode"; readonly toolId: RuntimeToolId }
   /** Ends the tool in use without closing the menu page: selects no tool. */
   | { readonly kind: "clear-selected-tool" }
   | { readonly kind: "choose-place-flag-type"; readonly flagType: PlacedFlagType }
@@ -74,7 +71,6 @@ export type RuntimeCommand =
   | { readonly kind: "set-editing-sign-message"; readonly message: string }
   // Tool state written by the tools and the frame loop.
   | { readonly kind: "set-cannon-tool-state"; readonly state: GeodesicCannonToolState }
-  | { readonly kind: "set-protractor-tool-state"; readonly state: ProtractorToolState }
   /** A module's client tool state (picks, prompts); `undefined` clears it. Design 013 section 9.3. */
   | { readonly kind: "set-module-tool-state"; readonly moduleId: string; readonly state: unknown }
   /** The tool request the world has not answered yet (design 013 section 8.1), or undefined once it has. */

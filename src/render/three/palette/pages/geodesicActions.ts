@@ -6,11 +6,11 @@ import { Trash2 } from "@pmndrs/uikit-lucide";
 import type { PaletteDefinition } from "../../../../ui/paletteDefinition";
 import type { ScenePaletteAdapterOptions } from "../adapterTypes";
 import { actionColor, borderColor, inactiveColor, scrollbarBorderColor, scrollbarColor, sectionColor, textColor } from "../tokens";
-import { createGeodesicCannonActionIcon, createLockedGeodesicSegmentStatus } from "../icons";
+import { createGeodesicCannonActionIcon, createConnectedGeodesicSegmentStatus } from "../icons";
 import { createButtonText, createInteractiveSurface, createSectionLabel } from "../widgets";
 
 /**
- * Geodesic cannon page: a scrollable list with one row per geodesic (label, locked-status icon or Aim button, delete button).
+ * Geodesic cannon page: a scrollable list with one row per geodesic (label, connected-status icon or Aim button, delete button).
  */
 export function buildGeodesicCannonActionsContent(
   content: Extract<PaletteDefinition["content"], { readonly kind: "geodesic-cannon-actions" }>,
@@ -76,7 +76,7 @@ export function buildGeodesicCannonActionsContent(
       fill: textColor,
     }));
 
-    if (geodesic.locked) {
+    if (geodesic.connected) {
       const status = createInteractiveSurface({
         width: 52,
         height: 42,
@@ -87,11 +87,11 @@ export function buildGeodesicCannonActionsContent(
         onClick: () => {},
       });
       status.name = geodesic.connectionSymbolLabel ?? "Locked geodesic segment between emitters";
-      status.add(createLockedGeodesicSegmentStatus());
+      status.add(createConnectedGeodesicSegmentStatus());
       row.add(status);
     }
 
-    if (!geodesic.locked) {
+    if (!geodesic.connected) {
       const aimButton = createInteractiveSurface({
         width: 112,
         height: 42,

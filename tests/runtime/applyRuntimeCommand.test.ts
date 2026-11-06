@@ -37,7 +37,6 @@ function stateWith(menu?: Partial<RuntimeMenuState>, appConfig: AppConfig = defa
     showCellPathRendersInstances: false,
     vrComfortOptions: defaultVrComfortOptions,
     cannonToolState: {},
-    protractorToolState: {},
     moduleToolState: {},
     pendingToolRequest: undefined,
   };
@@ -114,14 +113,14 @@ describe("applyRuntimeCommand: navigation", () => {
   });
 
   it("cancels the menu and the tool: closed, no tool, tool sessions ended, then redraw", () => {
-    const result = reduce({ kind: "cancel-menu-and-tool" }, stateWith({ isOpen: true, selectedTool: "protractor" }));
+    const result = reduce({ kind: "cancel-menu-and-tool" }, stateWith({ isOpen: true, selectedTool: "geodesicMeasurements/protractor" }));
 
     expect(result.state.menuState).toMatchObject({ isOpen: false, selectedTool: "none" });
     expect(result.effects).toEqual([{ kind: "end-tool-session" }, sync]);
   });
 
   it("cancels from a top-level page on the right action", () => {
-    const result = reduce({ kind: "menu-right-action" }, stateWith({ isOpen: true, page: "main", selectedTool: "protractor" }));
+    const result = reduce({ kind: "menu-right-action" }, stateWith({ isOpen: true, page: "main", selectedTool: "geodesicMeasurements/protractor" }));
 
     expect(result.state.menuState).toMatchObject({ isOpen: false, selectedTool: "none" });
     expect(result.effects[0]).toEqual({ kind: "end-tool-session" });
@@ -235,28 +234,21 @@ describe("applyRuntimeCommand: navigation", () => {
 
 describe("applyRuntimeCommand: tools and signs", () => {
   it("selects a tool: menu closed with the tool, other tools' sessions switched off, then redraw", () => {
-    const result = reduce({ kind: "select-tool", toolId: "protractor" }, stateWith({ isOpen: true }));
+    const result = reduce({ kind: "select-tool", toolId: "geodesicMeasurements/protractor" }, stateWith({ isOpen: true }));
 
-    expect(result.state.menuState).toMatchObject({ isOpen: false, selectedTool: "protractor" });
-    expect(result.effects).toEqual([{ kind: "switch-tool-session", toolId: "protractor" }, sync]);
+    expect(result.state.menuState).toMatchObject({ isOpen: false, selectedTool: "geodesicMeasurements/protractor" });
+    expect(result.effects).toEqual([{ kind: "switch-tool-session", toolId: "geodesicMeasurements/protractor" }, sync]);
   });
 
   it("ignores a tool the app configuration disables", () => {
     const off = stateWith({ isOpen: true }, disabled({ tools: { angles: false } }));
 
-    expect(reduce({ kind: "select-tool", toolId: "protractor" }, off)).toEqual({ state: off, effects: [] });
+    expect(reduce({ kind: "select-tool", toolId: "geodesicMeasurements/protractor" }, off)).toEqual({ state: off, effects: [] });
   });
 
-  it("enters a tool mode: menu closed with that tool, no session reset and no gate", () => {
-    const off = stateWith({ isOpen: true }, disabled({ tools: { geodesicEmitters: false } }));
-    const result = reduce({ kind: "enter-tool-mode", toolId: "geodesic-cannon-carry" }, off);
-
-    expect(result.state.menuState).toMatchObject({ isOpen: false, selectedTool: "geodesic-cannon-carry" });
-    expect(result.effects).toEqual([sync]);
-  });
 
   it("clears the selected tool without closing the page", () => {
-    const result = reduce({ kind: "clear-selected-tool" }, stateWith({ isOpen: true, selectedTool: "measure-length" }));
+    const result = reduce({ kind: "clear-selected-tool" }, stateWith({ isOpen: true, selectedTool: "geodesicMeasurements/length" }));
 
     expect(result.state.menuState).toMatchObject({ isOpen: true, selectedTool: "none" });
     expect(result.effects).toEqual([sync]);
@@ -265,7 +257,7 @@ describe("applyRuntimeCommand: tools and signs", () => {
   it("chooses the place-flag type, selects the tool and closes the menu", () => {
     const result = reduce({ kind: "choose-place-flag-type", flagType: "WoodenSign2" }, stateWith({ isOpen: true }));
 
-    expect(result.state.menuState).toMatchObject({ isOpen: false, selectedTool: "place-flag" });
+    expect(result.state.menuState).toMatchObject({ isOpen: false, selectedTool: "placedFlags/flag" });
     expect(result.state.menuState.placeFlagOptions.flagType).toBe("WoodenSign2");
 
     const off = stateWith({}, disabled({ tools: { placeFlags: false } }));
@@ -400,7 +392,7 @@ describe("applyRuntimeCommand: cannon and geometry computer actions", () => {
   it("forwards each cannon action to the host when its tool is enabled", () => {
     expect(reduce({ kind: "add-geodesic-to-cannon", cannonId: "c" }).effects).toEqual([{ kind: "add-geodesic-to-cannon", cannonId: "c" }]);
     expect(reduce({ kind: "start-cannon-carry", cannonId: "c" }).effects).toEqual([{ kind: "start-cannon-carry", cannonId: "c" }]);
-    const objectAction = { kind: "start-object-action", objectKind: "geodesic-cannon", objectId: "c", actionId: "tie-and-detach" } as const;
+    const objectAction = { kind: "start-object-action", objectKind: "geodesicEmitters/emitter", objectId: "c", actionId: "tie-and-detach" } as const;
     expect(reduce(objectAction).effects).toEqual([objectAction]);
     expect(reduce({ kind: "start-cannon-rotation", cannonId: "c", geodesicId: "g" }).effects).toEqual([
       { kind: "start-cannon-rotation", cannonId: "c", geodesicId: "g" },
@@ -410,13 +402,13 @@ describe("applyRuntimeCommand: cannon and geometry computer actions", () => {
     ]);
   });
 
-  it("ignores cannon actions when emitters are disabled, but still deletes", () => {
+  it("ignores a new ray while emitters are disabled, but deletes, and leaves modes to the world", () => {
     const off = stateWith({}, disabled({ tools: { geodesicEmitters: false } }));
 
     expect(reduce({ kind: "add-geodesic-to-cannon", cannonId: "c" }, off).effects).toEqual([]);
-    expect(reduce({ kind: "start-cannon-carry", cannonId: "c" }, off).effects).toEqual([]);
-    expect(reduce({ kind: "start-cannon-rotation", cannonId: "c" }, off).effects).toEqual([]);
-    expect(reduce({ kind: "start-cannon-aim", cannonId: "c" }, off).effects).toEqual([]);
+    expect(reduce({ kind: "start-cannon-carry", cannonId: "c" }, off).effects).toEqual([{ kind: "start-cannon-carry", cannonId: "c" }]);
+    expect(reduce({ kind: "start-cannon-rotation", cannonId: "c" }, off).effects).toEqual([{ kind: "start-cannon-rotation", cannonId: "c" }]);
+    expect(reduce({ kind: "start-cannon-aim", cannonId: "c" }, off).effects).toEqual([{ kind: "start-cannon-aim", cannonId: "c" }]);
     expect(reduce({ kind: "delete-geodesic-from-cannon", cannonId: "c", geodesicId: "g" }, off).effects).toEqual([
       { kind: "delete-geodesic-from-cannon", cannonId: "c", geodesicId: "g" },
     ]);
@@ -456,13 +448,6 @@ describe("applyRuntimeCommand: tool and player state", () => {
     expect(result.effects).toEqual([]);
   });
 
-  it("replaces the protractor tool state", () => {
-    const result = reduce({ kind: "set-protractor-tool-state", state: {} });
-
-    expect(result.state.protractorToolState).toEqual({});
-    expect(result.effects).toEqual([]);
-  });
-
   it("sets and clears one module's client tool state without touching the others", () => {
     const first = reduce({ kind: "set-module-tool-state", moduleId: "geodesicModel", state: { picks: [] } });
     const second = reduce({ kind: "set-module-tool-state", moduleId: "other", state: 1 }, first.state);
@@ -475,7 +460,7 @@ describe("applyRuntimeCommand: tool and player state", () => {
   });
 
   it("records a pending tool request and clears it", () => {
-    const request = { toolId: "protractor" as const, ticket: 3 };
+    const request = { toolId: "geodesicMeasurements/protractor" as const, ticket: 3 };
     const pending = reduce({ kind: "set-pending-tool-request", request });
 
     expect(pending.state.pendingToolRequest).toBe(request);

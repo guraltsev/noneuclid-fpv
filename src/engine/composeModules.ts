@@ -7,6 +7,7 @@ import type {
   AnyModuleDefinition,
   CommandContext,
   CommandResult,
+  EngineCommandBase,
   EngineEventBase,
   ModuleCreateContext,
   ModuleInstance,
@@ -43,10 +44,8 @@ export interface ComposedHandler {
 export interface ComposedModule {
   readonly definition: AnyModuleDefinition;
   readonly instance: ModuleInstance<unknown, never, EngineEventBase, unknown>;
-  /** Kinds this module declares. */
+  /** Kinds this module declares, the only ones the write guard lets it write. */
   readonly declaredKinds: ReadonlySet<string>;
-  /** Kinds the write guard lets this module write: the declared kinds and its `writesCoreKinds`. */
-  readonly writableKinds: ReadonlySet<string>;
   /** Ids of the modules whose tokens this module requires, directly. */
   readonly requiredModuleIds: ReadonlySet<string>;
 }
@@ -69,6 +68,8 @@ export interface ComposeOptions {
   readonly coreToolIds: readonly string[];
   readonly objects: RuntimeObjectRegistry;
   readonly getWorld: () => CompiledCellComplex;
+  /** What `ctx.submitPublicCommand` calls. */
+  submitPublicCommand(command: EngineCommandBase): Promise<CommandResult>;
   /** What `ctx.require` hands to a dependent in place of the provider's `api` (the engine wraps it for the write guard). */
   wrapApi(moduleId: string, api: unknown): unknown;
 }
@@ -101,6 +102,7 @@ export function composeModules(definitions: readonly AnyModuleDefinition[], opti
       },
       objects: options.objects,
       getWorld: options.getWorld,
+      submitPublicCommand: options.submitPublicCommand,
     };
     let instance: ModuleInstance<unknown, never, EngineEventBase, unknown>;
     try {
@@ -113,8 +115,7 @@ export function composeModules(definitions: readonly AnyModuleDefinition[], opti
     modules.push({
       definition,
       instance,
-      declaredKinds: new Set(definition.objectKinds.map((declaration) => declaration.kind)),
-      writableKinds: writableKindsOf(definition),
+      declaredKinds: declaredKindsOf(definition),
       requiredModuleIds: new Set(definition.requires.flatMap((token) => providerOfToken.get(token.id)?.id ?? [])),
     });
   }
@@ -129,9 +130,9 @@ export function composeModules(definitions: readonly AnyModuleDefinition[], opti
   return { modules, handlers, moduleToolIds };
 }
 
-/** The kinds the write guard lets a module write. */
-export function writableKindsOf(definition: AnyModuleDefinition): ReadonlySet<string> {
-  return new Set([...definition.objectKinds.map((declaration) => declaration.kind), ...(definition.writesCoreKinds ?? [])]);
+/** The kinds a module declares: what the write guard lets it write. */
+export function declaredKindsOf(definition: AnyModuleDefinition): ReadonlySet<string> {
+  return new Set(definition.objectKinds.map((declaration) => declaration.kind));
 }
 
 /** Topological order of `requires`, ties broken by list order; undefined (with a problem) when a token has no provider or the modules form a cycle. Records rules 1 to 4. */
@@ -221,9 +222,6 @@ function checkDefinitions(definitions: readonly AnyModuleDefinition[], options: 
       declaredBy.set(declaration.kind, definition.id);
       checkName(definition.id, "object kind", declaration.kind, problems);
     }
-    for (const kind of definition.writesCoreKinds ?? []) {
-      if (!core.has(kind)) problems.push(`module ${definition.id} lists ${kind} in writesCoreKinds, which is not a core kind`);
-    }
     for (const toolId of definition.toolIds ?? []) {
       checkName(definition.id, "tool id", toolId, problems);
     }
@@ -237,7 +235,7 @@ function checkName(moduleId: string, what: string, name: string, problems: strin
   }
 }
 
-/** Rules 6 to 9, 11 and 12 for what instances declare. Fills `handlers`. */
+/** Rules 6 to 9 and 11 to 13 for what instances declare. Fills `handlers`. */
 function checkInstances(
   modules: readonly ComposedModule[],
   knownToolIds: ReadonlySet<string>,
@@ -263,6 +261,10 @@ function checkInstances(
         problems.push(`module ${moduleId}: the command ${kind} requires the tool ${handler.requiresTool}, which no module in the experience defines`);
       }
       handlers.set(kind, { moduleId, run: handler.run, requiresTool: handler.requiresTool, moduleOnly: handler.moduleOnly === true });
+    }
+
+    for (const [name, value] of Object.entries(module.instance.publicApi ?? {})) {
+      if (typeof value !== "function") problems.push(`module ${moduleId}: the publicApi name ${name} is not a function`);
     }
 
     for (const tick of module.instance.ticks) {

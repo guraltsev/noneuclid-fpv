@@ -31,3 +31,5 @@ The one path that destroyed such a geodesic, `breakOnForbiddenZone` on the carry
 - The intended length is stored on the arc, as real state, and survives the end of the tool.
 - A test: end the tool while stopped at a corner, start it again, clear the corner, and the geodesic has its full length.
 - The same holds for a stop at a wall.
+
+- Job 64 (2026-11-05): done, needs review; see the Report in [the job](../.agents/jobs/_done/64_emitter_edits_and_length.md). Manual checks are not done, so this stays open.

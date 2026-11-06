@@ -158,11 +158,11 @@ lower numbers of jobs 18, 24, 30, 34 and 35.
 | [58](_done/58_derived_cache.md) | Add the derived cache, cached kind lists and their guards | done, needs review | - |  |
 | [59](_done/59_arc_index.md) | Answer every arc-end question from one cache, the arc index | done, needs review | - |  |
 | [60](_done/60_materialized_state_is_a_function_of_real_state.md) | Make stored segments a function of real state, and test that | done, needs review | - |  |
-| [00](00_coordinate_jobs_61_66.md) | Coordinate jobs 61-66 (time, emitters, public API, measurement tools and flags) | queued, Decisions await the maintainer | - |  |
-| [61](61_simulation_ticks.md) | Run the world in ticks owned by the simulation | queued | - |  |
-| [62](62_client_write_check.md) | Make the client write check measure writes | queued | [91](../../_issues/91_legacy_world_writers_list_does_not_measure_writes.md) |  |
-| [63](63_geodesic_emitters_module.md) | Create the geodesic emitters module: renames, place, shoot, extend, delete | queued | - |  |
-| [64](64_emitter_edits_and_length.md) | Rotate, aim and carry through the world; a free geodesic keeps its length | queued | [88](../../_issues/88_carry_changes_the_world_before_the_world_answers.md), [89](../../_issues/89_rotate_aim_and_carry_bypass_the_tool_gates.md), [93](../../_issues/93_a_free_geodesic_forgets_its_length_when_the_tool_ends.md) |  |
-| [65](65_module_public_api.md) | Give modules a public API and write the scenarios that were waiting for it | queued | - |  |
-| [66](66_measurement_tools_and_flags.md) | Move the measurement tools and the flags into modules | queued | [92](../../_issues/92_measurement_kinds_are_declared_transient.md) |  |
+| [00](_done/00_coordinate_jobs_61_66.md) | Coordinate jobs 61-66 (time, emitters, public API, measurement tools and flags) | done, needs review | - |  |
+| [61](_done/61_simulation_ticks.md) | Run the world in ticks owned by the simulation | done, needs review | - |  |
+| [62](_done/62_client_write_check.md) | Make the client write check measure writes | done, needs review | [91](../../_issues/91_legacy_world_writers_list_does_not_measure_writes.md) |  |
+| [63](_done/63_geodesic_emitters_module.md) | Create the geodesic emitters module: renames, place, shoot, extend, delete | done, needs review | - |  |
+| [64](_done/64_emitter_edits_and_length.md) | Rotate, aim and carry through the world; a free geodesic keeps its length | done, needs review | [88](../../_issues/88_carry_changes_the_world_before_the_world_answers.md), [89](../../_issues/89_rotate_aim_and_carry_bypass_the_tool_gates.md), [93](../../_issues/93_a_free_geodesic_forgets_its_length_when_the_tool_ends.md) |  |
+| [65](_done/65_module_public_api.md) | Give modules a public API and write the scenarios that were waiting for it | done, needs review | - |  |
+| [66](_done/66_measurement_tools_and_flags.md) | Move the measurement tools and the flags into modules | done, needs review | [92](../../_issues/92_measurement_kinds_are_declared_transient.md) |  |
 | [67](67_rigid_floor_patches_and_moduli_readout.md) | Rigid floor patches, Teichmuller steps and a moduli readout for the torus | queued (stages 3 and 4 wait for job 66) | [95](../../_issues/95_torus_moduli_floor_shears_and_the_deformation_does_not_read_as_moduli_space.md) |  |

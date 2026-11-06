@@ -8,7 +8,7 @@ import { identityRigidTransform3 } from "../../src/math/rigidTransform3";
 import { defineDerived, derivedStatsOf, setDerivedVerification } from "../../src/world-objects/derived";
 import { createRuntimeObjectRegistry, type RuntimeObjectReader, type RuntimeObjectRegistry, type RuntimeWorldObject } from "../../src/world-objects/runtimeObjectRegistry";
 import type { RuntimeCreatureObject } from "../../src/world-objects/runtimeObjectBase";
-import type { GeodesicCannonObject } from "../../src/world-objects/geodesic/objects";
+import type { GeodesicEmitterObject } from "../../src/world-objects/geodesic/objects";
 import { expectDerivedMatchesCompute, type FuzzWrite } from "../support/derivedFuzz";
 
 let serial = 0;
@@ -17,8 +17,8 @@ function mouse(id: string, cellId: string, portalRenderable = true): RuntimeCrea
   return { id, kind: "geo-mouse", cellId, localPose: identityRigidTransform3, portalRenderable };
 }
 
-function cannon(id: string, aimYawRadians = 0): GeodesicCannonObject {
-  return { id, kind: "geodesic-cannon", cellId: "a", localPose: identityRigidTransform3, portalRenderable: true, aimYawRadians };
+function cannon(id: string, aimYawRadians = 0): GeodesicEmitterObject {
+  return { id, kind: "geodesicEmitters/emitter", cellId: "a", localPose: identityRigidTransform3, portalRenderable: true, aimYawRadians };
 }
 
 const describeMice = (source: RuntimeObjectReader) =>
@@ -188,6 +188,16 @@ describe("defineDerived", () => {
     setDerivedVerification(1);
 
     expect(() => derived.read(registry)).toThrow(/differs from compute/);
+  });
+
+  it("counts the reads it compared, so a run can show that it verified", () => {
+    const registry = createRuntimeObjectRegistry([mouse("m1", "a")]);
+    const { derived } = toyCache(() => true);
+    setDerivedVerification(2);
+
+    for (let read = 0; read < 5; read += 1) derived.read(registry);
+
+    expect(derivedStatsOf(registry)[0]).toMatchObject({ reads: 5, verifies: 2 });
   });
 
   it("with verification off, does not compare", () => {

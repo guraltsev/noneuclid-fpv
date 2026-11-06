@@ -19,8 +19,8 @@ import {
   type RigidTransform3,
 } from "../../math/rigidTransform3";
 import { getEmitterGeodesicIds } from "../../world-objects/geodesic/endpoints";
-import { resolveGeodesicNumber } from "../../world-objects/geodesic/segments";
-import { type RuntimeObjectRegistry, type RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
+import { geodesicDisplayName } from "../../world-objects/measureLengthTool";
+import { type RuntimeObjectReader, type RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
 import { threePointToWorld, worldPointToThree } from "./worldAxes";
 import {
   createGeodesicEmitterLabel,
@@ -48,7 +48,7 @@ export interface GeodesicEmitterLabelControllerDeps {
   /** Camera whose world orientation labels copy each frame so they face the viewer. */
   readonly camera: THREE.Camera;
   /** Registry scanned for geodesic cannons and used to number geodesics. */
-  readonly runtimeObjectRegistry: RuntimeObjectRegistry;
+  readonly runtimeObjectRegistry: RuntimeObjectReader;
   /** Mutable label store keyed by `getGeodesicEmitterLabelKey`; shared with the shell, mutated in place by the controller. */
   readonly geodesicEmitterLabelsByKey: Map<string, GeodesicEmitterLabel>;
   /** Getter for the active compiled world, used to find where a cannon on another face appears from the player. */
@@ -64,8 +64,7 @@ export interface GeodesicEmitterLabelControllerDeps {
 /**
  * Creates the emitter-label controller and returns its update and naming functions.
  *
- * `updateGeodesicEmitterLabels` is called once per frame; `getGeodesicDisplayName` returns "G<n>" for a geodesic id and
- * `getGeodesicLabelsById` maps many ids to such names. There is no dispose function: remaining labels live in
+ * `updateGeodesicEmitterLabels` is called once per frame; `getGeodesicLabelsById` maps geodesic ids to their "G<n>" names. There is no dispose function: remaining labels live in
  * the caller-owned map and scene.
  */
 export function createGeodesicEmitterLabelController(deps: GeodesicEmitterLabelControllerDeps) {
@@ -87,7 +86,7 @@ export function createGeodesicEmitterLabelController(deps: GeodesicEmitterLabelC
     camera.getWorldQuaternion(cameraQuaternion);
 
     for (const object of runtimeObjectRegistry.getAll()) {
-      if (object.kind !== "geodesic-cannon") {
+      if (object.kind !== "geodesicEmitters/emitter") {
         continue;
       }
 
@@ -135,7 +134,7 @@ export function createGeodesicEmitterLabelController(deps: GeodesicEmitterLabelC
   // through the portals that a straight line from the player to the cannon crosses (at most two), with the map from the cannon's
   // frame to the player's. Undefined when no such line exists, so a cannon behind a wall gets no label.
   function resolveCannonAppearance(
-    cannon: Extract<RuntimeWorldObject, { readonly kind: "geodesic-cannon" }>,
+    cannon: Extract<RuntimeWorldObject, { readonly kind: "geodesicEmitters/emitter" }>,
   ): { readonly distanceMeters: number; readonly playerFrameFromCell?: RigidTransform3 } | undefined {
     const player = readLocalPlayerPose(deps.engine);
     if (cannon.cellId === player.cellId) {
@@ -187,12 +186,12 @@ export function createGeodesicEmitterLabelController(deps: GeodesicEmitterLabelC
   }
 
   function getGeodesicDisplayName(geodesicId: string): string {
-    return `G${resolveGeodesicNumber(runtimeObjectRegistry, geodesicId)}`;
+    return geodesicDisplayName(runtimeObjectRegistry, geodesicId);
   }
 
   function getGeodesicLabelsById(geodesicIds: readonly string[]): Readonly<Record<string, string>> {
     return Object.fromEntries(geodesicIds.map((geodesicId) => [geodesicId, getGeodesicDisplayName(geodesicId)]));
   }
 
-  return { updateGeodesicEmitterLabels, getGeodesicDisplayName, getGeodesicLabelsById };
+  return { updateGeodesicEmitterLabels, getGeodesicLabelsById };
 }

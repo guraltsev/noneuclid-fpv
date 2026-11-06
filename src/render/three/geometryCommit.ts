@@ -4,7 +4,7 @@
  *
  * The module owns the active world bundle (the current snapshot plus the render data derived from it); every other reader goes through
  * `active()`. A commit runs the steps in this order: map the player and the objects using the previous world, re-solve the derived
- * objects (locked geodesics, measured lengths, protractor angles), swap the bundle, then `afterSwap` (the shell's rebuild of meshes,
+ * objects (connected geodesics, measured lengths, protractor angles), swap the bundle, then `afterSwap` (the shell's rebuild of meshes,
  * portal instances, tool feedback and diagnostics for the new world).
  * Positions are cell-local meters and yaws are radians. Runs on the frame loop only, before input is read.
  */
@@ -20,7 +20,7 @@ import {
 import type { WorldGeometrySnapshot } from "../../runtime/worldGeometrySession";
 import type { DynamicObjectState } from "../../movement/dynamicObject";
 import type { PlayerPose } from "../../movement/playerPose";
-import type { RuntimeObjectRegistry } from "../../world-objects/runtimeObjectRegistry";
+import type { LegacyWorldWriter } from "../../world-objects/runtimeObjectRegistry";
 import type { ObjectHost } from "../../world-objects/worldObjectOwner";
 import type { PlacedFlagObject } from "../../world-objects/toolObjects";
 import { deriveCellRenderArchetypeCapacities } from "./cellRenderArchetypes";
@@ -48,7 +48,7 @@ export interface GeometryCommitDeps {
   readonly geometrySession: { pollReadySnapshot(): WorldGeometrySnapshot | undefined };
   /** The world engine: the player's pose is read from it and the mapped pose is published to it. */
   readonly engine: WorldEngine;
-  readonly runtimeObjectRegistry: RuntimeObjectRegistry;
+  readonly runtimeObjectRegistry: LegacyWorldWriter;
   readonly objectHost: Pick<ObjectHost, "transformGeometry">;
   /** The player's collision body at a pose. */
   readonly createPlayerCollisionState: (pose: PlayerPose) => DynamicObjectState;
@@ -108,7 +108,7 @@ export function createGeometryCommit(deps: GeometryCommitDeps): GeometryCommit {
 
     deps.objectHost.transformGeometry(mapByCellId, snapshot.world);
     for (const object of runtimeObjectRegistry.getAll()) {
-      if (object.kind === "placed-flag") {
+      if (object.kind === "placedFlags/flag") {
         const nextFlag = transformPlacedFlagForGeometryCommit(object, mapByCellId, snapshot.world);
         if (!nextFlag) {
           runtimeObjectRegistry.remove(object.id);
@@ -117,7 +117,7 @@ export function createGeometryCommit(deps: GeometryCommitDeps): GeometryCommit {
         }
         runtimeObjectRegistry.update(nextFlag);
         deps.syncPlacedFlagRuntime(nextFlag);
-      } else if (object.kind === "geodesic-cannon") {
+      } else if (object.kind === "geodesicEmitters/emitter") {
         const transformed = transformGeodesicCannonForGeometryCommit(object, mapByCellId);
         if (!transformed) {
           runtimeObjectRegistry.remove(object.id);

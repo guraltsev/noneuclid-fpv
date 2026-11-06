@@ -19,3 +19,5 @@ Section 11's contract test (every declared kind has a `label` and a `persistence
 
 - The declarations match 014 section 2.1: the real part is saved, and the displayed values are rebuilt.
 - The contract test of section 11 exists.
+
+- Job 66 (2026-11-06): done, needs review; see the Report in [the job](../.agents/jobs/_done/66_measurement_tools_and_flags.md). Manual checks are not done, so this stays open.

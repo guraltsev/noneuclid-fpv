@@ -20,7 +20,7 @@ import { getEmitterGeodesicIds } from "../world-objects/geodesic/endpoints";
 import { geodesicRayBeamHeightMeters, geodesicRayBeamStartOffsetMeters } from "../world-objects/geodesic/objects";
 import { resolveEmitterLaunchYaw } from "../world-objects/geodesic/segments";
 import { createProtractorAngleLabelHitbox } from "../world-objects/protractorTool";
-import { type RuntimeObjectRegistry, type RuntimeWorldObject } from "../world-objects/runtimeObjectRegistry";
+import { type RuntimeObjectReader, type RuntimeWorldObject } from "../world-objects/runtimeObjectRegistry";
 import { runtimeObjectToDynamicObjectState } from "../world-objects/runtimeObjectBase";
 import { locateDevelopedPoint, walkDevelopedSegment, type SegmentWalkPiece } from "../cell-complex/segmentWalk";
 import {
@@ -73,7 +73,7 @@ export interface ResolveAimTargetRequest {
   /** Compiled cell complex used to look up destination cells. */
   readonly world: CompiledCellComplex;
   /** Runtime objects, queried per cell. */
-  readonly registry: RuntimeObjectRegistry;
+  readonly registry: RuntimeObjectReader;
   /** The aim ray, in the root cell's frame. */
   readonly ray: AimRay;
   /** The player's (render root) cell; the ray's frame is this cell's local frame. */
@@ -298,7 +298,7 @@ function compareAimTargets(left: AimTarget, right: AimTarget): number {
 
 // Object proxy hit for one object in the cell-local frame (before the window test).
 function intersectAimObject(
-  registry: RuntimeObjectRegistry,
+  registry: RuntimeObjectReader,
   object: RuntimeWorldObject,
   origin: Vec3,
   direction: Vec3,
@@ -310,7 +310,7 @@ function intersectAimObject(
     ? intersectRayWithProtractorAngleLabelHitbox(object, origin, direction)
     : object.kind === "geodesicModel/segment"
     ? intersectRayWithSelectableSegment(object, origin, direction)
-    : object.kind === "geodesic-cannon"
+    : object.kind === "geodesicEmitters/emitter"
       ? intersectRayWithGeodesicEmitterAimCylinder(registry, origin, direction, object, ignoredGeodesicIds)
     : bounds
       ? intersectRayWithVerticalCylinder(origin, direction, bounds)
@@ -318,7 +318,7 @@ function intersectAimObject(
 }
 
 function resolveObjectAimTargets(
-  registry: RuntimeObjectRegistry,
+  registry: RuntimeObjectReader,
   cell: CompiledPrismCell,
   ray: CellRay,
   window: HitWindow,
@@ -346,7 +346,7 @@ function resolveObjectAimTargets(
       hit = shifted ? { ...shifted, distance: shifted.distance + window.tMin } : undefined;
     }
 
-    const targetMaxDistanceMeters = object.kind === "geodesic-cannon" ? maxEmitterDistanceMeters : maxDistanceMeters;
+    const targetMaxDistanceMeters = object.kind === "geodesicEmitters/emitter" ? maxEmitterDistanceMeters : maxDistanceMeters;
     if (
       !hit ||
       hit.distance > targetMaxDistanceMeters ||
@@ -405,8 +405,8 @@ function isBetterAimTarget(candidate: AimTarget, current: AimTarget): boolean {
 function isGeodesicVsEmitterChoice(left: AimTarget, right: AimTarget): boolean {
   const leftKind = left.object?.kind;
   const rightKind = right.object?.kind;
-  return (isGeodesicAimObjectKind(leftKind) && rightKind === "geodesic-cannon") ||
-    (leftKind === "geodesic-cannon" && isGeodesicAimObjectKind(rightKind));
+  return (isGeodesicAimObjectKind(leftKind) && rightKind === "geodesicEmitters/emitter") ||
+    (leftKind === "geodesicEmitters/emitter" && isGeodesicAimObjectKind(rightKind));
 }
 
 function isGeodesicAimObjectKind(kind: RuntimeWorldObject["kind"] | undefined): boolean {
@@ -427,7 +427,7 @@ function getAimTargetPriority(target: AimTarget): number {
     return 1;
   }
 
-  if (target.object?.kind === "geodesic-cannon") {
+  if (target.object?.kind === "geodesicEmitters/emitter") {
     return 4;
   }
 
@@ -723,7 +723,7 @@ function resolveFloorAimTarget(
  * (collision radius + padding) / 2 and the half-height is padded by 0.1 m.
  */
 export function getGeodesicEmitterAimCylinderBounds(
-  emitter: Extract<RuntimeWorldObject, { readonly kind: "geodesic-cannon" }>,
+  emitter: Extract<RuntimeWorldObject, { readonly kind: "geodesicEmitters/emitter" }>,
 ): SimpleCylinderBounds | undefined {
   const bounds = getDynamicObjectCollisionBounds(runtimeObjectToDynamicObjectState(emitter));
   if (!bounds) {
@@ -743,7 +743,7 @@ export function getGeodesicEmitterAimCylinderBounds(
  * It sits above the cannon's base at beam height shifted down by 0.3 m.
  */
 export function getGeodesicEmitterAimSphereCenter(
-  emitter: Extract<RuntimeWorldObject, { readonly kind: "geodesic-cannon" }>,
+  emitter: Extract<RuntimeWorldObject, { readonly kind: "geodesicEmitters/emitter" }>,
 ): Vec3 {
   return {
     x: emitter.localPose.translation.x,
@@ -966,10 +966,10 @@ function scaleVec3Like(vector: Vec3, scale: number): Vec3 {
 
 // Cannon proxy: union of padded cylinder and sphere, plus per-geodesic handle capsules which win if within the priority tolerance of the body hit.
 function intersectRayWithGeodesicEmitterAimCylinder(
-  registry: RuntimeObjectRegistry,
+  registry: RuntimeObjectReader,
   origin: Vec3,
   direction: Vec3,
-  emitter: Extract<RuntimeWorldObject, { readonly kind: "geodesic-cannon" }>,
+  emitter: Extract<RuntimeWorldObject, { readonly kind: "geodesicEmitters/emitter" }>,
   ignoredGeodesicIds: ReadonlySet<string>,
 ): ObjectAimHit | undefined {
   const bounds = getGeodesicEmitterAimCylinderBounds(emitter);
@@ -997,10 +997,10 @@ function intersectRayWithGeodesicEmitterAimCylinder(
 
 // One capsule per non-ignored geodesic along its emission yaw, starting at the beam start offset at beam height; nearest wins.
 function intersectRayWithEmitterGeodesicHandles(
-  registry: RuntimeObjectRegistry,
+  registry: RuntimeObjectReader,
   origin: Vec3,
   direction: Vec3,
-  emitter: Extract<RuntimeWorldObject, { readonly kind: "geodesic-cannon" }>,
+  emitter: Extract<RuntimeWorldObject, { readonly kind: "geodesicEmitters/emitter" }>,
   ignoredGeodesicIds: ReadonlySet<string>,
 ): ObjectAimHit | undefined {
   const center = {
@@ -1053,8 +1053,8 @@ function intersectRayWithEmitterGeodesicHandles(
 
 // The emitter's first attached geodesic that is not ignored.
 function resolveDefaultEmitterGeodesicId(
-  registry: RuntimeObjectRegistry,
-  emitter: Extract<RuntimeWorldObject, { readonly kind: "geodesic-cannon" }>,
+  registry: RuntimeObjectReader,
+  emitter: Extract<RuntimeWorldObject, { readonly kind: "geodesicEmitters/emitter" }>,
   ignoredGeodesicIds: ReadonlySet<string>,
 ): string | undefined {
   return getEmitterGeodesicIds(registry, emitter.id).find((geodesicId) => !ignoredGeodesicIds.has(geodesicId));

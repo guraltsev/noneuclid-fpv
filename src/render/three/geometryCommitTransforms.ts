@@ -73,9 +73,9 @@ export function transformPlacedFlagForGeometryCommit(
  * (the emitter is removed). The geodesics themselves are rebuilt afterwards by the computed-object policy.
  */
 export function transformGeodesicCannonForGeometryCommit(
-  object: Extract<RuntimeWorldObject, { readonly kind: "geodesic-cannon" }>,
+  object: Extract<RuntimeWorldObject, { readonly kind: "geodesicEmitters/emitter" }>,
   mapByCellId: ReadonlyMap<string, CellDeformationMap>,
-): Extract<RuntimeWorldObject, { readonly kind: "geodesic-cannon" }> | undefined {
+): Extract<RuntimeWorldObject, { readonly kind: "geodesicEmitters/emitter" }> | undefined {
   const map = mapByCellId.get(object.cellId);
   if (!map) {
     return undefined;

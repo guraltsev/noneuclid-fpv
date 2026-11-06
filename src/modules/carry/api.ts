@@ -1,5 +1,6 @@
 /**
  * The carry module's public face (design 013 sections 7 and 12.1): the names of its commands, events and control slot, and their plain-data shapes.
+ * What is carried is moved through the emitters' `api`, on the fast channel; the carry owns the relation and the hand, and writes no object.
  * Other modules and clients import this file and nothing else of the module's directory.
  */
 import type { EngineCommandBase, EngineEventBase } from "../../engine/moduleTypes";
@@ -19,14 +20,12 @@ export type CarryOffset = {
   readonly leashMeters: number;
 };
 
-/** Picks an object up. Refused with `carry/alreadyCarried`, `carry/notCarriable` or `carry/outOfReach`. */
+/** Picks an object up. On success, and only then, the emitter leaves the floor: its plain shot geodesics are deleted. Refused with `carry/alreadyCarried`, `carry/notCarriable`, `carry/outOfReach` or `geodesicEmitters/alreadyEdited`. */
 export interface CarryAttachCommand extends EngineCommandBase {
   readonly kind: "carry/attach";
   readonly objectId: string;
-  /** The geodesic the carrier works on, rebuilt first when the carried emitter has no locked geodesic (the emitter's own rule, `world-objects/geodesic/carryEnd.ts`). */
+  /** The geodesic the carrier works on, rebuilt first when the carried emitter has no connected geodesic (the emitter's own rule, `world-objects/geodesic/carryEnd.ts`). */
   readonly activeGeodesicId?: string;
-  /** The length a regrown plain active geodesic should have. */
-  readonly rotationTargetLengthMeters?: number;
 }
 
 /** Puts down what the issuing participant carries (a detach only, design 012 P4); the final rebuild of the emitter's geodesics runs. Does nothing when nothing is carried. */
@@ -34,15 +33,8 @@ export interface CarryDetachCommand extends EngineCommandBase {
   readonly kind: "carry/detach";
 }
 
-/** Module-only: the carry ends by the carry rules themselves (the hand's leash). Emits `carry/dropped` and then does what a detach does. */
-export interface CarryDropCommand extends EngineCommandBase {
-  readonly kind: "carry/drop";
-  readonly participantId: string;
-  readonly reason: CarryDropReason;
-}
-
 /** Every command of the module. */
-export type CarryCommand = CarryAttachCommand | CarryDetachCommand | CarryDropCommand;
+export type CarryCommand = CarryAttachCommand | CarryDetachCommand;
 
 /** Why the world ended a carry: the hand's leash released the object (too far, or unreachable), or the object no longer exists. */
 export type CarryDropReason = "leash" | "missing";
@@ -52,23 +44,11 @@ export interface CarryMovedEvent extends EngineEventBase {
   readonly kind: "carry/moved";
   readonly participantId: string;
   readonly objectId: string;
-  readonly rebuiltGeodesicIds: readonly string[];
   /** Set when the emitter's plain active geodesic was regrown: that geodesic is now the carrier's active one. */
   readonly regrownActiveGeodesicId?: string;
 }
 
-/** A carry ended, however it ended (detach or drop): the final rebuild ran. */
-export interface CarryReleasedEvent extends EngineEventBase {
-  readonly kind: "carry/released";
-  readonly participantId: string;
-  readonly objectId: string;
-  readonly rebuiltGeodesicIds: readonly string[];
-  /** Intersection objects that vanished with the rebuilt geodesics; the angles that used them as vertices must go. */
-  readonly prunedIntersectionIds: readonly string[];
-  readonly regrownActiveGeodesicId?: string;
-}
-
-/** The world ended the carry (design 013 section 7); the client leaves its carry tool. Followed by `carry/released` for the same object. */
+/** The world ended the carry (design 013 section 7), in the `bodies` tick; the final rebuild has run, and the client leaves its carry tool. */
 export interface CarryDroppedEvent extends EngineEventBase {
   readonly kind: "carry/dropped";
   readonly participantId: string;
@@ -77,7 +57,7 @@ export interface CarryDroppedEvent extends EngineEventBase {
 }
 
 /** Every event of the module. */
-export type CarryEvent = CarryMovedEvent | CarryReleasedEvent | CarryDroppedEvent;
+export type CarryEvent = CarryMovedEvent | CarryDroppedEvent;
 
 /** Refusal codes of `carry/attach`. */
 export const carryRefusals = {

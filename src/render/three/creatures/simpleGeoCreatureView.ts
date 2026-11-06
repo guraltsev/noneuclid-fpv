@@ -10,7 +10,7 @@ import type { RigidTransform3 } from "../../../math/rigidTransform3";
 import type { DynamicObjectState } from "../../../movement/dynamicObject";
 import { runtimeDiagnostics } from "../../../diagnostics/runtimeDiagnostics";
 import { createSimpleGeoCreatureBehavior } from "../../../world-objects/creatures/simpleGeoCreatureBehavior";
-import type { RuntimeObjectRegistry } from "../../../world-objects/runtimeObjectRegistry";
+import type { LegacyWorldWriter } from "../../../world-objects/runtimeObjectRegistry";
 import type { WorldObjectOwner } from "../../../world-objects/worldObjectOwner";
 import { buildObjectCollisionWireframe, updateObjectCollisionWireframe } from "../debugCollisionWireframes";
 import type { PreparedWorldAssets } from "../preparedWorldAssets";
@@ -61,7 +61,7 @@ export function createSimpleGeoCreatureRuntime(
   objectSpec: SimpleGeoCreatureObjectSpec,
   startCellId: string,
   assets: PreparedWorldAssets,
-  registry?: RuntimeObjectRegistry,
+  registry?: LegacyWorldWriter,
 ): SimpleGeoCreatureRuntime {
   const root = new THREE.Group();
   root.name = `${objectSpec.kind}:${objectSpec.id}`;

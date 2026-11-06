@@ -12,7 +12,7 @@ import {
 } from "../../src/world-objects/protractorTool";
 import { yawRigidTransform3 } from "../../src/math/rigidTransform3";
 import { createRuntimeObjectRegistry } from "../../src/world-objects/runtimeObjectRegistry";
-import type { GeodesicCannonObject } from "../../src/world-objects/geodesic/objects";
+import type { GeodesicEmitterObject } from "../../src/world-objects/geodesic/objects";
 
 describe("protractor angle renderer", () => {
   it("creates portal-renderable source meshes for the highlighted angle", () => {
@@ -67,10 +67,10 @@ describe("protractor angle renderer", () => {
   });
 });
 
-function createEmitter(overrides: Partial<GeodesicCannonObject> = {}): GeodesicCannonObject {
+function createEmitter(overrides: Partial<GeodesicEmitterObject> = {}): GeodesicEmitterObject {
   return {
     id: "emitter-a",
-    kind: "geodesic-cannon",
+    kind: "geodesicEmitters/emitter",
     cellId: "cell-a",
     localPose: yawRigidTransform3(0, { x: 0, y: 0, z: 0 }),
     portalRenderable: true,

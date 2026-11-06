@@ -107,7 +107,7 @@ export function reduceRuntimeCommand(state: ClientSessionState, command: Runtime
     case "show-debug-settings":
       return config.menu.debugSectionEnabled ? withMenu(showRuntimeMenuDebugSettings(menu), syncPalette) : nothing;
     case "show-place-flag-options":
-      return toolEnabled("place-flag") ? withMenu(showRuntimeMenuPlaceFlagOptions(menu), syncPalette) : nothing;
+      return toolEnabled("placedFlags/flag") ? withMenu(showRuntimeMenuPlaceFlagOptions(menu), syncPalette) : nothing;
     case "show-edit-sign":
       return withMenu(showRuntimeMenuEditSign(menu, { flagId: command.flagId, message: command.message }), syncPalette);
     case "show-geodesic-cannon-actions": {
@@ -150,12 +150,10 @@ export function reduceRuntimeCommand(state: ClientSessionState, command: Runtime
         { kind: "switch-tool-session", toolId: command.toolId },
         syncPalette,
       );
-    case "enter-tool-mode":
-      return withMenu(closeRuntimeMenu(setRuntimeMenuSelectedTool(menu, command.toolId)), syncPalette);
     case "clear-selected-tool":
       return withMenu(setRuntimeMenuSelectedTool(menu, "none"), syncPalette);
     case "choose-place-flag-type":
-      return toolEnabled("place-flag")
+      return toolEnabled("placedFlags/flag")
         ? withMenu(closeRuntimeMenu(selectRuntimeMenuPlaceFlagToolType(menu, command.flagType)), syncPalette)
         : nothing;
     case "set-editing-flag":
@@ -231,8 +229,6 @@ export function reduceRuntimeCommand(state: ClientSessionState, command: Runtime
       return { state: { ...state, showCellPathRendersInstances: command.enabled }, effects: [] };
     case "set-cannon-tool-state":
       return { state: { ...state, cannonToolState: command.state }, effects: [] };
-    case "set-protractor-tool-state":
-      return { state: { ...state, protractorToolState: command.state }, effects: [] };
     case "set-module-tool-state": {
       const { [command.moduleId]: previous, ...rest } = state.moduleToolState;
       if (command.state === undefined) {
@@ -266,16 +262,13 @@ export function reduceRuntimeCommand(state: ClientSessionState, command: Runtime
       };
     }
     case "add-geodesic-to-cannon":
-      return toolEnabled("geodesic-cannon") ? effectsOnly({ ...command }) : nothing;
+      return toolEnabled("geodesicEmitters/emitter") ? effectsOnly({ ...command }) : nothing;
     case "start-cannon-carry":
-      return toolEnabled("geodesic-cannon-carry") ? effectsOnly({ ...command }) : nothing;
     case "start-object-action":
-      // The world decides whether the action's tool is allowed (the tool request); nothing is checked here.
-      return effectsOnly({ ...command });
     case "start-cannon-rotation":
-      return toolEnabled("geodesic-cannon-rotate") ? effectsOnly({ ...command }) : nothing;
     case "start-cannon-aim":
-      return toolEnabled("geodesic-cannon-aim") ? effectsOnly({ ...command }) : nothing;
+      // The world decides whether the tool is allowed (the tool request); nothing is checked here.
+      return effectsOnly({ ...command });
     case "delete-geodesic-from-cannon":
     case "step-geometry-computer-target":
     case "start-geometry-computer-deformation":

@@ -7,7 +7,7 @@ import type { CompiledCellComplex } from "../cell-complex/compileCellComplex";
 import type { RuntimeToolId } from "../glue/toolIds";
 import type { PlayerPose } from "../movement/playerPose";
 import type { RuntimeObjectRegistry } from "../world-objects/runtimeObjectRegistry";
-import { composeModules, contributedNamePattern, writableKindsOf, type ComposedHandler } from "./composeModules";
+import { composeModules, contributedNamePattern, declaredKindsOf, type ComposedHandler } from "./composeModules";
 import { coreObjectKinds, coreToolIds, moduleOwnedCoreKinds } from "./coreIds";
 import { createEngineIdSource } from "./ids";
 import { createTickRunner, type MutableStepContext } from "./moduleTicks";
@@ -22,8 +22,10 @@ import type {
   EngineCommandBase,
   EngineEventBase,
   EngineIdSource,
+  ModulePublicApi,
   ParticipantRecord,
   WorldEngine,
+  WorldBehindRealTimeEvent,
   WorldReadView,
   WorldRequestToolCommand,
 } from "./moduleTypes";
@@ -44,6 +46,8 @@ export interface WorldEngineOptions {
   readonly isToolEnabled?: (toolId: RuntimeToolId) => boolean;
   /** Check every module write against the module's declared kinds (design 013 section 9.6). Default: off. */
   readonly writeGuard?: boolean;
+  /** What the wrappers of a module's `publicApi` submit through: the client that answers its callers (the engine keeps no promise). Without it, an engine has no scripts and a wrapper throws. */
+  readonly submitPublicCommand?: (command: EngineCommandBase) => Promise<CommandResult>;
 }
 
 interface QueuedCommand {
@@ -77,17 +81,24 @@ export function createWorldEngine(options: WorldEngineOptions): WorldEngine {
     },
   };
 
-  const declaredKindsOf = new Map(definitions.map((definition) => [definition.id, writableKindsOf(definition)]));
+  const kindsOfModule = new Map(definitions.map((definition) => [definition.id, declaredKindsOf(definition)]));
   const experience = composeModules(definitions, {
     coreObjectKinds,
     moduleOwnedCoreKinds,
     coreToolIds,
     objects: moduleObjects,
     getWorld: options.getWorld,
-    wrapApi: (moduleId, api) => (guardOn ? runFunctionsInFrame(frames, moduleId, declaredKindsOf.get(moduleId)!, api) : api),
+    submitPublicCommand(command) {
+      if (options.submitPublicCommand === undefined) throw new Error(`no client takes public commands: ${command.kind}`);
+      return options.submitPublicCommand(command);
+    },
+    wrapApi: (moduleId, api) => (guardOn ? runFunctionsInFrame(frames, moduleId, kindsOfModule.get(moduleId)!, api) : api),
   });
   const queriesByToken = new Map<string, unknown>();
+  const publicApis = new Map<string, ModulePublicApi>();
   for (const module of experience.modules) {
+    const { publicApi } = module.instance;
+    if (publicApi !== undefined) publicApis.set(module.definition.id, guardOn ? runFunctionsInFrame(frames, module.definition.id, null, publicApi) : publicApi);
     const token = module.definition.provides;
     if (token) {
       queriesByToken.set(token.id, guardOn ? runFunctionsInFrame(frames, module.definition.id, null, module.instance.queries) : module.instance.queries);
@@ -139,7 +150,7 @@ export function createWorldEngine(options: WorldEngineOptions): WorldEngine {
   function runHandler(handler: ComposedHandler, command: EngineCommandBase, participantId: string): CommandResult {
     const savedParticipantId = currentParticipantId;
     currentParticipantId = participantId;
-    frames.push(handler.moduleId, declaredKindsOf.get(handler.moduleId) ?? new Set<string>());
+    frames.push(handler.moduleId, kindsOfModule.get(handler.moduleId) ?? new Set<string>());
     try {
       return handler.run(command as never, commandContext);
     } finally {
@@ -167,6 +178,11 @@ export function createWorldEngine(options: WorldEngineOptions): WorldEngine {
     }
   }
 
+  function closeControl(participantId: string, slot: string): void {
+    assertSlotName(slot);
+    controls.close(participantId, slot);
+  }
+
   const stepContext: MutableStepContext = {
     get world() {
       return options.getWorld();
@@ -179,6 +195,7 @@ export function createWorldEngine(options: WorldEngineOptions): WorldEngine {
     forEachParticipant: (fn) => participants.forEach(fn),
     setAttachments: (participantId, attachments) => void participants.setAttachments(participantId, attachments),
     control: (participantId, slot) => controls.get(participantId, slot),
+    closeControl,
     emit,
     dispatch: dispatchFromModule,
     ids: activeIds,
@@ -202,10 +219,7 @@ export function createWorldEngine(options: WorldEngineOptions): WorldEngine {
       assertSlotName(slot);
       controls.open(participantId, slot);
     },
-    closeControl(participantId, slot) {
-      assertSlotName(slot);
-      controls.close(participantId, slot);
-    },
+    closeControl,
   };
 
   const ticks = createTickRunner(experience.modules, { frames, context: stepContext, journal: registry.changes });
@@ -275,6 +289,14 @@ export function createWorldEngine(options: WorldEngineOptions): WorldEngine {
         throw error;
       }
     },
+    noticeBehindRealTime(seconds) {
+      const notice: WorldBehindRealTimeEvent = {
+        kind: "world/behindRealTime",
+        message: `The world could not keep up and skipped ${seconds.toFixed(2)} s of real time.`,
+        seconds,
+      };
+      emit(notice);
+    },
     read,
     ids: coreIds,
     resultOf: (ticket) => results.get(ticket),
@@ -284,6 +306,10 @@ export function createWorldEngine(options: WorldEngineOptions): WorldEngine {
     query<Q>(token: { readonly id: string }): Q {
       if (!queriesByToken.has(token.id)) throw new Error(`no module in the experience provides ${token.id}`);
       return queriesByToken.get(token.id) as Q;
+    },
+    publicApis,
+    withdraw(ticket) {
+      queue = queue.filter((queued) => queued.ticket !== ticket);
     },
     endFrame() {
       registry.changes.clear();
@@ -296,6 +322,7 @@ export function createWorldEngine(options: WorldEngineOptions): WorldEngine {
 
 export type { WorldEngine } from "./moduleTypes";
 export { createLocalPlayerParticipant, localParticipantId } from "./participants";
+export { createSimulationClock, type SimulationClockOptions } from "./simulationClock";
 
 /** The pose of the local player: where this device's body is in the world. */
 export function readLocalPlayerPose(engine: Pick<WorldEngine, "read">): PlayerPose {

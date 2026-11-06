@@ -211,7 +211,7 @@ It does not answer questions about stereo or controller input; those need a head
 `npm run cdp` has a second backend that reaches any device (a headset, another desktop) through the local server
 ([DEPLOYMENT.md](DEPLOYMENT.md), "Local HTTPS server for a headset"). Every page served by that server joins a
 WebSocket channel and exposes its public API, `window.noneuclid.api`: namespaces `app` (`info`, `changeWorld`,
-`changeConfig`, `reload`), `debug` (including `playerPose` and `setPlayerPose`), `portal`, `render` (see 3b), `geometry` (torus-skew worlds only) and `view` (`screenshot`). A call is a
+`changeConfig`, `reload`), `debug` (including `playerPose` and `setPlayerPose`), `world`, one namespace per module with a public API (`geodesicEmitters`, `geodesicModel`, `curveShortening`), `portal`, `render` (see 3b), `geometry` (torus-skew worlds only) and `view` (`screenshot`). A call is a
 literal function call on that object; `help` lists what exists.
 
 ```powershell

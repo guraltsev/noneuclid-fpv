@@ -250,7 +250,7 @@ per-cell **segments** of a geodesic; the ordered list of portals crossed is its 
 
 **Arcs, vertices and crossings.** A `GeodesicArcObject` (kind `geodesicModel/arc`, formerly "geodesic interval") is a geodesic arc
 with a `start` and an `end` *attachment* (`src/world-objects/geodesic/objects.ts#GeodesicEndpointAttachment`): each end is attached to an
-*anchor object* — an emitter ("cannon"), or a `GeodesicVertexObject` (kind `geodesicModel/vertex`, formerly "free geodesic end"; a point of a
+*anchor object* — an emitter (`GeodesicEmitterObject`, kind `geodesicEmitters/emitter`, formerly "cannon"), or a `GeodesicVertexObject` (kind `geodesicModel/vertex`, formerly "free geodesic end"; a point of a
 cell that is not an emitter: it can be aimed when only one arc end is on it, and it is a shared vertex of a curve when two or more are). The arc stores
 its portal word, so it is determined by (anchor positions, word) alone. A `GeodesicCrossingObject` (kind `geodesicModel/crossing`, formerly
 "geodesic intersection") marks a point where the segments of two different geodesics cross. This is the "geodesic end model" of
@@ -263,14 +263,14 @@ in the frame of $C_0$ (`src/world-objects/geodesic/endpoints.ts#liftGeodesicEndp
 last portal back to the first). Its length is $|\tilde b-a|$ (the minimum is
 `src/world-objects/geodesic/objects.ts#GEODESIC_MIN_LENGTH_METERS` $=0.15$ m). The direction at $a$ is the direction of
 $\tilde b-a$, and re-tracing from $a$ in that direction for length $|\tilde b-a|$ must reproduce the word —
-this is how `src/world-objects/geodesic/intervals.ts#rebuildLockedGeodesicFromEndpointsAndPortalWord` rebuilds a *locked*
+this is how `src/world-objects/geodesic/intervals.ts#rebuildConnectedGeodesicFromEndpointsAndPortalWord` rebuilds a *connected*
 geodesic when its endpoints move. The reverse word (`src/world-objects/geodesic/portalWord.ts#reverseGeodesicPortalWord`) reads
 the arc from the other end: reverse the order and swap source/target of each step.
 
 **Why words, not just positions.** In a quotient space such as the torus two anchors are joined by infinitely many
 geodesics, distinguished by the sequence of portals crossed. Keeping the word makes a rebuilt arc a continuous
 deformation of the previous one rather than a jump to a different homotopy class
-(`src/world-objects/geodesic/intervals.ts#updateLockedGeodesicPortalWordForCarriedAnchorTraversal` appends the crossed portal p when the `end`
+(`src/world-objects/geodesic/intervals.ts#updateConnectedGeodesicPortalWordForCarriedAnchorTraversal` appends the crossed portal p when the `end`
 anchor crosses it, prepends p⁻¹ when the `start` anchor crosses it, and does both when one anchor holds both ends of
 a loop. The loop's word then becomes the conjugate $p^{-1}wp$, the same loop read from the new base point. Words are
 always freely reduced.)
@@ -471,7 +471,7 @@ marmots, flags). A commit carries the forward vector by the linear part $A$ of t
 $f'=A f/|A f|$, and rebuilds the yaw as $\psi'=\operatorname{atan2}(-f'_x,f'_y)$
 (`src/cell-complex/worldGeometryDeformations.ts#transformRigidPoseWithMap`); a marmot's velocity becomes $|v|\,f'$.
 Because $A$ maps the lattice to the lattice, a body walking along a closed geodesic of class $(p,q)\in\mathbb Z^2$
-still walks along one of class $(p,q)$ after the commit. Geodesic cannon yaws are direction angles
+still walks along one of class $(p,q)$ after the commit. Emitter yaws are direction angles
 ($(\cos\psi,\sin\psi)$) and are carried as directions (`src/render/three/runtimeSceneUtils.ts#transformYawWithMap`).
 
 **Floor texture.** In the torus family the floor UV of a point with lattice coordinates $(\alpha,\beta)$ is
@@ -489,8 +489,8 @@ the statically culled path tables — in a Web Worker with an inline fallback
 The render loop polls once per frame; the swap is therefore atomic on the render thread.
 
 On commit the application shell transports the player and runtime objects through the per-cell maps and then applies
-`src/runtime/worldGeometryComputedObjects.ts#applyGeometryCommitComputedObjectPolicy`: unlocked geodesics (and the
-measurements built on them) are deleted, geodesics locked between two emitters are re-solved with their endpoints' new
+`src/runtime/worldGeometryComputedObjects.ts#applyGeometryCommitComputedObjectPolicy`: free geodesics (and the
+measurements built on them) are deleted, geodesics connecting two emitters are re-solved with their endpoints' new
 positions, and any that cannot be re-solved are deleted and reported. Tool selections tied to old geometry are cleared.
 
 ## 10. Tolerances and constants
@@ -538,6 +538,6 @@ rather than discovered.
   keep a word whose aperture is too low to see through. The only lossy rule is the per-root path budget, which is spent
   best-first by line measure.
 - **Yaw conventions.** Rigid-transform yaw is $\operatorname{atan2}(R_{10},R_{00})$ and forward is $R e_y$. The marmot
-  derives its yaw from its velocity as $\operatorname{atan2}(-v_x,v_y)$, so it walks along $v$. Geodesic cannon and
+  derives its yaw from its velocity as $\operatorname{atan2}(-v_x,v_y)$, so it walks along $v$. Emitter and
   protractor yaws are direction angles along $(\cos\psi,\sin\psi)$.
 - **Curve shortening.** The flow does not insert vertices: a curve that needs a wrap around a forbidden-zone disk is destroyed.

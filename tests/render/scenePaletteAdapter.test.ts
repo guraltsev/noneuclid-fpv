@@ -4,7 +4,7 @@
  * with a `scenePaletteItemId` (and `scenePaletteAction` where it is clickable) that the input layer reads back.
  * This file covers only what the adapter itself decides that `PaletteDefinition` does not: which icon goes with
  * which tool and action, the on-screen sign-editing keyboard's key choice and cursor/preview layout, and
- * suppressing an action for a locked geodesic. Which options a page offers and which are disabled is
+ * suppressing an action for a connected geodesic. Which options a page offers and which are disabled is
  * `createPaletteDefinition`'s decision, covered directly in `tests/ui/paletteDefinition.test.ts`.
  */
 import { describe, expect, it } from "vitest";
@@ -16,12 +16,12 @@ import {
 } from "../../src/runtime/runtimeMenuState";
 import { publicAssetUrl } from "../../src/glue/assetUrls";
 import { createScenePaletteAdapter } from "../../src/render/three/palette/scenePaletteAdapter";
-import { createPaletteDefinition } from "../../src/ui/paletteDefinition";
+import { createTestPaletteDefinition } from "../support/tools";
 
 describe("scenePaletteAdapter", () => {
   it("maps each main tool and its nested options to the right icon", () => {
     const adapter = createScenePaletteAdapter(createNoopOptions());
-    adapter.setDefinition(createPaletteDefinition(createRuntimeMenuState({ selectedWorldId: "cube" })));
+    adapter.setDefinition(createTestPaletteDefinition(createRuntimeMenuState({ selectedWorldId: "cube" })));
 
     const itemIds = collectPaletteItemIds(adapter.root);
     const imageSources = collectPaletteImageSources(adapter.root);
@@ -37,7 +37,7 @@ describe("scenePaletteAdapter", () => {
 
   it("maps each geodesic emitter action to the right icon", () => {
     const adapter = createScenePaletteAdapter(createNoopOptions());
-    adapter.setDefinition(createPaletteDefinition(showRuntimeMenuGeodesicCannonActions(
+    adapter.setDefinition(createTestPaletteDefinition(showRuntimeMenuGeodesicCannonActions(
       createRuntimeMenuState({ selectedWorldId: "cube" }),
       { cannonId: "cannon-a", geodesicIds: ["g-a"], objectActions: [{ actionId: "tie-and-detach", label: "Tie & detach", iconId: "tie-and-detach", tooltip: "Tie them", enabled: true }] },
     )));
@@ -53,7 +53,7 @@ describe("scenePaletteAdapter", () => {
 
   it("omits a contributed action when it is unavailable", () => {
     const adapter = createScenePaletteAdapter(createNoopOptions());
-    adapter.setDefinition(createPaletteDefinition(showRuntimeMenuGeodesicCannonActions(
+    adapter.setDefinition(createTestPaletteDefinition(showRuntimeMenuGeodesicCannonActions(
       createRuntimeMenuState({ selectedWorldId: "cube" }),
       { cannonId: "cannon-a", geodesicIds: ["g-a"], objectActions: [{ actionId: "tie-and-detach", label: "Tie & detach", iconId: "tie-and-detach", tooltip: "Tie them", enabled: false }] },
     )));
@@ -64,11 +64,11 @@ describe("scenePaletteAdapter", () => {
     adapter.dispose();
   });
 
-  it("renders locked geodesic emitter actions with a lock segment marker", () => {
+  it("renders connected geodesic emitter actions with a lock segment marker", () => {
     const adapter = createScenePaletteAdapter(createNoopOptions());
-    adapter.setDefinition(createPaletteDefinition(showRuntimeMenuGeodesicCannonActions(
+    adapter.setDefinition(createTestPaletteDefinition(showRuntimeMenuGeodesicCannonActions(
       createRuntimeMenuState({ selectedWorldId: "cube" }),
-      { cannonId: "cannon-a", geodesicIds: ["g-a"], lockedGeodesicIds: ["g-a"] },
+      { cannonId: "cannon-a", geodesicIds: ["g-a"], connectedGeodesicIds: ["g-a"] },
     )));
 
     const itemIds = collectPaletteItemIds(adapter.root);
@@ -91,7 +91,7 @@ describe("scenePaletteAdapter", () => {
 
   it("renders a sign's keyboard, cursor and preview, fixed keys only, with a trash action", () => {
     const adapter = createScenePaletteAdapter(createNoopOptions());
-    const definition = createPaletteDefinition(showRuntimeMenuEditSign(
+    const definition = createTestPaletteDefinition(showRuntimeMenuEditSign(
       createRuntimeMenuState({ selectedWorldId: "cube" }),
       { flagId: "sign-a", message: "A\nB" },
     ));
@@ -125,7 +125,7 @@ describe("scenePaletteAdapter", () => {
 
   it("renders a fundamental tile picture on geometry computer action menus", () => {
     const adapter = createScenePaletteAdapter(createNoopOptions());
-    adapter.setDefinition(createPaletteDefinition(showRuntimeMenuGeometryComputerActions(
+    adapter.setDefinition(createTestPaletteDefinition(showRuntimeMenuGeometryComputerActions(
       createRuntimeMenuState({ selectedWorldId: "torus" }),
       {
         computerId: "torus-geometry-computer",

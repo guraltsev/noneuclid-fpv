@@ -60,12 +60,33 @@ export function updateGeodesicIntersectionObjects(registry: RuntimeObjectRegistr
   return intersections;
 }
 
-/** Returns the last known intersection marker with this id even if it has since disappeared from the registry, or `undefined`. */
+/** Returns the last known intersection marker with this id even if it has since disappeared from the registry, or `undefined`. The geodesic model forgets a vanished marker at its next pass: this tells what vanished in the pass that just ran. */
 export function getRememberedGeodesicIntersectionObject(
   registry: RuntimeObjectRegistry,
   intersectionId: string,
 ): GeodesicCrossingObject | undefined {
   return getGeodesicIntersectionMemory(registry).get(intersectionId);
+}
+
+/**
+ * The crossing of `geodesicIds` in the cell nearest `point`, within the tolerance a marker keeps its identity over, or `undefined`.
+ * What gives a crossing back to something that points at it after the memory is gone: its id is not real state, and a marker that returns after more than one pass, or a marker rebuilt after a load, has a new one.
+ */
+export function findGeodesicIntersectionNear(
+  registry: RuntimeObjectRegistry,
+  options: { readonly cellId: string; readonly geodesicIds: readonly string[]; readonly point: Vec3 },
+): GeodesicCrossingObject | undefined {
+  let best: GeodesicCrossingObject | undefined;
+  let bestDistance = vertexContinuityToleranceMeters;
+  for (const crossing of registry.getObjectsOfKind("geodesicModel/crossing")) {
+    if (crossing.cellId !== options.cellId || !options.geodesicIds.every((id) => crossing.geodesicIds.includes(id))) continue;
+    const distance = Math.sqrt(distanceSquaredVec3(crossing.aimStickyTarget?.localPoint ?? crossing.localPose.translation, options.point));
+    if (distance <= bestDistance) {
+      best = crossing;
+      bestDistance = distance;
+    }
+  }
+  return best;
 }
 
 /** Forgets remembered intersection markers that are no longer in the registry; returns the forgotten ids. */

@@ -6,6 +6,7 @@ import type { CompiledCellComplex } from "../cell-complex/compileCellComplex";
 import type { RuntimeToolId } from "../glue/toolIds";
 import type { PlayerPose } from "../movement/playerPose";
 import type { RuntimeObjectReader, RuntimeObjectRegistry } from "../world-objects/runtimeObjectRegistry";
+import type { PlacedFlagType } from "../world-objects/toolObjects";
 
 /** Data that survives a structured clone: what commands, results, events and control slots carry. */
 export type PlainData =
@@ -34,6 +35,14 @@ export interface WorldRequestToolCommand extends EngineCommandBase {
   readonly toolId: RuntimeToolId;
 }
 
+/** The notice that real time was dropped: the world could not keep up, even at the longest tick. */
+export interface WorldBehindRealTimeEvent extends EngineEventBase {
+  readonly kind: "world/behindRealTime";
+  readonly message: string;
+  /** The real time dropped since the last notice. */
+  readonly seconds: number;
+}
+
 /** The answer to a command: accepted (with an optional value) or refused with a stable code and a sentence for people. */
 export type CommandResult =
   | { readonly ok: true; readonly value?: PlainData }
@@ -46,16 +55,15 @@ export type CommandTicket = number;
 export type ParticipantBody = PlayerPose;
 
 /**
- * A relation the world holds between a participant and an object (design 013 section 7). Today only carrying (`kind` "carry"); the module that owns the kind changes it, through the contexts' `setAttachments`.
- * `arrived` is part of the relation because it changes how the object moves: false while the object still glides to the carrier, true from the first frame it is at the carrier.
- * The two optional fields are what the carry module needs to rebuild the object's geodesics: the geodesic the carrier works on and the length a regrown one should have.
+ * A relation the world holds between a participant and an object (design 013 section 7): carrying (`kind` "carry") and editing an emitter (`geodesicEmitters/edit`); the module that owns the kind changes it, through the contexts' `setAttachments`.
+ * `arrived` is part of a carry because it changes how the object moves: false while the object still glides to the carrier, true from the first frame it is at the carrier.
+ * `activeGeodesicId` is the geodesic the participant works on: the one a carry rebuilds first, the one an edit turns.
  */
 export interface ParticipantAttachment {
   readonly kind: string;
   readonly objectId: string;
-  readonly arrived: boolean;
+  readonly arrived?: boolean;
   readonly activeGeodesicId?: string;
-  readonly rotationTargetLengthMeters?: number;
 }
 
 /** The attachment of `kind` that `participant` holds, or undefined. */
@@ -105,8 +113,10 @@ export interface WorldEngine<Cmd extends EngineCommandBase = EngineCommandBase> 
   publishBody(participantId: string, body: ParticipantBody): boolean;
   /** Once per frame, before the frame's steps: runs the bodies ticks on the control slots, so what follows a participant keeps up with the frame whether or not a tick falls in it. `seconds` is the frame time the participant's own body moved in. */
   applyControls(seconds: number): void;
-  /** Advances the world by `deltaSeconds` (0 is legal: it applies commands and derives). */
+  /** Advances the world by `deltaSeconds`, any non-negative duration (0 is legal: it applies commands and derives). The app's ticks come from the simulation clock, which keeps them within its maximum. */
   step(deltaSeconds: number): void;
+  /** Emits the `world/behindRealTime` notice: the simulation clock dropped `seconds` of real time. The shell calls it as the clock allows, at most once per second. */
+  noticeBehindRealTime(seconds: number): void;
   /** Read-only world state. */
   readonly read: WorldReadView;
   /** Allocates ids for legacy world writers that still create objects themselves. */
@@ -117,6 +127,10 @@ export interface WorldEngine<Cmd extends EngineCommandBase = EngineCommandBase> 
   forEachEvent(fn: (event: EngineEventBase) => void): void;
   /** A module's read-only queries; never its `api`. */
   query<Q>(token: ModuleToken<unknown, Q>): Q;
+  /** The `publicApi` of each module that has one, by module id. The shell installs each as `api.<moduleId>` for the life of the app. */
+  readonly publicApis: ReadonlyMap<string, ModulePublicApi>;
+  /** Takes back a command no step has applied yet; it will never run. Does nothing for one already applied. */
+  withdraw(ticket: CommandTicket): void;
   /** Called by the client after it has read changes, events and results: clears the journals, events and results. */
   endFrame(): void;
 }
@@ -182,14 +196,13 @@ export interface ModuleDefinition<
   readonly provides?: ModuleToken<Api, Queries>;
   readonly requires: readonly ModuleToken<unknown, unknown>[];
   readonly objectKinds: readonly ObjectKindDeclaration[];
-  /**
-   * Kinds of the core union that this module also writes, because the module that will own them does not exist yet (the emitter and geodesic kinds, until `geodesicEmitters`, design 013 job 51). Only the write guard reads it; it empties as the owners arrive.
-   */
-  readonly writesCoreKinds?: readonly string[];
   /** Tool ids this module defines; the engine knows them for gating. */
   readonly toolIds?: readonly RuntimeToolId[];
   readonly create: (ctx: ModuleCreateContext) => ModuleInstance<Api, Cmd, Evt, Queries>;
 }
+
+/** What a module offers scripts: functions of plain data, in and out. */
+export type ModulePublicApi = { readonly [name: string]: (...args: never[]) => unknown };
 
 /** What a module's `create` returns. */
 export interface ModuleInstance<
@@ -204,6 +217,8 @@ export interface ModuleInstance<
   readonly queries: Queries;
   readonly commands: CommandHandlers<Cmd>;
   readonly ticks: readonly ModuleTick[];
+  /** For scripts, as `api.<moduleId>` (design 013 section 9.1): reads, or wrappers that submit a command and resolve with its result. Never a write of its own. Composition fails when a name is not a function. */
+  readonly publicApi?: ModulePublicApi;
   /** Phantom: the events this module emits. */
   readonly __events?: Evt;
 }
@@ -217,6 +232,8 @@ export interface ModuleCreateContext {
   require<A>(token: ModuleToken<A, unknown>): A;
   readonly objects: RuntimeObjectRegistry;
   readonly getWorld: () => CompiledCellComplex;
+  /** For the wrappers of `publicApi` only: submits a command as the local player, with every check a client's command gets, and resolves with its result. */
+  submitPublicCommand(command: EngineCommandBase): Promise<CommandResult>;
 }
 
 /** One object, reused every step: never keep it across steps. */
@@ -233,6 +250,8 @@ export interface StepContext {
   /** Replaces the attachments of a participant. */
   setAttachments(participantId: string, attachments: readonly ParticipantAttachment[]): void;
   control(participantId: string, slot: string): PlainData | undefined;
+  /** Closes a slot, for a relation that ends in a tick: on the fast channel, nothing may wait for a command. */
+  closeControl(participantId: string, slot: string): void;
   emit(event: EngineEventBase): void;
   /** Runs a command now, inside the step, as actor "world" (design 013 section 5.7). */
   dispatch(command: EngineCommandBase): CommandResult;
@@ -278,21 +297,37 @@ export interface AimPick {
   readonly point: { readonly x: number; readonly y: number; readonly z: number };
   /** The hit is close enough to interact with. */
   readonly withinRange: boolean;
+  /** The eye in the hit cell's local frame, meters. */
+  readonly eyePoint: { readonly x: number; readonly y: number; readonly z: number };
   readonly geodesicEndpoint?: AimPickEndpoint;
+  /** The geodesic of the hit emitter the aim points along, when it points along one. */
+  readonly emitterGeodesicId?: string;
 }
 
 /** What a tool may do. The shell implements it; tests fake it. A tool changes the world only through `submit`. */
 export interface ToolContext {
   /** Picks along the current aim ray (desktop: camera; XR: the hand ray), nearest first. A read-only query. */
   pickTargets(): readonly AimPick[];
+  /** The pick the person has selected along the ray: the first, or the one they cycled to. */
+  currentPick(): AimPick | undefined;
+  /** The horizontal direction of the aim ray in radians, or undefined for a (near-)vertical ray. */
+  aimYawRadians(): number | undefined;
   /** Submits a command for the local participant; its result arrives through the tool's `onResult` after the next step. */
   submit(command: EngineCommandBase): void;
+  /** This tool has a command the world has not answered. An answer that submits the next command of a sequence keeps it true, so a press that must not overlap one simply checks this. */
+  commandInFlight(): boolean;
   /** The client tool state of a module (`moduleToolState[moduleId]` of the client session), or undefined while its tool is idle. */
   getToolState<T>(moduleId: string): T | undefined;
   /** Replaces the client tool state of a module; undefined clears it. */
   setToolState(moduleId: string, state: unknown): void;
-  /** Ends the tool: closes the menu and selects no tool. */
+  /** Ends this tool, if it is still the selected one: closes the menu and selects no tool. An answer arriving after the person chose another tool ends nothing. */
   endTool(): void;
+  /** Makes the object and one of its geodesics the client's selection, which the object's menu page and its modes start from. */
+  selectObject(objectId: string, geodesicId: string): void;
+  /** Shows the object's menu page, with its current state; closes the menu when the object has no page, for example because it is gone. */
+  showObjectPage(objectId: string): void;
+  /** The type of sign the person chose on the palette. */
+  chosenFlagType(): PlacedFlagType;
   readonly read: WorldReadView;
   /** A module's read-only queries (design 013 section 5.7); never its `api`. */
   query<Q>(token: ModuleToken<unknown, Q>): Q;
@@ -336,9 +371,10 @@ export interface ToolDescriptor {
   readonly showsAimCross: boolean;
   /** `onPrimaryAction` runs every frame, not only on a primary action while no menu is open (the tools that update from the input each frame). */
   readonly runsEveryFrame?: boolean;
-  /** Where the tool is started from: the main tool list, or an action on an object's menu page. */
+  /** Where the tool is started from: the main tool list, an action on an object's menu page, or (`sub-mode`) the shell, from a button of its own. */
   readonly entry:
     | { readonly kind: "main-tool" }
+    | { readonly kind: "sub-mode" }
     | {
         readonly kind: "object-action";
         readonly objectKind: string;

@@ -1,6 +1,6 @@
 /**
  * Resolves the tooltip text for palette items from their string item ids.
- * Item ids are namespaced strings produced by the palette renderers (for example "tool:place-flag", "geodesic-cannon-action:rotate:<id>", "sign-key:A"); this module is the single place that turns them into human-readable labels, so desktop and VR show the same tooltips. It is a pure lookup with no state.
+ * Item ids are namespaced strings produced by the palette renderers (for example "tool:placedFlags/flag", "geodesic-cannon-action:rotate:<id>", "sign-key:A"); this module is the single place that turns them into human-readable labels, so desktop and VR show the same tooltips. It is a pure lookup with no state.
  */
 /**
  * Returns the tooltip for a palette item id (prefix families like tool:, tutorial:, sign-key: are decoded, others looked up in a fixed table), or undefined for an undefined or unknown id.
@@ -80,13 +80,13 @@ const fixedTooltips: Readonly<Record<string, string>> = {
 
 function toolTooltip(toolId: string): string | undefined {
   switch (toolId) {
-    case "place-flag":
+    case "placedFlags/flag":
       return "Place sign";
-    case "geodesic-cannon":
+    case "geodesicEmitters/emitter":
       return "Create and terminate straight lines";
-    case "measure-length":
+    case "geodesicMeasurements/length":
       return "Measure length";
-    case "protractor":
+    case "geodesicMeasurements/protractor":
       return "Measure angle";
     default:
       return undefined;

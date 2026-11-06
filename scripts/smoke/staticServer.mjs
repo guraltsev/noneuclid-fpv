@@ -35,9 +35,10 @@ export function contentTypeFor(filePath) {
   return TYPES[path.extname(filePath).toLowerCase()] ?? "application/octet-stream";
 }
 
-/** Start serving `root` under `base`. Resolves to `{ siteUrl, close }`. */
-export function startStaticServer({ root, base, host = "127.0.0.1", port = 0 }) {
+/** Start serving `root` under `base`, with the files of `overlayRoot`, if given, added and taking precedence. Resolves to `{ siteUrl, close }`. */
+export function startStaticServer({ root, base, overlayRoot, host = "127.0.0.1", port = 0 }) {
   const absRoot = path.resolve(root);
+  const absOverlayRoot = overlayRoot === undefined ? undefined : path.resolve(overlayRoot);
   const server = http.createServer((req, res) => {
     const notFound = (p) => {
       res.writeHead(404, { "Content-Type": "text/plain", "Cache-Control": "no-store" });
@@ -62,12 +63,14 @@ export function startStaticServer({ root, base, host = "127.0.0.1", port = 0 }) 
     }
     let rest = decoded.slice(base.length);
     if (rest === "" || rest.endsWith("/")) rest += "index.html";
-    const file = path.resolve(absRoot, rest);
-    const rel = path.relative(absRoot, file);
+    const rootFile = path.resolve(absRoot, rest);
+    const rel = path.relative(absRoot, rootFile);
     if (rel.startsWith("..") || path.isAbsolute(rel)) {
       notFound(decoded);
       return;
     }
+    const overlayFile = absOverlayRoot === undefined ? undefined : path.resolve(absOverlayRoot, rel);
+    const file = overlayFile !== undefined && fs.existsSync(overlayFile) ? overlayFile : rootFile;
     let stat;
     try {
       stat = fs.statSync(file);

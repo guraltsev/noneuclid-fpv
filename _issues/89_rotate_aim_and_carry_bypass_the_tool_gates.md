@@ -21,3 +21,5 @@ the emitters disabled, or a later gate such as a role, cannot refuse them.
 - `enter-tool-mode` is gone; rotate, aim and carry start through `world/requestTool`.
 - Commands that need these tools declare `requiresTool`.
 - A test: with the emitters disabled by configuration, each of the three is refused with its message, and the tool does not change.
+
+- Job 64 (2026-11-05): done, needs review; see the Report in [the job](../.agents/jobs/_done/64_emitter_edits_and_length.md). Manual checks are not done, so this stays open.

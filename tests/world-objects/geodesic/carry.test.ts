@@ -1,24 +1,24 @@
 /**
  * `tests/world-objects/geodesic/carry.test.ts` — unit tier.
  *
- * Moving an emitter that is an anchor of a locked geodesic carries that geodesic: the rebuild derives the portal
+ * Moving an emitter that is an anchor of a connected geodesic carries that geodesic: the rebuild derives the portal
  * word the carried endpoint actually crossed (from an explicit player traversal, or inferred from the emitter's
  * before/after pose), conjugates a same-emitter loop's word by the crossings its shared anchor made, and either
  * connects cleanly to the target emitter, preserves the geodesic unrebuilt when the caller asks and the live
  * rebuild fails, or destroys it when the rebuilt path would cross a forbidden zone
  * (`_docs/MATHEMATICAL_MODEL.md` §6-7). These tests check, by behaviour: carrying across a portal to another
  * emitter, carrying within one cell (including a fixed-face carry that leaves the word unchanged), updating a
- * locked interval's portal word from the carried endpoint's traversal before the rebuild runs, live carry with an
+ * connected interval's portal word from the carried endpoint's traversal before the rebuild runs, live carry with an
  * out-of-bounds or forbidden-zone-blocked endpoint, and same-emitter loop words under anchor portal crossings
  * (conjugation, folding several crossings of one frame, and the lifting/reduction rules a portal word obeys).
  */
+import { createFixtureArc as createGeodesicArcObject } from "../../support/arcs";
 import { describe, expect, it } from "vitest";
 import { moveDynamicObject } from "../../../src/movement/moveDynamicObject";
 import { createRuntimeObjectRegistry } from "../../../src/world-objects/runtimeObjectRegistry";
 import { runtimeObjectToDynamicObjectState } from "../../../src/world-objects/runtimeObjectBase";
 import {
-  createGeodesicCannonObject,
-  createGeodesicArcObject,
+  createGeodesicEmitterObject,
   geodesicRayBeamStartOffsetMeters,
 } from "../../../src/world-objects/geodesic/objects";
 import { collectGeodesicPortalWord, getGeodesicSegments } from "../../../src/world-objects/geodesic/segments";
@@ -26,8 +26,8 @@ import { getGeodesicConnection, arcConnectsEmitters } from "../../../src/world-o
 import { liftGeodesicEndpoint } from "../../../src/world-objects/geodesic/endpoints";
 import { rebuildConnectedGeodesicBetweenEmitters, shootGeodesic } from "../../../src/world-objects/geodesic/cannon";
 import {
-  updateLockedGeodesicPortalWordForCarriedAnchorTraversal,
-  updateLockedGeodesicPortalWordForCarriedAnchorTraversals,
+  updateConnectedGeodesicPortalWordForCarriedAnchorTraversal,
+  updateConnectedGeodesicPortalWordForCarriedAnchorTraversals,
 } from "../../../src/world-objects/geodesic/intervals";
 import { applyAnchorCrossingTraversals } from "../../../src/world-objects/geodesic/portalWord";
 import { yawRigidTransform3 } from "../../../src/math/rigidTransform3";
@@ -49,12 +49,12 @@ describe("carrying a geodesic across a portal", () => {
   it("ignores stale carried portal transitions that do not match the carried endpoint move", () => {
     const world = compileLargePortalWorld();
     const registry = createRuntimeObjectRegistry();
-    const source = createGeodesicCannonObject({
+    const source = createGeodesicEmitterObject({
       id: "cannon-a",
       cellId: "a",
       localPose: yawRigidTransform3(0, { x: 0.75, y: 1, z: 0 }),
     });
-    const incoming = createGeodesicCannonObject({
+    const incoming = createGeodesicEmitterObject({
       id: "cannon-b",
       cellId: "a",
       localPose: yawRigidTransform3(Math.PI, { x: 2.75, y: 1, z: 0 }),
@@ -63,7 +63,7 @@ describe("carrying a geodesic across a portal", () => {
     registry.add(incoming);
     shootGeodesic({ world, registry, cannon: source, geodesicId: "g-a", maxLengthMeters: 3 });
     const beforeMove = registry.get("cannon-b");
-    if (beforeMove?.kind !== "geodesic-cannon") {
+    if (beforeMove?.kind !== "geodesicEmitters/emitter") {
       throw new Error("Expected incoming emitter.");
     }
     registry.update({
@@ -86,15 +86,15 @@ describe("carrying a geodesic across a portal", () => {
     expect(arcConnectsEmitters(registry, "g-a")).toBe(true);
   });
 
-  it("rebuilds locked emitter-to-emitter geodesics after an endpoint moves across a portal", () => {
+  it("rebuilds connected emitter-to-emitter geodesics after an endpoint moves across a portal", () => {
     const world = compileLargePortalWorld();
     const registry = createRuntimeObjectRegistry();
-    const source = createGeodesicCannonObject({
+    const source = createGeodesicEmitterObject({
       id: "cannon-a",
       cellId: "a",
       localPose: yawRigidTransform3(0, { x: 4, y: 2.5, z: 0 }),
     });
-    const incoming = createGeodesicCannonObject({
+    const incoming = createGeodesicEmitterObject({
       id: "cannon-b",
       cellId: "b",
       localPose: yawRigidTransform3(Math.PI, { x: 1, y: 2.5, z: 0 }),
@@ -110,7 +110,7 @@ describe("carrying a geodesic across a portal", () => {
     }]);
 
     const movedIncoming = registry.get("cannon-b");
-    if (movedIncoming?.kind !== "geodesic-cannon") {
+    if (movedIncoming?.kind !== "geodesicEmitters/emitter") {
       throw new Error("Expected incoming emitter.");
     }
     registry.update({
@@ -137,15 +137,15 @@ describe("carrying a geodesic across a portal", () => {
     expect(arcConnectsEmitters(registry, "g-a")).toBe(true);
   });
 
-  it("keeps the portal clone while carrying a locked endpoint in a wrapping cell", () => {
+  it("keeps the portal clone while carrying a connected endpoint in a wrapping cell", () => {
     const world = compileTorusLoopWorld();
     const registry = createRuntimeObjectRegistry();
-    const source = createGeodesicCannonObject({
+    const source = createGeodesicEmitterObject({
       id: "cannon-a",
       cellId: "torus-room",
       localPose: yawRigidTransform3(0, { x: 4, y: 0, z: 0 }),
     });
-    const incoming = createGeodesicCannonObject({
+    const incoming = createGeodesicEmitterObject({
       id: "cannon-b",
       cellId: "torus-room",
       localPose: yawRigidTransform3(Math.PI, { x: -4, y: 0, z: 0 }),
@@ -155,7 +155,7 @@ describe("carrying a geodesic across a portal", () => {
     shootGeodesic({ world, registry, cannon: source, geodesicId: "g-a", maxLengthMeters: 8 });
 
     const movedIncoming = registry.get("cannon-b");
-    if (movedIncoming?.kind !== "geodesic-cannon") {
+    if (movedIncoming?.kind !== "geodesicEmitters/emitter") {
       throw new Error("Expected incoming emitter.");
     }
     registry.update({
@@ -184,12 +184,12 @@ describe("carrying a geodesic across a portal", () => {
   it("does not unlock or hide a carried geodesic when the direct clone is too short", () => {
     const world = compileTorusLoopWorld();
     const registry = createRuntimeObjectRegistry();
-    const source = createGeodesicCannonObject({
+    const source = createGeodesicEmitterObject({
       id: "cannon-a",
       cellId: "torus-room",
       localPose: yawRigidTransform3(0, { x: 4, y: 0, z: 0 }),
     });
-    const incoming = createGeodesicCannonObject({
+    const incoming = createGeodesicEmitterObject({
       id: "cannon-b",
       cellId: "torus-room",
       localPose: yawRigidTransform3(Math.PI, { x: -4, y: 0, z: 0 }),
@@ -199,7 +199,7 @@ describe("carrying a geodesic across a portal", () => {
     shootGeodesic({ world, registry, cannon: source, geodesicId: "g-a", maxLengthMeters: 8 });
 
     const movedIncoming = registry.get("cannon-b");
-    if (movedIncoming?.kind !== "geodesic-cannon") {
+    if (movedIncoming?.kind !== "geodesicEmitters/emitter") {
       throw new Error("Expected incoming emitter.");
     }
     registry.update({
@@ -235,12 +235,12 @@ describe("carrying a geodesic across a portal", () => {
   it("keeps a carried endpoint connected when it crosses back through the portal", () => {
     const world = compileLargePortalWorld();
     const registry = createRuntimeObjectRegistry();
-    const source = createGeodesicCannonObject({
+    const source = createGeodesicEmitterObject({
       id: "cannon-a",
       cellId: "a",
       localPose: yawRigidTransform3(0, { x: 4, y: 2.5, z: 0 }),
     });
-    const incoming = createGeodesicCannonObject({
+    const incoming = createGeodesicEmitterObject({
       id: "cannon-b",
       cellId: "b",
       localPose: yawRigidTransform3(Math.PI, { x: 1, y: 2.5, z: 0 }),
@@ -250,7 +250,7 @@ describe("carrying a geodesic across a portal", () => {
     shootGeodesic({ world, registry, cannon: source, geodesicId: "g-a", maxLengthMeters: 3 });
 
     const movedIncoming = registry.get("cannon-b");
-    if (movedIncoming?.kind !== "geodesic-cannon") {
+    if (movedIncoming?.kind !== "geodesicEmitters/emitter") {
       throw new Error("Expected incoming emitter.");
     }
     registry.update({
@@ -288,12 +288,12 @@ describe("carrying a geodesic across a portal", () => {
   it("derives a cross-cell carry transition from endpoint cells, with no player transition state", () => {
     const world = compileLargePortalWorld();
     const registry = createRuntimeObjectRegistry();
-    const source = createGeodesicCannonObject({
+    const source = createGeodesicEmitterObject({
       id: "cannon-a",
       cellId: "a",
       localPose: yawRigidTransform3(0, { x: 4, y: 2.5, z: 0 }),
     });
-    const incoming = createGeodesicCannonObject({
+    const incoming = createGeodesicEmitterObject({
       id: "cannon-b",
       cellId: "b",
       localPose: yawRigidTransform3(Math.PI, { x: 1, y: 2.5, z: 0 }),
@@ -303,7 +303,7 @@ describe("carrying a geodesic across a portal", () => {
     shootGeodesic({ world, registry, cannon: source, geodesicId: "g-a", maxLengthMeters: 3 });
 
     const previousIncoming = registry.get("cannon-b");
-    if (previousIncoming?.kind !== "geodesic-cannon") {
+    if (previousIncoming?.kind !== "geodesicEmitters/emitter") {
       throw new Error("Expected incoming emitter.");
     }
     registry.update({
@@ -328,12 +328,12 @@ describe("carrying a geodesic across a portal", () => {
   it("keeps a carried endpoint connected after the final drop rebuild", () => {
     const world = compileThreeCellPortalWorld();
     const registry = createRuntimeObjectRegistry();
-    const source = createGeodesicCannonObject({
+    const source = createGeodesicEmitterObject({
       id: "cannon-a",
       cellId: "front",
       localPose: yawRigidTransform3(0, { x: 4, y: 2.5, z: 0 }),
     });
-    const incoming = createGeodesicCannonObject({
+    const incoming = createGeodesicEmitterObject({
       id: "cannon-b",
       cellId: "left",
       localPose: yawRigidTransform3(Math.PI, { x: 1, y: 2.5, z: 0 }),
@@ -349,7 +349,7 @@ describe("carrying a geodesic across a portal", () => {
     }]);
 
     const previousIncoming = registry.get("cannon-b");
-    if (previousIncoming?.kind !== "geodesic-cannon") {
+    if (previousIncoming?.kind !== "geodesicEmitters/emitter") {
       throw new Error("Expected incoming emitter.");
     }
     const carriedIncoming = {
@@ -400,12 +400,12 @@ describe("carrying a geodesic within one cell", () => {
   it("derives a same-cell portal carry transition from the carried endpoint motion", () => {
     const world = compileTorusLoopWorld();
     const registry = createRuntimeObjectRegistry();
-    const source = createGeodesicCannonObject({
+    const source = createGeodesicEmitterObject({
       id: "cannon-a",
       cellId: "torus-room",
       localPose: yawRigidTransform3(0, { x: 5, y: 0, z: 0 }),
     });
-    const incoming = createGeodesicCannonObject({
+    const incoming = createGeodesicEmitterObject({
       id: "cannon-b",
       cellId: "torus-room",
       localPose: yawRigidTransform3(Math.PI, { x: 7.4, y: 0, z: 0 }),
@@ -450,12 +450,12 @@ describe("carrying a geodesic within one cell", () => {
   it("keeps the portal word unchanged during same-cell fixed-face carry without player traversal", () => {
     const world = compileTorusLoopWorld();
     const registry = createRuntimeObjectRegistry();
-    const source = createGeodesicCannonObject({
+    const source = createGeodesicEmitterObject({
       id: "cannon-a",
       cellId: "torus-room",
       localPose: yawRigidTransform3(0, { x: 0, y: 0, z: 0 }),
     });
-    const incoming = createGeodesicCannonObject({
+    const incoming = createGeodesicEmitterObject({
       id: "cannon-b",
       cellId: "torus-room",
       localPose: yawRigidTransform3(Math.PI, { x: 2, y: 0, z: 0 }),
@@ -488,16 +488,16 @@ describe("carrying a geodesic within one cell", () => {
   });
 });
 
-describe("updating a locked interval's portal word from carried traversal", () => {
-  it("updates a locked interval's word from the carried endpoint's traversal before rebuild", () => {
+describe("updating a connected interval's portal word from carried traversal", () => {
+  it("updates a connected interval's word from the carried endpoint's traversal before rebuild", () => {
     const world = compileLargePortalWorld();
     const registry = createRuntimeObjectRegistry();
-    const source = createGeodesicCannonObject({
+    const source = createGeodesicEmitterObject({
       id: "cannon-a",
       cellId: "a",
       localPose: yawRigidTransform3(0, { x: 4, y: 2.5, z: 0 }),
     });
-    const incoming = createGeodesicCannonObject({
+    const incoming = createGeodesicEmitterObject({
       id: "cannon-b",
       cellId: "b",
       localPose: yawRigidTransform3(Math.PI, { x: 1, y: 2.5, z: 0 }),
@@ -518,7 +518,7 @@ describe("updating a locked interval's portal word from carried traversal", () =
       localPose: yawRigidTransform3(Math.PI, { x: 4.8, y: 2.5, z: 0 }),
     });
 
-    const nextWord = updateLockedGeodesicPortalWordForCarriedAnchorTraversal({
+    const nextWord = updateConnectedGeodesicPortalWordForCarriedAnchorTraversal({
       registry,
       geodesicId: "g-a",
       carriedAnchorObjectId: "cannon-b",
@@ -535,12 +535,12 @@ describe("updating a locked interval's portal word from carried traversal", () =
   it("normalizes an out-of-cell carried emitter through one portal before the final rebuild", () => {
     const world = compileLargePortalWorld();
     const registry = createRuntimeObjectRegistry();
-    const source = createGeodesicCannonObject({
+    const source = createGeodesicEmitterObject({
       id: "cannon-a",
       cellId: "a",
       localPose: yawRigidTransform3(0, { x: 4, y: 2.5, z: 0 }),
     });
-    const incoming = createGeodesicCannonObject({
+    const incoming = createGeodesicEmitterObject({
       id: "cannon-b",
       cellId: "a",
       localPose: yawRigidTransform3(Math.PI, { x: 5.2, y: 2.5, z: 0 }),
@@ -568,7 +568,7 @@ describe("updating a locked interval's portal word from carried traversal", () =
       localPose: releaseMove.object.localPose,
     });
 
-    const nextWord = updateLockedGeodesicPortalWordForCarriedAnchorTraversal({
+    const nextWord = updateConnectedGeodesicPortalWordForCarriedAnchorTraversal({
       registry,
       geodesicId: "g-a",
       carriedAnchorObjectId: "cannon-b",
@@ -595,12 +595,12 @@ describe("live carry rebuilds that cannot connect cleanly", () => {
   it("rebuilds a live carried geodesic to a formal out-of-bounds emitter, word left unchanged", () => {
     const world = compileLargePortalWorld();
     const registry = createRuntimeObjectRegistry();
-    const source = createGeodesicCannonObject({
+    const source = createGeodesicEmitterObject({
       id: "cannon-a",
       cellId: "a",
       localPose: yawRigidTransform3(0, { x: 4, y: 2.5, z: 0 }),
     });
-    const incoming = createGeodesicCannonObject({
+    const incoming = createGeodesicEmitterObject({
       id: "cannon-b",
       cellId: "a",
       localPose: yawRigidTransform3(Math.PI, { x: 5.2, y: 2.5, z: 0 }),
@@ -642,15 +642,15 @@ describe("live carry rebuilds that cannot connect cleanly", () => {
     expect(registry.get("g-a")?.kind).toBe("geodesicModel/arc");
   });
 
-  it("preserves a locked interval after a failed live carry rebuild", () => {
+  it("preserves a connected interval after a failed live carry rebuild", () => {
     const world = compileLargePortalWorld();
     const registry = createRuntimeObjectRegistry();
-    registry.add(createGeodesicCannonObject({
+    registry.add(createGeodesicEmitterObject({
       id: "cannon-a",
       cellId: "a",
       localPose: yawRigidTransform3(0, { x: 1, y: 2.5, z: 0 }),
     }));
-    registry.add(createGeodesicCannonObject({
+    registry.add(createGeodesicEmitterObject({
       id: "cannon-b",
       cellId: "b",
       localPose: yawRigidTransform3(Math.PI, { x: 1, y: 2.5, z: 0 }),
@@ -689,15 +689,15 @@ describe("live carry rebuilds that cannot connect cleanly", () => {
     expect(registry.get("g-a")).toBeUndefined();
   });
 
-  it("destroys a locked interval when a live carry rebuild crosses a forbidden zone", () => {
+  it("destroys a connected interval when a live carry rebuild crosses a forbidden zone", () => {
     const world = compileLargePortalWorld();
     const registry = createRuntimeObjectRegistry();
-    registry.add(createGeodesicCannonObject({
+    registry.add(createGeodesicEmitterObject({
       id: "cannon-a",
       cellId: "a",
       localPose: yawRigidTransform3(0, { x: 1, y: 2.5, z: 0 }),
     }));
-    registry.add(createGeodesicCannonObject({
+    registry.add(createGeodesicEmitterObject({
       id: "cannon-b",
       cellId: "a",
       localPose: yawRigidTransform3(Math.PI, { x: 5, y: 0, z: 0 }),
@@ -728,7 +728,7 @@ describe("loop words under anchor portal crossings", () => {
   const torusLoopSetup = (startY: number, wordIds: readonly string[]) => {
     const world = compileTorusLoopWorld();
     const registry = createRuntimeObjectRegistry();
-    const cannon = createGeodesicCannonObject({
+    const cannon = createGeodesicEmitterObject({
       id: "cannon-a",
       cellId: "torus-room",
       localPose: yawRigidTransform3(0, { x: 0, y: startY, z: 0 }),
@@ -752,7 +752,7 @@ describe("loop words under anchor portal crossings", () => {
     expect(totalGeodesicLength(registry, "g-loop")).toBeCloseTo(15 * Math.SQRT2, 6);
 
     registry.update({ ...cannon, localPose: yawRigidTransform3(0, { x: 0, y: -7.4, z: 0 }) });
-    expect(updateLockedGeodesicPortalWordForCarriedAnchorTraversal({
+    expect(updateConnectedGeodesicPortalWordForCarriedAnchorTraversal({
       registry,
       geodesicId: "g-loop",
       carriedAnchorObjectId: "cannon-a",
@@ -774,13 +774,13 @@ describe("loop words under anchor portal crossings", () => {
     const px = createCarryPortalTraversal(sequential.world, "torus-room", "right-left");
     const common = { geodesicId: "g-loop", carriedAnchorObjectId: "cannon-a" } as const;
 
-    updateLockedGeodesicPortalWordForCarriedAnchorTraversal({ registry: sequential.registry, ...common, traversal: py });
-    const expected = updateLockedGeodesicPortalWordForCarriedAnchorTraversal({
+    updateConnectedGeodesicPortalWordForCarriedAnchorTraversal({ registry: sequential.registry, ...common, traversal: py });
+    const expected = updateConnectedGeodesicPortalWordForCarriedAnchorTraversal({
       registry: sequential.registry,
       ...common,
       traversal: px,
     });
-    const folded = updateLockedGeodesicPortalWordForCarriedAnchorTraversals({
+    const folded = updateConnectedGeodesicPortalWordForCarriedAnchorTraversals({
       registry: combined.registry,
       ...common,
       traversals: [py, px],
@@ -837,7 +837,7 @@ describe("loop words under anchor portal crossings", () => {
     expect(totalGeodesicLength(registry, "g-loop")).toBeCloseTo(15, 6);
 
     registry.update({ ...cannon, localPose: yawRigidTransform3(0, { x: 0, y: -7.4, z: 0 }) });
-    expect(updateLockedGeodesicPortalWordForCarriedAnchorTraversal({
+    expect(updateConnectedGeodesicPortalWordForCarriedAnchorTraversal({
       registry,
       geodesicId: "g-loop",
       carriedAnchorObjectId: "cannon-a",
@@ -852,7 +852,7 @@ describe("loop words under anchor portal crossings", () => {
     for (const mode of ["explicit", "inferred"] as const) {
       const world = compileTwoCellCylinderWorld();
       const registry = createRuntimeObjectRegistry();
-      const before = createGeodesicCannonObject({
+      const before = createGeodesicEmitterObject({
         id: "cannon-a",
         cellId: "a",
         localPose: yawRigidTransform3(0, { x: 4.9, y: 2.5, z: 0 }),
@@ -872,7 +872,7 @@ describe("loop words under anchor portal crossings", () => {
 
       registry.update({ ...before, cellId: "b", localPose: yawRigidTransform3(0, { x: 0.1, y: 2.5, z: 0 }) });
       if (mode === "explicit") {
-        expect(updateLockedGeodesicPortalWordForCarriedAnchorTraversal({
+        expect(updateConnectedGeodesicPortalWordForCarriedAnchorTraversal({
           registry,
           geodesicId: "g-loop",
           carriedAnchorObjectId: "cannon-a",
@@ -902,12 +902,12 @@ describe("loop words under anchor portal crossings", () => {
   it("refuses to lift an interval whose word does not chain between its anchors' cells", () => {
     const world = compileLargePortalWorld();
     const registry = createRuntimeObjectRegistry();
-    registry.add(createGeodesicCannonObject({
+    registry.add(createGeodesicEmitterObject({
       id: "cannon-a",
       cellId: "a",
       localPose: yawRigidTransform3(0, { x: 4, y: 2.5, z: 0 }),
     }));
-    registry.add(createGeodesicCannonObject({
+    registry.add(createGeodesicEmitterObject({
       id: "cannon-b",
       cellId: "b",
       localPose: yawRigidTransform3(0, { x: 1, y: 2.5, z: 0 }),

@@ -1,18 +1,17 @@
 /**
- * Interval rebuilds: realizing an interval's lifted chord, aiming free geodesics, splitting at a segment hit, rebuilding locked intervals after a carried anchor moved, and side-effect-free previews.
+ * Interval rebuilds: realizing an interval's lifted chord, aiming free geodesics, splitting at a segment hit, rebuilding connected intervals after a carried anchor moved, and side-effect-free previews.
  */
 import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex";
 import { transformPoint3, yawRigidTransform3 } from "../../math/rigidTransform3";
 import { addVec3, distanceSquaredVec3, scaleVec3, type Vec3 } from "../../math/vec3";
 import type { RuntimeObjectRegistry, RuntimeWorldObject } from "../runtimeObjectRegistry";
-import { createGeodesicArcObject, directionFromYaw, emitterConnectionToleranceMeters, type GeodesicVertexObject, GEODESIC_MIN_LENGTH_METERS, type GeodesicCannonObject, type GeodesicCarryPortalTransition, type GeodesicEndRole, type GeodesicArcObject, type GeodesicPortalTraversal, type GeodesicTraceBuildResult, getGeodesicCannonEmitterPoint, getOppositeEndRole, intersectionTolerance, isGeodesicVertexObject, type LiftedGeodesicEndpoint, minGeodesicSegmentLengthMeters, type TraceGeodesicSegmentResult, withoutStale } from "./objects";
+import { createGeodesicArcObject, directionFromYaw, emitterConnectionToleranceMeters, type GeodesicVertexObject, GEODESIC_MIN_LENGTH_METERS, type GeodesicEmitterObject, type GeodesicCarryPortalTransition, type GeodesicEndRole, type GeodesicArcObject, type GeodesicPortalTraversal, type GeodesicSegmentObject, type GeodesicTraceBuildResult, getGeodesicCannonEmitterPoint, getOppositeEndRole, intersectionTolerance, isGeodesicVertexObject, type LiftedGeodesicEndpoint, minGeodesicSegmentLengthMeters, type TraceGeodesicSegmentResult, withoutStale } from "./objects";
 import { canObjectAttachGeodesics } from "./anchors";
 import { applyAnchorCrossingTraversals, collectPortalWordFromTraces, portalTraversalFromCarryTransition, portalWordAfterAnchorCrossing, samePortalWord } from "./portalWord";
 import { reduceAdjacentInversePortalTraversals } from "./objects";
 import { traceGeodesicPathForConnectionMode, traceTerminalToBuildTerminal } from "./trace";
 import {
   getGeodesicEndpointAttachmentsForAnchor,
-  isAimableFreeGeodesic,
   liftGeodesicEndpointWithAnchors,
   portalWordMatchesCurrentEndpointCells,
   removeUnusedFreeGeodesicEnds,
@@ -20,7 +19,6 @@ import {
 } from "./endpoints";
 import {
   buildDerivedSegmentsFromTraces,
-  canConnectGeodesicSegmentAtDistance,
   getGeodesicSegments,
   nextGeodesicNumber,
   removeGeodesicIntervalAndDerivedObjects,
@@ -97,7 +95,7 @@ export type IntervalChordRealization =
 /**
  * Lifts the interval's far endpoint into its start cell and traces the straight chord exactly once, without touching the registry.
  *
- * The one place where a chord is lifted, traced and classified; previews, rebuilds and the locked-carry rebuild are built on it, so a
+ * The one place where a chord is lifted, traced and classified; previews, rebuilds and the connected-carry rebuild are built on it, so a
  * chord is never traced twice, also when it fails. Anchors in `candidateAnchorsById` shadow the registry. The realized word must equal the
  * stored word unless `allowUnexpectedPortalWord`.
  */
@@ -212,8 +210,8 @@ function commitRealizedTraces(
  * Re-aims a free geodesic (emitter at one role, a singly attached free end at the other) toward a target point.
  *
  * The free end is moved to wherever the new ray ends (cell, position), the interval's start cell and portal word are
- * recomputed from the actual trace, and segments are replaced. If `connectEmitters` (default true) and the ray ends at
- * another emitter, the free role is re-attached to that emitter and the interval is rebuilt as a locked geodesic.
+ * recomputed from the actual trace, and segments are replaced. The arc then runs from the emitter: one that held it at `end`, an arc freed from a tied curve, is turned round, since the trace, and so the word, starts at the emitter. If `connectEmitters` (default true) and the ray ends at
+ * another emitter, the free role is re-attached to that emitter and the interval is rebuilt as a connected geodesic.
  * Returns `undefined` for non-interval ids, non-(emitter, free end) attachments, a free end shared with other
  * attachments, or a target within `intersectionTolerance` of the emitter (length is otherwise at least `minGeodesicSegmentLengthMeters`).
  * Mutates the registry.
@@ -225,17 +223,18 @@ export function aimFreeGeodesicFromEndpoint(input: {
   readonly emitterEndRole: GeodesicEndRole;
   readonly targetPointInEmitterCell: Vec3;
   readonly connectEmitters?: boolean;
+  /** The arc's new intended length; absent, it keeps the one it has. */
+  readonly intendedLengthMeters?: number;
 }): GeodesicTraceBuildResult | undefined {
   const interval = input.registry.get(input.geodesicId);
   if (interval?.kind !== "geodesicModel/arc") {
     return undefined;
   }
   const emitterAttachment = interval[input.emitterEndRole];
-  const freeRole = getOppositeEndRole(input.emitterEndRole);
-  const freeAttachment = interval[freeRole];
+  const freeAttachment = interval[getOppositeEndRole(input.emitterEndRole)];
   const emitter = input.registry.get(emitterAttachment.anchorObjectId);
   const freeEnd = input.registry.get(freeAttachment.anchorObjectId);
-  if (emitter?.kind !== "geodesic-cannon" || freeEnd?.kind !== "geodesicModel/vertex") {
+  if (emitter?.kind !== "geodesicEmitters/emitter" || freeEnd?.kind !== "geodesicModel/vertex") {
     return undefined;
   }
   // A free end shared with another attachment (e.g. a curve-shortening vertex) must not be dragged around.
@@ -272,8 +271,6 @@ export function aimFreeGeodesicFromEndpoint(input: {
   const terminalCellId = tail.cellId;
   // The free end moves to wherever the trace actually ended, possibly in another cell after portal crossings; the portal word
   // below is read off the realized traces, so the interval's homotopy class always matches the picture.
-  // Caveat: the traces start at the EMITTER. The stored word/`startCellId` follow that order, which equals the interval's
-  // start-to-end convention only when the emitter holds the `start` role.
   const nextFreeEnd = {
     ...freeEnd,
     cellId: terminalCellId,
@@ -283,16 +280,19 @@ export function aimFreeGeodesicFromEndpoint(input: {
 
   let nextInterval: GeodesicArcObject = {
     ...interval,
+    start: { geodesicId: interval.id, role: "start", anchorObjectId: emitter.id },
+    end: { geodesicId: interval.id, role: "end", anchorObjectId: freeEnd.id },
     startCellId: emitter.cellId,
     cellId: emitter.cellId,
     portalWord,
+    ...(input.intendedLengthMeters === undefined ? {} : { intendedLengthMeters: input.intendedLengthMeters }),
   };
   input.registry.update(nextInterval);
   if ((input.connectEmitters ?? true) && tail.terminal.kind === "emitter-hit") {
     nextInterval = replaceGeodesicEndpointAttachment(
       input.registry,
       input.geodesicId,
-      freeRole,
+      "end",
       tail.terminal.emitterId,
     ) ?? nextInterval;
     const rebuilt = rebuildDerivedGeodesicSegments({
@@ -377,56 +377,37 @@ export function rebuildDerivedGeodesicSegmentsDetailed(input: {
 /**
  * Splits a free geodesic at a point on one of its segments, ending the first part at a newly placed emitter.
  *
- * Preconditions: the interval is an aimable free geodesic (emitter at one role, free end at the other; see
- * `isAimableFreeGeodesic`), the segment belongs to it, `placedEmitterId` is a cannon in the registry, and the clamped
- * cut distance leaves a long enough prefix (`canConnectGeodesicSegmentAtDistance`). Otherwise returns `[]` and changes
- * nothing. The original interval is shortened so its free role now attaches to the placed emitter (its portal word becomes
+ * Preconditions, which the caller has checked: the interval is an aimable free geodesic (emitter at one role, free end at the other; see
+ * `isAimableFreeGeodesic`), the segment belongs to it, `placed` is in the registry, and the cut distance lies on the segment and leaves
+ * a long enough prefix (`canConnectGeodesicSegmentAtDistance`).
+ * The original interval is shortened so its free role now attaches to the placed emitter (its portal word becomes
  * the word of the prefix traces); the remainder (if at least `minGeodesicSegmentLengthMeters`) becomes a new interval from
- * the placed emitter to the old free end, rebuilt along the same direction. Returns the surviving intervals
- * (prefix first, continuation second if created). Mutates the registry.
+ * the placed emitter to the old free end, rebuilt along the same direction, and it takes over what is left of the intended length. Mutates the registry.
  */
 export function splitGeodesicIntervalAtSegmentHit(input: {
   readonly world: CompiledCellComplex;
   readonly registry: RuntimeObjectRegistry;
-  readonly geodesicId: string;
-  readonly segmentId: string;
+  readonly interval: GeodesicArcObject;
+  readonly segment: GeodesicSegmentObject;
   readonly distanceAlongSegmentMeters: number;
-  readonly placedEmitterId: string;
+  readonly placed: GeodesicEmitterObject;
   readonly createContinuationGeodesicId: (sourceGeodesicId: string, sideIndex: number) => string;
-}): readonly GeodesicArcObject[] {
-  const interval = input.registry.get(input.geodesicId);
-  const segment = input.registry.get(input.segmentId);
-  const placed = input.registry.get(input.placedEmitterId);
-  if (
-    interval?.kind !== "geodesicModel/arc" ||
-    segment?.kind !== "geodesicModel/segment" ||
-    segment.geodesicId !== input.geodesicId ||
-    placed?.kind !== "geodesic-cannon" ||
-    !isAimableFreeGeodesic(input.registry, interval)
-  ) {
-    return [];
-  }
+}): void {
+  const { interval, segment, placed, distanceAlongSegmentMeters: clampedDistance } = input;
+  const geodesicId = interval.id;
   // Cut point: arc length `prefixLengthMeters` from the geodesic's emitter-side start (all earlier segments plus the distance in this one).
-  // The prefix must be at least the minimum length, otherwise the new emitter would sit on the old one.
-  const clampedDistance = Math.min(segment.lengthMeters, Math.max(0, input.distanceAlongSegmentMeters));
-  if (!canConnectGeodesicSegmentAtDistance(clampedDistance)) {
-    return [];
-  }
-
-  const segments = getGeodesicSegments(input.registry, input.geodesicId);
+  const segments = getGeodesicSegments(input.registry, geodesicId);
   const totalLengthMeters = totalGeodesicLengthFromSegments(segments);
   const prefixLengthMeters = totalLengthThroughSegment(segments, segment, clampedDistance);
   const continuationLengthMeters = totalLengthMeters - prefixLengthMeters;
+  const continuationIntendedLengthMeters = interval.intendedLengthMeters - prefixLengthMeters;
   // `freeRole` holds the free end, the other role is the original source emitter.
   const freeRole: GeodesicEndRole = input.registry.get(interval.start.anchorObjectId)?.kind === "geodesicModel/vertex"
     ? "start"
     : "end";
   const sourceRole = getOppositeEndRole(freeRole);
-  const sourceAnchor = input.registry.get(interval[sourceRole].anchorObjectId);
-  const freeEnd = input.registry.get(interval[freeRole].anchorObjectId);
-  if (sourceAnchor?.kind !== "geodesic-cannon" || freeEnd?.kind !== "geodesicModel/vertex") {
-    return [];
-  }
+  const sourceAnchor = input.registry.get(interval[sourceRole].anchorObjectId) as GeodesicEmitterObject;
+  const freeEnd = input.registry.get(interval[freeRole].anchorObjectId) as GeodesicVertexObject;
 
   // Prefix path = the whole segments before the hit plus the hit segment truncated at the cut point, ending at the new emitter.
   // Its portal word is the word of the shortened geodesic (portal-hit terminals of the whole segments).
@@ -442,7 +423,7 @@ export function splitGeodesicIntervalAtSegmentHit(input: {
   });
   const prefixPortalWord = collectPortalWordFromTraces(input.world, prefixTraces);
   const continuationId = continuationLengthMeters >= minGeodesicSegmentLengthMeters - intersectionTolerance
-    ? input.createContinuationGeodesicId(input.geodesicId, 0)
+    ? input.createContinuationGeodesicId(geodesicId, 0)
     : undefined;
   // The continuation takes over the old free end: placed emitter -> old free end. Its word/geometry is filled in by rebuildContinuationFromCut.
   if (continuationId) {
@@ -452,6 +433,7 @@ export function splitGeodesicIntervalAtSegmentHit(input: {
       endAnchorObjectId: freeEnd.id,
       startCellId: placed.cellId,
       geodesicNumber: nextGeodesicNumber(input.registry),
+      intendedLengthMeters: continuationIntendedLengthMeters,
     }));
   }
   // Shorten the original interval: its free role now attaches to the placed emitter, and its portal word becomes the prefix word.
@@ -469,7 +451,7 @@ export function splitGeodesicIntervalAtSegmentHit(input: {
   });
   replaceDerivedSegmentsFromTraces({
     registry: input.registry,
-    geodesicId: input.geodesicId,
+    geodesicId,
     traces: prefixTraces,
   });
 
@@ -481,16 +463,14 @@ export function splitGeodesicIntervalAtSegmentHit(input: {
       placed,
       freeEnd,
       yawRadians: Math.atan2(segment.direction.y, segment.direction.x),
-      lengthMeters: continuationLengthMeters,
+      lengthMeters: continuationIntendedLengthMeters,
     });
   }
   removeUnusedFreeGeodesicEnds(input.registry);
-  return [input.registry.get(input.geodesicId), continuationId ? input.registry.get(continuationId) : undefined]
-    .filter((object): object is GeodesicArcObject => object?.kind === "geodesicModel/arc");
 }
 
 /**
- * Rebuilds a locked (emitter-to-emitter) interval after an endpoint was carried, updating its portal word first.
+ * Rebuilds a connected (emitter-to-emitter) interval after an endpoint was carried, updating its portal word first.
  *
  * The new portal word is, in order of precedence: the explicit `carriedPortalWord`; otherwise the old word extended
  * by the portal the carried anchor crossed (inferred by `resolveCarriedPortalTraversalFromAnchorMotion` or taken from
@@ -499,25 +479,25 @@ export function splitGeodesicIntervalAtSegmentHit(input: {
  * `rebuildDerivedGeodesicSegments` runs (with `allowUnexpectedPortalWord = allowOutOfBoundsCarriedEndpoint`).
  * Returns `undefined` on failure; note the interval may already have been updated (and a degenerate one deleted).
  */
-export function rebuildLockedGeodesicFromEndpointsAndPortalWord(input: {
+export function rebuildConnectedGeodesicFromEndpointsAndPortalWord(input: {
   readonly world: CompiledCellComplex;
   readonly registry: RuntimeObjectRegistry;
   readonly geodesicId: string;
   readonly carriedAnchorObjectId?: string;
-  readonly carriedAnchorBeforeMove?: GeodesicCannonObject;
+  readonly carriedAnchorBeforeMove?: GeodesicEmitterObject;
   readonly carriedPortalTransition?: GeodesicCarryPortalTransition;
   readonly carriedPortalWord?: readonly GeodesicPortalTraversal[];
   readonly allowOutOfBoundsCarriedEndpoint?: boolean;
 }): GeodesicTraceBuildResult | undefined {
-  return rebuildLockedGeodesicFromEndpointsAndPortalWordDetailed(input).result;
+  return rebuildConnectedGeodesicFromEndpointsAndPortalWordDetailed(input).result;
 }
 
 /**
- * Like `rebuildLockedGeodesicFromEndpointsAndPortalWord`, and also returns how the chord was realized (`undefined` when `geodesicId` is
+ * Like `rebuildConnectedGeodesicFromEndpointsAndPortalWord`, and also returns how the chord was realized (`undefined` when `geodesicId` is
  * not an interval), so that the caller can tell a forbidden-zone failure from the other failures without tracing the chord again.
  */
-export function rebuildLockedGeodesicFromEndpointsAndPortalWordDetailed(
-  input: Parameters<typeof rebuildLockedGeodesicFromEndpointsAndPortalWord>[0],
+export function rebuildConnectedGeodesicFromEndpointsAndPortalWordDetailed(
+  input: Parameters<typeof rebuildConnectedGeodesicFromEndpointsAndPortalWord>[0],
 ): ReturnType<typeof rebuildDerivedGeodesicSegmentsDetailed> {
   const interval = input.registry.get(input.geodesicId);
   if (interval?.kind !== "geodesicModel/arc") {
@@ -565,13 +545,13 @@ export function rebuildLockedGeodesicFromEndpointsAndPortalWordDetailed(
  * reduced. Returns the new word, or `undefined` (nothing written) if the anchor is not an endpoint or the resulting word
  * does not chain between the endpoint anchors' current cells.
  */
-export function updateLockedGeodesicPortalWordForCarriedAnchorTraversal(input: {
+export function updateConnectedGeodesicPortalWordForCarriedAnchorTraversal(input: {
   readonly registry: RuntimeObjectRegistry;
   readonly geodesicId: string;
   readonly carriedAnchorObjectId: string;
   readonly traversal: GeodesicPortalTraversal;
 }): readonly GeodesicPortalTraversal[] | undefined {
-  return updateLockedGeodesicPortalWordForCarriedAnchorTraversals({
+  return updateConnectedGeodesicPortalWordForCarriedAnchorTraversals({
     registry: input.registry,
     geodesicId: input.geodesicId,
     carriedAnchorObjectId: input.carriedAnchorObjectId,
@@ -580,11 +560,11 @@ export function updateLockedGeodesicPortalWordForCarriedAnchorTraversal(input: {
 }
 
 /**
- * Same as {@link updateLockedGeodesicPortalWordForCarriedAnchorTraversal} for a chain of traversals the carried
+ * Same as {@link updateConnectedGeodesicPortalWordForCarriedAnchorTraversal} for a chain of traversals the carried
  * anchor made in one frame, in order. The word is folded through all of them and checked against the endpoint cells once
  * (the anchor already sits in the last target cell), then stored. Returns `undefined` and stores nothing on failure.
  */
-export function updateLockedGeodesicPortalWordForCarriedAnchorTraversals(input: {
+export function updateConnectedGeodesicPortalWordForCarriedAnchorTraversals(input: {
   readonly registry: RuntimeObjectRegistry;
   readonly geodesicId: string;
   readonly carriedAnchorObjectId: string;
@@ -672,7 +652,7 @@ function resolveCarriedIntervalPortalWord(input: {
   readonly interval: GeodesicArcObject;
   readonly registry: RuntimeObjectRegistry;
   readonly carriedAnchorObjectId?: string;
-  readonly carriedAnchorBeforeMove?: GeodesicCannonObject;
+  readonly carriedAnchorBeforeMove?: GeodesicEmitterObject;
   readonly carriedPortalTransition?: GeodesicCarryPortalTransition;
   readonly carriedPortalWord?: readonly GeodesicPortalTraversal[];
 }): readonly GeodesicPortalTraversal[] | undefined {
@@ -724,13 +704,13 @@ function resolveCarriedPortalTraversalFromAnchorMotion(
   world: CompiledCellComplex,
   registry: RuntimeObjectRegistry,
   carriedAnchorObjectId: string | undefined,
-  carriedAnchorBeforeMove: GeodesicCannonObject | undefined,
+  carriedAnchorBeforeMove: GeodesicEmitterObject | undefined,
 ): GeodesicPortalTraversal | undefined {
   if (!carriedAnchorObjectId || carriedAnchorBeforeMove?.id !== carriedAnchorObjectId) {
     return undefined;
   }
   const current = registry.get(carriedAnchorObjectId);
-  if (current?.kind !== "geodesic-cannon") {
+  if (current?.kind !== "geodesicEmitters/emitter") {
     return undefined;
   }
 
@@ -772,12 +752,12 @@ function resolveCarriedPortalTraversalFromAnchorMotion(
 function carriedTransitionMatchesAnchorMove(
   registry: RuntimeObjectRegistry,
   carriedAnchorObjectId: string,
-  carriedAnchorBeforeMove: GeodesicCannonObject | undefined,
+  carriedAnchorBeforeMove: GeodesicEmitterObject | undefined,
   transition: GeodesicCarryPortalTransition,
 ): boolean {
   const current = registry.get(carriedAnchorObjectId);
   if (
-    current?.kind !== "geodesic-cannon" ||
+    current?.kind !== "geodesicEmitters/emitter" ||
     carriedAnchorBeforeMove?.id !== carriedAnchorObjectId ||
     carriedAnchorBeforeMove.cellId !== transition.sourceCellId ||
     current.cellId !== transition.targetCellId
@@ -818,13 +798,13 @@ function traceTerminalToBuildTerminalForInterval(
 }
 
 // Retraces the part of a split free geodesic beyond a newly placed emitter: from the placed emitter along the original yaw
-// for the remaining length, moving the old free end to the new terminal point. Deletes the continuation interval if no trace
-// came out; if the trace reaches an emitter, the free end is re-attached to that emitter (the interval becomes locked).
+// to what is left of the intended length, moving the old free end to the new terminal point. Deletes the continuation interval if no trace
+// came out; if the trace reaches an emitter, the free end is re-attached to that emitter (the interval becomes connected).
 function rebuildContinuationFromCut(input: {
   readonly world: CompiledCellComplex;
   readonly registry: RuntimeObjectRegistry;
   readonly geodesicId: string;
-  readonly placed: GeodesicCannonObject;
+  readonly placed: GeodesicEmitterObject;
   readonly freeEnd: GeodesicVertexObject;
   readonly yawRadians: number;
   readonly lengthMeters: number;

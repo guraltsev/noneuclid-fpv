@@ -27,7 +27,7 @@ export interface XrControllerHandModelsUpdate {
   readonly referenceSpaceToWorldMatrix: THREE.Matrix4;
   /** Tool shown by the right wrist indicator; absent for no tool (indicator hidden). */
   readonly tool?: ToolDescriptor;
-  /** Sign variant shown when the tool is "place-flag"; defaults to "WoodenSign1". */
+  /** Sign variant shown when the tool is "placedFlags/flag"; defaults to "WoodenSign1". */
   readonly placeFlagType?: PlacedFlagType;
 }
 

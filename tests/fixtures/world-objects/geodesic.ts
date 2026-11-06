@@ -3,27 +3,59 @@
  * `tests/world-objects/runtimeObjectRegistry.test.ts`): small compiled worlds, segment/scenario builders, and
  * geometric helpers. Not a test file itself; see `tests.md` §3.
  */
+import { createFixtureArc as createGeodesicArcObject } from "../../support/arcs";
 import { expect } from "vitest";
-import { compileCellComplex } from "../../../src/cell-complex/compileCellComplex";
-import { createRuntimeObjectRegistry } from "../../../src/world-objects/runtimeObjectRegistry";
+import { compileCellComplex, type CompiledCellComplex } from "../../../src/cell-complex/compileCellComplex";
+import { createRuntimeObjectRegistry, type RuntimeObjectRegistry } from "../../../src/world-objects/runtimeObjectRegistry";
 import { curveDynamicsToken } from "../../../src/modules/curveShortening/api";
 import { curveShorteningModule } from "../../../src/modules/curveShortening";
 import { geodesicModelModule } from "../../../src/modules/geodesicModel";
 import { tieAtNewVertex } from "../../../src/world-objects/geodesic/vertices";
 import {
   createGeodesicVertexObject,
-  createGeodesicCannonObject,
-  createGeodesicArcObject,
+  createGeodesicEmitterObject,
   geodesicRayBeamHeightMeters,
   type GeodesicSegmentObject,
 } from "../../../src/world-objects/geodesic/objects";
 import { getEmitterGeodesicIds } from "../../../src/world-objects/geodesic/endpoints";
 import { getGeodesicSegments, resolveEmitterLaunchYaw } from "../../../src/world-objects/geodesic/segments";
-import { rebuildConnectedGeodesicBetweenEmitters } from "../../../src/world-objects/geodesic/cannon";
-import { rebuildDerivedGeodesicSegments } from "../../../src/world-objects/geodesic/intervals";
+import {
+  cutGeodesicsAtVertex,
+  followAnchorRoute,
+  moveEmitterAlongRoute,
+  rebuildConnectedGeodesicBetweenEmitters,
+  type GeodesicEmitterCuts,
+  type MoveEmitterAlongRouteInput,
+  type MoveEmitterAlongRouteResult,
+} from "../../../src/world-objects/geodesic/cannon";
+import { rebuildDerivedGeodesicSegments, splitGeodesicIntervalAtSegmentHit } from "../../../src/world-objects/geodesic/intervals";
 import { createTestEngine } from "../../support/engine";
 import { yawRigidTransform3 } from "../../../src/math/rigidTransform3";
 import { walkDevelopedSegment } from "../../../src/cell-complex/segmentWalk";
+
+/** `moveEmitterAlongRoute` on a bare registry, with the geodesic model's half of the move done on the same registry. */
+export function moveEmitterWithItsArcs(input: Omit<MoveEmitterAlongRouteInput, "followRoute">): MoveEmitterAlongRouteResult {
+  return moveEmitterAlongRoute({ ...input, followRoute: (route) => followAnchorRoute(input.registry, input.emitterId, route) });
+}
+
+/** The cuts of a placement on a bare registry: the geodesic model's half done on the same registry; a continuation's id says what it continues and at which emitter. */
+export function bareRegistryCuts(world: CompiledCellComplex, registry: RuntimeObjectRegistry): GeodesicEmitterCuts {
+  const emitterAt = (id: string) => {
+    const emitter = registry.get(id);
+    if (emitter?.kind !== "geodesicEmitters/emitter") throw new Error(`Expected the emitter "${id}".`);
+    return emitter;
+  };
+  return {
+    cutAtSegment({ emitterId, arcId, segmentId, distanceAlongSegmentMeters }) {
+      const interval = registry.get(arcId);
+      const segment = registry.get(segmentId);
+      if (interval?.kind !== "geodesicModel/arc" || segment?.kind !== "geodesicModel/segment") throw new Error("Expected the arc and its segment.");
+      splitGeodesicIntervalAtSegmentHit({ world, registry, interval, segment, distanceAlongSegmentMeters, placed: emitterAt(emitterId), createContinuationGeodesicId: (id) => `${id}:continuation:${emitterId}` });
+    },
+    cutAtVertex: ({ emitterId, cellId, vertexPoint }) =>
+      cutGeodesicsAtVertex({ world, registry, emitter: emitterAt(emitterId), cellId, vertexPoint, createContinuationGeodesicId: (id) => `${id}:continuation:${emitterId}` }),
+  };
+}
 
 export function createSegment(overrides: Partial<GeodesicSegmentObject> = {}): GeodesicSegmentObject {
   return {
@@ -88,7 +120,7 @@ export function addGeodesicLeavingEmitter(
   yawRadians: number,
 ): void {
   const cannon = registry.get(cannonId);
-  if (cannon?.kind !== "geodesic-cannon") {
+  if (cannon?.kind !== "geodesicEmitters/emitter") {
     throw new Error(`No emitter "${cannonId}".`);
   }
   const start = { x: cannon.localPose.translation.x, y: cannon.localPose.translation.y, z: cannon.localPose.translation.z + geodesicRayBeamHeightMeters };
@@ -120,7 +152,7 @@ export function getCannonGeodesicYaw(
   geodesicId: string,
 ): number | undefined {
   const cannon = registry.get(cannonId);
-  return cannon?.kind === "geodesic-cannon" ? resolveEmitterLaunchYaw(registry, cannon, geodesicId) : undefined;
+  return cannon?.kind === "geodesicEmitters/emitter" ? resolveEmitterLaunchYaw(registry, cannon, geodesicId) : undefined;
 }
 
 export function getCannonPoseYaw(
@@ -128,7 +160,7 @@ export function getCannonPoseYaw(
   cannonId: string,
 ): number | undefined {
   const cannon = registry.get(cannonId);
-  return cannon?.kind === "geodesic-cannon"
+  return cannon?.kind === "geodesicEmitters/emitter"
     ? Math.atan2(cannon.localPose.rotation.m10, cannon.localPose.rotation.m00)
     : undefined;
 }
@@ -394,12 +426,12 @@ export function runCurveShorteningUntilAtRest(
   return ticks;
 }
 
-// Two emitters on the 15 m torus, a straight arc E1 -> E2 and an arc E2 -> E1 that wraps once to the right, both locked to their emitters.
-export function createTorusLockedPairScenario() {
+// Two emitters on the 15 m torus, a straight arc E1 -> E2 and an arc E2 -> E1 that wraps once to the right, both connected to their emitters.
+export function createTorusConnectedPairScenario() {
   const world = compileTorusLoopWorld();
   const registry = createRuntimeObjectRegistry();
-  registry.add(createGeodesicCannonObject({ id: "e1", cellId: "torus-room", localPose: yawRigidTransform3(0, { x: -3, y: 0, z: 0 }) }));
-  registry.add(createGeodesicCannonObject({ id: "e2", cellId: "torus-room", localPose: yawRigidTransform3(0, { x: 3, y: 2, z: 0 }) }));
+  registry.add(createGeodesicEmitterObject({ id: "e1", cellId: "torus-room", localPose: yawRigidTransform3(0, { x: -3, y: 0, z: 0 }) }));
+  registry.add(createGeodesicEmitterObject({ id: "e2", cellId: "torus-room", localPose: yawRigidTransform3(0, { x: 3, y: 2, z: 0 }) }));
   registry.add(createGeodesicArcObject({ id: "g1", startAnchorObjectId: "e1", endAnchorObjectId: "e2", startCellId: "torus-room" }));
   registry.add(createGeodesicArcObject({
     id: "g2",
@@ -413,9 +445,9 @@ export function createTorusLockedPairScenario() {
   return { world, registry };
 }
 
-// The locked pair tied at E2.
+// The connected pair tied at E2.
 export function createTorusTiedPairScenario() {
-  const { world, registry } = createTorusLockedPairScenario();
+  const { world, registry } = createTorusConnectedPairScenario();
   // The tie is made outside any step, so a flow run starts with its first step (the command route is tested in tests/modules/).
   tieAtNewVertex(world, registry, {
     detachedEmitterId: "e2",
@@ -432,8 +464,8 @@ export function createManyArcsFlowScenario(extraArcs: number) {
   const { world, registry } = scenario;
   for (let i = 0; i < extraArcs; i += 1) {
     const y = -6 + (12 * (i + 0.5)) / Math.max(extraArcs, 1);
-    registry.add(createGeodesicCannonObject({ id: `x${i}a`, cellId: "torus-room", localPose: yawRigidTransform3(0, { x: -5, y, z: 0 }) }));
-    registry.add(createGeodesicCannonObject({ id: `x${i}b`, cellId: "torus-room", localPose: yawRigidTransform3(0, { x: 5, y: -y * 0.5, z: 0 }) }));
+    registry.add(createGeodesicEmitterObject({ id: `x${i}a`, cellId: "torus-room", localPose: yawRigidTransform3(0, { x: -5, y, z: 0 }) }));
+    registry.add(createGeodesicEmitterObject({ id: `x${i}b`, cellId: "torus-room", localPose: yawRigidTransform3(0, { x: 5, y: -y * 0.5, z: 0 }) }));
     registry.add(createGeodesicArcObject({ id: `xg${i}`, startAnchorObjectId: `x${i}a`, endAnchorObjectId: `x${i}b`, startCellId: "torus-room" }));
     rebuildConnectedGeodesicBetweenEmitters({ world, registry, geodesicId: `xg${i}` });
   }
@@ -444,8 +476,8 @@ export function createManyArcsFlowScenario(extraArcs: number) {
 export function createSymmetricPairScenario(halfWidth: number, height: number) {
   const world = compileLargeWorld();
   const registry = createRuntimeObjectRegistry();
-  registry.add(createGeodesicCannonObject({ id: "e1", cellId: "a", localPose: yawRigidTransform3(0, { x: -halfWidth, y: 0, z: 0 }) }));
-  registry.add(createGeodesicCannonObject({ id: "e2", cellId: "a", localPose: yawRigidTransform3(0, { x: halfWidth, y: 0, z: 0 }) }));
+  registry.add(createGeodesicEmitterObject({ id: "e1", cellId: "a", localPose: yawRigidTransform3(0, { x: -halfWidth, y: 0, z: 0 }) }));
+  registry.add(createGeodesicEmitterObject({ id: "e2", cellId: "a", localPose: yawRigidTransform3(0, { x: halfWidth, y: 0, z: 0 }) }));
   registry.add(createGeodesicVertexObject({ id: "free", cellId: "a", point: { x: 0, y: height, z: geodesicRayBeamHeightMeters } }));
   registry.add(createGeodesicArcObject({ id: "g1", startAnchorObjectId: "e1", endAnchorObjectId: "free", startCellId: "a" }));
   registry.add(createGeodesicArcObject({ id: "g2", startAnchorObjectId: "free", endAnchorObjectId: "e2", startCellId: "a" }));
@@ -458,7 +490,7 @@ export function createSymmetricPairScenario(halfWidth: number, height: number) {
 export function createTorusLoopBenchmarkScene() {
   const world = compileTorusLoopWorld();
   const registry = createRuntimeObjectRegistry();
-  registry.add(createGeodesicCannonObject({
+  registry.add(createGeodesicEmitterObject({
     id: "e",
     cellId: "torus-room",
     localPose: yawRigidTransform3(0, { x: -2, y: 1.95, z: 0 }),

@@ -8,6 +8,7 @@
  * and its vertex; every query leaves the registry version unchanged; `removeVertex` on a blocked vertex is refused and changes nothing; both previews refuse an
  * emitter id; the module-only commands are refused to clients. The geometry itself is tested in `tests/world-objects/geodesic/`.
  */
+import { createFixtureArc as createGeodesicArcObject } from "../support/arcs";
 import { describe, expect, it } from "vitest";
 import type { CompiledCellComplex } from "../../src/cell-complex/compileCellComplex";
 import type { AnyModuleDefinition, CommandContext, CommandResult, EngineCommandBase, EngineEventBase, ModuleCreateContext } from "../../src/engine/moduleTypes";
@@ -15,13 +16,13 @@ import { yawRigidTransform3 } from "../../src/math/rigidTransform3";
 import { geodesicModelToken, type ArcEnd, type GeodesicModelApi, type GeodesicModelCommand } from "../../src/modules/geodesicModel/api";
 import { geodesicModelModule } from "../../src/modules/geodesicModel";
 import { carryModule } from "../../src/modules/carry";
+import { geodesicEmittersModule } from "../../src/modules/geodesicEmitters";
 import { carryOffsetSlot } from "../../src/modules/carry/api";
 import { createDefaultPlayerPose } from "../../src/movement/playerPose";
 import { rebuildConnectedGeodesicBetweenEmitters } from "../../src/world-objects/geodesic/cannon";
 import { rebuildDerivedGeodesicSegments } from "../../src/world-objects/geodesic/intervals";
 import {
-  createGeodesicArcObject,
-  createGeodesicCannonObject,
+  createGeodesicEmitterObject,
   createGeodesicVertexObject,
   geodesicRayBeamHeightMeters,
 } from "../../src/world-objects/geodesic/objects";
@@ -88,12 +89,12 @@ function setup(world: CompiledCellComplex, registry: RuntimeObjectRegistry) {
 
 const beamZ = geodesicRayBeamHeightMeters;
 
-// Two emitters on the 15 m torus, a straight arc e1 -> e2 and an arc e2 -> e1 wrapping once to the right, both locked.
-function torusLockedPair() {
+// Two emitters on the 15 m torus, a straight arc e1 -> e2 and an arc e2 -> e1 wrapping once to the right, both connected.
+function torusConnectedPair() {
   const world = compileTorusLoopWorld();
   const registry = createRuntimeObjectRegistry();
-  registry.add(createGeodesicCannonObject({ id: "e1", cellId: "torus-room", localPose: yawRigidTransform3(0, { x: -3, y: 0, z: 0 }) }));
-  registry.add(createGeodesicCannonObject({ id: "e2", cellId: "torus-room", localPose: yawRigidTransform3(0, { x: 3, y: 2, z: 0 }) }));
+  registry.add(createGeodesicEmitterObject({ id: "e1", cellId: "torus-room", localPose: yawRigidTransform3(0, { x: -3, y: 0, z: 0 }) }));
+  registry.add(createGeodesicEmitterObject({ id: "e2", cellId: "torus-room", localPose: yawRigidTransform3(0, { x: 3, y: 2, z: 0 }) }));
   registry.add(createGeodesicArcObject({ id: "g1", startAnchorObjectId: "e1", endAnchorObjectId: "e2", startCellId: "torus-room" }));
   registry.add(createGeodesicArcObject({
     id: "g2",
@@ -109,7 +110,7 @@ function torusLockedPair() {
 
 // The same pair, tied at e2 through the command; returns the new vertex id.
 function tiedTorusPair() {
-  const { world, registry } = torusLockedPair();
+  const { world, registry } = torusConnectedPair();
   const model = setup(world, registry);
   const tied = model.submit({
     kind: "geodesicModel/tieAndDetach",
@@ -125,8 +126,8 @@ function tiedTorusPair() {
 function symmetricPair(halfWidth: number, height: number) {
   const world = compileLargeWorld();
   const registry = createRuntimeObjectRegistry();
-  registry.add(createGeodesicCannonObject({ id: "e1", cellId: "a", localPose: yawRigidTransform3(0, { x: -halfWidth, y: 0, z: 0 }) }));
-  registry.add(createGeodesicCannonObject({ id: "e2", cellId: "a", localPose: yawRigidTransform3(0, { x: halfWidth, y: 0, z: 0 }) }));
+  registry.add(createGeodesicEmitterObject({ id: "e1", cellId: "a", localPose: yawRigidTransform3(0, { x: -halfWidth, y: 0, z: 0 }) }));
+  registry.add(createGeodesicEmitterObject({ id: "e2", cellId: "a", localPose: yawRigidTransform3(0, { x: halfWidth, y: 0, z: 0 }) }));
   registry.add(createGeodesicVertexObject({ id: "v", cellId: "a", point: { x: 0, y: height, z: beamZ } }));
   registry.add(createGeodesicArcObject({ id: "g1", startAnchorObjectId: "e1", endAnchorObjectId: "v", startCellId: "a" }));
   registry.add(createGeodesicArcObject({ id: "g2", startAnchorObjectId: "v", endAnchorObjectId: "e2", startCellId: "a" }));
@@ -146,7 +147,7 @@ describe("geodesicModel: the model's identity", () => {
 
 describe("geodesicModel: tying", () => {
   it("ties through the command, emits vertexTied and leaves the geometry unchanged", () => {
-    const { world, registry } = torusLockedPair();
+    const { world, registry } = torusConnectedPair();
     const lengthBefore = totalGeodesicLength(registry, "g1") + totalGeodesicLength(registry, "g2");
     const model = setup(world, registry);
     const result = model.submit({
@@ -167,7 +168,7 @@ describe("geodesicModel: tying", () => {
   });
 
   it("refuses with the documented codes and changes nothing", () => {
-    const { world, registry } = torusLockedPair();
+    const { world, registry } = torusConnectedPair();
     const model = setup(world, registry);
     const version = registry.getVersion();
     const end = { geodesicId: "g1", role: "end" as const, anchorObjectId: "e2" };
@@ -392,7 +393,7 @@ describe("geodesicModel: with the carry module", () => {
     const engine = createTestEngine({
       registry,
       getWorld: () => world,
-      modules: [geodesicModelModule(), carryModule()],
+      modules: [geodesicModelModule(), geodesicEmittersModule(), carryModule()],
       playerPose: { ...createDefaultPlayerPose("a"), position: { x: -1.5, y: 0, z: 0 } },
     });
     const vertexBefore = registry.get("v");

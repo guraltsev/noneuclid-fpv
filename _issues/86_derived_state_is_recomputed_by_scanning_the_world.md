@@ -56,3 +56,5 @@ Each is fixed by a job above.
 ## Closing evidence
 
 Status note: job 55 is done in code; see the Report of .agents/jobs/55_destroy_policy.md (one manual check outstanding).
+
+- Job 65 (2026-11-05): evidence for closing, in the Report of [the job](../.agents/jobs/_done/65_module_public_api.md): a `derived-verify` release scenario over carry, shoot, tie and flow found no mismatch. It covers one cache (the arc index), about 1.6 percent of its reads, and at least 17 real comparisons, so it does not cover "every cache". The maintainer decides whether that closes this issue.

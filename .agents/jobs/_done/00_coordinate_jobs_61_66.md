@@ -1,9 +1,9 @@
 # Job 00 - Coordinate jobs 61-66 (time, emitters, public API, measurement tools and flags)
 
-Status: started 2026-11-05 at the maintainer's word.
+Status: done, needs review on 2026-11-06.
 Coordinates: jobs [61](61_simulation_ticks.md), [62](62_client_write_check.md), [63](63_geodesic_emitters_module.md),
 [64](64_emitter_edits_and_length.md), [65](65_module_public_api.md) and [66](66_measurement_tools_and_flags.md), which implement
-the next batch of design [013](../../_docs/design/013-world-engine-clients-and-modules.md), section 16.
+the next batch of design [013](../../../_docs/design/013-world-engine-clients-and-modules.md), section 16.
 
 ## Goal
 
@@ -12,7 +12,7 @@ fresh context. Never stop to ask. At the end, write one batch report that a more
 
 ## Decisions
 
-- Follow [the coordinator of jobs 51 to 60](_done/00_coordinate_jobs_51_60.md) for the steps of each job (gate in, execute, gate out,
+- Follow [the coordinator of jobs 51 to 60](00_coordinate_jobs_51_60.md) for the steps of each job (gate in, execute, gate out,
   review, close) and for the report template, except as stated here.
 - **One branch, one worktree:** `batch-61-66` in `.worktrees/batch-61-66`, from `design/012-engine-api`. Link `node_modules` as a
   junction. Remove the junction by hand before anyone removes the worktree: it points into the main checkout.

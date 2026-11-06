@@ -18,7 +18,7 @@ import { carryAttachmentKind } from "../../modules/carry/api";
 import type { ClientSession } from "../../runtime/clientSession";
 import type * as THREE from "three";
 import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex";
-import type { RuntimeObjectRegistry, RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
+import type { RuntimeObjectReader, RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
 import { runtimeObjectToDynamicObjectState } from "../../world-objects/runtimeObjectBase";
 import { collectCarryHighlightRecords, createCarryHighlightSource, type CarryHighlightObject } from "./carryHighlight";
 import type { FrameRenderSnapshot } from "./frameRenderSnapshot";
@@ -71,7 +71,7 @@ export type RuntimeObjectRecordSource = (typeof runtimeObjectRecordSources)[numb
 
 /** Inputs of {@link createRuntimeObjectInstanceSync}; the maps are shared with the tool object runtimes and mutated here. */
 export interface RuntimeObjectInstanceSyncDeps {
-  readonly registry: RuntimeObjectRegistry;
+  readonly registry: RuntimeObjectReader;
   readonly runtimeObjectRootsById: ReadonlyMap<string, THREE.Object3D>;
   /** Shared with toolObjectRuntimes (which deletes keys directly on invalidation). */
   readonly renderSourcesByKey: Map<string, RuntimeObjectRenderSourceMesh>;
@@ -234,7 +234,7 @@ export function createRuntimeObjectInstanceSync(deps: RuntimeObjectInstanceSyncD
   // A placed flag draws its own text planes plus the model archetypes shared by all flags of its type.
   function archetypeKeysForObject(object: RuntimeWorldObject, prefix: string): readonly string[] {
     const own = archetypeKeysByPrefix.get(prefix) ?? noKeys;
-    if (object.kind !== "placed-flag") {
+    if (object.kind !== "placedFlags/flag") {
       return own;
     }
 
@@ -304,7 +304,7 @@ export function createRuntimeObjectInstanceSync(deps: RuntimeObjectInstanceSyncD
       }
 
       addCachedOrCollect(`object:${object.id}`, root, () =>
-        object.kind === "placed-flag"
+        object.kind === "placedFlags/flag"
           ? collectPlacedFlagRenderSourceMeshes(object.id, object.flagType, root, runtimeObjectArchetypeKeyPrefix(object))
           : collectRuntimeObjectRenderSourceMeshes(object.id, root, runtimeObjectArchetypeKeyPrefix(object))
       );

@@ -20,7 +20,7 @@ interface AppInfo {
 /** True once the debug namespace responds again, false while it is still being torn down or rebuilt. */
 async function debugNamespaceIsInstalled(api: ScenarioApi): Promise<boolean> {
   try {
-    await api.debug.dumpLockedGeodesicWords();
+    await api.debug.dumpConnectedGeodesicWords();
     return true;
   } catch {
     return false;

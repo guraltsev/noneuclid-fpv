@@ -135,6 +135,18 @@ describe("commands and results", () => {
     expect(engine.read.stepIndex).toBe(1);
   });
 
+  it("emits the notice of dropped time as an event with a message, until endFrame", () => {
+    const engine = createTestEngine();
+    engine.noticeBehindRealTime(0.25);
+
+    const events: unknown[] = [];
+    engine.forEachEvent((event) => events.push(event));
+    expect(events).toEqual([{ kind: "world/behindRealTime", message: "The world could not keep up and skipped 0.25 s of real time.", seconds: 0.25 }]);
+
+    engine.endFrame();
+    engine.forEachEvent(() => expect.unreachable());
+  });
+
   it("clears results, events and the journal at endFrame", () => {
     const registry = createTestEngine().registry;
     const engine = createTestEngine({
@@ -398,12 +410,12 @@ describe("the realtime view", () => {
 
 describe("tool requests and gates", () => {
   it("accepts a tool the configuration enables and refuses one it disables, with a message", () => {
-    const engine = createTestEngine({ isToolEnabled: (toolId) => toolId !== "protractor" });
-    const accepted = engine.submit("local", requestTool("measure-length"));
-    const refused = engine.submit("local", requestTool("protractor"));
+    const engine = createTestEngine({ isToolEnabled: (toolId) => toolId !== "geodesicEmitters/rotate" });
+    const accepted = engine.submit("local", requestTool("geodesicEmitters/carry"));
+    const refused = engine.submit("local", requestTool("geodesicEmitters/rotate"));
     const unknown = engine.submit("local", requestTool("no-such-tool" as RuntimeToolId));
     engine.step(0);
-    expect(engine.resultOf(accepted)).toEqual({ ok: true, value: { toolId: "measure-length" } });
+    expect(engine.resultOf(accepted)).toEqual({ ok: true, value: { toolId: "geodesicEmitters/carry" } });
     expect(engine.resultOf(refused)).toEqual({ ok: false, refusal: { code: "world/toolDisabled", message: "This tool is not available in this world." } });
     expect(engine.resultOf(unknown)).toMatchObject({ ok: false, refusal: { code: "world/unknownTool" } });
   });
@@ -637,22 +649,12 @@ describe("attachments and the bodies phase", () => {
     expect(engine.read.participant("local")?.attachments).toEqual([attachment]);
   });
 
-  it("lets a module write a core kind only if it lists it in writesCoreKinds", () => {
-    const flag = thing("flag-1", "placed-flag");
-    const engineFor = (writesCoreKinds?: readonly string[]) =>
-      createTestEngine({
-        modules: [{ ...fake("a", { commands: { "a/add": { run: (_command, ctx) => (ctx.objects.add(flag), ok) } } }), writesCoreKinds }],
-      });
+  it("refuses a module's write of a core kind it does not own", () => {
+    const flag = thing("flag-1", "placedFlags/flag");
+    const refusing = createTestEngine({ modules: [fake("a", { commands: { "a/add": { run: (_command, ctx) => (ctx.objects.add(flag), ok) } } })] });
 
-    const refusing = engineFor();
     const refused = refusing.submit("local", { kind: "a/add" });
     expect(() => refusing.step(0)).toThrow(/does not declare/);
     expect(refusing.resultOf(refused)).toMatchObject({ ok: false, refusal: { code: "world/internalError" } });
-
-    const allowing = engineFor(["placed-flag"]);
-    const accepted = allowing.submit("local", { kind: "a/add" });
-    allowing.step(0);
-    expect(allowing.resultOf(accepted)).toEqual({ ok: true });
-    expect(allowing.registry.get("flag-1")).toBeDefined();
   });
 });

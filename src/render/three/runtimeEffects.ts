@@ -60,13 +60,11 @@ export function createRuntimeEffects(deps: RuntimeEffectsDeps): RuntimeEffects {
         deps.syncDesktopPalette();
         return;
       case "end-tool-session":
-        dispatch({ kind: "set-protractor-tool-state", state: {} });
         dispatch({ kind: "set-cannon-tool-state", state: {} });
         deps.clearProtractorToolFeedback();
         return;
       case "switch-tool-session":
-        if (effect.toolId !== "protractor") {
-          dispatch({ kind: "set-protractor-tool-state", state: {} });
+        if (effect.toolId !== "geodesicMeasurements/protractor") {
           deps.clearProtractorToolFeedback();
         }
         return;

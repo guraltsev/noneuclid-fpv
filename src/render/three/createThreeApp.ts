@@ -14,7 +14,7 @@
  *
  * ## Frame loop (`renderFrame`, driven by `renderer.setAnimationLoop`)
  * One call per animation frame, on the main thread, with no re-entrancy. In order:
- * 0. Bookkeeping: `clock.getDelta()` gives `deltaSeconds`; a finished background geometry deformation is
+ * 0. Bookkeeping: `clock.getDelta()` gives the elapsed real time and, capped, the frame time `deltaSeconds`; a finished background geometry deformation is
  *    committed first (`geometryCommit.commitReady` -> `geometryCommit.commit`), so the rest of the
  *    frame sees one consistent world.
  * 1. Input: `getXrInputFrame` or `getDesktopInputFrame` consume one `RuntimeInputFrame` (XR is used only when
@@ -23,7 +23,9 @@
  *    `bodiesInCell`; in XR a second `movePlayer` applies physical head motion
  *    (room-scale walking). The result replaces `playerPose` and may change `playerPose.cellId` by crossing a
  *    portal. Then the camera/XR rig is synced to the pose, the aim ray is resolved, and the selected tool
- *    handles the primary/carry/interact actions. Creatures and flags advance.
+ *    handles the primary/carry/interact actions. Creatures and flags advance on frame time. Then the world engine: `applyControls` with the frame time, once
+ *    per frame, then the ticks the simulation clock asks for from the elapsed real time: none, one or several `engine.step`. The client hooks that replay the
+ *    frame's events run once, after the last tick, also in a frame with no tick.
  * 3. Portal visibility: `updateVisibleCell` shows only the player's cell mesh, the culling cameras are placed
  *    (one per eye in stereo XR), and `computeVisiblePortalPaths` (inside `syncPortalInstances`)
  *    selects visible portal paths from the static per-root cull tables.
@@ -65,8 +67,8 @@ import type { EngineEventBase } from "../../engine/moduleTypes";
 import { createToolHost } from "./toolHost";
 import type { RootAimRay } from "./rootAimRay";
 import { createWorldClient } from "./worldClient";
-import { createDefaultClientModules, createDefaultWorldModules } from "../../runtime/experience";
-import { createLocalPlayerParticipant, createWorldEngine, publishLocalPlayerPose, readLocalPlayerPose } from "../../engine/worldEngine";
+import { createDefaultClientModules, createDefaultWorldModules, defaultSimulationClockOptions } from "../../runtime/experience";
+import { createLocalPlayerParticipant, createSimulationClock, createWorldEngine, publishLocalPlayerPose, readLocalPlayerPose } from "../../engine/worldEngine";
 import * as THREE from "three";
 import { reversePainterSortStable } from "@pmndrs/uikit";
 import { type AppState } from "../../runtime/appState";
@@ -101,7 +103,7 @@ import { runtimeObjectToDynamicObjectState } from "../../world-objects/runtimeOb
 import { isSimpleGeoCreatureObjectSpec } from "../../world-objects/simpleGeoCreature";
 import { type SimpleGeoCreatureRuntime, createSimpleGeoCreatureRuntime } from "./creatures/simpleGeoCreatureView";
 import { createObjectHost, createPlainWorldObject, type PlainWorldObject } from "../../world-objects/worldObjectOwner";
-import { setApiNamespace } from "../../runtime/publicApi";
+import { installModuleApis, setApiNamespace } from "../../runtime/publicApi";
 import { createDesktopToolIndicator } from "../dom/desktopToolIndicator";
 import { createFloatingObjectTooltip } from "../dom/floatingObjectTooltip";
 import { createAimCrossMarker } from "./aimCrossMarker";
@@ -129,6 +131,12 @@ import {
 } from "./frameDiagnostics";
 import { type FrameRenderSnapshot } from "./frameRenderSnapshot";
 import { createGeodesicRuntimeRenderSources } from "./geodesicCannonRenderer";
+import { requestGeodesicDeletion, requestGeodesicExtension, requestNewGeodesic } from "../../modules/geodesicEmitters/client";
+import { geodesicLengthToolId, geodesicMeasurementsModuleId, geodesicProtractorToolId } from "../../modules/geodesicMeasurements/api";
+import { requestAngleRemoval, requestLengthRemoval } from "../../modules/geodesicMeasurements/client";
+import { placedFlagToolId } from "../../modules/placedFlags/api";
+import { requestFlagMessage, requestFlagRemoval } from "../../modules/placedFlags/client";
+import { geodesicEmitterToolId } from "../../modules/geodesicEmitters/api";
 import { createGeodesicCannonTools } from "./geodesicCannonTools";
 import { createPortalFramePass } from "./portalFramePass";
 import { createGeodesicDebugDumps } from "./geodesicDebugDumps";
@@ -316,8 +324,12 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   scene.add(xrRig.root);
   const vrComfortVignette = createVrComfortVignette(camera, options.vrComfortOptions);
   const clock = new THREE.Clock();
-  /** Longest simulation step per frame, in seconds; longer wall-clock gaps (hidden tab, debugger pause) are treated as this long. */
+  /** Longest frame time, in seconds, for what still runs on frames (the player, creatures, client tools, the fast channel); longer wall-clock gaps (hidden tab, debugger pause) are treated as this long. The world's ticks do not use it: their time comes from `simulationClock`. */
   const maxSimulationStepSeconds = 0.1;
+  // Turns elapsed real time into the world's ticks (design 012 P8).
+  const simulationClock = createSimulationClock(defaultSimulationClockOptions);
+  // How long the last frame's ticks took; the clock lengthens the ticks when they take too large a share of the frame.
+  let lastTicksCostSeconds = 0;
   // The authoritative player pose (cell id, cell-local position in meters, yaw in radians) is the body of the engine's
   // "local" participant. Written only in renderFrame (movement), geometryCommit and the reset/teleport helpers,
   // through publishLocalPlayerPose (direct write D1); factories read it with readLocalPlayerPose(engine).
@@ -355,7 +367,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       "portal-path-overlay-instances",
     ),
     cannonToolState: {},
-    protractorToolState: {},
     moduleToolState: {},
     pendingToolRequest: undefined,
   });
@@ -372,6 +383,8 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     modules: createDefaultWorldModules(),
     isToolEnabled: (toolId) => isRuntimeToolEnabled(appConfig, toolId),
     writeGuard: hasActiveDebugOption(options.debugLevel, options.debugOptions, "module-write-guard"),
+    // Called by scripts only, so `worldClient` below exists by then.
+    submitPublicCommand: (command) => worldClient.submit(command),
   });
   function showWorldMessage(message: string, detail: EngineEventBase | { readonly code: string }): void {
     console.info(`[noneuclid] ${message}`);
@@ -606,7 +619,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   const {
     dumpGeodesicCreatures,
     dumpGeodesicPath,
-    dumpLockedGeodesicWords,
+    dumpConnectedGeodesicWords,
     dumpAllGeodesics,
     updateGeodesicCreatureDebug,
   } = createGeodesicDebugDumps({
@@ -649,7 +662,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       session,
     });
 
-  const { updateGeodesicEmitterLabels, getGeodesicDisplayName, getGeodesicLabelsById } =
+  const { updateGeodesicEmitterLabels, getGeodesicLabelsById } =
     createGeodesicEmitterLabelController({
       engine,
       scene,
@@ -708,24 +721,15 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     resolveDesktopTooltipScreenPosition,
     getRuntimeObjectTooltipText,
     getWorldFocusMessageDefinition,
-    getGeodesicDisplayName,
   });
-  const { clearProtractorToolFeedback, resolveProtractorDirectedSelectionFromAimTarget } = aimFeedback;
+  const { clearProtractorToolFeedback } = aimFeedback;
 
   const {
     syncPlacedFlagRuntime,
     removePlacedFlagRuntime,
-    syncMeasuredGeodesicLengthRuntime,
     removeMeasuredGeodesicLengthRuntime,
-    syncProtractorAngleRuntime,
     removeProtractorAngleRuntime,
-    removePlacedFlags,
-    removeMeasuredGeodesicLengths,
-    removeMeasuredGeodesicLengthsForGeodesic,
-    removeProtractorAngles,
-    removeProtractorAnglesForGeodesic,
-    removeProtractorAnglesForMissingVertices,
-    syncLabelRuntimesFromJournal,
+    syncToolObjectRuntimesFromJournal,
   } = createToolObjectRuntimes({
     assets: options.assets,
     runtimeObjectRegistry,
@@ -737,58 +741,46 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     runtimeObjectRenderSourcesByKey,
     runtimeObjectRenderArchetypesByKey,
     runtimeObjectRenderRoot,
-    session,
-    dispatch: dispatchRuntimeCommand,
-    clearProtractorToolFeedback,
     syncSelectableHitboxDebug: requestSelectableHitboxDebugSync,
   });
 
+  // The emitter tool's context, for the buttons of the emitter's page and a click on a geodesic with no tool selected. Called from events, after the tool host below exists.
+  const emitterTool = () => toolHost.contextOf(geodesicEmitterToolId);
+
   const {
-    tryUseGeodesicCannonToolFromAim,
-    tryExtendFocusedGeodesicFromAim,
-    addGeodesicToCannon,
     startGeodesicCannonRotation,
     startGeodesicCannonAim,
     startGeodesicCannonCarry,
+    settleEmitterMode,
     tryStartFocusedGeodesicCannonCarry,
     finishGeodesicCannonCarry,
-    deleteGeodesicFromCannon,
     updateCarriedGeodesicCannonPose,
     afterWorldStep: afterCarryWorldStep,
     updateActiveGeodesicCannonRotation,
     updateActiveGeodesicCannonAim,
-    getLockedGeodesicIds,
+    getConnectedGeodesicIds,
     freezeXrHeadHeightDuringGeodesicCannonRotation,
     resetGeodesicCannonRotationTracking,
   } = createGeodesicCannonTools({
     engine,
     renderer,
     controls,
-    runtimeObjectRegistry,
     getWorld: activeWorld,
     session,
     dispatch: dispatchRuntimeCommand,
+    // Called from events and the frame, after the tool host below exists.
+    toolContext: (toolId) => toolHost.contextOf(toolId),
     resolveCurrentAimTarget,
-    targetIsWithinInteractionRange,
-    logVerboseAimClick,
     findFocusedRuntimeObject,
-    getGeodesicLabelsById,
-    objectActionsFor: (objectKind, objectId) => toolHost.objectActionsFor(objectKind, objectId),
     syncDesktopPalette,
-    syncSelectableHitboxDebug: requestSelectableHitboxDebugSync,
-    removeMeasuredGeodesicLengthsForGeodesic,
-    removeProtractorAnglesForGeodesic,
-    removeProtractorAnglesForMissingVertices,
   });
 
   const {
     appendEditingSignCharacter,
     backspaceEditingSignMessage,
     deleteEditingSign,
-    tryPlaceFlagFromAim,
-    tryUseMeasureLengthToolFromAim,
-    tryUseProtractorToolFromAim,
     tryUseFocusedObjectPrimaryInteraction,
+    showObjectPage,
     openContextMenuFromAim,
     applyDesktopScenePaletteToggle,
     resetPlayerToHome,
@@ -814,26 +806,17 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     targetIsWithinInteractionRange,
     logVerboseAimClick,
     findFocusedRuntimeObject,
-    tryExtendFocusedGeodesicFromAim,
-    getGeodesicDisplayName,
+    extendGeodesic: (arcId) => requestGeodesicExtension(emitterTool(), arcId),
     getGeodesicLabelsById,
-    getLockedGeodesicIds,
+    getConnectedGeodesicIds,
     objectActionsFor: (objectKind, objectId) => toolHost.objectActionsFor(objectKind, objectId),
     createGeometryComputerMenuOptions,
-    syncPlacedFlagRuntime,
-    removePlacedFlagRuntime,
-    syncMeasuredGeodesicLengthRuntime,
-    removeMeasuredGeodesicLengthRuntime,
-    syncProtractorAngleRuntime,
-    removeProtractorAngleRuntime,
-    removePlacedFlags,
-    removeMeasuredGeodesicLengths,
-    removeProtractorAngles,
+    setFlagMessage: (flagId, message) => requestFlagMessage(toolHost.contextOf(placedFlagToolId), flagId, message),
+    removeFlag: (flagId) => requestFlagRemoval(toolHost.contextOf(placedFlagToolId), flagId),
+    removeLength: (lengthId) => requestLengthRemoval(toolHost.contextOf(geodesicLengthToolId), lengthId),
+    removeAngle: (angleId) => requestAngleRemoval(toolHost.contextOf(geodesicProtractorToolId), angleId),
     removeGeodesicRuntimeObjects,
-    syncSelectableHitboxDebug: requestSelectableHitboxDebugSync,
-    syncDesktopPalette,
     clearProtractorToolFeedback,
-    resolveProtractorDirectedSelectionFromAimTarget,
   });
 
   // The tools: the shell's own, as handlers, and the modules' as descriptors from the experience's client parts. One lookup (`toolHost.toolsById`) serves every place that varies by tool.
@@ -849,11 +832,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     dispatch: dispatchRuntimeCommand,
     clients: createDefaultClientModules(),
     core: {
-      placeFlag: tryPlaceFlagFromAim,
-      useGeodesicCannon: tryUseGeodesicCannonToolFromAim,
-      measureLength: tryUseMeasureLengthToolFromAim,
-      protractor: tryUseProtractorToolFromAim,
-      protractorPrompt: getProtractorToolPrompt,
       carry: (primaryActionRequested) => {
         if (primaryActionRequested) finishGeodesicCannonCarry();
         return primaryActionRequested;
@@ -866,16 +844,17 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
         updateActiveGeodesicCannonAim(primaryActionRequested, ray);
         return primaryActionRequested;
       },
+      emitterModeResult: settleEmitterMode,
     },
     resolveCurrentAimTargets,
+    resolveCurrentAimTarget,
     targetIsWithinInteractionRange,
     useFocusedObject: tryUseFocusedObjectPrimaryInteraction,
     requestTool: (toolId, objectId) => worldClient.requestTool(toolId, objectId),
     showMessage: (message) => showWorldMessage(message, { code: "tool/message" }),
     syncDesktopPalette,
-    syncWorldObjects() {
-      requestSelectableHitboxDebugSync();
-    },
+    selectObject: (objectId, geodesicId) => dispatchRuntimeCommand({ kind: "set-cannon-tool-state", state: { selectedCannonId: objectId, activeGeodesicId: geodesicId } }),
+    showObjectPage,
   });
 
   const {
@@ -917,12 +896,12 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     applyMenuComfortState,
     requestAppRestart: xrSession.requestAppRestart,
     teleportPlayerHome,
-    addGeodesicToCannon,
+    addGeodesicToCannon: (cannonId) => requestNewGeodesic(emitterTool(), cannonId),
     startGeodesicCannonCarry,
     startObjectAction: (objectKind, objectId, actionId) => toolHost.startObjectAction(objectKind, objectId, actionId),
     startGeodesicCannonRotation,
     startGeodesicCannonAim,
-    deleteGeodesicFromCannon,
+    deleteGeodesicFromCannon: (cannonId, geodesicId) => requestGeodesicDeletion(emitterTool(), cannonId, geodesicId),
     stepGeometryComputerPendingTarget,
     startGeometryComputerDeformation,
     appendEditingSignCharacter,
@@ -973,7 +952,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     dumpGeodesicCreatures: dumpGeodesicCreatures,
     dumpAllGeodesics: dumpAllGeodesics,
     dumpGeodesicPath: dumpGeodesicPath,
-    dumpLockedGeodesicWords: dumpLockedGeodesicWords,
+    dumpConnectedGeodesicWords: dumpConnectedGeodesicWords,
     placeObjectAt: debugPlaceObjectAt,
     playerPose: debugPlayerPose,
     kindScans: () => runtimeObjectRegistry.getKindScanCounts(),
@@ -983,6 +962,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   installRenderInspectionApi(runtimeObjectInstanceSync.inspection);
   geometryDebugHelpers.installIfAvailable();
   setApiNamespace("world", worldClient.api);
+  const uninstallModuleApis = installModuleApis(engine.publicApis);
   setApiNamespace("view", {
     screenshot() {
       if (renderer.xr.isPresenting) {
@@ -1139,6 +1119,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     const frameStartMs = performance.now();
     // Phase 0: timing. deltaSeconds is the wall-clock time since the previous frame, capped so that a frame after the
     // tab was in the background does not fling creatures and the player far outside their cells in a single step.
+    // The world's ticks take the uncapped time, through the simulation clock.
     const wallClockDeltaSeconds = clock.getDelta();
     const deltaSeconds = Math.min(wallClockDeltaSeconds, maxSimulationStepSeconds);
     const frameRateFps = wallClockDeltaSeconds > 0 ? 1 / wallClockDeltaSeconds : undefined;
@@ -1168,12 +1149,11 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       deltaSeconds,
       normalFovDegrees: camera.fov,
     });
-    const rotatingGeodesicCannon = currentMenuState().selectedTool === "geodesic-cannon-rotate";
-    const aimingGeodesicCannon = currentMenuState().selectedTool === "geodesic-cannon-aim";
+    const rotatingGeodesicCannon = currentMenuState().selectedTool === "geodesicEmitters/rotate";
     const effectiveHeadLocalMeters = rotatingGeodesicCannon && xrActive
       ? freezeXrHeadHeightDuringGeodesicCannonRotation(headLocalMeters)
       : headLocalMeters;
-    resetGeodesicCannonRotationTracking({ rotating: rotatingGeodesicCannon, aiming: aimingGeodesicCannon });
+    resetGeodesicCannonRotationTracking(rotatingGeodesicCannon);
     const frameAfterInputMs = performance.now();
     const frameBeforeMoveMs = frameAfterInputMs;
     const previousCellId = readLocalPlayerPose(engine).cellId;
@@ -1248,7 +1228,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     // menu is open). primaryActionConsumed stops the generic focused-object interaction.
     let primaryActionConsumed = false;
     if (frame.carryActionRequested && !currentMenuState().isOpen) {
-      primaryActionConsumed = currentMenuState().selectedTool === "geodesic-cannon-carry"
+      primaryActionConsumed = currentMenuState().selectedTool === "geodesicEmitters/carry"
         ? finishGeodesicCannonCarry()
         : tryStartFocusedGeodesicCannonCarry(activeAimRay);
     }
@@ -1284,20 +1264,29 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     for (const runtime of placedFlagRuntimes.values()) {
       runtime.syncParent(cellMeshes);
     }
-    // The world engine: the fast channel first (what follows a participant keeps up with this frame), then the step: queued commands and the modules' ticks. Contained like any phase.
+    // The world engine: the fast channel first (what follows a participant keeps up with this frame), then the frame's ticks: queued commands and the modules' ticks. A frame with no tick runs only the fast channel. Contained like any phase.
     frameErrorGuard.runPhase("world engine", () => {
-      const worldSeconds = frame.resetRequested ? 0 : deltaSeconds;
-      engine.applyControls(worldSeconds);
-      engine.step(worldSeconds);
+      if (frame.resetRequested) {
+        engine.applyControls(0);
+        engine.step(0);
+        return;
+      }
+      engine.applyControls(deltaSeconds);
+      const { ticks, tickSeconds } = simulationClock.advance(wallClockDeltaSeconds, lastTicksCostSeconds);
+      const behindSeconds = simulationClock.takeBehindNotice();
+      if (behindSeconds > 0) engine.noticeBehindRealTime(behindSeconds);
+      const ticksStartMs = performance.now();
+      for (let tick = 0; tick < ticks; tick += 1) engine.step(tickSeconds);
+      lastTicksCostSeconds = (performance.now() - ticksStartMs) / 1000;
     });
-    // A separate phase: a step that rethrows a handler's error has still stored its results, which the client must read before `endFrame` clears them.
+    // A separate phase, once per frame, after the last tick, also in a frame with no tick: these hooks replay every event since `endFrame`. A step that rethrows a handler's error has still stored its results, which the client must read before `endFrame` clears them.
     frameErrorGuard.runPhase("world client", () => {
       worldClient.afterStep();
       toolHost.afterStep();
       afterCarryWorldStep();
     });
-    // Crossings, lengths and angles follow from what changed: the engine's derive pass wrote them, and the label runtimes read them from the journal.
-    frameErrorGuard.runPhase("label runtimes", syncLabelRuntimesFromJournal);
+    // Crossings, lengths and angles follow from what changed: the engine's derive pass wrote them, and the runtimes of flags and labels read what was written from the journal.
+    frameErrorGuard.runPhase("tool object runtimes", syncToolObjectRuntimesFromJournal);
     const frameAfterObjectsMs = performance.now();
     const frameBeforeCameraMs = frameAfterObjectsMs;
 
@@ -1420,7 +1409,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
 
   function clearGeometryToolStateAfterCommit(): void {
     dispatchRuntimeCommand({ kind: "set-cannon-tool-state", state: {} });
-    dispatchRuntimeCommand({ kind: "set-protractor-tool-state", state: {} });
+    dispatchRuntimeCommand({ kind: "set-module-tool-state", moduleId: geodesicMeasurementsModuleId, state: undefined });
     clearProtractorToolFeedback();
     refreshOpenGeometryComputerMenu();
     syncDesktopPalette();
@@ -1458,7 +1447,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       dumpGeodesicCreatures: dumpGeodesicCreatures,
       dumpAllGeodesics: dumpAllGeodesics,
       dumpGeodesicPath: dumpGeodesicPath,
-      dumpLockedGeodesicWords: dumpLockedGeodesicWords,
+      dumpConnectedGeodesicWords: dumpConnectedGeodesicWords,
       placeObjectAt: debugPlaceObjectAt,
       playerPose: debugPlayerPose,
       kindScans: () => runtimeObjectRegistry.getKindScanCounts(),
@@ -1607,6 +1596,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       uninstallGeometryDebugHelpers();
       setApiNamespace("view", undefined);
       setApiNamespace("world", undefined);
+      uninstallModuleApis();
       worldClient.dispose();
       geometrySession.dispose();
       debugOverlay.dispose();
@@ -1694,18 +1684,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     controls.setLookMode(currentMenuState().isOpen ? "palette" : "camera");
     const selectedTool = currentMenuState().selectedTool;
     desktopToolIndicator.setTool(toolHost.toolsById.get(selectedTool), currentMenuState().placeFlagOptions.flagType, toolHost.promptOf(selectedTool));
-  }
-
-  function getProtractorToolPrompt(): string {
-    if (!session.get().protractorToolState.center) {
-      return "select: vertex";
-    }
-
-    if (!session.get().protractorToolState.first) {
-      return "select: side1";
-    }
-
-    return "select: side2";
   }
 
   function playerBlockingBodiesInCell(cellId: string) {

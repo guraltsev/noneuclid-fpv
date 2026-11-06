@@ -25,3 +25,5 @@ The lift is also a direct world write from the shell (section 5.7): it belongs i
 - `carry/attach` itself removes the plain geodesics, only on success.
 - The client enters the carry tool only on an accepted attach.
 - A test: a refused attach leaves the emitter's geodesics and the client's tool unchanged.
+
+- Job 64 (2026-11-05): done, needs review; see the Report in [the job](../.agents/jobs/_done/64_emitter_edits_and_length.md). Manual checks are not done, so this stays open.

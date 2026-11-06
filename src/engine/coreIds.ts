@@ -10,8 +10,8 @@ const coreObjectKindTable: Record<RuntimeWorldObject["kind"], true> = {
   "geo-mouse": true,
   "geo-butterfly": true,
   asset: true,
-  "placed-flag": true,
-  "geodesic-cannon": true,
+  "placedFlags/flag": true,
+  "geodesicEmitters/emitter": true,
   "geodesicModel/arc": true,
   "geodesicModel/vertex": true,
   "geodesicModel/segment": true,
@@ -23,29 +23,27 @@ const coreObjectKindTable: Record<RuntimeWorldObject["kind"], true> = {
 const coreToolIdTable: Record<CoreToolId, true> = {
   none: true,
   aim: true,
-  "place-flag": true,
-  "geodesic-cannon": true,
-  "measure-length": true,
-  protractor: true,
-  "geodesic-cannon-carry": true,
-  "geodesic-cannon-rotate": true,
-  "geodesic-cannon-aim": true,
+  "geodesicEmitters/carry": true,
+  "geodesicEmitters/rotate": true,
+  "geodesicEmitters/aim": true,
 };
 
 /** Kinds of the core union of the registry. */
 export const coreObjectKinds: readonly string[] = Object.keys(coreObjectKindTable);
 
 /**
- * Kinds of the registry's core union that a module declares as its own (design 013 section 13.1): the geodesic model and the geodesic measurements keep their declaring files in `world-objects/geodesic/objects.ts` and in the core union in this wave, and its `objectKinds` lists them.
+ * Kinds of the registry's core union that a module declares as its own (design 013 section 13.1): the emitters, the geodesic model, the geodesic measurements and the placed flags keep their declaring files in `world-objects/geodesic/objects.ts` and in the core union in this wave, and its `objectKinds` lists them.
  * Composition accepts a declaration of exactly these kinds (rule 5); any other declaration of a core kind is still a problem.
  */
 export const moduleOwnedCoreKinds: readonly string[] = [
+  "geodesicEmitters/emitter",
   "geodesicModel/arc",
   "geodesicModel/vertex",
   "geodesicModel/segment",
   "geodesicModel/crossing",
   "geodesicMeasurements/length",
   "geodesicMeasurements/angle",
+  "placedFlags/flag",
 ];
 
 /** Ids of the tools the shell defines itself. */

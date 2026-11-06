@@ -10,7 +10,6 @@ import type { DebugSettings } from "../glue/debugSettings";
 import type { RuntimeToolId } from "../glue/toolIds";
 import type { VrComfortOptions } from "../glue/vrComfortOptions";
 import type { GeodesicCannonToolState } from "../world-objects/geodesic/cannonToolState";
-import type { ProtractorToolState } from "../world-objects/protractorTool";
 import type { RuntimeMenuState } from "./runtimeMenuState";
 
 /**
@@ -40,8 +39,6 @@ export interface ClientSessionState {
   readonly vrComfortOptions: VrComfortOptions;
   /** Real state: which cannon and geodesic the emitter tools work on; empty when idle. */
   readonly cannonToolState: GeodesicCannonToolState;
-  /** Real state: the protractor tool's picks; empty when idle. */
-  readonly protractorToolState: ProtractorToolState;
   /** Real state: the client tool state of each module's tools, by module id; absent while that module's tool is idle. */
   readonly moduleToolState: Readonly<Record<string, unknown>>;
   /** Real state: the tool the person asked for that the world has not confirmed yet, or undefined. */

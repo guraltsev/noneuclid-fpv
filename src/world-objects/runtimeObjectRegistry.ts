@@ -13,7 +13,7 @@ import type { AssetObjectSpec } from "../cell-complex/specs";
 import { yawRigidTransform3 } from "../math/rigidTransform3";
 import type {
   GeodesicVertexObject,
-  GeodesicCannonObject,
+  GeodesicEmitterObject,
   GeodesicCrossingObject,
   GeodesicArcObject,
   GeodesicSegmentObject,
@@ -22,7 +22,7 @@ import type { MeasuredGeodesicLengthObject } from "./toolObjects";
 import type { PlacedFlagObject } from "./toolObjects";
 import type { ProtractorAngleObject } from "./toolObjects";
 import { userObjectClass } from "./objectMetadata";
-import { ChangeOp, createRuntimeObjectChangeJournal, type RuntimeObjectChangeJournal } from "./runtimeObjectChangeJournal";
+import { ChangeOp, createRuntimeObjectChangeJournal, type RuntimeObjectChangeJournal, type RuntimeObjectChangeReader } from "./runtimeObjectChangeJournal";
 import type { RuntimeCreatureObject, RuntimeWorldObjectBase } from "./runtimeObjectBase";
 
 /**
@@ -42,7 +42,7 @@ export type RuntimeWorldObject =
   | RuntimeCreatureObject
   | RuntimeStaticAssetObject
   | PlacedFlagObject
-  | GeodesicCannonObject
+  | GeodesicEmitterObject
   | GeodesicArcObject
   | GeodesicVertexObject
   | GeodesicSegmentObject
@@ -96,12 +96,17 @@ export interface RuntimeObjectRegistry {
 }
 
 /**
- * The read-only face of the registry (design 013 section 6.1): everything except the writes `add`, `update`, `remove`, `claimOwnership`, `releaseOwnership` and `moveToCell`. A type only; the object is the same registry, so clients that receive the reader cannot write by type.
+ * The read-only face of the registry (design 013 section 6.1): everything except the writes `add`, `update`, `remove`, `claimOwnership`, `releaseOwnership` and `moveToCell`, and with `changes` narrowed to its read side (no `clear`, no `retainFrom`). A type only; the object is the same registry, so clients that receive the reader cannot write by type.
  */
 export type RuntimeObjectReader = Omit<
   RuntimeObjectRegistry,
-  "add" | "update" | "remove" | "claimOwnership" | "releaseOwnership" | "moveToCell"
->;
+  "add" | "update" | "remove" | "claimOwnership" | "releaseOwnership" | "moveToCell" | "changes"
+> & { readonly changes: RuntimeObjectChangeReader<RuntimeWorldObject> };
+
+/**
+ * The registry as a client file that still writes the world takes it (design 013 section 14): `RuntimeObjectRegistry` under a name that can be searched for. Only the files in `legacyWorldWriters` (scripts/docs/lib.mjs) may name it, and the list only shrinks; every other client takes {@link RuntimeObjectReader}.
+ */
+export type LegacyWorldWriter = RuntimeObjectRegistry;
 
 /**
  * Creates a registry, optionally pre-populated with `initialObjects`.
@@ -335,7 +340,7 @@ export function createRuntimeObjectRegistry(
       const queries = cellQueriesFor(cellId);
       return (queries.playerBlocking ??= Object.freeze(
         registry.getCollidableObjectsInCell(cellId).filter(
-          (object) => object.kind !== "geodesic-cannon" && !object.do_not_collide_with?.includes(userObjectClass),
+          (object) => object.kind !== "geodesicEmitters/emitter" && !object.do_not_collide_with?.includes(userObjectClass),
         ),
       ));
     },

@@ -8,7 +8,7 @@ import * as THREE from "three";
 import { type Vec3 } from "../../math/vec3";
 import { getEmitterGeodesicIds } from "../../world-objects/geodesic/endpoints";
 import { geodesicRayBeamHeightMeters } from "../../world-objects/geodesic/objects";
-import { type RuntimeObjectRegistry, type RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
+import { type RuntimeObjectReader, type RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
 import { RootAimRay } from "./rootAimRay";
 import { threePointToWorld } from "./worldAxes";
 
@@ -28,7 +28,7 @@ export interface XrHeadWorldPose {
  * Returns `undefined` when there is no active aim ray.
  */
 export function resolveDesktopCarriedGeodesicCannonAnchor(
-  cannon: Extract<RuntimeWorldObject, { readonly kind: "geodesic-cannon" }>,
+  cannon: Extract<RuntimeWorldObject, { readonly kind: "geodesicEmitters/emitter" }>,
   activeAimRay: RootAimRay | undefined,
 ): Vec3 | undefined {
   if (!activeAimRay) {
@@ -54,7 +54,7 @@ export function resolveDesktopCarriedGeodesicCannonAnchor(
  * Returns `undefined` when there is no active aim ray.
  */
 export function resolveVrCarriedGeodesicCannonAnchor(
-  cannon: Extract<RuntimeWorldObject, { readonly kind: "geodesic-cannon" }>,
+  cannon: Extract<RuntimeWorldObject, { readonly kind: "geodesicEmitters/emitter" }>,
   activeAimRay: RootAimRay | undefined,
 ): Vec3 | undefined {
   if (!activeAimRay) {
@@ -76,8 +76,8 @@ export function resolveVrCarriedGeodesicCannonAnchor(
  * that, otherwise its first attached geodesic; `undefined` when the cannon has none.
  */
 export function resolveCannonGeodesicId(
-  registry: RuntimeObjectRegistry,
-  cannon: Extract<RuntimeWorldObject, { readonly kind: "geodesic-cannon" }>,
+  registry: RuntimeObjectReader,
+  cannon: Extract<RuntimeWorldObject, { readonly kind: "geodesicEmitters/emitter" }>,
   requestedGeodesicId: string | undefined,
   activeGeodesicId: string | undefined,
 ): string | undefined {
@@ -96,7 +96,7 @@ export function resolveCannonGeodesicId(
  * the offset is purely vertical.
  */
 export function resolveGeodesicCannonAbsoluteEmitterPoint(
-  cannon: Extract<RuntimeWorldObject, { readonly kind: "geodesic-cannon" }>,
+  cannon: Extract<RuntimeWorldObject, { readonly kind: "geodesicEmitters/emitter" }>,
 ): Vec3 {
   return {
     x: cannon.localPose.translation.x,

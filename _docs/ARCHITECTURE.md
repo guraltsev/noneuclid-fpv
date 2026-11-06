@@ -52,9 +52,10 @@ The geodesic emitter code lives in `src/world-objects/geodesic/`, one module per
 imports only modules before it): `src/math/vec2.ts` (2-D helpers), `objects.ts` (object types, constants, constructors),
 `portalWord.ts` (pure portal-word algebra), `development.ts` (cached inverse portal transforms), `trace.ts` (single-cell
 and multi-cell ray tracing), `intersections.ts` (crossing markers), `endpoints.ts` (endpoint attachments and lifting),
-`segments.ts` (derived segments), `lifecycle.ts` (locked queries and removal), `intervals.ts` (interval rebuilds and
+`segments.ts` (derived segments), `lifecycle.ts` (connection queries and removal), `intervals.ts` (interval rebuilds and
 previews), `vertices.ts` (tying, moving and removing a vertex) and `cannon.ts` (shooting, extending, connecting and placing
-cannons). The curve shortening flow that decides what to do with a vertex is the world module `src/modules/curveShortening/`.
+emitters). The commands a person or a script uses on emitters are the world module `src/modules/geodesicEmitters/`, over `cannon.ts`. The curve shortening flow that decides what to do with a vertex is the world module `src/modules/curveShortening/`.
+Each kind is written by the module that owns it, and the write guard allows nothing else: `geodesicEmitters` writes the emitter, `geodesicModel` the arcs, vertices, segments and crossings (its commands, or its `api` on the fast channel), `geodesicMeasurements` the lengths and angles (its commands and ticks), `placedFlags` the flags. Carrying and editing an emitter run in `bodies` ticks, once per frame: the carry calls the emitters' `api`, and the emitters call the model's.
 
 ## Layers and the dependency rule
 
@@ -145,7 +146,7 @@ Order of work in each frame (`renderFrame`; the engine's journals, events and re
 4. Resolve the active aim ray (camera centre ray or controller ray), update carried emitters, and dispatch the primary
    action to the selected tool through the one tool lookup, `toolsById` (`src/render/three/toolHost.ts#createToolHost`; the shell's tools: place flag, emit geodesic, measure, protractor, carry, rotate, aim; the modules' tools, such as the tie tool, come from their client parts), or to the
    focused object's own interaction when no tool is selected.
-5. Advance the world: creature runtimes, then the fast channel (`engine.applyControls`: what follows a participant, such as a carried emitter), then the engine's step (`engine.step`: queued commands, then the module ticks, among them the curve shortening flow, and the derive pass that refreshes crossings, measurements and angles).
+5. Advance the world: creature runtimes on frame time, then the fast channel (`engine.applyControls` with the frame time: what follows a participant, such as a carried emitter), then the frame's ticks. `src/engine/simulationClock.ts#createSimulationClock` turns the elapsed real time into none, one or at most three calls of `engine.step` with the tick length \(h\): queued commands, then the module ticks, among them the curve shortening flow, and the derive pass that refreshes crossings, measurements and angles. \(h\) is never shorter than the frame period, grows when the ticks took more than their share of the last half second of real time, comes back slowly once they fit, and stops at its maximum; what still does not fit is dropped, with a `world/behindRealTime` notice. A frame with no tick runs the fast channel only: commands and derived values wait for the next tick. The hooks that replay the frame's events run once, after the last tick, in every frame. A reset frame runs `engine.step(0)`.
 6. Place the camera(s); for XR also the per-eye culling cameras.
 7. **Portal visibility and instances**: compute visible portal paths from the camera, update the instanced cell meshes
    (one draw per cell archetype, one instance per visible path). This pass builds one frame snapshot (rendered root
@@ -177,7 +178,7 @@ renderer-neutral data (`src/ui/paletteDefinition.ts#createPaletteDefinition`) an
 (`src/render/three/palette/scenePaletteAdapter.ts` builds the VR widgets). Commands requested by the UI are plain data
 (`src/runtime/runtimeCommands.ts`) and applied to the client session (`src/runtime/clientSession.ts`) by the pure reducer `applyRuntimeCommand` in `src/runtime/applyRuntimeCommand.ts`, which returns the effects the shell runs.
 
-A tool is a descriptor (`src/engine/moduleTypes.ts#ToolDescriptor`): its label, help, icon, prompt and what it does with the primary action. The shell's own tools are described in `src/runtime/coreTools.ts#createCoreToolDescriptors`; a module contributes its tools in the client part of the module (`src/modules/geodesicModel/client.ts#geodesicModelClient`), and the shell merges both into `toolsById` (`src/runtime/toolRegistry.ts#createToolsById`). The indicators, the help lens, the aim cross and the actions on an object's menu page read this map, so a tool is added without changing any of them. A tool acts on the world only through `ToolContext.submit` and keeps its picks in the client session, under its module (`moduleToolState`); both are cleared when the tool ends.
+A tool is a descriptor (`src/engine/moduleTypes.ts#ToolDescriptor`): its label, help, icon, prompt and what it does with the primary action. The shell's own tools are described in `src/runtime/coreTools.ts#createCoreToolDescriptors`; a module contributes its tools in the client part of the module (`src/modules/geodesicModel/client.ts#geodesicModelClient`, `src/modules/geodesicEmitters/client.ts#geodesicEmittersClient`), and the shell merges both into `toolsById` (`src/runtime/toolRegistry.ts#createToolsById`). The indicators, the help lens, the aim cross and the actions on an object's menu page read this map, so a tool is added without changing any of them. A tool acts on the world only through `ToolContext.submit` and keeps its picks in the client session, under its module (`moduleToolState`); both are cleared when the tool ends.
 
 ## Testing strategy
 
@@ -194,6 +195,7 @@ checked by a manual/headless smoke run (see [DEVELOPMENT.md](DEVELOPMENT.md)).
 | `npm run docs:generate` | rewrites `_docs/generated/*` from the code |
 | `npm run docs:check` / `tests/docs/documentation.test.ts` | fails on: a module without a header comment; an exported symbol without JSDoc; a stale generated file; a layering violation not in the baseline; a `three` import outside `render`; an import cycle; a dangling `` `src/<dir>/<file>.ts#<symbol>` `` reference in the hand-written documents |
 | `npm run docs:coverage [dir]` | lists what is still undocumented |
+| `npm run docs:writers` | lists every direct registry write and world-objects mutator use in `render/`, `ui/` and `runtime/`, then the file and call counts; `docs:check` fails when those files and `legacyWorldWriters` in `scripts/docs/lib.mjs` differ |
 
 Rules for contributors: put the *why* and the *contract* in the code comment next to the code (header + JSDoc), put the
 *mathematics that spans modules* in [MATHEMATICAL_MODEL.md](MATHEMATICAL_MODEL.md) with symbol references, and run

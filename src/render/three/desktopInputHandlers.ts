@@ -103,7 +103,7 @@ export function createDesktopInputHandlers(deps: DesktopInputHandlersDeps): Desk
     dismissHelpLensFocus,
   } = deps;
   const currentMenuState = () => session.get().menuState;
-  const paletteDefinitionCache = createPaletteDefinitionCache(deps.appConfig);
+  const paletteDefinitionCache = createPaletteDefinitionCache(deps.appConfig, deps.toolsById);
   // Desktop fallbacks of updateScenePalette's head pose; overwritten before each use.
   const paletteHeadPositionScratch = new THREE.Vector3();
   const paletteHeadQuaternionScratch = new THREE.Quaternion();

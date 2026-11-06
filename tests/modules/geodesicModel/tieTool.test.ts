@@ -12,7 +12,7 @@ import { geodesicModelClient, geodesicModelModule } from "../../../src/modules/g
 import { geodesicTieToolId, type GeodesicTieAndDetachCommand } from "../../../src/modules/geodesicModel/api";
 import { createToolsById, findObjectActionTool, objectActionsFor } from "../../../src/runtime/toolRegistry";
 import { getGeodesicSegments } from "../../../src/world-objects/geodesic/segments";
-import { createFlowTestEngine, createTorusLockedPairScenario, totalGeodesicLength } from "../../fixtures/world-objects/geodesic";
+import { createFlowTestEngine, createTorusConnectedPairScenario, totalGeodesicLength } from "../../fixtures/world-objects/geodesic";
 import { createTestEngine } from "../../support/engine";
 
 const frame60Hz = 1 / 60;
@@ -22,12 +22,12 @@ const g2Start: AimPickEndpoint = { geodesicId: "g2", role: "start", anchorObject
 const g1Start: AimPickEndpoint = { geodesicId: "g1", role: "start", anchorObjectId: "e1" };
 
 function pickOf(endpoint: AimPickEndpoint, withinRange = true): AimPick {
-  return { objectId: `${endpoint.geodesicId}:segment`, objectKind: "geodesicModel/segment", cellId: "torus-room", point: { x: 0, y: 0, z: 0 }, withinRange, geodesicEndpoint: endpoint };
+  return { objectId: `${endpoint.geodesicId}:segment`, objectKind: "geodesicModel/segment", cellId: "torus-room", point: { x: 0, y: 0, z: 0 }, withinRange, eyePoint: { x: 0, y: 0, z: 1.6 }, geodesicEndpoint: endpoint };
 }
 
-/** The tie tool over the locked pair of the torus scenario, started from emitter e2, with a fake context that submits to a real engine. */
+/** The tie tool over the connected pair of the torus scenario, started from emitter e2, with a fake context that submits to a real engine. */
 function setup() {
-  const { world, registry } = createTorusLockedPairScenario();
+  const { world, registry } = createTorusConnectedPairScenario();
   const engine = createFlowTestEngine(world, registry);
   const tool: ToolDescriptor = geodesicModelClient().tools[0]!;
   const picks: { current: readonly AimPick[] } = { current: [] };
@@ -36,6 +36,12 @@ function setup() {
   const state = { toolState: undefined as unknown, ended: 0 };
   const context: ToolContext = {
     pickTargets: () => picks.current,
+    currentPick: () => picks.current[0],
+    aimYawRadians: () => 0,
+    commandInFlight: () => false,
+    selectObject: () => undefined,
+    showObjectPage: () => undefined,
+    chosenFlagType: () => "WoodenSign1",
     submit: (command) => void submitted.push({ ticket: engine.submit("local", command), command }),
     getToolState: <T,>() => state.toolState as T | undefined,
     setToolState: (_moduleId, next) => void (state.toolState = next),
@@ -70,7 +76,7 @@ describe("the tie tool", () => {
     expect(tool.id).toBe(geodesicTieToolId);
     expect(tool.id).toBe("geodesicModel/tie");
     expect(tool.ownerModuleId).toBe("geodesicModel");
-    expect(tool.entry).toMatchObject({ kind: "object-action", objectKind: "geodesic-cannon", action: { actionId: "tie-and-detach" } });
+    expect(tool.entry).toMatchObject({ kind: "object-action", objectKind: "geodesicEmitters/emitter", action: { actionId: "tie-and-detach" } });
   });
 
   it("ties two picked ends of connecting arcs, and the curve then shortens", () => {
@@ -203,23 +209,23 @@ describe("the tie tool in an experience", () => {
     const toolsById = createToolsById([], [geodesicModelClient()]);
     const context = { query: (token) => engine.query(token) } as ToolContext;
 
-    const actions = objectActionsFor(toolsById, "geodesic-cannon", "e2", () => context);
+    const actions = objectActionsFor(toolsById, "geodesicEmitters/emitter", "e2", () => context);
 
     expect(actions).toEqual([expect.objectContaining({ actionId: "tie-and-detach", label: "Tie & detach", iconId: "tie-and-detach", enabled: true })]);
-    expect(findObjectActionTool(toolsById, "geodesic-cannon", "tie-and-detach")?.id).toBe(geodesicTieToolId);
-    expect(objectActionsFor(toolsById, "geodesic-cannon", "nobody", () => context)[0]?.enabled).toBe(false);
+    expect(findObjectActionTool(toolsById, "geodesicEmitters/emitter", "tie-and-detach")?.id).toBe(geodesicTieToolId);
+    expect(objectActionsFor(toolsById, "geodesicEmitters/emitter", "nobody", () => context)[0]?.enabled).toBe(false);
     expect(objectActionsFor(toolsById, "asset", "e2", () => context)).toEqual([]);
   });
 
   it("has no tool and no page action with tieTool false; the command still works", () => {
     const client = geodesicModelClient({ tieTool: false });
     const toolsById = createToolsById([], [client]);
-    const { world, registry } = createTorusLockedPairScenario();
+    const { world, registry } = createTorusConnectedPairScenario();
     const engine = createTestEngine({ registry, getWorld: () => world, modules: [geodesicModelModule({ tieTool: false })] });
     const context = { query: (token) => engine.query(token) } as ToolContext;
 
     expect(client.tools).toEqual([]);
-    expect(objectActionsFor(toolsById, "geodesic-cannon", "e2", () => context)).toEqual([]);
+    expect(objectActionsFor(toolsById, "geodesicEmitters/emitter", "e2", () => context)).toEqual([]);
     const requestCommand: WorldRequestToolCommand = { kind: "world/requestTool", toolId: geodesicTieToolId };
     const request = engine.submit("local", requestCommand);
     const tie: GeodesicTieAndDetachCommand = { kind: "geodesicModel/tieAndDetach", emitterId: "e2", first: g1End, second: g2Start };
@@ -231,7 +237,7 @@ describe("the tie tool in an experience", () => {
   });
 
   it("requires the tool for the tie command by default", () => {
-    const { world, registry } = createTorusLockedPairScenario();
+    const { world, registry } = createTorusConnectedPairScenario();
     const disabled: RuntimeToolId = geodesicTieToolId;
     const engine = createTestEngine({ registry, getWorld: () => world, modules: [geodesicModelModule()], isToolEnabled: (toolId) => toolId !== disabled });
     const tie: GeodesicTieAndDetachCommand = { kind: "geodesicModel/tieAndDetach", emitterId: "e2", first: g1End, second: g2Start };

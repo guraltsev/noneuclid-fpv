@@ -15,8 +15,8 @@ import { buildForbiddenZoneWireframe } from "./debugCollisionWireframes";
 /** Type guard: true for runtime objects rendered by the geodesic renderer (cannon, segment or intersection). */
 export function isGeodesicRuntimeRenderObject(
   object: RuntimeWorldObject,
-): object is Extract<RuntimeWorldObject, { readonly kind: "geodesic-cannon" | "geodesicModel/segment" | "geodesicModel/crossing" }> {
-  return object.kind === "geodesic-cannon" ||
+): object is Extract<RuntimeWorldObject, { readonly kind: "geodesicEmitters/emitter" | "geodesicModel/segment" | "geodesicModel/crossing" }> {
+  return object.kind === "geodesicEmitters/emitter" ||
     object.kind === "geodesicModel/segment" ||
     object.kind === "geodesicModel/crossing";
 }
@@ -178,7 +178,7 @@ export function buildCurrentCellForbiddenZoneWireframes(cell: CompiledPrismCell)
 
 /** Returns the render-archetype key prefix for a runtime object: kind and id, plus the flag type for placed flags. */
 export function runtimeObjectArchetypeKeyPrefix(object: RuntimeWorldObject): string {
-  if (object.kind === "placed-flag") {
+  if (object.kind === "placedFlags/flag") {
     return `placed-flag:${object.flagType}:${object.id}`;
   }
 

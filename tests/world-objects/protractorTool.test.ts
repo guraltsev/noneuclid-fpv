@@ -2,7 +2,7 @@
  * `tests/world-objects/protractorTool.test.ts` — unit tier.
  *
  * A protractor angle measures between two selections, each a side of a geodesic chosen from an emitter, a segment,
- * or an endpoint-centered locked geodesic; the angle is counterclockwise from the first to the second, wrapped
+ * or an endpoint-centered connected geodesic; the angle is counterclockwise from the first to the second, wrapped
  * positive, and must come from different anchors of its geodesics. These tests check selection resolution for
  * each kind, angle measurement (counterclockwise, wrapping, different-anchor requirement, custom labels), live
  * refresh from an emitter's or segment's current direction, and hiding a vertex-centered angle while its vertex is
@@ -22,7 +22,7 @@ import {
 } from "../../src/world-objects/protractorTool";
 import {
   geodesicRayBeamHeightMeters,
-  type GeodesicCannonObject,
+  type GeodesicEmitterObject,
   type GeodesicCrossingObject,
   type GeodesicSegmentObject,
 } from "../../src/world-objects/geodesic/objects";
@@ -63,7 +63,7 @@ describe("protractor tool objects", () => {
     expect(Math.abs(left?.yawRadians ?? 0)).toBeCloseTo(Math.PI);
   });
 
-  it("uses the outgoing side from an endpoint-centered locked geodesic selection", () => {
+  it("uses the outgoing side from an endpoint-centered connected geodesic selection", () => {
     const emitter = createEmitter({ localPose: yawRigidTransform3(Math.PI, { x: 1, y: 0, z: 0 }) });
     const registry = createRuntimeObjectRegistry([emitter]);
     addGeodesicLeavingEmitter(registry, emitter.id, "g-a", Math.PI);
@@ -306,10 +306,10 @@ function createIntersection(overrides: Partial<GeodesicCrossingObject> = {}): Ge
   };
 }
 
-function createEmitter(overrides: Partial<GeodesicCannonObject> = {}): GeodesicCannonObject {
+function createEmitter(overrides: Partial<GeodesicEmitterObject> = {}): GeodesicEmitterObject {
   return {
     id: "emitter-a",
-    kind: "geodesic-cannon",
+    kind: "geodesicEmitters/emitter",
     cellId: "cell-a",
     localPose: yawRigidTransform3(0, { x: 0, y: 0, z: 0 }),
     portalRenderable: true,

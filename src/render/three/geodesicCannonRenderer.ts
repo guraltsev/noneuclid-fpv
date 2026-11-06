@@ -12,14 +12,14 @@
 import * as THREE from "three";
 import {
   geodesicRayBeamHeightMeters,
-  type GeodesicCannonObject,
+  type GeodesicEmitterObject,
   type GeodesicCrossingObject,
   type GeodesicSegmentObject,
 } from "../../world-objects/geodesic/objects";
 import { yawRigidTransform3, type RigidTransform3 } from "../../math/rigidTransform3";
 import { getEmitterGeodesicIds } from "../../world-objects/geodesic/endpoints";
 import { resolveEmitterLaunchYaw } from "../../world-objects/geodesic/segments";
-import type { RuntimeObjectRegistry } from "../../world-objects/runtimeObjectRegistry";
+import type { RuntimeObjectReader } from "../../world-objects/runtimeObjectRegistry";
 import { collectRuntimeObjectRenderSourceMeshes, type RuntimeObjectRenderRecord, type RuntimeObjectRenderSourceMesh } from "./runtimeObjectRenderRecords";
 import type { PreparedWorldAssets } from "./preparedWorldAssets";
 import { rigidTransformToThreeMatrix } from "./worldAxes";
@@ -102,14 +102,14 @@ export interface GeodesicBodyPlacement {
  * tangent. For an intersection: the balloon at its pose.
  */
 export function collectGeodesicBodyPlacements(
-  registry: RuntimeObjectRegistry,
-  object: GeodesicCannonObject | GeodesicSegmentObject | GeodesicCrossingObject,
+  registry: RuntimeObjectReader,
+  object: GeodesicEmitterObject | GeodesicSegmentObject | GeodesicCrossingObject,
   geodesicArchetypeKeys: readonly string[] = [],
 ): readonly GeodesicBodyPlacement[] {
   const keysWithPrefix = (prefix: string): readonly string[] => geodesicArchetypeKeys.filter((key) => key.startsWith(`${prefix}:`));
   const placements: GeodesicBodyPlacement[] = [];
 
-  if (object.kind === "geodesic-cannon") {
+  if (object.kind === "geodesicEmitters/emitter") {
     placements.push({ objectId: object.id, cellId: object.cellId, localPose: object.localPose, archetypeKeys: keysWithPrefix(geodesicRayPostArchetypePrefix) });
     const headKeys = keysWithPrefix(geodesicRayHeadArchetypePrefix);
     for (const geodesicId of getEmitterGeodesicIds(registry, object.id)) {
@@ -138,11 +138,11 @@ export function collectGeodesicBodyPlacements(
  * (empty means no cannon or intersection records).
  */
 export function collectGeodesicRuntimeRenderRecords(
-  registry: RuntimeObjectRegistry,
-  object: GeodesicCannonObject | GeodesicSegmentObject | GeodesicCrossingObject,
+  registry: RuntimeObjectReader,
+  object: GeodesicEmitterObject | GeodesicSegmentObject | GeodesicCrossingObject,
   geodesicArchetypeKeys: readonly string[] = [],
 ): readonly RuntimeObjectRenderRecord[] {
-  if (object.kind === "geodesic-cannon" || object.kind === "geodesicModel/crossing") {
+  if (object.kind === "geodesicEmitters/emitter" || object.kind === "geodesicModel/crossing") {
     return collectGeodesicBodyPlacements(registry, object, geodesicArchetypeKeys).flatMap((placement) => {
       const localMatrix = rigidTransformToThreeMatrix(placement.localPose);
       return placement.archetypeKeys.map((archetypeKey) => ({
@@ -170,16 +170,16 @@ export function collectGeodesicRuntimeRenderRecords(
 }
 
 // Yaw about world +z at the cannon's position, along the geodesic's launch tangent.
-function emitterYawPose(registry: RuntimeObjectRegistry, cannon: GeodesicCannonObject, geodesicId: string): RigidTransform3 {
+function emitterYawPose(registry: RuntimeObjectReader, cannon: GeodesicEmitterObject, geodesicId: string): RigidTransform3 {
   return yawRigidTransform3(resolveEmitterLaunchYaw(registry, cannon, geodesicId), cannon.localPose.translation);
 }
 
 /** A string that changes whenever the heads drawn at a cannon change: the attached geodesics and their launch yaws. Empty for any other object. */
-export function emitterHeadsKey(registry: RuntimeObjectRegistry, object: { readonly kind: string }): string {
-  if (object.kind !== "geodesic-cannon") {
+export function emitterHeadsKey(registry: RuntimeObjectReader, object: { readonly kind: string }): string {
+  if (object.kind !== "geodesicEmitters/emitter") {
     return "";
   }
-  const cannon = object as GeodesicCannonObject;
+  const cannon = object as GeodesicEmitterObject;
   return getEmitterGeodesicIds(registry, cannon.id)
     .map((geodesicId) => `${geodesicId}@${resolveEmitterLaunchYaw(registry, cannon, geodesicId)}`)
     .join("|");

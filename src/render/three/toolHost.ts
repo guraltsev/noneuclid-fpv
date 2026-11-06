@@ -8,25 +8,24 @@ import type { AimPick, CommandResult, EngineCommandBase, ModuleClient, ObjectAct
 import { localParticipantId, type WorldEngine } from "../../engine/worldEngine";
 import type { AimTarget } from "../../interaction/aimTarget";
 import type { RuntimeToolId } from "../../glue/toolIds";
+import { geometryTolerance } from "../../math/tolerances";
 import type { ClientSession } from "../../runtime/clientSession";
-import { createCoreToolDescriptors } from "../../runtime/coreTools";
+import { createCoreToolDescriptors, type EmitterModeToolId } from "../../runtime/coreTools";
 import type { RuntimeCommand } from "../../runtime/runtimeCommands";
 import { createToolsById, findObjectActionTool, objectActionsFor, type ToolsById } from "../../runtime/toolRegistry";
-import type { RootAimRay } from "./rootAimRay";
+import { getDistanceAlongGeodesicSegment } from "./carriedGeodesicCannon";
+import { getAimForwardVector, type RootAimRay } from "./rootAimRay";
 
 /** What the shell does for each of its own tools; the aim ray and the frame's input are passed in. */
 export interface CoreToolActions {
-  placeFlag(ray: RootAimRay | undefined): void;
-  useGeodesicCannon(ray: RootAimRay | undefined): void;
-  measureLength(ray: RootAimRay | undefined): void;
-  protractor(ray: RootAimRay | undefined): void;
-  protractorPrompt(): string;
   /** Finishes the carry when the primary action was requested; true then. */
   carry(primaryActionRequested: boolean): boolean;
   /** Updates the rotation from the frame's yaw; true when the primary action was requested. */
   rotate(yawDeltaRadians: number, primaryActionRequested: boolean): boolean;
   /** Updates the aim from the frame's ray; true when the primary action was requested. */
   aim(primaryActionRequested: boolean, ray: RootAimRay | undefined): boolean;
+  /** The world answered a command of one of the emitter's sub-modes. */
+  emitterModeResult(toolId: EmitterModeToolId, result: CommandResult): void;
 }
 
 /** One frame's input to the tools. */
@@ -46,6 +45,8 @@ export interface ToolHostDeps {
   readonly core: CoreToolActions;
   /** All aim targets along a ray, nearest first. */
   resolveCurrentAimTargets(ray: RootAimRay): readonly AimTarget[];
+  /** The aim target the person has selected along a ray. */
+  resolveCurrentAimTarget(ray: RootAimRay): AimTarget | undefined;
   /** True when the target is close enough to interact with. */
   targetIsWithinInteractionRange(target: AimTarget | undefined): boolean;
   /** With no tool selected the primary action acts on the focused object; true when it did. */
@@ -54,15 +55,19 @@ export interface ToolHostDeps {
   requestTool(toolId: RuntimeToolId, objectId: string): void;
   /** Shows a sentence from a tool to the person. */
   showMessage(message: string): void;
-  /** Redraws the tool indicator and the palette: after a refused start and after a tool changed its state (its prompt follows the state). */
+  /** Redraws the tool indicator and the palette: after a refused start, after a tool changed its state (its prompt follows the state) and after the world answered a tool. */
   syncDesktopPalette(): void;
-  /** Re-syncs what is drawn from the world's objects (portal instances, hitbox debug) after the world answered a tool's commands. */
-  syncWorldObjects(): void;
+  /** The client's selection: an object and one of its geodesics. */
+  selectObject(objectId: string, geodesicId: string): void;
+  /** Shows an object's menu page, or closes the menu when the object has none. */
+  showObjectPage(objectId: string): void;
 }
 
 /** Handle returned by {@link createToolHost}. */
 export interface ToolHost {
   readonly toolsById: ToolsById;
+  /** The context a tool acts through, for what a tool does from outside its descriptor (a button on an object's page). */
+  contextOf(toolId: RuntimeToolId): ToolContext;
   /** Hands the host this frame's input; call before `dispatchPrimaryAction`. */
   setFrame(frame: ToolFrameInput): void;
   /**
@@ -80,7 +85,7 @@ export interface ToolHost {
   toolStarted(toolId: RuntimeToolId, objectId: string | undefined): void;
   /** A tool ended, however it ended: runs its `onEnd` and clears its owner's tool state. */
   toolEnded(toolId: RuntimeToolId): void;
-  /** Call after every `engine.step`: hands the results of the commands tools submitted to the tools. */
+  /** Call once per frame, after the frame's last tick, also in a frame with no tick: hands the results of the commands tools submitted to the tools. */
   afterStep(): void;
 }
 
@@ -92,34 +97,64 @@ export function createToolHost(deps: ToolHostDeps): ToolHost {
 
   const toolsById = createToolsById(
     createCoreToolDescriptors({
-      placeFlag: () => deps.core.placeFlag(frame.ray),
-      useGeodesicCannon: () => deps.core.useGeodesicCannon(frame.ray),
-      measureLength: () => deps.core.measureLength(frame.ray),
-      protractor: () => deps.core.protractor(frame.ray),
-      protractorPrompt: () => deps.core.protractorPrompt(),
       carry: () => deps.core.carry(frame.primaryActionRequested),
       rotate: () => deps.core.rotate(frame.yawDeltaRadians, frame.primaryActionRequested),
       aim: () => deps.core.aim(frame.primaryActionRequested, frame.ray),
+      emitterModeResult: (toolId, result) => deps.core.emitterModeResult(toolId, result),
     }),
     deps.clients,
   );
 
-  function pickTargets(): readonly AimPick[] {
-    if (frame.ray === undefined) return [];
-    return deps.resolveCurrentAimTargets(frame.ray).map((target): AimPick => {
-      const object = target.object;
-      const pick: AimPick = {
-        objectId: object?.id,
-        objectKind: object?.kind ?? "floor",
-        cellId: target.cellId,
-        point: target.localPoint,
-        withinRange: deps.targetIsWithinInteractionRange(target),
+  /** Where a target is, as a command says it: the point of the crossing or of the segment itself, in the object's own cell; otherwise the aim point in the hit cell. */
+  function placeOf(target: AimTarget): Pick<AimPick, "cellId" | "point"> {
+    const object = target.object;
+    if (object?.kind === "geodesicModel/crossing") {
+      return { cellId: object.cellId, point: object.aimStickyTarget?.localPoint ?? target.localPoint };
+    }
+    if (object?.kind === "geodesicModel/segment") {
+      const distance = target.geodesicSegmentDistanceMeters ?? getDistanceAlongGeodesicSegment(object, target.localPoint);
+      const along = Math.min(object.lengthMeters, Math.max(0, distance));
+      return {
+        cellId: object.cellId,
+        point: {
+          x: object.start.x + object.direction.x * along,
+          y: object.start.y + object.direction.y * along,
+          z: object.start.z + object.direction.z * along,
+        },
       };
-      if (object?.kind !== "geodesicModel/segment" || object.halfRole === undefined) return pick;
-      // A half-labelled segment stands for the endpoint role of its arc that it belongs to.
-      const arc = engine.read.objects.get(object.geodesicId);
-      return arc?.kind === "geodesicModel/arc" ? { ...pick, geodesicEndpoint: arc[object.halfRole] } : pick;
-    });
+    }
+    return { cellId: target.cellId, point: target.localPoint };
+  }
+
+  function toPick(target: AimTarget): AimPick {
+    const object = target.object;
+    const pick: AimPick = {
+      objectId: object?.id,
+      objectKind: object?.kind ?? "floor",
+      ...placeOf(target),
+      withinRange: deps.targetIsWithinInteractionRange(target),
+      eyePoint: target.localEyePosition,
+      ...(target.geodesicEmitterGeodesicId === undefined ? {} : { emitterGeodesicId: target.geodesicEmitterGeodesicId }),
+    };
+    if (object?.kind !== "geodesicModel/segment" || object.halfRole === undefined) return pick;
+    // A half-labelled segment stands for the endpoint role of its arc that it belongs to.
+    const arc = engine.read.objects.get(object.geodesicId);
+    return arc?.kind === "geodesicModel/arc" ? { ...pick, geodesicEndpoint: arc[object.halfRole] } : pick;
+  }
+
+  function pickTargets(): readonly AimPick[] {
+    return frame.ray === undefined ? [] : deps.resolveCurrentAimTargets(frame.ray).map(toPick);
+  }
+
+  function currentPick(): AimPick | undefined {
+    const target = frame.ray === undefined ? undefined : deps.resolveCurrentAimTarget(frame.ray);
+    return target === undefined ? undefined : toPick(target);
+  }
+
+  function aimYawRadians(): number | undefined {
+    const forward = getAimForwardVector(frame.ray);
+    if (forward === undefined || Math.hypot(forward.x, forward.y) <= geometryTolerance) return undefined;
+    return Math.atan2(forward.y, forward.x);
   }
 
   const contexts = new Map<RuntimeToolId, ToolContext>();
@@ -128,18 +163,25 @@ export function createToolHost(deps: ToolHostDeps): ToolHost {
     if (context === undefined) {
       context = {
         pickTargets,
+        currentPick,
+        aimYawRadians,
         submit(command: EngineCommandBase) {
           pending.push({ ticket: engine.submit(localParticipantId, command), toolId });
         },
+        commandInFlight: () => pending.some((entry) => entry.toolId === toolId),
         getToolState: <T>(moduleId: string) => session.get().moduleToolState[moduleId] as T | undefined,
         setToolState(moduleId, state) {
           deps.dispatch({ kind: "set-module-tool-state", moduleId, state });
           deps.syncDesktopPalette();
         },
         endTool() {
+          if (session.get().menuState.selectedTool !== toolId) return;
           deps.dispatch({ kind: "close-menu" });
           deps.dispatch({ kind: "clear-selected-tool" });
         },
+        selectObject: deps.selectObject,
+        showObjectPage: deps.showObjectPage,
+        chosenFlagType: () => session.get().menuState.placeFlagOptions.flagType,
         read: engine.read,
         query: (token) => engine.query(token),
         showMessage: deps.showMessage,
@@ -151,6 +193,7 @@ export function createToolHost(deps: ToolHostDeps): ToolHost {
 
   return {
     toolsById,
+    contextOf: contextFor,
     setFrame(next) {
       frame = next;
     },
@@ -202,7 +245,7 @@ export function createToolHost(deps: ToolHostDeps): ToolHost {
         tool?.onResult?.(contextFor(entry.toolId), result);
         answered = true;
       }
-      if (answered) deps.syncWorldObjects();
+      if (answered) deps.syncDesktopPalette();
     },
   };
 }

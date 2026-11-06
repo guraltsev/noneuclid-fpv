@@ -34,10 +34,10 @@ describe("createScenePaletteCommands", () => {
     const { commands, dispatched, toolRequests } = createHarness();
 
     commands.onWorldSelected("torus");
-    commands.onToolSelected("protractor");
+    commands.onToolSelected("geodesicMeasurements/protractor");
 
     expect(dispatched).toEqual([{ kind: "select-world", worldId: "torus" }]);
-    expect(toolRequests).toEqual(["protractor"]);
+    expect(toolRequests).toEqual(["geodesicMeasurements/protractor"]);
   });
 
   it("presses reload with the clock time and the confirmation window", () => {

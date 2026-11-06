@@ -41,7 +41,7 @@ describe("findNearestImageRoute", () => {
 
   it("finds the single portal between two faces of the cube for a jump to the neighbouring face", () => {
     const world = compileCellComplex(cube);
-    // The emitter of a locked geodesic on the right face, and a hand on the bottom face (the player is next to it).
+    // The emitter of a connected geodesic on the right face, and a hand on the bottom face (the player is next to it).
     const route = findNearestImageRoute(world, at("right", -2.46, -4.45), at("bottom", 3.4, -6.97), 6);
 
     expect(route?.hops.map((hop) => `${hop.sourceCellId}>${hop.targetCellId}`)).toEqual(["right>bottom"]);

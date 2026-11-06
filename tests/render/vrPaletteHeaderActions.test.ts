@@ -10,12 +10,12 @@ import {
   showRuntimeMenuDebugSettings,
   showRuntimeMenuSettings,
 } from "../../src/runtime/runtimeMenuState";
-import { createPaletteDefinition } from "../../src/ui/paletteDefinition";
+import { createTestPaletteDefinition } from "../support/tools";
 import { resolveVrPaletteHeaderActions } from "../../src/render/three/vrPaletteHeaderActions";
 
 describe("vrPaletteHeaderActions", () => {
   it("keeps settings and close available on the main VR menu", () => {
-    const definition = createPaletteDefinition(createRuntimeMenuState({
+    const definition = createTestPaletteDefinition(createRuntimeMenuState({
       selectedWorldId: "cube",
       debugOverlayEnabled: true,
     }));
@@ -26,7 +26,7 @@ describe("vrPaletteHeaderActions", () => {
   });
 
   it("puts back on the left and close on the right for the VR settings submenu", () => {
-    const definition = createPaletteDefinition(showRuntimeMenuSettings(createRuntimeMenuState({
+    const definition = createTestPaletteDefinition(showRuntimeMenuSettings(createRuntimeMenuState({
       selectedWorldId: "cube",
       debugOverlayEnabled: true,
     })));
@@ -37,7 +37,7 @@ describe("vrPaletteHeaderActions", () => {
   });
 
   it("puts back on the left and close on the right for the VR debug submenu", () => {
-    const definition = createPaletteDefinition(showRuntimeMenuDebugSettings(createRuntimeMenuState({
+    const definition = createTestPaletteDefinition(showRuntimeMenuDebugSettings(createRuntimeMenuState({
       selectedWorldId: "cube",
       debugOverlayEnabled: true,
     })));

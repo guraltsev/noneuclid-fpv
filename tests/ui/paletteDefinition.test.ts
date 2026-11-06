@@ -5,11 +5,11 @@
  * `PaletteDefinition` both the desktop DOM menu and the VR panel (`scenePaletteAdapter`) draw from: which
  * options a page offers, which are disabled, and which sections the app config hides. These tests check that
  * decision directly, without going through either renderer. The scene adapter's own rendering mechanism (icon
- * lookup, the on-screen sign keyboard's key choice, suppressing an action for a locked geodesic) is covered in
+ * lookup, the on-screen sign keyboard's key choice, suppressing an action for a connected geodesic) is covered in
  * `tests/render/scenePaletteAdapter.test.ts` instead, since none of it is decided here.
  */
 import { describe, expect, it } from "vitest";
-import { normalizeAppConfig } from "../../src/glue/appConfig";
+import { defaultAppConfig, normalizeAppConfig } from "../../src/glue/appConfig";
 import {
   createRuntimeMenuState,
   showRuntimeMenuEditSign,
@@ -21,7 +21,6 @@ import {
   showRuntimeMenuTutorial,
 } from "../../src/runtime/runtimeMenuState";
 import {
-  createPaletteDefinition,
   type GeodesicCannonActionsPaletteContent,
   type MainPaletteContent,
   type PlaceFlagOptionsPaletteContent,
@@ -29,22 +28,37 @@ import {
   type SettingsPaletteContent,
   type TutorialPaletteContent,
 } from "../../src/ui/paletteDefinition";
+import { createTestPaletteDefinition, createTestToolsById } from "../support/tools";
 
 describe("createPaletteDefinition", () => {
   it("lists only the app config's enabled main tools, with no default tool", () => {
-    const definition = createPaletteDefinition(createRuntimeMenuState({ selectedWorldId: "cube" }));
+    const definition = createTestPaletteDefinition(createRuntimeMenuState({ selectedWorldId: "cube" }));
     const content = definition.content as MainPaletteContent;
 
     expect(content.kind).toBe("main");
     const toolIds = content.toolOptions.map((tool) => tool.id);
-    expect(toolIds).toContain("place-flag");
-    expect(toolIds).toContain("geodesic-cannon");
-    expect(toolIds).toContain("measure-length");
+    expect(toolIds).toContain("placedFlags/flag");
+    expect(toolIds).toContain("geodesicEmitters/emitter");
+    expect(toolIds).toContain("geodesicMeasurements/length");
     expect(toolIds).not.toContain("aim");
   });
 
+  it("takes the main list from the tools whose entry says so, in the config's order", () => {
+    const tools = new Map(createTestToolsById());
+    const sign = tools.get("placedFlags/flag")!;
+    tools.set("placedFlags/flag", { ...sign, entry: { kind: "sub-mode" } });
+
+    const definition = createTestPaletteDefinition(createRuntimeMenuState({ selectedWorldId: "cube" }), defaultAppConfig, "desktop", 0, tools);
+
+    expect((definition.content as MainPaletteContent).toolOptions).toEqual([
+      { id: "geodesicEmitters/emitter", label: "Geodesic emitter" },
+      { id: "geodesicMeasurements/length", label: "Length" },
+      { id: "geodesicMeasurements/protractor", label: "Protractor" },
+    ]);
+  });
+
   it("lists every placed-flag type as a place-flag option", () => {
-    const definition = createPaletteDefinition(showRuntimeMenuPlaceFlagOptions(
+    const definition = createTestPaletteDefinition(showRuntimeMenuPlaceFlagOptions(
       createRuntimeMenuState({ selectedWorldId: "cube" }),
     ));
     const content = definition.content as PlaceFlagOptionsPaletteContent;
@@ -56,12 +70,12 @@ describe("createPaletteDefinition", () => {
 
   it("shows each contributed action with the availability the cannon options give it", () => {
     const state = createRuntimeMenuState({ selectedWorldId: "cube" });
-    const available = createPaletteDefinition(showRuntimeMenuGeodesicCannonActions(state, {
+    const available = createTestPaletteDefinition(showRuntimeMenuGeodesicCannonActions(state, {
       cannonId: "cannon-a",
       geodesicIds: ["g-a"],
       objectActions: [{ actionId: "tie-and-detach", label: "Tie & detach", iconId: "tie-and-detach", tooltip: "Tie them", enabled: true }],
     })).content as GeodesicCannonActionsPaletteContent;
-    const unavailable = createPaletteDefinition(showRuntimeMenuGeodesicCannonActions(state, {
+    const unavailable = createTestPaletteDefinition(showRuntimeMenuGeodesicCannonActions(state, {
       cannonId: "cannon-a",
       geodesicIds: ["g-a"],
       objectActions: [{ actionId: "tie-and-detach", label: "Tie & detach", iconId: "tie-and-detach", tooltip: "Tie them", enabled: false }],
@@ -71,26 +85,26 @@ describe("createPaletteDefinition", () => {
     expect(unavailable.objectActions.map((action) => action.enabled)).toEqual([false]);
   });
 
-  it("marks a locked geodesic with a connection-symbol label; an unlocked one with none", () => {
+  it("marks a connected geodesic with a connection-symbol label; a free one with none", () => {
     const state = createRuntimeMenuState({ selectedWorldId: "cube" });
-    const content = createPaletteDefinition(showRuntimeMenuGeodesicCannonActions(state, {
+    const content = createTestPaletteDefinition(showRuntimeMenuGeodesicCannonActions(state, {
       cannonId: "cannon-a",
       geodesicIds: ["g-a", "g-b"],
-      lockedGeodesicIds: ["g-a"],
+      connectedGeodesicIds: ["g-a"],
     })).content as GeodesicCannonActionsPaletteContent;
-    const [locked, unlocked] = content.geodesics;
+    const [connected, free] = content.geodesics;
 
-    expect(locked.locked).toBe(true);
-    expect(locked.connectionSymbolLabel).toBe("Locked geodesic segment between emitters");
-    expect(unlocked.locked).toBe(false);
-    expect(unlocked.connectionSymbolLabel).toBeUndefined();
+    expect(connected.connected).toBe(true);
+    expect(connected.connectionSymbolLabel).toBe("Locked geodesic segment between emitters");
+    expect(free.connected).toBe(false);
+    expect(free.connectionSymbolLabel).toBeUndefined();
   });
 
   it("hides the world and config picker sections exactly as the app config says to", () => {
-    const shown = createPaletteDefinition(
+    const shown = createTestPaletteDefinition(
       showRuntimeMenuSettings(createRuntimeMenuState({ selectedWorldId: "cube" })),
     ).content as SettingsPaletteContent;
-    const hidden = createPaletteDefinition(
+    const hidden = createTestPaletteDefinition(
       showRuntimeMenuSettings(createRuntimeMenuState({ selectedWorldId: "001-basic-cube" })),
       normalizeAppConfig({ optionsMenu: { configSelectionSection: false, worldSelectionSection: false } }),
     ).content as SettingsPaletteContent;
@@ -103,7 +117,7 @@ describe("createPaletteDefinition", () => {
 
   it("disables tutorial paging at the first and last page, and labels the current one", () => {
     const state = createRuntimeMenuState({ selectedWorldId: "cube" });
-    const content = createPaletteDefinition(showRuntimeMenuTutorial(state, {
+    const content = createTestPaletteDefinition(showRuntimeMenuTutorial(state, {
       objectId: "startingQuestionCube",
       pages: [
         { title: "Move", body: "Use arrows." },
@@ -118,7 +132,7 @@ describe("createPaletteDefinition", () => {
 
   it("disables a help hub subpage exactly when it has no pages", () => {
     const state = createRuntimeMenuState({ selectedWorldId: "cube" });
-    const content = createPaletteDefinition(showRuntimeMenuQuestionHelp(state, {
+    const content = createTestPaletteDefinition(showRuntimeMenuQuestionHelp(state, {
       objectId: "startingQuestionCube",
       tutorialPages: [{ title: "Move", body: "Use arrows." }],
       goalPages: [],
@@ -130,7 +144,7 @@ describe("createPaletteDefinition", () => {
 
   it("disables the geometry computer's go action until the target differs from the current shape", () => {
     const state = createRuntimeMenuState({ selectedWorldId: "torus" });
-    const unchanged = createPaletteDefinition(showRuntimeMenuGeometryComputerActions(state, {
+    const unchanged = createTestPaletteDefinition(showRuntimeMenuGeometryComputerActions(state, {
       computerId: "torus-geometry-computer",
       available: true,
       widthMeters: 15,
@@ -139,7 +153,7 @@ describe("createPaletteDefinition", () => {
       targetSkewXMeters: 0,
       targetDepthMeters: 15,
     }));
-    const changed = createPaletteDefinition(showRuntimeMenuGeometryComputerActions(state, {
+    const changed = createTestPaletteDefinition(showRuntimeMenuGeometryComputerActions(state, {
       computerId: "torus-geometry-computer",
       available: true,
       widthMeters: 15,
@@ -154,7 +168,7 @@ describe("createPaletteDefinition", () => {
   });
 
   it("keeps the edit-sign flag id and message, capped at the placed-flag message limit", () => {
-    const content = createPaletteDefinition(showRuntimeMenuEditSign(
+    const content = createTestPaletteDefinition(showRuntimeMenuEditSign(
       createRuntimeMenuState({ selectedWorldId: "cube" }),
       { flagId: "sign-a", message: "A\nB" },
     )).content;

@@ -28,3 +28,5 @@ The per-file claims come from a read-only audit on 2026-11-05 and were not all r
 - The check finds a client's writes, not its imports: for example, clients receive `RuntimeObjectReader`, and the few legacy files
   that still need the writer are the list.
 - `runtime/` is covered.
+
+- Job 62 (2026-11-05): done, needs review; see the Report in [the job](../.agents/jobs/_done/62_client_write_check.md). The count it gives is a lower bound: writes through owners are not counted.

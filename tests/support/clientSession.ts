@@ -15,7 +15,6 @@ export function createTestClientSession(overrides: Partial<ClientSessionState> =
     showCellPathRendersInstances: false,
     vrComfortOptions: defaultVrComfortOptions,
     cannonToolState: {},
-    protractorToolState: {},
     moduleToolState: {},
     pendingToolRequest: undefined,
     ...overrides,

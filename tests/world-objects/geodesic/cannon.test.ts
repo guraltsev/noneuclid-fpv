@@ -10,11 +10,11 @@
  * that preview rebuilds never connect emitters, and that deleting a connected geodesic clears both emitters'
  * associations.
  */
+import { createFixtureArc as createGeodesicArcObject } from "../../support/arcs";
 import { describe, expect, it } from "vitest";
 import { createRuntimeObjectRegistry } from "../../../src/world-objects/runtimeObjectRegistry";
 import {
-  createGeodesicCannonObject,
-  createGeodesicArcObject,
+  createGeodesicEmitterObject,
   geodesicRayBeamHeightMeters,
   minGeodesicSegmentLengthMeters,
 } from "../../../src/world-objects/geodesic/objects";
@@ -39,19 +39,20 @@ import {
   getCannonGeodesicYaw,
   compileLargeWorld,
   compileTorusLoopWorld,
+  bareRegistryCuts,
 } from "../../fixtures/world-objects/geodesic";
 
 describe("geodesic cannon world objects: cannon", () => {
   it("places an incoming emitter on a segment, truncates the geodesic, and locks it", () => {
     const world = compileLargeWorld();
     const registry = createRuntimeObjectRegistry();
-    const cannon = createGeodesicCannonObject({
+    const cannon = createGeodesicEmitterObject({
       id: "cannon-a",
       cellId: "a",
       localPose: yawRigidTransform3(0, { x: -1.5, y: 0, z: 0 }),
     });
     registry.add(cannon);
-    const first = shootGeodesic({ world, registry, cannon, geodesicId: "g-a" });
+    const first = shootGeodesic({ maxLengthMeters: 2, world, registry, cannon, geodesicId: "g-a" });
 
     const result = placeGeodesicCannonOnGeodesic({
       world,
@@ -60,7 +61,8 @@ describe("geodesic cannon world objects: cannon", () => {
       segmentId: first.id,
       distanceAlongSegmentMeters: 1,
       aimYawRadians: Math.PI / 2,
-      id: "cannon-b",
+      createId: () => "cannon-b",
+      cuts: bareRegistryCuts(world, registry),
     });
 
     expect(result.placed).toBe(true);
@@ -78,20 +80,20 @@ describe("geodesic cannon world objects: cannon", () => {
     expect(getGeodesicEndpointAttachmentsForAnchor(registry, "cannon-b").map((attachment) => attachment.geodesicId).sort())
       .toEqual(["g-a", continuationId]);
     expect(getCannonGeodesicYaw(registry, "cannon-b", "g-a")).toBeCloseTo(Math.PI);
-    expect(extendGeodesic({ world, registry, geodesicId: "g-a" })).toBeUndefined();
-    expect(extendGeodesic({ world, registry, geodesicId: continuationId })).toBeDefined();
+    expect(extendGeodesic({ maxLengthMeters: 2, world, registry, geodesicId: "g-a" })).toBeUndefined();
+    expect(extendGeodesic({ maxLengthMeters: 2, world, registry, geodesicId: continuationId })).toBeDefined();
   });
 
   it("refuses to place an emitter where splitting would create a tiny segment", () => {
     const world = compileLargeWorld();
     const registry = createRuntimeObjectRegistry();
-    const cannon = createGeodesicCannonObject({
+    const cannon = createGeodesicEmitterObject({
       id: "cannon-a",
       cellId: "a",
       localPose: yawRigidTransform3(0, { x: -1.5, y: 0, z: 0 }),
     });
     registry.add(cannon);
-    const segment = shootGeodesic({ world, registry, cannon, geodesicId: "g-a" });
+    const segment = shootGeodesic({ maxLengthMeters: 2, world, registry, cannon, geodesicId: "g-a" });
 
     const result = placeGeodesicCannonOnGeodesic({
       world,
@@ -100,7 +102,8 @@ describe("geodesic cannon world objects: cannon", () => {
       segmentId: segment.id,
       distanceAlongSegmentMeters: minGeodesicSegmentLengthMeters / 2,
       aimYawRadians: 0,
-      id: "cannon-b",
+      createId: () => "cannon-b",
+      cuts: bareRegistryCuts(world, registry),
     });
 
     expect(result.placed).toBe(false);
@@ -111,19 +114,20 @@ describe("geodesic cannon world objects: cannon", () => {
   it("places an incoming emitter on the right geodesic when the source owns several", () => {
     const world = compileLargeWorld();
     const registry = createRuntimeObjectRegistry();
-    const cannon = createGeodesicCannonObject({
+    const cannon = createGeodesicEmitterObject({
       id: "cannon-a",
       cellId: "a",
       localPose: yawRigidTransform3(0, { x: -1.5, y: 0, z: 0 }),
     });
     registry.add(cannon);
-    const first = shootGeodesic({ world, registry, cannon, geodesicId: "g-a" });
+    const first = shootGeodesic({ maxLengthMeters: 2, world, registry, cannon, geodesicId: "g-a" });
     const updatedCannon = registry.get("cannon-a");
-    if (updatedCannon?.kind !== "geodesic-cannon") {
+    if (updatedCannon?.kind !== "geodesicEmitters/emitter") {
       throw new Error("Expected updated geodesic cannon.");
     }
 
     shootGeodesic({
+      maxLengthMeters: 2,
       world,
       registry,
       cannon: {
@@ -141,7 +145,8 @@ describe("geodesic cannon world objects: cannon", () => {
       segmentId: first.id,
       distanceAlongSegmentMeters: 1,
       aimYawRadians: Math.PI / 2,
-      id: "cannon-b",
+      createId: () => "cannon-b",
+      cuts: bareRegistryCuts(world, registry),
     });
 
     expect(result.placed).toBe(true);
@@ -158,12 +163,12 @@ describe("geodesic cannon world objects: cannon", () => {
   it("connects immediately when an aimed geodesic reaches an emitter", () => {
     const world = compileLargeWorld();
     const registry = createRuntimeObjectRegistry();
-    const source = createGeodesicCannonObject({
+    const source = createGeodesicEmitterObject({
       id: "cannon-a",
       cellId: "a",
       localPose: yawRigidTransform3(0, { x: -1.5, y: 0, z: 0 }),
     });
-    const incoming = createGeodesicCannonObject({
+    const incoming = createGeodesicEmitterObject({
       id: "cannon-b",
       cellId: "a",
       localPose: yawRigidTransform3(Math.PI, { x: 1, y: 0, z: 0 }),
@@ -191,12 +196,12 @@ describe("geodesic cannon world objects: cannon", () => {
   it("recomputes an emitter-hit lock so the segment lands on the emitter pole", () => {
     const world = compileLargeWorld();
     const registry = createRuntimeObjectRegistry();
-    const source = createGeodesicCannonObject({
+    const source = createGeodesicEmitterObject({
       id: "cannon-a",
       cellId: "a",
       localPose: yawRigidTransform3(0, { x: -1.5, y: 0, z: 0 }),
     });
-    const incoming = createGeodesicCannonObject({
+    const incoming = createGeodesicEmitterObject({
       id: "cannon-b",
       cellId: "a",
       localPose: yawRigidTransform3(Math.PI, { x: 1, y: 0.05, z: 0 }),
@@ -208,7 +213,7 @@ describe("geodesic cannon world objects: cannon", () => {
 
     const tail = getGeodesicTail(registry, "g-a");
     if (!tail) {
-      throw new Error("Expected a locked geodesic tail.");
+      throw new Error("Expected a connected geodesic tail.");
     }
     const endpoint = {
       x: tail.start.x + tail.direction.x * tail.lengthMeters,
@@ -226,7 +231,7 @@ describe("geodesic cannon world objects: cannon", () => {
   it("connects a looped-world geodesic back to its source emitter", () => {
     const world = compileTorusLoopWorld();
     const registry = createRuntimeObjectRegistry();
-    const source = createGeodesicCannonObject({
+    const source = createGeodesicEmitterObject({
       id: "cannon-a",
       cellId: "torus-room",
       localPose: yawRigidTransform3(0, { x: 4, y: 0, z: 0 }),
@@ -263,12 +268,12 @@ describe("geodesic cannon world objects: cannon", () => {
   it("does not connect to emitters during preview rebuilds", () => {
     const world = compileLargeWorld();
     const registry = createRuntimeObjectRegistry();
-    const source = createGeodesicCannonObject({
+    const source = createGeodesicEmitterObject({
       id: "cannon-a",
       cellId: "a",
       localPose: yawRigidTransform3(0, { x: -1.5, y: 0, z: 0 }),
     });
-    const incoming = createGeodesicCannonObject({
+    const incoming = createGeodesicEmitterObject({
       id: "cannon-b",
       cellId: "a",
       localPose: yawRigidTransform3(Math.PI, { x: 1, y: 0.05, z: 0 }),
@@ -297,12 +302,12 @@ describe("geodesic cannon world objects: cannon", () => {
   it("does not connect until extension reaches the target emitter", () => {
     const world = compileLargeWorld();
     const registry = createRuntimeObjectRegistry();
-    const source = createGeodesicCannonObject({
+    const source = createGeodesicEmitterObject({
       id: "cannon-a",
       cellId: "a",
       localPose: yawRigidTransform3(0, { x: -1.5, y: 0, z: 0 }),
     });
-    const incoming = createGeodesicCannonObject({
+    const incoming = createGeodesicEmitterObject({
       id: "cannon-b",
       cellId: "a",
       localPose: yawRigidTransform3(Math.PI, { x: 1, y: 0, z: 0 }),
@@ -321,12 +326,12 @@ describe("geodesic cannon world objects: cannon", () => {
   it("deleting a connected geodesic removes association from both emitters", () => {
     const world = compileLargeWorld();
     const registry = createRuntimeObjectRegistry();
-    registry.add(createGeodesicCannonObject({
+    registry.add(createGeodesicEmitterObject({
       id: "cannon-a",
       cellId: "a",
       localPose: yawRigidTransform3(0, { x: -1.5, y: 0, z: 0 }),
     }));
-    registry.add(createGeodesicCannonObject({
+    registry.add(createGeodesicEmitterObject({
       id: "cannon-b",
       cellId: "a",
       localPose: yawRigidTransform3(Math.PI, { x: 1, y: 0, z: 0 }),

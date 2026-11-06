@@ -9,7 +9,7 @@ import { type CompiledCellComplex } from "../../cell-complex/compileCellComplex"
 import { type DebugLevelId } from "../../diagnostics/debugLevels";
 import { type DebugOptionId, hasActiveDebugOption } from "../../glue/debugOptions";
 import { type GeodesicMarmotRuntime } from "./creatures/geodesicMarmotView";
-import { type RuntimeObjectRegistry } from "../../world-objects/runtimeObjectRegistry";
+import { type RuntimeObjectReader } from "../../world-objects/runtimeObjectRegistry";
 import { type SimpleGeoCreatureRuntime } from "./creatures/simpleGeoCreatureView";
 import {
   buildAimCollisionOutlineDebugMesh,
@@ -21,7 +21,7 @@ import { buildStaticObjectCollisionWireframeGroup } from "./staticObjectCollisio
 /** Dependencies for {@link createDebugVisualization}; createThreeApp#shell passes the shared maps by reference (this module mutates the group maps) and the changing state as getters. */
 export interface DebugVisualizationDeps {
   /** Source of world objects per cell used to build static wireframes and hitboxes. */
-  readonly runtimeObjectRegistry: RuntimeObjectRegistry;
+  readonly runtimeObjectRegistry: RuntimeObjectReader;
   /** Moving creature runtimes whose own collision wireframes are toggled. */
   readonly dynamicObjectRuntimes: readonly (GeodesicMarmotRuntime | SimpleGeoCreatureRuntime)[];
   /** Cell id to cell root object under which debug groups are parented; cells without a root are skipped. */

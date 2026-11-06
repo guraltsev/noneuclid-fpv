@@ -9,7 +9,7 @@ import { addVec3, scaleVec3, type Vec3 } from "../../math/vec3";
 import type { RuntimeObjectRegistry } from "../runtimeObjectRegistry";
 import {
   emitterConnectionToleranceMeters,
-  type GeodesicCannonObject,
+  type GeodesicEmitterObject,
   type GeodesicSegmentTerminal,
   type GeodesicTraceBuildResult,
   intersectionTolerance,
@@ -232,16 +232,16 @@ export function findNearestEmitterHitOnTrace(input: {
   readonly start: Vec3;
   readonly direction: Vec3;
   readonly maxLengthMeters: number;
-}): { readonly emitter: GeodesicCannonObject; readonly distanceMeters: number } | undefined {
+}): { readonly emitter: GeodesicEmitterObject; readonly distanceMeters: number } | undefined {
   const direction = normalizeHorizontalDirection(input.direction);
-  let nearest: { readonly emitter: GeodesicCannonObject; readonly distanceMeters: number } | undefined;
+  let nearest: { readonly emitter: GeodesicEmitterObject; readonly distanceMeters: number } | undefined;
   // An emitter the geodesic is already attached to is not a hit (only the source emitter, handled below, is exempt from that).
   const interval = input.geodesicId ? input.registry.get(input.geodesicId) : undefined;
   const isAttached = (emitterId: string): boolean =>
     interval?.kind === "geodesicModel/arc" && (interval.start.anchorObjectId === emitterId || interval.end.anchorObjectId === emitterId);
 
   for (const object of input.registry.getObjectsInCell(input.cellId)) {
-    if (object.kind !== "geodesic-cannon") {
+    if (object.kind !== "geodesicEmitters/emitter") {
       continue;
     }
     const isSourceEmitter = object.id === input.sourceEmitterId;

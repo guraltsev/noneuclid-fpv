@@ -1,7 +1,7 @@
 /**
  * Queries whether an arc connects emitters or follows one, and removal of geodesics and cannons together with their derived objects.
  */
-import type { RuntimeObjectRegistry } from "../runtimeObjectRegistry";
+import type { RuntimeObjectReader, RuntimeObjectRegistry } from "../runtimeObjectRegistry";
 import type { GeodesicEmitterAttachment } from "./objects";
 import {
   getEmitterGeodesicIds,
@@ -17,21 +17,21 @@ import { removeGeodesicIntervalAndDerivedObjects, removeGeodesicSegments } from 
  * outgoing and `open`. Returns `undefined` for an id that is not an interval or has no emitter at either end.
  */
 export function getGeodesicConnection(
-  registry: RuntimeObjectRegistry,
+  registry: RuntimeObjectReader,
   geodesicId: string,
 ): GeodesicEmitterAttachment | undefined {
   const interval = registry.get(geodesicId);
   if (interval?.kind === "geodesicModel/arc") {
     const start = registry.get(interval.start.anchorObjectId);
     const end = registry.get(interval.end.anchorObjectId);
-    if (start?.kind === "geodesic-cannon") {
+    if (start?.kind === "geodesicEmitters/emitter") {
       return {
         outgoingEmitterId: start.id,
-        incomingEmitterId: end?.kind === "geodesic-cannon" ? end.id : undefined,
-        state: end?.kind === "geodesic-cannon" ? "connected" : "open",
+        incomingEmitterId: end?.kind === "geodesicEmitters/emitter" ? end.id : undefined,
+        state: end?.kind === "geodesicEmitters/emitter" ? "connected" : "open",
       };
     }
-    if (end?.kind === "geodesic-cannon") {
+    if (end?.kind === "geodesicEmitters/emitter") {
       return {
         outgoingEmitterId: end.id,
         state: "open",
@@ -45,11 +45,11 @@ export function getGeodesicConnection(
  * True when both ends of the arc are on emitters: a geodesic with no interior vertex. This is a fact about the ends, not a state.
  * An id that is not an arc never connects emitters.
  */
-export function arcConnectsEmitters(registry: RuntimeObjectRegistry, arcId: string): boolean {
+export function arcConnectsEmitters(registry: RuntimeObjectReader, arcId: string): boolean {
   const arc = registry.get(arcId);
   return arc?.kind === "geodesicModel/arc" &&
-    registry.get(arc.start.anchorObjectId)?.kind === "geodesic-cannon" &&
-    registry.get(arc.end.anchorObjectId)?.kind === "geodesic-cannon";
+    registry.get(arc.start.anchorObjectId)?.kind === "geodesicEmitters/emitter" &&
+    registry.get(arc.end.anchorObjectId)?.kind === "geodesicEmitters/emitter";
 }
 
 /**
@@ -93,12 +93,12 @@ export function removeGeodesic(registry: RuntimeObjectRegistry, geodesicId: stri
 }
 
 /** Removes every geodesic of the cannon that does not follow it (a plain shot geodesic with an unshared free end) and returns the removed ids (empty if the id is not a cannon). Arcs that connect emitters and tied arcs stay. */
-export function removeUnlockedGeodesicsFromCannon(
+export function removePlainGeodesicsFromCannon(
   registry: RuntimeObjectRegistry,
   cannonId: string,
 ): readonly string[] {
   const cannon = registry.get(cannonId);
-  if (cannon?.kind !== "geodesic-cannon") {
+  if (cannon?.kind !== "geodesicEmitters/emitter") {
     return [];
   }
 

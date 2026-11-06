@@ -41,7 +41,7 @@ let activeAssets: OwnedPreparedWorldAssets | undefined;
 let activeRunId = 0;
 
 // The public API object window.noneuclid.api lives here so that it survives app restarts; per-run namespaces
-// (debug, portal, geometry, view) are installed and removed by each app.
+// (debug, portal, geometry, view, world and one per module with a public API) are installed and removed by each app.
 setApiNamespace("app", {
   info: () => ({
     worldId: launchOptions.selectedWorldId,
@@ -111,8 +111,9 @@ async function restartApp(container: HTMLDivElement, nextLaunchOptions: LaunchOp
     assets = loadedAssets;
     loadingStatus.setPhase("Placing player");
     const appState = createInitialAppState(world);
+    // A superseded run creates no app: creating one installs its API namespaces over the live app's, and its dispose would remove them.
     const nextApp = await loadingStatus.track("Preparing renderer", () =>
-      createThreeApp(container, appState, {
+      runId !== activeRunId ? undefined : createThreeApp(container, appState, {
         selectedWorldId: launchOptions.selectedWorldId,
         worldSpec: geometrySpec,
         debugLevel: launchOptions.debugLevel,
@@ -149,8 +150,8 @@ async function restartApp(container: HTMLDivElement, nextLaunchOptions: LaunchOp
       }),
     );
 
-    if (runId !== activeRunId) {
-      nextApp.dispose();
+    if (nextApp === undefined || runId !== activeRunId) {
+      nextApp?.dispose();
       loadedAssets.dispose();
       loadingStatus.dispose();
       return;

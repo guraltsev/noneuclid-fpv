@@ -4,12 +4,13 @@
  * The module decides what is shown and enabled (config-gated sections, disabled buttons, tutorial text per input device, integer-meter limits for the geometry computer) but performs no rendering and holds no state; any page whose payload is missing falls back to the main page.
  */
 import type { ObjectActionEntry } from "../engine/moduleTypes";
-import { appConfigCatalog, defaultAppConfig, getEnabledMainTools, type AppConfig, type ConfigurableToolId } from "../glue/appConfig";
+import { appConfigCatalog, getEnabledMainTools, type AppConfig, type ConfigurableToolId } from "../glue/appConfig";
 import { formatBodyForInputMode } from "./inputModeText";
 import { worldCatalog } from "../authoring/worldCatalog";
 import { helpHubHomeGuidance } from "../world-objects/helpHubCopy";
 import { portalPanelModeDefinitions } from "../glue/portalPanelMode";
 import type { RuntimeMenuConsoleLogLevelId, RuntimeMenuPageId, RuntimeMenuState } from "../runtime/runtimeMenuState";
+import type { ToolsById } from "../runtime/toolRegistry";
 import type { RuntimeDebugOverlayItemId, RuntimeToolId } from "../glue/toolIds";
 import type { InputMode } from "./inputIntents";
 import { placedFlagMaxMessageLength } from "../world-objects/placedFlags";
@@ -114,12 +115,12 @@ export interface GeodesicCannonActionsPaletteContent {
   /** The actions the tools contribute to the page (design 013 section 8.3), in order, each with its availability. */
   readonly objectActions: readonly ObjectActionEntry[];
   /**
-   * One entry per geodesic of the emitter; locked ones carry a connection label explaining they run between emitters.
+   * One entry per geodesic of the emitter; connected ones carry a connection label explaining they run between emitters.
    */
   readonly geodesics: readonly {
     readonly id: string;
     readonly label: string;
-    readonly locked: boolean;
+    readonly connected: boolean;
     readonly connectionSymbolLabel?: string;
     readonly deleteDisabled: boolean;
   }[];
@@ -251,9 +252,10 @@ export interface PaletteDefinition {
  */
 export function createPaletteDefinition(
   state: RuntimeMenuState,
-  appConfig: AppConfig = defaultAppConfig,
-  inputMode: InputMode = "desktop",
-  nowMs: number = Date.now(),
+  appConfig: AppConfig,
+  inputMode: InputMode,
+  nowMs: number,
+  toolsById: ToolsById,
 ): PaletteDefinition {
   const reloadConfirmationActive = (state.reloadConfirmUntilMs ?? 0) > nowMs;
 
@@ -369,7 +371,7 @@ export function createPaletteDefinition(
         geodesics: createGeodesicCannonEntries(
           state.geodesicCannonOptions.geodesicIds,
           state.geodesicCannonOptions.geodesicLabelsById,
-          state.geodesicCannonOptions.lockedGeodesicIds,
+          state.geodesicCannonOptions.connectedGeodesicIds,
         ),
       },
     };
@@ -440,7 +442,7 @@ export function createPaletteDefinition(
       kind: "main",
       selectedTool: state.selectedTool,
       placeFlagType: state.placeFlagOptions.flagType,
-      toolOptions: createToolOptions(appConfig),
+      toolOptions: createToolOptions(appConfig, toolsById),
     },
   };
 }
@@ -463,7 +465,7 @@ export interface PaletteDefinitionCache {
  * immutably, so reference equality of `state` is a complete change test; the clock enters only through the
  * reload-confirmation flag, which is part of the key.
  */
-export function createPaletteDefinitionCache(appConfig: AppConfig): PaletteDefinitionCache {
+export function createPaletteDefinitionCache(appConfig: AppConfig, toolsById: ToolsById): PaletteDefinitionCache {
   let lastState: RuntimeMenuState | undefined;
   let lastInputMode: InputMode | undefined;
   let lastReloadConfirmationActive = false;
@@ -484,7 +486,7 @@ export function createPaletteDefinitionCache(appConfig: AppConfig): PaletteDefin
         lastState = state;
         lastInputMode = inputMode;
         lastReloadConfirmationActive = reloadConfirmationActive;
-        definition = createPaletteDefinition(state, appConfig, inputMode, nowMs);
+        definition = createPaletteDefinition(state, appConfig, inputMode, nowMs, toolsById);
         version += 1;
         result = { definition, version };
       }
@@ -543,19 +545,13 @@ function resolveTutorialBodyForInputMode(
   return page.xrBody ?? formatBodyForInputMode(page.body, "xr");
 }
 
-function createToolOptions(appConfig: AppConfig): MainPaletteContent["toolOptions"] {
-  return getEnabledMainTools(appConfig).map((id) => ({
-    id,
-    label: toolLabels[id],
-  }));
+// The tools the config enables that have an entry on the main list, in the config's order.
+function createToolOptions(appConfig: AppConfig, toolsById: ToolsById): MainPaletteContent["toolOptions"] {
+  return getEnabledMainTools(appConfig).flatMap((id) => {
+    const tool = toolsById.get(id);
+    return tool?.entry.kind === "main-tool" ? [{ id, label: tool.label }] : [];
+  });
 }
-
-const toolLabels = {
-  "place-flag": "Sign",
-  "geodesic-cannon": "Geodesic emitter",
-  "measure-length": "Length",
-  protractor: "Protractor",
-} as const satisfies Record<ConfigurableToolId, string>;
 
 function createGeometryComputerActionsContent(
   options: NonNullable<RuntimeMenuState["geometryComputerOptions"]>,
@@ -611,14 +607,14 @@ function createGeometryComputerActionsContent(
 function createGeodesicCannonEntries(
   geodesicIds: readonly string[],
   geodesicLabelsById: Readonly<Record<string, string>> | undefined,
-  lockedGeodesicIds: readonly string[] | undefined,
+  connectedGeodesicIds: readonly string[] | undefined,
 ): GeodesicCannonActionsPaletteContent["geodesics"] {
-  const lockedIds = new Set(lockedGeodesicIds ?? []);
+  const connectedIds = new Set(connectedGeodesicIds ?? []);
   return geodesicIds.map((geodesicId, index) => ({
     id: geodesicId,
     label: geodesicLabelsById?.[geodesicId] ?? `G${index + 1}`,
-    locked: lockedIds.has(geodesicId),
-    connectionSymbolLabel: lockedIds.has(geodesicId) ? "Locked geodesic segment between emitters" : undefined,
+    connected: connectedIds.has(geodesicId),
+    connectionSymbolLabel: connectedIds.has(geodesicId) ? "Locked geodesic segment between emitters" : undefined,
     deleteDisabled: false,
   }));
 }

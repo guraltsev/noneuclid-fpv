@@ -18,7 +18,7 @@ import type { RuntimeWorldObject } from "../../src/world-objects/runtimeObjectRe
 describe("worldInteractionDefinition", () => {
   it("emits context edit for signs", () => {
     const definition = createWorldFocusMessageDefinition({
-      object: baseObject("placed-flag", "Sign"),
+      object: baseObject("placedFlags/flag", "Sign"),
       selectedTool: "none",
     });
 
@@ -29,7 +29,7 @@ describe("worldInteractionDefinition", () => {
   it("emits context menu for geodesic emitters", () => {
     const definition = createWorldFocusMessageDefinition({
       object: {
-        ...baseObjectFields("geodesic-cannon-a", "geodesic-cannon", "Geodesic emitter"),
+        ...baseObjectFields("geodesic-cannon-a", "geodesicEmitters/emitter", "Geodesic emitter"),
         geodesicIds: [],
         aimYawRadians: 0,
       } as RuntimeWorldObject,
@@ -61,7 +61,7 @@ describe("worldInteractionDefinition", () => {
       selectedTool: "none",
       canExtendGeodesic: true,
     });
-    const locked = createWorldFocusMessageDefinition({
+    const connected = createWorldFocusMessageDefinition({
       object: segment(),
       selectedTool: "none",
       canExtendGeodesic: false,
@@ -69,17 +69,17 @@ describe("worldInteractionDefinition", () => {
 
     expect(definition?.actions).toMatchObject([{ id: "extend-geodesic", intent: "primary", label: "Extend" }]);
     expect(formatWorldFocusMessageTextForLegacyFallback(definition, "desktop")).toBe("Geodesic G1\nLeft click - Extend");
-    expect(formatWorldFocusMessageTextForLegacyFallback(locked, "desktop")).toBe("Geodesic G1");
+    expect(formatWorldFocusMessageTextForLegacyFallback(connected, "desktop")).toBe("Geodesic G1");
   });
 
   it("emits tool-specific primary actions for geodesic segments", () => {
     expect(createWorldFocusMessageDefinition({
       object: segment(),
-      selectedTool: "measure-length",
+      selectedTool: "geodesicMeasurements/length",
     })?.actions).toMatchObject([{ id: "measure-length", label: "Measure length" }]);
     expect(createWorldFocusMessageDefinition({
       object: segment(),
-      selectedTool: "protractor",
+      selectedTool: "geodesicMeasurements/protractor",
     })?.actions).toMatchObject([{ id: "select-protractor-side", label: "Select side" }]);
   });
 

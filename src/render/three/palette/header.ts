@@ -106,7 +106,7 @@ function createContextualHeaderActions(
       ...content.objectActions.map((action) => createHeaderActionButton(
         `geodesic-cannon-action:${action.actionId}`,
         "",
-        () => options.onObjectActionRequested?.("geodesic-cannon", content.cannonId, action.actionId),
+        () => options.onObjectActionRequested?.("geodesicEmitters/emitter", content.cannonId, action.actionId),
         { icon: headerActionIcon(action.iconId), disabled: !action.enabled, backgroundColor: "#b45309", width: 52, tooltip: action.tooltip },
       )),
     ];

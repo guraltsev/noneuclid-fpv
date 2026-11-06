@@ -9,7 +9,7 @@
 import * as THREE from "three";
 import { yawRigidTransform3 } from "../../math/rigidTransform3";
 import { resolveEmitterLaunchYaw } from "../../world-objects/geodesic/segments";
-import { type RuntimeObjectRegistry, type RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
+import { type RuntimeObjectReader, type RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
 import { roundRect } from "./canvasDrawing";
 import { geodesicRayEmitterPosition } from "./geodesicCannonRenderer";
 import { rigidTransformToThreeMatrix } from "./worldAxes";
@@ -35,8 +35,8 @@ export function getGeodesicEmitterLabelKey(cannonId: string, geodesicId: string)
  * yawed pose into the world, so the label tracks emitter rotation. Returns a fresh vector.
  */
 export function resolveGeodesicEmitterLabelPosition(
-  registry: RuntimeObjectRegistry,
-  cannon: Extract<RuntimeWorldObject, { readonly kind: "geodesic-cannon" }>,
+  registry: RuntimeObjectReader,
+  cannon: Extract<RuntimeWorldObject, { readonly kind: "geodesicEmitters/emitter" }>,
   geodesicId: string,
 ): THREE.Vector3 {
   const yawRadians = resolveEmitterLaunchYaw(registry, cannon, geodesicId);

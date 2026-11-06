@@ -11,14 +11,14 @@ import { identityRigidTransform3 } from "../../src/math/rigidTransform3";
 import { ChangeOp } from "../../src/world-objects/runtimeObjectChangeJournal";
 import { createRuntimeObjectRegistry, type RuntimeObjectReader } from "../../src/world-objects/runtimeObjectRegistry";
 import type { RuntimeCreatureObject } from "../../src/world-objects/runtimeObjectBase";
-import type { GeodesicCannonObject } from "../../src/world-objects/geodesic/objects";
+import type { GeodesicEmitterObject } from "../../src/world-objects/geodesic/objects";
 
 function mouse(id: string, cellId = "a"): RuntimeCreatureObject {
   return { id, kind: "geo-mouse", cellId, localPose: identityRigidTransform3, portalRenderable: true };
 }
 
-function cannon(id: string, cellId = "a"): GeodesicCannonObject {
-  return { id, kind: "geodesic-cannon", cellId, localPose: identityRigidTransform3, portalRenderable: true, aimYawRadians: 0 };
+function cannon(id: string, cellId = "a"): GeodesicEmitterObject {
+  return { id, kind: "geodesicEmitters/emitter", cellId, localPose: identityRigidTransform3, portalRenderable: true, aimYawRadians: 0 };
 }
 
 describe("runtime object change journal", () => {
@@ -34,9 +34,21 @@ describe("runtime object change journal", () => {
     expect(journal.length).toBe(4);
     expect([0, 1, 2, 3].map((i) => journal.opAt(i))).toEqual([ChangeOp.Added, ChangeOp.Added, ChangeOp.Updated, ChangeOp.Removed]);
     expect([0, 1, 2, 3].map((i) => journal.idAt(i))).toEqual(["m1", "c1", "m1", "m1"]);
-    expect([0, 1, 2, 3].map((i) => journal.kindAt(i))).toEqual(["geo-mouse", "geodesic-cannon", "geo-mouse", "geo-mouse"]);
+    expect([0, 1, 2, 3].map((i) => journal.kindAt(i))).toEqual(["geo-mouse", "geodesicEmitters/emitter", "geo-mouse", "geo-mouse"]);
     expect(journal.objectAt(2)).toBe(moved);
     expect(journal.objectAt(3)).toBe(moved);
+  });
+
+  it("hides clear, retainFrom and the writes from the reader type", () => {
+    const reader: RuntimeObjectReader = createRuntimeObjectRegistry([mouse("m1")]);
+    // @ts-expect-error a reader cannot start a new frame
+    void reader.changes.clear;
+    // @ts-expect-error a reader cannot move the retention mark
+    void reader.changes.retainFrom;
+    // @ts-expect-error a reader cannot write
+    void reader.update;
+
+    expect(reader.changes.ring.headSeq).toBe(1);
   });
 
   it("records moveToCell and owner publishes as updates", () => {
@@ -74,16 +86,16 @@ describe("runtime object change journal", () => {
     registry.add(mouse("m2"));
 
     expect(registry.changes.lastIndexOfKind("geo-mouse")).toBe(2);
-    expect(registry.changes.lastIndexOfKind("geodesic-cannon")).toBe(1);
+    expect(registry.changes.lastIndexOfKind("geodesicEmitters/emitter")).toBe(1);
     expect(registry.changes.lastIndexOfKind("asset")).toBe(-1);
 
     registry.changes.clear();
     expect(registry.changes.length).toBe(0);
     expect(registry.changes.lastIndexOfKind("geo-mouse")).toBe(-1);
-    expect(registry.changes.lastIndexOfKind("geodesic-cannon")).toBe(-1);
+    expect(registry.changes.lastIndexOfKind("geodesicEmitters/emitter")).toBe(-1);
 
     registry.add(cannon("c2"));
-    expect(registry.changes.lastIndexOfKind("geodesic-cannon")).toBe(0);
+    expect(registry.changes.lastIndexOfKind("geodesicEmitters/emitter")).toBe(0);
     expect(registry.changes.lastIndexOfKind("geo-mouse")).toBe(-1);
   });
 
@@ -123,7 +135,7 @@ describe("runtime object change journal", () => {
     expect(registry.countOfKind("geo-mouse")).toBe(2);
     registry.remove("m1");
     expect(registry.countOfKind("geo-mouse")).toBe(1);
-    expect(registry.countOfKind("geodesic-cannon")).toBe(1);
+    expect(registry.countOfKind("geodesicEmitters/emitter")).toBe(1);
     expect(registry.countOfKind("asset")).toBe(0);
   });
 

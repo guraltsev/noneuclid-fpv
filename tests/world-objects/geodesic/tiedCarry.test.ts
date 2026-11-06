@@ -7,17 +7,17 @@
  * release. A plain shot geodesic (an unshared free end) is still deleted when its emitter is lifted. The flow is not involved: without it a dragged
  * tied curve stays kinked at its vertex.
  */
+import { createFixtureArc as createGeodesicArcObject } from "../../support/arcs";
 import { describe, expect, it } from "vitest";
 import { yawRigidTransform3 } from "../../../src/math/rigidTransform3";
 import { expectSegmentsAreRealizedFromArcs } from "../../support/segmentOracle";
 import { createRuntimeObjectRegistry } from "../../../src/world-objects/runtimeObjectRegistry";
-import { moveEmitterAlongRoute, rebuildConnectedGeodesicBetweenEmitters, shootGeodesic } from "../../../src/world-objects/geodesic/cannon";
-import { rebuildEmitterGeodesics, releaseCarriedEmitter } from "../../../src/world-objects/geodesic/carryEnd";
+import { rebuildConnectedGeodesicBetweenEmitters, shootGeodesic } from "../../../src/world-objects/geodesic/cannon";
+import { rebuildEmitterGeodesics } from "../../../src/world-objects/geodesic/carryEnd";
 import { arcsOfCurve, isStale, isTied } from "../../../src/world-objects/geodesic/endpoints";
-import { arcFollowsEmitter, removeUnlockedGeodesicsFromCannon } from "../../../src/world-objects/geodesic/lifecycle";
+import { arcFollowsEmitter, removePlainGeodesicsFromCannon } from "../../../src/world-objects/geodesic/lifecycle";
 import {
-  createGeodesicArcObject,
-  createGeodesicCannonObject,
+  createGeodesicEmitterObject,
   createGeodesicVertexObject,
   geodesicRayBeamHeightMeters,
   getGeodesicCannonEmitterPoint,
@@ -29,11 +29,12 @@ import {
   createSymmetricPairScenario,
   createTorusTiedPairScenario,
   totalGeodesicLength,
+  moveEmitterWithItsArcs as moveEmitterAlongRoute,
 } from "../../fixtures/world-objects/geodesic";
 
 function emitterOf(registry: ReturnType<typeof createRuntimeObjectRegistry>, id: string) {
   const emitter = registry.get(id);
-  if (emitter?.kind !== "geodesic-cannon") {
+  if (emitter?.kind !== "geodesicEmitters/emitter") {
     throw new Error(`Expected the emitter ${id}.`);
   }
   return emitter;
@@ -46,7 +47,7 @@ describe("lifting the emitter of a tied curve", () => {
     expect(registry.get("g-plain")?.kind).toBe("geodesicModel/arc");
     expect(isTied(registry, "g-plain")).toBe(false);
 
-    const removed = removeUnlockedGeodesicsFromCannon(registry, "e1");
+    const removed = removePlainGeodesicsFromCannon(registry, "e1");
 
     expect(removed).toEqual(["g-plain"]);
     expect(registry.get("g-plain")).toBeUndefined();
@@ -71,9 +72,8 @@ describe("carrying the emitter of a tied curve", () => {
     });
     expect(moved).toEqual({ moved: true, brokenGeodesicIds: [] });
 
-    const rebuild = rebuildEmitterGeodesics({ world, registry, emitterId: "e1", preserveGeodesicOnRebuildFailure: true });
+    rebuildEmitterGeodesics({ world, registry, emitterId: "e1", preserveGeodesicOnRebuildFailure: true });
 
-    expect(rebuild.rebuiltGeodesicIds).toEqual(["g1"]);
     expect(registry.get("free")).toBe(vertexBefore);
     expect(collectGeodesicPortalWord(registry, "g1")).toEqual([]);
     expect(isTied(registry, "g1")).toBe(true);
@@ -168,9 +168,8 @@ describe("a tied curve that cannot follow its emitter", () => {
     expect(isStale(registry, "g-b")).toBe(true);
     expect(registry.get("g-a")?.kind).toBe("geodesicModel/arc");
 
-    const release = releaseCarriedEmitter({ world, registry, emitterId: "cannon-b" });
+    rebuildEmitterGeodesics({ world, registry, emitterId: "cannon-b" });
 
-    expect(release.rebuiltGeodesicIds).toEqual(["g-b"]);
     expect(registry.get("g-a")).toBeUndefined();
     expect(registry.get("g-b")).toBeUndefined();
     expect(registry.get("v")).toBeUndefined();
@@ -178,5 +177,5 @@ describe("a tied curve that cannot follow its emitter", () => {
 });
 
 function createCannon(id: string, point: { readonly x: number; readonly y: number }) {
-  return createGeodesicCannonObject({ id, cellId: "a", localPose: yawRigidTransform3(0, { ...point, z: 0 }) });
+  return createGeodesicEmitterObject({ id, cellId: "a", localPose: yawRigidTransform3(0, { ...point, z: 0 }) });
 }

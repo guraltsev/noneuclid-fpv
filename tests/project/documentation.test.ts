@@ -29,5 +29,6 @@ describe("documentation", () => {
       // Report the first few problems of every failing check, not just the first failing check.
       expect({ check: name, problems: problems.slice(0, 15) }).toEqual({ check: name, problems: [] });
     }
-  });
+    // The legacy-writer check builds a TypeScript program of all of src/, a few seconds on a loaded machine.
+  }, 60000);
 });

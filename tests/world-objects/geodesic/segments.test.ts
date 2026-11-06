@@ -4,12 +4,12 @@
  * The display state of the derived segments of an arc (`connectionState`): `"connected"` when both ends of the arc are on
  * emitters, `"open"` otherwise. An arc tied at a vertex is drawn open: there is no separate state for a tied arc.
  */
+import { createFixtureArc as createGeodesicArcObject } from "../../support/arcs";
 import { describe, expect, it } from "vitest";
 import { yawRigidTransform3 } from "../../../src/math/rigidTransform3";
 import { createRuntimeObjectRegistry } from "../../../src/world-objects/runtimeObjectRegistry";
 import {
-  createGeodesicArcObject,
-  createGeodesicCannonObject,
+  createGeodesicEmitterObject,
   createGeodesicVertexObject,
   geodesicRayBeamHeightMeters,
 } from "../../../src/world-objects/geodesic/objects";
@@ -21,7 +21,7 @@ import { getGeodesicSegments, removeGeodesicSegments, resolveGeodesicNumber } fr
 import { compileLargeWorld, createFlowTestEngine, createSymmetricPairScenario, runCurveShorteningUntilAtRest } from "../../fixtures/world-objects/geodesic";
 
 function addEmitter(registry: ReturnType<typeof createRuntimeObjectRegistry>, id: string, x: number, y: number): void {
-  registry.add(createGeodesicCannonObject({ id, cellId: "a", localPose: yawRigidTransform3(0, { x, y, z: 0 }) }));
+  registry.add(createGeodesicEmitterObject({ id, cellId: "a", localPose: yawRigidTransform3(0, { x, y, z: 0 }) }));
 }
 
 function addArc(registry: ReturnType<typeof createRuntimeObjectRegistry>, id: string, start: string, end: string): void {
@@ -64,10 +64,10 @@ describe("display numbers are stored on the arc", () => {
   function shootThree() {
     const world = compileLargeWorld();
     const registry = createRuntimeObjectRegistry();
-    registry.add(createGeodesicCannonObject({ id: "cannon-a", cellId: "a", localPose: yawRigidTransform3(0, { x: -1.5, y: 0, z: 0 }) }));
+    registry.add(createGeodesicEmitterObject({ id: "cannon-a", cellId: "a", localPose: yawRigidTransform3(0, { x: -1.5, y: 0, z: 0 }) }));
     const cannon = () => {
       const object = registry.get("cannon-a");
-      if (object?.kind !== "geodesic-cannon") {
+      if (object?.kind !== "geodesicEmitters/emitter") {
         throw new Error("Expected the emitter.");
       }
       return object;
@@ -93,19 +93,27 @@ describe("display numbers are stored on the arc", () => {
 
   it("gives the continuation of a split the next free number", () => {
     const { world, registry } = shootThree();
-    registry.add(createGeodesicCannonObject({ id: "placed", cellId: "a", localPose: yawRigidTransform3(0, { x: -0.5, y: 0, z: 0 }) }));
+    registry.add(createGeodesicEmitterObject({ id: "placed", cellId: "a", localPose: yawRigidTransform3(0, { x: -0.5, y: 0, z: 0 }) }));
 
-    const surviving = splitGeodesicIntervalAtSegmentHit({
+    const interval = registry.get("g-b");
+    const segment = registry.get("g-b:segment:0");
+    const placed = registry.get("placed");
+    if (interval?.kind !== "geodesicModel/arc" || segment?.kind !== "geodesicModel/segment" || placed?.kind !== "geodesicEmitters/emitter") {
+      throw new Error("Expected the arc, its segment and the emitter.");
+    }
+
+    splitGeodesicIntervalAtSegmentHit({
       world,
       registry,
-      geodesicId: "g-b",
-      segmentId: "g-b:segment:0",
+      interval,
+      segment,
       distanceAlongSegmentMeters: 0.8,
-      placedEmitterId: "placed",
+      placed,
       createContinuationGeodesicId: (id) => `${id}:rest`,
     });
 
-    expect(surviving.map((arc) => arc.id)).toEqual(["g-b", "g-b:rest"]);
+    expect(registry.get("g-b")?.kind).toBe("geodesicModel/arc");
+    expect(registry.get("g-b:rest")?.kind).toBe("geodesicModel/arc");
     expect(resolveGeodesicNumber(registry, "g-b")).toBe(2);
     expect(resolveGeodesicNumber(registry, "g-b:rest")).toBe(4);
     expect(getGeodesicSegments(registry, "g-b:rest").every((segment) => segment.geodesicNumber === 4)).toBe(true);

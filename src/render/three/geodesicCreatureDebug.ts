@@ -10,7 +10,7 @@
 import * as THREE from "three";
 import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex";
 import { getDynamicObjectCollisionBounds, signedDistanceToSide, testCellCollision } from "../../movement/collision";
-import { type RuntimeObjectRegistry } from "../../world-objects/runtimeObjectRegistry";
+import { type RuntimeObjectReader } from "../../world-objects/runtimeObjectRegistry";
 import { runtimeObjectToDynamicObjectState } from "../../world-objects/runtimeObjectBase";
 import type { GeodesicMarmotRuntime } from "./creatures/geodesicMarmotView";
 import type { SimpleGeoCreatureRuntime } from "./creatures/simpleGeoCreatureView";
@@ -70,7 +70,7 @@ export interface GeodesicCreatureDebugDump {
 export function collectGeodesicCreatureDebugDump(options: {
   readonly world: CompiledCellComplex;
   readonly runtimes: readonly GeodesicCreatureRuntime[];
-  readonly registry: RuntimeObjectRegistry;
+  readonly registry: RuntimeObjectReader;
   readonly cellRoots: ReadonlyMap<string, THREE.Object3D>;
 }): GeodesicCreatureDebugDump {
   const records = options.runtimes.map((runtime) =>
@@ -88,7 +88,7 @@ export function collectGeodesicCreatureDebugDump(options: {
 function collectGeodesicCreatureDebugRecord(
   runtime: GeodesicCreatureRuntime,
   world: CompiledCellComplex,
-  registry: RuntimeObjectRegistry,
+  registry: RuntimeObjectReader,
   cellRoots: ReadonlyMap<string, THREE.Object3D>,
 ): GeodesicCreatureDebugRecord {
   runtime.root.updateMatrixWorld(true);

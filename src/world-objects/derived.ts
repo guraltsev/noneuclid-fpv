@@ -32,6 +32,8 @@ export interface DerivedStats {
   readonly reads: number;
   readonly computes: number;
   readonly entriesScanned: number;
+  /** How many reads `derived-verify` also recomputed and compared. */
+  readonly verifies: number;
 }
 
 interface Instance<T extends JournalRecord, V> {
@@ -44,6 +46,7 @@ interface Instance<T extends JournalRecord, V> {
   reads: number;
   computes: number;
   entriesScanned: number;
+  verifies: number;
 }
 
 const instancesByRing = new WeakMap<ChangeRing<JournalRecord>, Map<unknown, Instance<JournalRecord, unknown>>>();
@@ -83,7 +86,7 @@ export function defineDerived<S extends DerivedSource<T>, T extends JournalRecor
       for (const other of bySpec.values()) {
         if (other.id === spec.id) throw new Error(`derived: id ${spec.id} is defined twice`);
       }
-      instance = { id: spec.id, ring, kinds: new Set(kindList), cursor: 0, hasValue: false, value: undefined, reads: 0, computes: 0, entriesScanned: 0 };
+      instance = { id: spec.id, ring, kinds: new Set(kindList), cursor: 0, hasValue: false, value: undefined, reads: 0, computes: 0, entriesScanned: 0, verifies: 0 };
       bySpec.set(spec, instance as Instance<JournalRecord, unknown>);
     }
     return instance;
@@ -168,6 +171,7 @@ export function defineDerived<S extends DerivedSource<T>, T extends JournalRecor
     } finally {
       computing = false;
     }
+    instance.verifies += 1;
     if (!deepEqual(fresh, instance.value)) {
       throw new Error(`derived: ${spec.id} read differs from compute`);
     }
@@ -180,7 +184,7 @@ export function derivedStatsOf(source: DerivedSource<JournalRecord>): readonly D
   if (bySpec === undefined) return [];
   const result: DerivedStats[] = [];
   for (const instance of bySpec.values()) {
-    result.push({ id: instance.id, reads: instance.reads, computes: instance.computes, entriesScanned: instance.entriesScanned });
+    result.push({ id: instance.id, reads: instance.reads, computes: instance.computes, entriesScanned: instance.entriesScanned, verifies: instance.verifies });
   }
   return result;
 }

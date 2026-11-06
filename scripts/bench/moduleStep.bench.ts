@@ -29,7 +29,7 @@ import {
   resolveProtractorCenterSelection,
   resolveProtractorEmitterGeodesicSelection,
 } from "../../src/world-objects/protractorTool";
-import type { GeodesicCannonObject } from "../../src/world-objects/geodesic/objects";
+import type { GeodesicEmitterObject } from "../../src/world-objects/geodesic/objects";
 import { defineDerived } from "../../src/world-objects/derived";
 import type { RuntimeObjectReader, RuntimeObjectRegistry, RuntimeWorldObject } from "../../src/world-objects/runtimeObjectRegistry";
 import { createManyArcsFlowScenario, createTorusLoopBenchmarkScene, createTorusTiedPairScenario } from "../../tests/fixtures/world-objects/geodesic";
@@ -234,7 +234,7 @@ function createIdleScene(): Scene {
   for (let j = 0; j < 4; j += 1) {
     addLength(registry, world, `length-${j}`, `loop-${j}`);
   }
-  const emitter = registry.get("e") as GeodesicCannonObject;
+  const emitter = registry.get("e") as GeodesicEmitterObject;
   addAngle(registry, emitter, "angle-0", { geodesicId: "loop-0", endRole: "start" }, { geodesicId: "loop-1", endRole: "start" });
   addAngle(registry, emitter, "angle-1", { geodesicId: "loop-2", endRole: "start" }, { geodesicId: "loop-3", endRole: "start" });
   const engine = createWorldEngine({
@@ -270,7 +270,7 @@ function createFlowScene(withDependents: boolean): Scene {
   const { world, registry } = createTorusTiedPairScenario();
   if (!withDependents) return { world, registry, engine: createFlowEngine(world, registry, [geodesicModelModule(), curveShorteningModule()]) };
   addLength(registry, world, "length-g1", "g1");
-  const emitter = registry.get("e1") as GeodesicCannonObject;
+  const emitter = registry.get("e1") as GeodesicEmitterObject;
   addAngle(registry, emitter, "angle-g", { geodesicId: "g1", endRole: "start" }, { geodesicId: "g2", endRole: "end" });
   // The dependents are derived by the engine's derive pass: crossings, then lengths and angles.
   return { world, registry, engine: createFlowEngine(world, registry, [geodesicModelModule(), geodesicMeasurementsModule(), curveShorteningModule()]) };
@@ -284,7 +284,7 @@ function addLength(registry: RuntimeObjectRegistry, world: CompiledCellComplex, 
 
 type Side = { readonly geodesicId: string; readonly endRole: "start" | "end" };
 
-function addAngle(registry: RuntimeObjectRegistry, emitter: GeodesicCannonObject, id: string, first: Side, second: Side): void {
+function addAngle(registry: RuntimeObjectRegistry, emitter: GeodesicEmitterObject, id: string, first: Side, second: Side): void {
   const center = {
     ...resolveProtractorCenterSelection(registry, emitter),
     geodesicIds: [first.geodesicId, second.geodesicId],
@@ -392,8 +392,8 @@ function measureCacheHitBytesPerRead(gc: () => void): number {
   const { registry } = createIdleScene();
   const cannons = defineDerived<RuntimeObjectReader, RuntimeWorldObject, readonly string[]>({
     id: "bench/cannonIds",
-    kinds: ["geodesic-cannon"],
-    compute: (source) => Object.freeze(source.getObjectsOfKind("geodesic-cannon").map((object) => object.id)),
+    kinds: ["geodesicEmitters/emitter"],
+    compute: (source) => Object.freeze(source.getObjectsOfKind("geodesicEmitters/emitter").map((object) => object.id)),
   });
   let sink = 0;
   for (let i = 0; i < 1_000; i += 1) sink += cannons.read(registry).length;

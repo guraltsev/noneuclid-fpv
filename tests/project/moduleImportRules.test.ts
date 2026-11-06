@@ -7,9 +7,13 @@
  * a module that pulls in the registry, rendering, or other impure layers. These tests check the rule against
  * the pure modules it protects, and the rules of design 013 section 12.2: the prefix rule shape (`onlyVia`,
  * prefix entries, `exceptFromPrefixes`), the rules generated for each module directory, the public face of the
- * engine, the geometry tools exception, the legacy world writers (a list that may only shrink) and the layer order.
+ * engine, the geometry tools exception, the legacy world writers (found by the type checker on a small source tree; a
+ * list that stays exact and may only shrink) and the layer order.
  */
-import { describe, expect, it } from "vitest";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 // The documentation tooling is plain ESM JavaScript; load it through a variable path (see documentation.test.ts).
 const libPath = "../../scripts/docs/lib.mjs";
@@ -17,44 +21,121 @@ const libPath = "../../scripts/docs/lib.mjs";
 interface FakeModule {
   readonly path: string;
   readonly imports: readonly string[];
-  readonly writesRegistry?: boolean;
 }
 
 interface PrefixRule {
   readonly fromPrefix: string;
   readonly toPrefix: string;
   readonly onlyVia: readonly string[];
+  readonly alsoViaFrom?: Readonly<Record<string, readonly string[]>>;
   readonly exceptFromPrefixes?: readonly string[];
   readonly reason: string;
 }
 
 type Violation = { from: string; to: string; reason: string };
 
+interface ClientWrites {
+  readonly path: string;
+  readonly namesWriter: boolean;
+  readonly writes: readonly { readonly line: number; readonly text: string }[];
+  readonly mutatorUses: readonly { readonly line: number; readonly name: string }[];
+}
+
 interface DocLib {
   moduleImportRuleViolations(modules: Map<string, FakeModule>): Violation[];
   prefixImportRuleViolations(modules: Map<string, FakeModule>, rules: readonly PrefixRule[]): Violation[];
   legacyWorldWriters: readonly string[];
+  scanClientWrites(root: string): Map<string, ClientWrites>;
+  legacyWorldWriterViolations(clients: Map<string, ClientWrites>, listed: readonly string[]): { path: string; reason: string }[];
   layerMayImport(from: string, to: string): boolean;
   layerOrder: readonly string[];
 }
 
-// The legacy world writers as committed with design 013. The list in lib.mjs may only shrink: every entry must be here.
+// The legacy world writers as measured by the type checker. The list in lib.mjs may only shrink: every entry must be here.
 const committedLegacyWorldWriters = [
-  "render/three/carriedGeodesicCannon.ts",
   "render/three/createThreeApp.ts",
   "render/three/creatures/geodesicMarmotView.ts",
   "render/three/creatures/simpleGeoCreatureView.ts",
-  "render/three/geodesicCannonRenderer.ts",
   "render/three/geodesicCannonTools.ts",
-  "render/three/geodesicDebugDumps.ts",
-  "render/three/geodesicEmitterLabelController.ts",
-  "render/three/geodesicEmitterLabels.ts",
   "render/three/geometryCommit.ts",
-  "render/three/placedFlagRenderer.ts",
-  "render/three/preloadWorldAssets.ts",
-  "render/three/runtimeObjectActions.ts",
-  "ui/paletteDefinition.ts",
+  "runtime/worldGeometryComputedObjects.ts",
 ];
+
+// A small source tree for scanClientWrites: the registry's shape, two mutators (one through the other), a read, and clients of each sort.
+const clientWriteSources: Readonly<Record<string, string>> = {
+  "world-objects/runtimeObjectRegistry.ts": `
+    export interface RuntimeObjectRegistry {
+      add(object: string): void;
+      update(object: string): void;
+      remove(id: string): void;
+      claimOwnership(id: string): () => void;
+      releaseOwnership(id: string): void;
+      moveToCell(id: string, cellId: string): void;
+      get(id: string): string | undefined;
+    }
+    export type RuntimeObjectReader = Pick<RuntimeObjectRegistry, "get">;
+    export type LegacyWorldWriter = RuntimeObjectRegistry;
+  `,
+  "world-objects/flags.ts": `
+    import type { RuntimeObjectReader, RuntimeObjectRegistry } from "./runtimeObjectRegistry";
+    export const flagKind = "flag";
+    export function removeFlag(registry: RuntimeObjectRegistry, id: string): void { registry.remove(id); }
+    export function readFlag(registry: RuntimeObjectReader, id: string): string | undefined { return registry.get(id); }
+    export function createFlagOwner(store: RuntimeObjectRegistry, id: string): () => void {
+      return () => { store.claimOwnership(id); };
+    }
+  `,
+  "world-objects/bulk.ts": `
+    import type { RuntimeObjectRegistry } from "./runtimeObjectRegistry";
+    import { removeFlag } from "./flags";
+    export { removeFlag as dropFlag } from "./flags";
+    export function clearFlags(registry: RuntimeObjectRegistry, ids: readonly string[]): void {
+      for (const id of ids) removeFlag(registry, id);
+    }
+  `,
+  "render/readsOnly.ts": `
+    import type { RuntimeObjectReader } from "../world-objects/runtimeObjectRegistry";
+    import { flagKind, readFlag } from "../world-objects/flags";
+    export function labels(registry: RuntimeObjectReader, ids: Set<string>): void {
+      ids.add(flagKind);
+      readFlag(registry, flagKind);
+    }
+  `,
+  "render/renamedWriter.ts": `
+    import type { RuntimeObjectRegistry } from "../world-objects/runtimeObjectRegistry";
+    export function move(world: RuntimeObjectRegistry): void {
+      const alias = world;
+      alias.update("a");
+      alias.moveToCell("a", "cell");
+    }
+  `,
+  "ui/usesMutators.ts": `
+    import { clearFlags, dropFlag } from "../world-objects/bulk";
+    import { createFlagOwner, removeFlag } from "../world-objects/flags";
+    export const pick = (registry: Parameters<typeof clearFlags>[0]): void => {
+      clearFlags(registry, []);
+      dropFlag(registry, "a");
+      createFlagOwner(registry, "b");
+      ["c"].forEach((id) => [removeFlag].forEach((remove) => remove(registry, id)));
+    };
+  `,
+  "runtime/namesWriter.ts": `
+    import type { LegacyWorldWriter } from "../world-objects/runtimeObjectRegistry";
+    export interface Options { readonly registry: LegacyWorldWriter; }
+  `,
+  "runtime/writes.ts": `
+    import type { Options } from "./namesWriter";
+    export function drop(options: Options): void { options.registry.remove("a"); }
+  `,
+  "engine/notAClient.ts": `
+    import type { RuntimeObjectRegistry } from "../world-objects/runtimeObjectRegistry";
+    export function write(registry: RuntimeObjectRegistry): void { registry.add("a"); }
+  `,
+};
+
+function clientWrites(path: string, facts: Partial<ClientWrites> = {}): [string, ClientWrites] {
+  return [path, { path, namesWriter: false, writes: [], mutatorUses: [], ...facts }];
+}
 
 async function loadLib(): Promise<DocLib> {
   return (await import(/* @vite-ignore */ libPath)) as DocLib;
@@ -100,6 +181,38 @@ describe("module import rules", () => {
     expect(prefixImportRuleViolations(modules, [rule])).toEqual([{ from: "a/bad.ts", to: "b/internal.ts", reason: "test rule" }]);
   });
 
+  it("lets alsoViaFrom open a target to the importers under one prefix only", async () => {
+    const { prefixImportRuleViolations } = await loadLib();
+    const rule: PrefixRule = { fromPrefix: "a/", toPrefix: "b/", onlyVia: ["b/api.ts"], alsoViaFrom: { "a/one/": ["b/open.ts"] }, reason: "test rule" };
+    const modules = modulesOf(
+      { path: "a/one/x.ts", imports: ["b/open.ts", "b/closed.ts"] },
+      { path: "a/two/y.ts", imports: ["b/open.ts"] },
+    );
+
+    expect(prefixImportRuleViolations(modules, [rule])).toEqual([
+      { from: "a/one/x.ts", to: "b/closed.ts", reason: "test rule" },
+      { from: "a/two/y.ts", to: "b/open.ts", reason: "test rule" },
+    ]);
+  });
+
+  it("lets the emitters reach cannon.ts, and no other module", async () => {
+    const { moduleImportRuleViolations } = await loadLib();
+    const violations = moduleImportRuleViolations(
+      modulesOf(
+        { path: "modules/geodesicEmitters/module.ts", imports: ["world-objects/geodesic/cannon.ts", "world-objects/geodesic/carryEnd.ts", "world-objects/geodesic/segments.ts"] },
+        { path: "modules/curveShortening/module.ts", imports: ["world-objects/geodesic/cannon.ts"] },
+        { path: "modules/carry/module.ts", imports: ["world-objects/geodesic/cannon.ts"] },
+      ),
+    );
+
+    expect(violations.map((violation: { readonly from: string; readonly to: string }) => [violation.from, violation.to])).toEqual([
+      ["modules/geodesicEmitters/module.ts", "world-objects/geodesic/carryEnd.ts"],
+      ["modules/geodesicEmitters/module.ts", "world-objects/geodesic/segments.ts"],
+      ["modules/curveShortening/module.ts", "world-objects/geodesic/cannon.ts"],
+      ["modules/carry/module.ts", "world-objects/geodesic/cannon.ts"],
+    ]);
+  });
+
   it("lets a module reach another module only through its api.ts, and its own files freely", async () => {
     const { moduleImportRuleViolations } = await loadLib();
     const violations = moduleImportRuleViolations(
@@ -141,20 +254,85 @@ describe("module import rules", () => {
     expect(edges(violations)).toEqual(["render/three/view.ts -> engine/moduleTicks.ts", "ui/panel.ts -> engine/participants.ts"]);
   });
 
-  it("reports a client importing a world-objects mutator unless it is a legacy writer", async () => {
-    const { moduleImportRuleViolations, legacyWorldWriters } = await loadLib();
-    const legacy = legacyWorldWriters[0]!;
-    const violations = moduleImportRuleViolations(
-      modulesOf(
-        { path: "world-objects/placedFlags.ts", imports: [], writesRegistry: true },
-        { path: "world-objects/measureLengthTool.ts", imports: [] },
-        { path: "render/three/newTool.ts", imports: ["world-objects/placedFlags.ts", "world-objects/measureLengthTool.ts"] },
-        { path: legacy, imports: ["world-objects/placedFlags.ts"] },
-        { path: "runtime/appState.ts", imports: ["world-objects/placedFlags.ts"] },
-      ),
+  describe("client writes", () => {
+    let root: string;
+    let clients: Map<string, ClientWrites>;
+
+    beforeAll(async () => {
+      root = fs.mkdtempSync(path.join(os.tmpdir(), "client-writes-"));
+      for (const [rel, text] of Object.entries(clientWriteSources)) {
+        fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true });
+        fs.writeFileSync(path.join(root, rel), text);
+      }
+      clients = (await loadLib()).scanClientWrites(root);
+    }, 30000);
+
+    afterAll(() => {
+      fs.rmSync(root, { recursive: true, force: true });
+    });
+
+    it("scans render, ui and runtime and nothing else", () => {
+      expect([...clients.keys()]).toEqual([
+        "render/readsOnly.ts",
+        "render/renamedWriter.ts",
+        "runtime/namesWriter.ts",
+        "runtime/writes.ts",
+        "ui/usesMutators.ts",
+      ]);
+    });
+
+    it("sees nothing in a client that reads, even one importing from a module with mutators", () => {
+      expect(clients.get("render/readsOnly.ts")).toMatchObject({ namesWriter: false, writes: [], mutatorUses: [] });
+    });
+
+    it("finds a direct write by its type, whatever the variable is called", () => {
+      expect(clients.get("render/renamedWriter.ts")?.writes.map((write) => write.text)).toEqual(["alias.update", "alias.moveToCell"]);
+      expect(clients.get("runtime/writes.ts")?.writes.map((write) => write.text)).toEqual(["options.registry.remove"]);
+    });
+
+    it("finds a mutator through another mutator, a re-export, a closure and a value", () => {
+      expect(clients.get("ui/usesMutators.ts")?.mutatorUses.map((use) => use.name)).toEqual([
+        "clearFlags",
+        "clearFlags",
+        "dropFlag",
+        "createFlagOwner",
+        "removeFlag",
+      ]);
+    });
+
+    it("finds a file that only names the writer type", () => {
+      expect(clients.get("runtime/namesWriter.ts")).toMatchObject({ namesWriter: true, writes: [], mutatorUses: [] });
+    });
+
+    it("gives the line of a write", () => {
+      expect(clients.get("runtime/writes.ts")?.writes[0]?.line).toBe(3);
+    });
+  });
+
+  it("fails on a writing client outside the list, whichever way it writes", async () => {
+    const { legacyWorldWriterViolations } = await loadLib();
+    const violations = legacyWorldWriterViolations(
+      new Map([
+        clientWrites("render/reader.ts"),
+        clientWrites("render/listed.ts", { namesWriter: true }),
+        clientWrites("render/names.ts", { namesWriter: true }),
+        clientWrites("ui/mutator.ts", { mutatorUses: [{ line: 1, name: "removeFlag" }] }),
+        clientWrites("runtime/direct.ts", { writes: [{ line: 1, text: "registry.add" }] }),
+      ]),
+      ["render/listed.ts"],
     );
 
-    expect(edges(violations)).toEqual(["render/three/newTool.ts -> world-objects/placedFlags.ts"]);
+    expect(violations.map((violation) => violation.path)).toEqual(["render/names.ts", "ui/mutator.ts", "runtime/direct.ts"]);
+  });
+
+  it("fails on a listed file that does not write or no longer exists", async () => {
+    const { legacyWorldWriterViolations } = await loadLib();
+    const violations = legacyWorldWriterViolations(
+      new Map([clientWrites("render/reader.ts"), clientWrites("runtime/writer.ts", { writes: [{ line: 1, text: "registry.add" }] })]),
+      ["render/reader.ts", "runtime/writer.ts", "render/gone.ts"],
+    );
+
+    expect(violations.map((violation) => violation.path)).toEqual(["render/reader.ts", "render/gone.ts"]);
   });
 
   it("lets the list of legacy world writers only shrink", async () => {

@@ -11,13 +11,13 @@
  * shared corner — these tests check that through `shootGeodesic`, the one public entry point that reaches this
  * mapping, rather than the pure (but test-only-exported) conversion function directly.
  */
+import { createFixtureArc as createGeodesicArcObject } from "../../support/arcs";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { compileCellComplex } from "../../../src/cell-complex/compileCellComplex";
 import { invertRigidTransform3, transformPoint3, yawRigidTransform3 } from "../../../src/math/rigidTransform3";
 import {
-  createGeodesicCannonObject,
-  createGeodesicArcObject,
+  createGeodesicEmitterObject,
   geodesicRayBeamHeightMeters,
   getGeodesicSegmentEnd,
   type GeodesicSegmentObject,
@@ -43,7 +43,7 @@ describe("geodesic tracing on the kernel", () => {
         fc.double({ min: 15, max: 3000, noNaN: true }),
         (x, y, yaw, length) => {
           const registry = createRuntimeObjectRegistry();
-          const cannon = createGeodesicCannonObject({
+          const cannon = createGeodesicEmitterObject({
             id: "cannon",
             cellId: torusCell,
             localPose: yawRigidTransform3(yaw, { x, y, z: 0 }),
@@ -84,10 +84,10 @@ describe("geodesic tracing on the kernel", () => {
     expect(checked).toBeGreaterThan(10);
   });
 
-  it("rebuilds a locked interval whose end anchor is 1e-5 m from a portal side after ten wraps", () => {
+  it("rebuilds a connected interval whose end anchor is 1e-5 m from a portal side after 10 wraps", () => {
     const registry = createRuntimeObjectRegistry();
-    registry.add(createGeodesicCannonObject({ id: "cannon-a", cellId: torusCell, localPose: yawRigidTransform3(0, { x: -3, y: 2, z: 0 }) }));
-    registry.add(createGeodesicCannonObject({
+    registry.add(createGeodesicEmitterObject({ id: "cannon-a", cellId: torusCell, localPose: yawRigidTransform3(0, { x: -3, y: 2, z: 0 }) }));
+    registry.add(createGeodesicEmitterObject({
       id: "cannon-b",
       cellId: torusCell,
       localPose: yawRigidTransform3(0, { x: 7.5 - 1e-5, y: 2.3, z: 0 }),
@@ -122,7 +122,7 @@ describe("geodesic tracing on the kernel", () => {
     let segments: readonly GeodesicSegmentObject[] = [];
     for (const yaw of [0.3, 0.45, 0.61, 0.9, 1.1]) {
       const registry = createRuntimeObjectRegistry();
-      const cannon = createGeodesicCannonObject({ id: "cannon", cellId: torusCell, localPose: yawRigidTransform3(yaw, { x: 1, y: 2, z: 0 }) });
+      const cannon = createGeodesicEmitterObject({ id: "cannon", cellId: torusCell, localPose: yawRigidTransform3(yaw, { x: 1, y: 2, z: 0 }) });
       registry.add(cannon);
       shootGeodesic({ world: torusWorld, registry, cannon, geodesicId: "g", maxLengthMeters: 120, connectEmitters: false });
       segments = getGeodesicSegments(registry, "g");
@@ -212,7 +212,7 @@ describe("geodesic tracing on the kernel", () => {
       ],
     });
     const registry = createRuntimeObjectRegistry();
-    const cannon = createGeodesicCannonObject({
+    const cannon = createGeodesicEmitterObject({
       id: "cannon",
       cellId: "room",
       localPose: yawRigidTransform3(Math.atan2(1, 1), { x: 0, y: 0, z: 0 }),

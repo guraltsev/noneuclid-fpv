@@ -344,6 +344,8 @@ export function previewVertexRemoval(
     startCellId: anchorA.cellId,
     portalWord: word,
     geodesicNumber: (mergedId === firstArc.id ? firstArc : secondArc).geodesicNumber,
+    // A vertex goes when its two arcs are taut, so their real lengths add up to the merged chord.
+    intendedLengthMeters: getGeodesicTotalLengthMeters(registry, firstArc.id) + getGeodesicTotalLengthMeters(registry, secondArc.id),
   });
   const preview = previewRebuildGeodesicInterval({ world, registry, interval: merged });
   if (!preview) {
@@ -358,7 +360,7 @@ export function previewVertexRemoval(
   }
 
   // A merged arc between two emitters that repeats an existing arc is discarded in its favour.
-  const connects = registry.get(anchorA.id)?.kind === "geodesic-cannon" && registry.get(anchorB.id)?.kind === "geodesic-cannon";
+  const connects = registry.get(anchorA.id)?.kind === "geodesicEmitters/emitter" && registry.get(anchorB.id)?.kind === "geodesicEmitters/emitter";
   const duplicate = connects && findEquivalentConnectingArc(registry, merged, [firstArc.id, secondArc.id]) !== undefined;
   const internal: MergePreviewInternal = {
     vertexId: input.vertexId,
@@ -442,7 +444,7 @@ export function tieAtNewVertex(
     return { ok: false, reason: "sameEndpoint" };
   }
   const detached = registry.get(request.detachedEmitterId);
-  if (detached?.kind !== "geodesic-cannon") {
+  if (detached?.kind !== "geodesicEmitters/emitter") {
     return { ok: false, reason: "notAnEmitter" };
   }
   const firstArc = registry.get(request.first.geodesicId);

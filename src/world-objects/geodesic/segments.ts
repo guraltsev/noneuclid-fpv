@@ -3,9 +3,9 @@
  */
 import { yawRigidTransform3 } from "../../math/rigidTransform3";
 import { addVec3, scaleVec3, type Vec3 } from "../../math/vec3";
-import type { RuntimeObjectRegistry, RuntimeWorldObject } from "../runtimeObjectRegistry";
+import type { RuntimeObjectReader, RuntimeObjectRegistry, RuntimeWorldObject } from "../runtimeObjectRegistry";
 import {
-  type GeodesicCannonObject,
+  type GeodesicEmitterObject,
   type GeodesicEndRole,
   type GeodesicHalfRole,
   type GeodesicArcObject,
@@ -24,9 +24,9 @@ import {
 /**
  * Deletes an interval together with everything derived from or pointing at it.
  *
- * Removes its segments, the interval, measurements and protractor angles referring to it, intersection markers
- * involving it, emitter list entries, and any free ends left unreferenced; then refreshes intersection markers.
- * No-op for unknown ids (the sweeps simply find nothing).
+ * Removes its segments, the interval, intersection markers involving it and any free ends left unreferenced; everything it
+ * writes is the geodesic model's. Lengths and angles that refer to it are the measurements' to remove: their derive ticks do,
+ * when they see the segments gone. No-op for unknown ids (the sweeps simply find nothing).
  */
 export function removeGeodesicIntervalAndDerivedObjects(
   registry: RuntimeObjectRegistry,
@@ -37,16 +37,6 @@ export function removeGeodesicIntervalAndDerivedObjects(
   const interval = registry.get(geodesicId);
   if (interval?.kind === "geodesicModel/arc") {
     doomed.push(interval);
-  }
-  for (const object of registry.getObjectsOfKind("geodesicMeasurements/length")) {
-    if (object.geodesicId === geodesicId) {
-      doomed.push(object);
-    }
-  }
-  for (const object of registry.getObjectsOfKind("geodesicMeasurements/angle")) {
-    if (object.first.geodesicId === geodesicId || object.second.geodesicId === geodesicId) {
-      doomed.push(object);
-    }
   }
   for (const object of registry.getObjectsOfKind("geodesicModel/crossing")) {
     if (object.geodesicIds.includes(geodesicId)) {
@@ -63,7 +53,7 @@ export function removeGeodesicIntervalAndDerivedObjects(
 
 /** Returns the derived segments of a geodesic sorted by `segmentIndex` (empty if none). */
 export function getGeodesicSegments(
-  registry: RuntimeObjectRegistry,
+  registry: RuntimeObjectReader,
   geodesicId: string,
 ): readonly GeodesicSegmentObject[] {
   return [...registry.getSegmentsOfGeodesic(geodesicId)].sort((a, b) => a.segmentIndex - b.segmentIndex);
@@ -78,7 +68,7 @@ export function getGeodesicTail(
 }
 
 /** Returns the 1-based display number of a geodesic: its arc's `geodesicNumber`, or 1 (an arc without one exists only in test fixtures). Only reads. */
-export function resolveGeodesicNumber(registry: RuntimeObjectRegistry, geodesicId: string): number {
+export function resolveGeodesicNumber(registry: RuntimeObjectReader, geodesicId: string): number {
   const arc = registry.get(geodesicId);
   return arc?.kind === "geodesicModel/arc" ? arc.geodesicNumber ?? 1 : 1;
 }
@@ -163,7 +153,7 @@ export function splitDerivedSegmentsIntoEndpointHalves(
  * cell. Returns `undefined` if the interval or its segments are missing.
  */
 export function resolveEndpointTangentAtAnchor(input: {
-  readonly registry: RuntimeObjectRegistry;
+  readonly registry: RuntimeObjectReader;
   readonly geodesicId: string;
   readonly endRole: GeodesicEndRole;
 }): { readonly anchorObjectId: string; readonly yawRadians: number } | undefined {
@@ -192,8 +182,8 @@ export function resolveEndpointTangentAtAnchor(input: {
  * emitter, or the emitter's default `aimYawRadians` when the geodesic has no segments yet (or does not attach to it).
  */
 export function resolveEmitterLaunchYaw(
-  registry: RuntimeObjectRegistry,
-  emitter: GeodesicCannonObject,
+  registry: RuntimeObjectReader,
+  emitter: GeodesicEmitterObject,
   geodesicId: string,
 ): number {
   const interval = registry.get(geodesicId);
@@ -231,7 +221,7 @@ export function withAnchoredTargetTerminalForAnchors(
   const targetAnchor = candidateAnchorsById?.get(interval.end.anchorObjectId) ??
     registry.get(interval.end.anchorObjectId);
   const tail = traces.at(-1);
-  if (targetAnchor?.kind !== "geodesic-cannon" || !tail || tail.terminal.kind !== "open") {
+  if (targetAnchor?.kind !== "geodesicEmitters/emitter" || !tail || tail.terminal.kind !== "open") {
     return traces;
   }
 
@@ -301,7 +291,7 @@ function resolveDerivedSegmentConnectionState(
   }
   const start = registry.get(interval.start.anchorObjectId);
   const end = registry.get(interval.end.anchorObjectId);
-  return start?.kind === "geodesic-cannon" && end?.kind === "geodesic-cannon" ? "connected" : "open";
+  return start?.kind === "geodesicEmitters/emitter" && end?.kind === "geodesicEmitters/emitter" ? "connected" : "open";
 }
 
 /** Converts a derived segment back to the trace piece it was built from. */
@@ -323,7 +313,7 @@ export function getGeodesicTotalLengthMeters(registry: RuntimeObjectRegistry, ge
 
 /** Returns the stored portal word of an interval geodesic; `[]` for unknown ids or geodesics that never cross a portal. */
 export function collectGeodesicPortalWord(
-  registry: RuntimeObjectRegistry,
+  registry: RuntimeObjectReader,
   geodesicId: string,
 ): readonly GeodesicPortalTraversal[] {
   return getGeodesicPortalWord(registry, geodesicId) ?? [];
