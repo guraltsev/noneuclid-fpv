@@ -5,13 +5,13 @@
  * `heightMeters`. The returned group is authored directly in Three.js axes (world (x, y, z) becomes (x, z, -y), see
  * `worldAxes`): a textured floor at y = 0, a ceiling at y = height, one wall per side (a solid wall, or a portal
  * wall via `buildPortalMesh` for sides with a portal), optional portal debug panels, optional forbidden-zone
- * wireframes. Objects are not part of a cell mesh: creatures and static assets are runtime objects drawn from the registry. Floor UVs are metric (one texture tile = `tileSizeMeters`) or lattice UVs when a `floorUvFrame` is given (see `floorUv`). Meshes carry names (`floor:`, `ceiling:`, `wall:`) and
+ * wireframes. Objects are not part of a cell mesh: creatures and static assets are runtime objects drawn from the registry. Floor UVs are metric (one texture tile = `tileSizeMeters`) or lattice UVs when a `floorUvFrame` is given (see `floorUv`); a lattice frame also gives a textured floor its rigid floor patches (`userData.floorPatchField`). Meshes carry names (`floor:`, `ceiling:`, `wall:`) and
  * `userData.kind` tags that `cellRenderArchetypes` uses to classify them for instancing. Walls are nudged 1 cm
  * toward the cell interior along the inward normal to avoid z-fighting with coplanar surfaces. Called once per cell at load time; not a per-frame path.
  */
 
 import * as THREE from "three";
-import { floorLatticeUv, floorMetricUv, type FloorLatticeUvFrame } from "../../cell-complex/floorUv";
+import { floorLatticeUv, floorMetricUv, floorPatchField, type FloorLatticeUvFrame } from "../../cell-complex/floorUv";
 import type { CompiledPrismCell } from "../../cell-complex/prismCells";
 import type { DebugLevelId } from "../../diagnostics/debugLevels";
 import {
@@ -135,6 +135,9 @@ function buildFloorMesh(cell: CompiledPrismCell, assets: PreparedWorldAssets, fl
 
     if (texture) {
       material.map = texture;
+      if (floorUvFrame) {
+        material.userData.floorPatchField = floorPatchField(floorUvFrame);
+      }
       material.userData.textureUrl = cell.floorMaterial.colorTexturePath;
     } else {
       material.userData.missingTextureUrl = cell.floorMaterial.colorTexturePath;

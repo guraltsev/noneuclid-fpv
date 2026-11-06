@@ -137,8 +137,18 @@ describe("buildCellRenderArchetypes floor UV frames", () => {
       assets: createPreparedAssets(),
       capacitiesByCellId: new Map([["floor-room", 1]]),
       floorUvFramesByCellId: new Map([["floor-room", frame]]),
+      portalClipMaterialState: createPortalClipMaterialState(createPortalClipData({ maxVisiblePaths: 8 })),
     });
     const floor = archetypes.find((archetype) => archetype.kind === "floor")!;
+    // Both the instanced material and the root material (the room you stand in) carry the rigid floor patches.
+    const keyOf = (material: THREE.Material | THREE.Material[]) => (Array.isArray(material) ? material[0] : material).customProgramCacheKey();
+    expect(keyOf(floor.mesh.material)).toContain("floor-rigid-patches");
+    expect(keyOf(floor.mesh.material)).toContain("portal-clip-planes");
+    expect(keyOf(floor.rootMesh.material)).toContain("floor-rigid-patches");
+    for (const other of archetypes.filter((archetype) => archetype !== floor)) {
+      expect(keyOf(other.mesh.material)).not.toContain("floor-rigid-patches");
+      expect(keyOf(other.rootMesh.material)).not.toContain("floor-rigid-patches");
+    }
     const position = floor.mesh.geometry.getAttribute("position");
     const uv = floor.mesh.geometry.getAttribute("uv");
     for (let i = 0; i < position.count; i += 1) {

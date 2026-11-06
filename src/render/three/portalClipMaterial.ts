@@ -129,6 +129,9 @@ function patchSinglePortalClipMaterial(
   state: PortalClipMaterialState,
 ): THREE.Material {
   const previousOnBeforeCompile = material.onBeforeCompile;
+  // Keep an earlier key (for example the floor patch), or the two programs would collide in three's cache.
+  const previousProgramKey =
+    material.customProgramCacheKey === THREE.Material.prototype.customProgramCacheKey ? "" : material.customProgramCacheKey();
   material.onBeforeCompile = (shader, renderer) => {
     previousOnBeforeCompile.call(material, shader, renderer);
     shader.uniforms.portalClipPlaneTexture = state.uniforms.portalClipPlaneTexture;
@@ -138,7 +141,7 @@ function patchSinglePortalClipMaterial(
     shader.fragmentShader = patchFragmentShader(shader.fragmentShader, state.hardwareClipDistances);
   };
   material.customProgramCacheKey = () =>
-    `portal-clip-planes:${state.clipData.maxClipTextureEyes}:${state.hardwareClipDistances ? "hw" : "frag"}`;
+    `${previousProgramKey}portal-clip-planes:${state.clipData.maxClipTextureEyes}:${state.hardwareClipDistances ? "hw" : "frag"}`;
 
   if (state.hardwareClipDistances) {
     // Three.js reads `material.extensions` for every material type but only ShaderMaterial declares it.

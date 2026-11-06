@@ -20,6 +20,7 @@ import type { StaticPortalPathCullResult } from "../../cell-complex/staticPortal
 import type { DebugLevelId } from "../../diagnostics/debugLevels";
 import type { PortalPanelModeId } from "../../glue/portalPanelMode";
 import { buildCellMesh } from "./buildCellMesh";
+import { patchFloorPatchMaterial } from "./floorPatchMaterial";
 import { patchPortalClipMaterial, type PortalClipMaterialState } from "./portalClipMaterial";
 import type { PreparedWorldAssets } from "./preparedWorldAssets";
 import { disposeMaterial, disposeObject3D } from "./runtimeSceneUtils";
@@ -301,10 +302,10 @@ function cloneMaterial(
   portalClipMaterialState: PortalClipMaterialState | undefined,
 ): THREE.Material | THREE.Material[] {
   if (Array.isArray(material)) {
-    const cloned = material.map((entry) => entry.clone());
+    const cloned = material.map((entry) => patchFloorPatchMaterial(entry.clone()));
     return portalClipMaterialState ? patchPortalClipMaterial(cloned, portalClipMaterialState) : cloned;
   }
 
-  const cloned = material.clone();
+  const cloned = patchFloorPatchMaterial(material.clone());
   return portalClipMaterialState ? patchPortalClipMaterial(cloned, portalClipMaterialState) : cloned;
 }

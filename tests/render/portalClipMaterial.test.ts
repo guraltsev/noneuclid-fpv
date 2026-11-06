@@ -45,6 +45,18 @@ describe("portal clip material", () => {
     clipData.dispose();
   });
 
+  it("keeps an earlier program key", () => {
+    const clipData = createPortalClipData({ maxVisiblePaths: 16 });
+    const state = createPortalClipMaterialState(clipData, { hardwareClipDistances: false });
+    const earlier = new THREE.MeshBasicMaterial();
+    earlier.customProgramCacheKey = () => "earlier:";
+    const plain = new THREE.MeshBasicMaterial();
+
+    expect((patchPortalClipMaterial(earlier, state) as THREE.Material).customProgramCacheKey().startsWith("earlier:portal-clip-planes")).toBe(true);
+    expect((patchPortalClipMaterial(plain, state) as THREE.Material).customProgramCacheKey().startsWith("portal-clip-planes")).toBe(true);
+    clipData.dispose();
+  });
+
   it("clamps the active eye index and reports the eye count", () => {
     const { clipData, state } = compile(false);
 

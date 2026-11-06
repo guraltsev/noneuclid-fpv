@@ -304,6 +304,26 @@ describe("buildCellMesh floor UVs", () => {
     }
   });
 
+  it("stores the patch field only for a textured floor with a frame", () => {
+    const frame = { origin: { x: -5, y: -5 }, u: { x: 10, y: 0 }, v: { x: 2, y: 10 }, tilesAlongU: 3, tilesAlongV: 2, restU: { x: 10, y: 0 }, restV: { x: 2, y: 10 } };
+    const fieldOf = (spec: CellComplexSpec, extra: { floorUvFrame?: FloorLatticeUvFrame }) => {
+      const mesh = buildCellMesh(compileCellComplex(spec).cellsById.get("floor-room")!, {
+        debugLevel: "off",
+        portalPanelMode: "none",
+        eyeHeightMeters: 1.6,
+        assets: createFakePreparedAssets(),
+        ...extra,
+      });
+      return ((mesh.getObjectByName("floor:floor-room") as THREE.Mesh).material as THREE.Material).userData.floorPatchField;
+    };
+    const textured = createFloorRoomSpec(5);
+    expect(fieldOf(textured, { floorUvFrame: frame })).toBeDefined();
+    expect(fieldOf(textured, {})).toBeUndefined();
+    const cell = textured.cells[0];
+    const colour = { ...textured, cells: [{ ...cell, visuals: { ...cell.visuals, floorMaterial: { kind: "floor-color" as const, floorColor: "#888888" } } }] } as unknown as CellComplexSpec;
+    expect(fieldOf(colour, { floorUvFrame: frame })).toBeUndefined();
+  });
+
   it("uses lattice UVs when a floor UV frame is given", () => {
     const frame = { origin: { x: -5, y: -5 }, u: { x: 10, y: 0 }, v: { x: 2, y: 10 }, tilesAlongU: 3, tilesAlongV: 2, restU: { x: 10, y: 0 }, restV: { x: 2, y: 10 } };
     const { position, uv } = readFloor(5, { floorUvFrame: frame });
