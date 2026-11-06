@@ -36,7 +36,6 @@ export function createModeToolHost(input: {
     dispatch: input.dispatch,
     clients: [],
     core: {
-      placeFlag: nothing,
       carry: () => false,
       rotate: () => false,
       aim: () => false,

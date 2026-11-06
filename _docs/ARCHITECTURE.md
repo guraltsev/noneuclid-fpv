@@ -55,7 +55,7 @@ and multi-cell ray tracing), `intersections.ts` (crossing markers), `endpoints.t
 `segments.ts` (derived segments), `lifecycle.ts` (connection queries and removal), `intervals.ts` (interval rebuilds and
 previews), `vertices.ts` (tying, moving and removing a vertex) and `cannon.ts` (shooting, extending, connecting and placing
 emitters). The commands a person or a script uses on emitters are the world module `src/modules/geodesicEmitters/`, over `cannon.ts`. The curve shortening flow that decides what to do with a vertex is the world module `src/modules/curveShortening/`.
-Each kind is written by the module that owns it, and the write guard allows nothing else: `geodesicEmitters` writes the emitter, `geodesicModel` the arcs, vertices, segments and crossings (its commands, or its `api` on the fast channel), `geodesicMeasurements` the lengths and angles, in its ticks. Carrying and editing an emitter run in `bodies` ticks, once per frame: the carry calls the emitters' `api`, and the emitters call the model's.
+Each kind is written by the module that owns it, and the write guard allows nothing else: `geodesicEmitters` writes the emitter, `geodesicModel` the arcs, vertices, segments and crossings (its commands, or its `api` on the fast channel), `geodesicMeasurements` the lengths and angles (its commands and ticks), `placedFlags` the flags. Carrying and editing an emitter run in `bodies` ticks, once per frame: the carry calls the emitters' `api`, and the emitters call the model's.
 
 ## Layers and the dependency rule
 

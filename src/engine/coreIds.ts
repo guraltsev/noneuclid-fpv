@@ -23,7 +23,6 @@ const coreObjectKindTable: Record<RuntimeWorldObject["kind"], true> = {
 const coreToolIdTable: Record<CoreToolId, true> = {
   none: true,
   aim: true,
-  "placedFlags/flag": true,
   "geodesicEmitters/carry": true,
   "geodesicEmitters/rotate": true,
   "geodesicEmitters/aim": true,
@@ -33,7 +32,7 @@ const coreToolIdTable: Record<CoreToolId, true> = {
 export const coreObjectKinds: readonly string[] = Object.keys(coreObjectKindTable);
 
 /**
- * Kinds of the registry's core union that a module declares as its own (design 013 section 13.1): the emitters, the geodesic model and the geodesic measurements keep their declaring files in `world-objects/geodesic/objects.ts` and in the core union in this wave, and its `objectKinds` lists them.
+ * Kinds of the registry's core union that a module declares as its own (design 013 section 13.1): the emitters, the geodesic model, the geodesic measurements and the placed flags keep their declaring files in `world-objects/geodesic/objects.ts` and in the core union in this wave, and its `objectKinds` lists them.
  * Composition accepts a declaration of exactly these kinds (rule 5); any other declaration of a core kind is still a problem.
  */
 export const moduleOwnedCoreKinds: readonly string[] = [
@@ -44,6 +43,7 @@ export const moduleOwnedCoreKinds: readonly string[] = [
   "geodesicModel/crossing",
   "geodesicMeasurements/length",
   "geodesicMeasurements/angle",
+  "placedFlags/flag",
 ];
 
 /** Ids of the tools the shell defines itself. */

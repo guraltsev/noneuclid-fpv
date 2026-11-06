@@ -18,7 +18,6 @@ import { getAimForwardVector, type RootAimRay } from "./rootAimRay";
 
 /** What the shell does for each of its own tools; the aim ray and the frame's input are passed in. */
 export interface CoreToolActions {
-  placeFlag(ray: RootAimRay | undefined): void;
   /** Finishes the carry when the primary action was requested; true then. */
   carry(primaryActionRequested: boolean): boolean;
   /** Updates the rotation from the frame's yaw; true when the primary action was requested. */
@@ -98,7 +97,6 @@ export function createToolHost(deps: ToolHostDeps): ToolHost {
 
   const toolsById = createToolsById(
     createCoreToolDescriptors({
-      placeFlag: () => deps.core.placeFlag(frame.ray),
       carry: () => deps.core.carry(frame.primaryActionRequested),
       rotate: () => deps.core.rotate(frame.yawDeltaRadians, frame.primaryActionRequested),
       aim: () => deps.core.aim(frame.primaryActionRequested, frame.ray),

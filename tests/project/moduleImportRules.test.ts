@@ -58,8 +58,6 @@ const committedLegacyWorldWriters = [
   "render/three/creatures/simpleGeoCreatureView.ts",
   "render/three/geodesicCannonTools.ts",
   "render/three/geometryCommit.ts",
-  "render/three/runtimeObjectActions.ts",
-  "render/three/toolObjectRuntimes.ts",
   "runtime/worldGeometryComputedObjects.ts",
 ];
 

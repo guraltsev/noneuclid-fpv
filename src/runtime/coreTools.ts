@@ -1,5 +1,5 @@
 /**
- * The descriptors of the tools the shell defines itself (design 013 section 8.3): sign, and the emitter's carry, rotate and aim sub-modes.
+ * The descriptors of the tools the shell defines itself (design 013 section 8.3): the emitter's carry, rotate and aim sub-modes.
  * Their behavior stays in the shell (carry, rotate and aim are the client's sources for the world's control slots, section 7); a descriptor only calls the handler the shell passes in. The tools modules contribute come from the modules' client parts.
  * "none" and "aim" are not tools with descriptors: with neither selected the primary action acts on the focused object.
  */
@@ -10,7 +10,6 @@ export type EmitterModeToolId = "geodesicEmitters/carry" | "geodesicEmitters/rot
 
 /** What the shell does for each core tool; each handler reads the current frame's input itself. */
 export interface CoreToolHandlers {
-  placeFlag(): void;
   /** Carry, every frame: finishes the carry when the primary action was requested; true then. */
   carry(): boolean;
   /** Rotate, every frame; true when the primary action was requested. */
@@ -23,21 +22,8 @@ export interface CoreToolHandlers {
 
 /** The descriptors of the core tools. */
 export function createCoreToolDescriptors(handlers: CoreToolHandlers): readonly ToolDescriptor[] {
-  const mainTool = { ownerModuleId: "core", entry: { kind: "main-tool" } } as const;
   const subMode = { ownerModuleId: "core", entry: { kind: "sub-mode" } } as const;
   return [
-    {
-      ...mainTool,
-      id: "placedFlags/flag",
-      label: "Sign",
-      helpTitle: "Sign tool",
-      helpBody: "Places a note on the floor where you aim.",
-      helpRows: [{ input: "primary", label: "place sign" }, { input: "context-menu", label: "open tools" }],
-      indicatorColor: "#22c55e",
-      iconId: "sign",
-      showsAimCross: true,
-      onPrimaryAction: () => (handlers.placeFlag(), true),
-    },
     {
       ...subMode,
       id: "geodesicEmitters/carry",

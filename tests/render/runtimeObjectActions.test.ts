@@ -3,13 +3,11 @@
  *
  * `createRuntimeObjectActions` holds what the player does to runtime objects through the aim and the home button. These
  * tests drive the handle with a shell session, a real registry and a compiled one-room world, and stub the
- * rest of the shell: placing a sign from a floor aim adds a `placed-flag` record and ends the tool, a non-floor aim places
- * nothing, going home dispatches the world's starting pose and clears the rig, and teleporting home first cancels an open
- * menu.
+ * rest of the shell: typing on a sign asks the world, the text growing before it answers, going home dispatches the world's
+ * starting pose and clears the rig, and teleporting home first cancels an open menu.
  */
 import { readLocalPlayerPose } from "../../src/engine/worldEngine";
 import { createTestEngine } from "../support/engine";
-import * as THREE from "three";
 import { describe, expect, it, vi } from "vitest";
 import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
 import type { AimTarget } from "../../src/interaction/aimTarget";
@@ -20,7 +18,8 @@ import type { RuntimeCommand } from "../../src/runtime/runtimeCommands";
 import { createRuntimeMenuState } from "../../src/runtime/runtimeMenuState";
 import { createRuntimeObjectRegistry } from "../../src/world-objects/runtimeObjectRegistry";
 import { createRuntimeObjectActions } from "../../src/render/three/runtimeObjectActions";
-import type { RootAimRay } from "../../src/render/three/rootAimRay";
+import { yawRigidTransform3 } from "../../src/math/rigidTransform3";
+import { createPlacedFlagObject } from "../../src/world-objects/placedFlags";
 import { createTestClientSession } from "../support/clientSession";
 
 const world = compileCellComplex({
@@ -40,30 +39,13 @@ const world = compileCellComplex({
   ],
 });
 
-const aimRay: RootAimRay = {
-  origin: new THREE.Vector3(0, 1.6, 0),
-  direction: new THREE.Vector3(0, -1, 0),
-  quaternion: new THREE.Quaternion(),
-};
-
-const floorTarget: AimTarget = {
-  kind: "floor",
-  cellId: "room",
-  localEyePosition: { x: 0, y: -2, z: 1.6 },
-  localPoint: { x: 1, y: 0.5, z: 0 },
-  localNormal: { x: 0, y: 0, z: 1 },
-  rootPoint: { x: 1, y: 0.5, z: 0 },
-  rootNormal: { x: 0, y: 0, z: 1 },
-  distanceMeters: 2,
-  hopCount: 0,
-};
-
 function createHarness(target: AimTarget | undefined, sessionOverrides: Partial<ClientSessionState> = {}) {
   const session = createTestClientSession(sessionOverrides);
   const registry = createRuntimeObjectRegistry();
   const engine = createTestEngine({ registry, playerPose: createDefaultPlayerPose("room") });
   const commands: RuntimeCommand[] = [];
-  const syncedFlagIds: string[] = [];
+  const messages: (readonly [string, string])[] = [];
+  const removedFlags: string[] = [];
   const rigResets = vi.fn();
   const none = vi.fn();
   const actions = createRuntimeObjectActions({
@@ -90,30 +72,59 @@ function createHarness(target: AimTarget | undefined, sessionOverrides: Partial<
     createGeometryComputerMenuOptions: () => {
       throw new Error("not used");
     },
-    syncPlacedFlagRuntime: (flag) => syncedFlagIds.push(flag.id),
-    removePlacedFlagRuntime: none,
+    setFlagMessage: (flagId, message) => void messages.push([flagId, message]),
+    removeFlag: (flagId) => void removedFlags.push(flagId),
     removeLength: none,
     removeAngle: none,
-    removePlacedFlags: none,
     removeGeodesicRuntimeObjects: none,
-    syncSelectableHitboxDebug: none,
     clearProtractorToolFeedback: none,
   });
-  return { actions, registry, commands, syncedFlagIds, rigResets, engine };
+  return { actions, registry, commands, messages, removedFlags, rigResets, engine };
 }
 
 describe("createRuntimeObjectActions", () => {
-  it("places a sign at the aimed floor point and ends the placing tool", () => {
-    const { actions, registry, commands, syncedFlagIds } = createHarness(floorTarget);
+  function editingSign() {
+    const flag = createPlacedFlagObject({ id: "flag", cellId: "room", localPose: yawRigidTransform3(0, { x: 1, y: 1, z: 0 }), flagType: "WoodenSign1", message: "A1" });
+    const menuState = { ...createRuntimeMenuState({ selectedWorldId: "test" }), isOpen: true, editSignOptions: { flagId: flag.id, message: flag.message } };
+    const harness = createHarness(undefined, { menuState });
+    harness.registry.add(flag);
+    return harness;
+  }
 
-    actions.tryPlaceFlagFromAim(aimRay);
+  it("asks the world for each key of a sign, and writes nothing itself", () => {
+    const { actions, registry, commands, messages } = editingSign();
+    const version = registry.getVersion();
 
-    const flags = registry.getAll().filter((object) => object.kind === "placedFlags/flag");
-    expect(flags).toHaveLength(1);
-    expect(flags[0].cellId).toBe("room");
-    expect(flags[0].localPose.translation).toEqual({ x: 1, y: 0.5, z: 0 });
-    expect(syncedFlagIds).toEqual([flags[0].id]);
-    expect(commands).toContainEqual({ kind: "clear-selected-tool" });
+    actions.appendEditingSignCharacter("B");
+    actions.backspaceEditingSignMessage();
+
+    // The stub of `dispatch` leaves the page as it is: both keys act on "A1".
+    expect(messages).toEqual([["flag", "A1B"], ["flag", "A"]]);
+    expect(commands).toEqual([{ kind: "set-editing-sign-message", message: "A1B" }, { kind: "set-editing-sign-message", message: "A" }]);
+    expect(registry.getVersion()).toBe(version);
+  });
+
+  it("closes the page of a sign that is gone, asking nothing", () => {
+    const { actions, registry, commands, messages, removedFlags } = editingSign();
+    registry.remove("flag");
+
+    actions.appendEditingSignCharacter("B");
+    actions.deleteEditingSign();
+
+    expect(messages).toEqual([]);
+    expect(removedFlags).toEqual([]);
+    expect(commands).toEqual([{ kind: "close-menu" }, { kind: "close-menu" }]);
+  });
+
+  it("asks the world to delete the sign, and closes the page", () => {
+    const { actions, registry, commands, removedFlags } = editingSign();
+    const version = registry.getVersion();
+
+    actions.deleteEditingSign();
+
+    expect(removedFlags).toEqual(["flag"]);
+    expect(commands).toEqual([{ kind: "close-menu" }]);
+    expect(registry.getVersion()).toBe(version);
   });
 
   it("closes the menu when a tool asks for the page of an emitter that is gone", () => {
@@ -122,23 +133,6 @@ describe("createRuntimeObjectActions", () => {
     actions.showObjectPage("gone");
 
     expect(commands).toEqual([{ kind: "close-menu" }]);
-  });
-
-  it("places nothing when the aim hits something other than the floor", () => {
-    const { actions, registry, commands } = createHarness({ ...floorTarget, kind: "object" });
-
-    actions.tryPlaceFlagFromAim(aimRay);
-
-    expect(registry.getAll()).toEqual([]);
-    expect(commands).toEqual([]);
-  });
-
-  it("places nothing without an aim ray", () => {
-    const { actions, registry } = createHarness(floorTarget);
-
-    actions.tryPlaceFlagFromAim(undefined);
-
-    expect(registry.getAll()).toEqual([]);
   });
 
   it("sends the player to the starting position and resets the rig", () => {

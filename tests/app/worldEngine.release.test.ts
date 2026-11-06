@@ -63,6 +63,36 @@ describe("api.world", () => {
     expect(await app.api.world.submit({ kind: "geodesicEmitters/remove", emitterId })).toEqual({ ok: true, value: { outcome: "removed", emitterId, arcIds: [] } });
   });
 
+  it("measures a geodesic and places a sign through the world commands, in the running app", async () => {
+    app = await openApp({ world: "cube" });
+    const pose = (await app.api.debug.playerPose()) as { cellId: string; position: { x: number; y: number } };
+    const point = { x: pose.position.x + 1, y: pose.position.y, z: 0 };
+
+    const placed = (await app.api.world.submit({ kind: "geodesicEmitters/place", cellId: pose.cellId, point, yawRadians: 0 })) as { value: { emitterId: string } };
+    const shot = (await app.api.world.submit({ kind: "geodesicEmitters/shoot", emitterId: placed.value.emitterId, yawRadians: Math.PI / 2, lengthMeters: 0.5 })) as { value: { arcId: string } };
+
+    const length = (await app.api.world.submit({ kind: "geodesicMeasurements/createLength", arcId: shot.value.arcId })) as { ok: boolean; value: { id: string } };
+    expect(length).toMatchObject({ ok: true, value: { outcome: "lengthCreated" } });
+    expect(length.value.id).toMatch(/^geodesicMeasurements\/length:\d+$/);
+    expect(await app.api.world.submit({ kind: "geodesicMeasurements/removeLength", lengthId: length.value.id })).toMatchObject({ ok: true });
+    expect(await app.api.world.submit({ kind: "geodesicMeasurements/removeLength", lengthId: length.value.id })).toMatchObject({ ok: false, refusal: { code: "geodesicMeasurements/notALength" } });
+    expect(await app.api.world.submit({ kind: "geodesicMeasurements/removeAngle", angleId: "no-such-angle" })).toMatchObject({ ok: false, refusal: { code: "geodesicMeasurements/notAnAngle" } });
+
+    const sign = (await app.api.world.submit({
+      kind: "placedFlags/place",
+      cellId: pose.cellId,
+      point: { x: pose.position.x - 1, y: pose.position.y, z: 0 },
+      eyePoint: { x: pose.position.x, y: pose.position.y, z: 1.6 },
+      flagType: "WoodenSign1",
+    })) as { ok: boolean; value: { flagId: string } };
+    expect(sign).toMatchObject({ ok: true, value: { outcome: "placed" } });
+    expect(sign.value.flagId).toMatch(/^placedFlags\/flag:\d+$/);
+    const { flagId } = sign.value;
+    expect(await app.api.world.submit({ kind: "placedFlags/setMessage", flagId, message: "HELLO" })).toEqual({ ok: true, value: { outcome: "messageSet", flagId } });
+    expect(await app.api.world.submit({ kind: "placedFlags/remove", flagId })).toEqual({ ok: true, value: { outcome: "removed", flagId } });
+    expect(await app.api.world.submit({ kind: "placedFlags/remove", flagId })).toMatchObject({ ok: false, refusal: { code: "placedFlags/notAFlag" } });
+  });
+
   it("refuses a tie at an object that is no emitter, with the model's code", async () => {
     app = await openApp({ world: "torus-moduli" });
 

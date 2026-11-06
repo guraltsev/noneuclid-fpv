@@ -1451,7 +1451,7 @@ The names the engine knows without any module: the object kinds of the registry'
 | Kind | Name | Summary |
 | --- | --- | --- |
 | const | `coreObjectKinds` | Kinds of the core union of the registry. |
-| const | `moduleOwnedCoreKinds` | Kinds of the registry's core union that a module declares as its own (design 013 section 13.1): the emitters, the geodesic model and the geodesic measurements keep their declaring files in `world-objects/geodesic/object… |
+| const | `moduleOwnedCoreKinds` | Kinds of the registry's core union that a module declares as its own (design 013 section 13.1): the emitters, the geodesic model, the geodesic measurements and the placed flags keep their declaring files in `world-objec… |
 | const | `coreToolIds` | Ids of the tools the shell defines itself. |
 
 ### `engine/ids.ts`
@@ -1815,6 +1815,46 @@ The tie tool, the client part of `geodesicModel/tie` (design 013 sections 8.3 an
 | --- | --- | --- |
 | function | `createTieToolDescriptor` | The descriptor of the tie tool. |
 
+### `modules/placedFlags/api.ts`
+
+The placed flags' public face (design 013 sections 12.1 and 16): the sign tool's id, the flag kind, the plain-data shapes of the module's commands and their results, and the stable refusal codes.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| const | `placedFlagToolId` | The id of the sign tool. |
+| const | `placedFlagKind` | The object kind of a flag. |
+| interface | `PlacedFlagsPlaceCommand` | Stands a flag of `flagType` at `point` of the cell `cellId` (cell-local meters, the height is ignored), its front to `eyePoint` (the same frame). |
+| interface | `PlacedFlagsSetMessageCommand` | Replaces a flag's message; it is sanitized as every message is. |
+| interface | `PlacedFlagsRemoveCommand` | Removes a flag. |
+| type | `PlacedFlagsCommand` | Every command of the module. |
+| interface | `PlacedFlagsResult` | What a command that succeeded answers with: `outcome` names the command, `flagId` is the flag. |
+| const | `placedFlagsRefusals` | The refusal codes of the module's commands. |
+
+### `modules/placedFlags/client.ts`
+
+The placed flags' client part (design 013 sections 8.3 and 9.1): the sign tool, and the requests the sign's menu page makes.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| function | `requestFlagMessage` | The sign's menu page changed the message. |
+| function | `requestFlagRemoval` | The sign's menu page asks to delete the sign; the page closes with it, so there is no second press. |
+| function | `placedFlagsClient` | Creates the client part. |
+
+### `modules/placedFlags/index.ts`
+
+The placed flags module's factories (design 013 section 12.1): `placedFlagsModule` is the world part, `placedFlagsClient` the client part (the sign tool).
+
+_No exports._
+
+### `modules/placedFlags/module.ts`
+
+The placed flags module (design 013 section 16): a flag and what a person does to it, as commands over `src/world-objects/placedFlags.ts`.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| type | `PlacedFlagsModuleDefinition` | The module as the engine's list takes it. |
+| function | `placedFlagsModule` | Creates the placed flags module. |
+
 ## `runtime`
 
 ### `runtime/apiCall.ts`
@@ -1861,7 +1901,7 @@ The client session: the one record that holds how one person is interacting with
 
 ### `runtime/coreTools.ts`
 
-The descriptors of the tools the shell defines itself (design 013 section 8.3): sign, and the emitter's carry, rotate and aim sub-modes.
+The descriptors of the tools the shell defines itself (design 013 section 8.3): the emitter's carry, rotate and aim sub-modes.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
@@ -3066,7 +3106,7 @@ Runs the effects the session reducer lists after a command (`applyRuntimeCommand
 
 ### `render/three/runtimeObjectActions.ts`
 
-Actions the player performs on runtime objects through the aim: placing and editing signs, the primary interaction and context menu of the focused object, going home, resetting the world, and the debug pose helpers.
+Actions the player performs on runtime objects through the aim: editing signs, the primary interaction and context menu of the focused object, going home, resetting the world, and the debug pose helpers.
 
 | Kind | Name | Summary |
 | --- | --- | --- |

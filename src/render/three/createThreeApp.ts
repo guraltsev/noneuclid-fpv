@@ -134,6 +134,8 @@ import { createGeodesicRuntimeRenderSources } from "./geodesicCannonRenderer";
 import { requestGeodesicDeletion, requestGeodesicExtension, requestNewGeodesic } from "../../modules/geodesicEmitters/client";
 import { geodesicLengthToolId, geodesicMeasurementsModuleId, geodesicProtractorToolId } from "../../modules/geodesicMeasurements/api";
 import { requestAngleRemoval, requestLengthRemoval } from "../../modules/geodesicMeasurements/client";
+import { placedFlagToolId } from "../../modules/placedFlags/api";
+import { requestFlagMessage, requestFlagRemoval } from "../../modules/placedFlags/client";
 import { geodesicEmitterToolId } from "../../modules/geodesicEmitters/api";
 import { createGeodesicCannonTools } from "./geodesicCannonTools";
 import { createPortalFramePass } from "./portalFramePass";
@@ -727,8 +729,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     removePlacedFlagRuntime,
     removeMeasuredGeodesicLengthRuntime,
     removeProtractorAngleRuntime,
-    removePlacedFlags,
-    syncLabelRuntimesFromJournal,
+    syncToolObjectRuntimesFromJournal,
   } = createToolObjectRuntimes({
     assets: options.assets,
     runtimeObjectRegistry,
@@ -778,7 +779,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     appendEditingSignCharacter,
     backspaceEditingSignMessage,
     deleteEditingSign,
-    tryPlaceFlagFromAim,
     tryUseFocusedObjectPrimaryInteraction,
     showObjectPage,
     openContextMenuFromAim,
@@ -811,13 +811,11 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     getConnectedGeodesicIds,
     objectActionsFor: (objectKind, objectId) => toolHost.objectActionsFor(objectKind, objectId),
     createGeometryComputerMenuOptions,
-    syncPlacedFlagRuntime,
-    removePlacedFlagRuntime,
+    setFlagMessage: (flagId, message) => requestFlagMessage(toolHost.contextOf(placedFlagToolId), flagId, message),
+    removeFlag: (flagId) => requestFlagRemoval(toolHost.contextOf(placedFlagToolId), flagId),
     removeLength: (lengthId) => requestLengthRemoval(toolHost.contextOf(geodesicLengthToolId), lengthId),
     removeAngle: (angleId) => requestAngleRemoval(toolHost.contextOf(geodesicProtractorToolId), angleId),
-    removePlacedFlags,
     removeGeodesicRuntimeObjects,
-    syncSelectableHitboxDebug: requestSelectableHitboxDebugSync,
     clearProtractorToolFeedback,
   });
 
@@ -834,7 +832,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     dispatch: dispatchRuntimeCommand,
     clients: createDefaultClientModules(),
     core: {
-      placeFlag: tryPlaceFlagFromAim,
       carry: (primaryActionRequested) => {
         if (primaryActionRequested) finishGeodesicCannonCarry();
         return primaryActionRequested;
@@ -1288,8 +1285,8 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       toolHost.afterStep();
       afterCarryWorldStep();
     });
-    // Crossings, lengths and angles follow from what changed: the engine's derive pass wrote them, and the label runtimes read them from the journal.
-    frameErrorGuard.runPhase("label runtimes", syncLabelRuntimesFromJournal);
+    // Crossings, lengths and angles follow from what changed: the engine's derive pass wrote them, and the runtimes of flags and labels read what was written from the journal.
+    frameErrorGuard.runPhase("tool object runtimes", syncToolObjectRuntimesFromJournal);
     const frameAfterObjectsMs = performance.now();
     const frameBeforeCameraMs = frameAfterObjectsMs;
 

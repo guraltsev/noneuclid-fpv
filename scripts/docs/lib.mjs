@@ -364,8 +364,6 @@ export const legacyWorldWriters = [
   "render/three/creatures/geodesicMarmotView.ts",
   "render/three/creatures/simpleGeoCreatureView.ts",
   "render/three/geometryCommit.ts",
-  "render/three/runtimeObjectActions.ts",
-  "render/three/toolObjectRuntimes.ts",
   "runtime/worldGeometryComputedObjects.ts",
 ];
 

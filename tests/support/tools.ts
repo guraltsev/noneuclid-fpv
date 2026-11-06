@@ -13,7 +13,6 @@ import { createPaletteDefinition, type PaletteDefinition } from "../../src/ui/pa
 export function createTestToolsById(): ToolsById {
   return createToolsById(
     createCoreToolDescriptors({
-      placeFlag: () => undefined,
       carry: () => false,
       rotate: () => false,
       aim: () => false,

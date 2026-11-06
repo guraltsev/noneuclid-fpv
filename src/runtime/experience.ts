@@ -9,16 +9,17 @@ import { geodesicEmittersClient, geodesicEmittersModule } from "../modules/geode
 import { geodesicMeasurementsClient, geodesicMeasurementsModule } from "../modules/geodesicMeasurements";
 import { curveShorteningModule } from "../modules/curveShortening";
 import { geodesicModelClient, geodesicModelModule } from "../modules/geodesicModel";
+import { placedFlagsClient, placedFlagsModule } from "../modules/placedFlags";
 
 /** The time of the default experience (design 012 P8): ticks of \(1/90\) s, up to \(1/30\) s, taking at most a third of the last half second of real time before they grow. The share is a starting value. */
 export const defaultSimulationClockOptions: SimulationClockOptions = { tickSeconds: 1 / 90, maxTickSeconds: 1 / 30, tickBudgetShare: 1 / 3 };
 
 /** The world modules of the default experience. */
 export function createDefaultWorldModules(): readonly AnyModuleDefinition[] {
-  return [geodesicModelModule(), geodesicMeasurementsModule(), geodesicEmittersModule(), carryModule(), curveShorteningModule()];
+  return [geodesicModelModule(), geodesicMeasurementsModule(), geodesicEmittersModule(), carryModule(), curveShorteningModule(), placedFlagsModule()];
 }
 
 /** The client parts of the default experience's modules (only the modules with tools have one). */
 export function createDefaultClientModules(): readonly ModuleClient[] {
-  return [geodesicModelClient(), geodesicEmittersClient(), geodesicMeasurementsClient()];
+  return [geodesicModelClient(), geodesicEmittersClient(), geodesicMeasurementsClient(), placedFlagsClient()];
 }

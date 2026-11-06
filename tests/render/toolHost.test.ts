@@ -7,10 +7,11 @@
  */
 import * as THREE from "three";
 import { describe, expect, it, vi } from "vitest";
-import type { CommandResult, ModuleClient, ToolDescriptor } from "../../src/engine/moduleTypes";
+import type { CommandResult, EngineCommandBase, ModuleClient, ToolDescriptor } from "../../src/engine/moduleTypes";
 import type { RuntimeToolId } from "../../src/glue/toolIds";
 import type { AimTarget } from "../../src/interaction/aimTarget";
 import { applyRuntimeCommand } from "../../src/runtime/applyRuntimeCommand";
+import { createDefaultClientModules, createDefaultWorldModules } from "../../src/runtime/experience";
 import { geodesicEmittersClient, geodesicEmittersModule } from "../../src/modules/geodesicEmitters";
 import { geodesicModelModule } from "../../src/modules/geodesicModel";
 import { createToolHost, type CoreToolActions } from "../../src/render/three/toolHost";
@@ -56,7 +57,6 @@ function setup(options: { readonly available?: boolean } = {}) {
   };
   const client: ModuleClient = { tools: [probe] };
   const core: CoreToolActions = {
-    placeFlag: vi.fn(),
     carry: vi.fn(() => false),
     rotate: vi.fn(() => false),
     aim: vi.fn(() => false),
@@ -84,15 +84,11 @@ function setup(options: { readonly available?: boolean } = {}) {
 
 describe("the tool host dispatch", () => {
   it("gives the primary action to the selected tool's descriptor when no menu is open", () => {
-    const { host, select, core, log } = setup();
-
-    select("placedFlags/flag");
-    expect(host.dispatchPrimaryAction(false, false)).toBe(false);
-    expect(core.placeFlag).not.toHaveBeenCalled();
-    expect(host.dispatchPrimaryAction(true, false)).toBe(true);
-    expect(core.placeFlag).toHaveBeenCalledTimes(1);
+    const { host, select, log } = setup();
 
     select(probeId);
+    expect(host.dispatchPrimaryAction(false, false)).toBe(false);
+    expect(log.primary).toBe(0);
     expect(host.dispatchPrimaryAction(true, false)).toBe(true);
     expect(log.primary).toBe(1);
   });
@@ -216,11 +212,10 @@ describe("the tool lookup", () => {
       "geodesicEmitters/aim",
       "geodesicEmitters/carry",
       "geodesicEmitters/rotate",
-      "placedFlags/flag",
       probeId,
     ]);
-    const twice: ModuleClient = { tools: [host.toolsById.get("placedFlags/flag") as ToolDescriptor] };
-    expect(() => createToolHost({ ...dummyDeps(), clients: [twice] })).toThrow("the tool placedFlags/flag is described twice");
+    const twice: ModuleClient = { tools: [host.toolsById.get("geodesicEmitters/carry") as ToolDescriptor] };
+    expect(() => createToolHost({ ...dummyDeps(), clients: [twice] })).toThrow("the tool geodesicEmitters/carry is described twice");
   });
 });
 
@@ -298,6 +293,93 @@ describe("a tool's answer arriving later", () => {
   });
 });
 
+describe("a tool switch with a command of the new tools in flight", () => {
+  function emitterScene() {
+    const world = compileLargePortalWorld();
+    const engine = createTestEngine({ getWorld: () => world, modules: createDefaultWorldModules() });
+    const deps = dummyDeps();
+    const dispatch = (command: RuntimeCommand): void => void applyRuntimeCommand(deps.session, command);
+    const run = (command: EngineCommandBase): { readonly emitterId: string; readonly arcId: string } => {
+      const ticket = engine.submit("local", command);
+      engine.step(0);
+      const result = engine.resultOf(ticket);
+      engine.endFrame();
+      if (!result?.ok) throw new Error("refused");
+      return result.value as never;
+    };
+    const { emitterId } = run({ kind: "geodesicEmitters/place", cellId: "a", point: { x: 2, y: 2.5, z: 0 }, yawRadians: 0 } as EngineCommandBase);
+    const { arcId: east } = run({ kind: "geodesicEmitters/shoot", emitterId, yawRadians: 0, lengthMeters: 2 } as EngineCommandBase);
+    const { arcId: north } = run({ kind: "geodesicEmitters/shoot", emitterId, yawRadians: Math.PI / 2, lengthMeters: 2 } as EngineCommandBase);
+    const aim: { target?: AimTarget } = {};
+    const host = createToolHost({ ...deps, engine, dispatch, clients: createDefaultClientModules(), resolveCurrentAimTarget: () => aim.target });
+    host.setFrame({ ray: { origin: new THREE.Vector3(), direction: new THREE.Vector3(1, 0, 0), quaternion: new THREE.Quaternion() }, yawDeltaRadians: 0, primaryActionRequested: true });
+    const frame = (): void => {
+      engine.step(0);
+      host.afterStep();
+      engine.endFrame();
+    };
+    const eye = { localEyePosition: { x: 1, y: 1, z: 1.6 } };
+    const emitter = engine.registry.get(emitterId);
+    const press = (target: Partial<AimTarget>): boolean => {
+      aim.target = { kind: "object", cellId: "a", localPoint: { x: 2, y: 2.5, z: 1 }, ...eye, ...target } as AimTarget;
+      return host.dispatchPrimaryAction(true, false);
+    };
+    return { engine, dispatch, frame, press, emitter, east, north, session: deps.session };
+  }
+
+  it("keeps the tool the person switched to when the sign's answer arrives", () => {
+    const { engine, dispatch, frame, press, session } = emitterScene();
+    dispatch({ kind: "select-tool", toolId: "placedFlags/flag" });
+
+    press({ kind: "floor", localPoint: { x: 4, y: 4, z: 0 } });
+    press({ kind: "floor", localPoint: { x: 1, y: 4, z: 0 } });
+    dispatch({ kind: "select-tool", toolId: "geodesicMeasurements/length" });
+    frame();
+
+    expect(engine.registry.getObjectsOfKind("placedFlags/flag")).toHaveLength(1);
+    expect(session.get().menuState.selectedTool).toBe("geodesicMeasurements/length");
+  });
+
+  it("keeps the tool the person switched to when the length's answer arrives", () => {
+    const { engine, dispatch, frame, press, east, session } = emitterScene();
+    dispatch({ kind: "select-tool", toolId: "geodesicMeasurements/length" });
+    const object = engine.registry.getSegmentsOfGeodesic(east)[0]!;
+
+    press({ object });
+    press({ object });
+    dispatch({ kind: "select-tool", toolId: "placedFlags/flag" });
+    frame();
+
+    expect(engine.registry.getObjectsOfKind("geodesicMeasurements/length")).toHaveLength(1);
+    expect(session.get().menuState.selectedTool).toBe("placedFlags/flag");
+  });
+
+  it("keeps the tool the person switched to when the protractor's answer arrives", () => {
+    const { engine, dispatch, frame, press, emitter, east, north, session } = emitterScene();
+    dispatch({ kind: "select-tool", toolId: "geodesicMeasurements/protractor" });
+
+    press({ object: emitter });
+    press({ object: emitter, geodesicEmitterGeodesicId: east });
+    press({ object: emitter, geodesicEmitterGeodesicId: north });
+    press({ object: emitter, geodesicEmitterGeodesicId: north });
+    dispatch({ kind: "select-tool", toolId: "placedFlags/flag" });
+    frame();
+
+    expect(engine.registry.getObjectsOfKind("geodesicMeasurements/angle")).toHaveLength(1);
+    expect(session.get().menuState.selectedTool).toBe("placedFlags/flag");
+  });
+
+  it("ends the tool that is still selected when its answer arrives", () => {
+    const { dispatch, frame, press, session } = emitterScene();
+    dispatch({ kind: "select-tool", toolId: "placedFlags/flag" });
+
+    press({ kind: "floor", localPoint: { x: 4, y: 4, z: 0 } });
+    frame();
+
+    expect(session.get().menuState.selectedTool).toBe("none");
+  });
+});
+
 describe("what the host tells a tool about the aim", () => {
   function hostAiming(target: AimTarget, direction = new THREE.Vector3(1, 0, 0)) {
     const host = createToolHost({ ...dummyDeps(), resolveCurrentAimTargets: () => [target], resolveCurrentAimTarget: () => target });
@@ -344,7 +426,7 @@ function dummyDeps(): Parameters<typeof createToolHost>[0] {
     session,
     dispatch: noop,
     clients: [],
-    core: { placeFlag: noop, carry: () => false, rotate: () => false, aim: () => false, emitterModeResult: noop },
+    core: { carry: () => false, rotate: () => false, aim: () => false, emitterModeResult: noop },
     resolveCurrentAimTargets: () => [],
     resolveCurrentAimTarget: () => undefined,
     targetIsWithinInteractionRange: () => true,

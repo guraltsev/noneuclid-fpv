@@ -60,7 +60,7 @@ export function updateGeodesicIntersectionObjects(registry: RuntimeObjectRegistr
   return intersections;
 }
 
-/** Returns the last known intersection marker with this id even if it has since disappeared from the registry, or `undefined`. */
+/** Returns the last known intersection marker with this id even if it has since disappeared from the registry, or `undefined`. The geodesic model forgets a vanished marker at its next pass: this tells what vanished in the pass that just ran. */
 export function getRememberedGeodesicIntersectionObject(
   registry: RuntimeObjectRegistry,
   intersectionId: string,

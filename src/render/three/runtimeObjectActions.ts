@@ -1,10 +1,10 @@
 /**
- * Actions the player performs on runtime objects through the aim: placing and editing signs, the primary interaction and
+ * Actions the player performs on runtime objects through the aim: editing signs, the primary interaction and
  * context menu of the focused object, going home, resetting the world, and the debug pose helpers.
  *
  * It owns no state: menu and tool state are read from the session, the pose from the engine and changed by commands through `dispatch`;
- * the registry and the tool-object runtimes are mutated directly. Poses are cell-local meters; yaws are radians about +z
- * (the debug helpers take degrees). Ids of new objects come from the engine.
+ * the world is read here and changed by engine commands. Poses are cell-local meters; yaws are radians about +z
+ * (the debug helpers take degrees).
  */
 import type { ObjectActionEntry } from "../../engine/moduleTypes";
 import { localParticipantId, publishLocalPlayerPose, readLocalPlayerPose, type WorldEngine } from "../../engine/worldEngine";
@@ -16,10 +16,10 @@ import type { AimTarget } from "../../interaction/aimTarget";
 import type { ClientSession } from "../../runtime/clientSession";
 import { getEmitterGeodesicIds } from "../../world-objects/geodesic/endpoints";
 import type { RuntimeCommand, ShowGeometryComputerActionsPayload } from "../../runtime/runtimeCommands";
-import { placeFlagAtFloorPoint, updatePlacedFlagMessage } from "../../world-objects/placedFlags";
+import { sanitizePlacedFlagMessage } from "../../world-objects/placedFlags";
 import { geodesicMeasurementsModuleId, type GeodesicMeasurementsRemoveAngleCommand, type GeodesicMeasurementsRemoveLengthCommand } from "../../modules/geodesicMeasurements/api";
-import type { PlacedFlagObject } from "../../world-objects/toolObjects";
-import type { LegacyWorldWriter, RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
+import type { PlacedFlagsRemoveCommand } from "../../modules/placedFlags/api";
+import type { RuntimeObjectReader, RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
 import type { PlainWorldObject } from "../../world-objects/worldObjectOwner";
 import type { PlayerPoseDebugDump } from "./appDebugHelpers";
 import type { GeodesicMarmotRuntime } from "./creatures/geodesicMarmotView";
@@ -33,12 +33,12 @@ import type * as THREE from "three";
 export interface RuntimeObjectActionsDeps {
   /** The shell session; menu, tool, serial and pose state are read from it. */
   readonly session: ClientSession;
-  /** The world engine: the player's pose, the object ids and the pose writes of reset and teleport. */
+  /** The world engine: the player's pose, the pose writes of reset and teleport, and the removals of a world reset. */
   readonly engine: WorldEngine;
   /** Runs a command through the shell's one command path. */
   dispatch(command: RuntimeCommand): void;
-  /** Registry of runtime objects; mutated directly. */
-  readonly runtimeObjectRegistry: LegacyWorldWriter;
+  /** Registry of runtime objects, read only. */
+  readonly runtimeObjectRegistry: RuntimeObjectReader;
   /** The active compiled world; read on every call because geometry commits replace it. */
   getWorld(): CompiledCellComplex;
   /** Feature toggles; decide which tools may open an object's menu. */
@@ -73,21 +73,16 @@ export interface RuntimeObjectActionsDeps {
   objectActionsFor(objectKind: string, objectId: string): readonly ObjectActionEntry[];
   /** Menu options of the geometry computer object with this id. */
   createGeometryComputerMenuOptions(objectId: string): ShowGeometryComputerActionsPayload;
-  /** Builds or refreshes the drawn copy of a sign. */
-  syncPlacedFlagRuntime(flag: PlacedFlagObject): void;
-  /** Drops the drawn copy of a sign. */
-  removePlacedFlagRuntime(flagId: string): void;
-  /** Drops every drawn sign and its registry object (world reset). */
-  removePlacedFlags(): void;
+  /** Asks the world to change the message of a sign. */
+  setFlagMessage(flagId: string, message: string): void;
+  /** Asks the world to remove a sign. */
+  removeFlag(flagId: string): void;
   /** Asks the world to remove a length, after a click on its label. */
   removeLength(lengthId: string): void;
   /** Asks the world to remove an angle, after a click on its label. */
   removeAngle(angleId: string): void;
   /** Drops every geodesic object and clears the cannon tool state (world reset). */
   removeGeodesicRuntimeObjects(): void;
-  /** Requests a sync of the portal instances of runtime objects after registry changes; the frame performs it. */
-  /** Requests a refresh of the selectable-hitbox debug wireframes after registry changes; the frame performs it. */
-  syncSelectableHitboxDebug(): void;
   /** Hides the protractor tool's feedback drawing. */
   clearProtractorToolFeedback(): void;
 }
@@ -102,8 +97,6 @@ export interface RuntimeObjectActions {
   backspaceEditingSignMessage(): void;
   /** Deletes the sign being edited and closes the menu. */
   deleteEditingSign(): void;
-  /** Places a sign where the aim ray meets the floor, when the aim target is a floor. */
-  tryPlaceFlagFromAim(ray?: RootAimRay): void;
   /** Primary action on the focused object (help, extend, remove a label); true when it did something. */
   tryUseFocusedObjectPrimaryInteraction(ray?: RootAimRay): boolean;
   /** Secondary action: closes an open menu, else opens the focused object's menu, else the main menu. */
@@ -146,14 +139,10 @@ export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): Runt
     getConnectedGeodesicIds,
     objectActionsFor,
     createGeometryComputerMenuOptions,
-    syncPlacedFlagRuntime,
-    removePlacedFlagRuntime,
-    removePlacedFlags,
     removeGeodesicRuntimeObjects,
     clearProtractorToolFeedback,
   } = deps;
   const dispatchRuntimeCommand = deps.dispatch;
-  const requestSelectableHitboxDebugSync = deps.syncSelectableHitboxDebug;
   const currentMenuState = () => session.get().menuState;
 
   function appendEditingSignCharacter(character: string): void {
@@ -184,52 +173,22 @@ export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): Runt
       return;
     }
 
-    const flag = runtimeObjectRegistry.get(editState.flagId);
-    if (flag?.kind === "placedFlags/flag") {
-      runtimeObjectRegistry.remove(editState.flagId);
-      removePlacedFlagRuntime(editState.flagId);
+    if (runtimeObjectRegistry.get(editState.flagId)?.kind === "placedFlags/flag") {
+      deps.removeFlag(editState.flagId);
     }
     dispatchRuntimeCommand({ kind: "close-menu" });
   }
 
   function setEditingSignMessage(flagId: string, message: string): void {
-    const flag = runtimeObjectRegistry.get(flagId);
-    if (flag?.kind !== "placedFlags/flag") {
+    if (runtimeObjectRegistry.get(flagId)?.kind !== "placedFlags/flag") {
       dispatchRuntimeCommand({ kind: "close-menu" });
       return;
     }
 
-    const nextFlag = updatePlacedFlagMessage(flag, message);
-    runtimeObjectRegistry.update(nextFlag);
-    syncPlacedFlagRuntime(nextFlag);
-    dispatchRuntimeCommand({ kind: "set-editing-sign-message", message: nextFlag.message });
-  }
-
-  function tryPlaceFlagFromAim(ray?: RootAimRay): void {
-    if (!ray) {
-      return;
-    }
-
-    const target = resolveCurrentAimTarget(ray);
-    if (target?.kind !== "floor") {
-      return;
-    }
-
-    const result = placeFlagAtFloorPoint({
-      world: activeWorld(),
-      registry: runtimeObjectRegistry,
-      cellId: target.cellId,
-      eyePosition: target.localEyePosition,
-      floorPoint: target.localPoint,
-      flagType: currentMenuState().placeFlagOptions.flagType,
-      id: engine.ids.next("placedFlags/flag"),
-    });
-
-    if (result.placed && result.object) {
-      syncPlacedFlagRuntime(result.object);
-      dispatchRuntimeCommand({ kind: "clear-selected-tool" });
-      requestSelectableHitboxDebugSync();
-    }
+    // The page holds the text, so the next key builds on this one before the world has answered.
+    const sanitized = sanitizePlacedFlagMessage(message);
+    deps.setFlagMessage(flagId, sanitized);
+    dispatchRuntimeCommand({ kind: "set-editing-sign-message", message: sanitized });
   }
 
   function resetPlayerToHome(): void {
@@ -302,9 +261,12 @@ export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): Runt
     for (const owner of staticAssetOwners) {
       owner.reset();
     }
-    removePlacedFlags();
     removeGeodesicRuntimeObjects();
     // The reset's frame runs a step, which applies these.
+    for (const flag of runtimeObjectRegistry.getObjectsOfKind("placedFlags/flag")) {
+      const removal: PlacedFlagsRemoveCommand = { kind: "placedFlags/remove", flagId: flag.id };
+      engine.submit(localParticipantId, removal);
+    }
     for (const length of runtimeObjectRegistry.getObjectsOfKind("geodesicMeasurements/length")) {
       const removal: GeodesicMeasurementsRemoveLengthCommand = { kind: "geodesicMeasurements/removeLength", lengthId: length.id };
       engine.submit(localParticipantId, removal);
@@ -466,7 +428,6 @@ export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): Runt
     appendEditingSignCharacter,
     backspaceEditingSignMessage,
     deleteEditingSign,
-    tryPlaceFlagFromAim,
     tryUseFocusedObjectPrimaryInteraction,
     showObjectPage,
     openContextMenuFromAim,
