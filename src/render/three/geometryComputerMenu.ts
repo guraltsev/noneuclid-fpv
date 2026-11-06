@@ -32,6 +32,7 @@ export function createGeometryComputerMenu(deps: GeometryComputerMenuDeps) {
     const state = geometrySession.state;
     const current = state.current.kind === "torus-skew" ? state.current : undefined;
     const target = state.target.kind === "torus-skew" ? state.target : undefined;
+    const initial = state.initial.kind === "torus-skew" ? state.initial : undefined;
     const pending = deps.session.get().menuState.geometryComputerOptions;
 
     return {
@@ -42,6 +43,8 @@ export function createGeometryComputerMenu(deps: GeometryComputerMenuDeps) {
       currentDepthMeters: current?.depthMeters,
       targetSkewXMeters: pending?.targetSkewXMeters ?? target?.skewXMeters,
       targetDepthMeters: pending?.targetDepthMeters ?? target?.depthMeters,
+      startSkewXMeters: initial?.skewXMeters,
+      startDepthMeters: initial?.depthMeters,
     };
   }
 

@@ -121,6 +121,8 @@ export interface RuntimeMenuState {
     readonly currentDepthMeters?: number;
     readonly targetSkewXMeters?: number;
     readonly targetDepthMeters?: number;
+    readonly startSkewXMeters?: number;
+    readonly startDepthMeters?: number;
   };
   /** Payload of the tutorial page; pageIndex is always within pages. */
   readonly tutorialOptions?: {
@@ -313,6 +315,8 @@ export function showRuntimeMenuGeometryComputerActions(
     readonly currentDepthMeters?: number;
     readonly targetSkewXMeters?: number;
     readonly targetDepthMeters?: number;
+    readonly startSkewXMeters?: number;
+    readonly startDepthMeters?: number;
   },
 ): RuntimeMenuState {
   return {
@@ -327,6 +331,8 @@ export function showRuntimeMenuGeometryComputerActions(
       currentDepthMeters: options.currentDepthMeters,
       targetSkewXMeters: options.targetSkewXMeters,
       targetDepthMeters: options.targetDepthMeters,
+      startSkewXMeters: options.startSkewXMeters,
+      startDepthMeters: options.startDepthMeters,
     },
   };
 }

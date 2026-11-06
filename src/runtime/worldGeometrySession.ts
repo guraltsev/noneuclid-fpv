@@ -53,6 +53,8 @@ export interface LiveGeometryDebugState {
   readonly current: WorldDeformationState;
   /** State the session is stepping toward; equal to current when idle. */
   readonly target: WorldDeformationState;
+  /** State the session started from; the geometry computer compares the torus with it. */
+  readonly initial: WorldDeformationState;
   /** True while a background build has been requested and not yet answered. */
   readonly buildInFlight: boolean;
   /** Duration of the most recent successful build, request to completion. */
@@ -277,6 +279,7 @@ export function createWorldGeometrySession(options: CreateWorldGeometrySessionOp
         deformationKind: current.kind,
         current,
         target,
+        initial: options.initialSnapshot.deformation,
         buildInFlight,
         lastBuildMs,
         lastCommitMs,

@@ -22,7 +22,7 @@ startingQuestionCube("torus-room", {
   turn: -18,
   goalPages: [{
     title: "Goal",
-    body: "Cross opposite portals in the torus room and watch how the room wraps around. Then use the computer to change the world deformation.",
+    body: "Cross opposite portals in the torus room and watch how the room wraps around. Then use the computer to change the world deformation. Set A to 15 and watch the floor: it comes back, because that is the same torus.",
   }],
 });
 

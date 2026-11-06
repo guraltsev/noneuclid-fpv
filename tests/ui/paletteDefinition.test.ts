@@ -167,6 +167,31 @@ describe("createPaletteDefinition", () => {
     expect((changed.content as { goAction: { disabled: boolean } }).goAction.disabled).toBe(false);
   });
 
+  it("shows the moduli of current and target", () => {
+    const state = createRuntimeMenuState({ selectedWorldId: "torus" });
+    const content = createTestPaletteDefinition(showRuntimeMenuGeometryComputerActions(state, {
+      computerId: "torus-geometry-computer",
+      available: true,
+      widthMeters: 15,
+      currentSkewXMeters: 0,
+      currentDepthMeters: 15,
+      targetSkewXMeters: 15,
+      targetDepthMeters: 15,
+      startSkewXMeters: 0,
+      startDepthMeters: 15,
+    })).content as { currentModuliLabel: string; targetModuliLabel: string };
+    expect(content.currentModuliLabel).toContain("square");
+    expect(content.currentModuliLabel).toContain("starting torus");
+    expect(content.targetModuliLabel).toContain("1 Dehn twist");
+
+    const unavailable = createTestPaletteDefinition(showRuntimeMenuGeometryComputerActions(state, {
+      computerId: "torus-geometry-computer",
+      available: false,
+    })).content as { currentModuliLabel: string; targetModuliLabel: string };
+    expect(unavailable.currentModuliLabel).toBe("");
+    expect(unavailable.targetModuliLabel).toBe("");
+  });
+
   it("keeps the edit-sign flag id and message, capped at the placed-flag message limit", () => {
     const content = createTestPaletteDefinition(showRuntimeMenuEditSign(
       createRuntimeMenuState({ selectedWorldId: "cube" }),

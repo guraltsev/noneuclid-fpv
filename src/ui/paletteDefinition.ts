@@ -5,6 +5,12 @@
  */
 import type { ObjectActionEntry } from "../engine/moduleTypes";
 import { appConfigCatalog, getEnabledMainTools, type AppConfig, type ConfigurableToolId } from "../glue/appConfig";
+import {
+  describeTorusRelation,
+  reducedTorusModulus,
+  torusShape,
+  type TorusLatticeParameters,
+} from "../cell-complex/deformations/torusModuli";
 import { formatBodyForInputMode } from "./inputModeText";
 import { worldCatalog } from "../authoring/worldCatalog";
 import { helpHubHomeGuidance } from "../world-objects/helpHubCopy";
@@ -134,6 +140,10 @@ export interface GeometryComputerActionsPaletteContent {
   readonly computerId: string;
   readonly available: boolean;
   readonly statusLabel: string;
+  /** Shape and relation to the start of the current torus; empty when unavailable. */
+  readonly currentModuliLabel: string;
+  /** Shape and relation to the start of the target torus; empty when unavailable. */
+  readonly targetModuliLabel: string;
   readonly widthMeters: number;
   /** Currently committed skew a and depth b, clamped to limits and rounded to integer meters. */
   readonly current: {
@@ -566,12 +576,27 @@ function createGeometryComputerActionsContent(
     ? `Current (${formatMeters(currentA)}, ${formatMeters(currentB)}) / target (${formatMeters(targetA)}, ${formatMeters(targetB)})`
     : "World deformation is only available in the torus world.";
   const halfWidthStep = Math.round(widthMeters / 2);
+  const start = {
+    widthMeters,
+    skewXMeters: options.startSkewXMeters ?? options.currentSkewXMeters ?? currentA,
+    depthMeters: options.startDepthMeters ?? options.currentDepthMeters ?? currentB,
+  };
 
   return {
     kind: "geometry-computer-actions",
     computerId: options.computerId,
     available,
     statusLabel,
+    currentModuliLabel: available
+      ? formatTorusModuliLabel(
+          "Current",
+          { widthMeters, skewXMeters: options.currentSkewXMeters ?? currentA, depthMeters: options.currentDepthMeters ?? currentB },
+          start,
+        )
+      : "",
+    targetModuliLabel: available
+      ? formatTorusModuliLabel("Target", { widthMeters, skewXMeters: targetA, depthMeters: targetB }, start)
+      : "",
     widthMeters,
     current: {
       aMeters: currentA,
@@ -602,6 +627,11 @@ function createGeometryComputerActionsContent(
       disabled: !available || (currentA === targetA && currentB === targetB),
     },
   };
+}
+
+function formatTorusModuliLabel(prefix: string, state: TorusLatticeParameters, start: TorusLatticeParameters): string {
+  const modulus = reducedTorusModulus(state);
+  return `${prefix}: ${torusShape(modulus)}, modulus ${modulus.re.toFixed(2)} + ${modulus.im.toFixed(2)}i. ${describeTorusRelation(state, start)}`;
 }
 
 function createGeodesicCannonEntries(

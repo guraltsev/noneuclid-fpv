@@ -31,6 +31,8 @@ export interface ShowGeometryComputerActionsPayload {
   readonly currentDepthMeters?: number;
   readonly targetSkewXMeters?: number;
   readonly targetDepthMeters?: number;
+  readonly startSkewXMeters?: number;
+  readonly startDepthMeters?: number;
 }
 
 /**

@@ -48,6 +48,22 @@ export function buildGeometryComputerActionsContent(
     wordBreak: "break-word",
   }));
 
+  // Diagram colours: current white, target green.
+  for (const [label, color] of [
+    [content.currentModuliLabel, "#f8fafc"],
+    [content.targetModuliLabel, "#34d399"],
+  ] as const) {
+    panel.add(new Text({
+      text: label,
+      fontSize: 16,
+      fontWeight: "medium",
+      color,
+      fill: color,
+      flexShrink: 1,
+      wordBreak: "break-word",
+    }));
+  }
+
   const presetGrid = new Container({
     width: "100%",
     flexDirection: "column",
