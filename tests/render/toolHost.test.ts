@@ -158,7 +158,7 @@ describe("the tool host and a tool's commands", () => {
     expect(log.palette).toBe(1);
 
     expect(host.promptOf(probeId)).toBe("state 1");
-    expect(host.promptOf("placedFlags/flag")).toBeUndefined();
+    expect(host.promptOf("geodesicEmitters/carry")).toBeUndefined();
   });
 
   it("starts the tool with the object it was started from", () => {
