@@ -1,14 +1,13 @@
 /**
- * Actions the player performs on runtime objects through the aim: placing and editing signs, measuring a geodesic,
- * the protractor, the primary interaction and context menu of the focused object, going home, resetting the world, and the
- * debug pose helpers.
+ * Actions the player performs on runtime objects through the aim: placing and editing signs, the primary interaction and
+ * context menu of the focused object, going home, resetting the world, and the debug pose helpers.
  *
  * It owns no state: menu and tool state are read from the session, the pose from the engine and changed by commands through `dispatch`;
  * the registry and the tool-object runtimes are mutated directly. Poses are cell-local meters; yaws are radians about +z
  * (the debug helpers take degrees). Ids of new objects come from the engine.
  */
 import type { ObjectActionEntry } from "../../engine/moduleTypes";
-import { publishLocalPlayerPose, readLocalPlayerPose, type WorldEngine } from "../../engine/worldEngine";
+import { localParticipantId, publishLocalPlayerPose, readLocalPlayerPose, type WorldEngine } from "../../engine/worldEngine";
 import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex";
 import { isRuntimeToolEnabled, type AppConfig } from "../../glue/appConfig";
 import { yawRigidTransform3 } from "../../math/rigidTransform3";
@@ -17,20 +16,9 @@ import type { AimTarget } from "../../interaction/aimTarget";
 import type { ClientSession } from "../../runtime/clientSession";
 import { getEmitterGeodesicIds } from "../../world-objects/geodesic/endpoints";
 import type { RuntimeCommand, ShowGeometryComputerActionsPayload } from "../../runtime/runtimeCommands";
-import { createMeasuredGeodesicLengthObject } from "../../world-objects/measureLengthTool";
 import { placeFlagAtFloorPoint, updatePlacedFlagMessage } from "../../world-objects/placedFlags";
-import {
-  createProtractorAngleObject,
-  protractorSelectionsUseDifferentGeodesics,
-  resolveProtractorCenterSelection,
-  type ProtractorCenterSelection,
-} from "../../world-objects/protractorTool";
-import type {
-  MeasuredGeodesicLengthObject,
-  PlacedFlagObject,
-  ProtractorAngleObject,
-  ProtractorDirectedGeodesic,
-} from "../../world-objects/toolObjects";
+import { geodesicMeasurementsModuleId, type GeodesicMeasurementsRemoveAngleCommand, type GeodesicMeasurementsRemoveLengthCommand } from "../../modules/geodesicMeasurements/api";
+import type { PlacedFlagObject } from "../../world-objects/toolObjects";
 import type { LegacyWorldWriter, RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
 import type { PlainWorldObject } from "../../world-objects/worldObjectOwner";
 import type { PlayerPoseDebugDump } from "./appDebugHelpers";
@@ -77,8 +65,6 @@ export interface RuntimeObjectActionsDeps {
   findFocusedRuntimeObject(ray?: RootAimRay): FocusedRuntimeObject | undefined;
   /** Asks the world to lengthen a free geodesic; false, asking nothing, when a click on it means nothing. */
   extendGeodesic(arcId: string): boolean;
-  /** Display name ("G1", ...) of a geodesic. */
-  getGeodesicDisplayName(geodesicId: string): string;
   /** Maps geodesic ids to their display names for menus. */
   getGeodesicLabelsById(geodesicIds: readonly string[]): Readonly<Record<string, string>>;
   /** Ids among the given geodesics that are connected. */
@@ -91,34 +77,19 @@ export interface RuntimeObjectActionsDeps {
   syncPlacedFlagRuntime(flag: PlacedFlagObject): void;
   /** Drops the drawn copy of a sign. */
   removePlacedFlagRuntime(flagId: string): void;
-  /** Builds or refreshes the drawn copy of a length measurement. */
-  syncMeasuredGeodesicLengthRuntime(measurement: MeasuredGeodesicLengthObject): void;
-  /** Drops the drawn copy of a length measurement. */
-  removeMeasuredGeodesicLengthRuntime(measurementId: string): void;
-  /** Builds or refreshes the drawn copy of a protractor angle. */
-  syncProtractorAngleRuntime(angle: ProtractorAngleObject): void;
-  /** Drops the drawn copy of a protractor angle. */
-  removeProtractorAngleRuntime(angleId: string): void;
   /** Drops every drawn sign and its registry object (world reset). */
   removePlacedFlags(): void;
-  /** Drops every length measurement (world reset). */
-  removeMeasuredGeodesicLengths(): void;
-  /** Drops every protractor angle (world reset). */
-  removeProtractorAngles(): void;
+  /** Asks the world to remove a length, after a click on its label. */
+  removeLength(lengthId: string): void;
+  /** Asks the world to remove an angle, after a click on its label. */
+  removeAngle(angleId: string): void;
   /** Drops every geodesic object and clears the cannon tool state (world reset). */
   removeGeodesicRuntimeObjects(): void;
   /** Requests a sync of the portal instances of runtime objects after registry changes; the frame performs it. */
   /** Requests a refresh of the selectable-hitbox debug wireframes after registry changes; the frame performs it. */
   syncSelectableHitboxDebug(): void;
-  /** Re-syncs the desktop tool palette after tool or menu changes. */
-  syncDesktopPalette(): void;
   /** Hides the protractor tool's feedback drawing. */
   clearProtractorToolFeedback(): void;
-  /** Reads a protractor side (directed geodesic) off an aim target for the given centre. */
-  resolveProtractorDirectedSelectionFromAimTarget(
-    target: AimTarget | undefined,
-    center: ProtractorCenterSelection,
-  ): ProtractorDirectedGeodesic | undefined;
 }
 
 /** What the shell calls: the aim actions, the sign editing keys, going home and resetting, and the debug helpers. */
@@ -133,10 +104,6 @@ export interface RuntimeObjectActions {
   deleteEditingSign(): void;
   /** Places a sign where the aim ray meets the floor, when the aim target is a floor. */
   tryPlaceFlagFromAim(ray?: RootAimRay): void;
-  /** Measures the aimed geodesic (replacing an earlier measurement of it). */
-  tryUseMeasureLengthToolFromAim(ray?: RootAimRay): void;
-  /** Takes the next protractor step (vertex, first side, second side) from the aim. */
-  tryUseProtractorToolFromAim(ray?: RootAimRay): void;
   /** Primary action on the focused object (help, extend, remove a label); true when it did something. */
   tryUseFocusedObjectPrimaryInteraction(ray?: RootAimRay): boolean;
   /** Secondary action: closes an open menu, else opens the focused object's menu, else the main menu. */
@@ -175,24 +142,15 @@ export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): Runt
     logVerboseAimClick,
     findFocusedRuntimeObject,
     extendGeodesic,
-    getGeodesicDisplayName,
     getGeodesicLabelsById,
     getConnectedGeodesicIds,
     objectActionsFor,
     createGeometryComputerMenuOptions,
     syncPlacedFlagRuntime,
     removePlacedFlagRuntime,
-    syncMeasuredGeodesicLengthRuntime,
-    removeMeasuredGeodesicLengthRuntime,
-    syncProtractorAngleRuntime,
-    removeProtractorAngleRuntime,
     removePlacedFlags,
-    removeMeasuredGeodesicLengths,
-    removeProtractorAngles,
     removeGeodesicRuntimeObjects,
-    syncDesktopPalette,
     clearProtractorToolFeedback,
-    resolveProtractorDirectedSelectionFromAimTarget,
   } = deps;
   const dispatchRuntimeCommand = deps.dispatch;
   const requestSelectableHitboxDebugSync = deps.syncSelectableHitboxDebug;
@@ -274,45 +232,6 @@ export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): Runt
     }
   }
 
-  function tryUseMeasureLengthToolFromAim(ray?: RootAimRay): void {
-    if (!ray) {
-      return;
-    }
-
-    const target = resolveCurrentAimTarget(ray);
-    logVerboseAimClick(target);
-    if (!targetIsWithinInteractionRange(target) || target?.object?.kind !== "geodesicModel/segment") {
-      return;
-    }
-
-    const geodesicId = target.object.geodesicId;
-    const existing = runtimeObjectRegistry.getAll().find((object) =>
-      object.kind === "geodesicMeasurements/length" && object.geodesicId === geodesicId
-    );
-    const measurement = createMeasuredGeodesicLengthObject({
-      id: existing?.id ?? engine.ids.next("measured-geodesic-length"),
-      registry: runtimeObjectRegistry,
-      world: activeWorld(),
-      geodesicId,
-      playerCellId: readLocalPlayerPose(engine).cellId,
-      playerPoint: readLocalPlayerPose(engine).position,
-      label: getGeodesicDisplayName(geodesicId),
-      fallbackSegment: target.object,
-    });
-    if (!measurement) {
-      return;
-    }
-
-    if (existing) {
-      runtimeObjectRegistry.update(measurement);
-    } else {
-      runtimeObjectRegistry.add(measurement);
-    }
-    syncMeasuredGeodesicLengthRuntime(measurement);
-    dispatchRuntimeCommand({ kind: "clear-selected-tool" });
-    requestSelectableHitboxDebugSync();
-  }
-
   function resetPlayerToHome(): void {
     const startingPosition = activeWorld().startingPosition;
     const fallbackCell = activeWorld().cells[0];
@@ -385,64 +304,17 @@ export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): Runt
     }
     removePlacedFlags();
     removeGeodesicRuntimeObjects();
-    removeMeasuredGeodesicLengths();
-    removeProtractorAngles();
-  }
-
-  function tryUseProtractorToolFromAim(ray?: RootAimRay): void {
-    const protractor = session.get().protractorToolState;
-    if (!ray) {
-      return;
+    // The reset's frame runs a step, which applies these.
+    for (const length of runtimeObjectRegistry.getObjectsOfKind("geodesicMeasurements/length")) {
+      const removal: GeodesicMeasurementsRemoveLengthCommand = { kind: "geodesicMeasurements/removeLength", lengthId: length.id };
+      engine.submit(localParticipantId, removal);
     }
-
-    const target = resolveCurrentAimTarget(ray);
-    logVerboseAimClick(target);
-    if (!targetIsWithinInteractionRange(target)) {
-      return;
+    for (const angle of runtimeObjectRegistry.getObjectsOfKind("geodesicMeasurements/angle")) {
+      const removal: GeodesicMeasurementsRemoveAngleCommand = { kind: "geodesicMeasurements/removeAngle", angleId: angle.id };
+      engine.submit(localParticipantId, removal);
     }
-
-    if (!protractor.center) {
-      if (target?.object?.kind !== "geodesicEmitters/emitter" && target?.object?.kind !== "geodesicModel/crossing") {
-        return;
-      }
-
-      dispatchRuntimeCommand({ kind: "set-protractor-tool-state", state: {
-        center: resolveProtractorCenterSelection(runtimeObjectRegistry, target.object),
-      } });
-      syncDesktopPalette();
-      return;
-    }
-
-    const selected = resolveProtractorDirectedSelectionFromAimTarget(target, protractor.center);
-    if (!selected) {
-      return;
-    }
-
-    if (!protractor.first) {
-      dispatchRuntimeCommand({ kind: "set-protractor-tool-state", state: {
-        center: protractor.center,
-        first: selected,
-      } });
-      syncDesktopPalette();
-      return;
-    }
-
-    if (!protractorSelectionsUseDifferentGeodesics(protractor.first, selected)) {
-      return;
-    }
-
-    const angle = createProtractorAngleObject({
-      id: engine.ids.next("protractor-angle"),
-      center: protractor.center,
-      first: protractor.first,
-      second: selected,
-    });
-    runtimeObjectRegistry.add(angle);
-    syncProtractorAngleRuntime(angle);
-    dispatchRuntimeCommand({ kind: "set-protractor-tool-state", state: {} });
+    dispatchRuntimeCommand({ kind: "set-module-tool-state", moduleId: geodesicMeasurementsModuleId, state: undefined });
     clearProtractorToolFeedback();
-    dispatchRuntimeCommand({ kind: "clear-selected-tool" });
-    requestSelectableHitboxDebugSync();
   }
 
   function tryRemoveFocusedProtractorAngle(ray?: RootAimRay): boolean {
@@ -451,9 +323,7 @@ export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): Runt
       return false;
     }
 
-    runtimeObjectRegistry.remove(focused.object.id);
-    removeProtractorAngleRuntime(focused.object.id);
-    requestSelectableHitboxDebugSync();
+    deps.removeAngle(focused.object.id);
     return true;
   }
 
@@ -463,9 +333,7 @@ export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): Runt
       return false;
     }
 
-    runtimeObjectRegistry.remove(focused.object.id);
-    removeMeasuredGeodesicLengthRuntime(focused.object.id);
-    requestSelectableHitboxDebugSync();
+    deps.removeLength(focused.object.id);
     return true;
   }
 
@@ -599,8 +467,6 @@ export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): Runt
     backspaceEditingSignMessage,
     deleteEditingSign,
     tryPlaceFlagFromAim,
-    tryUseMeasureLengthToolFromAim,
-    tryUseProtractorToolFromAim,
     tryUseFocusedObjectPrimaryInteraction,
     showObjectPage,
     openContextMenuFromAim,

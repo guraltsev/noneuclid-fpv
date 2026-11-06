@@ -10,8 +10,6 @@ export type CoreToolId =
   | "none"
   | "aim"
   | "placedFlags/flag"
-  | "geodesicMeasurements/length"
-  | "geodesicMeasurements/protractor"
   | "geodesicEmitters/carry"
   | "geodesicEmitters/rotate"
   | "geodesicEmitters/aim";

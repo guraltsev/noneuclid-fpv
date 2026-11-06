@@ -24,8 +24,6 @@ const coreToolIdTable: Record<CoreToolId, true> = {
   none: true,
   aim: true,
   "placedFlags/flag": true,
-  "geodesicMeasurements/length": true,
-  "geodesicMeasurements/protractor": true,
   "geodesicEmitters/carry": true,
   "geodesicEmitters/rotate": true,
   "geodesicEmitters/aim": true,

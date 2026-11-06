@@ -19,9 +19,6 @@ import { getAimForwardVector, type RootAimRay } from "./rootAimRay";
 /** What the shell does for each of its own tools; the aim ray and the frame's input are passed in. */
 export interface CoreToolActions {
   placeFlag(ray: RootAimRay | undefined): void;
-  measureLength(ray: RootAimRay | undefined): void;
-  protractor(ray: RootAimRay | undefined): void;
-  protractorPrompt(): string;
   /** Finishes the carry when the primary action was requested; true then. */
   carry(primaryActionRequested: boolean): boolean;
   /** Updates the rotation from the frame's yaw; true when the primary action was requested. */
@@ -102,9 +99,6 @@ export function createToolHost(deps: ToolHostDeps): ToolHost {
   const toolsById = createToolsById(
     createCoreToolDescriptors({
       placeFlag: () => deps.core.placeFlag(frame.ray),
-      measureLength: () => deps.core.measureLength(frame.ray),
-      protractor: () => deps.core.protractor(frame.ray),
-      protractorPrompt: () => deps.core.protractorPrompt(),
       carry: () => deps.core.carry(frame.primaryActionRequested),
       rotate: () => deps.core.rotate(frame.yawDeltaRadians, frame.primaryActionRequested),
       aim: () => deps.core.aim(frame.primaryActionRequested, frame.ray),
@@ -141,6 +135,8 @@ export function createToolHost(deps: ToolHostDeps): ToolHost {
       objectKind: object?.kind ?? "floor",
       ...placeOf(target),
       withinRange: deps.targetIsWithinInteractionRange(target),
+      eyePoint: target.localEyePosition,
+      ...(target.geodesicEmitterGeodesicId === undefined ? {} : { emitterGeodesicId: target.geodesicEmitterGeodesicId }),
     };
     if (object?.kind !== "geodesicModel/segment" || object.halfRole === undefined) return pick;
     // A half-labelled segment stands for the endpoint role of its arc that it belongs to.
@@ -187,6 +183,7 @@ export function createToolHost(deps: ToolHostDeps): ToolHost {
         },
         selectObject: deps.selectObject,
         showObjectPage: deps.showObjectPage,
+        chosenFlagType: () => session.get().menuState.placeFlagOptions.flagType,
         read: engine.read,
         query: (token) => engine.query(token),
         showMessage: deps.showMessage,

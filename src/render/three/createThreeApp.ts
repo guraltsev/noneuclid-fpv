@@ -132,6 +132,8 @@ import {
 import { type FrameRenderSnapshot } from "./frameRenderSnapshot";
 import { createGeodesicRuntimeRenderSources } from "./geodesicCannonRenderer";
 import { requestGeodesicDeletion, requestGeodesicExtension, requestNewGeodesic } from "../../modules/geodesicEmitters/client";
+import { geodesicLengthToolId, geodesicMeasurementsModuleId, geodesicProtractorToolId } from "../../modules/geodesicMeasurements/api";
+import { requestAngleRemoval, requestLengthRemoval } from "../../modules/geodesicMeasurements/client";
 import { geodesicEmitterToolId } from "../../modules/geodesicEmitters/api";
 import { createGeodesicCannonTools } from "./geodesicCannonTools";
 import { createPortalFramePass } from "./portalFramePass";
@@ -363,7 +365,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       "portal-path-overlay-instances",
     ),
     cannonToolState: {},
-    protractorToolState: {},
     moduleToolState: {},
     pendingToolRequest: undefined,
   });
@@ -659,7 +660,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       session,
     });
 
-  const { updateGeodesicEmitterLabels, getGeodesicDisplayName, getGeodesicLabelsById } =
+  const { updateGeodesicEmitterLabels, getGeodesicLabelsById } =
     createGeodesicEmitterLabelController({
       engine,
       scene,
@@ -718,20 +719,15 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     resolveDesktopTooltipScreenPosition,
     getRuntimeObjectTooltipText,
     getWorldFocusMessageDefinition,
-    getGeodesicDisplayName,
   });
-  const { clearProtractorToolFeedback, resolveProtractorDirectedSelectionFromAimTarget } = aimFeedback;
+  const { clearProtractorToolFeedback } = aimFeedback;
 
   const {
     syncPlacedFlagRuntime,
     removePlacedFlagRuntime,
-    syncMeasuredGeodesicLengthRuntime,
     removeMeasuredGeodesicLengthRuntime,
-    syncProtractorAngleRuntime,
     removeProtractorAngleRuntime,
     removePlacedFlags,
-    removeMeasuredGeodesicLengths,
-    removeProtractorAngles,
     syncLabelRuntimesFromJournal,
   } = createToolObjectRuntimes({
     assets: options.assets,
@@ -744,9 +740,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     runtimeObjectRenderSourcesByKey,
     runtimeObjectRenderArchetypesByKey,
     runtimeObjectRenderRoot,
-    session,
-    dispatch: dispatchRuntimeCommand,
-    clearProtractorToolFeedback,
     syncSelectableHitboxDebug: requestSelectableHitboxDebugSync,
   });
 
@@ -786,8 +779,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     backspaceEditingSignMessage,
     deleteEditingSign,
     tryPlaceFlagFromAim,
-    tryUseMeasureLengthToolFromAim,
-    tryUseProtractorToolFromAim,
     tryUseFocusedObjectPrimaryInteraction,
     showObjectPage,
     openContextMenuFromAim,
@@ -816,25 +807,18 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     logVerboseAimClick,
     findFocusedRuntimeObject,
     extendGeodesic: (arcId) => requestGeodesicExtension(emitterTool(), arcId),
-    getGeodesicDisplayName,
     getGeodesicLabelsById,
     getConnectedGeodesicIds,
     objectActionsFor: (objectKind, objectId) => toolHost.objectActionsFor(objectKind, objectId),
     createGeometryComputerMenuOptions,
     syncPlacedFlagRuntime,
     removePlacedFlagRuntime,
-    syncMeasuredGeodesicLengthRuntime,
-    removeMeasuredGeodesicLengthRuntime,
-    syncProtractorAngleRuntime,
-    removeProtractorAngleRuntime,
+    removeLength: (lengthId) => requestLengthRemoval(toolHost.contextOf(geodesicLengthToolId), lengthId),
+    removeAngle: (angleId) => requestAngleRemoval(toolHost.contextOf(geodesicProtractorToolId), angleId),
     removePlacedFlags,
-    removeMeasuredGeodesicLengths,
-    removeProtractorAngles,
     removeGeodesicRuntimeObjects,
     syncSelectableHitboxDebug: requestSelectableHitboxDebugSync,
-    syncDesktopPalette,
     clearProtractorToolFeedback,
-    resolveProtractorDirectedSelectionFromAimTarget,
   });
 
   // The tools: the shell's own, as handlers, and the modules' as descriptors from the experience's client parts. One lookup (`toolHost.toolsById`) serves every place that varies by tool.
@@ -851,9 +835,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     clients: createDefaultClientModules(),
     core: {
       placeFlag: tryPlaceFlagFromAim,
-      measureLength: tryUseMeasureLengthToolFromAim,
-      protractor: tryUseProtractorToolFromAim,
-      protractorPrompt: getProtractorToolPrompt,
       carry: (primaryActionRequested) => {
         if (primaryActionRequested) finishGeodesicCannonCarry();
         return primaryActionRequested;
@@ -1431,7 +1412,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
 
   function clearGeometryToolStateAfterCommit(): void {
     dispatchRuntimeCommand({ kind: "set-cannon-tool-state", state: {} });
-    dispatchRuntimeCommand({ kind: "set-protractor-tool-state", state: {} });
+    dispatchRuntimeCommand({ kind: "set-module-tool-state", moduleId: geodesicMeasurementsModuleId, state: undefined });
     clearProtractorToolFeedback();
     refreshOpenGeometryComputerMenu();
     syncDesktopPalette();
@@ -1706,18 +1687,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     controls.setLookMode(currentMenuState().isOpen ? "palette" : "camera");
     const selectedTool = currentMenuState().selectedTool;
     desktopToolIndicator.setTool(toolHost.toolsById.get(selectedTool), currentMenuState().placeFlagOptions.flagType, toolHost.promptOf(selectedTool));
-  }
-
-  function getProtractorToolPrompt(): string {
-    if (!session.get().protractorToolState.center) {
-      return "select: vertex";
-    }
-
-    if (!session.get().protractorToolState.first) {
-      return "select: side1";
-    }
-
-    return "select: side2";
   }
 
   function playerBlockingBodiesInCell(cellId: string) {

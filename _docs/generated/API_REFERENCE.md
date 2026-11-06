@@ -785,6 +785,7 @@ Geodesic intersection markers: crossings of segments in the same cell, stable ma
 | --- | --- | --- |
 | function | `updateGeodesicIntersectionObjects` | Recomputes all intersection markers (where segments of two different geodesics cross in a cell) and returns them. |
 | function | `getRememberedGeodesicIntersectionObject` | Returns the last known intersection marker with this id even if it has since disappeared from the registry, or `undefined`. |
+| function | `findGeodesicIntersectionNear` | The crossing of `geodesicIds` in the cell nearest `point`, within the tolerance a marker keeps its identity over, or `undefined`. |
 | function | `pruneMissingGeodesicIntersectionObjects` | Forgets remembered intersection markers that are no longer in the registry; returns the forgotten ids. |
 
 ### `world-objects/geodesic/intervals.ts`
@@ -995,6 +996,7 @@ Measured-length tool: persistent "geodesic length = N m" labels attached to a ge
 
 | Kind | Name | Summary |
 | --- | --- | --- |
+| function | `geodesicDisplayName` | The name a person reads for a geodesic: "G" and its display number. |
 | function | `createMeasuredGeodesicLengthObject` | Creates a length label for a geodesic, anchored on the segment of that geodesic in the player's cell that is closest to the player. |
 | function | `refreshMeasuredGeodesicLengthObject` | Recomputes a length label against the current registry and player position. |
 | function | `formatMeasuredGeodesicLengthLabel` | Formats the label text "<name> length = <value> m". |
@@ -1038,15 +1040,18 @@ Protractor tool: persistent angle measurements between two geodesic directions a
 | const | `protractorAngleLabelVerticalOffsetMeters` | Height in meters by which the label sits above the centre point. |
 | const | `protractorAngleLabelAimPaddingMeters` | Padding in meters added on each side of the badge to form the (more forgiving) aiming hitbox. |
 | const | `protractorAngleLabelAimDepthMeters` | Thickness in meters of the label's aiming hitbox along its normal. |
+| const | `vanishedAngleSeconds` | World seconds an angle waits for its crossing after the aiming stopped (design 013 section 17, item 6). |
 | interface | `ProtractorCenterSelection` | The vertex chosen as the centre of an angle: where it is, which cell, and which geodesics pass through it. |
 | interface | `ProtractorToolState` | Selections made so far by the protractor tool: the centre vertex, then the first side. |
 | function | `resolveProtractorCenterSelection` | Builds the centre selection for a cannon or intersection object. |
 | function | `resolveProtractorDirectedGeodesicSelection` | Resolves a clicked geodesic segment into a ray leaving the centre, or undefined if the segment is not a valid side. |
 | function | `resolveProtractorEmitterGeodesicSelection` | Resolves an emitter at the centre into a ray along one of its geodesics, or undefined if it is not in the centre's cell or shares no geodesic with it. |
+| function | `resolveProtractorSideAt` | Reads a side off a thing aimed at: a segment through the centre, or an emitter at it, named by a person with its geodesic's display name; undefined for anything else. |
 | function | `createProtractorAngleObject` | Creates an angle measurement between two rays at a centre. |
 | function | `protractorSelectionsUseDifferentGeodesics` | Returns true when two sides differ in geodesic id or end role, i.e. |
 | function | `createProtractorAngleLabelHitbox` | Computes the aiming hitbox for the label of an angle. |
 | function | `refreshProtractorAngleObject` | Recomputes an angle from the live registry after geodesics or emitters have moved. |
+| function | `resolveProtractorSides` | Resolves the two sides of a `createAngle` against the world, as a refresh does; undefined when one is not a ray of the centre. |
 | function | `formatProtractorAngleLabel` | Formats the label text "<first> ∠ <second> = <degrees>°". |
 
 ### `world-objects/runtimeObjectBase.ts`
@@ -1701,15 +1706,42 @@ The geodesic emitters module (design 013 section 16): an emitter and what a pers
 | type | `GeodesicEmittersModuleDefinition` | The module as the engine's list takes it. |
 | function | `geodesicEmittersModule` | Creates the geodesic emitters module. |
 
+### `modules/geodesicMeasurements/api.ts`
+
+The geodesic measurements' public face (design 013 sections 12.1 and 16): the ids of the two tools, the plain-data shapes of the module's commands and their results, and the stable refusal codes.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| const | `geodesicMeasurementsModuleId` | The id of the module, which is also the key of its client tool state. |
+| const | `geodesicLengthToolId` | The id of the length tool. |
+| const | `geodesicProtractorToolId` | The id of the protractor. |
+| interface | `GeodesicMeasurementsCreateLengthCommand` | Measures the arc, labelling it near the issuing participant; measuring it again moves its label. |
+| interface | `GeodesicMeasurementsRemoveLengthCommand` | Removes a length. |
+| interface | `GeodesicMeasurementsCreateAngleCommand` | Measures the angle at `center`, an emitter or a crossing named by its id, counterclockwise from `first` to `second`. |
+| interface | `GeodesicMeasurementsRemoveAngleCommand` | Removes an angle. |
+| type | `GeodesicMeasurementsCommand` | Every command of the module. |
+| interface | `GeodesicMeasurementsResult` | What a command that succeeded answers with: `outcome` names the command, `id` is the record it created or removed. |
+| const | `geodesicMeasurementsRefusals` | The refusal codes of the module's commands. |
+
+### `modules/geodesicMeasurements/client.ts`
+
+The geodesic measurements' client part (design 013 sections 8.3 and 9.1): the length tool and the protractor, and the removal a click on a label asks for.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| function | `requestLengthRemoval` | A click on a length label asks to remove it. |
+| function | `requestAngleRemoval` | A click on an angle label asks to remove it. |
+| function | `geodesicMeasurementsClient` | Creates the client part. |
+
 ### `modules/geodesicMeasurements/index.ts`
 
-The geodesic measurements module's world factory (design 013 section 12.1): the length and angle labels as records derived from the geodesic model.
+The geodesic measurements module's factories (design 013 section 12.1): `geodesicMeasurementsModule` is the world part, `geodesicMeasurementsClient` the client part (the length tool and the protractor).
 
 _No exports._
 
 ### `modules/geodesicMeasurements/module.ts`
 
-The geodesic measurements module (design 013 section 6.4, design 014 D9): the length labels and protractor angles the player's tools place, kept current by two derive ticks that read the change ring.
+The geodesic measurements module (design 013 section 6.4, design 014 D9): the length labels and protractor angles, made and removed by its commands and kept current by two derive ticks that read the change ring.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
@@ -1829,7 +1861,7 @@ The client session: the one record that holds how one person is interacting with
 
 ### `runtime/coreTools.ts`
 
-The descriptors of the tools the shell defines itself (design 013 section 8.3): sign, length, protractor, and the emitter's carry, rotate and aim sub-modes.
+The descriptors of the tools the shell defines itself (design 013 section 8.3): sign, and the emitter's carry, rotate and aim sub-modes.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
@@ -3034,7 +3066,7 @@ Runs the effects the session reducer lists after a command (`applyRuntimeCommand
 
 ### `render/three/runtimeObjectActions.ts`
 
-Actions the player performs on runtime objects through the aim: placing and editing signs, measuring a geodesic, the protractor, the primary interaction and context menu of the focused object, going home, resetting the world, and the debug pose helpers.
+Actions the player performs on runtime objects through the aim: placing and editing signs, the primary interaction and context menu of the focused object, going home, resetting the world, and the debug pose helpers.
 
 | Kind | Name | Summary |
 | --- | --- | --- |

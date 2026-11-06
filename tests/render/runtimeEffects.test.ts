@@ -63,7 +63,6 @@ describe("createRuntimeEffects", () => {
     effects.run({ kind: "end-tool-session" });
 
     expect(dispatched).toEqual([
-      { kind: "set-protractor-tool-state", state: {} },
       { kind: "set-cannon-tool-state", state: {} },
     ]);
     expect(calls.clearProtractorToolFeedback).toHaveBeenCalledTimes(1);

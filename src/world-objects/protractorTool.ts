@@ -12,9 +12,10 @@ import {
   type GeodesicCrossingObject,
   type GeodesicSegmentObject,
 } from "./geodesic/objects";
-import { getRememberedGeodesicIntersectionObject } from "./geodesic/intersections";
+import { findGeodesicIntersectionNear, getRememberedGeodesicIntersectionObject } from "./geodesic/intersections";
 import { getEmitterGeodesicIds, getGeodesicEndpointAttachmentsForAnchor } from "./geodesic/endpoints";
 import { resolveEndpointTangentAtAnchor } from "./geodesic/segments";
+import { geodesicDisplayName } from "./measureLengthTool";
 import type { RuntimeObjectReader, RuntimeObjectRegistry } from "./runtimeObjectRegistry";
 import type {
   ProtractorAngleLabelHitbox,
@@ -46,6 +47,11 @@ export const protractorAngleLabelAimPaddingMeters = 0.04;
  * Thickness in meters of the label's aiming hitbox along its normal.
  */
 export const protractorAngleLabelAimDepthMeters = 0.12;
+
+/**
+ * World seconds an angle waits for its crossing after the aiming stopped (design 013 section 17, item 6).
+ */
+export const vanishedAngleSeconds = 3;
 
 /**
  * The vertex chosen as the centre of an angle: where it is, which cell, and which geodesics pass through it.
@@ -183,6 +189,24 @@ export function resolveProtractorEmitterGeodesicSelection(options: {
 }
 
 /**
+ * Reads a side off a thing aimed at: a segment through the centre, or an emitter at it, named by a person with its geodesic's display name; undefined for anything else.
+ * `objectId` is the thing hit, `point` where (in its cell's frame), `emitterGeodesicId` the geodesic of an emitter the aim points along.
+ */
+export function resolveProtractorSideAt(
+  registry: RuntimeObjectReader,
+  center: ProtractorCenterSelection,
+  at: { readonly objectId?: string; readonly point: Vec3; readonly emitterGeodesicId?: string },
+): ProtractorDirectedGeodesic | undefined {
+  const object = at.objectId === undefined ? undefined : registry.get(at.objectId);
+  const selected = object?.kind === "geodesicModel/segment"
+    ? resolveProtractorDirectedGeodesicSelection({ center, segment: object, hitPoint: at.point })
+    : object?.kind === "geodesicEmitters/emitter"
+      ? resolveProtractorEmitterGeodesicSelection({ center, emitter: object, registry, geodesicId: at.emitterGeodesicId })
+      : undefined;
+  return selected === undefined ? undefined : { ...selected, label: geodesicDisplayName(registry, selected.geodesicId) };
+}
+
+/**
  * Creates an angle measurement between two rays at a centre.
  * Throws if both sides refer to the same geodesic end. The angle is `second.yaw - first.yaw` reduced to [0, 2π), i.e. counterclockwise from the first ray to the second (so swapping the sides gives 2π minus the angle).
  */
@@ -267,19 +291,16 @@ export function createProtractorAngleLabelHitbox(options: {
 
 /**
  * Recomputes an angle from the live registry after geodesics or emitters have moved.
- * Re-resolves the centre and both sides (matching segments by id, else by nearest segment of the same geodesic/end role near the centre). Returns undefined if a side can no longer be found; if the centre object is gone but a remembered intersection still exists, returns the angle unchanged but not portal-renderable.
+ * Re-resolves the centre and both sides (matching segments by id, else by nearest segment of the same geodesic/end role near the centre). Returns undefined if a side can no longer be found.
+ * A centre that is gone is looked for again as a crossing of the two sides' geodesics near the last centre point: its id is not real state, so that is also what finds it after a load. A crossing that is not there hides the angle ({@link hiddenProtractorAngle}); a centre that was anything else takes the angle with it.
  */
 export function refreshProtractorAngleObject(options: {
   readonly registry: RuntimeObjectRegistry;
   readonly angle: ProtractorAngleObject;
 }): ProtractorAngleObject | undefined {
-  const centerObject = options.registry.get(options.angle.centerObjectId);
-  if (centerObject?.kind !== "geodesicEmitters/emitter" && centerObject?.kind !== "geodesicModel/crossing") {
-    const rememberedCenter = getRememberedGeodesicIntersectionObject(options.registry, options.angle.centerObjectId);
-    return rememberedCenter ? {
-      ...options.angle,
-      portalRenderable: false,
-    } : undefined;
+  const centerObject = resolveAngleCenterObject(options.registry, options.angle);
+  if (centerObject === undefined) {
+    return hiddenProtractorAngle(options.registry, options.angle);
   }
 
   const center = resolveProtractorCenterSelection(options.registry, centerObject);
@@ -298,6 +319,20 @@ export function refreshProtractorAngleObject(options: {
 }
 
 /**
+ * Resolves the two sides of a `createAngle` against the world, as a refresh does; undefined when one is not a ray of the centre.
+ */
+export function resolveProtractorSides(
+  registry: RuntimeObjectRegistry,
+  center: ProtractorCenterSelection,
+  first: ProtractorDirectedGeodesic,
+  second: ProtractorDirectedGeodesic,
+): { readonly first: ProtractorDirectedGeodesic; readonly second: ProtractorDirectedGeodesic } | undefined {
+  const liveFirst = resolveLiveProtractorDirectedGeodesic(registry, center, first);
+  const liveSecond = resolveLiveProtractorDirectedGeodesic(registry, center, second);
+  return liveFirst && liveSecond ? { first: liveFirst, second: liveSecond } : undefined;
+}
+
+/**
  * Formats the label text "<first> ∠ <second> = <degrees>°".
  * Names are the sides' labels or geodesic ids; degrees are rounded to one decimal.
  */
@@ -307,6 +342,29 @@ export function formatProtractorAngleLabel(
   angleDegrees: number,
 ): string {
   return `${formatGeodesicLabel(first)} ∠ ${formatGeodesicLabel(second)} = ${formatDegrees(angleDegrees)}°`;
+}
+
+function resolveAngleCenterObject(registry: RuntimeObjectRegistry, angle: ProtractorAngleObject): GeodesicEmitterObject | GeodesicCrossingObject | undefined {
+  const object = registry.get(angle.centerObjectId);
+  if (object?.kind === "geodesicEmitters/emitter" || object?.kind === "geodesicModel/crossing") {
+    return object;
+  }
+
+  return findGeodesicIntersectionNear(registry, {
+    cellId: angle.cellId,
+    geodesicIds: [angle.first.geodesicId, angle.second.geodesicId],
+    point: angle.centerPoint,
+  });
+}
+
+// The angle whose centre is not in the registry. A crossing that just vanished is still remembered, and an angle already waiting says so itself: the memory is a memo, and does not survive a load. Either way it waits, unless a side's geodesic is gone, when its crossing cannot return. Anything else, a removed emitter, takes the angle with it.
+function hiddenProtractorAngle(registry: RuntimeObjectRegistry, angle: ProtractorAngleObject): ProtractorAngleObject | undefined {
+  const waits = angle.vanishedSecondsLeft !== undefined || getRememberedGeodesicIntersectionObject(registry, angle.centerObjectId) !== undefined;
+  if (!waits || registry.getSegmentsOfGeodesic(angle.first.geodesicId).length === 0 || registry.getSegmentsOfGeodesic(angle.second.geodesicId).length === 0) {
+    return undefined;
+  }
+
+  return { ...angle, portalRenderable: false, vanishedSecondsLeft: angle.vanishedSecondsLeft ?? vanishedAngleSeconds };
 }
 
 function getDistanceAlongSegment(segment: GeodesicSegmentObject, point: Vec3): number {

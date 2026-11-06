@@ -181,7 +181,7 @@ function removePlainArcs(command: GeodesicRemovePlainArcsCommand, ctx: CommandCo
 
 /**
  * Crossing markers follow the segments: every pass that sees a segment written recomputes them all (the call removes and adds every marker, so it writes whenever it wakes).
- * The identity memory then forgets the markers that did not come back, so a marker keeps its id only across the pass that moves it.
+ * The identity memory first forgets the markers the last pass did not bring back, so a marker keeps its id only across the pass that moves it, and one that vanished in this pass is still remembered for the ticks that follow in this pass: that is how an angle tells a crossing that vanished from a centre that was removed.
  */
 const crossingsTick: ModuleTick = {
   id: "geodesicModel/crossings",
@@ -189,8 +189,8 @@ const crossingsTick: ModuleTick = {
   writes: ["geodesicModel/crossing"],
   subscribes: ["geodesicModel/segment"],
   run(ctx) {
-    updateGeodesicIntersectionObjects(ctx.objects);
     pruneMissingGeodesicIntersectionObjects(ctx.objects);
+    updateGeodesicIntersectionObjects(ctx.objects);
   },
 };
 

@@ -89,7 +89,6 @@ function createHarness(sessionOverrides: Partial<ClientSessionState> = {}) {
     getRuntimeObjectTooltipText: () => "Sign",
     getWorldFocusMessageDefinition: (object) =>
       createWorldFocusMessageDefinition({ object, selectedTool: session.get().menuState.selectedTool }),
-    getGeodesicDisplayName: (geodesicId) => geodesicId,
   });
   return { feedback, focus, scene, tooltipUpdates, helpUpdates, crossUpdates, xrTooltipUpdates };
 }

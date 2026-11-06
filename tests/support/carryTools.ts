@@ -37,9 +37,6 @@ export function createModeToolHost(input: {
     clients: [],
     core: {
       placeFlag: nothing,
-      measureLength: nothing,
-      protractor: nothing,
-      protractorPrompt: () => "",
       carry: () => false,
       rotate: () => false,
       aim: () => false,

@@ -19,7 +19,7 @@ import {
   type RigidTransform3,
 } from "../../math/rigidTransform3";
 import { getEmitterGeodesicIds } from "../../world-objects/geodesic/endpoints";
-import { resolveGeodesicNumber } from "../../world-objects/geodesic/segments";
+import { geodesicDisplayName } from "../../world-objects/measureLengthTool";
 import { type RuntimeObjectReader, type RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
 import { threePointToWorld, worldPointToThree } from "./worldAxes";
 import {
@@ -64,8 +64,7 @@ export interface GeodesicEmitterLabelControllerDeps {
 /**
  * Creates the emitter-label controller and returns its update and naming functions.
  *
- * `updateGeodesicEmitterLabels` is called once per frame; `getGeodesicDisplayName` returns "G<n>" for a geodesic id and
- * `getGeodesicLabelsById` maps many ids to such names. There is no dispose function: remaining labels live in
+ * `updateGeodesicEmitterLabels` is called once per frame; `getGeodesicLabelsById` maps geodesic ids to their "G<n>" names. There is no dispose function: remaining labels live in
  * the caller-owned map and scene.
  */
 export function createGeodesicEmitterLabelController(deps: GeodesicEmitterLabelControllerDeps) {
@@ -187,12 +186,12 @@ export function createGeodesicEmitterLabelController(deps: GeodesicEmitterLabelC
   }
 
   function getGeodesicDisplayName(geodesicId: string): string {
-    return `G${resolveGeodesicNumber(runtimeObjectRegistry, geodesicId)}`;
+    return geodesicDisplayName(runtimeObjectRegistry, geodesicId);
   }
 
   function getGeodesicLabelsById(geodesicIds: readonly string[]): Readonly<Record<string, string>> {
     return Object.fromEntries(geodesicIds.map((geodesicId) => [geodesicId, getGeodesicDisplayName(geodesicId)]));
   }
 
-  return { updateGeodesicEmitterLabels, getGeodesicDisplayName, getGeodesicLabelsById };
+  return { updateGeodesicEmitterLabels, getGeodesicLabelsById };
 }

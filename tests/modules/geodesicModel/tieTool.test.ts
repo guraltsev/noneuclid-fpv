@@ -22,7 +22,7 @@ const g2Start: AimPickEndpoint = { geodesicId: "g2", role: "start", anchorObject
 const g1Start: AimPickEndpoint = { geodesicId: "g1", role: "start", anchorObjectId: "e1" };
 
 function pickOf(endpoint: AimPickEndpoint, withinRange = true): AimPick {
-  return { objectId: `${endpoint.geodesicId}:segment`, objectKind: "geodesicModel/segment", cellId: "torus-room", point: { x: 0, y: 0, z: 0 }, withinRange, geodesicEndpoint: endpoint };
+  return { objectId: `${endpoint.geodesicId}:segment`, objectKind: "geodesicModel/segment", cellId: "torus-room", point: { x: 0, y: 0, z: 0 }, withinRange, eyePoint: { x: 0, y: 0, z: 1.6 }, geodesicEndpoint: endpoint };
 }
 
 /** The tie tool over the connected pair of the torus scenario, started from emitter e2, with a fake context that submits to a real engine. */
@@ -41,6 +41,7 @@ function setup() {
     commandInFlight: () => false,
     selectObject: () => undefined,
     showObjectPage: () => undefined,
+    chosenFlagType: () => "WoodenSign1",
     submit: (command) => void submitted.push({ ticket: engine.submit("local", command), command }),
     getToolState: <T,>() => state.toolState as T | undefined,
     setToolState: (_moduleId, next) => void (state.toolState = next),

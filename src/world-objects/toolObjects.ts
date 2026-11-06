@@ -64,6 +64,11 @@ export interface ProtractorAngleObject extends RuntimeWorldObjectBase {
   readonly radiusMeters: number;
   /** Aiming box around the label, used to select the measurement for removal. */
   readonly labelHitbox?: ProtractorAngleLabelHitbox;
+  /**
+   * Real, and present only while the crossing at the centre is gone (design 013 section 17, item 6): the world seconds left before the angle is deleted. Not derivable: it records how long the crossing has been missing with nobody aiming.
+   * It stands at its full value while either geodesic's emitter is held; the angle is hidden (`portalRenderable` false, the materialized form) as long as it is present.
+   */
+  readonly vanishedSecondsLeft?: number;
 }
 
 /**

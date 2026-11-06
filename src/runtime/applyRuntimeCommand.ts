@@ -229,8 +229,6 @@ export function reduceRuntimeCommand(state: ClientSessionState, command: Runtime
       return { state: { ...state, showCellPathRendersInstances: command.enabled }, effects: [] };
     case "set-cannon-tool-state":
       return { state: { ...state, cannonToolState: command.state }, effects: [] };
-    case "set-protractor-tool-state":
-      return { state: { ...state, protractorToolState: command.state }, effects: [] };
     case "set-module-tool-state": {
       const { [command.moduleId]: previous, ...rest } = state.moduleToolState;
       if (command.state === undefined) {

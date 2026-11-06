@@ -37,7 +37,6 @@ function stateWith(menu?: Partial<RuntimeMenuState>, appConfig: AppConfig = defa
     showCellPathRendersInstances: false,
     vrComfortOptions: defaultVrComfortOptions,
     cannonToolState: {},
-    protractorToolState: {},
     moduleToolState: {},
     pendingToolRequest: undefined,
   };
@@ -446,13 +445,6 @@ describe("applyRuntimeCommand: tool and player state", () => {
     const result = reduce({ kind: "set-cannon-tool-state", state: { selectedCannonId: "c", activeGeodesicId: "g" } });
 
     expect(result.state.cannonToolState).toEqual({ selectedCannonId: "c", activeGeodesicId: "g" });
-    expect(result.effects).toEqual([]);
-  });
-
-  it("replaces the protractor tool state", () => {
-    const result = reduce({ kind: "set-protractor-tool-state", state: {} });
-
-    expect(result.state.protractorToolState).toEqual({});
     expect(result.effects).toEqual([]);
   });
 

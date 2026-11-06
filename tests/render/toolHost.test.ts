@@ -57,9 +57,6 @@ function setup(options: { readonly available?: boolean } = {}) {
   const client: ModuleClient = { tools: [probe] };
   const core: CoreToolActions = {
     placeFlag: vi.fn(),
-    measureLength: vi.fn(),
-    protractor: vi.fn(),
-    protractorPrompt: () => "select: vertex",
     carry: vi.fn(() => false),
     rotate: vi.fn(() => false),
     aim: vi.fn(() => false),
@@ -219,8 +216,6 @@ describe("the tool lookup", () => {
       "geodesicEmitters/aim",
       "geodesicEmitters/carry",
       "geodesicEmitters/rotate",
-      "geodesicMeasurements/length",
-      "geodesicMeasurements/protractor",
       "placedFlags/flag",
       probeId,
     ]);
@@ -349,7 +344,7 @@ function dummyDeps(): Parameters<typeof createToolHost>[0] {
     session,
     dispatch: noop,
     clients: [],
-    core: { placeFlag: noop, measureLength: noop, protractor: noop, protractorPrompt: () => "", carry: () => false, rotate: () => false, aim: () => false, emitterModeResult: noop },
+    core: { placeFlag: noop, carry: () => false, rotate: () => false, aim: () => false, emitterModeResult: noop },
     resolveCurrentAimTargets: () => [],
     resolveCurrentAimTarget: () => undefined,
     targetIsWithinInteractionRange: () => true,

@@ -14,9 +14,6 @@ export function createTestToolsById(): ToolsById {
   return createToolsById(
     createCoreToolDescriptors({
       placeFlag: () => undefined,
-      measureLength: () => undefined,
-      protractor: () => undefined,
-      protractorPrompt: () => "select: vertex",
       carry: () => false,
       rotate: () => false,
       aim: () => false,

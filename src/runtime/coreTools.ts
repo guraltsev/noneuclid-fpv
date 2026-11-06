@@ -1,5 +1,5 @@
 /**
- * The descriptors of the tools the shell defines itself (design 013 section 8.3): sign, length, protractor, and the emitter's carry, rotate and aim sub-modes.
+ * The descriptors of the tools the shell defines itself (design 013 section 8.3): sign, and the emitter's carry, rotate and aim sub-modes.
  * Their behavior stays in the shell (carry, rotate and aim are the client's sources for the world's control slots, section 7); a descriptor only calls the handler the shell passes in. The tools modules contribute come from the modules' client parts.
  * "none" and "aim" are not tools with descriptors: with neither selected the primary action acts on the focused object.
  */
@@ -11,10 +11,6 @@ export type EmitterModeToolId = "geodesicEmitters/carry" | "geodesicEmitters/rot
 /** What the shell does for each core tool; each handler reads the current frame's input itself. */
 export interface CoreToolHandlers {
   placeFlag(): void;
-  measureLength(): void;
-  protractor(): void;
-  /** The protractor's prompt, from its picks. */
-  protractorPrompt(): string;
   /** Carry, every frame: finishes the carry when the primary action was requested; true then. */
   carry(): boolean;
   /** Rotate, every frame; true when the primary action was requested. */
@@ -41,32 +37,6 @@ export function createCoreToolDescriptors(handlers: CoreToolHandlers): readonly 
       iconId: "sign",
       showsAimCross: true,
       onPrimaryAction: () => (handlers.placeFlag(), true),
-    },
-    {
-      ...mainTool,
-      id: "geodesicMeasurements/length",
-      label: "Length",
-      helpTitle: "Length tool",
-      helpBody: "Measures total length along a selected geodesic.",
-      helpRows: [{ input: "primary", label: "choose geodesic" }, { input: "context-menu", label: "open choices" }],
-      indicatorColor: "#22c55e",
-      iconId: "length",
-      showsAimCross: true,
-      prompt: () => "select: geodesic",
-      onPrimaryAction: () => (handlers.measureLength(), true),
-    },
-    {
-      ...mainTool,
-      id: "geodesicMeasurements/protractor",
-      label: "Protractor",
-      helpTitle: "Protractor tool",
-      helpBody: "Measures the angle between two geodesic sides at a vertex.",
-      helpRows: [{ input: "primary", label: "select vertex or side" }, { input: "context-menu", label: "open choices" }],
-      indicatorColor: "#fb7185",
-      iconId: "protractor",
-      showsAimCross: true,
-      prompt: () => handlers.protractorPrompt(),
-      onPrimaryAction: () => (handlers.protractor(), true),
     },
     {
       ...subMode,

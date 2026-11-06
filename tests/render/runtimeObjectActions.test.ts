@@ -84,7 +84,6 @@ function createHarness(target: AimTarget | undefined, sessionOverrides: Partial<
     logVerboseAimClick: none,
     findFocusedRuntimeObject: () => undefined,
     extendGeodesic: () => false,
-    getGeodesicDisplayName: (geodesicId) => geodesicId,
     getGeodesicLabelsById: () => ({}),
     getConnectedGeodesicIds: () => [],
     objectActionsFor: () => [],
@@ -93,18 +92,12 @@ function createHarness(target: AimTarget | undefined, sessionOverrides: Partial<
     },
     syncPlacedFlagRuntime: (flag) => syncedFlagIds.push(flag.id),
     removePlacedFlagRuntime: none,
-    syncMeasuredGeodesicLengthRuntime: none,
-    removeMeasuredGeodesicLengthRuntime: none,
-    syncProtractorAngleRuntime: none,
-    removeProtractorAngleRuntime: none,
+    removeLength: none,
+    removeAngle: none,
     removePlacedFlags: none,
-    removeMeasuredGeodesicLengths: none,
-    removeProtractorAngles: none,
     removeGeodesicRuntimeObjects: none,
     syncSelectableHitboxDebug: none,
-    syncDesktopPalette: none,
     clearProtractorToolFeedback: none,
-    resolveProtractorDirectedSelectionFromAimTarget: () => undefined,
   });
   return { actions, registry, commands, syncedFlagIds, rigResets, engine };
 }

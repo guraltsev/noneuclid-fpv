@@ -8,8 +8,14 @@ import { enumerateCellImages } from "../cell-complex/portalRoute";
 import { identityRigidTransform3, transformPoint3, yawRigidTransform3 } from "../math/rigidTransform3";
 import type { Vec3 } from "../math/vec3";
 import type { GeodesicSegmentObject } from "./geodesic/objects";
-import type { RuntimeObjectRegistry } from "./runtimeObjectRegistry";
+import { resolveGeodesicNumber } from "./geodesic/segments";
+import type { RuntimeObjectReader, RuntimeObjectRegistry } from "./runtimeObjectRegistry";
 import type { MeasuredGeodesicLengthObject } from "./toolObjects";
+
+/** The name a person reads for a geodesic: "G" and its display number. */
+export function geodesicDisplayName(registry: RuntimeObjectReader, geodesicId: string): string {
+  return `G${resolveGeodesicNumber(registry, geodesicId)}`;
+}
 
 /**
  * Creates a length label for a geodesic, anchored on the segment of that geodesic in the player's cell that is closest to the player.

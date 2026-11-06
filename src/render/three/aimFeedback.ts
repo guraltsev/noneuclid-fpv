@@ -13,14 +13,13 @@ import type { ClientSession } from "../../runtime/clientSession";
 import type { ToolsById } from "../../runtime/toolRegistry";
 import { createHelpLensDefinition } from "../../ui/helpLensDefinition";
 import type { RuntimeObjectReader, RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
+import { geodesicMeasurementsModuleId } from "../../modules/geodesicMeasurements/api";
 import {
   protractorSelectionsUseDifferentGeodesics,
   resolveProtractorCenterSelection,
-  resolveProtractorDirectedGeodesicSelection,
-  resolveProtractorEmitterGeodesicSelection,
-  type ProtractorCenterSelection,
+  resolveProtractorSideAt,
+  type ProtractorToolState,
 } from "../../world-objects/protractorTool";
-import type { ProtractorDirectedGeodesic } from "../../world-objects/toolObjects";
 import type { FloatingObjectTooltip } from "../dom/floatingObjectTooltip";
 import type { AimCrossMarker } from "./aimCrossMarker";
 import type { HelpLensRenderer } from "./helpLensRenderer";
@@ -69,8 +68,6 @@ export interface AimFeedbackDeps {
   getRuntimeObjectTooltipText(object: RuntimeWorldObject, inputMode: "desktop" | "xr"): string | undefined;
   /** Focus message of an object, from which its help is built. */
   getWorldFocusMessageDefinition(object: RuntimeWorldObject): Parameters<typeof createHelpLensDefinition>[0]["focus"] | undefined;
-  /** Display name ("G1", ...) of a geodesic. */
-  getGeodesicDisplayName(geodesicId: string): string;
 }
 
 /** Handle to the aim feedback created by {@link createAimFeedback}. */
@@ -85,11 +82,6 @@ export interface AimFeedback {
   dismissHelpLensFocus(): boolean;
   /** Hides the protractor tool's drawing. */
   clearProtractorToolFeedback(): void;
-  /** Reads a protractor side (directed geodesic) off an aim target for the given centre. */
-  resolveProtractorDirectedSelectionFromAimTarget(
-    target: AimTarget | undefined,
-    center: ProtractorCenterSelection,
-  ): ProtractorDirectedGeodesic | undefined;
   /** Removes the controller ray and the protractor drawing and frees them. */
   dispose(): void;
 }
@@ -210,7 +202,7 @@ export function createAimFeedback(deps: AimFeedbackDeps): AimFeedback {
   }
 
   function updateProtractorToolFeedback(activeAimRay: RootAimRay | undefined): void {
-    const protractor = session.get().protractorToolState;
+    const protractor = (session.get().moduleToolState[geodesicMeasurementsModuleId] as ProtractorToolState | undefined) ?? {};
     if (currentMenuState().selectedTool !== "geodesicMeasurements/protractor" || currentMenuState().isOpen) {
       clearProtractorToolFeedback();
       return;
@@ -228,7 +220,11 @@ export function createAimFeedback(deps: AimFeedbackDeps): AimFeedback {
     }
 
     const hoverSelection = protractor.center
-      ? resolveProtractorDirectedSelectionFromAimTarget(usableTarget, protractor.center)
+      ? (usableTarget && resolveProtractorSideAt(runtimeObjectRegistry, protractor.center, {
+        objectId: usableTarget.object?.id,
+        point: usableTarget.localPoint,
+        emitterGeodesicId: usableTarget.geodesicEmitterGeodesicId,
+      }))
       : undefined;
     const validHoverSelection = hoverSelection && protractor.first &&
         !protractorSelectionsUseDifferentGeodesics(protractor.first, hoverSelection)
@@ -250,39 +246,6 @@ export function createAimFeedback(deps: AimFeedbackDeps): AimFeedback {
     }
 
     syncProtractorToolFeedback(feedback);
-  }
-
-  function resolveProtractorDirectedSelectionFromAimTarget(
-    target: AimTarget | undefined,
-    center: ProtractorCenterSelection,
-  ): ProtractorDirectedGeodesic | undefined {
-    if (target?.object?.kind === "geodesicModel/segment") {
-      const selected = resolveProtractorDirectedGeodesicSelection({
-        center,
-        segment: target.object,
-        hitPoint: target.localPoint,
-      });
-      return selected ? withProtractorGeodesicLabel(selected) : undefined;
-    }
-
-    if (target?.object?.kind === "geodesicEmitters/emitter") {
-      const selected = resolveProtractorEmitterGeodesicSelection({
-        center,
-        emitter: target.object,
-        registry: runtimeObjectRegistry,
-        geodesicId: target.geodesicEmitterGeodesicId,
-      });
-      return selected ? withProtractorGeodesicLabel(selected) : undefined;
-    }
-
-    return undefined;
-  }
-
-  function withProtractorGeodesicLabel(selection: ProtractorDirectedGeodesic): ProtractorDirectedGeodesic {
-    return {
-      ...selection,
-      label: deps.getGeodesicDisplayName(selection.geodesicId),
-    };
   }
 
   function syncProtractorToolFeedback(feedback: {
@@ -411,7 +374,6 @@ export function createAimFeedback(deps: AimFeedbackDeps): AimFeedback {
     requestHelpLensForFocusedObject,
     dismissHelpLensFocus,
     clearProtractorToolFeedback,
-    resolveProtractorDirectedSelectionFromAimTarget,
     dispose() {
       clearProtractorToolFeedback();
       aimControllerRay.removeFromParent();

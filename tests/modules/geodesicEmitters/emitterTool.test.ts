@@ -33,6 +33,7 @@ function setup(scene: { readonly world: ReturnType<typeof compileLargePortalWorl
     endTool: () => void (log.ended += 1),
     selectObject: (objectId, geodesicId) => void log.selected.push([objectId, geodesicId]),
     showObjectPage: (objectId) => void log.pages.push(objectId),
+    chosenFlagType: () => "WoodenSign1",
     read: engine.read,
     query: (token) => engine.query(token),
     showMessage: (message) => void log.messages.push(message),
@@ -55,7 +56,7 @@ function setup(scene: { readonly world: ReturnType<typeof compileLargePortalWorl
   return { engine, registry, tool, context, log, aim, submitted, stepOnce, settle, click };
 }
 
-const floorAt = (x: number, y: number): AimPick => ({ objectKind: "floor", cellId: "a", point: { x, y, z: 0 }, withinRange: true });
+const floorAt = (x: number, y: number): AimPick => ({ objectKind: "floor", cellId: "a", point: { x, y, z: 0 }, withinRange: true, eyePoint: { x: 0, y: 0, z: 1.6 } });
 
 describe("the emitter tool", () => {
   it("places on the floor, shoots a first geodesic along the aim, selects both and ends", () => {
@@ -78,7 +79,7 @@ describe("the emitter tool", () => {
     settle();
     const [arcId] = getEmitterGeodesicIds(registry, registry.getObjectsOfKind("geodesicEmitters/emitter")[0]!.id);
 
-    click({ objectId: `${arcId}:segment:0`, objectKind: "geodesicModel/segment", cellId: "a", point: { x: 4, y: 2.5, z: 1.2 }, withinRange: true });
+    click({ objectId: `${arcId}:segment:0`, objectKind: "geodesicModel/segment", cellId: "a", point: { x: 4, y: 2.5, z: 1.2 }, withinRange: true, eyePoint: { x: 0, y: 0, z: 1.6 } });
     settle();
 
     const placed = registry.getObjectsOfKind("geodesicEmitters/emitter")[1]!;
@@ -92,7 +93,7 @@ describe("the emitter tool", () => {
     click(floorAt(3, 2.5));
     settle();
     const emitter = registry.getObjectsOfKind("geodesicEmitters/emitter")[0]!;
-    const pick: AimPick = { objectId: emitter.id, objectKind: emitter.kind, cellId: "a", point: { x: 3, y: 2.5, z: 1 }, withinRange: true };
+    const pick: AimPick = { objectId: emitter.id, objectKind: emitter.kind, cellId: "a", point: { x: 3, y: 2.5, z: 1 }, withinRange: true, eyePoint: { x: 0, y: 0, z: 1.6 } };
 
     click({ ...pick, withinRange: false });
     settle();
@@ -110,7 +111,7 @@ describe("the emitter tool", () => {
     aim.pick = floorAt(3, 2.5);
     aim.yaw = undefined;
     expect(tool.onPrimaryAction(context)).toBe(true);
-    aim.pick = { objectId: "flag", objectKind: "placedFlags/flag", cellId: "a", point: { x: 1, y: 1, z: 0 }, withinRange: true };
+    aim.pick = { objectId: "flag", objectKind: "placedFlags/flag", cellId: "a", point: { x: 1, y: 1, z: 0 }, withinRange: true, eyePoint: { x: 0, y: 0, z: 1.6 } };
     aim.yaw = 0;
     expect(tool.onPrimaryAction(context)).toBe(true);
     aim.pick = undefined;
@@ -228,7 +229,7 @@ describe("a press while the world has not answered", () => {
     click(floorAt(3, 2.5));
     stepOnce();
     const emitter = registry.getObjectsOfKind("geodesicEmitters/emitter")[0]!;
-    click({ objectId: emitter.id, objectKind: emitter.kind, cellId: "a", point: { x: 3, y: 2.5, z: 1 }, withinRange: true });
+    click({ objectId: emitter.id, objectKind: emitter.kind, cellId: "a", point: { x: 3, y: 2.5, z: 1 }, withinRange: true, eyePoint: { x: 0, y: 0, z: 1.6 } });
     settle();
 
     expect(getEmitterGeodesicIds(registry, emitter.id)).toHaveLength(1);

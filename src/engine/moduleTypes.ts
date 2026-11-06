@@ -6,6 +6,7 @@ import type { CompiledCellComplex } from "../cell-complex/compileCellComplex";
 import type { RuntimeToolId } from "../glue/toolIds";
 import type { PlayerPose } from "../movement/playerPose";
 import type { RuntimeObjectReader, RuntimeObjectRegistry } from "../world-objects/runtimeObjectRegistry";
+import type { PlacedFlagType } from "../world-objects/toolObjects";
 
 /** Data that survives a structured clone: what commands, results, events and control slots carry. */
 export type PlainData =
@@ -296,7 +297,11 @@ export interface AimPick {
   readonly point: { readonly x: number; readonly y: number; readonly z: number };
   /** The hit is close enough to interact with. */
   readonly withinRange: boolean;
+  /** The eye in the hit cell's local frame, meters. */
+  readonly eyePoint: { readonly x: number; readonly y: number; readonly z: number };
   readonly geodesicEndpoint?: AimPickEndpoint;
+  /** The geodesic of the hit emitter the aim points along, when it points along one. */
+  readonly emitterGeodesicId?: string;
 }
 
 /** What a tool may do. The shell implements it; tests fake it. A tool changes the world only through `submit`. */
@@ -321,6 +326,8 @@ export interface ToolContext {
   selectObject(objectId: string, geodesicId: string): void;
   /** Shows the object's menu page, with its current state; closes the menu when the object has no page, for example because it is gone. */
   showObjectPage(objectId: string): void;
+  /** The type of sign the person chose on the palette. */
+  chosenFlagType(): PlacedFlagType;
   readonly read: WorldReadView;
   /** A module's read-only queries (design 013 section 5.7); never its `api`. */
   query<Q>(token: ModuleToken<unknown, Q>): Q;

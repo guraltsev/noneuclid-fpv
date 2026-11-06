@@ -44,29 +44,29 @@ describe("selecting a tool", () => {
   it("keeps the old tool until the world accepts, then switches", () => {
     const { client, session, frame } = setup();
 
-    client.requestTool("geodesicMeasurements/length");
+    client.requestTool("geodesicEmitters/carry");
     expect(session.get().menuState.selectedTool).toBe("none");
-    expect(session.get().pendingToolRequest?.toolId).toBe("geodesicMeasurements/length");
+    expect(session.get().pendingToolRequest?.toolId).toBe("geodesicEmitters/carry");
 
     frame();
-    expect(session.get().menuState.selectedTool).toBe("geodesicMeasurements/length");
+    expect(session.get().menuState.selectedTool).toBe("geodesicEmitters/carry");
     expect(session.get().pendingToolRequest).toBeUndefined();
   });
 
   it("tells the shell which object a tool was started from, only once the world accepted", () => {
     const { client, started, frame } = setup();
 
-    client.requestTool("geodesicMeasurements/length", "cannon-a");
+    client.requestTool("geodesicEmitters/carry", "cannon-a");
     expect(started).toEqual([]);
 
     frame();
-    expect(started).toEqual([{ toolId: "geodesicMeasurements/length", objectId: "cannon-a" }]);
+    expect(started).toEqual([{ toolId: "geodesicEmitters/carry", objectId: "cannon-a" }]);
   });
 
   it("shows the world's message and keeps the old tool when the configuration disables it", () => {
-    const { client, session, messages, frame } = setup({ isToolEnabled: (toolId) => toolId !== "geodesicMeasurements/protractor" });
+    const { client, session, messages, frame } = setup({ isToolEnabled: (toolId) => toolId !== "geodesicEmitters/rotate" });
 
-    client.requestTool("geodesicMeasurements/protractor");
+    client.requestTool("geodesicEmitters/rotate");
     frame();
 
     expect(session.get().menuState.selectedTool).toBe("none");
@@ -245,7 +245,7 @@ describe("api.world", () => {
     const submit = client.api.submit as (command: unknown) => Promise<unknown>;
 
     const pending = submit({ kind: "broken/boom" });
-    client.requestTool("geodesicMeasurements/length");
+    client.requestTool("geodesicEmitters/carry");
     // The shell's frame: the step and the client's read are separate guarded phases.
     expect(() => engine.step(1 / 60)).toThrow("boom");
     client.afterStep();

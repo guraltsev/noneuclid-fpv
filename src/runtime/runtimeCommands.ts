@@ -8,7 +8,6 @@ import type { DebugSettings } from "../glue/debugSettings";
 import type { PortalPanelModeId } from "../glue/portalPanelMode";
 import type { RuntimeDebugOverlayItemId, RuntimeToolId } from "../glue/toolIds";
 import type { GeodesicCannonToolState } from "../world-objects/geodesic/cannonToolState";
-import type { ProtractorToolState } from "../world-objects/protractorTool";
 import type { PlacedFlagType } from "../world-objects/toolObjects";
 import type { RuntimeMenuConsoleLogLevelId } from "./runtimeMenuState";
 import type { PendingToolRequest } from "./clientSession";
@@ -72,7 +71,6 @@ export type RuntimeCommand =
   | { readonly kind: "set-editing-sign-message"; readonly message: string }
   // Tool state written by the tools and the frame loop.
   | { readonly kind: "set-cannon-tool-state"; readonly state: GeodesicCannonToolState }
-  | { readonly kind: "set-protractor-tool-state"; readonly state: ProtractorToolState }
   /** A module's client tool state (picks, prompts); `undefined` clears it. Design 013 section 9.3. */
   | { readonly kind: "set-module-tool-state"; readonly moduleId: string; readonly state: unknown }
   /** The tool request the world has not answered yet (design 013 section 8.1), or undefined once it has. */

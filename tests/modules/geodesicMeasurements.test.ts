@@ -3,7 +3,7 @@
  *
  * The derive ticks of design 013 section 6.4, driven through the world engine with the geodesic model and the geodesic measurements modules: `geodesicModel/crossings`, `geodesicMeasurements/lengths`
  * and `geodesicMeasurements/angles`. Each wakes on a write of a kind it subscribes to (the lengths tick also when the local player moved), stays asleep otherwise, reads each change once,
- * and writes a record only when it changed. An angle whose centre marker was removed is removed. The pure refreshers they call are tested in `tests/world-objects/measureLengthTool.test.ts`
+ * and writes a record only when it changed. An angle whose crossing vanished is hidden: tests/modules/vanishedAngles.test.ts follows what happens next. The pure refreshers they call are tested in `tests/world-objects/measureLengthTool.test.ts`
  * and `tests/world-objects/protractorTool.test.ts`.
  */
 import { describe, expect, it } from "vitest";
@@ -15,6 +15,7 @@ import {
   createProtractorAngleObject,
   resolveProtractorCenterSelection,
   resolveProtractorDirectedGeodesicSelection,
+  vanishedAngleSeconds,
 } from "../../src/world-objects/protractorTool";
 import { createRuntimeObjectRegistry, type RuntimeObjectRegistry } from "../../src/world-objects/runtimeObjectRegistry";
 import { compileLargeWorld, createSegment } from "../fixtures/world-objects/geodesic";
@@ -129,7 +130,7 @@ describe("the lengths tick", () => {
 });
 
 describe("the angles tick", () => {
-  it("refreshes a moved angle, writes only what changed, and drops it with its centre", () => {
+  it("refreshes a moved angle, writes only what changed, and hides it when its crossing vanishes", () => {
     const { registry, engine } = setup();
     runDerivePass(engine);
     addAngle(registry);
@@ -147,6 +148,6 @@ describe("the angles tick", () => {
     moveSegmentB(registry, 4);
     runDerivePass(engine);
     expect(registry.getObjectsOfKind("geodesicModel/crossing")).toHaveLength(0);
-    expect(registry.get("angle-a")).toBeUndefined();
+    expect(registry.get("angle-a")).toMatchObject({ portalRenderable: false, vanishedSecondsLeft: vanishedAngleSeconds, centerPoint: { x: 0.25, y: 0 } });
   });
 });
