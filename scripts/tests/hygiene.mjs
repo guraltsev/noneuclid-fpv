@@ -24,7 +24,7 @@ function toPosix(p) {
 // Directories git ignores wholesale (`.gitignore`); walking the filesystem instead of shelling out to
 // `git ls-files` keeps `gitTrackedFiles()` usable from the `unit` tier, which may touch only the process itself
 // (`_docs/tests.md` §5). None of H1-H10 needs the finer-grained ignores (textures, key files), only these.
-const IGNORED_DIR_NAMES = new Set([".git", "node_modules", "dist", ".vite", "coverage", "assets-src"]);
+const IGNORED_DIR_NAMES = new Set([".git", "node_modules", "dist", ".vite", "coverage", "assets-src", ".temp", ".worktrees"]);
 
 function listAllFiles(dir) {
   const out = [];
