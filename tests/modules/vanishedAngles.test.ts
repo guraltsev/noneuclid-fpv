@@ -13,21 +13,23 @@ import { geodesicEmitterYawSlot, type GeodesicEmittersResult } from "../../src/m
 import { curveShorteningModule } from "../../src/modules/curveShortening";
 import { geodesicMeasurementsModule } from "../../src/modules/geodesicMeasurements";
 import { geodesicModelModule } from "../../src/modules/geodesicModel";
-import { createDefaultWorldModules } from "../../src/runtime/experience";
+import { createSimulationClock } from "../../src/engine/worldEngine";
+import { createDefaultWorldModules, defaultSimulationClockOptions } from "../../src/runtime/experience";
 import { yawRigidTransform3 } from "../../src/math/rigidTransform3";
 import { rebuildDerivedGeodesicSegments } from "../../src/world-objects/geodesic/intervals";
 import { shootGeodesic } from "../../src/world-objects/geodesic/cannon";
-import { createGeodesicEmitterObject } from "../../src/world-objects/geodesic/objects";
+import { createGeodesicEmitterObject, geodesicRayBeamHeightMeters as beam } from "../../src/world-objects/geodesic/objects";
 import {
   createProtractorAngleObject,
+  refreshProtractorAngleObject,
   resolveProtractorCenterSelection,
   resolveProtractorSideAt,
   vanishedAngleSeconds,
 } from "../../src/world-objects/protractorTool";
 import { createRuntimeObjectRegistry, type RuntimeObjectRegistry } from "../../src/world-objects/runtimeObjectRegistry";
 import type { ProtractorAngleObject } from "../../src/world-objects/toolObjects";
-import { compileLargePortalWorld, createSymmetricPairScenario } from "../fixtures/world-objects/geodesic";
-import { createTestEngine, runDerivePass, runFrame } from "../support/engine";
+import { compileLargePortalWorld, createSegment, createSymmetricPairScenario } from "../fixtures/world-objects/geodesic";
+import { createTestEngine, runClockFrame, runDerivePass, runFrame } from "../support/engine";
 
 const dt = 1 / 60;
 const angleId = "angle";
@@ -136,6 +138,42 @@ describe("an angle whose crossing is aimed away", () => {
     expect(angle.centerObjectId).toBe(registry.getObjectsOfKind("geodesicModel/crossing")[0]!.id);
   });
 
+  it("comes back on the other half of an arc, keeping its geodesics and directions", () => {
+    const { registry, aimB, beginEdit, a } = aimingScene();
+    const before = angleIn(registry)!;
+    expect(before.first).toMatchObject({ geodesicId: a.arcId, endRole: "end", directionSign: 1 });
+    beginEdit();
+    aimB(0);
+
+    // From (3, 1) this runs back to (2, 2.5), on the half of A that starts at its emitter.
+    aimB(Math.atan2(1.5, -1));
+
+    const crossing = registry.getObjectsOfKind("geodesicModel/crossing")[0]!;
+    expect(crossing.aimStickyTarget?.localPoint).toMatchObject({ x: 2, y: 2.5 });
+    const angle = angleIn(registry)!;
+    expect(angle).toMatchObject({ portalRenderable: true, centerObjectId: crossing.id });
+    expect(angle.vanishedSecondsLeft).toBeUndefined();
+    expect(angle.first).toMatchObject({ geodesicId: a.arcId, endRole: "start", directionSign: 1, yawRadians: 0 });
+    expect(angle.second.geodesicId).toBe(before.second.geodesicId);
+    expect(angle.second.directionSign).toBe(before.second.directionSign);
+  });
+
+  it("is given up when two sides told apart by their halves alone come back as one", () => {
+    const world = compileLargePortalWorld();
+    const registry = createRuntimeObjectRegistry([
+      createSegment({ id: "g-a:segment:0", geodesicId: "g-a", halfRole: "start", start: { x: 1, y: 2.5, z: beam }, direction: { x: 1, y: 0, z: 0 }, lengthMeters: 3 }),
+      createSegment({ id: "g-b:segment:0", geodesicId: "g-b", start: { x: 3, y: 1, z: beam }, direction: { x: 0, y: 1, z: 0 }, lengthMeters: 3 }),
+    ]);
+    const engine = createTestEngine({ registry, getWorld: () => world, modules: [geodesicModelModule(), geodesicMeasurementsModule()] });
+    runDerivePass(engine);
+    const crossing = registry.getObjectsOfKind("geodesicModel/crossing")[0]!;
+    const center = resolveProtractorCenterSelection(registry, crossing);
+    const side = { geodesicId: "g-a", segmentId: "g-a:segment:0", yawRadians: 0, directionSign: 1 } as const;
+    const angle = createProtractorAngleObject({ id: angleId, center, first: { ...side, endRole: "start" }, second: { ...side, endRole: "end", yawRadians: Math.PI, directionSign: -1 } });
+
+    expect(refreshProtractorAngleObject({ registry, angle: { ...angle, vanishedSecondsLeft: 1 } })).toBeUndefined();
+  });
+
   it("comes back when the crossing returns within 3 s of the end of the edit", () => {
     const { registry, engine, aimB, beginEdit, endEdit, aimAway } = aimingScene();
     aimAway();
@@ -177,6 +215,27 @@ describe("an angle whose crossing is aimed away", () => {
     expect(angleIn(registry)?.portalRenderable).toBe(false);
     drive(engine, 0.2);
     expect(angleIn(registry)).toBeUndefined();
+  });
+
+  it("spends world time through frames of none, one and several ticks", () => {
+    const { registry, engine, aimAway } = aimingScene();
+    aimAway();
+    const clock = createSimulationClock(defaultSimulationClockOptions);
+    const tickCounts = new Set<number>();
+    let worldSeconds = 0;
+    let lastTick = 0;
+
+    for (let frame = 0; angleIn(registry) !== undefined && frame < 5000; frame += 1) {
+      const advance = runClockFrame(engine, clock, frame % 7 === 0 ? 1 / 30 : 1 / 240);
+      tickCounts.add(Math.min(advance.ticks, 2));
+      worldSeconds += advance.ticks * advance.tickSeconds;
+      if (advance.ticks > 0) lastTick = advance.tickSeconds;
+    }
+
+    expect([...tickCounts].sort()).toEqual([0, 1, 2]);
+    expect(angleIn(registry)).toBeUndefined();
+    expect(worldSeconds).toBeGreaterThanOrEqual(vanishedAngleSeconds - dt);
+    expect(worldSeconds).toBeLessThan(vanishedAngleSeconds + 3 * lastTick);
   });
 
   it("does not wait in a frame with no tick", () => {

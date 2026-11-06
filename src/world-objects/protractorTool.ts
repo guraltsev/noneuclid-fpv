@@ -291,7 +291,7 @@ export function createProtractorAngleLabelHitbox(options: {
 
 /**
  * Recomputes an angle from the live registry after geodesics or emitters have moved.
- * Re-resolves the centre and both sides (matching segments by id, else by nearest segment of the same geodesic/end role near the centre). Returns undefined if a side can no longer be found.
+ * Re-resolves the centre and both sides (matching segments by id, else by nearest segment of the same geodesic/end role near the centre). Returns undefined if a side can no longer be found; a side of an angle coming back from hidden may be found on the other half of its arc.
  * A centre that is gone is looked for again as a crossing of the two sides' geodesics near the last centre point: its id is not real state, so that is also what finds it after a load. A crossing that is not there hides the angle ({@link hiddenProtractorAngle}); a centre that was anything else takes the angle with it.
  */
 export function refreshProtractorAngleObject(options: {
@@ -304,9 +304,10 @@ export function refreshProtractorAngleObject(options: {
   }
 
   const center = resolveProtractorCenterSelection(options.registry, centerObject);
-  const first = resolveLiveProtractorDirectedGeodesic(options.registry, center, options.angle.first);
-  const second = resolveLiveProtractorDirectedGeodesic(options.registry, center, options.angle.second);
-  if (!first || !second) {
+  const returning = options.angle.vanishedSecondsLeft !== undefined;
+  const first = resolveAngleSide(options.registry, center, options.angle.first, returning);
+  const second = resolveAngleSide(options.registry, center, options.angle.second, returning);
+  if (!first || !second || !protractorSelectionsUseDifferentGeodesics(first, second)) {
     return undefined;
   }
 
@@ -342,6 +343,19 @@ export function formatProtractorAngleLabel(
   angleDegrees: number,
 ): string {
   return `${formatGeodesicLabel(first)} ∠ ${formatGeodesicLabel(second)} = ${formatDegrees(angleDegrees)}°`;
+}
+
+// A side of an angle that returns with its crossing may find the crossing on the other half of its arc. The half was only where the side lay, so the side keeps what still means something there: its geodesic and its direction along it, towards the same end. `endRole` becomes the half it lies on now. Two sides that were told apart by their halves alone are then one side, and the refresh gives the angle up.
+function resolveAngleSide(
+  registry: RuntimeObjectRegistry,
+  center: ProtractorCenterSelection,
+  side: ProtractorDirectedGeodesic,
+  returning: boolean,
+): ProtractorDirectedGeodesic | undefined {
+  const live = resolveLiveProtractorDirectedGeodesic(registry, center, side);
+  return live === undefined && returning
+    ? resolveLiveProtractorDirectedGeodesic(registry, center, { ...side, endRole: undefined })
+    : live;
 }
 
 function resolveAngleCenterObject(registry: RuntimeObjectRegistry, angle: ProtractorAngleObject): GeodesicEmitterObject | GeodesicCrossingObject | undefined {

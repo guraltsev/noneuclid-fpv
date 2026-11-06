@@ -120,11 +120,12 @@ export function createToolObjectRuntimes(deps: ToolObjectRuntimesDeps) {
 
   function removeMeasuredGeodesicLengthRuntime(objectId: string): void {
     const runtime = measuredGeodesicLengthRuntimes.get(objectId);
-    if (runtime) {
-      runtime.dispose();
-      measuredGeodesicLengthRuntimes.delete(objectId);
+    if (!runtime) {
+      return;
     }
 
+    runtime.dispose();
+    measuredGeodesicLengthRuntimes.delete(objectId);
     runtimeObjectRootsById.delete(objectId);
     invalidateRuntimeObjectRenderState(objectId);
   }
@@ -148,11 +149,12 @@ export function createToolObjectRuntimes(deps: ToolObjectRuntimesDeps) {
 
   function removeProtractorAngleRuntime(objectId: string): void {
     const runtime = protractorAngleRuntimes.get(objectId);
-    if (runtime) {
-      runtime.dispose();
-      protractorAngleRuntimes.delete(objectId);
+    if (!runtime) {
+      return;
     }
 
+    runtime.dispose();
+    protractorAngleRuntimes.delete(objectId);
     runtimeObjectRootsById.delete(objectId);
     invalidateRuntimeObjectRenderState(objectId);
   }

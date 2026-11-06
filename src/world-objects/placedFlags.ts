@@ -54,7 +54,8 @@ export interface PlaceFlagAtFloorPointRequest {
   readonly eyePosition: Vec3;
   readonly floorPoint: Vec3;
   readonly flagType: PlacedFlagType;
-  readonly id: string;
+  /** Called only once the placement is accepted, so a refusal takes no id. */
+  readonly createId: () => string;
 }
 
 /**
@@ -167,7 +168,7 @@ export function placeFlagAtFloorPoint(request: PlaceFlagAtFloorPointRequest): Pl
   // A yaw of psi turns the flag's front (local +y) towards (-sin psi, cos psi), hence the negated x component.
   const yawRadians = Math.atan2(floorPoint.x - request.eyePosition.x, request.eyePosition.y - floorPoint.y);
   const candidate = createPlacedFlagObject({
-    id: request.id,
+    id: "",
     cellId: request.cellId,
     localPose: yawRigidTransform3(yawRadians, floorPoint),
     flagType: request.flagType,
@@ -192,6 +193,7 @@ export function placeFlagAtFloorPoint(request: PlaceFlagAtFloorPointRequest): Pl
     }
   }
 
-  request.registry.add(candidate);
-  return { placed: true, object: candidate };
+  const flag = { ...candidate, id: request.createId() };
+  request.registry.add(flag);
+  return { placed: true, object: flag };
 }

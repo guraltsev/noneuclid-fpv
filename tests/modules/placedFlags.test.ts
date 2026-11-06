@@ -67,6 +67,15 @@ describe("the commands", () => {
     expectRefused({ ...place(1, 3), eyePoint: { x: Number.NaN, y: 0, z: 0 } } as PlacedFlagsCommand, placedFlagsRefusals.blocked);
   });
 
+  it("takes no id for a flag that was refused", () => {
+    const { run, place } = setup();
+    run(place(1, 0.5));
+
+    run(place(1.2, 0.5));
+
+    expect(run(place(-3, 0.5))).toMatchObject({ ok: true, value: { flagId: "placedFlags/flag:1" } });
+  });
+
   it("refuses a type of sign there is not", () => {
     const { place, expectRefused } = setup();
 

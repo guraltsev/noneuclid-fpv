@@ -42,7 +42,7 @@ function place(command: PlacedFlagsPlaceCommand, ctx: CommandContext): CommandRe
     eyePosition: command.eyePoint,
     floorPoint: command.point,
     flagType: command.flagType,
-    id: ctx.ids.next("flag"),
+    createId: () => ctx.ids.next("flag"),
   });
   if (!placed.placed || placed.object === undefined) return refuse(placedFlagsRefusals.blocked, "A sign cannot stand there.");
   return answer({ outcome: "placed", flagId: placed.object.id });

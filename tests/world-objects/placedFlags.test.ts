@@ -82,7 +82,7 @@ describe("placedFlags", () => {
       eyePosition: { x: -1.5, y: -2, z: 1.6 },
       floorPoint: { x: -1.5, y: -2, z: 0 },
       flagType: "WoodenSign1",
-      id: "flag-new-a",
+      createId: () => "flag-new-a",
     });
     const sign2Result = placeFlagAtFloorPoint({
       world,
@@ -91,7 +91,7 @@ describe("placedFlags", () => {
       eyePosition: { x: 1.5, y: -2, z: 1.6 },
       floorPoint: { x: 1.5, y: -2, z: 0 },
       flagType: "WoodenSign2",
-      id: "flag-new-b",
+      createId: () => "flag-new-b",
     });
 
     expect(sign1Result.object?.message).toBe("A8");
@@ -109,7 +109,7 @@ describe("placedFlags", () => {
       eyePosition: { x: 0, y: -2, z: 1.6 },
       floorPoint: { x: 1, y: 0.5, z: 0 },
       flagType: "WoodenSign1",
-      id: "flag-room-b",
+      createId: () => "flag-room-b",
     });
 
     expect(result.placed).toBe(true);
@@ -124,7 +124,7 @@ describe("placedFlags", () => {
     const floorPoint = { x: 1, y: 0.5, z: 0 };
     for (const eye of [{ x: 0, y: -2, z: 1.6 }, { x: 2.5, y: 0.2, z: 1.6 }, { x: 3, y: 2, z: 1.6 }]) {
       const registry = createRuntimeObjectRegistry();
-      const result = placeFlagAtFloorPoint({ world, registry, cellId: "room-b", eyePosition: eye, floorPoint, flagType: "WoodenSign1", id: "f" });
+      const result = placeFlagAtFloorPoint({ world, registry, cellId: "room-b", eyePosition: eye, floorPoint, flagType: "WoodenSign1", createId: () => "f" });
       expect(result.placed).toBe(true);
       const front = transformDirection3(result.object!.localPose, { x: 0, y: 1, z: 0 });
       const length = Math.hypot(eye.x - floorPoint.x, eye.y - floorPoint.y);

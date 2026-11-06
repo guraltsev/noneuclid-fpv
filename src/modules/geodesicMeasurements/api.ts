@@ -1,7 +1,7 @@
 /**
  * The geodesic measurements' public face (design 013 sections 12.1 and 16): the ids of the two tools, the plain-data shapes of the module's commands and their results, and the stable refusal codes.
  *
- * A length says how long a geodesic is; an angle says what the angle is between two geodesic rays at a vertex. What a person chooses is real: the geodesic of a length, the centre and the two sides of an angle. The values are refreshed from the world by the module's ticks.
+ * A length says how long a geodesic is; an angle says what the angle is between two geodesic rays at a vertex. What a person chooses is real: the geodesic of a length, the two sides of an angle and its centre, an emitter by its id or a crossing by those sides and its place (a crossing's id is not real state). The values are refreshed from the world by the module's ticks.
  * A command carries what was chosen, never a ray: the client resolves its aim first.
  */
 import type { EngineCommandBase } from "../../engine/moduleTypes";

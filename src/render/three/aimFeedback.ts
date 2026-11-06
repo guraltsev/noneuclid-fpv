@@ -28,6 +28,9 @@ import type { XrHeadWorldPose } from "./carriedGeodesicCannon";
 import type { FocusedRuntimeObject, RootAimRay } from "./rootAimRay";
 import { disposeObject3D } from "./runtimeSceneUtils";
 
+/** The protractor's state while it has no picks: one object, because this is read every frame. */
+const noProtractorPicks: ProtractorToolState = {};
+
 /** Dependencies of the aim feedback, supplied by createThreeApp's shell. */
 export interface AimFeedbackDeps {
   /** Scene that receives the controller ray line. */
@@ -202,7 +205,7 @@ export function createAimFeedback(deps: AimFeedbackDeps): AimFeedback {
   }
 
   function updateProtractorToolFeedback(activeAimRay: RootAimRay | undefined): void {
-    const protractor = (session.get().moduleToolState[geodesicMeasurementsModuleId] as ProtractorToolState | undefined) ?? {};
+    const protractor = (session.get().moduleToolState[geodesicMeasurementsModuleId] as ProtractorToolState | undefined) ?? noProtractorPicks;
     if (currentMenuState().selectedTool !== "geodesicMeasurements/protractor" || currentMenuState().isOpen) {
       clearProtractorToolFeedback();
       return;

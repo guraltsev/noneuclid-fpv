@@ -26,6 +26,7 @@ function setup() {
   const registry = createRuntimeObjectRegistry();
   const placedFlagRuntimes = new Map();
   const protractorAngleRuntimes = new Map();
+  const renderSources = new Map();
   const hitboxRequests = vi.fn();
   const runtimes = createToolObjectRuntimes({
     assets: createFakePreparedAssets(),
@@ -35,7 +36,7 @@ function setup() {
     measuredGeodesicLengthRuntimes: new Map(),
     protractorAngleRuntimes,
     runtimeObjectRootsById: new Map(),
-    runtimeObjectRenderSourcesByKey: new Map(),
+    runtimeObjectRenderSourcesByKey: renderSources,
     runtimeObjectRenderArchetypesByKey: new Map(),
     runtimeObjectRenderRoot: new THREE.Group(),
     syncSelectableHitboxDebug: hitboxRequests,
@@ -44,7 +45,7 @@ function setup() {
     runtimes.syncToolObjectRuntimesFromJournal();
     registry.changes.clear();
   }
-  return { registry, placedFlagRuntimes, protractorAngleRuntimes, hitboxRequests, frame };
+  return { registry, placedFlagRuntimes, protractorAngleRuntimes, renderSources, hitboxRequests, frame };
 }
 
 describe("the runtimes of tool objects", () => {
@@ -72,7 +73,7 @@ describe("the runtimes of tool objects", () => {
   });
 
   it("drop a hidden angle, build nothing for its countdown, and bring it back with its crossing", () => {
-    const { registry, protractorAngleRuntimes, hitboxRequests, frame } = setup();
+    const { registry, protractorAngleRuntimes, renderSources, hitboxRequests, frame } = setup();
     registry.add(angle);
     frame();
     expect(protractorAngleRuntimes.has("angle")).toBe(true);
@@ -83,10 +84,12 @@ describe("the runtimes of tool objects", () => {
     expect(protractorAngleRuntimes.has("angle")).toBe(false);
     expect(hitboxRequests).toHaveBeenCalledTimes(2);
 
+    const walks = vi.spyOn(renderSources, Symbol.iterator);
     registry.update({ ...hidden, vanishedSecondsLeft: 1 });
     frame();
     expect(protractorAngleRuntimes.has("angle")).toBe(false);
     expect(hitboxRequests).toHaveBeenCalledTimes(2);
+    expect(walks).not.toHaveBeenCalled();
 
     registry.update(angle);
     frame();
