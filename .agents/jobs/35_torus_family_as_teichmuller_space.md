@@ -5,6 +5,12 @@ Former issue: 54 (converted to a job on 2026-10-28).
 
 Priority: P3 (design; it also improves rendering quality and makes the family generalize).
 
+## Status update 2026-11-05 (issue 95)
+
+[Job 67](67_rigid_floor_patches_and_moduli_readout.md) takes over proposed changes 2 (Teichmuller steps, on a straight segment rather than the hyperbolic geodesic) and 3 (moduli display). What remains here is change 1 (reduced footprint)
+and change 4 (GL2R). Rewrite change 1 from [issue 95](../../_issues/95_torus_moduli_floor_shears_and_the_deformation_does_not_read_as_moduli_space.md) part 4, which corrects this text: a re-marking needs no change to `validateTopologyPreservingSnapshot`,
+needs no half-lattice shift, and needs nothing for the floor once job 67 has landed. The hard part is re-deriving the portal words of locked geodesics, so write it after jobs 63-66.
+
 ## Status update 2026-11-05
 
 This text predates the engine wave; rewrite it before running it. The file moved to `src/cell-complex/deformations/` and the line references are stale. Re-marking must now pass through `geometryCommit` and the geodesic model module.
