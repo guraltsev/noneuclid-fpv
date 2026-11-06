@@ -129,7 +129,7 @@ describe("buildCellRenderArchetypes floor UV frames", () => {
         },
       ],
     } as unknown as CellComplexSpec);
-    const frame = { origin: { x: -5, y: -5 }, u: { x: 10, y: 0 }, v: { x: 2, y: 10 }, tilesAlongU: 3, tilesAlongV: 2 };
+    const frame = { origin: { x: -5, y: -5 }, u: { x: 10, y: 0 }, v: { x: 2, y: 10 }, tilesAlongU: 3, tilesAlongV: 2, restU: { x: 10, y: 0 }, restV: { x: 2, y: 10 } };
     const archetypes = buildCellRenderArchetypes(world, {
       debugLevel: "off",
       portalPanelMode: "none",

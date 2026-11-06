@@ -305,7 +305,7 @@ describe("buildCellMesh floor UVs", () => {
   });
 
   it("uses lattice UVs when a floor UV frame is given", () => {
-    const frame = { origin: { x: -5, y: -5 }, u: { x: 10, y: 0 }, v: { x: 2, y: 10 }, tilesAlongU: 3, tilesAlongV: 2 };
+    const frame = { origin: { x: -5, y: -5 }, u: { x: 10, y: 0 }, v: { x: 2, y: 10 }, tilesAlongU: 3, tilesAlongV: 2, restU: { x: 10, y: 0 }, restV: { x: 2, y: 10 } };
     const { position, uv } = readFloor(5, { floorUvFrame: frame });
     for (let i = 0; i < position.count; i += 1) {
       const [s, t] = floorLatticeUv(frame, { x: position.getX(i), y: -position.getZ(i) });

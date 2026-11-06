@@ -3,7 +3,7 @@
  * The state is width w (the shipped UI keeps it fixed, but the family allows a width change), skew a = skewXMeters in [0, 2w] and depth b = depthMeters in [w/2, 2w]; changing (a, b) changes the flat torus R^2/(Zu + Zv) while keeping the same combinatorics.
  * The per-cell map sends a point p = o_old + alpha u_old + beta v_old to o_new + alpha u_new + beta v_new, where o = -(u+v)/2 is the footprint's first vertex, and keeps the height z; directions map by the same linear part. So lattice coordinates (alpha, beta) are invariant, which is what carries players and objects across a commit.
  * Stepping moves (w, a, b) together along a straight segment in (w, a, b) space by at most maxStepMeters per rebuild (the allowed set is convex, so every point of the segment is allowed). Snapshot validation requires unchanged topology and equal lengths of opposite sides.
- * The floor UV frame is the lattice frame of the current state with tile counts fixed from the base state, so the floor texture follows lattice coordinates like the objects do.
+ * The floor UV frame is the lattice frame of the current state with tile counts and rest vectors fixed from the base state; the floor is painted by rigid patches anchored on the tile lattice (see floorUv.ts), so pebbles keep their shape.
  */
 import type { CompiledCellComplex } from "../compileCellComplex";
 import { floorTilesAlong } from "../floorUv";
@@ -123,6 +123,8 @@ export function createTorusSkewDeformationFamily(): WorldDeformationFamily<Torus
             v: frame.v,
             tilesAlongU: floorTilesAlong(length2(baseFrame.u), material.tileSizeMeters),
             tilesAlongV: floorTilesAlong(length2(baseFrame.v), material.tileSizeMeters),
+            restU: baseFrame.u,
+            restV: baseFrame.v,
           },
         ],
       ]);

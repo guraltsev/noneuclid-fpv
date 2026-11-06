@@ -329,6 +329,11 @@ describe("torus skew floor UV frames", () => {
     expect(frame(trap).tilesAlongV).toBe(6);
   });
 
+  it("gives the base state's vectors as the rest frame", () => {
+    expect(frame(trap).restU).toEqual({ x: 15, y: 0 });
+    expect(frame(trap).restV).toEqual({ x: 0, y: 15 });
+  });
+
   it("has no floor UV frame for a colour floor", () => {
     const cell = torus.cells[0];
     const spec = {
