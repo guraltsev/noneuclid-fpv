@@ -7,7 +7,7 @@ Status: **built** (2026-11-06). The tool is `worldMap/map`, in `src/modules/worl
 The map tool shows the whole world in miniature until it is dismissed: the solid, an icon for each object, and one for the player. It has an entry on the main tool list. The primary action (click, trigger) dismisses it, and choosing another tool ends it as it ends any tool.
 
 - **Desktop.** The map floats in front of the player. It is fixed to the view and turned so the avatar faces the viewer with its heading up, which makes the solid turn under the avatar as the player walks. The palette hides it while open, because both stand in the same place.
-- **VR.** The map floats above the right hand and turns exactly as the hand turns.
+- **VR.** The map floats above the right hand. With the hand held as when the map appeared, it stands as on the desktop; turning the hand turns it from there.
 
 ## Decisions
 
@@ -31,11 +31,11 @@ Two earlier designs were dropped. Low-poly 3D copies made with a mesh simplifier
 
 **Flat things are stacked by render order, not depth.** They write no depth, so overlapping icons on one face cannot fight: strips first, then icons, then the player's on top.
 
-**The hand gives the map its turn, not its offset.** The map's center stays a fixed height above the hand, rather than riding on a rigid arm. Otherwise a turn of the wrist would swing the whole map through the air, and looking at the far side of the solid would move it out of view. It also needs no assumption about the axes of grip and wrist spaces, which differ. The turn relative to the hand is captured the first frame the map appears there, so it opens with the avatar facing the viewer.
+**The hand's turn is composed with the desktop pose, about the player's point.** The first frame the map appears in the hand, the view and the hand's turn are captured. The map's default pose is the desktop one: the player's point a fixed height above the hand, the player facing the captured view, and the solid turning under the player as they move. The hand's turn since the capture is applied on top of it, about the player's point. So the player is centered while the hand is held as at first, a turn of the wrist spins the solid about the player instead of swinging it through the air on a rigid arm, and no assumption is needed about the axes of grip and wrist spaces, which differ. Turning the head does not turn the map.
 
 **The map draws in a thin near slice of the depth range** (`gl.depthRange`), on each of its meshes. A wall close to the player cannot cut through it, and it keeps depth testing among its own parts, which `depthTest: false` would lose. Clearing the depth buffer instead would break the transparent world objects drawn after it.
 
-**The player is always at the map's center.** On the desktop the map is placed so that the player's point, not the solid's center, stands at the map's place in front of the eye, and the solid is turned so that the direction from its center to the player points at the viewer, tilted back 15° so the face is seen a little from above. The turn uses that radial direction, not the face normal, so it does not jump at an edge: in the middle of a face the face is seen almost square on, and toward an edge or a corner the solid turns to show the next faces. A three-quarter view with the player off to the lower left came first and lost the player on faces seen edge-on; a 30° tilt hid the face ahead when walking toward an edge. In XR the hand turns the map and the solid's center stays above the hand.
+**The player is always at the map's center.** On the desktop the map is placed so that the player's point, not the solid's center, stands at the map's place in front of the eye, and the solid is turned so that the direction from its center to the player points at the viewer, tilted back 15° so the face is seen a little from above. The turn uses that radial direction, not the face normal, so it does not jump at an edge: in the middle of a face the face is seen almost square on, and toward an edge or a corner the solid turns to show the next faces. A three-quarter view with the player off to the lower left came first and lost the player on faces seen edge-on; a 30° tilt hid the face ahead when walking toward an edge.
 
 ## Not verified on a headset
 
