@@ -122,6 +122,7 @@ function createRuntimeCreatureObject(objectSpec: SimpleGeoCreatureObjectSpec, ce
   return {
     id: objectSpec.id,
     kind: objectSpec.kind,
+    mapIconPath: objectSpec.mapIconPath,
     cellId,
     localPose: yawRigidTransform3(
       objectSpec.turnRadians ?? 0,

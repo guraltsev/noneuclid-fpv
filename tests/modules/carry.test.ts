@@ -378,6 +378,90 @@ describe("a carry the world ends in a frame with no tick", () => {
   });
 });
 
+describe("setting an emitter down on a geodesic's path", () => {
+  /** `cannon-c` at (3, 1.5) of room a, with nothing of its own, and a free geodesic `g-f` from `cannon-f` at (2, 0.5) running north for 4 m. */
+  function withFreeGeodesic() {
+    const scene = setup();
+    const { world, registry } = scene;
+    registry.add(createGeodesicEmitterObject({ id: "cannon-c", cellId: "a", localPose: yawRigidTransform3(0, { x: 3, y: 1.5, z: 0 }) }));
+    const free = createGeodesicEmitterObject({ id: "cannon-f", cellId: "a", localPose: yawRigidTransform3(Math.PI / 2, { x: 2, y: 0.5, z: 0 }) });
+    registry.add(free);
+    shootGeodesic({ world, registry, cannon: free, geodesicId: "g-f", maxLengthMeters: 4 });
+    return scene;
+  }
+
+  function carryTo(scene: ReturnType<typeof setup>, emitterId: string, x: number, y: number): void {
+    scene.run("local", { kind: "carry/attach", objectId: emitterId });
+    scene.hand(x, y);
+    scene.step(1);
+    scene.run("local", { kind: "carry/detach" });
+  }
+
+  function arcLeaving(registry: RuntimeObjectRegistry, emitterId: string) {
+    return registry.getAll().filter((object) => object.kind === "geodesicModel/arc").find((arc) => arc.kind === "geodesicModel/arc" && arc.start.anchorObjectId === emitterId);
+  }
+
+  it("cuts a connected geodesic in two connected halves that keep its portal crossing", () => {
+    const scene = setup();
+    const { registry } = scene;
+    registry.add(createGeodesicEmitterObject({ id: "cannon-c", cellId: "a", localPose: yawRigidTransform3(0, { x: 3, y: 1.5, z: 0 }) }));
+
+    carryTo(scene, "cannon-c", 4.6, 2.6);
+
+    expect(registry.get("g-a")).toMatchObject({ start: { anchorObjectId: "cannon-a" }, end: { anchorObjectId: "cannon-c" }, portalWord: [] });
+    const leaving = arcLeaving(registry, "cannon-c");
+    expect(leaving).toMatchObject({ end: { anchorObjectId: "cannon-b" }, portalWord: [{ sourceCellId: "a", sourcePortalId: "ab", targetCellId: "b" }] });
+    expect(getGeodesicConnection(registry, "g-a")?.state).toBe("connected");
+    expect(getGeodesicConnection(registry, leaving!.id)?.state).toBe("connected");
+    const end = getGeodesicSegments(registry, "g-a").at(-1)!;
+    expect(end.start.x + end.direction.x * end.lengthMeters).toBeCloseTo(registry.get("cannon-c")!.localPose.translation.x, 9);
+  });
+
+  it("cuts a free geodesic: the first half connects, the second keeps the free end", () => {
+    const scene = withFreeGeodesic();
+    const { registry } = scene;
+    const freeEndId = (registry.get("g-f") as { readonly end: { readonly anchorObjectId: string } }).end.anchorObjectId;
+
+    carryTo(scene, "cannon-c", 2.1, 2.5);
+
+    expect(registry.get("g-f")).toMatchObject({ start: { anchorObjectId: "cannon-f" }, end: { anchorObjectId: "cannon-c" } });
+    expect(getGeodesicConnection(registry, "g-f")?.state).toBe("connected");
+    const leaving = arcLeaving(registry, "cannon-c");
+    expect(leaving).toMatchObject({ end: { anchorObjectId: freeEndId } });
+    // The free end stays where it was, so the second half is the straight chord from the emitter to it, and nothing of the 4 m was stopped short.
+    const leavingMeters = getGeodesicSegments(registry, leaving!.id).reduce((total, segment) => total + segment.lengthMeters, 0);
+    expect(leavingMeters).toBeCloseTo(Math.hypot(2 - 2.1, 4.5 - 2.5), 9);
+    expect(leaving?.kind === "geodesicModel/arc" ? leaving.intendedLengthMeters : Number.NaN).toBeCloseTo(leavingMeters, 9);
+  });
+
+  it("leaves a geodesic alone when the emitter is set down beside its path", () => {
+    const scene = withFreeGeodesic();
+    const { registry } = scene;
+    const before = registry.get("g-f");
+
+    carryTo(scene, "cannon-c", 2.5, 2.5);
+
+    expect(registry.get("g-f")).toBe(before);
+    expect(arcLeaving(registry, "cannon-c")).toBeUndefined();
+  });
+
+  it("does not cut the carried emitter's own geodesics", () => {
+    const scene = setup();
+    const { registry } = scene;
+
+    carryTo(scene, "cannon-b", 4.6, 2.5);
+
+    expect(registry.getAll().filter((object) => object.kind === "geodesicModel/arc").map((arc) => arc.id)).toEqual(["g-a"]);
+    expect(getGeodesicConnection(registry, "g-a")).toMatchObject({ outgoingEmitterId: "cannon-a", incomingEmitterId: "cannon-b", state: "connected" });
+  });
+
+  it("keeps the module-only land away from clients", () => {
+    const { run } = setup();
+
+    expect(run("local", { kind: "geodesicEmitters/land", emitterId: "cannon-a" } as never)).toMatchObject({ ok: false, refusal: { code: "world/moduleOnly" } });
+  });
+});
+
 describe("the hand lets go", () => {
   it("ends the carry in the world and emits carry/dropped when the emitter is beyond the leash", () => {
     const { engine, registry, run, hand, step, events } = setup();

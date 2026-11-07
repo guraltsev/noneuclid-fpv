@@ -20,7 +20,7 @@ import { readGlbBounds } from "../support/glbBounds";
 
 const world = compileCellComplex(tetrahedron);
 
-// The real rover.glb box in a stand-in scene, placed by the real rover model (scale and half turn), so the footprint is the one the app measures.
+// The real model's box in a stand-in scene, placed by the real avatar model (scale, turn and lift), so the footprint is the one the app measures.
 function realRoverModel() {
   const bounds = readGlbBounds(new URL(`../../public/assets/${playerRoverAssetPath}`, import.meta.url));
   const size = bounds.max.map((max, axis) => max - bounds.min[axis]);
@@ -83,8 +83,8 @@ describe("the measured rover footprint", () => {
   it("is built from the real model (a stand-in for it would not reproduce the offset)", () => {
     const { footprint } = realRoverModel();
 
-    expect(footprint.radiusMeters).toBeCloseTo(0.9628, 3);
-    expect(footprint.center.y).toBeCloseTo(0.146, 3);
+    expect(footprint.radiusMeters).toBeCloseTo(0.929, 3);
+    expect(footprint.center.y).toBeCloseTo(-0.181, 3);
     expect(collectRuntimeObjectRenderSourceMeshes).toBeDefined();
   });
 });

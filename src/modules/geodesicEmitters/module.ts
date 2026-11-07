@@ -1,7 +1,7 @@
 /**
  * The geodesic emitters module (design 013 section 16): an emitter and what a person does to create or remove it and its geodesics, as commands. It is the world part over `src/world-objects/geodesic/cannon.ts`, which stays in place.
  *
- * It declares the emitter kind and handles `place`, `shoot`, `extend`, `deleteGeodesic` and `remove`, each requiring the emitter tool, which it defines, then `beginEdit` and `endEdit`, and the module-only `lift`. Every command is atomic: a refusal changes nothing. Results carry the new ids.
+ * It declares the emitter kind and handles `place`, `shoot`, `extend`, `deleteGeodesic` and `remove`, each requiring the emitter tool, which it defines, then `beginEdit` and `endEdit`, and the module-only `lift` and `land`. Every command is atomic: a refusal changes nothing. Results carry the new ids.
  * Its one tick, `edit`, runs in `bodies`, on the fast channel: each frame an edited emitter takes the yaw of its slot and its free geodesic is re-traced, so aiming keeps up in frames with no tick too. Crossings, lengths and angles follow from the change ring in the derive pass of the next step.
  * The module writes the emitter and nothing else. Reads of arcs go through the geodesic model's queries; every write of an arc is the model's, by its commands, or by its `api` on the fast channel, where a command would not do (design 013 section 5.4). Its own `api` is what a carrier calls.
  */
@@ -14,6 +14,7 @@ import type { RuntimeObjectReader, RuntimeObjectRegistry } from "../../world-obj
 import {
   geodesicModelToken,
   type GeodesicCutAtSegmentCommand,
+  type GeodesicCutAtEmitterCommand,
   type GeodesicCutAtVertexCommand,
   type GeodesicExtendArcCommand,
   type GeodesicModelApi,
@@ -32,6 +33,7 @@ import {
   type GeodesicEmitterBeginEditCommand,
   type GeodesicEmitterDeleteGeodesicCommand,
   type GeodesicEmitterExtendCommand,
+  type GeodesicEmitterLandCommand,
   type GeodesicEmitterLiftCommand,
   type GeodesicEmitterPlaceCommand,
   type GeodesicEmitterRemoveCommand,
@@ -157,6 +159,11 @@ function createRemove(model: GeodesicModelQueries) {
     ctx.objects.remove(command.emitterId);
     return answer({ outcome: "removed", emitterId: command.emitterId, arcIds });
   };
+}
+
+function land(command: GeodesicEmitterLandCommand, ctx: CommandContext): CommandResult {
+  const cut: GeodesicCutAtEmitterCommand = { kind: "geodesicModel/cutAtEmitter", emitterId: command.emitterId };
+  return ctx.dispatch(cut);
 }
 
 function withoutEdit(participant: ParticipantRecord) {
@@ -316,6 +323,7 @@ export function geodesicEmittersModule(): GeodesicEmittersModuleDefinition {
         "geodesicEmitters/beginEdit": { run: createBeginEdit(model), requiresTool: editToolId },
         "geodesicEmitters/endEdit": { run: createEndEdit(model), requiresTool: editToolId },
         "geodesicEmitters/lift": { run: lift, moduleOnly: true },
+        "geodesicEmitters/land": { run: land, moduleOnly: true },
       };
       return { api: createApi(context.objects, model), queries: {}, commands, ticks: [edit], publicApi: createPublicApi(context.submitPublicCommand) };
     },

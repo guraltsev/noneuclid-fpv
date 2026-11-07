@@ -764,7 +764,8 @@ img.desktop-tool-tile-icon {
 .desktop-tool-indicator-ray-icon,
 .desktop-tool-indicator-carry-icon,
 .desktop-tool-indicator-protractor-icon,
-.desktop-tool-indicator-measure-icon {
+.desktop-tool-indicator-measure-icon,
+.desktop-tool-indicator-world-map-icon {
   display: none;
   width: 2rem;
   height: 2rem;
@@ -774,12 +775,14 @@ img.desktop-tool-tile-icon {
 .desktop-tool-indicator-ray-icon,
 .desktop-tool-indicator-carry-icon,
 .desktop-tool-indicator-protractor-icon,
-.desktop-tool-indicator-measure-icon {
+.desktop-tool-indicator-measure-icon,
+.desktop-tool-indicator-world-map-icon {
   object-fit: contain;
 }
 
 .desktop-tool-indicator-carry-icon,
-.desktop-tool-indicator-measure-icon {
+.desktop-tool-indicator-measure-icon,
+.desktop-tool-indicator-world-map-icon {
   filter: invert(1);
 }
 
@@ -792,7 +795,8 @@ img.desktop-tool-tile-icon {
 .desktop-tool-indicator-geodesic-cannon .desktop-tool-indicator-ray-icon,
 .desktop-tool-indicator-geodesic-cannon-carry .desktop-tool-indicator-carry-icon,
 .desktop-tool-indicator-measure-length .desktop-tool-indicator-measure-icon,
-.desktop-tool-indicator-protractor .desktop-tool-indicator-protractor-icon {
+.desktop-tool-indicator-protractor .desktop-tool-indicator-protractor-icon,
+.desktop-tool-indicator-world-map .desktop-tool-indicator-world-map-icon {
   display: block;
   color: #f8fafc;
 }

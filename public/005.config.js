@@ -17,6 +17,9 @@ export default {
     geodesicEmitters: true,
     distances: true,
     angles: true,
+
+    // World map: the world in miniature, in worlds that are Platonic solids.
+    worldMap: true,
   },
 
   debug: {

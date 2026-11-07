@@ -6,9 +6,11 @@
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import { publicAssetUrl } from "../../src/glue/assetUrls";
+import { createFakeXrFrame, createFakeXrInputSource } from "../support/fakeXr";
 import { createTestToolsById } from "../support/tools";
 import {
   createHandModelTemplates,
+  createXrControllerHandModels,
   resolveWristToolIndicatorVisual,
 } from "../../src/render/three/xrControllerHandModels";
 
@@ -62,7 +64,33 @@ describe("xrControllerHandModels", () => {
       imageSource: publicAssetUrl("icons/carry.svg"),
       label: "Carry",
     });
+    expect(resolveWristToolIndicatorVisual(toolsById.get("worldMap/map"), "WoodenSign1")).toMatchObject({
+      icon: "image",
+      imageSource: publicAssetUrl("icons/world-map.svg"),
+      label: "Map",
+    });
     expect(resolveWristToolIndicatorVisual(toolsById.get("none"), "WoodenSign1")).toBeUndefined();
+  });
+
+  it("reports the right hand only while it is tracked", () => {
+    const hands = createXrControllerHandModels(new THREE.Scene());
+    const frame = {
+      xrFrame: createFakeXrFrame({ position: { x: 0.2, y: 1.1, z: -0.3 } }),
+      referenceSpace: {} as XRReferenceSpace,
+      referenceSpaceToWorldMatrix: new THREE.Matrix4().makeTranslation(1, 0, 0),
+      tool: undefined,
+    };
+    expect(hands.rightHand()).toBeUndefined();
+
+    hands.update({ ...frame, inputSources: [createFakeXrInputSource({ handedness: "left" })] });
+    expect(hands.rightHand()).toBeUndefined();
+
+    hands.update({ ...frame, inputSources: [createFakeXrInputSource({ handedness: "right" })] });
+    expect(hands.rightHand()?.position.toArray()).toEqual([1.2, 1.1, -0.3]);
+
+    hands.update({ ...frame, inputSources: [] });
+    expect(hands.rightHand()).toBeUndefined();
+    hands.dispose();
   });
 });
 

@@ -4,7 +4,7 @@
  *
  * The module declares the four geodesic kinds (arc, vertex, segment, crossing), provides the token `geodesicModel` with the queries clients and dependents
  * read and the hot operations only dependents hold (`previewVertexMove`, `commitVertexMove`, `previewVertexRemoval`, and on the fast channel `retraceArc`, `followAnchorRoute`, `rebuildArcsOfEmitter`), and handles the commands `tieAndDetach`,
- * `highlightEndpoint`, and the module-only `removeVertex`, `removeCurve`, `shootArc`, `extendArc`, `cutAtSegment`, `cutAtVertex` and `removePlainArcs`. Its one tick, `crossings`, is a derive tick that recomputes the crossing markers when segments change. The
+ * `highlightEndpoint`, and the module-only `removeVertex`, `removeCurve`, `shootArc`, `extendArc`, `cutAtSegment`, `cutAtVertex`, `cutAtEmitter` and `removePlainArcs`. Its one tick, `crossings`, is a derive tick that recomputes the crossing markers when segments change. The
  * tie command requires the tie tool (defined here, with its client part in `client.ts`) unless the experience leaves the tool out. Each command is atomic: on refusal nothing changes.
  * Everything that writes an arc, a vertex or a segment runs here, in this module's frame, so the write guard holds for every caller; the emitter's own record is the emitters' to write.
  */
@@ -23,6 +23,7 @@ import {
   isTied,
   tiedVertexCount,
 } from "../../world-objects/geodesic/endpoints";
+import { cutArcsPassingEmitter } from "../../world-objects/geodesic/cutAtEmitter";
 import { splitGeodesicIntervalAtSegmentHit } from "../../world-objects/geodesic/intervals";
 import { arcConnectsEmitters, getGeodesicConnection, removeGeodesic, removePlainGeodesicsFromCannon } from "../../world-objects/geodesic/lifecycle";
 import { pruneMissingGeodesicIntersectionObjects, updateGeodesicIntersectionObjects } from "../../world-objects/geodesic/intersections";
@@ -43,6 +44,7 @@ import {
   geodesicModelToken,
   geodesicTieToolId,
   type GeodesicCutAtSegmentCommand,
+  type GeodesicCutAtEmitterCommand,
   type GeodesicCutAtVertexCommand,
   type GeodesicExtendArcCommand,
   type GeodesicHighlightEndpointCommand,
@@ -175,6 +177,13 @@ function cutAtVertex(command: GeodesicCutAtVertexCommand, ctx: CommandContext): 
   return yawRadians === undefined ? { ok: true } : { ok: true, value: { yawRadians } };
 }
 
+function cutAtEmitter(command: GeodesicCutAtEmitterCommand, ctx: CommandContext): CommandResult {
+  const emitter = ctx.objects.get(command.emitterId);
+  if (emitter?.kind !== "geodesicEmitters/emitter") return refuse(geodesicModelRefusals.notAnEmitter, "That is not an emitter.");
+  const arcIds = cutArcsPassingEmitter({ world: ctx.world, registry: ctx.objects, emitter, createArcId: () => ctx.ids.next("arc") });
+  return { ok: true, value: { arcIds: [...arcIds] } };
+}
+
 function removePlainArcs(command: GeodesicRemovePlainArcsCommand, ctx: CommandContext): CommandResult {
   return { ok: true, value: { arcIds: removePlainGeodesicsFromCannon(ctx.objects, command.emitterId) } };
 }
@@ -247,6 +256,7 @@ export function geodesicModelModule(options: Partial<GeodesicModelOptions> = {})
         "geodesicModel/extendArc": { run: extendArc, moduleOnly: true },
         "geodesicModel/cutAtSegment": { run: cutAtSegment, moduleOnly: true },
         "geodesicModel/cutAtVertex": { run: cutAtVertex, moduleOnly: true },
+        "geodesicModel/cutAtEmitter": { run: cutAtEmitter, moduleOnly: true },
         "geodesicModel/removePlainArcs": { run: removePlainArcs, moduleOnly: true },
       };
       const publicApi: GeodesicModelPublicApi = {

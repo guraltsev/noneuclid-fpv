@@ -109,6 +109,12 @@ export interface GeodesicEmitterLiftCommand extends EngineCommandBase {
   readonly emitterId: string;
 }
 
+/** Module-only. The emitter is set down: every arc whose path passes it is cut there and attached to it (`geodesicModel/cutAtEmitter`). The result is that command's. */
+export interface GeodesicEmitterLandCommand extends EngineCommandBase {
+  readonly kind: "geodesicEmitters/land";
+  readonly emitterId: string;
+}
+
 /** Every command of the module. */
 export type GeodesicEmittersCommand =
   | GeodesicEmitterPlaceCommand
@@ -118,7 +124,8 @@ export type GeodesicEmittersCommand =
   | GeodesicEmitterRemoveCommand
   | GeodesicEmitterBeginEditCommand
   | GeodesicEmitterEndEditCommand
-  | GeodesicEmitterLiftCommand;
+  | GeodesicEmitterLiftCommand
+  | GeodesicEmitterLandCommand;
 
 /** What a command that succeeded answers with: `outcome` names the command, the ids are what it created or touched. `arcIds` of `placed` are the arcs on the new emitter, the arc that was cut first. */
 export type GeodesicEmittersResult =

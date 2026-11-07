@@ -17,6 +17,7 @@ const rayToolIconSource = publicAssetUrl("flashlight/Lightsaber.png");
 const carryToolIconSource = publicAssetUrl("icons/carry.svg");
 const protractorToolIconSource = publicAssetUrl("icons/protractor.png");
 const measureLengthToolIconSource = publicAssetUrl("icons/ruler.svg");
+const worldMapToolIconSource = publicAssetUrl("icons/world-map.svg");
 
 /** Handle to the tool indicator created by {@link createDesktopToolIndicator}. */
 export interface DesktopToolIndicator {
@@ -77,7 +78,13 @@ export function createDesktopToolIndicator(container: HTMLElement): DesktopToolI
   measureIcon.decoding = "async";
   measureIcon.src = measureLengthToolIconSource;
   measureIcon.setAttribute("aria-hidden", "true");
-  icon.append(aimIcon, signIcon, rayIcon, carryIcon, protractorIcon, measureIcon);
+  const worldMapIcon = document.createElement("img");
+  worldMapIcon.className = "desktop-tool-indicator-world-map-icon";
+  worldMapIcon.alt = "";
+  worldMapIcon.decoding = "async";
+  worldMapIcon.src = worldMapToolIconSource;
+  worldMapIcon.setAttribute("aria-hidden", "true");
+  icon.append(aimIcon, signIcon, rayIcon, carryIcon, protractorIcon, measureIcon, worldMapIcon);
 
   const label = document.createElement("span");
   label.className = "desktop-tool-indicator-label";
@@ -103,6 +110,7 @@ export function createDesktopToolIndicator(container: HTMLElement): DesktopToolI
       root.classList.toggle("desktop-tool-indicator-geodesic-cannon", iconId === "ray" || iconId === "rotate" || iconId === "aim");
       root.classList.toggle("desktop-tool-indicator-geodesic-cannon-carry", iconId === "carry");
       root.classList.toggle("desktop-tool-indicator-protractor", iconId === "protractor");
+      root.classList.toggle("desktop-tool-indicator-world-map", iconId === "map");
       root.classList.toggle("desktop-tool-indicator-WoodenSign1", flagType === "WoodenSign1");
       root.classList.toggle("desktop-tool-indicator-WoodenSign2", flagType === "WoodenSign2");
       signIcon.src = signIconSources[flagType];

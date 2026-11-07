@@ -76,6 +76,8 @@ export interface RuntimeWorldObjectBase {
  */
 export interface RuntimeCreatureObject extends RuntimeWorldObjectBase {
   readonly kind: "geodesci-marmot" | "geo-mouse" | "geo-butterfly";
+  /** The creature's icon on the world map, from its spec. */
+  readonly mapIconPath?: string;
 }
 
 /**

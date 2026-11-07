@@ -13,7 +13,10 @@
  */
 import { createFixtureArc as createGeodesicArcObject } from "../../support/arcs";
 import { describe, expect, it } from "vitest";
-import { yawRigidTransform3 } from "../../../src/math/rigidTransform3";
+import { transformPoint3, yawRigidTransform3 } from "../../../src/math/rigidTransform3";
+import { compileCellComplex } from "../../../src/cell-complex/compileCellComplex";
+import { tetrahedron } from "../../../src/authoring/exampleWorlds";
+import { tieAtNewVertex } from "../../../src/world-objects/geodesic/vertices";
 import { rebuildConnectedGeodesicBetweenEmitters } from "../../../src/world-objects/geodesic/cannon";
 import { updateGeodesicIntersectionObjects } from "../../../src/world-objects/geodesic/intersections";
 import { collectFollowingArcIdsForEmitter, removeGeodesic } from "../../../src/world-objects/geodesic/lifecycle";
@@ -128,6 +131,71 @@ describe("geodesic rebuild outcomes", () => {
     expect(realize({ x: 1, y: 0 }).kind).toBe("ok");
     expect(realize({ x: 5, y: 0 })).toMatchObject({ kind: "wall", sideIndex: 1 });
     expect(realize({ x: -1.9, y: 0 }).kind).toBe("degenerate");
+  });
+
+  describe("an anchor exactly on a portal side", () => {
+    // Tetrahedron face-c, side-0 is the portal to face-d. `onSide` is the midpoint of that side, in face-c's frame.
+    const world = compileCellComplex(tetrahedron);
+    const side = world.cellsById.get("face-c")!.sides.find((entry) => entry.sideIndex === 0)!;
+    const portal = side.portal!;
+    const onSide = { x: (side.start.x + side.end.x) / 2, y: (side.start.y + side.end.y) / 2, z: 0 };
+    const crossing = { sourceCellId: "face-c", sourcePortalId: portal.id, targetCellId: portal.targetCellId, targetPortalId: portal.targetPortalId };
+
+    function sceneWithEdgeEmitter(edgeEmitterCellId: "face-c" | "face-d") {
+      const registry = createRuntimeObjectRegistry();
+      const edgePoint = edgeEmitterCellId === "face-c" ? onSide : transformPoint3(portal.transformToTarget, onSide);
+      registry.add(createGeodesicEmitterObject({ id: "inner", cellId: "face-c", localPose: yawRigidTransform3(0, { x: 0, y: 0, z: 0 }) }));
+      registry.add(createGeodesicEmitterObject({ id: "edge", cellId: edgeEmitterCellId, localPose: yawRigidTransform3(0, edgePoint) }));
+      registry.add(createGeodesicEmitterObject({ id: "other", cellId: "face-c", localPose: yawRigidTransform3(0, { x: -3, y: 2, z: 0 }) }));
+      registry.add(createGeodesicArcObject({
+        id: "to-edge",
+        startAnchorObjectId: "inner",
+        endAnchorObjectId: "edge",
+        startCellId: "face-c",
+        portalWord: edgeEmitterCellId === "face-c" ? [] : [crossing],
+      }));
+      return registry;
+    }
+
+    it("ends a chord on the side without crossing it when the word stays in the side's cell", () => {
+      const registry = sceneWithEdgeEmitter("face-c");
+      const interval = registry.get("to-edge");
+      if (interval?.kind !== "geodesicModel/arc") throw new Error("Expected the arc.");
+
+      const realization = realizeIntervalChord({ world, registry, interval });
+
+      expect(realization.kind).toBe("ok");
+      expect(realization.kind === "ok" ? realization.traces.map((trace) => [trace.cellId, trace.terminal.kind]) : []).toEqual([["face-c", "open"]]);
+    });
+
+    it("still crosses the side when the word ends beyond it", () => {
+      const registry = sceneWithEdgeEmitter("face-d");
+      const interval = registry.get("to-edge");
+      if (interval?.kind !== "geodesicModel/arc") throw new Error("Expected the arc.");
+
+      const realization = realizeIntervalChord({ world, registry, interval });
+
+      expect(realization.kind).toBe("ok");
+      expect(realization.kind === "ok" ? realization.traces.map((trace) => [trace.cellId, trace.terminal.kind]) : []).toEqual([["face-c", "portal-hit"]]);
+    });
+
+    it("ties two arcs at an emitter on the side", () => {
+      const registry = sceneWithEdgeEmitter("face-c");
+      registry.add(createGeodesicArcObject({ id: "from-edge", startAnchorObjectId: "edge", endAnchorObjectId: "other", startCellId: "face-c" }));
+      for (const id of ["to-edge", "from-edge"]) {
+        expect(rebuildConnectedGeodesicBetweenEmitters({ world, registry, geodesicId: id }).length).toBeGreaterThan(0);
+      }
+
+      const tied = tieAtNewVertex(world, registry, {
+        detachedEmitterId: "edge",
+        first: { geodesicId: "to-edge", role: "end", anchorObjectId: "edge" },
+        second: { geodesicId: "from-edge", role: "start", anchorObjectId: "edge" },
+        createVertexId: () => "v",
+      });
+
+      expect(tied).toMatchObject({ ok: true, vertexId: "v" });
+      expect(registry.get("to-edge")).toMatchObject({ portalWord: [], end: { anchorObjectId: "v" } });
+    });
   });
 
   it("reports the junction of a chord blocked by a forbidden zone", () => {

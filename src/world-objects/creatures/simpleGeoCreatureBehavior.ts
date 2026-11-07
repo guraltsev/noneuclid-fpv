@@ -1,6 +1,6 @@
 /**
  * Motion of the simple geodesic creatures (the mouse and the butterfly), with no renderer: the state a creature owns, how it advances each frame, and how it follows geometry changes.
- * Each creature owns an invisible leader that walks its geodesic exactly with the segment-walk kernel (while the creature is within `creatureLeashMeters` of it); the creature steers toward the leader plus a sinusoidal sideways wobble (faded out near forbidden zones around portal junction vertices) and, for butterflies, a bounded vertical bob, with swept collision against walls, forbidden zones and other bodies, so it detours around an obstacle and then rejoins the same geodesic; a detour around a forbidden zone keeps the zone's vertex on the side the geodesic passes it.
+ * Each creature owns an invisible leader that walks its geodesic exactly with the segment-walk kernel, at the spec speed, every frame: the leader is authoritative, and nothing the creature meets slows or turns it. The leader leaves a trail (one straight piece per cell it crosses). The creature steers toward a chase point on that trail, at most `creatureLeashMeters` ahead of it along the trail and never past the leader, plus a sinusoidal sideways wobble (faded out near forbidden zones around portal junction vertices) and, for butterflies, a bounded vertical bob, with swept collision against walls, forbidden zones and other bodies. So a blocked creature goes round the obstacle, then catches up with the leader along its trail, at up to `creatureCatchUpFactor` times its speed; a detour around a forbidden zone keeps the zone's vertex on the side the geodesic passes it.
  * Units are meters, seconds and radians; positions and displacements are in the current cell's local frame (x right, y forward, z up). The behavior registers its record in the runtime object registry and publishes every change of its pose there; the Three.js model that shows it lives in `render/three/creatures/simpleGeoCreatureView`.
  */
 import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex";
@@ -50,9 +50,11 @@ export interface SimpleGeoCreatureBehavior extends WorldObjectOwner {
   reset(): void;
 }
 
-/** The leader advances only while the creature lags it by less than this many meters, so it waits for a blocked creature. */
+/**
+ * The chase point that the creature steers to runs at most this many meters ahead of the creature along the leader's trail (sideways distance does not count, so a creature going wide round a forbidden zone does not hold it back). It only shapes the creature's motion: the leader never waits.
+ */
 export const creatureLeashMeters = 0.5;
-/** The creature may move toward its leader at up to this multiple of its speed, so it catches up after a detour. */
+/** The creature may move toward its chase point at up to this multiple of its speed, so it catches up with the leader after a detour. */
 const creatureCatchUpFactor = 1.5;
 /** Margin added to the sum of radii when deciding that a creature touches a forbidden zone, in meters. */
 const forbiddenZoneContactMarginMeters = 1e-5;
@@ -67,9 +69,35 @@ const butterflyVerticalMagnitudeMaxMeters = 0.08;
 const forbiddenZoneLateralStopClearanceMeters = 0.5;
 const forbiddenZoneLateralFadeMeters = 0.5;
 
+/** One straight piece of a leader's trail: the part of its geodesic in one cell. */
+interface TrailPiece {
+  readonly cellId: string;
+  /** Arc length along the geodesic where the piece starts, meters. */
+  readonly startMeters: number;
+  /** The leader's pose where the piece starts, in the cell's frame. */
+  readonly start: RigidTransform3;
+  /** Map from the previous piece's cell frame to this piece's cell frame (the portal crossing); identity for the first piece. */
+  readonly fromPrevious: RigidTransform3;
+}
+
+/** The pose on a trail piece at arc length `meters`, in the piece's cell frame. */
+function poseOnTrailPiece(piece: TrailPiece, meters: number): RigidTransform3 {
+  const forward = transformDirection3(piece.start, vec3(0, 1, 0));
+  const along = meters - piece.startMeters;
+
+  return {
+    rotation: piece.start.rotation,
+    translation: vec3(
+      piece.start.translation.x + forward.x * along,
+      piece.start.translation.y + forward.y * along,
+      piece.start.translation.z,
+    ),
+  };
+}
+
 /**
  * Creates the behavior for a creature starting in `startCellId`.
- * Registers the object in `registry` when given (throwing if the id already exists) and claims ownership of its registry record, so only the creature itself writes the record afterwards; `place` (the `WorldObjectOwner` placement command), `reset` and `transformGeometry` re-seed the leader on the creature. The leader advances at the spec speed along its forward axis exactly on the geodesic; the creature moves toward the leader plus the lateral wobble and butterfly bob, so with nothing in the way its path is the geodesic plus a bounded oscillation, and after a detour it returns to the same geodesic.
+ * Registers the object in `registry` when given (throwing if the id already exists) and claims ownership of its registry record, so only the creature itself writes the record afterwards; `place` (the `WorldObjectOwner` placement command), `reset` and `transformGeometry` re-seed the leader on the creature. The leader advances at the spec speed along its forward axis exactly on the geodesic every frame; the creature moves toward a chase point on the leader's trail plus the lateral wobble and butterfly bob, so with nothing in the way the chase point is the leader and the creature's path is the geodesic plus a bounded oscillation, and after a detour it catches up along the trail and returns to the same geodesic.
  */
 export function createSimpleGeoCreatureBehavior(
   objectSpec: SimpleGeoCreatureObjectSpec,
@@ -87,31 +115,42 @@ export function createSimpleGeoCreatureBehavior(
   let verticalOscillationPhaseRadians = initialButterflyVerticalOscillationPhaseRadians(objectSpec);
   // The bob is measured from its value at the start, so the creature starts at its authored height.
   let verticalBaselineMeters = butterflyVerticalOscillationHeightOffset(objectSpec, verticalOscillationPhaseRadians);
-  // The leader walks the geodesic exactly; `creatureFromLeader` maps its cell frame to the creature's cell frame along the paths actually walked.
-  let leader: { cellId: string; localPose: RigidTransform3 } = { cellId: state.cellId, localPose: state.localPose };
-  let creatureFromLeader: RigidTransform3 = identityRigidTransform3;
+  // The leader's trail from the chase point to the leader: pieces of the geodesic, one per cell, at arc lengths (meters along the geodesic) from the last seeding.
+  // `leaderMeters` is the leader's arc length, so the leader is at the end of the last piece. The chase point is at `chaseMeters` on the first piece, and
+  // `creatureFromChase` maps that piece's cell frame to the creature's cell frame along the paths actually walked (the trail's crossings and the creature's).
+  let trail: TrailPiece[] = [];
+  let leaderMeters = 0;
+  let chaseMeters = 0;
+  let creatureFromChase: RigidTransform3 = identityRigidTransform3;
   let warnedLeaderWalk = false;
+  // Set when the last step stopped at a forbidden zone because the chase point lies a little behind round it; the chase point then moves on whatever the leash says.
+  let waitingForChase = false;
   const seedLeaderOnCreature = (): void => {
-    leader = { cellId: state.cellId, localPose: state.localPose };
-    creatureFromLeader = identityRigidTransform3;
+    trail = [{ cellId: state.cellId, startMeters: 0, start: state.localPose, fromPrevious: identityRigidTransform3 }];
+    leaderMeters = 0;
+    chaseMeters = 0;
+    creatureFromChase = identityRigidTransform3;
+    waitingForChase = false;
   };
+  seedLeaderOnCreature();
   const publishState = (): void => {
     record = { ...record, cellId: state.cellId, localPose: state.localPose, collision: state.collision };
     publish(record);
   };
+  const lastTrailPiece = (): TrailPiece => trail[trail.length - 1];
+  // Walks the leader `lengthMeters` on along its geodesic and adds a trail piece for each cell it enters.
   const advanceLeader = (world: CompiledCellComplex, lengthMeters: number): void => {
-    const pose = leader.localPose;
+    const pose = poseOnTrailPiece(lastTrailPiece(), leaderMeters);
     const direction = transformDirection3(pose, vec3(0, 1, 0));
     const walk = walkDevelopedSegment({
       world,
-      cellId: leader.cellId,
+      cellId: lastTrailPiece().cellId,
       start: { x: pose.translation.x, y: pose.translation.y },
       direction: { x: direction.x, y: direction.y },
       lengthMeters,
     });
-    const last = walk.pieces[walk.pieces.length - 1];
 
-    if (walk.status !== "end" || !last) {
+    if (walk.status !== "end" || walk.pieces.length === 0) {
       if (!warnedLeaderWalk) {
         warnedLeaderWalk = true;
         console.warn(`Creature "${objectSpec.id}": leader walk ended with status "${walk.status}"; the leader stays put.`);
@@ -119,19 +158,42 @@ export function createSimpleGeoCreatureBehavior(
       return;
     }
 
-    const moved: RigidTransform3 = {
-      rotation: pose.rotation,
-      translation: vec3(
-        pose.translation.x + direction.x * lengthMeters,
-        pose.translation.y + direction.y * lengthMeters,
-        pose.translation.z,
-      ),
-    };
-    leader = { cellId: last.cellId, localPose: orthonormalizeYawRigidTransform3(composeRigidTransform3(last.cellFromStart, moved)) };
-    creatureFromLeader = orthonormalizeYawRigidTransform3(
-      composeRigidTransform3(creatureFromLeader, invertRigidTransform3(last.cellFromStart)),
-    );
+    for (let index = 1; index < walk.pieces.length; index += 1) {
+      const piece = walk.pieces[index];
+      const entered: RigidTransform3 = {
+        rotation: pose.rotation,
+        translation: vec3(
+          pose.translation.x + direction.x * piece.tEnter,
+          pose.translation.y + direction.y * piece.tEnter,
+          pose.translation.z,
+        ),
+      };
+      trail.push({
+        cellId: piece.cellId,
+        startMeters: leaderMeters + piece.tEnter,
+        start: orthonormalizeYawRigidTransform3(composeRigidTransform3(piece.cellFromStart, entered)),
+        fromPrevious: orthonormalizeYawRigidTransform3(
+          composeRigidTransform3(piece.cellFromStart, invertRigidTransform3(walk.pieces[index - 1].cellFromStart)),
+        ),
+      });
+    }
+    leaderMeters += lengthMeters;
   };
+  // Moves the chase point to arc length `meters` (never past the leader) and drops the trail behind it.
+  const moveChaseTo = (meters: number): void => {
+    chaseMeters = Math.min(Math.max(meters, chaseMeters), leaderMeters);
+    let passed = 0;
+
+    while (passed + 1 < trail.length && chaseMeters >= trail[passed + 1].startMeters) {
+      passed += 1;
+      creatureFromChase = orthonormalizeYawRigidTransform3(
+        composeRigidTransform3(creatureFromChase, invertRigidTransform3(trail[passed].fromPrevious)),
+      );
+    }
+    trail = trail.slice(passed);
+  };
+  // The chase point's pose in the creature's cell frame.
+  const chasePose = (): RigidTransform3 => composeRigidTransform3(creatureFromChase, poseOnTrailPiece(trail[0], chaseMeters));
 
   return {
     objectId: objectSpec.id,
@@ -159,9 +221,28 @@ export function createSimpleGeoCreatureBehavior(
       const verticalOffsetMeters =
         butterflyVerticalOscillationHeightOffset(objectSpec, verticalOscillationPhaseRadians) - verticalBaselineMeters;
 
-      // The leader in the creature's frame; the target is the leader plus the wobble.
+      // The leader is authoritative: it walks on whatever happens to the creature.
+      advanceLeader(world, stepMeters);
+
+      // The chase point moves on until it is a leash ahead of where the creature can get this frame, along the trail (the trail is straight in the
+      // creature's frame, so that distance grows one for one with arc length), or on by a catch-up step while the creature waits at a zone for it to come round.
+      const chaseLeadMeters = (): number => {
+        const pose = chasePose();
+        const forward = transformDirection3(pose, vec3(0, 1, 0));
+        const anchor = state.localPose.translation;
+
+        return forward.x * (pose.translation.x - anchor.x) + forward.y * (pose.translation.y - anchor.y);
+      };
+      moveChaseTo(
+        Math.max(
+          chaseMeters + creatureLeashMeters + creatureCatchUpFactor * stepMeters - chaseLeadMeters(),
+          waitingForChase ? chaseMeters + creatureCatchUpFactor * stepMeters : chaseMeters,
+        ),
+      );
+
+      // The target is the chase point plus the wobble.
       const targetOf = (): { readonly x: number; readonly y: number; readonly z: number } => {
-        const pose = composeRigidTransform3(creatureFromLeader, leader.localPose);
+        const pose = chasePose();
         const right = transformDirection3(pose, vec3(1, 0, 0));
 
         return {
@@ -177,11 +258,6 @@ export function createSimpleGeoCreatureBehavior(
         return Math.hypot(target.x - anchor.x, target.y - anchor.y);
       };
 
-      const lagBefore = lagMeters();
-      if (lagBefore < creatureLeashMeters && stepMeters > 0) {
-        advanceLeader(world, stepMeters);
-      }
-
       const target = targetOf();
       const anchor = state.localPose.translation;
       let desiredX = target.x - anchor.x;
@@ -196,24 +272,28 @@ export function createSimpleGeoCreatureBehavior(
 
       // Detour around a forbidden zone on the side the geodesic passes its vertex.
       let ruleApplied = false;
+      waitingForChase = false;
       const bounds = getDynamicObjectCollisionBounds(state);
 
       if (cell && bounds && cell.singularityColumns.length > 0) {
-        const leaderPose = composeRigidTransform3(creatureFromLeader, leader.localPose);
-        const leaderForward = transformDirection3(leaderPose, vec3(0, 1, 0));
+        const geodesicPose = chasePose();
+        const geodesicForward = transformDirection3(geodesicPose, vec3(0, 1, 0));
         const sideRule = applyForbiddenZoneSideRuleToColumns(
           { x: desiredX, y: desiredY },
           { x: bounds.center.x, y: bounds.center.y },
           bounds.radius,
           cell.singularityColumns,
-          { x: leaderPose.translation.x, y: leaderPose.translation.y },
-          { x: leaderForward.x, y: leaderForward.y },
+          { x: geodesicPose.translation.x, y: geodesicPose.translation.y },
+          { x: geodesicForward.x, y: geodesicForward.y },
           Math.max(desiredLength, stepMeters),
+          { x: anchor.x, y: anchor.y },
+          { x: target.x, y: target.y },
         );
 
         desiredX = sideRule.displacement.x;
         desiredY = sideRule.displacement.y;
         ruleApplied = sideRule.applied;
+        waitingForChase = sideRule.waiting;
       }
 
       const result = moveDynamicObject({
@@ -224,10 +304,10 @@ export function createSimpleGeoCreatureBehavior(
         bodiesInCell: (cellId) => obstacles.filter((obstacle) => obstacle.cellId === cellId),
       });
       // Obstacle bodies (the player) are swept discs in the move, so the creature slides around them.
-      creatureFromLeader = orthonormalizeYawRigidTransform3(composeRigidTransform3(result.cellFromStart, creatureFromLeader));
+      creatureFromChase = orthonormalizeYawRigidTransform3(composeRigidTransform3(result.cellFromStart, creatureFromChase));
       state = result.object;
 
-      // A body that stands inside a forbidden zone or wall rejects every step (even one that leads out), so it would stay there for good while the leader waits; push it out. A push through a portal is not taken: it would change the cell under the leader's frame map.
+      // A body that stands inside a forbidden zone or wall rejects every step (even one that leads out), so it would stay there for good; push it out. A push through a portal is not taken: it would change the cell under the chase point's frame map.
       if (result.blocked && Math.hypot(result.appliedDisplacement.x, result.appliedDisplacement.y) < 1e-9) {
         const pushed = depenetrateDynamicObject(world, state).object;
 
@@ -236,12 +316,12 @@ export function createSimpleGeoCreatureBehavior(
         }
       }
 
-      // Heading: the leader's when the creature is on its way, else the direction of the last applied step. Turning swings the collision cylinder (its centre is offset from the origin), so the turn is limited to what the cell allows.
+      // Heading: the geodesic's when the creature is on its way, else the direction of the last applied step. Turning swings the collision cylinder (its centre is offset from the origin), so the turn is limited to what the cell allows.
       if (lagMeters() < 1e-4 || (!result.blocked && !ruleApplied)) {
         state = {
           ...state,
           localPose: turnWithoutOverlap(world, state, {
-            rotation: composeRigidTransform3(creatureFromLeader, leader.localPose).rotation,
+            rotation: chasePose().rotation,
             translation: state.localPose.translation,
           }),
         };
@@ -265,7 +345,12 @@ export function createSimpleGeoCreatureBehavior(
       publishState();
     },
     leaderForDebug() {
-      return { cellId: leader.cellId, localPose: leader.localPose, creatureFromLeader };
+      let creatureFromLeader = creatureFromChase;
+
+      for (const piece of trail.slice(1)) {
+        creatureFromLeader = composeRigidTransform3(creatureFromLeader, invertRigidTransform3(piece.fromPrevious));
+      }
+      return { cellId: lastTrailPiece().cellId, localPose: poseOnTrailPiece(lastTrailPiece(), leaderMeters), creatureFromLeader };
     },
     transformGeometry(mapByCellId, nextWorld) {
       const transformedState = transformPoseWithCellMaps(state, mapByCellId);
@@ -397,6 +482,23 @@ export function applyForbiddenZoneSideRule(
   return { x: desired.x * hit + t.x * remaining, y: desired.y * hit + t.y * remaining };
 }
 
+/**
+ * Whether `target` lies a little behind `anchor` (less than a quarter turn) on the way round the zone centre `zoneCenter` that `side` requires: counterclockwise for side +1 (zone on the left of the motion), clockwise for -1.
+ * A creature that would run into the zone toward such a target has gone round further than the point it chases (its body centre is ahead of its origin). Going round on would overtake that point for good (it stays a leash ahead along the trail), so the creature would circle the whole vertex to reach it; it stops at the zone instead and lets the point come round, which a point moving along a geodesic that passes the vertex on that side always does. A target farther round, or straight across the zone, is reached by going round.
+ */
+export function isTargetBehindAroundZone(
+  zoneCenter: { readonly x: number; readonly y: number },
+  anchor: { readonly x: number; readonly y: number },
+  target: { readonly x: number; readonly y: number },
+  side: 1 | -1,
+): boolean {
+  const anchorAngle = Math.atan2(anchor.y - zoneCenter.y, anchor.x - zoneCenter.x);
+  const targetAngle = Math.atan2(target.y - zoneCenter.y, target.x - zoneCenter.x);
+  const ahead = side * Math.atan2(Math.sin(targetAngle - anchorAngle), Math.cos(targetAngle - anchorAngle));
+
+  return ahead < 0 && ahead > -Math.PI / 2;
+}
+
 /** Fraction in [0, 1] of `desired` at which a body at `d0` (relative to the zone centre) first reaches the contact circle while moving inward; undefined when it does not. */
 function zoneHitFraction(
   desired: { readonly x: number; readonly y: number },
@@ -428,7 +530,7 @@ function zoneHitFraction(
 
 /**
  * Applies {@link applyForbiddenZoneSideRule} to the nearest zone column the displacement `desired` would run into (or that the body touches while standing on the wrong side of it).
- * `leaderPoint` and `leaderForward` describe the geodesic in the body's frame; each zone fixes its side with {@link geodesicSideOfPoint}. A body touching a zone on the side opposite to the required one orbits it by `orbitLength` meters toward the required side.
+ * `leaderPoint` and `leaderForward` describe the geodesic in the body's frame; each zone fixes its side with {@link geodesicSideOfPoint}. A body touching a zone on the side opposite to the required one orbits it by `orbitLength` meters toward the required side. `anchor` is the creature's origin and `target` the point it steers to, in the same frame; when the target lies behind around the zone (see {@link isTargetBehindAroundZone}) the step ends at the zone and `waiting` is true, so the chase point moves on until it has come round.
  */
 function applyForbiddenZoneSideRuleToColumns(
   desired: { readonly x: number; readonly y: number },
@@ -438,7 +540,9 @@ function applyForbiddenZoneSideRuleToColumns(
   leaderPoint: { readonly x: number; readonly y: number },
   leaderForward: { readonly x: number; readonly y: number },
   orbitLength: number,
-): { readonly displacement: { readonly x: number; readonly y: number }; readonly applied: boolean } {
+  anchor: { readonly x: number; readonly y: number },
+  target: { readonly x: number; readonly y: number },
+): { readonly displacement: { readonly x: number; readonly y: number }; readonly applied: boolean; readonly waiting: boolean } {
   let best: { readonly s: number; readonly column: (typeof columns)[number]; readonly wrongSide: boolean } | undefined;
 
   for (const column of columns) {
@@ -457,7 +561,7 @@ function applyForbiddenZoneSideRuleToColumns(
   }
 
   if (!best) {
-    return { displacement: desired, applied: false };
+    return { displacement: desired, applied: false, waiting: false };
   }
 
   const side = geodesicSideOfPoint(leaderPoint, leaderForward, best.column.center);
@@ -469,13 +573,17 @@ function applyForbiddenZoneSideRuleToColumns(
     const n = Math.hypot(nx, ny);
 
     if (n < 1e-9) {
-      return { displacement: desired, applied: false };
+      return { displacement: desired, applied: false, waiting: false };
     }
 
     const length = Math.max(Math.hypot(desired.x, desired.y), orbitLength);
     const t = side > 0 ? { x: -ny / n, y: nx / n } : { x: ny / n, y: -nx / n };
 
-    return { displacement: { x: t.x * length, y: t.y * length }, applied: true };
+    return { displacement: { x: t.x * length, y: t.y * length }, applied: true, waiting: false };
+  }
+
+  if (isTargetBehindAroundZone(best.column.center, anchor, target, side)) {
+    return { displacement: { x: desired.x * best.s, y: desired.y * best.s }, applied: true, waiting: true };
   }
 
   return {
@@ -487,6 +595,7 @@ function applyForbiddenZoneSideRuleToColumns(
       side,
     ),
     applied: true,
+    waiting: false,
   };
 }
 

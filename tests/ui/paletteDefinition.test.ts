@@ -54,6 +54,7 @@ describe("createPaletteDefinition", () => {
       { id: "geodesicEmitters/emitter", label: "Geodesic emitter" },
       { id: "geodesicMeasurements/length", label: "Length" },
       { id: "geodesicMeasurements/protractor", label: "Protractor" },
+      { id: "worldMap/map", label: "Map" },
     ]);
   });
 

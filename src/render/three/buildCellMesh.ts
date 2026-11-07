@@ -83,6 +83,27 @@ function buildForbiddenZoneWireframes(cell: CompiledPrismCell): THREE.Object3D {
 }
 
 // ShapeGeometry lives in the xy plane; rotateX(-pi/2) sends (x, y, 0) to (x, 0, -y), i.e. world y becomes Three -z.
+/** The tiling color texture of a cell's floor, or undefined if it has none or it failed to load. Shared, do not dispose. */
+export function floorColorTexture(cell: CompiledPrismCell, assets: Pick<PreparedWorldAssets, "getConfiguredTexture">): THREE.Texture | undefined {
+  if (cell.floorMaterial.kind !== "floor-texture" || !cell.floorMaterial.colorTexturePath) {
+    return undefined;
+  }
+
+  return assets.getConfiguredTexture({
+    assetPath: cell.floorMaterial.colorTexturePath,
+    colorSpace: THREE.SRGBColorSpace,
+    repeatX: 1,
+    repeatY: 1,
+    wrapS: THREE.RepeatWrapping,
+    wrapT: THREE.RepeatWrapping,
+    userData: {
+      textureUrl: cell.floorMaterial.colorTexturePath,
+      repeatX: 1,
+      repeatY: 1,
+    },
+  });
+}
+
 function buildFloorMesh(cell: CompiledPrismCell, assets: PreparedWorldAssets, floorUvFrame?: FloorLatticeUvFrame): THREE.Object3D {
   const shape = new THREE.Shape();
   const first = cell.baseVertices[0];
@@ -119,19 +140,7 @@ function buildFloorMesh(cell: CompiledPrismCell, assets: PreparedWorldAssets, fl
   material.normalScale = new THREE.Vector2(0.8, 0.8);
 
   if (cell.floorMaterial.kind === "floor-texture" && cell.floorMaterial.colorTexturePath) {
-    const texture = assets.getConfiguredTexture({
-      assetPath: cell.floorMaterial.colorTexturePath,
-      colorSpace: THREE.SRGBColorSpace,
-      repeatX: 1,
-      repeatY: 1,
-      wrapS: THREE.RepeatWrapping,
-      wrapT: THREE.RepeatWrapping,
-      userData: {
-        textureUrl: cell.floorMaterial.colorTexturePath,
-        repeatX: 1,
-        repeatY: 1,
-      },
-    });
+    const texture = floorColorTexture(cell, assets);
 
     if (texture) {
       material.map = texture;

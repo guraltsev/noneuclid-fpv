@@ -32,6 +32,8 @@ import type { RuntimeCreatureObject, RuntimeWorldObjectBase } from "./runtimeObj
 export interface RuntimeStaticAssetObject extends RuntimeWorldObjectBase {
   readonly kind: "asset";
   readonly assetPath: string;
+  /** The object's icon on the world map, from its spec. */
+  readonly mapIconPath?: string;
 }
 
 /**
@@ -431,6 +433,7 @@ export function createRuntimeStaticAssetObject(
     id: objectSpec.id,
     kind: "asset",
     assetPath: objectSpec.assetPath,
+    mapIconPath: objectSpec.mapIconPath,
     cellId,
     localPose: yawRigidTransform3(
       objectSpec.turnRadians ?? objectSpec.yawRadians ?? 0,

@@ -74,7 +74,7 @@ import { reversePainterSortStable } from "@pmndrs/uikit";
 import { type AppState } from "../../runtime/appState";
 import { type CellComplexSpec } from "../../cell-complex/specs";
 import { buildStaticallyCulledPortalPathTables } from "../../cell-complex/staticPortalPathCull";
-import { type AppConfig, defaultAppConfig, isRuntimeToolEnabled } from "../../glue/appConfig";
+import { type AppConfig, appConfigForWorld, defaultAppConfig, isRuntimeToolEnabled } from "../../glue/appConfig";
 import { type DebugLevelId } from "../../diagnostics/debugLevels";
 import { type DebugOptionId, hasActiveDebugOption } from "../../glue/debugOptions";
 import { type DebugSettings } from "../../glue/debugSettings";
@@ -108,6 +108,7 @@ import { createDesktopToolIndicator } from "../dom/desktopToolIndicator";
 import { createFloatingObjectTooltip } from "../dom/floatingObjectTooltip";
 import { createAimCrossMarker } from "./aimCrossMarker";
 import { createAimFeedback } from "./aimFeedback";
+import type { XrHeadWorldPose } from "./carriedGeodesicCannon";
 import { createAimInteraction } from "./aimInteraction";
 import {
   installGeneralDebugHelpers,
@@ -144,6 +145,9 @@ import { createGeodesicEmitterLabelController } from "./geodesicEmitterLabelCont
 import { createGeometryComputerMenu } from "./geometryComputerMenu";
 import { createRuntimeObjectActions } from "./runtimeObjectActions";
 import { createHelpLensRenderer } from "./helpLensRenderer";
+import { createWorldMapPieceReader } from "./worldMapPieces";
+import { createWorldMapRenderer } from "./worldMapRenderer";
+import { worldMapToolId } from "../../modules/worldMap";
 import { MeasuredGeodesicLengthRuntime } from "./measureLengthRenderer";
 import { PlacedFlagRuntime } from "./placedFlagRenderer";
 import { createPlayerRoverRenderModel } from "./playerRoverModel";
@@ -290,7 +294,7 @@ const MAX_CONSECUTIVE_FAILED_FRAMES = 30;
  * detected asynchronously. The caller owns the returned handle and must call `dispose()` once.
  */
 export function createThreeApp(container: HTMLElement, appState: AppState, options: ThreeAppOptions): ThreeApp {
-  const appConfig = options.appConfig ?? defaultAppConfig;
+  const appConfig = appConfigForWorld(options.appConfig ?? defaultAppConfig, appState.world);
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(SCENE_BACKGROUND_COLOR);
   scene.environment = null;
@@ -424,6 +428,9 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   const aimCrossMarker = createAimCrossMarker(scene);
   const floatingObjectTooltip = createFloatingObjectTooltip(document.body);
   const helpLensRenderer = createHelpLensRenderer(document.body, scene);
+  const worldMapRenderer = createWorldMapRenderer(scene, renderer, options.assets);
+  const worldMapViewerPosition = new THREE.Vector3();
+  const worldMapViewerQuaternion = new THREE.Quaternion();
   const xrEntryUi = createXrEntryUi(container, () => void xrSession.enterVr());
   const xrSession = createXrSessionController({
     engine,
@@ -547,6 +554,10 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   const geodesicRuntimeArchetypeKeys = geodesicRuntimeRenderSources.map((source) => source.archetypeKey);
   const runtimeObjectRenderDiagnostics = createRuntimeObjectRenderArchetypeDiagnostics();
   const playerRoverRenderModel = createPlayerRoverRenderModel(options.assets);
+  const readWorldMapPieces = createWorldMapPieceReader({
+    registry: runtimeObjectRegistry,
+    geodesicRenderSources: geodesicRuntimeRenderSources,
+  });
   const portalClipData = createPortalClipData({ maxVisiblePaths });
   // Hardware clip distances (WEBGL_clip_cull_distance) when available, otherwise a fragment compare and discard.
   const portalClipDistanceToggle = createPortalClipDistanceToggle(renderer);
@@ -1331,6 +1342,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       updateGeodesicEmitterLabels();
       xrSession.syncDebugState(frame.source, moveResult);
       updateScenePalette(xrActive, xrFrame, xrReferenceSpace, xrHeadWorldPose, deltaSeconds, frame);
+      updateWorldMap(xrActive, xrActive ? xrSession.resolveXrHeadWorldPose(xrViewerPose) : undefined, deltaSeconds);
       const overlayState = portalDebugRuntime.updateVisiblePortalPaths();
       // Resolve the head pose again: the rig was synced a second time after the first pose was computed, and a stale
       // pose would make the head-locked panel shake while walking. The pose aliases scratch vectors; use it at once.
@@ -1521,6 +1533,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       aimFeedback.dispose();
       floatingObjectTooltip.dispose();
       helpLensRenderer.dispose();
+      worldMapRenderer.dispose();
       vrComfortVignette.dispose();
       clearXrObjectTooltip();
       controls.dispose();
@@ -1705,6 +1718,26 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     }
     dispatchRuntimeCommand({ kind: "set-cannon-tool-state", state: {} });
     requestSelectableHitboxDebugSync();
+  }
+
+  // The map shows while its tool is selected. On the desktop it stands where the palette opens, so the palette hides it.
+  function updateWorldMap(xrActive: boolean, xrHeadWorldPose: XrHeadWorldPose | undefined, deltaSeconds: number): void {
+    const menu = currentMenuState();
+    if (menu.selectedTool !== worldMapToolId || (menu.isOpen && !xrActive)) {
+      worldMapRenderer.hide();
+      return;
+    }
+    const playerPose = readLocalPlayerPose(engine);
+    const world = activeWorld();
+    worldMapRenderer.update({
+      world,
+      pieces: readWorldMapPieces(playerPose, world),
+      playerPose,
+      viewerQuaternion: xrHeadWorldPose?.quaternion ?? camera.getWorldQuaternion(worldMapViewerQuaternion),
+      viewerPosition: xrHeadWorldPose?.position ?? camera.getWorldPosition(worldMapViewerPosition),
+      hand: xrActive ? { tracked: xrControllerHandModels.rightHand() } : undefined,
+      deltaSeconds,
+    });
   }
 
   // The one command path: the reducer changes the session, then the effects run in the order it listed them.

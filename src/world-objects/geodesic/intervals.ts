@@ -181,9 +181,32 @@ function traceAndClassifyChord(input: {
     input.expectedPortalWord && !input.allowUnexpectedPortalWord &&
     !samePortalWord(realizedWord, input.expectedPortalWord)
   ) {
-    return { kind: "word-mismatch", realizedWord, traces };
+    const stopped = stopOnEndSide(input.world, traces, input.lengthMeters, input.expectedPortalWord);
+    return stopped ? { kind: "ok", traces: stopped } : { kind: "word-mismatch", realizedWord, traces };
   }
   return { kind: "ok", traces };
+}
+
+// A chord whose end lies on a portal side (within `intersectionTolerance`) ends with a hit of that side at its full length, because the
+// tracer counts a side reached at the end as crossed. The crossing belongs to the word only when the end anchor is in the cell beyond the
+// side. When the expected word is the realized word without that last crossing, the last piece ends on the side instead (`open`), and
+// these traces are returned; otherwise `undefined`.
+function stopOnEndSide(
+  world: CompiledCellComplex,
+  traces: readonly TraceGeodesicSegmentResult[],
+  lengthMeters: number,
+  expectedPortalWord: readonly GeodesicPortalTraversal[],
+): readonly TraceGeodesicSegmentResult[] | undefined {
+  const tail = traces.at(-1);
+  if (tail?.terminal.kind !== "portal-hit") {
+    return undefined;
+  }
+  const tracedMeters = traces.reduce((sum, trace) => sum + trace.lengthMeters, 0);
+  if (lengthMeters - tracedMeters > intersectionTolerance) {
+    return undefined;
+  }
+  const stopped = [...traces.slice(0, -1), { ...tail, terminal: { kind: "open" as const } }];
+  return samePortalWord(collectPortalWordFromTraces(world, stopped), expectedPortalWord) ? stopped : undefined;
 }
 
 // Commit: replaces the interval's segments by the traces (an `open` last piece becomes `emitter-hit` if the end anchor is an emitter).

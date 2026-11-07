@@ -4,6 +4,8 @@
  * AppConfig values are immutable; launch-option parsing (readLaunchOptions.ts) uses them as defaults beneath explicit URL parameters, and the menu/palette uses them to gate sections and tools.
  */
 import { findWorldCatalogEntry, normalizeWorldId, defaultWorldId } from "../authoring/worldCatalog";
+import type { CompiledCellComplex } from "../cell-complex/compileCellComplex";
+import { findPlatonicSolid } from "../cell-complex/platonicSolid";
 import { debugOptionDefinitions, type DebugOptionId } from "./debugOptions";
 import { parseDebugLevel, type DebugLevelId } from "../diagnostics/debugLevels";
 import { parsePortalPanelMode, type PortalPanelModeId } from "./portalPanelMode";
@@ -11,7 +13,7 @@ import type { RuntimeDebugOverlayItemId, RuntimeToolId } from "./toolIds";
 import { publicUrl } from "./assetUrls";
 
 /** Id of a main-menu tool that an app config can switch on or off. */
-export type ConfigurableToolId = "placedFlags/flag" | "geodesicEmitters/emitter" | "geodesicMeasurements/length" | "geodesicMeasurements/protractor";
+export type ConfigurableToolId = "placedFlags/flag" | "geodesicEmitters/emitter" | "geodesicMeasurements/length" | "geodesicMeasurements/protractor" | "worldMap/map";
 
 /** Which optional menu sections the app config enables. */
 export interface AppMenuConfig {
@@ -21,13 +23,14 @@ export interface AppMenuConfig {
 }
 
 /**
- * Which tools the app config enables (placeFlags = signs, geodesicEmitters = rays, distances = length tool, angles = protractor).
+ * Which tools the app config enables (placeFlags = signs, geodesicEmitters = rays, distances = length tool, angles = protractor, worldMap = the map of a world that is a Platonic solid).
  */
 export interface AppToolConfig {
   readonly placeFlags: boolean;
   readonly geodesicEmitters: boolean;
   readonly distances: boolean;
   readonly angles: boolean;
+  readonly worldMap: boolean;
 }
 
 /** Default debug settings supplied by the app config; URL parameters can override them. */
@@ -91,6 +94,7 @@ export const defaultAppConfig: AppConfig = {
     geodesicEmitters: true,
     distances: true,
     angles: true,
+    worldMap: true,
   },
   debug: {
     level: "off",
@@ -198,6 +202,7 @@ export function normalizeAppConfig(rawConfig: unknown): AppConfig {
       geodesicEmitters: readBoolean(rawTools, "geodesicEmitters", defaultAppConfig.tools.geodesicEmitters),
       distances: readBoolean(rawTools, "distances", defaultAppConfig.tools.distances),
       angles: readBoolean(rawTools, "angles", defaultAppConfig.tools.angles),
+      worldMap: readBoolean(rawTools, "worldMap", defaultAppConfig.tools.worldMap),
     },
     debug: {
       level: readDebugLevel(rawDebug, "level", defaultAppConfig.debug.level),
@@ -227,13 +232,15 @@ export function isRuntimeToolEnabled(config: AppConfig, toolId: RuntimeToolId): 
       return config.tools.distances;
     case "geodesicMeasurements/protractor":
       return config.tools.angles;
+    case "worldMap/map":
+      return config.tools.worldMap;
     default:
       return true;
   }
 }
 
 /**
- * Lists the configurable tools enabled by the config, in main-menu order (sign, emitter, length, protractor).
+ * Lists the configurable tools enabled by the config, in main-menu order (sign, emitter, length, protractor, map).
  */
 export function getEnabledMainTools(config: AppConfig): readonly ConfigurableToolId[] {
   return [
@@ -241,7 +248,17 @@ export function getEnabledMainTools(config: AppConfig): readonly ConfigurableToo
     ...(config.tools.geodesicEmitters ? (["geodesicEmitters/emitter"] as const) : []),
     ...(config.tools.distances ? (["geodesicMeasurements/length"] as const) : []),
     ...(config.tools.angles ? (["geodesicMeasurements/protractor"] as const) : []),
+    ...(config.tools.worldMap ? (["worldMap/map"] as const) : []),
   ];
+}
+
+/**
+ * The config as it applies to `world`: a world that is not a Platonic solid has no map, so the tool is off there, which takes it off the menu and makes the world refuse it.
+ * A deformation cannot change the answer: only torus worlds deform, and they stay tori.
+ */
+export function appConfigForWorld(config: AppConfig, world: CompiledCellComplex): AppConfig {
+  if (!config.tools.worldMap || findPlatonicSolid(world) !== undefined) return config;
+  return { ...config, tools: { ...config.tools, worldMap: false } };
 }
 
 function readWorldId(raw: Readonly<Record<string, unknown>>, key: string): string | undefined {

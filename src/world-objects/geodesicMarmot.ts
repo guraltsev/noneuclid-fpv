@@ -34,6 +34,7 @@ export function createGeodesicMarmot(options: CreateGeodesicMarmotOptions): Geod
     id: options.id,
     kind: "geodesci-marmot",
     assetPath: "_legacy/racoon-animation/scene.gltf",
+    mapIconPath: "_legacy/racoon-animation/map-icon.svg",
     position: options.position,
     scale: options.scale ?? defaultScale,
     yawRadians: yawFromVelocity(options.velocity),
@@ -70,6 +71,7 @@ function createRuntimeCreatureObject(objectSpec: GeodesicMarmotObjectSpec, cellI
   return {
     id: objectSpec.id,
     kind: "geodesci-marmot",
+    mapIconPath: objectSpec.mapIconPath,
     cellId,
     localPose: yawRigidTransform3(
       objectSpec.yawRadians ?? yawFromVelocity(objectSpec.velocity),

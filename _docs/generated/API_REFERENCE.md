@@ -241,6 +241,17 @@ Oriented portal segments: a portal side developed into a root cell's plan, with 
 | interface | `OrientedPortalSegment` | A portal side developed into a root frame's plan; `left`/`right` as seen when leaving the source cell through it. |
 | function | `developPortalSegment` | Develops side `sideIndex` of cell `sourceCellId` into the root frame with `rootFromSource` (z of the side vertices is taken as 0). |
 
+### `cell-complex/platonicSolid.ts`
+
+Recognizes a world that is the surface of a Platonic solid, and places its cells on that solid.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| type | `PlatonicSolidName` | The name of a Platonic solid. |
+| interface | `PlatonicSolid` | A world recognized as a Platonic solid. |
+| function | `findPlatonicSolid` | The solid `world` is the surface of, or undefined when it is not one. |
+| function | `faceCenter` | The center of a cell's floor polygon, in its local frame. |
+
 ### `cell-complex/portalPathDebug.ts`
 
 Debugging helpers that explain what happened to a portal path during table construction and static culling.
@@ -677,10 +688,11 @@ Motion of the simple geodesic creatures (the mouse and the butterfly), with no r
 | Kind | Name | Summary |
 | --- | --- | --- |
 | interface | `SimpleGeoCreatureBehavior` | The motion state of one creature, owned by its view. |
-| const | `creatureLeashMeters` | The leader advances only while the creature lags it by less than this many meters, so it waits for a blocked creature. |
+| const | `creatureLeashMeters` | The chase point that the creature steers to runs at most this many meters ahead of the creature along the leader's trail (sideways distance does not count, so a creature going wide round a forbidden zone does not hold i… |
 | function | `createSimpleGeoCreatureBehavior` | Creates the behavior for a creature starting in `startCellId`. |
 | function | `geodesicSideOfPoint` | Sign of the side on which the point `v` lies relative to the oriented line through `leaderPoint` with direction `leaderForward`: +1 when `v` is to the left, -1 when it is to the right. |
 | function | `applyForbiddenZoneSideRule` | Replaces a desired horizontal displacement that would run into a zone disc by one that goes round the disc with the zone centre on the required side. |
+| function | `isTargetBehindAroundZone` | Whether `target` lies a little behind `anchor` (less than a quarter turn) on the way round the zone centre `zoneCenter` that `side` requires: counterclockwise for side +1 (zone on the left of the motion), clockwise for … |
 | function | `forbiddenZoneLateralOscillationScale` | Returns a factor in [0, 1] that fades the sideways wobble out near forbidden zones. |
 | function | `butterflyVerticalOscillationRateHz` | Returns the butterfly's instantaneous vertical bob rate in Hz at `elapsedSeconds`, or 0 for non-butterflies. |
 | function | `butterflyVerticalOscillationHeightMagnitudeMeters` | Returns the butterfly's vertical bob amplitude in meters (10% of its collision height, capped at 0.08 m), or 0 for non-butterflies. |
@@ -771,6 +783,14 @@ What an emitter does to its geodesics when it has been carried: the rebuild afte
 | --- | --- | --- |
 | interface | `EmitterGeodesicRebuild` | What a rebuild of an emitter's geodesics means for the emitter and its carrier. |
 | function | `rebuildEmitterGeodesics` | Rebuilds the geodesics that depend on an emitter after it moved. |
+
+### `world-objects/geodesic/cutAtEmitter.ts`
+
+Cutting the arcs that pass through an emitter: an emitter set down on a geodesic's path becomes a point of it.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| function | `cutArcsPassingEmitter` | Splits every arc whose path passes `emitter` (see the module header) and returns the ids of the arcs that leave the emitter after the split. |
 
 ### `world-objects/geodesic/development.ts`
 
@@ -1012,7 +1032,7 @@ World object library: the catalogue of named, ready-to-place objects available t
 | Kind | Name | Summary |
 | --- | --- | --- |
 | interface | `StandardUserRobotObjectDefinition` | Shape of the fixed definition of the player's robot avatar (asset, scale, collision cylinder and class). |
-| const | `standardUserRobotObject` | The player's rover avatar definition: class "user", 0.32 m radius by 1 m high collision cylinder centred 0.5 m above the floor, ignoring no classes. |
+| const | `standardUserRobotObject` | The player's avatar definition, the Job Bot: class "user", 0.32 m radius by 1 m high collision cylinder centred 0.5 m above the floor, ignoring no classes. |
 | interface | `GeodesicMarmotAuthoringParams` | Authoring parameters for the `geodesic_marmot` library entry. |
 | type | `WorldLibraryObjectSpec` | A CellObjectSpec carrying a non-enumerable brand proving it was produced by the object library. |
 | interface | `WorldObjectLibrary` | The set of constructors injected as globals into world scripts. |
@@ -1045,6 +1065,7 @@ Placed flags (signs): player-placed wooden signs carrying a short text label.
 | Kind | Name | Summary |
 | --- | --- | --- |
 | const | `placedFlagAssetPaths` | Maps each sign type to its glTF asset path under the assets directory. |
+| const | `placedFlagMapIconPaths` | Maps each sign type to its icon on the world map, next to its model. |
 | const | `defaultPlacedFlagTextColor` | Default sign text color (CSS hex). |
 | const | `placedFlagMaxMessageLength` | Maximum number of characters (code points) in a sign message. |
 | interface | `CreatePlacedFlagOptions` | Inputs for createPlacedFlagObject. |
@@ -1259,7 +1280,7 @@ Loads and normalizes the app configuration: a per-deployment JavaScript file (<n
 | --- | --- | --- |
 | type | `ConfigurableToolId` | Id of a main-menu tool that an app config can switch on or off. |
 | interface | `AppMenuConfig` | Which optional menu sections the app config enables. |
-| interface | `AppToolConfig` | Which tools the app config enables (placeFlags = signs, geodesicEmitters = rays, distances = length tool, angles = protractor). |
+| interface | `AppToolConfig` | Which tools the app config enables (placeFlags = signs, geodesicEmitters = rays, distances = length tool, angles = protractor, worldMap = the map of a world that is a Platonic solid). |
 | interface | `AppDebugConfig` | Default debug settings supplied by the app config; URL parameters can override them. |
 | interface | `AppConfig` | Fully normalized app configuration: starting world, menu sections, tools and debug defaults. |
 | type | `RawAppConfig` | Untrusted shape of a loaded config module's default export before normalization. |
@@ -1274,7 +1295,8 @@ Loads and normalizes the app configuration: a per-deployment JavaScript file (<n
 | function | `readAppConfigForwardName` | Returns the validated name in a raw config's forwardTo field, or undefined if absent or invalid. |
 | function | `normalizeAppConfig` | Converts an untrusted raw config object into an AppConfig, taking each recognized field only if it has the right type and valid value and otherwise using the default; accepts optionsMenu or menu for the menu block. |
 | function | `isRuntimeToolEnabled` | Returns whether the config permits a tool; cannon sub-modes follow geodesicEmitters, and non-configurable tools (none, aim) are always enabled. |
-| function | `getEnabledMainTools` | Lists the configurable tools enabled by the config, in main-menu order (sign, emitter, length, protractor). |
+| function | `getEnabledMainTools` | Lists the configurable tools enabled by the config, in main-menu order (sign, emitter, length, protractor, map). |
+| function | `appConfigForWorld` | The config as it applies to `world`: a world that is not a Platonic solid has no map, so the tool is off there, which takes it off the menu and makes the world refuse it. |
 
 ### `glue/assetUrls.ts`
 
@@ -1704,6 +1726,7 @@ The geodesic emitters' public face (design 013 sections 12.1 and 16): the emitte
 | interface | `GeodesicEmitterBeginEditCommand` | The issuing participant begins to edit an emitter: the attachment is held and the slot `geodesicEmitters/yaw` opens. |
 | interface | `GeodesicEmitterEndEditCommand` | Ends the issuing participant's edit: the attachment and the slot go, and the geodesic is traced once more and connects to an emitter it reaches, snapping onto one that lies almost on its ray. |
 | interface | `GeodesicEmitterLiftCommand` | Module-only. |
+| interface | `GeodesicEmitterLandCommand` | Module-only. |
 | type | `GeodesicEmittersCommand` | Every command of the module. |
 | type | `GeodesicEmittersResult` | What a command that succeeded answers with: `outcome` names the command, the ids are what it created or touched. |
 | type | `GeodesicEmittersPublicApi` | `api.geodesicEmitters`, for scripts: each function submits the command of its name as the local player and resolves with its result, a {@link GeodesicEmittersResult} in `value` or a refusal. |
@@ -1807,6 +1830,7 @@ The geodesic model's public face (design 013 sections 12.1 and 13.1): its token,
 | interface | `GeodesicExtendArcCommand` | Module-only. |
 | interface | `GeodesicCutAtSegmentCommand` | Module-only. |
 | interface | `GeodesicCutAtVertexCommand` | Module-only. |
+| interface | `GeodesicCutAtEmitterCommand` | Module-only. |
 | interface | `GeodesicRemovePlainArcsCommand` | Module-only. |
 | type | `GeodesicModelCommand` | Every command of the module. |
 | interface | `GeodesicVertexTiedEvent` | Two endpoint roles were tied at a new vertex. |
@@ -1883,6 +1907,37 @@ The placed flags module (design 013 section 16): a flag and what a person does t
 | --- | --- | --- |
 | type | `PlacedFlagsModuleDefinition` | The module as the engine's list takes it. |
 | function | `placedFlagsModule` | Creates the placed flags module. |
+
+### `modules/worldMap/api.ts`
+
+The world map's public face (design 013 section 12.1): the tool's id.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| const | `worldMapToolId` | The id of the map tool. |
+
+### `modules/worldMap/client.ts`
+
+The world map's client part (design 013 sections 8.3 and 9.1): the map tool.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| function | `worldMapClient` | Creates the client part. |
+
+### `modules/worldMap/index.ts`
+
+The world map module's factories (design 013 section 12.1): `worldMapModule` is the world part, `worldMapClient` the client part (the map tool).
+
+_No exports._
+
+### `modules/worldMap/module.ts`
+
+The world map module (design 013 section 16): it defines the map tool, so the engine can gate it.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| type | `WorldMapModuleDefinition` | The module as the engine's list takes it. |
+| function | `worldMapModule` | Creates the world map module. |
 
 ## `runtime`
 
@@ -2296,6 +2351,7 @@ Builds the Three.js geometry of one prism cell in the cell's own local frame (wh
 | --- | --- | --- |
 | interface | `BuildCellMeshOptions` | Options controlling which debug and decoration content a cell mesh includes. |
 | function | `buildCellMesh` | Builds the full Three.js group for a cell, named `cell:<id>` and tagged with its portal sides in `userData`. |
+| function | `floorColorTexture` | The tiling color texture of a cell's floor, or undefined if it has none or it failed to load. |
 
 ### `render/three/buildDecorationMesh.ts`
 
@@ -2564,6 +2620,7 @@ Render sources and per-frame render records for geodesic cannons, geodesic segme
 | const | `geodesicRayHeadArchetypePrefix` | Archetype-key prefix (followed by `:<mesh>`) for the per-geodesic cannon head (lightsaber) meshes. |
 | const | `geodesicIntersectionArchetypePrefix` | Archetype-key prefix (followed by `:<mesh>`) for the intersection balloon meshes. |
 | const | `geodesicRayAssetPaths` | glTF asset paths (relative to the public asset root) needed by the geodesic renderer. |
+| const | `geodesicMapIconPaths` | Icons on the world map of an emitter and of a crossing, next to their models. |
 | const | `geodesicRayAssetScale` | Uniform scale of the post and lightsaber models. |
 | const | `geodesicRayPostAssetFloorOffsetMeters` | Lifts the loaded post model so its base sits on the floor (meters, Three.js y); not applied to the fallback. |
 | const | `geodesicRayEmitterPosition` | Position of the lightsaber (beam emission point) in the cannon's local Three.js frame, meters; y matches the beam height used for aiming and ray tracing. |
@@ -2843,7 +2900,7 @@ Renderer for player-placed text signs ("flags"): a glTF sign model with the user
 
 ### `render/three/playerRoverModel.ts`
 
-Render model for the player's own rover avatar.
+Render model for the player's own avatar, the Job Bot.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
@@ -3427,6 +3484,7 @@ Conversion between the simulation's world frame and the Three.js scene frame.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
+| const | `threeToWorldBasis` | Carries Three axes to world axes (B^-1). |
 | function | `worldPointToThree` | Converts a world-frame point (x right, y forward, z up) to a new Three.js vector (x, z, -y). |
 | function | `threePointToWorld` | Inverse of `worldPointToThree`: converts a Three.js point (x, y up, -z forward) to a world-frame point (x, -z, y). |
 | function | `threeDirectionToWorld` | Converts a Three.js direction vector to a world-frame direction; identical to the point mapping because B is purely linear. |
@@ -3444,6 +3502,31 @@ The shell's side of its conversation with the world engine (design 013 sections 
 | interface | `WorldClientDeps` | What the world client needs from the shell. |
 | interface | `WorldClient` | Handle returned by {@link createWorldClient}. |
 | function | `createWorldClient` | Creates the world client over the shell's engine, session and command path. |
+
+### `render/three/worldMapPieces.ts`
+
+What the world map shows, all of it flat on the solid: nothing on the map has height, so a geodesic stays straight on each face and meets itself at each edge, and it stays with its emitter.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `WorldMapIconPiece` | A thing on the map, as its icon. |
+| interface | `WorldMapStripPiece` | A piece of a geodesic on the map. |
+| type | `WorldMapPiece` | One thing on the map. |
+| interface | `WorldMapPieceSources` | Where the pieces are read from. |
+| const | `worldMapPieceHeightMeters` | Height over the face of everything on it, in meters: only enough not to fight the face for depth. |
+| function | `worldMapIconPathOf` | The icon of `object`, as declared with it, or undefined for a thing the map does not show. |
+| function | `createWorldMapPieceReader` | Returns a function listing the pieces of the moment. |
+
+### `render/three/worldMapRenderer.ts`
+
+The world map: the world in miniature, as the Platonic solid it is the surface of, with everything in it flat on its faces: the icons of its things, the player's among them, and geodesics as strips (`worldMapPieces.ts`).
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `WorldMapFrame` | What the map needs each frame. |
+| interface | `WorldMapRenderer` | Handle returned by {@link createWorldMapRenderer}. |
+| function | `worldMapFacing` | The turn of the solid, relative to a viewer looking along -z with +y up, that faces the rover at `position` to the viewer with `heading` up, tilted back (both in the solid's frame). |
+| function | `createWorldMapRenderer` | Creates the map, hidden, under `scene`. |
 
 ### `render/three/worldResultBadge.ts`
 

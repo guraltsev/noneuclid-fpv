@@ -190,6 +190,12 @@ export interface GeodesicCutAtVertexCommand extends EngineCommandBase {
   readonly vertexPoint: { readonly x: number; readonly y: number; readonly z: number };
 }
 
+/** Module-only. Cuts every arc, free, connecting emitters or tied, whose path passes the emitter, and attaches both halves to it (`world-objects/geodesic/cutAtEmitter.ts`). Refused with `geodesicModel/notAnEmitter`. The result is `{ arcIds }`, the arcs that now leave the emitter. */
+export interface GeodesicCutAtEmitterCommand extends EngineCommandBase {
+  readonly kind: "geodesicModel/cutAtEmitter";
+  readonly emitterId: string;
+}
+
 /** Module-only. Deletes the arcs of the emitter that do not follow it: its plain shot geodesics. Connected and tied arcs stay. The result is `{ arcIds }`, those deleted. */
 export interface GeodesicRemovePlainArcsCommand extends EngineCommandBase {
   readonly kind: "geodesicModel/removePlainArcs";
@@ -206,6 +212,7 @@ export type GeodesicModelCommand =
   | GeodesicExtendArcCommand
   | GeodesicCutAtSegmentCommand
   | GeodesicCutAtVertexCommand
+  | GeodesicCutAtEmitterCommand
   | GeodesicRemovePlainArcsCommand;
 
 /** Two endpoint roles were tied at a new vertex. */

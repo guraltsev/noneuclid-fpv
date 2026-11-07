@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 64 64">
+<!-- World map icon. Project-made, covered by the project MIT License. The top of the picture is the thing's forward. -->
+<path d="M20 58 L18 38 M32 58 L32 22 M44 58 L46 36" fill="none" stroke="#111827" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M20 58 L18 38 M32 58 L32 22 M44 58 L46 36" fill="none" stroke="#4d7c22" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M26 58 C22 46 24 40 27 34 C28 44 30 50 30 58 Z" fill="#6aa23a" stroke="#111827" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke" />
+<path d="M38 58 C42 48 42 42 39 36 C36 44 34 50 34 58 Z" fill="#6aa23a" stroke="#111827" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke" />
+<circle cx="18.00" cy="26.50" r="5.50" fill="#e5737f" stroke="#111827" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke" />
+<circle cx="25.13" cy="31.68" r="5.50" fill="#e5737f" stroke="#111827" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke" />
+<circle cx="22.41" cy="40.07" r="5.50" fill="#e5737f" stroke="#111827" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke" />
+<circle cx="13.59" cy="40.07" r="5.50" fill="#e5737f" stroke="#111827" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke" />
+<circle cx="10.87" cy="31.68" r="5.50" fill="#e5737f" stroke="#111827" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke" />
+<circle cx="18" cy="34" r="4.00" fill="#facc15" />
+<circle cx="46.00" cy="24.50" r="5.50" fill="#e5737f" stroke="#111827" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke" />
+<circle cx="53.13" cy="29.68" r="5.50" fill="#e5737f" stroke="#111827" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke" />
+<circle cx="50.41" cy="38.07" r="5.50" fill="#e5737f" stroke="#111827" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke" />
+<circle cx="41.59" cy="38.07" r="5.50" fill="#e5737f" stroke="#111827" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke" />
+<circle cx="38.87" cy="29.68" r="5.50" fill="#e5737f" stroke="#111827" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke" />
+<circle cx="46" cy="32" r="4.00" fill="#facc15" />
+<circle cx="32.00" cy="9.00" r="6.60" fill="#d9536a" stroke="#111827" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke" />
+<circle cx="40.56" cy="15.22" r="6.60" fill="#d9536a" stroke="#111827" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke" />
+<circle cx="37.29" cy="25.28" r="6.60" fill="#d9536a" stroke="#111827" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke" />
+<circle cx="26.71" cy="25.28" r="6.60" fill="#d9536a" stroke="#111827" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke" />
+<circle cx="23.44" cy="15.22" r="6.60" fill="#d9536a" stroke="#111827" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke" />
+<circle cx="32" cy="18" r="4.80" fill="#facc15" />
+</svg>

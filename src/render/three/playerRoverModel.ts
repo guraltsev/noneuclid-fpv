@@ -1,5 +1,5 @@
 /**
- * Render model for the player's own rover avatar.
+ * Render model for the player's own avatar, the Job Bot. The names here say rover, the avatar's earlier model; the record source `player-rover` is one of them.
  *
  * Instantiates the rover glTF from prepared assets, exposes its meshes as instancing sources, and
  * describes where the avatar stands for the player pose: the object (cell and cell-local pose, x right,
@@ -45,8 +45,8 @@ export interface PlayerRoverRenderModel {
 /**
  * Creates the rover render model, or returns `undefined` if the rover glTF was not preloaded.
  *
- * The model is uniformly scaled by the robot definition's scale and turned by pi about Three.js y
- * (a half-turn correction between the asset's authored forward axis and the avatar's forward direction).
+ * The model is uniformly scaled by the robot definition's scale, turned about Three.js y so that its face looks along the avatar's
+ * forward direction, and lifted so that it hovers just off the floor.
  */
 export function createPlayerRoverRenderModel(
   assets: PreparedWorldAssets,
@@ -62,7 +62,8 @@ export function createPlayerRoverRenderModel(
 
   prepared.scene.name = "player-rover-model";
   prepared.scene.scale.setScalar(standardUserRobotObject.scale);
-  prepared.scene.rotation.y = Math.PI;
+  prepared.scene.rotation.y = standardUserRobotObject.modelTurnRadians;
+  prepared.scene.position.y = standardUserRobotObject.modelLiftMeters;
   root.add(prepared.scene);
 
   return {

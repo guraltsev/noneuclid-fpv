@@ -29,6 +29,8 @@ const protractorToolIconSource = publicAssetUrl("icons/protractor.png");
 
 const measureLengthToolIconSource = publicAssetUrl("icons/ruler-inverted.svg");
 
+const worldMapToolIconSource = publicAssetUrl("icons/world-map-inverted.svg");
+
 /**
  * Icon for a tool id; unknown ids get an invisible 64x64 placeholder.
  */
@@ -52,6 +54,10 @@ export function createToolIcon(
     return createMeasureLengthIcon();
   }
 
+  if (toolId === "worldMap/map") {
+    return createWorldMapIcon();
+  }
+
   return new Container({ width: 64, height: 64, opacity: 0 });
 }
 
@@ -68,6 +74,21 @@ function createMeasureLengthIcon(): Component<any> {
     renderOrder: 1002,
   });
   image.userData.scenePaletteIconSrc = measureLengthToolIconSource;
+  return image;
+}
+
+function createWorldMapIcon(): Component<any> {
+  const image = new Image({
+    src: worldMapToolIconSource,
+    width: 88,
+    height: 88,
+    objectFit: "fill",
+    keepAspectRatio: true,
+    depthTest: false,
+    depthWrite: false,
+    renderOrder: 1002,
+  });
+  image.userData.scenePaletteIconSrc = worldMapToolIconSource;
   return image;
 }
 

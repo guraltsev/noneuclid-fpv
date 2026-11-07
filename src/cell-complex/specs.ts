@@ -170,6 +170,10 @@ export interface PositionedCellObjectSpec {
   readonly autoDisplayHelpRangeMeters?: number;
   readonly tutorialPages?: readonly TutorialPageSpec[];
   readonly goalPages?: readonly TutorialPageSpec[];
+  /**
+   * The object's icon on the world map, an image relative to the assets directory, kept next to its model; without one the map leaves the object out.
+   */
+  readonly mapIconPath?: string;
 }
 
 /**

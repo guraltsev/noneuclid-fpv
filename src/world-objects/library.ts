@@ -1,6 +1,6 @@
 /**
  * World object library: the catalogue of named, ready-to-place objects available to world scripts (tree, house, bench, geo_mouse, geodesic_marmot, ...).
- * Each library entry wraps createStaticAssetObject, createSimpleGeoCreature or createGeodesicMarmot with library-owned defaults (asset path, visual scale, model offset, collision cylinder and collision class) that scale with the author's `scale`, and brands the result so WorldBuilder.OnFace can reject hand-made specs.
+ * Each library entry wraps createStaticAssetObject, createSimpleGeoCreature or createGeodesicMarmot with library-owned defaults (asset path, map icon, visual scale, model offset, collision cylinder and collision class) that scale with the author's `scale`, and brands the result so WorldBuilder.OnFace can reject hand-made specs.
  * Authoring coordinates are [x, height, y] triples (meters); the library swaps them into cell-local (x, y, z) with z up. Turn/tilt angles are in degrees at the authoring layer and converted to radians in the specs.
  */
 import type { CellObjectSpec, GeodesicMarmotObjectSpec, SimpleCollisionCylinderSpec } from "../cell-complex/specs";
@@ -21,19 +21,28 @@ export interface StandardUserRobotObjectDefinition {
   readonly id: "user-robot";
   readonly class: typeof userObjectClass;
   readonly assetPath: string;
+  /** The avatar's icon on the world map, next to its model. */
+  readonly mapIconPath: string;
   readonly scale: number;
+  /** Turn about the vertical that brings the model's face to the avatar's forward direction, in radians. */
+  readonly modelTurnRadians: number;
+  /** Height of the model's origin above the floor, in meters: the bot hovers with the tip of its tie just off the ground. */
+  readonly modelLiftMeters: number;
   readonly collision: SimpleCollisionCylinderSpec;
   readonly do_not_collide_with: readonly string[];
 }
 
 /**
- * The player's rover avatar definition: class "user", 0.32 m radius by 1 m high collision cylinder centred 0.5 m above the floor, ignoring no classes.
+ * The player's avatar definition, the Job Bot: class "user", 0.32 m radius by 1 m high collision cylinder centred 0.5 m above the floor, ignoring no classes.
  */
 export const standardUserRobotObject: StandardUserRobotObjectDefinition = {
   id: "user-robot",
   class: userObjectClass,
-  assetPath: "rover/rover.glb",
-  scale: 0.1925,
+  assetPath: "jobbot/JobBot.glb",
+  mapIconPath: "jobbot/map-icon.svg",
+  scale: 1.2,
+  modelTurnRadians: -0.74,
+  modelLiftMeters: 0.415,
   collision: {
     radius: 0.32,
     height: 1,
@@ -44,6 +53,8 @@ export const standardUserRobotObject: StandardUserRobotObjectDefinition = {
 
 interface StaticLibraryDefinition {
   readonly assetPath: string;
+  /** The object's icon on the world map, next to its model; undefined leaves the object off the map, as for grass. */
+  readonly mapIconPath: string | undefined;
   readonly class: string;
   readonly visualScale?: number;
   readonly visualScaleXYZ?: (authorScale: number) => readonly [number, number, number];
@@ -66,6 +77,7 @@ const smallHouseFootprintCenter = {
 const staticLibraryDefinitions = {
   small_house: {
     assetPath: "small_house/small_house.glb",
+    mapIconPath: "small_house/map-icon.svg",
     class: "house",
     displayHelpMessage: "A static landmark. Use nearby landmarks to keep track of where you are in the world.",
     visualScale: smallHouseAssetScale,
@@ -82,6 +94,7 @@ const staticLibraryDefinitions = {
   },
   tree: {
     assetPath: "Tree1/Tree.glb",
+    mapIconPath: "Tree1/map-icon.svg",
     class: "tree",
     displayHelpMessage: "A static tree. It marks the local shape of this face and blocks movement at its trunk.",
     visualScaleXYZ: treeScaleXYZ,
@@ -93,6 +106,7 @@ const staticLibraryDefinitions = {
   },
   tree_swirl: {
     assetPath: "TreeSwirl/tree_swirl.glb",
+    mapIconPath: "TreeSwirl/map-icon.svg",
     class: "tree",
     displayHelpMessage: "A static tree. It marks the local shape of this face and blocks movement at its trunk.",
     visualScaleXYZ: treeScaleXYZ,
@@ -104,11 +118,13 @@ const staticLibraryDefinitions = {
   },
   grass: {
     assetPath: "grass1/Grass.glb",
+    mapIconPath: undefined,
     class: "grass",
     do_not_collide_with: [userObjectClass],
   },
   bench: {
     assetPath: "Bench/Bench.glb",
+    mapIconPath: "Bench/map-icon.svg",
     class: "bench",
     displayHelpMessage: "A static bench. It is a landmark and collision object in this cell.",
     visualScale: 0.9,
@@ -121,6 +137,7 @@ const staticLibraryDefinitions = {
   },
   bicycle: {
     assetPath: "bicycle/Bicycle.glb",
+    mapIconPath: "bicycle/map-icon.svg",
     class: "bike",
     displayHelpMessage: "A static bicycle. It is a landmark and collision object in this cell.",
     visualScale: 0.9,
@@ -132,12 +149,14 @@ const staticLibraryDefinitions = {
   },
   flower_group: {
     assetPath: "FloweGroup/flower_group.glb",
+    mapIconPath: "FloweGroup/map-icon.svg",
     class: "flowers",
     visualScale: 0.7,
     do_not_collide_with: [userObjectClass],
   },
   flower_pot: {
     assetPath: "flowerPot/flower_pot.glb",
+    mapIconPath: "flowerPot/map-icon.svg",
     class: "flower-pot",
     displayHelpMessage: "A small decorative object. It can help you recognize this part of the world.",
     visualScale: 0.75,
@@ -149,6 +168,7 @@ const staticLibraryDefinitions = {
   },
   stop_sign: {
     assetPath: "stopsign/stop_sign.glb",
+    mapIconPath: "stopsign/map-icon.svg",
     class: "sign",
     displayHelpMessage: "A static sign. Use it as a landmark while exploring portal connections.",
     visualScale: 0.03,
@@ -160,6 +180,7 @@ const staticLibraryDefinitions = {
   },
   traffic_cone: {
     assetPath: "trafficCone/Cone.glb",
+    mapIconPath: "trafficCone/map-icon.svg",
     class: "cone",
     displayHelpMessage: "A static traffic cone. It marks this spot and blocks movement.",
     visualScale: 0.75,
@@ -171,6 +192,7 @@ const staticLibraryDefinitions = {
   },
   question_cube: {
     assetPath: "questionblock/questionBlock.glb",
+    mapIconPath: "questionblock/map-icon.svg",
     class: "question-cube",
     displayHelpMessage: "A help cube. Aim at it to see a short tutorial prompt.",
     visualScale: questionCubeAssetScale,
@@ -183,11 +205,13 @@ const staticLibraryDefinitions = {
   },
   clock: {
     assetPath: "_legacy/clock_low_poly/scene.gltf",
+    mapIconPath: "_legacy/clock_low_poly/map-icon.svg",
     class: "clock",
     do_not_collide_with: [userObjectClass],
   },
   campfire: {
     assetPath: "_legacy/low_poly_campfire/scene.gltf",
+    mapIconPath: "_legacy/low_poly_campfire/map-icon.svg",
     class: "fire",
     displayHelpMessage: "A static campfire landmark.",
     collision: (scale) => ({
@@ -198,6 +222,7 @@ const staticLibraryDefinitions = {
   },
   rocks: {
     assetPath: "_legacy/low_poly_rocks/scene.gltf",
+    mapIconPath: "_legacy/low_poly_rocks/map-icon.svg",
     class: "rocks",
     displayHelpMessage: "Static rocks. They are landmarks and collision objects in this cell.",
     collision: (scale) => ({
@@ -208,6 +233,7 @@ const staticLibraryDefinitions = {
   },
   emergency_button: {
     assetPath: "_legacy/low_poly_emergency_button/scene.gltf",
+    mapIconPath: "_legacy/low_poly_emergency_button/map-icon.svg",
     class: "interactive",
     displayHelpMessage: "A static button-like object. Use it as an exploration landmark.",
     collision: (scale) => ({
@@ -218,6 +244,7 @@ const staticLibraryDefinitions = {
   },
   computer_large: {
     assetPath: "computerlarge/ComputerLarge.glb",
+    mapIconPath: "computerlarge/map-icon.svg",
     class: "geometry-computer",
     displayHelpMessage: "Use this computer to change world deformation when the current world supports live geometry changes.",
     visualScale: 0.9,
@@ -309,9 +336,9 @@ export const worldObjectLibrary: WorldObjectLibrary = {
   traffic_cone: (name, params) => createDefinedStaticLibraryObject("traffic_cone", name, params),
   question_cube: (name, params) => createDefinedStaticLibraryObject("question_cube", name, params),
   geo_mouse: (name, params) =>
-    brandLibraryObject(createSimpleGeoCreature("geo-mouse", name, "mouse/Mouse.glb", params)),
+    brandLibraryObject({ ...createSimpleGeoCreature("geo-mouse", name, "mouse/Mouse.glb", params), mapIconPath: "mouse/map-icon.svg" }),
   geo_butterfly: (name, params) =>
-    brandLibraryObject(createSimpleGeoCreature("geo-butterfly", name, "butterfly/Butterfly.glb", params)),
+    brandLibraryObject({ ...createSimpleGeoCreature("geo-butterfly", name, "butterfly/Butterfly.glb", params), mapIconPath: "butterfly/map-icon.svg" }),
   house: (name, params) => worldObjectLibrary.small_house(name, params),
   clock: (name, params) => createDefinedStaticLibraryObject("clock", name, params),
   campfire: (name, params) => createDefinedStaticLibraryObject("campfire", name, params),
@@ -353,9 +380,10 @@ export function isWorldLibraryObjectSpec(value: unknown): value is WorldLibraryO
 function createStaticLibraryObject(
   name: string,
   assetPath: string,
+  mapIconPath: string | undefined,
   params: StaticObjectAuthoringParams,
 ): WorldLibraryObjectSpec {
-  return brandLibraryObject(createStaticAssetObject(name, assetPath, params));
+  return brandLibraryObject({ ...createStaticAssetObject(name, assetPath, params), mapIconPath });
 }
 
 function createDefinedStaticLibraryObject(
@@ -377,7 +405,7 @@ function createDefinedStaticLibraryObject(
     displayHelpMessage: params.displayHelpMessage ?? definition.displayHelpMessage,
   };
 
-  return createStaticLibraryObject(name, definition.assetPath, resolvedParams);
+  return createStaticLibraryObject(name, definition.assetPath, definition.mapIconPath, resolvedParams);
 }
 
 // Non-uniform scale compensating for the tree model's native proportions (0.02 base; narrower horizontally than vertically).

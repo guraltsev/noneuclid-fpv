@@ -37,7 +37,12 @@ import type { PreparedWorldAssets } from "../../src/render/three/preparedWorldAs
 import { createRuntimeObjectRegistry } from "../../src/world-objects/runtimeObjectRegistry";
 import { createObjectHost } from "../../src/world-objects/worldObjectOwner";
 import { createSimpleGeoCreature } from "../../src/world-objects/simpleGeoCreature";
-import { applyForbiddenZoneSideRule, geodesicSideOfPoint, forbiddenZoneLateralOscillationScale } from "../../src/world-objects/creatures/simpleGeoCreatureBehavior";
+import {
+  applyForbiddenZoneSideRule,
+  geodesicSideOfPoint,
+  forbiddenZoneLateralOscillationScale,
+  isTargetBehindAroundZone,
+} from "../../src/world-objects/creatures/simpleGeoCreatureBehavior";
 import { createSimpleGeoCreatureRuntime } from "../../src/render/three/creatures/simpleGeoCreatureView";
 
 const squareRoomBase = [
@@ -295,6 +300,18 @@ describe("side rule", () => {
     expect(right.x).toBeCloseTo(-0.05, 6);
     // A displacement that does not point at the disc is returned unchanged.
     expect(applyForbiddenZoneSideRule({ x: 0, y: -0.05 }, { x: 0, y: -0.2 }, { x: 0, y: 0 }, 0.2, 1)).toEqual({ x: 0, y: -0.05 });
+  });
+
+  it("waits for a target a little behind on the required way round, and goes round to any other", () => {
+    const zone = { x: 0, y: 0 };
+    const anchor = { x: 0, y: -1 };
+    // Side +1 goes round counterclockwise, which from (0, -1) is towards +x.
+    expect(isTargetBehindAroundZone(zone, anchor, { x: -0.5, y: -1 }, 1)).toBe(true);
+    expect(isTargetBehindAroundZone(zone, anchor, { x: 0.5, y: -1 }, 1)).toBe(false);
+    expect(isTargetBehindAroundZone(zone, anchor, { x: 0.5, y: -1 }, -1)).toBe(true);
+    // Straight across the zone, or more than a quarter turn behind: go round.
+    expect(isTargetBehindAroundZone(zone, anchor, { x: -0.01, y: 1 }, 1)).toBe(false);
+    expect(isTargetBehindAroundZone(zone, anchor, { x: -1, y: 0.2 }, 1)).toBe(false);
   });
 });
 
@@ -594,8 +611,7 @@ describe("leader and detour", () => {
       maxForwardX = Math.max(maxForwardX, c.pose().pose.translation.x);
     }
     // Turn -90 degrees faces +x; the body sits at x = 1 with a combined radius of 0.35 m (0.3 body + 0.05
-    // creature), so the creature must stop short of it, but should still have advanced well past its start (the
-    // leash lets it get within 0.5 m of the leader before holding the leader back).
+    // creature), so the creature must stop short of it, but should still have advanced well past its start.
     expect(maxForwardX).toBeLessThanOrEqual(0.65 + 1e-6);
     expect(maxForwardX).toBeGreaterThan(0.15);
 
@@ -603,6 +619,28 @@ describe("leader and detour", () => {
       c.runtime.update(world, dt, []);
     }
     expectRejoinsGeodesic(c);
+  });
+
+  it("catches up with where it would be unblocked: a block never holds the leader back", () => {
+    const world = compileCellComplex(cube);
+    const blocked = makeCreature(world, "front", 0, 0, -90);
+    const free = makeCreature(world, "front", 0, 0, -90);
+    const body = {
+      cellId: "front",
+      localPose: yawRigidTransform3(0, { x: 1, y: 0, z: 0 }),
+      collision: simpleCollisionCylinder(0.3, 0.4, { x: 0, y: 0, z: 0.2 }),
+    };
+
+    // Held for 3 s, the creature falls 3 m or so behind its leader; it then catches up at half its speed again, in about 6 s.
+    for (let tick = 0; tick < 900; tick += 1) {
+      blocked.runtime.update(world, dt, tick < 180 ? [body] : []);
+      free.runtime.update(world, dt);
+    }
+
+    const mine = blocked.pose();
+    const unblocked = free.pose();
+    expect(mine.cellId).toBe(unblocked.cellId);
+    expect(Math.hypot(mine.pose.translation.x - unblocked.pose.translation.x, mine.pose.translation.y - unblocked.pose.translation.y)).toBeLessThan(1e-8);
   });
 
   it("host.placeAt re-seeds the leader so the creature walks the geodesic from the placed pose", () => {

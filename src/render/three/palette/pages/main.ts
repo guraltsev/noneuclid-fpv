@@ -32,7 +32,7 @@ export function buildMainContent(
   const row = new Container({
     width: "100%",
     flexDirection: "row",
-    justifyContent: "space-between",
+    flexWrap: "wrap",
     gap: 12,
   });
   for (const tool of content.toolOptions) {

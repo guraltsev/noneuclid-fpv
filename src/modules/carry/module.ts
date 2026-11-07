@@ -18,6 +18,7 @@ import {
   geodesicEmitterEditAttachmentKind,
   geodesicEmittersRefusals,
   geodesicEmittersToken,
+  type GeodesicEmitterLandCommand,
   type GeodesicEmitterLiftCommand,
   type GeodesicEmittersApi,
 } from "../geodesicEmitters/api";
@@ -66,9 +67,14 @@ function asCannon(object: RuntimeWorldObject | undefined): Cannon | undefined {
   return object?.kind === "geodesicEmitters/emitter" ? object : undefined;
 }
 
-/** Ends the carry of `participant`: the emitter's final rebuild (without the safety net of the carry in progress), and the attachment and the slot go. */
-function endCarry(ctx: Pick<StepContext, "setAttachments" | "closeControl">, emitters: GeodesicEmittersApi, participant: ParticipantRecord, carry: ParticipantAttachment): void {
+/**
+ * Ends the carry of `participant`: the emitter's final rebuild (without the safety net of the carry in progress), then the emitter lands, so a geodesic whose path it was set down on
+ * is cut there and attached to it, and the attachment and the slot go.
+ */
+function endCarry(ctx: Pick<StepContext, "setAttachments" | "closeControl" | "dispatch">, emitters: GeodesicEmittersApi, participant: ParticipantRecord, carry: ParticipantAttachment): void {
   emitters.settleGeodesics(carry.objectId, carry.activeGeodesicId);
+  const landing: GeodesicEmitterLandCommand = { kind: "geodesicEmitters/land", emitterId: carry.objectId };
+  ctx.dispatch(landing);
   ctx.setAttachments(participant.id, withoutCarry(participant));
   ctx.closeControl(participant.id, carryOffsetSlot);
 }

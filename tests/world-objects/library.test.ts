@@ -150,8 +150,8 @@ describe("worldObjectLibrary", () => {
     expect(standardUserRobotObject).toMatchObject({
       id: "user-robot",
       class: userObjectClass,
-      assetPath: "rover/rover.glb",
-      scale: 0.1925,
+      assetPath: "jobbot/JobBot.glb",
+      scale: 1.2,
       collision: {
         radius: 0.32,
         height: 1,

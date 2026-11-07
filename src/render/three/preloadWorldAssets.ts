@@ -2,7 +2,7 @@
  * Asset preloading and instancing for the Three.js renderer.
  *
  * Gathers every texture and glTF path referenced by the compiled world (floor textures, cell objects, placed flags,
- * geodesic ray models, the player rover), downloads them in parallel before the scene is built, and returns a read-only
+ * geodesic ray models, the player rover, and the map icons of all of them), downloads them in parallel before the scene is built, and returns a read-only
  * {@link PreparedWorldAssets} lookup used synchronously during scene construction. Texture loader choice depends on the file
  * extension (KTX2, EXR, common image formats); anything else is treated as glTF. Floor colour textures are optional (a failed
  * load is tolerated) whereas every other loaded asset is required and rejects the whole preload. The portal wall
@@ -14,8 +14,9 @@ import * as THREE from "three";
 import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex";
 import { publicAssetUrl } from "../../glue/assetUrls";
 import { createPortalWallDataTexture, PORTAL_WALL_TEXTURE_KEY } from "./portalWallTexture";
-import { placedFlagAssetPaths } from "../../world-objects/placedFlags";
-import { geodesicRayAssetPaths } from "./geodesicCannonRenderer";
+import { placedFlagAssetPaths, placedFlagMapIconPaths } from "../../world-objects/placedFlags";
+import { standardUserRobotObject } from "../../world-objects/library";
+import { geodesicMapIconPaths, geodesicRayAssetPaths } from "./geodesicCannonRenderer";
 import { playerRoverAssetPath } from "./playerRoverModel";
 import { runtimeDiagnostics } from "../../diagnostics/runtimeDiagnostics";
 import { clone as cloneSkeleton } from "three/examples/jsm/utils/SkeletonUtils.js";
@@ -42,8 +43,8 @@ export interface PreloadWorldAssetsOptions {
 /**
  * Lists the unique asset paths needed by `world`.
  *
- * Includes floor material textures (colour, normal, bump, roughness) and every cell object's asset, plus the fixed
- * placed-flag, geodesic-ray and player-rover assets. Does not include the portal wall texture, which is generated in code.
+ * Includes floor material textures (colour, normal, bump, roughness) and every cell object's asset and map icon, plus the fixed
+ * placed-flag, geodesic-ray and player-rover assets and their map icons. Does not include the portal wall texture, which is generated in code.
  */
 export function collectWorldAssetPaths(world: CompiledCellComplex): readonly string[] {
   const assetPaths = new Set<string>();
@@ -64,6 +65,9 @@ export function collectWorldAssetPaths(world: CompiledCellComplex): readonly str
 
     for (const object of cell.objects) {
       assetPaths.add(object.assetPath);
+      if (object.mapIconPath !== undefined) {
+        assetPaths.add(object.mapIconPath);
+      }
     }
   }
 
@@ -71,6 +75,9 @@ export function collectWorldAssetPaths(world: CompiledCellComplex): readonly str
     ...Object.values(placedFlagAssetPaths),
     ...Object.values(geodesicRayAssetPaths),
     playerRoverAssetPath,
+    ...Object.values(placedFlagMapIconPaths),
+    ...Object.values(geodesicMapIconPaths),
+    standardUserRobotObject.mapIconPath,
   ]) {
     assetPaths.add(assetPath);
   }
@@ -81,7 +88,7 @@ export function collectWorldAssetPaths(world: CompiledCellComplex): readonly str
 /**
  * Maps an asset path to the loader category by file extension (case-insensitive).
  *
- * `.ktx2` and `.exr` have dedicated loaders, avif/jpg/jpeg/png/webp are plain textures, and everything else is assumed to be glTF.
+ * `.ktx2` and `.exr` have dedicated loaders, avif/jpg/jpeg/png/svg/webp are plain textures, and everything else is assumed to be glTF.
  */
 export function classifyAssetPreloadKind(assetPath: string): AssetPreloadKind {
   if (/\.ktx2$/i.test(assetPath)) {
@@ -92,7 +99,7 @@ export function classifyAssetPreloadKind(assetPath: string): AssetPreloadKind {
     return "texture-exr";
   }
 
-  if (/\.(avif|jpe?g|png|webp)$/i.test(assetPath)) {
+  if (/\.(avif|jpe?g|png|svg|webp)$/i.test(assetPath)) {
     return "texture";
   }
 

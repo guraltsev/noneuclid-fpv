@@ -180,6 +180,8 @@ renderer-neutral data (`src/ui/paletteDefinition.ts#createPaletteDefinition`) an
 
 A tool is a descriptor (`src/engine/moduleTypes.ts#ToolDescriptor`): its label, help, icon, prompt and what it does with the primary action. The shell's own tools are described in `src/runtime/coreTools.ts#createCoreToolDescriptors`; a module contributes its tools in the client part of the module (`src/modules/geodesicModel/client.ts#geodesicModelClient`, `src/modules/geodesicEmitters/client.ts#geodesicEmittersClient`), and the shell merges both into `toolsById` (`src/runtime/toolRegistry.ts#createToolsById`). The indicators, the help lens, the aim cross and the actions on an object's menu page read this map, so a tool is added without changing any of them. A tool acts on the world only through `ToolContext.submit` and keeps its picks in the client session, under its module (`moduleToolState`); both are cleared when the tool ends.
 
+A tool need not touch the world. The world map (`src/modules/worldMap/`) only defines the tool, so the engine can gate it; the map shows while the tool is selected (`src/render/three/worldMapRenderer.ts#createWorldMapRenderer`). See [design/015-world-map.md](design/015-world-map.md).
+
 ## Testing strategy
 
 Tests mirror `src/` (see [tests.md](tests.md)). The geometry layers are covered by behavior tests that need no browser;

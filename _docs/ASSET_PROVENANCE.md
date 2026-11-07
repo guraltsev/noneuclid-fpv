@@ -44,7 +44,7 @@ link to [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/).
 | `mapMarker/MapMarker.glb` (public only) | [Map Marker, Chris Ross](https://poly.pizza/m/6ij4nru_NPh) | CC BY 3.0 | “Map Marker by Chris Ross via Poly Pizza.” |
 | `mouse/Mouse.glb` | [Mouse, Poly by Google](https://poly.pizza/m/cWxdxmp7yaE) | CC BY 3.0 | “Mouse by Poly by Google via Poly Pizza.” |
 | `questionblock/questionBlock.glb` | [?-Block, Studio Creality](https://poly.pizza/m/dIC3dNIL84K) | CC BY 3.0 | “?-Block by Studio Creality via Poly Pizza.” |
-| `rover/rover.glb` | [Space rover, Poly by Google](https://poly.pizza/m/dhLVA8z7cGo) | CC BY 3.0 | “Space rover by Poly by Google via Poly Pizza.” |
+| `jobbot/JobBot.glb` | [Job Simulator Job Bot, Tipatat Chennavasin](https://poly.pizza/m/bV9H_MniqF0) | CC BY 3.0 | “Job Simulator Job Bot by Tipatat Chennavasin via Poly Pizza.” |
 | `simplesuitcase/SimpleSuitcase.glb` (public only) | [Simple Suitcase, Don Carson](https://poly.pizza/m/023W-XcCmir) | CC BY 3.0 | “Simple Suitcase by Don Carson via Poly Pizza.” |
 | `small_house/small_house.glb` | [Small House, Jarlan Perez](https://poly.pizza/m/053kskrV4U_) | CC BY 3.0 | “Small House by Jarlan Perez via Poly Pizza.” |
 | `stopsign/stop_sign.glb` | [Stop sign, Poly by Google](https://poly.pizza/m/60GyU9CdZ9r) | CC BY 3.0 | “Stop sign by Poly by Google via Poly Pizza.” |
@@ -113,6 +113,8 @@ color/diffuse map and inherits its source asset’s license.
 | `icons/arrowkeys.svg` | [Circle Up, Font Awesome Free 6.5.1 / Fonticons, Inc.](https://fontawesome.com/icons/circle-up?f=classic&s=solid); [matching free icons](https://fontawesome.com/search?o=r&m=free) | CC BY 4.0 | “Font Awesome Free 6.5.1 by Fonticons, Inc.” The left, right, and down arrows are rotations of the supplied up-arrow glyph. |
 | `icons/ruler.svg` | [Ruler, Phosphor Icons](https://github.com/phosphor-icons/core/blob/main/assets/regular/ruler.svg); [matching icons](https://phosphoricons.com/?q=ruler) | MIT | “Copyright 2023 Phosphor Icons.” |
 | `icons/ruler-inverted.svg` | Same as `icons/ruler.svg`, with strokes recolored white for dark backgrounds | MIT | “Copyright 2023 Phosphor Icons.” |
+| `icons/world-map.svg`, `icons/world-map-inverted.svg` | Project-made: an icosahedron seen along a vertex axis. The inverted file is the same drawing in white for dark backgrounds. | Covered by the project MIT License. |
+| `*/map-icon.svg` (one in the folder of each object's model, including `_legacy/*`) | Project-made: the objects' symbols on the world map, drawn as flat glyphs, not traced from the models or from any other icon set. | Covered by the project MIT License. |
 | `icons/trash.svg` | [Trash 2, Feather Icons](https://github.com/feathericons/feather/blob/main/icons/trash-2.svg); [matching icons](https://feathericons.com) | MIT | “Copyright 2013-2023 Cole Bemis.” |
 | `icons/mouse-button-left.svg`, `icons/mouse-button-right.svg` | [Iconoir](https://iconoir.com); [MIT license](https://github.com/iconoir-icons/iconoir/blob/main/LICENSE) | MIT | “Copyright 2021 Luca Burgio.” |
 | `icons/a-alphabet.svg` through `icons/z-alphabet.svg` | [UXWing Alphabet icons](https://uxwing.com/wp-content/themes/uxwing/download/education-school/q-alphabet-icon.svg) | [UXWing license](https://uxwing.com/license/) | Attribution is not required; this project voluntarily credits UXWing. The files are used only as application assets, not offered as a separate icon collection, and are not relicensed. |

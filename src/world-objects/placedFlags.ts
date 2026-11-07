@@ -22,6 +22,14 @@ export const placedFlagAssetPaths: Record<PlacedFlagType, string> = {
 };
 
 /**
+ * Maps each sign type to its icon on the world map, next to its model.
+ */
+export const placedFlagMapIconPaths: Record<PlacedFlagType, string> = {
+  WoodenSign1: "WoodenSign1/map-icon.svg",
+  WoodenSign2: "WoodenSign2/map-icon.svg",
+};
+
+/**
  * Default sign text color (CSS hex).
  */
 export const defaultPlacedFlagTextColor = "#f8fafc";

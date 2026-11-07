@@ -318,9 +318,9 @@ describe("the ghosts of an emitter that moves", () => {
   });
 });
 
-/** The real rover model, as the renderer places it: the bounds of `rover.glb` as one box under the model's scale and half turn. */
+/** The real avatar model, as the renderer places it: the bounds of its glb as one box under the model's scale, turn and lift. */
 function realRover(): PlayerRoverRenderModel {
-  const bounds = readGlbBounds(new URL("../../public/assets/rover/rover.glb", import.meta.url));
+  const bounds = readGlbBounds(new URL("../../public/assets/jobbot/JobBot.glb", import.meta.url));
   const size = bounds.max.map((max, axis) => max - bounds.min[axis]);
   const centre = bounds.max.map((max, axis) => (max + bounds.min[axis]) / 2);
   const assets = createFakePreparedAssets({
@@ -384,7 +384,7 @@ describe("the player's rover is ghosted through the portal it stands at", () => 
   });
 
   it("draws none far from every portal (the rover's own copy is not drawn at the root)", () => {
-    expect(roverCopies(realRover(), 0)).toBe(0);
+    expect(roverCopies(realRover(), 0.3)).toBe(0);
   });
 
   it("fails loudly when the rover has nothing measurable to ghost", () => {

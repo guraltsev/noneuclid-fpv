@@ -42,6 +42,11 @@ export const geodesicRayAssetPaths = {
   lightsaber: "flashlight/Lightsaber.glb",
   balloon: "baloon/Balloon.glb",
 } as const;
+/** Icons on the world map of an emitter and of a crossing, next to their models. */
+export const geodesicMapIconPaths = {
+  emitter: "flashlight/map-icon.svg",
+  crossing: "baloon/map-icon.svg",
+} as const;
 /** Uniform scale of the post and lightsaber models. */
 export const geodesicRayAssetScale = 0.42;
 /** Lifts the loaded post model so its base sits on the floor (meters, Three.js y); not applied to the fallback. */

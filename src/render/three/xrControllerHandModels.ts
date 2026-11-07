@@ -37,6 +37,8 @@ export interface XrControllerHandModelsUpdate {
 export interface XrControllerHandModels {
   /** Poses and shows a hand for each visible left/right source, hiding the others; call every XR frame. */
   update(frame: XrControllerHandModelsUpdate): void;
+  /** The right hand's pose in the scene as of the last `update`, or undefined while it is not tracked. The object is the hand's own: read it, do not keep or change it. */
+  rightHand(): THREE.Object3D | undefined;
   /** Hides all hands and the wrist indicator without freeing anything; call when an XR session ends. */
   reset(): void;
   /** Removes hands and indicator from the scene and frees their geometry, materials, textures; any in-flight model load is discarded. The owner must call it. */
@@ -136,6 +138,10 @@ export function createXrControllerHandModels(scene: THREE.Scene): XrControllerHa
         rightToolIndicator.root.visible = false;
       }
     },
+    rightHand() {
+      const hand = instances.get("right");
+      return hand?.visible ? hand : undefined;
+    },
     reset() {
       hideInstances(instances);
       rightToolIndicator.root.visible = false;
@@ -180,6 +186,7 @@ const wristToolIndicatorAimIconSource = publicAssetUrl("icons/aim-inverted.png")
 const wristToolIndicatorRayIconSource = publicAssetUrl("flashlight/Lightsaber.png");
 const wristToolIndicatorProtractorIconSource = publicAssetUrl("icons/protractor.png");
 const wristToolIndicatorMeasureLengthIconSource = publicAssetUrl("icons/ruler.svg");
+const wristToolIndicatorWorldMapIconSource = publicAssetUrl("icons/world-map.svg");
 
 const wristToolIndicatorIconSources: Readonly<Record<string, string>> = {
   ray: wristToolIndicatorRayIconSource,
@@ -188,6 +195,7 @@ const wristToolIndicatorIconSources: Readonly<Record<string, string>> = {
   carry: wristToolIndicatorCarryIconSource,
   protractor: wristToolIndicatorProtractorIconSource,
   length: wristToolIndicatorMeasureLengthIconSource,
+  map: wristToolIndicatorWorldMapIconSource,
 };
 
 /**

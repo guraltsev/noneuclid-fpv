@@ -23,7 +23,8 @@ const worldToThreeBasis = new THREE.Matrix4().set(
   0, -1, 0, 0,
   0, 0, 0, 1,
 );
-const threeToWorldBasis = worldToThreeBasis.clone().invert();
+/** Carries Three axes to world axes (B^-1). Shared: do not mutate. */
+export const threeToWorldBasis = worldToThreeBasis.clone().invert();
 
 /** Converts a world-frame point (x right, y forward, z up) to a new Three.js vector (x, z, -y). */
 export function worldPointToThree(point: Vec3): THREE.Vector3 {

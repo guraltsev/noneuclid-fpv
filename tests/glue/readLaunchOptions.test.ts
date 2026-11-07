@@ -196,6 +196,7 @@ describe("readLaunchOptions", () => {
           geodesicEmitters: true,
           distances: true,
           angles: true,
+          worldMap: true,
         },
         debug: {
           level: "off",
@@ -234,6 +235,7 @@ describe("readLaunchOptions", () => {
         geodesicEmitters: true,
         distances: true,
         angles: true,
+        worldMap: true,
       });
       expect(config.menu, configName).toMatchObject({
         configSelectionSectionEnabled: false,
