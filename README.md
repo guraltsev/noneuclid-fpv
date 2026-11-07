@@ -16,18 +16,22 @@ build an explanation.
 
 These activities open in a browser from the project's own GitHub Pages site.
 
-- [Activity 1: cube-world exploration](https://guraltsev.github.io/noneuclid-fpv/main/?config=001)
-- [Activity 2: tetrahedron-world exploration](https://guraltsev.github.io/noneuclid-fpv/main/?config=002)
-- [Activity 3: flat torus](https://guraltsev.github.io/noneuclid-fpv/main/?config=003)
-- [Activity 4: genus-2 torus](https://guraltsev.github.io/noneuclid-fpv/main/?config=004)
-- [Activity 5: torus moduli](https://guraltsev.github.io/noneuclid-fpv/main/?config=005)
+This is the **classic** branch: the version before the engine redesign, kept
+unchanged. The current version is on `main`; every published version is listed on the
+[all published versions](https://guraltsev.github.io/noneuclid-fpv/versions/) page.
+
+- [Activity 1: cube-world exploration](https://guraltsev.github.io/noneuclid-fpv/classic/?config=001)
+- [Activity 2: tetrahedron-world exploration](https://guraltsev.github.io/noneuclid-fpv/classic/?config=002)
+- [Activity 3: flat torus](https://guraltsev.github.io/noneuclid-fpv/classic/?config=003)
+- [Activity 4: genus-2 torus](https://guraltsev.github.io/noneuclid-fpv/classic/?config=004)
+- [Activity 5: torus moduli](https://guraltsev.github.io/noneuclid-fpv/classic/?config=005)
 
 ### Unrestricted mode (teachers and developers)
 
 The activity links above are locked down. This link opens every menu and tool,
 including world selection and the debug menu:
 
-- [Unrestricted: all worlds, tools, and debug menu](https://guraltsev.github.io/noneuclid-fpv/?config=full)
+- [Unrestricted: all worlds, tools, and debug menu](https://guraltsev.github.io/noneuclid-fpv/classic/?config=full)
 
 Debug features start switched off. For verbose logging and the on-screen
 overlay, add `&debugLevel=verbose&debugOverlay=1`; use `&world=<id>` to pick a
