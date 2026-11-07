@@ -15,19 +15,27 @@ build an explanation.
 ## Start an activity
 
 These activities open in a browser from the project's own GitHub Pages site.
+Every published version of the project, with its links, is listed on the
+**[all published versions](https://guraltsev.github.io/noneuclid-fpv/versions/)** page.
 
-- [Activity 1: cube-world exploration](https://guraltsev.github.io/noneuclid-fpv/?config=001)
-- [Activity 2: tetrahedron-world exploration](https://guraltsev.github.io/noneuclid-fpv/?config=002)
-- [Activity 3: flat torus](https://guraltsev.github.io/noneuclid-fpv/?config=003)
-- [Activity 4: genus-2 torus](https://guraltsev.github.io/noneuclid-fpv/?config=004)
-- [Activity 5: torus moduli](https://guraltsev.github.io/noneuclid-fpv/?config=005)
+The current version (the `main` branch):
+
+- [Activity 1: cube-world exploration](https://guraltsev.github.io/noneuclid-fpv/main/?config=001)
+- [Activity 2: tetrahedron-world exploration](https://guraltsev.github.io/noneuclid-fpv/main/?config=002)
+- [Activity 3: flat torus](https://guraltsev.github.io/noneuclid-fpv/main/?config=003)
+- [Activity 4: genus-2 torus](https://guraltsev.github.io/noneuclid-fpv/main/?config=004)
+- [Activity 5: torus moduli](https://guraltsev.github.io/noneuclid-fpv/main/?config=005)
+
+The earlier version, kept unchanged on the `classic` branch:
+[classic](https://guraltsev.github.io/noneuclid-fpv/classic/).
 
 ### Unrestricted mode (teachers and developers)
 
-The activity links above are locked down. This link opens every menu and tool,
-including world selection and the debug menu:
+The activity links above are locked down. Opening the site without a
+`?config=` parameter starts the unrestricted mode in the cube world, with every
+menu and tool, including world selection and the debug menu:
 
-- [Unrestricted: all worlds, tools, and debug menu](https://guraltsev.github.io/noneuclid-fpv/?config=full)
+- [Unrestricted: all worlds, tools, and debug menu](https://guraltsev.github.io/noneuclid-fpv/main/)
 
 Debug features start switched off. For verbose logging and the on-screen
 overlay, add `&debugLevel=verbose&debugOverlay=1`; use `&world=<id>` to pick a

@@ -9,8 +9,11 @@ gh_pages
   published.json       which commit each folder was built from
   .nojekyll
   main/                build of main            https://guraltsev.github.io/noneuclid-fpv/main/
-  design-012-engine-api/   build of design/012-engine-api
+  classic/             build of classic         https://guraltsev.github.io/noneuclid-fpv/classic/
 ```
+
+Published branches are `main` (the current version) and `classic` (the version before the engine redesign, kept
+frozen). The list of everything published is at <https://guraltsev.github.io/noneuclid-fpv/versions/>.
 
 The tool is the reusable Python tool in `.gittools/pages-publish/` (source of truth, installer and tests:
 `Documents/templates/git/.gittools/pages-publish/`). Its full usage is in
