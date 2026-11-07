@@ -5,7 +5,7 @@
 
 This reference is produced from the source code. For the *meaning* of the modules — the mathematical model they implement — read [../MATHEMATICAL_MODEL.md](../MATHEMATICAL_MODEL.md) and [../ARCHITECTURE.md](../ARCHITECTURE.md). For every exported symbol see [API_REFERENCE.md](API_REFERENCE.md).
 
-**284 modules, 55,130 lines** under `src/`.
+**284 modules, 55,142 lines** under `src/`.
 
 ## Layers
 
@@ -27,7 +27,7 @@ A module belongs to the layer named by its first path segment under `src/`. "May
 | `modules` | 29 | 2,739 | `math`, `cell-complex`, `diagnostics`, `movement`, `world-objects`, `glue`, `interaction`, `engine` | World modules (design 013): each owns a slice of world behaviour and exposes a typed api.ts to the others. |
 | `runtime` | 16 | 2,672 | `math`, `cell-complex`, `diagnostics`, `movement`, `world-objects`, `authoring`, `glue`, `engine`, `modules` | Application state, runtime menu state, command dispatch, geometry session/worker, server channel and public API. |
 | `ui` | 6 | 1,300 | `math`, `cell-complex`, `world-objects`, `authoring`, `glue`, `engine`, `modules`, `runtime` | Renderer-neutral palette, help, tooltip and input-intent definitions. |
-| `render` | 120 | 25,109 | every lower layer | Three.js / DOM / WebXR rendering and input adapters (the application shell). |
+| `render` | 120 | 25,121 | every lower layer | Three.js / DOM / WebXR rendering and input adapters (the application shell). |
 | `root` | 1 | 214 | every lower layer | Entry point. |
 
 ## Layer dependency graph
@@ -467,7 +467,7 @@ None: every import respects the intended layering.
 | `render/three/worldAxes.ts` | 92 | Conversion between the simulation's world frame and the Three.js scene frame. | `math/rigidTransform3`, `math/vec3` |
 | `render/three/worldClient.ts` | 133 | The shell's side of its conversation with the world engine (design 013 sections 5.3, 5.5 and 8.1): the tool-switch protocol (also for tools started from an object's menu page), the generic event sink and the `api.world`… | `engine/moduleTypes`, `engine/worldEngine`, `glue/toolIds`, `runtime/apiCall`, `runtime/clientSession`, `runtime/runtimeCommands` |
 | `render/three/worldMapPieces.ts` | 142 | What the world map shows, all of it flat on the solid: nothing on the map has height, so a geodesic stays straight on each face and meets itself at each edge, and it stays with its emitter. | `cell-complex/compileCellComplex`, `cell-complex/platonicSolid`, `cell-complex/prismCells`, `math/rigidTransform3`, `math/vec3`, `movement/playerPose`, `render/three/geodesicCannonRenderer`, `render/three/runtimeObjectRenderRecords`, `render/three/worldAxes`, `world-objects/library`, `world-objects/placedFlags`, `world-objects/runtimeObjectRegistry` |
-| `render/three/worldMapRenderer.ts` | 348 | The world map: the world in miniature, as the Platonic solid it is the surface of, with everything in it flat on its faces: the icons of its things, the player's among them, and geodesics as strips (`worldMapPieces.ts`). | `cell-complex/compileCellComplex`, `cell-complex/floorUv`, `cell-complex/platonicSolid`, `math/rigidTransform3`, `math/vec3`, `movement/playerPose`, `render/three/buildCellMesh`, `render/three/preparedWorldAssets`, `render/three/worldAxes`, `render/three/worldMapPieces` |
+| `render/three/worldMapRenderer.ts` | 360 | The world map: the world in miniature, as the Platonic solid it is the surface of, with everything in it flat on its faces: the icons of its things, the player's among them, and geodesics as strips (`worldMapPieces.ts`). | `cell-complex/compileCellComplex`, `cell-complex/floorUv`, `cell-complex/platonicSolid`, `math/rigidTransform3`, `math/vec3`, `movement/playerPose`, `render/three/buildCellMesh`, `render/three/preparedWorldAssets`, `render/three/worldAxes`, `render/three/worldMapPieces` |
 | `render/three/worldResultBadge.ts` | 168 | Floating text badge ("pill" with an optional downward pointer) used as an in-world result label, for example for measured lengths and protractor angles. | `render/three/canvasDrawing` |
 | `render/three/xrControllerHandModels.ts` | 645 | Cosmetic low-poly hand models that follow XR controllers (or tracked hands), plus a small icon sprite near the right wrist showing the selected tool. | `engine/moduleTypes`, `glue/assetUrls`, `render/three/xrPlayerRig`, `world-objects/toolObjects` |
 | `render/three/xrControls.ts` | 242 | WebXR gamepad input -> `RuntimeInputFrame` (the XR input path for locomotion and actions). | `interaction/inputFrame`, `interaction/vrLocomotion`, `math/vec3`, `render/three/vrComfort` |

@@ -244,38 +244,61 @@ describe("the world map", () => {
 
   describe("in XR", () => {
     const handAt = (x: number, y: number, z: number, quaternion: THREE.Quaternion) => ({ tracked: { position: new THREE.Vector3(x, y, z), quaternion } });
+    // Where the player's point is in the scene.
+    const roverInScene = (map: ReturnType<typeof setup>["map"]) => {
+      map.root.updateMatrixWorld(true);
+      const solid = findPlatonicSolid(cubeWorld)!;
+      const point = transformPoint3(solid.cellFrames.get(pose.cellId)!, pose.position);
+      return new THREE.Vector3(point.x, point.y, point.z).applyMatrix4(map.root.matrixWorld);
+    };
 
-    it("stays above the right hand wherever it goes", () => {
+    it("stands the player's point above the right hand wherever it goes", () => {
       const { map, frame } = setup();
-      map.update(frame({ hand: handAt(0.3, 1.1, -0.4, new THREE.Quaternion()) }));
-      const first = map.root.position.clone();
-      map.update(frame({ hand: handAt(-0.2, 1.3, -0.5, new THREE.Quaternion()) }));
-      expect(first.y).toBeGreaterThan(1.1);
-      expect(map.root.position.x - first.x).toBeCloseTo(-0.5);
-      expect(map.root.position.y - first.y).toBeCloseTo(0.2);
+      const held = new THREE.Quaternion().setFromEuler(new THREE.Euler(0.4, 1.2, -0.3));
+      map.update(frame({ hand: handAt(0.3, 1.1, -0.4, held) }));
+      expect(roverInScene(map).distanceTo(new THREE.Vector3(0.3, 1.3, -0.4))).toBeLessThan(1e-9);
+      map.update(frame({ hand: handAt(-0.2, 1.3, -0.5, held) }));
+      expect(roverInScene(map).distanceTo(new THREE.Vector3(-0.2, 1.5, -0.5))).toBeLessThan(1e-9);
     });
 
-    it("turns exactly as the hand turns, and spins in place", () => {
-      const { map, frame } = setup();
-      const held = new THREE.Quaternion().setFromEuler(new THREE.Euler(0.3, -0.7, 0.2));
-      map.update(frame({ hand: handAt(0, 1, 0, held) }));
-      const first = map.root.quaternion.clone();
-      const position = map.root.position.clone();
-      const turn = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), 1.2);
-      map.update(frame({ hand: handAt(0, 1, 0, turn.clone().multiply(held)) }));
-      expect(map.root.quaternion.angleTo(turn.clone().multiply(first))).toBeLessThan(1e-6);
-      expect(map.root.position.distanceTo(position)).toBeLessThan(1e-9);
-    });
-
-    it("first faces the rover to the viewer, and then the head and the rover no longer turn it", () => {
+    it("stands as on the desktop while the hand keeps its first turn, the player facing the view", () => {
       const { map, frame } = setup();
       const hand = handAt(0, 1, 0, new THREE.Quaternion().setFromEuler(new THREE.Euler(1, 2, 0.5)));
       const viewerQuaternion = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), 0.8);
       map.update(frame({ hand, viewerQuaternion }));
       expect(map.root.quaternion.angleTo(viewerQuaternion.clone().multiply(worldMapFacingFor(pose)))).toBeLessThan(1e-6);
+    });
+
+    it("composes the hand's turn with that pose, about the player's point", () => {
+      const { map, frame } = setup();
+      const held = new THREE.Quaternion().setFromEuler(new THREE.Euler(0.3, -0.7, 0.2));
+      map.update(frame({ hand: handAt(0, 1, 0, held) }));
       const first = map.root.quaternion.clone();
-      map.update(frame({ hand, viewerQuaternion: new THREE.Quaternion(), playerPose: { ...pose, yawRadians: 2 } }));
+      const turn = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), 1.2);
+      map.update(frame({ hand: handAt(0, 1, 0, turn.clone().multiply(held)) }));
+      expect(map.root.quaternion.angleTo(turn.clone().multiply(first))).toBeLessThan(1e-6);
+      expect(roverInScene(map).distanceTo(new THREE.Vector3(0, 1.2, 0))).toBeLessThan(1e-9);
+    });
+
+    it("keeps the view it opened in when the head turns", () => {
+      const { map, frame } = setup();
+      const hand = handAt(0, 1, 0, new THREE.Quaternion());
+      map.update(frame({ hand }));
+      const first = map.root.quaternion.clone();
+      map.update(frame({ hand, viewerQuaternion: new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), 1) }));
       expect(map.root.quaternion.angleTo(first)).toBeLessThan(1e-6);
+    });
+
+    it("turns the solid under the player as they turn, gradually", () => {
+      const { map, frame } = setup();
+      const hand = handAt(0, 1, 0, new THREE.Quaternion());
+      map.update(frame({ hand }));
+      const before = map.root.quaternion.clone();
+      const turned = { ...pose, yawRadians: pose.yawRadians + 1 };
+      map.update(frame({ hand, playerPose: turned }));
+      const step = before.angleTo(map.root.quaternion);
+      expect(step).toBeGreaterThan(0);
+      expect(step).toBeLessThan(before.angleTo(worldMapFacingFor(turned)));
     });
 
     it("hides while the hand is lost and comes back with the same turn", () => {
@@ -290,13 +313,12 @@ describe("the world map", () => {
       expect(map.root.quaternion.angleTo(first)).toBeLessThan(1e-6);
     });
 
-    it("faces the rover again when the map is opened anew", () => {
+    it("takes the hand's turn and the view afresh when the map is opened anew", () => {
       const { map, frame } = setup();
-      const hand = handAt(0, 1, 0, new THREE.Quaternion());
-      map.update(frame({ hand }));
+      map.update(frame({ hand: handAt(0, 1, 0, new THREE.Quaternion()) }));
       map.hide();
       const viewerQuaternion = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), 1);
-      map.update(frame({ hand, viewerQuaternion }));
+      map.update(frame({ hand: handAt(0, 1, 0, new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), 0.7)), viewerQuaternion }));
       expect(map.root.quaternion.angleTo(viewerQuaternion.clone().multiply(worldMapFacingFor(pose)))).toBeLessThan(1e-6);
     });
   });

@@ -2,7 +2,7 @@
  * The world map: the world in miniature, as the Platonic solid it is the surface of, with everything in it flat on its faces: the icons of its things, the player's among them, and geodesics as strips (`worldMapPieces.ts`).
  * An icon has one size on every map, a fixed part of the solid's size, whatever the size of its thing: like a road map's symbols, it says what stands there, not how large it is. The player's is larger.
  * The map's root is one group in the frame of the solid (`cell-complex/platonicSolid.ts`), scaled down and posed each frame. Its children are the faces, the edges and one mesh per piece; a piece's matrix is its cell-local placement carried onto the solid, so everything follows the world while the map is open. The faces wear the floors' own textures, which their mipmaps bring down to the map's size, and are lit by a matcap, a fixed light that turns with the viewer: they turn every way, and those turned from the world's sun would be dark.
- * Placement: on the desktop the map floats in front of the viewer with the player's point always at its center, turned so that the player faces them with their heading up and tilted back a little, like a table seen from above, so that what lies ahead shows. The solid turns under the player as they move, and as they near an edge it turns a little to bring the next face in. In XR it floats above the right hand and turns with the hand, keeping the turn it had when it first appeared, so a person looks around the solid by rotating their hand. The hand gives the map its orientation but not its offset, so a turn of the wrist spins the solid in place. While the hand is not tracked the map hides.
+ * Placement: on the desktop the map floats in front of the viewer with the player's point always at its center, turned so that the player faces them with their heading up and tilted back a little, like a table seen from above, so that what lies ahead shows. The solid turns under the player as they move, and as they near an edge it turns a little to bring the next face in. In XR it floats above the right hand. With the hand as it was when the map appeared, the map stands as on the desktop, facing the view it opened in, with the player's point above the hand; the hand's turn since then is composed with that pose, about the player's point, so a person looks around the solid by rotating their hand, and a turn of the wrist spins the solid about the player rather than swinging it through the air. While the hand is not tracked the map hides.
  * The map draws over the world without losing its own depth order: its meshes use a thin slice at the near end of the depth range, so a wall the player stands close to does not cut through it.
  * The renderer owns its GPU resources; the owner must call `dispose()`.
  */
@@ -122,10 +122,12 @@ export function createWorldMapRenderer(scene: THREE.Scene, renderer: Pick<THREE.
   let shownWorld: CompiledCellComplex | undefined;
   let solid: PlatonicSolid | undefined;
   let surface: readonly (THREE.Mesh<THREE.BufferGeometry, THREE.Material> | THREE.LineSegments<THREE.BufferGeometry, THREE.Material>)[] = [];
-  // The desktop's turn of the map, relative to the viewer, as it eases to the target.
+  // The map's turn relative to the view, as it eases to the player's facing.
   let facing: THREE.Quaternion | undefined;
-  // The map's turn relative to the hand, fixed when the map first appears in the hand.
-  let heldTurn: THREE.Quaternion | undefined;
+  // In XR, the view and the hand's turn when the map first appeared in the hand.
+  let held: { readonly view: THREE.Quaternion; readonly hand: THREE.Quaternion } | undefined;
+  // Whether the map was last shown in the hand; a switch starts it afresh.
+  let shownInHand: boolean | undefined;
 
   function useNearDepth(): void {
     renderer.getContext().depthRange(0, depthSlice);
@@ -239,26 +241,36 @@ export function createWorldMapRenderer(scene: THREE.Scene, renderer: Pick<THREE.
     }
   }
 
+  // Turns and places the map so that the player's point stands at `anchor`.
+  function standRoverAt(anchor: THREE.Vector3, turn: THREE.Quaternion, roverPosition: Vec3, radiusMeters: number, circumradiusMeters: number): void {
+    root.quaternion.copy(turn);
+    root.scale.setScalar(radiusMeters / circumradiusMeters);
+    const roverFromCenter = new THREE.Vector3(roverPosition.x, roverPosition.y, roverPosition.z).multiplyScalar(root.scale.x).applyQuaternion(turn);
+    root.position.copy(anchor).sub(roverFromCenter);
+  }
+
   function place(frame: WorldMapFrame, roverPosition: Vec3, roverHeading: Vec3, circumradiusMeters: number): boolean {
     const target = worldMapFacing(roverPosition, roverHeading);
-    if (frame.hand === undefined) {
-      heldTurn = undefined;
-      facing = facing === undefined ? target : facing.slerp(target, 1 - Math.exp(-facingTurnRate * frame.deltaSeconds));
-      root.quaternion.copy(frame.viewerQuaternion).multiply(facing);
-      root.scale.setScalar(desktopRadiusMeters / circumradiusMeters);
-      // The player's point, not the solid's center, stands at the map's place in front of the eye.
-      const roverFromCenter = new THREE.Vector3(roverPosition.x, roverPosition.y, roverPosition.z).multiplyScalar(root.scale.x).applyQuaternion(root.quaternion);
-      root.position.copy(desktopOffsetFromEye).applyQuaternion(frame.viewerQuaternion).add(frame.viewerPosition).sub(roverFromCenter);
+    const inHand = frame.hand !== undefined;
+    if (shownInHand !== inHand) {
+      held = undefined;
+      facing = undefined;
+      shownInHand = inHand;
+    }
+    const hand = frame.hand?.tracked;
+    if (inHand && hand === undefined) return false;
+    facing = facing === undefined ? target : facing.slerp(target, 1 - Math.exp(-facingTurnRate * frame.deltaSeconds));
+    if (hand === undefined) {
+      const anchor = desktopOffsetFromEye.clone().applyQuaternion(frame.viewerQuaternion).add(frame.viewerPosition);
+      standRoverAt(anchor, frame.viewerQuaternion.clone().multiply(facing), roverPosition, desktopRadiusMeters, circumradiusMeters);
       return true;
     }
-    const hand = frame.hand.tracked;
-    if (hand === undefined) return false;
-    facing = undefined;
-    heldTurn ??= hand.quaternion.clone().invert().multiply(frame.viewerQuaternion).multiply(target);
-    root.quaternion.copy(hand.quaternion).multiply(heldTurn);
-    root.position.copy(hand.position);
-    root.position.y += xrHeightAboveHandMeters;
-    root.scale.setScalar(xrRadiusMeters / circumradiusMeters);
+    held ??= { view: frame.viewerQuaternion.clone(), hand: hand.quaternion.clone() };
+    // The default pose faces the player to the view the map opened in; the hand's turn since then turns it about the player's point.
+    const handTurn = hand.quaternion.clone().multiply(held.hand.clone().invert());
+    const anchor = hand.position.clone();
+    anchor.y += xrHeightAboveHandMeters;
+    standRoverAt(anchor, handTurn.multiply(held.view).multiply(facing), roverPosition, xrRadiusMeters, circumradiusMeters);
     return true;
   }
 
@@ -281,7 +293,7 @@ export function createWorldMapRenderer(scene: THREE.Scene, renderer: Pick<THREE.
     hide() {
       root.visible = false;
       facing = undefined;
-      heldTurn = undefined;
+      held = undefined;
     },
     dispose() {
       scene.remove(root);
