@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 64 64">
+<!-- World map icon. Project-made, covered by the project MIT License. The top of the picture is the thing's forward. -->
+<rect x="8" y="8" width="48" height="48" rx="6" fill="#facc15" stroke="#111827" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke" />
+<rect x="12" y="12" width="40" height="40" rx="4" fill="#374151" />
+<circle cx="32" cy="32" r="15" fill="#dc2626" stroke="#111827" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke" />
+<circle cx="27" cy="27" r="4" fill="#f87171" />
+</svg>

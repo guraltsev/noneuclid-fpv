@@ -1,0 +1,47 @@
+arrow-circle.png - <a href="https://www.flaticon.com/free-icons/rotate" title="rotate icons">Rotate icons created by ChilliColor - Flaticon</a>
+arrow-circle-inverted.png - inverted derivative of arrow-circle.png
+aim.png - <a href="https://www.flaticon.com/free-icons/aim" title="aim icons">Aim icons created by Creative Stall Premium - Flaticon</a>
+aim-inverted.png - inverted derivative of aim.png
+add.png - <a href="https://www.flaticon.com/free-icons/plus" title="plus icons">Plus icons created by dmitri13 - Flaticon</a>
+lock.png - <a href="https://www.flaticon.com/free-icons/privacy" title="privacy icons">Privacy icons created by meaicon - Flaticon</a>
+protractor.png - <a href="https://www.flaticon.com/free-icons/protractor" title="protractor icons">Protractor icons created by Freepik - Flaticon</a>
+unlink.png - <a href="https://www.flaticon.com/free-icons/unlink" title="unlink icons">Unlink icons created by Maniprasanth - Flaticon</a>
+
+arrowkeys.svg - Circle Up icon from Font Awesome Free 6.5.1 by Fonticons, Inc.
+(https://fontawesome.com/icons/circle-up?f=classic&s=solid); browse matching
+free icons at https://fontawesome.com/search?o=r&m=free. Licensed under CC BY 4.0
+(https://fontawesome.com/license/free). The left, right, and down arrows are
+rotations of the supplied up-arrow glyph.
+
+ruler.svg - Ruler icon from Phosphor Icons (https://phosphoricons.com/?q=ruler),
+Copyright 2023 Phosphor Icons; source:
+https://github.com/phosphor-icons/core/blob/main/assets/regular/ruler.svg.
+Licensed under the MIT License:
+https://github.com/phosphor-icons/core/blob/main/LICENSE
+
+trash.svg - Trash 2 icon from Feather Icons (https://feathericons.com),
+Copyright 2013-2023 Cole Bemis; source:
+https://github.com/feathericons/feather/blob/main/icons/trash-2.svg.
+Licensed under the MIT License:
+https://github.com/feathericons/feather/blob/main/LICENSE
+
+mouse-button-left.svg and mouse-button-right.svg - Mouse Button icons from
+Iconoir (https://iconoir.com), Copyright 2021 Luca Burgio. Licensed under the
+MIT License: https://github.com/iconoir-icons/iconoir/blob/main/LICENSE
+
+a-alphabet.svg through z-alphabet.svg - Alphabet icons from UXWing
+(https://uxwing.com/). No attribution is required under the UXWing license,
+but this project voluntarily credits UXWing. The source collection is
+https://uxwing.com/wp-content/themes/uxwing/download/education-school/q-alphabet-icon.svg
+and the terms are https://uxwing.com/license/. UXWing does not allow these
+files to be resold, redistributed, sublicensed, or claimed as this project's
+own icon collection. They are used here only as application assets, not offered
+as a separate icon collection.
+
+carry.svg - Reply Map Location Black icon from UXWing, source:
+https://uxwing.com/wp-content/themes/uxwing/download/location-travel-map/reply-map-location-black-icon.svg.
+carry-inverted.svg is a white-color project-made derivative for dark UI
+surfaces. UXWing does not require attribution for allowed use, but this project
+voluntarily credits UXWing (https://uxwing.com/). Terms:
+https://uxwing.com/license/. Both files are application assets only, not a
+separately offered icon collection, and are not relicensed.

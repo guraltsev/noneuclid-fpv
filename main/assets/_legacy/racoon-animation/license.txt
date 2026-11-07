@@ -1,0 +1,11 @@
+Model Information:
+* title:	Low-poly Racoon Run Animation
+* source:	https://sketchfab.com/3d-models/low-poly-racoon-run-animation-ee040f4719fa4b449176f860921a7655
+* author:	avatrass (https://sketchfab.com/avatrass)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Low-poly Racoon Run Animation" (https://sketchfab.com/3d-models/low-poly-racoon-run-animation-ee040f4719fa4b449176f860921a7655) by avatrass (https://sketchfab.com/avatrass) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

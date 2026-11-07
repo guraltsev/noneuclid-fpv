@@ -1,0 +1,17 @@
+{
+  "default": "main",
+  "entries": {
+    "main": {
+      "branch": "main",
+      "sha": "43228f6697b2ff9776f06b2fba6650f34a953d05",
+      "publishedAt": "2026-11-07T13:34:59.235Z",
+      "bytes": 52675345
+    },
+    "classic": {
+      "branch": "classic",
+      "sha": "d9dc700bead18b8996aab79c6de6483ac0d1f173",
+      "publishedAt": "2026-11-07T13:33:08.520Z",
+      "bytes": 53385329
+    }
+  }
+}
