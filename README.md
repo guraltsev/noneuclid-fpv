@@ -6,13 +6,16 @@ It is designed for curious learners aged 12 and up, and for teachers who want an
 
 ## What can you explore?
 
-Imagine making a room out of a polygonal floor and vertical walls. Some walls are **portals**: walking through one carries you to another room. The rooms fit together to model a larger space.
+Imagine cutting flat polygons out of paper and gluing them edge to edge. Glue six squares like the faces of a cube, or the opposite edges of one square to each other, and you get a surface. You walk on that surface: step off the edge of one piece and you carry on onto the piece glued to it.
 
 The program gives you a world and
 tools so that you can make observations, compare ideas with other people, and
 build an explanation.
 
 ## Start an activity
+
+The **[project page](https://guraltsev.github.io/noneuclid-fpv/)** lists every world with a screenshot and a
+short description, and explains the controls with pictures.
 
 These activities open in a browser from the project's own GitHub Pages site.
 Every published version of the project, with its links, is listed on the
@@ -51,7 +54,7 @@ work with a teacher or partner when a new tool is introduced.
 
 ## A good way to investigate
 
-1. **Make a prediction.** For example: “If I cross these two portals, I think I
+1. **Make a prediction.** For example: “If I walk straight ahead, I think I
    will return to the place where I started.”
 2. **Try it.** Walk, place a sign, draw a locally straight ray, or measure an
    angle or length.

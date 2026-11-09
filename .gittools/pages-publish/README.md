@@ -5,7 +5,8 @@ Pages serves. Every listed branch gets its own address, so a branch can be previ
 
 ```text
 gh_pages
-  index.html           redirects to the default branch (or to versions/ while it is not published)
+  index.html           redirects to the default branch (or to versions/ while it is not published),
+                       unless publish.landing provides a landing page
   versions/index.html  every published branch with links, commit and time
   published.json       which commit each folder was built from
   main/                build of main            https://<user>.github.io/<repo>/main/
@@ -73,6 +74,18 @@ env = { NODE_ENV = "production" }
 `PAGES_FOLDER`, `PAGES_BRANCH`, `PAGES_SHA`. Because each branch is served from a sub-path, the build must use relative
 asset paths or `{base}`; by default a built `index.html` with `src="/..."` is refused (`require_relative = false` turns
 that off). The URL path comes from the remote URL (`site_base` overrides it).
+
+## Landing page
+
+```toml
+[publish]
+landing = "landing"   # a folder of the repository, relative to its root
+```
+
+Each publish of the default branch copies the files of that folder, as they are in the published commit, to the site
+root; its `index.html` replaces the redirect. `published.json` lists those files, so the next publish removes ones that
+were deleted. Publishing another branch leaves them alone. A landing file or folder may not share a name with a branch
+folder, `versions/`, `published.json` or `.nojekyll`. Link to the branches with relative paths (`./main/`).
 
 ## Optional automation
 

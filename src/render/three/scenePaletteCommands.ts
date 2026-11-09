@@ -30,7 +30,7 @@ export type ScenePaletteCommands = Pick<
   | "onObjectActionRequested" | "onGeodesicCannonRotateRequested" | "onGeodesicCannonAimRequested"
   | "onGeodesicCannonDeleteRequested" | "onGeometryComputerStepTargetRequested" | "onGeometryComputerGoRequested"
   | "onQuestionHelpTutorialRequested" | "onQuestionHelpGoalRequested" | "onTutorialPreviousRequested"
-  | "onTutorialNextRequested" | "onGoalPreviousRequested" | "onGoalNextRequested" | "onSignKeyboardCharacter"
+  | "onTutorialNextRequested" | "onTutorialPageRequested" | "onGoalPreviousRequested" | "onGoalNextRequested" | "onSignKeyboardCharacter"
   | "onSignKeyboardBackspace" | "onSignDeleteRequested"
 >;
 
@@ -139,6 +139,9 @@ export function createScenePaletteCommands(deps: ScenePaletteCommandsDeps): Scen
     },
     onTutorialNextRequested() {
       dispatch({ kind: "step-tutorial-page", delta: 1 });
+    },
+    onTutorialPageRequested(pageIndex) {
+      dispatch({ kind: "show-tutorial-page", pageIndex });
     },
     onGoalPreviousRequested() {
       dispatch({ kind: "step-goal-page", delta: -1 });

@@ -28,26 +28,117 @@ const startingHouseLookOffsetDegrees = 12;
 export const defaultStartingQuestionCubeMessage =
   "Open this cube to page through the tutorial.";
 /**
- * Default tutorial pages (movement, actions, help) of the starting question cube, with desktop and XR text variants.
+ * Default tutorial pages of the starting question cube: one page per thing a player can do, each with a screenshot and its controls (shown with the icons of the current device).
+ * The tutorial opens on an index of these titles. A page that names `requiresTools` is left out when the app config (as it applies to the world) enables none of them.
  */
 export const defaultStartingQuestionCubeTutorialPages: readonly TutorialPageSpec[] = [
   {
-    title: "Move",
-    body: "Move with Arrow keys or the left stick. Look at nearby objects to see available actions.",
-    desktopBody: "Move with Arrow keys. Look at nearby objects to see available actions.",
-    xrBody: "Move with the left stick. Look at nearby objects to see available actions.",
-  },
-  {
-    title: "Use actions",
-    body: "Use primary action or trigger for the selected/default action. Use context action or side trigger for tools and object menus.",
-    desktopBody: "Left click uses the selected/default action. Right click or F opens tools and object menus.",
-    xrBody: "Trigger uses the selected/default action. Side trigger opens tools and object menus.",
+    title: "Look and walk",
+    body: "Look around and walk. Walk off the edge of a flat piece and you carry on onto the piece glued to it. Look at nearby objects to see what you can do with them.",
+    desktopBody: "Click the view once so the mouse turns your head; Esc gives the mouse back. Turn also with Q and E. Walk off the edge of a flat piece and you carry on onto the piece glued to it.",
+    xrBody: "Turn your head, or push the stick sideways, to look around. Walk off the edge of a flat piece and you carry on onto the piece glued to it.",
+    imagePath: "tutorial/walk.jpg",
+    controls: [
+      { intent: "look", label: "look around" },
+      { intent: "move", label: "walk" },
+      { intent: "reset", label: "start over: removes everything you placed" },
+    ],
   },
   {
     title: "Get help",
-    body: `Press H or B while aiming at an object for its help. ${helpHubHomeGuidance}`,
-    desktopBody: `Press H while aiming at an object for its help. ${helpHubHomeGuidance}`,
-    xrBody: `Press B while aiming at an object for its help. ${helpHubHomeGuidance}`,
+    body: `Aim at anything to see its name. Ask for help about it, or open its menu. ${helpHubHomeGuidance}`,
+    imagePath: "tutorial/help.jpg",
+    controls: [
+      { intent: "help", label: "help about what you aim at" },
+      { intent: "context-menu", label: "menu of what you aim at" },
+    ],
+  },
+  {
+    title: "The tool menu",
+    body: "Aim at empty floor and open the tool menu, then pick a tool. The buttons at the top are Settings (choose another world), Home (back to the start) and Reload (press twice).",
+    imagePath: "tutorial/tool-menu.jpg",
+    controls: [
+      { intent: "context-menu", label: "open the tool menu" },
+      { intent: "primary", label: "pick a tool or press a button" },
+      { intent: "cancel", label: "close the menu" },
+    ],
+  },
+  {
+    title: "Straight rays",
+    body: "Pick Geodesic emitter and select a spot on the floor: a post appears and fires a short, locally straight ray the way you face. Select the ray to make it 2 m longer. A ray stops if it runs into a corner: each corner of the surface is surrounded by a thin column.",
+    imagePath: "tutorial/rays.jpg",
+    requiresTools: ["geodesicEmitters/emitter"],
+    controls: [
+      { intent: "primary", label: "place a post, or lengthen a ray" },
+      { intent: "context-menu", label: "on a post: its menu" },
+    ],
+  },
+  {
+    title: "Aim a ray",
+    body: "Open a post's menu: it lists the post's rays. Press Aim next to a free ray; the ray now points wherever you look. Select to fix it. If it ends on another post, or close to one, it locks there. The + button adds a ray, the bin deletes one.",
+    imagePath: "tutorial/post-menu.jpg",
+    requiresTools: ["geodesicEmitters/emitter"],
+    controls: [
+      { intent: "context-menu", label: "open the post's menu" },
+      { intent: "primary", label: "press Aim; select again to fix the ray" },
+    ],
+  },
+  {
+    title: "Locked rays",
+    body: "A ray with a post at both ends is locked: it turns amber and shows a lock in the post's menu. It cannot be aimed or made longer. A ray locks when it reaches another post, or when you put a new post on a free ray, which cuts the ray in two.",
+    imagePath: "tutorial/locked.jpg",
+    requiresTools: ["geodesicEmitters/emitter"],
+    controls: [
+      { intent: "primary", label: "with Geodesic emitter, select a free ray to cut it with a post" },
+    ],
+  },
+  {
+    title: "Move a post",
+    body: "Aim at a post and pick it up. Its locked rays stay attached: they are redrawn as straight rays between the posts while you walk, going the same way around the world. Its free rays are removed. Putting a post down on a ray cuts that ray.",
+    imagePath: "tutorial/carry.jpg",
+    requiresTools: ["geodesicEmitters/emitter"],
+    controls: [
+      { intent: "carry", label: "pick up or put down a post" },
+      { intent: "primary", label: "put it down" },
+    ],
+  },
+  {
+    title: "Unite and shorten",
+    body: "The orange button in a post's menu unites two of the post's locked geodesic segments into one curve and detaches it from the post. Select the two segments near the post. The curve-shortening flow then moves the corner where they meet so that the curve gets shorter, until it is a geodesic between the other two posts, or a closed geodesic.",
+    imagePath: "tutorial/tie.jpg",
+    requiresTools: ["geodesicEmitters/emitter"],
+    controls: [
+      { intent: "context-menu", label: "open the post's menu" },
+      { intent: "primary", label: "press the orange button, then select the two segments" },
+    ],
+  },
+  {
+    title: "Measure",
+    body: "Length: pick it and select a ray to see how long it is, all the way along. Protractor: select a post or a crossing, then two rays leaving it; the angle goes counter-clockwise from the first to the second. With no tool, select a measurement to remove it.",
+    imagePath: "tutorial/measure.jpg",
+    requiresTools: ["geodesicMeasurements/length", "geodesicMeasurements/protractor"],
+    controls: [
+      { intent: "primary", label: "select a ray, a post, a crossing or a side" },
+    ],
+  },
+  {
+    title: "Signs",
+    body: "Pick Sign and select a spot on the floor. Signs are numbered A1, A2, and so on, so you can tell places apart. Open a sign's menu to type your own text on its keyboard, or delete it. The ... button on the Sign tool picks the style.",
+    imagePath: "tutorial/signs.jpg",
+    requiresTools: ["placedFlags/flag"],
+    controls: [
+      { intent: "primary", label: "put up a sign" },
+      { intent: "context-menu", label: "on a sign: edit or delete it" },
+    ],
+  },
+  {
+    title: "World map",
+    body: "Pick Map to see the whole world as a small solid in front of you, with you and the objects on it. Compare it with what you see around you.",
+    imagePath: "tutorial/map.jpg",
+    requiresTools: ["worldMap/map"],
+    controls: [
+      { intent: "primary", label: "close the map" },
+    ],
   },
 ];
 /**

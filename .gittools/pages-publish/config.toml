@@ -7,6 +7,8 @@ default_branch = "main"
 history = "single"
 # The site is built with relative paths (vite base "./"), so no base path is needed.
 require_relative = true
+# Folder copied to the site root when the default branch is published; its index.html replaces the redirect.
+landing = "landing"
 
 [build]
 command = "node scripts/build-pages.mjs"

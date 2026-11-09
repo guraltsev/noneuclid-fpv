@@ -389,7 +389,7 @@ export function createGeodesicEmitterObject(options: CreateGeodesicEmitterOption
     },
     collision: options.collision ?? defaultCannonCollision,
     portalRenderable: true,
-    displayHelpMessage: "Creates and edits geodesic rays. Open its menu to add, carry, rotate, aim, tie, detach, or delete rays.",
+    displayHelpMessage: "Creates and edits geodesic rays. Open its menu to add, aim or delete rays, carry the emitter, or unite two of its geodesic segments.",
     tooltip: {
       label: "Geodesic emitter",
       rangeMeters: 2.5,

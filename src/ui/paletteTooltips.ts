@@ -71,7 +71,7 @@ const fixedTooltips: Readonly<Record<string, string>> = {
   "debug-tools-toggle": "Debug tools",
   "tool-options:place-sign": "Sign options",
   "geodesic-cannon-action:add-geodesic": "Add geodesic",
-  "geodesic-cannon-action:carry": "Move emitter while maintaining attached geodesics",
+  "geodesic-cannon-action:carry": "Carry the emitter: locked geodesics stay attached, free ones are removed",
   "sign-action:trash": "Delete sign",
   "sign-key:Space": "Space",
   "sign-key:Enter": "New line",

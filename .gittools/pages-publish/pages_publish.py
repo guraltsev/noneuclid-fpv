@@ -5,7 +5,8 @@ commit with the command configured in ``config.toml`` and copy the result
 into ``<pages branch>/<branch folder>/``. The Pages branch (``gh_pages`` by
 default) also receives ``published.json`` (which commit each folder was built
 from), a ``versions/`` page listing every published folder, and a root
-``index.html`` that redirects to the default branch.
+``index.html`` that redirects to the default branch, or, when ``publish.landing``
+names a folder, that folder's files (copied when the default branch is published).
 
 A commit that ``published.json`` already records is skipped without building,
 so a local publish and the optional workflow never repeat each other's work.
@@ -53,7 +54,11 @@ _PUBLISH_KEYS = {
     "site_base",
     "warn_total_mib",
     "require_relative",
+    "landing",
 }
+
+# Files at the site root that the tool writes itself; a landing folder cannot provide them.
+_SITE_FILES = frozenset({"published.json", ".nojekyll"})
 _BUILD_KEYS = {"command", "commands", "dist", "cwd", "env"}
 
 # Marker lines delimiting the block that ``install-hook`` owns in a hook file.
@@ -158,6 +163,10 @@ class Config:
         Warn when published folders add up to more than this many MiB.
     require_relative : bool
         Refuse a build whose ``index.html`` uses root-absolute asset paths.
+    landing : str or None
+        Folder, relative to the repository root, whose files are copied to the
+        site root each time the default branch is published; its
+        ``index.html`` replaces the root redirect. ``None`` keeps the redirect.
     commands : list of (str or list of str)
         Build steps, each a shell string or an argument list.
     dist : str
@@ -176,6 +185,7 @@ class Config:
     site_base: str | None = None
     warn_total_mib: int = 800
     require_relative: bool = True
+    landing: str | None = None
     commands: list[str | list[str]] = field(default_factory=list)
     dist: str = "dist"
     cwd: str = "."
@@ -266,6 +276,7 @@ def load_config(path: Path) -> Config:
         site_base=publish_table.get("site_base"),
         warn_total_mib=int(publish_table.get("warn_total_mib", defaults.warn_total_mib)),
         require_relative=bool(publish_table.get("require_relative", defaults.require_relative)),
+        landing=publish_table.get("landing") or None,
         commands=commands,
         dist=build_table.get("dist", defaults.dist),
         cwd=build_table.get("cwd", defaults.cwd),
@@ -374,6 +385,13 @@ def publish(
     if any(name != config_relative for name in changed if name):
         raise PublishError("the working tree has uncommitted changes; commit them first so the published folder matches the commit.")
 
+    # The landing folder is taken from the same commit as the build.
+    landing = None
+    if config.landing and branch == config.default_branch:
+        landing = (root / config.landing).resolve()
+        if not landing.is_dir():
+            raise PublishError(f"publish.landing folder '{config.landing}' does not exist.")
+
     with _publish_lock(root):
         # Build once, then freeze a private copy of the output so nothing that
         # touches ``dist`` afterwards (another build, a hook) can change what
@@ -383,6 +401,8 @@ def publish(
         snapshot = Path(tempfile.mkdtemp(prefix="pages-publish-snapshot-"))
         try:
             shutil.copytree(built, snapshot / "content")
+            if landing is not None:
+                shutil.copytree(landing, snapshot / "landing")
             if config.require_relative:
                 _require_relative_paths(snapshot / "content")
             size_bytes = _directory_size(snapshot / "content")
@@ -396,6 +416,7 @@ def publish(
                 sha=sha,
                 content=snapshot / "content",
                 size_bytes=size_bytes,
+                landing=snapshot / "landing" if landing is not None else None,
                 push=push,
                 prune_dead=prune_dead,
                 log=log,
@@ -720,6 +741,7 @@ def _push_folder(
     sha: str,
     content: Path,
     size_bytes: int,
+    landing: Path | None = None,
     push: bool,
     prune_dead: bool,
     log,
@@ -727,7 +749,10 @@ def _push_folder(
     """Write one built folder into the Pages branch and push it."""
 
     def edit(manifest: dict, worktree: Path) -> str | None:
-        """Replace the folder, record the commit, and optionally prune."""
+        """Replace the folder, record the commit, replace the landing files, and optionally prune."""
+        landing_names = {name.split("/", 1)[0] for name in manifest.get("landing", [])}
+        if folder in landing_names and landing is None:
+            raise PublishError(f"the folder '{folder}' is used by the landing page; rename the branch or the landing file.")
         shutil.rmtree(worktree / folder, ignore_errors=True)
         shutil.copytree(content, worktree / folder)
         manifest["entries"][folder] = {
@@ -736,12 +761,30 @@ def _push_folder(
             "publishedAt": datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z"),
             "bytes": size_bytes,
         }
+        if landing is not None:
+            _replace_landing(manifest, worktree, landing)
         if prune_dead:
             _prune_manifest(root, remote, manifest, worktree, log, keep=branch)
         return f"Publish {folder} @ {sha[:7]}"
 
     _commit_to_pages_branch(root, config, remote, edit, push=push, log=log)
     return Result("published", folder, sha)
+
+
+def _replace_landing(manifest: dict, worktree: Path, landing: Path) -> None:
+    """Delete the previously published landing files and copy ``landing`` to the site root."""
+    files = sorted(path.relative_to(landing).as_posix() for path in landing.rglob("*") if path.is_file())
+    taken = set(manifest["entries"]) | RESERVED_FOLDERS | _SITE_FILES
+    clashes = sorted({name.split("/", 1)[0] for name in files} & taken)
+    if clashes:
+        raise PublishError(f"landing files clash with published folders or site files: {', '.join(clashes)}")
+    for name in manifest.get("landing", []):
+        (worktree / name).unlink(missing_ok=True)
+    for name in files:
+        target = worktree / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(landing / name, target)
+    manifest["landing"] = files
 
 
 def _commit_to_pages_branch(root: Path, config: Config, remote: str, edit, *, push: bool, log) -> None:
@@ -878,9 +921,10 @@ def _prune_manifest(root: Path, remote: str, manifest: dict, worktree: Path, log
 
 
 def _write_site_files(worktree: Path, manifest: dict) -> None:
-    """Write ``published.json``, the root redirect, ``versions/`` and ``.nojekyll``."""
+    """Write ``published.json``, the root redirect (unless a landing page provides it), ``versions/`` and ``.nojekyll``."""
     (worktree / "published.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8", newline="\n")
-    (worktree / "index.html").write_text(_render_index(manifest), encoding="utf-8", newline="\n")
+    if "index.html" not in manifest.get("landing", []):
+        (worktree / "index.html").write_text(_render_index(manifest), encoding="utf-8", newline="\n")
     (worktree / "versions").mkdir(exist_ok=True)
     (worktree / "versions" / "index.html").write_text(_render_versions(manifest), encoding="utf-8", newline="\n")
     (worktree / ".nojekyll").write_text("\n", encoding="utf-8", newline="\n")
@@ -974,7 +1018,11 @@ def _read_manifest(where: Path, config: Config, tip: str | None, *, local: bool 
         return empty
     if not isinstance(parsed, dict) or not isinstance(parsed.get("entries"), dict):
         return empty
-    return {"default": parsed.get("default", config.default_branch), "entries": parsed["entries"]}
+    result = {"default": parsed.get("default", config.default_branch), "entries": parsed["entries"]}
+    landing = parsed.get("landing")
+    if isinstance(landing, list) and all(isinstance(name, str) for name in landing):
+        result["landing"] = landing
+    return result
 
 
 def _commit_identity(root: Path) -> dict[str, str]:

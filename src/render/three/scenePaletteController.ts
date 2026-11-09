@@ -93,6 +93,7 @@ export interface ScenePaletteControllerOptions {
   readonly onQuestionHelpGoalRequested: () => void;
   readonly onTutorialPreviousRequested: () => void;
   readonly onTutorialNextRequested: () => void;
+  readonly onTutorialPageRequested: (pageIndex: number) => void;
   readonly onGoalPreviousRequested: () => void;
   readonly onGoalNextRequested: () => void;
   /** Sign editing keyboard events: append a character, backspace, delete the sign. */
@@ -206,6 +207,7 @@ export function createScenePaletteController(options: ScenePaletteControllerOpti
     onQuestionHelpGoalRequested: options.onQuestionHelpGoalRequested,
     onTutorialPreviousRequested: options.onTutorialPreviousRequested,
     onTutorialNextRequested: options.onTutorialNextRequested,
+    onTutorialPageRequested: options.onTutorialPageRequested,
     onGoalPreviousRequested: options.onGoalPreviousRequested,
     onGoalNextRequested: options.onGoalNextRequested,
     onSignKeyboardCharacter: options.onSignKeyboardCharacter,

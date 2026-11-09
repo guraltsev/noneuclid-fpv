@@ -14,7 +14,7 @@ describe("paletteTooltips", () => {
     expect(resolvePaletteTooltipLabel("go-home")).toBe("Home");
     expect(resolvePaletteTooltipLabel("reload-world")).toBe("Reload");
     expect(resolvePaletteTooltipLabel("geodesic-cannon-action:add-geodesic")).toBe("Add geodesic");
-    expect(resolvePaletteTooltipLabel("geodesic-cannon-action:carry")).toBe("Move emitter while maintaining attached geodesics");
+    expect(resolvePaletteTooltipLabel("geodesic-cannon-action:carry")).toBe("Carry the emitter: locked geodesics stay attached, free ones are removed");
     // The tie action comes from the tie tool's descriptor, and its button carries its own tooltip, so the table has no entry for it.
     expect(resolvePaletteTooltipLabel("geodesic-cannon-action:tie-and-detach")).toBeUndefined();
     expect(resolvePaletteTooltipLabel("geodesic-cannon-action:delete:g-a")).toBe("Delete geodesic");

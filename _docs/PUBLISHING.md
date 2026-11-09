@@ -4,7 +4,8 @@ The site is served from the `gh_pages` branch, which holds one built folder per 
 
 ```text
 gh_pages
-  index.html           redirects to ./main/ (or to ./versions/ while the default branch is not published)
+  index.html           landing page with the list of worlds, copied from landing/ when main is published
+  img/                 its screenshots
   versions/index.html  every published branch with links, commit and time
   published.json       which commit each folder was built from
   .nojekyll
@@ -59,4 +60,9 @@ Independent; use none, one or both.
 - **Build.** `node scripts/build-pages.mjs` runs `npm run build`, writes `.nojekyll` and enforces the 64 MiB dist budget.
 - **Not served by Pages.** The local server, channel and `npm run cdp` ([DEPLOYMENT.md](DEPLOYMENT.md)) need
   `npm run server`; on Pages the app runs as the single-player static site.
+- **Landing page.** The site root is `landing/index.html` with its screenshots in `landing/img/` (`landing = "landing"`
+  in the config). It is copied when `main` is published, so a change to it reaches the site with the next publish of
+  `main`. It links to the full worlds of `main` (`./main/?world=<id>`); the locked `?config=` activities are not listed
+  there. Keep the worlds on it in step with `src/authoring/worldCatalog.ts`, leaving out experimental ones (the genus-2
+  surface). Screenshots are 960x540 JPEGs taken from the running app in a headless browser.
 - **History.** `gh_pages` is a single force-pushed commit, so built assets never accumulate in the repository's history.

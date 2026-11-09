@@ -41,6 +41,7 @@ import type { EmitterModeToolId } from "../../runtime/coreTools";
 import type { RuntimeCommand } from "../../runtime/runtimeCommands";
 import type { GeodesicCannonToolState } from "../../world-objects/geodesic/cannonToolState";
 import { arcConnectsEmitters } from "../../world-objects/geodesic/lifecycle";
+import { isTied } from "../../world-objects/geodesic/endpoints";
 import { type RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
 import { AimTarget } from "../../interaction/aimTarget";
 import { handCarryLeashMeters } from "../../interaction/handCarry";
@@ -465,8 +466,9 @@ export function createGeodesicCannonTools(deps: GeodesicCannonToolsDeps) {
     return withinRange ? { playerFrameFromCell } : undefined;
   }
 
+  // The geodesics the menu shows with a lock instead of Aim: those between two emitters, and tied ones (part of a curve the flow is shortening), which cannot be aimed either.
   function getConnectedGeodesicIds(geodesicIds: readonly string[]): readonly string[] {
-    return geodesicIds.filter((geodesicId) => arcConnectsEmitters(objects, geodesicId));
+    return geodesicIds.filter((geodesicId) => arcConnectsEmitters(objects, geodesicId) || isTied(objects, geodesicId));
   }
 
   function freezeXrHeadHeightDuringGeodesicCannonRotation(headLocalMeters: Vec3 | undefined): Vec3 | undefined {

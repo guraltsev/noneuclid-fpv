@@ -348,6 +348,8 @@ Authoring-level data model for a cell complex: the plain-data spec that world fi
 | interface | `PositionedCellObjectSpec` | Fields shared by every authored object placed in a cell: pose, scale, model adjustments, help text and collision exemptions. |
 | interface | `AssetObjectSpec` | Static decoration loaded from an asset file, with an optional collision cylinder. |
 | interface | `TutorialPageSpec` | One page of tutorial or goal text; the desktop and XR bodies override `body` for that input mode. |
+| type | `TutorialInputIntent` | An abstract input a tutorial control refers to; the palette shows the device-specific key, button or stick for it. |
+| interface | `TutorialControlSpec` | One row of a tutorial page's control list: the input, and what it does here. |
 | interface | `SimpleCollisionCylinderSpec` | Vertical collision cylinder: radius and height in meters, with an optional offset from the object's anchor. |
 | interface | `GeodesicMarmotObjectSpec` | Autonomous marmot that moves along locally straight paths with a given velocity. |
 | interface | `SimpleGeoCreatureObjectSpec` | Autonomous creature (mouse or butterfly) moving at constant speed with an oscillation added. |
@@ -1248,7 +1250,7 @@ World builder: the imperative API behind the world-script DSL that assembles a C
 | Kind | Name | Summary |
 | --- | --- | --- |
 | const | `defaultStartingQuestionCubeMessage` | Default help message shown on the starting question cube when the author supplies none. |
-| const | `defaultStartingQuestionCubeTutorialPages` | Default tutorial pages (movement, actions, help) of the starting question cube, with desktop and XR text variants. |
+| const | `defaultStartingQuestionCubeTutorialPages` | Default tutorial pages of the starting question cube: one page per thing a player can do, each with a screenshot and its controls (shown with the icons of the current device). |
 | const | `defaultStartingQuestionCubeGoalPages` | Default goal pages of the starting question cube. |
 | interface | `WorldBuilder` | The set of calls available to world scripts for assembling a world. |
 | interface | `StartingQuestionCubeAuthoringParams` | Parameters for startingQuestionCube: ordinary static-object parameters plus tutorial content. |
@@ -2047,10 +2049,12 @@ Renderer-neutral state machine for the in-game menu, shared by the desktop overl
 | function | `showRuntimeMenuGeodesicCannonActions` | Opens the menu on the cannon actions page for the given cannon; geodesicIds defaults to empty. |
 | function | `showRuntimeMenuGeometryComputerActions` | Opens the menu on the geometry-computer page with the computer's availability and the torus measurements (all optional numbers in meters). |
 | function | `showRuntimeMenuTutorial` | Opens the tutorial page for an object's pages, with pageIndex clamped to the valid range (default 0). |
+| function | `showRuntimeMenuTutorialPage` | Shows one page of the open tutorial (index clamped to range); unchanged if no tutorial is showing. |
+| function | `showRuntimeMenuTutorialIndex` | Returns the open tutorial to its index of pages; unchanged if no tutorial is showing or it has a single page. |
 | function | `showRuntimeMenuQuestionHelp` | Opens the question-help page, using the given options or else the stored questionHelpOptions; returns the state unchanged if neither exists. |
 | function | `showRuntimeMenuQuestionTutorial` | Opens the tutorial subpage from stored question-help options; unchanged if they are missing or have no tutorial pages. |
 | function | `showRuntimeMenuGoal` | Opens the goal page from the given options or the stored question-help goal pages; unchanged if there are no pages. |
-| function | `setRuntimeMenuTutorialPageIndex` | Sets the tutorial page index, clamped to range; unchanged if no tutorial is showing. |
+| function | `setRuntimeMenuTutorialPageIndex` | Sets the tutorial page index, clamped to range, and shows that page; unchanged if no tutorial is showing. |
 | function | `setRuntimeMenuGoalPageIndex` | Sets the goal page index, clamped to range; unchanged if no goal is showing. |
 | function | `setRuntimeMenuEditingSignMessage` | Replaces the sign text being edited; unchanged if no sign is being edited. |
 | function | `setRuntimeMenuSelectedWorldId` | Records the world id chosen in the world picker. |
@@ -2171,7 +2175,7 @@ Maps abstract input intents (move, primary action, context menu, help, ...) to t
 | Kind | Name | Summary |
 | --- | --- | --- |
 | type | `InputMode` | Input device family a hint is written for: keyboard and mouse ("desktop") or VR controllers ("xr"). |
-| type | `InputIntent` | Abstract user action that is bound to a different physical control per input mode. |
+| type | `InputIntent` | Abstract user action that is bound to a different physical control per input mode; the same list that tutorial pages name their controls by. |
 | interface | `InputHintGlyph` | Display data for one intent in one mode. |
 | function | `getInputHintGlyph` | Returns the label and optional icon for an intent in a mode; total over all intents. |
 
@@ -2198,7 +2202,9 @@ Renderer-neutral definition of the tool/settings palette: createPaletteDefinitio
 | interface | `EditSignPaletteContent` | Content of the edit-sign page for one placed flag. |
 | interface | `GeodesicCannonActionsPaletteContent` | Content of the geodesic emitter menu: the add and carry actions, the actions tools contribute, and one row per geodesic. |
 | interface | `GeometryComputerActionsPaletteContent` | Content of the world-deformation (geometry computer) page, in whole meters: torus width, current and target (a, b), limits and step buttons. |
-| interface | `TutorialPaletteContent` | Content of one tutorial page, with previous/next paging controls. |
+| interface | `PagedHelpControl` | A control row of a tutorial or goal page: the device's input for it and what it does. |
+| interface | `PagedHelpExtras` | Picture and control rows of a tutorial or goal page; both are optional on a page, so these may be absent and empty. |
+| interface | `TutorialPaletteContent` | Content of the tutorial: in the "index" view a button per page (title and `topics`), in the "page" view one page with previous/next paging controls. |
 | interface | `GoalPaletteContent` | Content of one goal page, with previous/next paging controls. |
 | interface | `QuestionHelpPaletteContent` | Content of the help hub page that offers the tutorial and goal subpages. |
 | const | `questionHelpHubBody` | Body text of the help hub page (the shared home guidance). |
@@ -2808,7 +2814,7 @@ Geometry computer palette page: target stepping controls, the lattice diagram an
 
 ### `render/three/palette/pages/help.ts`
 
-Help palette pages: the question-mark hub and the paged tutorial and goal pages.
+Help palette pages: the question-mark hub, the tutorial's index of pages, and the paged tutorial and goal pages (title, optional picture, body, and control rows that show the input icon of the current device).
 
 | Kind | Name | Summary |
 | --- | --- | --- |
@@ -3527,6 +3533,16 @@ The world map: the world in miniature, as the Platonic solid it is the surface o
 | interface | `WorldMapRenderer` | Handle returned by {@link createWorldMapRenderer}. |
 | function | `worldMapFacing` | The turn of the solid, relative to a viewer looking along -z with +y up, that faces the rover at `position` to the viewer with `heading` up, tilted back (both in the solid's frame). |
 | function | `createWorldMapRenderer` | Creates the map, hidden, under `scene`. |
+
+### `render/three/worldMessageDisplay.ts`
+
+On-screen messages: the world's and the tools' sentences (a refused action, a notice) shown briefly in front of the player, so an action that does nothing says why.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `WorldMessageDisplay` | Handle to the message display created by {@link createWorldMessageDisplay}. |
+| interface | `WorldMessageDisplayOptions` | Tuning of {@link createWorldMessageDisplay}. |
+| function | `createWorldMessageDisplay` | Creates the display and adds its (hidden) plane to `scene`. |
 
 ### `render/three/worldResultBadge.ts`
 

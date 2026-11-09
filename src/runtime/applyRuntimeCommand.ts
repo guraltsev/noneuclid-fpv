@@ -32,6 +32,8 @@ import {
   setRuntimeMenuSelectedTool,
   setRuntimeMenuSelectedWorldId,
   setRuntimeMenuTutorialPageIndex,
+  showRuntimeMenuTutorialIndex,
+  showRuntimeMenuTutorialPage,
   showRuntimeMenuDebugSettings,
   showRuntimeMenuEditSign,
   showRuntimeMenuGeodesicCannonActions,
@@ -122,7 +124,9 @@ export function reduceRuntimeCommand(state: ClientSessionState, command: Runtime
       return withMenu(
         showRuntimeMenuQuestionHelp(menu, {
           objectId: command.objectId,
-          tutorialPages: command.tutorialPages,
+          tutorialPages: command.tutorialPages.filter(
+            (page) => !page.requiresTools || page.requiresTools.some((toolId) => toolEnabled(toolId as RuntimeToolId)),
+          ),
           goalPages: command.goalPages,
         }),
         syncPalette,
@@ -136,6 +140,11 @@ export function reduceRuntimeCommand(state: ClientSessionState, command: Runtime
         return nothing;
       }
       return withMenu(setRuntimeMenuTutorialPageIndex(menu, menu.tutorialOptions.pageIndex + command.delta), syncPalette);
+    case "show-tutorial-page":
+      if (menu.page !== "tutorial" || !menu.tutorialOptions) {
+        return nothing;
+      }
+      return withMenu(showRuntimeMenuTutorialPage(menu, command.pageIndex), syncPalette);
     case "step-goal-page":
       if (menu.page !== "goal" || !menu.goalOptions) {
         return nothing;
@@ -304,10 +313,13 @@ function cancelMenuAndTool(
   );
 }
 
-/** The page one level up: debug settings go to settings, tutorial and goal go to the help hub, everything else to the main page. */
+/** The page one level up: debug settings go to settings, a tutorial page to the tutorial's index, the index and goal to the help hub, everything else to the main page. */
 function menuOneLevelUp(menu: RuntimeMenuState): RuntimeMenuState {
   if (menu.page === "debug-settings") {
     return showRuntimeMenuSettings(menu);
+  }
+  if (menu.page === "tutorial" && menu.tutorialOptions?.view === "page" && menu.tutorialOptions.pages.length > 1) {
+    return showRuntimeMenuTutorialIndex(menu);
   }
   if (menu.page === "tutorial" || menu.page === "goal") {
     return showRuntimeMenuQuestionHelp(menu);

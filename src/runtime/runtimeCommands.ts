@@ -63,6 +63,8 @@ export type RuntimeCommand =
   | { readonly kind: "show-question-tutorial" }
   | { readonly kind: "show-goal" }
   | { readonly kind: "step-tutorial-page"; readonly delta: -1 | 1 }
+  /** Shows one page of the open tutorial, chosen from its index. */
+  | { readonly kind: "show-tutorial-page"; readonly pageIndex: number }
   | { readonly kind: "step-goal-page"; readonly delta: -1 | 1 }
   // Tool and sign selection.
   | { readonly kind: "select-tool"; readonly toolId: RuntimeToolId }

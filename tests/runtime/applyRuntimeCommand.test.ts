@@ -202,6 +202,38 @@ describe("applyRuntimeCommand: navigation", () => {
     expect(result.effects).toEqual([sync]);
   });
 
+  it("leaves out tutorial pages whose tools the config switches off", () => {
+    const tutorialPages = [
+      { title: "Always", body: "a" },
+      { title: "Rays", body: "r", requiresTools: ["geodesicEmitters/emitter"] },
+      { title: "Measure", body: "m", requiresTools: ["geodesicMeasurements/length", "geodesicMeasurements/protractor"] },
+    ];
+    const command: RuntimeCommand = { kind: "show-question-help", objectId: "o", tutorialPages, goalPages: [] };
+    const titles = (config: AppConfig) =>
+      reduce(command, stateWith(undefined, config)).state.menuState.questionHelpOptions?.tutorialPages.map((page) => page.title);
+
+    expect(titles(defaultAppConfig)).toEqual(["Always", "Rays", "Measure"]);
+    expect(titles(disabled({ tools: { geodesicEmitters: false, distances: false } }))).toEqual(["Always", "Measure"]);
+    expect(titles(disabled({ tools: { geodesicEmitters: false, distances: false, angles: false } }))).toEqual(["Always"]);
+  });
+
+  it("opens a tutorial page from its index and goes back to the index, then to the help hub", () => {
+    const hub = {
+      ...stateWith(),
+      menuState: showRuntimeMenuQuestionHelp(stateWith().menuState, { objectId: "o", tutorialPages: pages, goalPages: [] }),
+    };
+    const index = reduce({ kind: "show-question-tutorial" }, hub).state;
+    expect(index.menuState.tutorialOptions?.view).toBe("index");
+
+    const page = reduce({ kind: "show-tutorial-page", pageIndex: 1 }, index).state;
+    expect(page.menuState.tutorialOptions).toMatchObject({ view: "page", pageIndex: 1 });
+
+    const back = reduce({ kind: "menu-right-action" }, page).state;
+    expect(back.menuState.page).toBe("tutorial");
+    expect(back.menuState.tutorialOptions?.view).toBe("index");
+    expect(reduce({ kind: "menu-right-action" }, back).state.menuState.page).toBe("question-help");
+  });
+
   it("shows the tutorial and the goal from the help hub", () => {
     const hub = {
       ...stateWith(),

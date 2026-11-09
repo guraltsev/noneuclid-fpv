@@ -187,12 +187,38 @@ export interface AssetObjectSpec extends PositionedCellObjectSpec {
 
 /**
  * One page of tutorial or goal text; the desktop and XR bodies override `body` for that input mode.
+ * A tutorial with several pages opens on an index of their titles; each page may add a picture and a list of controls, drawn with the icon of the input that performs each one on the current device.
  */
 export interface TutorialPageSpec {
   readonly title: string;
   readonly body: string;
   readonly desktopBody?: string;
   readonly xrBody?: string;
+  /** Picture shown beside the text, relative to the assets directory (for example "tutorial/rays.jpg"). */
+  readonly imagePath?: string;
+  /** Controls listed under the text, each with the icon of its input on the current device. */
+  readonly controls?: readonly TutorialControlSpec[];
+  /** Tool ids (such as "geodesicEmitters/emitter"); the page is shown only when the app config enables at least one of them. */
+  readonly requiresTools?: readonly string[];
+}
+
+/** An abstract input a tutorial control refers to; the palette shows the device-specific key, button or stick for it. */
+export type TutorialInputIntent =
+  | "look"
+  | "move"
+  | "primary"
+  | "context-menu"
+  | "keyboard-context-fallback"
+  | "help"
+  | "carry"
+  | "next-focus-target"
+  | "cancel"
+  | "reset";
+
+/** One row of a tutorial page's control list: the input, and what it does here. */
+export interface TutorialControlSpec {
+  readonly intent: TutorialInputIntent;
+  readonly label: string;
 }
 
 /**

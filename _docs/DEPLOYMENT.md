@@ -7,7 +7,8 @@ from the main README so students and educators can focus on the mathematics.
 
 The site is published from [guraltsev/noneuclid-fpv](https://github.com/guraltsev/noneuclid-fpv). The `gh_pages`
 branch holds one built folder per published branch; the stable version is at
-**https://guraltsev.github.io/noneuclid-fpv/main/** and the root redirects there. Setup, the `npm run publish:branch`
+**https://guraltsev.github.io/noneuclid-fpv/main/**; the root is a landing page that lists the worlds (see
+[PUBLISHING.md](PUBLISHING.md)). Setup, the `npm run publish:branch`
 command, the optional push hook and the optional workflow are described in [PUBLISHING.md](PUBLISHING.md).
 
 The local pre-push hook (`.githooks/pre-push`, enabled by `npm install` or `npm run setup:hooks`) runs no checks;

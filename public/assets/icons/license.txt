@@ -45,3 +45,5 @@ surfaces. UXWing does not require attribution for allowed use, but this project
 voluntarily credits UXWing (https://uxwing.com/). Terms:
 https://uxwing.com/license/. Both files are application assets only, not a
 separately offered icon collection, and are not relicensed.
+
+mouse-move.svg, esc-key.svg, xr-headset.svg, xr-thumbstick.svg, xr-trigger.svg, xr-grip.svg - project-made; covered by the project MIT License.

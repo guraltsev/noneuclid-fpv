@@ -12,6 +12,8 @@ import {
   type TorusLatticeParameters,
 } from "../cell-complex/deformations/torusModuli";
 import { formatBodyForInputMode } from "./inputModeText";
+import { getInputHintGlyph, type InputHintGlyph } from "./inputIntents";
+import { publicAssetUrl } from "../glue/assetUrls";
 import { worldCatalog } from "../authoring/worldCatalog";
 import { helpHubHomeGuidance } from "../world-objects/helpHubCopy";
 import { portalPanelModeDefinitions } from "../glue/portalPanelMode";
@@ -182,10 +184,28 @@ export interface GeometryComputerActionsPaletteContent {
   };
 }
 
-/** Content of one tutorial page, with previous/next paging controls. */
-export interface TutorialPaletteContent {
+/** A control row of a tutorial or goal page: the device's input for it and what it does. */
+export interface PagedHelpControl {
+  readonly hint: InputHintGlyph;
+  readonly label: string;
+}
+
+/** Picture and control rows of a tutorial or goal page; both are optional on a page, so these may be absent and empty. */
+export interface PagedHelpExtras {
+  /** URL of the page's picture. */
+  readonly imageSrc?: string;
+  readonly controls: readonly PagedHelpControl[];
+}
+
+/**
+ * Content of the tutorial: in the "index" view a button per page (title and `topics`), in the "page" view one page with previous/next paging controls.
+ */
+export interface TutorialPaletteContent extends PagedHelpExtras {
   readonly kind: "tutorial";
   readonly objectId: string;
+  readonly view: "index" | "page";
+  /** One entry per page, in order, for the index view. */
+  readonly topics: readonly { readonly pageIndex: number; readonly title: string }[];
   readonly title: string;
   readonly body: string;
   readonly pageLabel: string;
@@ -200,7 +220,7 @@ export interface TutorialPaletteContent {
 }
 
 /** Content of one goal page, with previous/next paging controls. */
-export interface GoalPaletteContent {
+export interface GoalPaletteContent extends PagedHelpExtras {
   readonly kind: "goal";
   readonly objectId: string;
   readonly title: string;
@@ -526,12 +546,17 @@ function createPagedHelpContent(
     ? 0
     : Math.max(0, Math.min(pageCount - 1, options.pageIndex));
   const page = options.pages[pageIndex] ?? { title: kind === "goal" ? "Goal" : "Tutorial", body: "" };
-
-  return {
-    kind,
+  const showIndex = kind === "tutorial" && "view" in options && options.view === "index";
+  const common = {
     objectId: options.objectId,
-    title: page.title,
-    body: resolveTutorialBodyForInputMode(page, inputMode),
+    title: showIndex ? "Tutorial" : page.title,
+    body: showIndex ? tutorialIndexBody : resolveTutorialBodyForInputMode(page, inputMode),
+    imageSrc: !showIndex && page.imagePath ? publicAssetUrl(page.imagePath) : undefined,
+    controls: showIndex
+      ? []
+      : (page.controls ?? []).map((control) => ({ hint: getInputHintGlyph(inputMode, control.intent), label: control.label })),
+  };
+  const paging = {
     pageLabel: pageCount === 0 ? "0 / 0" : `${pageIndex + 1} / ${pageCount}`,
     previousAction: {
       label: "<",
@@ -542,7 +567,22 @@ function createPagedHelpContent(
       disabled: pageIndex >= pageCount - 1,
     },
   };
+
+  if (kind === "goal") {
+    return { kind, ...common, ...paging };
+  }
+
+  return {
+    kind,
+    ...common,
+    ...paging,
+    view: showIndex ? "index" : "page",
+    topics: options.pages.map((entry, index) => ({ pageIndex: index, title: entry.title })),
+  };
 }
+
+/** Text above the tutorial's index of pages. */
+const tutorialIndexBody = "Choose a topic to see what you can do and how.";
 
 function resolveTutorialBodyForInputMode(
   page: NonNullable<RuntimeMenuState["tutorialOptions"]>["pages"][number],

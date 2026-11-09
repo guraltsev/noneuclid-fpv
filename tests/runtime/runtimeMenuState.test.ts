@@ -27,6 +27,8 @@ import {
   showRuntimeMenuQuestionHelp,
   showRuntimeMenuQuestionTutorial,
   showRuntimeMenuTutorial,
+  showRuntimeMenuTutorialIndex,
+  showRuntimeMenuTutorialPage,
 } from "../../src/runtime/runtimeMenuState";
 import { questionHelpHubBody } from "../../src/ui/paletteDefinition";
 import { createTestPaletteDefinition } from "../support/tools";
@@ -44,7 +46,7 @@ describe("paged help fallback titles", () => {
       ...base,
       isOpen: true,
       page: "tutorial",
-      tutorialOptions: { objectId: "t", pages: [], pageIndex: 0 },
+      tutorialOptions: { objectId: "t", pages: [], pageIndex: 0, view: "page" },
     });
 
     expect(goal.content).toMatchObject({ kind: "goal", title: "Goal", pageLabel: "0 / 0" });
@@ -292,13 +294,22 @@ describe("runtimeMenuState", () => {
       ],
     });
 
-    const firstPage = createTestPaletteDefinition(state);
+    const index = createTestPaletteDefinition(state);
+    const firstPage = createTestPaletteDefinition(showRuntimeMenuTutorialPage(state, 0));
     const secondPage = createTestPaletteDefinition(setRuntimeMenuTutorialPageIndex(state, 1));
 
+    expect(index.content).toMatchObject({
+      kind: "tutorial",
+      view: "index",
+      title: "Tutorial",
+      topics: [{ pageIndex: 0, title: "Move" }, { pageIndex: 1, title: "Act" }],
+    });
+    expect(showRuntimeMenuTutorialIndex(showRuntimeMenuTutorialPage(state, 1)).tutorialOptions?.view).toBe("index");
     expect(firstPage.pageId).toBe("tutorial");
     expect(firstPage.rightAction.id).toBe("back");
     expect(firstPage.content).toMatchObject({
       kind: "tutorial",
+      view: "page",
       title: "Move",
       body: "Use arrows.",
       pageLabel: "1 / 2",

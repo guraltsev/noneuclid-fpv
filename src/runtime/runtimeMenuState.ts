@@ -124,11 +124,12 @@ export interface RuntimeMenuState {
     readonly startSkewXMeters?: number;
     readonly startDepthMeters?: number;
   };
-  /** Payload of the tutorial page; pageIndex is always within pages. */
+  /** Payload of the tutorial page; pageIndex is always within pages. `view` is "index" while the list of page titles shows, "page" while one page shows. */
   readonly tutorialOptions?: {
     readonly objectId: string;
     readonly pages: readonly TutorialPageSpec[];
     readonly pageIndex: number;
+    readonly view: "index" | "page";
   };
   /** Payload of the goal page; pageIndex is always within pages. */
   readonly goalOptions?: {
@@ -339,6 +340,7 @@ export function showRuntimeMenuGeometryComputerActions(
 
 /**
  * Opens the tutorial page for an object's pages, with pageIndex clamped to the valid range (default 0).
+ * Several pages open on their index unless `view` says otherwise; a single page opens directly.
  */
 export function showRuntimeMenuTutorial(
   state: RuntimeMenuState,
@@ -346,6 +348,7 @@ export function showRuntimeMenuTutorial(
     readonly objectId: string;
     readonly pages: readonly TutorialPageSpec[];
     readonly pageIndex?: number;
+    readonly view?: "index" | "page";
   },
 ): RuntimeMenuState {
   return {
@@ -356,7 +359,36 @@ export function showRuntimeMenuTutorial(
       objectId: options.objectId,
       pages: options.pages,
       pageIndex: clampTutorialPageIndex(options.pageIndex ?? 0, options.pages),
+      view: options.pages.length > 1 ? options.view ?? "index" : "page",
     },
+  };
+}
+
+/** Shows one page of the open tutorial (index clamped to range); unchanged if no tutorial is showing. */
+export function showRuntimeMenuTutorialPage(state: RuntimeMenuState, pageIndex: number): RuntimeMenuState {
+  if (!state.tutorialOptions) {
+    return state;
+  }
+
+  return {
+    ...state,
+    tutorialOptions: {
+      ...state.tutorialOptions,
+      pageIndex: clampTutorialPageIndex(pageIndex, state.tutorialOptions.pages),
+      view: "page",
+    },
+  };
+}
+
+/** Returns the open tutorial to its index of pages; unchanged if no tutorial is showing or it has a single page. */
+export function showRuntimeMenuTutorialIndex(state: RuntimeMenuState): RuntimeMenuState {
+  if (!state.tutorialOptions || state.tutorialOptions.pages.length <= 1) {
+    return state;
+  }
+
+  return {
+    ...state,
+    tutorialOptions: { ...state.tutorialOptions, view: "index" },
   };
 }
 
@@ -440,7 +472,7 @@ export function showRuntimeMenuGoal(
   };
 }
 
-/** Sets the tutorial page index, clamped to range; unchanged if no tutorial is showing. */
+/** Sets the tutorial page index, clamped to range, and shows that page; unchanged if no tutorial is showing. */
 export function setRuntimeMenuTutorialPageIndex(
   state: RuntimeMenuState,
   pageIndex: number,
@@ -454,6 +486,7 @@ export function setRuntimeMenuTutorialPageIndex(
     tutorialOptions: {
       ...state.tutorialOptions,
       pageIndex: clampTutorialPageIndex(pageIndex, state.tutorialOptions.pages),
+      view: "page",
     },
   };
 }

@@ -145,6 +145,7 @@ import { createGeodesicEmitterLabelController } from "./geodesicEmitterLabelCont
 import { createGeometryComputerMenu } from "./geometryComputerMenu";
 import { createRuntimeObjectActions } from "./runtimeObjectActions";
 import { createHelpLensRenderer } from "./helpLensRenderer";
+import { createWorldMessageDisplay } from "./worldMessageDisplay";
 import { createWorldMapPieceReader } from "./worldMapPieces";
 import { createWorldMapRenderer } from "./worldMapRenderer";
 import { worldMapToolId } from "../../modules/worldMap";
@@ -390,12 +391,17 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     // Called by scripts only, so `worldClient` below exists by then.
     submitPublicCommand: (command) => worldClient.submit(command),
   });
+  // The world's and the tools' sentences (a refused action, a notice) show briefly in front of the player, and also go
+  // to the console and the diagnostics, always (not only in debug mode).
+  const worldMessageDisplay = createWorldMessageDisplay(scene);
   function showWorldMessage(message: string, detail: EngineEventBase | { readonly code: string }): void {
     console.info(`[noneuclid] ${message}`);
     runtimeDiagnostics().recordDebugEvent(message, detail);
+    // A performance notice is for diagnostics only; on a slow device it would cover the view again and again.
+    if ("kind" in detail && detail.kind === "world/behindRealTime") return;
+    worldMessageDisplay.show(message);
   }
-  // The tool-switch protocol, the generic event sink and api.world. There is no on-screen message system yet, so
-  // the world's sentences go to the console and the diagnostics, always (not only in debug mode).
+  // The tool-switch protocol, the generic event sink and api.world.
   const worldClient = createWorldClient({
     engine,
     session,
@@ -1357,6 +1363,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
         nowMs: performance.now(),
       });
     });
+    worldMessageDisplay.update(camera, performance.now());
     const frameAfterUiMs = performance.now();
     // Phase 5: draw. In XR the renderer renders each eye from `camera` as updated by the WebXR manager.
     const frameBeforeRenderMs = performance.now();
@@ -1533,6 +1540,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       aimFeedback.dispose();
       floatingObjectTooltip.dispose();
       helpLensRenderer.dispose();
+      worldMessageDisplay.dispose();
       worldMapRenderer.dispose();
       vrComfortVignette.dispose();
       clearXrObjectTooltip();

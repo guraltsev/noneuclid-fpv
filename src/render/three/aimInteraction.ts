@@ -15,6 +15,7 @@ import {
 } from "../../ui/worldInteractionDefinition";
 import { canExtendGeodesicSegment } from "../../world-objects/geodesic/objects";
 import { arcConnectsEmitters } from "../../world-objects/geodesic/lifecycle";
+import { isTied } from "../../world-objects/geodesic/endpoints";
 import { type RuntimeObjectReader, type RuntimeWorldObject } from "../../world-objects/runtimeObjectRegistry";
 import { AimTarget } from "../../interaction/aimTarget";
 import { resolveAimTargets as defaultResolveAimTargets } from "./aimTarget";
@@ -308,14 +309,15 @@ export function createAimInteraction(deps: AimInteractionDeps) {
     );
   }
 
-  // Focus message for the object; extension is offered only for free geodesic segments that can be extended.
+  // Focus message for the object; extension is offered only for free geodesic segments that can be extended (not between emitters, not tied).
   function getWorldFocusMessageDefinition(object: RuntimeWorldObject) {
     return createWorldFocusMessageDefinition({
       object,
       selectedTool: deps.session.get().menuState.selectedTool,
       canExtendGeodesic: object.kind === "geodesicModel/segment" &&
         canExtendGeodesicSegment(object) &&
-        !arcConnectsEmitters(runtimeObjectRegistry, object.geodesicId),
+        !arcConnectsEmitters(runtimeObjectRegistry, object.geodesicId) &&
+        !isTied(runtimeObjectRegistry, object.geodesicId),
     });
   }
 

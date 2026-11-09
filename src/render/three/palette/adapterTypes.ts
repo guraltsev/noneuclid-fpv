@@ -55,6 +55,8 @@ export interface ScenePaletteAdapterOptions {
   readonly onQuestionHelpGoalRequested?: () => void;
   readonly onTutorialPreviousRequested?: () => void;
   readonly onTutorialNextRequested?: () => void;
+  /** A page was chosen from the tutorial's index. */
+  readonly onTutorialPageRequested?: (pageIndex: number) => void;
   readonly onGoalPreviousRequested?: () => void;
   readonly onGoalNextRequested?: () => void;
   /** Sign editor on-panel keyboard: a character (including " " and "\n"), backspace, and delete-sign. */
