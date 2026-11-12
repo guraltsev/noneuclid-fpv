@@ -1,7 +1,7 @@
 /**
  * Placement math for the XR palette: where the panel floats relative to the head and how it faces the viewer.
  * All positions and quaternions are in the Three.js world frame, in meters; the head pose is the XR viewer pose already converted to world space.
- * The panel target is a fixed offset in head-local space (0.12 m below, 0.72 m ahead), smoothed toward over time and optionally frozen.
+ * The panel target is a fixed offset in head-local space (0.24 m below, 1.44 m ahead), smoothed toward over time and optionally frozen.
  * Also provides the auto-close distance check and facing-quaternion helpers reused elsewhere.
  */
 import * as THREE from "three";
@@ -50,13 +50,13 @@ export interface VrPalettePlacement {
 export const VR_PALETTE_AUTO_CLOSE_DISTANCE_METERS = 1;
 
 const upAxis = new THREE.Vector3(0, 1, 0);
-const headOffset = new THREE.Vector3(0, -0.12, -0.72);
+const headOffset = new THREE.Vector3(0, -0.24, -1.44);
 const lookAtMatrix = new THREE.Matrix4();
 const positiveZFacingFlip = new THREE.Quaternion().setFromAxisAngle(upAxis, Math.PI);
 
 /**
  * Computes where the XR palette should sit this frame: a head-relative target, smoothed from the previous pose.
- * The target is the head position plus the offset (0, -0.12, -0.72) m rotated by the head orientation, facing back toward the head via resolveFacingQuaternion.
+ * The target is the head position plus the offset (0, -0.24, -1.44) m rotated by the head orientation, facing back toward the head via resolveFacingQuaternion.
  * With no previous pose the target is returned directly; with freeze set and a full previous pose, a clone of the previous pose is returned.
  * Never mutates its inputs. Position uses lerp and orientation uses slerp with the same factor.
  */
