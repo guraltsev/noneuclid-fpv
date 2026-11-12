@@ -27,3 +27,12 @@ If no <project-knowledge> block arrived at the start of the session (hooks may n
 you start a task.
 If the MCP tools are unavailable, the same operations are `_scripts/know_search "<query>"`, `_scripts/know_read <id>`,
 `_scripts/know_write` (note as JSON on standard input) and `_scripts/know_assess <id> <outcome> <reason>`.
+A note passed to `know_write` needs `title`, `summary`, `body`, `type` (`discovery`, `procedure`, `decision`,
+`constraint`, `antipattern`, `environment` or `open_question`) and `confidence` (`low`, `medium`, `high` or `unknown`);
+`evidence_level` (`observed`, `reproduced`, `tested`, `source_verified` or `hypothesis`) is optional. Leave out `status`.
+To revise a note, write again with its `id`.
+The summary is usually all a later agent reads. State the conclusion in its first sentence, as a claim or a rule, then
+when it applies and what to do instead; keep it short, and say if the note is a sketch or a hypothesis.
+Search with `know_search` before starting a task in an area the notes may cover, not only after something fails: the
+session-start block is chosen from the first prompt alone. When briefing a subagent, put the IDs and one-line conclusions
+of the notes that apply into its prompt.
