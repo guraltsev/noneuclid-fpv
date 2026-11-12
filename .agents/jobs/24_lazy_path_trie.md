@@ -6,6 +6,13 @@ Former issue: 60 (converted to a job on 2026-10-28).
 Priority: P2 (design / performance / memory). The id inconsistencies already listed in issue 41 disappear under this
 design; they are not filed again here.
 
+## Status update 2026-11-11
+
+Job 30 (rewritten today) overlaps this job. It builds intermediate deformation states on the main thread and re-develops the kept
+path table from its words (`redevelopPortalPathTable`); the worker only refreshes the kept set. This job keeps: the trie itself,
+"no per-root table posted from the worker", typed-array transport, the capacity rework, and `Iso2` (issue 55 item 4, moved here).
+Rewrite this job after job 30 lands.
+
 ## Status update 2026-11-05
 
 This text predates the engine wave; rewrite it before running it. Line references are stale. Its budget bias was fixed by job 20. It omits `portalDebugRuntime.ts` and job 21's per-path allocation handoff. `deriveCellRenderArchetypeCapacities` now takes `eyes`, and root groups already solve issue 59.

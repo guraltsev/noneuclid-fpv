@@ -87,6 +87,9 @@ lower numbers of jobs 18, 24, 30, 34 and 35.
 **Priority (maintainer, 2026-11-05):** the coordinator of jobs 61-66 comes before every other queued job. Jobs 18, 24, 30, 34 and
 35 wait; their text is stale and each says why.
 
+**Priority (maintainer, 2026-11-11):** job 30, then job 35, come before every other queued job. Both were rewritten on 2026-11-11 and
+can run as written. Job 68 (split from job 30) waits for the maintainer.
+
 **Order of jobs 51-60 (2026-11-04):** the coordinator [00_coordinate_jobs_51_60](_done/00_coordinate_jobs_51_60.md) runs them in the order 51, 56, 57, 58,
 59, 60, 52, 53, 54, 55, despite their numbers: the new jobs 56 to 60 lay the foundation the older ones need. It comes before every other queued job.
 
@@ -124,12 +127,12 @@ lower numbers of jobs 18, 24, 30, 34 and 35.
 | [27](_done/27_geodesic_rebuild_performance.md) | Per-frame cost of geodesic rebuilds | done, needs review | [70](../../_issues/70_geodesic_module_performance_and_split.md) |  |
 | [28](_done/28_frame_snapshot_instance_sync.md) | Sync runtime-object instances once per frame against the rendered root | done, needs review | [71](../../_issues/71_runtime_object_instance_sync_runs_twice_with_stale_root.md) |  |
 | [29](_done/29_frame_loop_allocation_and_draw_calls.md) | Frame-loop allocation and per-object draw calls | done, needs review | [75](../../_issues/75_frame_loop_allocation_and_per_object_draw_calls.md) |  |
-| [30](30_deformation_rebuild_pipeline.md) | Incremental deformation rebuild pipeline | queued | [55](../../_issues/55_live_deformation_rebuild_cost_and_se2_transforms.md), [82](../../_issues/82_deformation_commit_rebuilds_whole_scene_and_reuploads_floor_texture.md) |  |
+| [30](30_deformation_rebuild_pipeline.md) | Smooth deformation: cheap commits, a step per frame, a worker only for the cull | queued (rewritten 2026-11-11) | [55](../../_issues/55_live_deformation_rebuild_cost_and_se2_transforms.md) (items 1-3), [82](../../_issues/82_deformation_commit_rebuilds_whole_scene_and_reuploads_floor_texture.md), [90](../../_issues/90_portal_wall_textures_pile_up_during_deformation.md) |  |
 | [31](_done/31_app_shell_state_holder.md) | Shell cleanups: dead field, one portal sync, split the palette adapter | done, needs review | - | 77 |
 | [32](_done/32_layer_dag.md) | Make the layer rule a real DAG | done, needs review | [78](../../_issues/_closed/78_enforce_layer_dag_and_move_domain_logic_out_of_render.md) |  |
 | [33](_done/33_decompose_runtime_monoliths.md) | Decompose runtime monoliths and retire legacy paths | done | - | 38 |
 | [34](34_type_strictness_lint_bundle.md) | Type strictness, linting and bundle configuration | queued | - | 80 |
-| [35](35_torus_family_as_teichmuller_space.md) | Treat the torus family as TeichmÃƒÆ’Ã‚Â¼ller space | queued | - | 54 |
+| [35](35_torus_family_as_teichmuller_space.md) | Cut the torus room from a reduced basis (re-marking) | queued (rewritten 2026-11-11) | [95](../../_issues/95_torus_moduli_floor_shears_and_the_deformation_does_not_read_as_moduli_space.md) (part 4) | 54 |
 | [36](_done/36_creatures_detour_and_resume_geodesic.md) | Creatures detour around obstacles and resume their geodesic | done, needs review | - |  |
 | [37](_done/37_object_owners_and_place_at.md) | Objects own their position; `placeAt` moves any positioned object | done, needs review | - |  |
 | [38](_done/38_draw_assets_from_registry.md) | Draw static assets from their registry record | done, needs review | - |  |
@@ -166,3 +169,4 @@ lower numbers of jobs 18, 24, 30, 34 and 35.
 | [65](_done/65_module_public_api.md) | Give modules a public API and write the scenarios that were waiting for it | done, needs review | - |  |
 | [66](_done/66_measurement_tools_and_flags.md) | Move the measurement tools and the flags into modules | done, needs review | [92](../../_issues/92_measurement_kinds_are_declared_transient.md) |  |
 | [67](_done/67_rigid_floor_patches_and_moduli_readout.md) | Rigid floor patches, Teichmuller steps and a moduli readout for the torus | done, needs review | [95](../../_issues/95_torus_moduli_floor_shears_and_the_deformation_does_not_read_as_moduli_space.md) |  |
+| [68](68_deformation_commit_in_the_step.md) | Commit a deformation inside the engine step (phase 7) | blocked on the maintainer (013 API rows) | - |  |
