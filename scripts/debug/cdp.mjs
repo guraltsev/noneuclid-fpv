@@ -7,6 +7,7 @@
  *
  *   npm run cdp -- devices
  *   npm run cdp -- call <path> [args...]       e.g. call app.changeWorld '"cube"'; args are JSON, else strings
+ *                                              (call help [path] is the page's own listing, the same as `help`)
  *   npm run cdp -- help [path]
  *   npm run cdp -- eval "<expression>"         (server backend: needs the server started with --dev)
  *   npm run cdp -- shot <file.jpg|file.png>
@@ -15,6 +16,8 @@
  *
  * Options (server backend): --device <id> (required with several devices; `call` also takes `all`), --ca <file>
  * (trust that certificate; otherwise the server's certificate is accepted with a warning).
+ * Option (DevTools backend): --timeout <seconds> for `call` and `eval` (default 300), which wait for a returned promise,
+ * for example a scripted walk (`call motion.walkTo ...`). The server backend's own limit is 30 s per call.
  * Environment (DevTools backend): CDP_PORT (default 9222), CDP_MATCH (substring of the page url, default "localhost:").
  */
 import fs from "node:fs";
@@ -22,7 +25,7 @@ import { createCdpSession, listTargets } from "../lib/cdpClient.mjs";
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const USAGE = `usage: npm run cdp -- [--server <url>] [--device <id>|all] [--ca <file>] devices | call <path> [args...] | help [path] | eval "<expression>" | shot <file> | console [seconds] | record "<expression|path>" [seconds]`;
+const USAGE = `usage: npm run cdp -- [--server <url>] [--device <id>|all] [--ca <file>] [--timeout <seconds>] devices | call <path> [args...] | help [path] | eval "<expression>" | shot <file> | console [seconds] | record "<expression|path>" [seconds]`;
 const COMMANDS = ["devices", "call", "help", "eval", "shot", "console", "record"];
 
 /** Parse an argument as JSON, or take it as a string if it is not valid JSON. */
@@ -56,7 +59,7 @@ function decodeDataUrl(dataUrl) {
 
 // ---- DevTools backend ----
 
-async function attachDevTools() {
+async function attachDevTools({ timeoutSeconds = 300 } = {}) {
   const port = process.env.CDP_PORT ?? 9222;
   const match = process.env.CDP_MATCH ?? "localhost:";
   let targets;
@@ -72,7 +75,8 @@ async function attachDevTools() {
     process.exit(2);
   }
   const session = await createCdpSession(target.webSocketDebuggerUrl);
-  const evaluate = session.evaluate;
+  const timeoutMs = timeoutSeconds * 1000;
+  const evaluate = (expression) => session.evaluate(expression, { timeoutMs });
   const listExpression = `(() => {
     const out = {};
     const visit = (o, p) => {
@@ -280,7 +284,7 @@ function parseFlags(argv) {
   const flags = {};
   const rest = [];
   for (let i = 0; i < argv.length; i += 1) {
-    if (["--server", "--device", "--ca"].includes(argv[i])) {
+    if (["--server", "--device", "--ca", "--timeout"].includes(argv[i])) {
       flags[argv[i].slice(2)] = argv[i + 1];
       i += 1;
     } else {
@@ -291,6 +295,10 @@ function parseFlags(argv) {
 }
 
 const { flags, rest } = parseFlags(process.argv.slice(2));
+if (flags.timeout !== undefined && !(Number(flags.timeout) > 0)) {
+  console.error("--timeout takes a positive number of seconds");
+  process.exit(2);
+}
 const [command, ...args] = rest;
 const needsArgument = ["call", "eval", "shot", "record"].includes(command);
 if (COMMANDS.includes(command) && (!needsArgument || args[0])) {
@@ -298,7 +306,7 @@ if (COMMANDS.includes(command) && (!needsArgument || args[0])) {
   try {
     const backend = server
       ? await attachServer({ url: server, device: flags.device, ca: flags.ca })
-      : await attachDevTools();
+      : await attachDevTools(flags.timeout === undefined ? {} : { timeoutSeconds: Number(flags.timeout) });
     await run(backend, command, args, flags);
   } catch (error) {
     console.error(error.message);

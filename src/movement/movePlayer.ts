@@ -62,6 +62,8 @@ export type MoveResult = {
   readonly appliedDisplacement: Vec3;
   readonly blocked: boolean;
   readonly blockingReason?: BlockingReason;
+  /** Id of the runtime body hit first, when the player was blocked by one. */
+  readonly blockingObjectId?: string;
   readonly crossedPortal: boolean;
   readonly crossedPortalId?: string;
   /** Every portal crossed, in order (empty without a world). */
@@ -111,6 +113,7 @@ export function movePlayer(request: MoveRequest): MoveResult {
       appliedDisplacement: result.appliedDisplacement,
       blocked: result.blocked,
       blockingReason: result.blockingReason,
+      ...(result.blockingObjectId !== undefined ? { blockingObjectId: result.blockingObjectId } : {}),
       crossedPortal: result.crossedPortal,
       crossedPortalId: result.crossedPortalId,
       crossings: result.crossings,

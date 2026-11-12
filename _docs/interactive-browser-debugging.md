@@ -22,6 +22,8 @@ npm run edge -- --world cube       # Edge on that world, debugging port 9222, fr
 `scripts/debug/cdp.mjs`, which implements the client of section 1:
 
 ```powershell
+npm run cdp -- help                          # or: call help [namespace], the page's own listing
+npm run cdp -- call motion.walkTo right-tree # scripted walking and looking, see 3c
 npm run cdp -- record "<expression>" 10
 npm run cdp -- eval "<expression>"
 npm run cdp -- shot out.jpg
@@ -212,7 +214,8 @@ It does not answer questions about stereo or controller input; those need a head
 ([DEPLOYMENT.md](DEPLOYMENT.md), "Local HTTPS server for a headset"). Every page served by that server joins a
 WebSocket channel and exposes its public API, `window.noneuclid.api`: namespaces `app` (`info`, `changeWorld`,
 `changeConfig`, `reload`), `debug` (including `playerPose` and `setPlayerPose`), `world`, one namespace per module with a public API (`geodesicEmitters`, `geodesicModel`, `curveShortening`), `portal`, `render` (see 3b), `geometry` (torus-skew worlds only) and `view` (`screenshot`). A call is a
-literal function call on that object; `help` lists what exists.
+literal function call on that object; `help` lists what exists (`help` is itself a function of the API, so `call help motion`
+works on both backends).
 
 ```powershell
 $env:NONEUCLID_ADMIN_PASSWORD = "choose-one"
@@ -262,6 +265,39 @@ Positions are in world axes (x, y, z up), in the frame named in each field (`pos
 A missing far-side copy is then a three-step question: is there a record in that cell (`records`), did the ghost rule keep the cell copy
 (`explainGhosts`), and was the record drawn on the visible paths to that cell (`explainInstances`). `paths` tells which cell copy is on screen at a
 given pixel, and `instances {detail: true}` shows the polygon each instance was clipped to.
+
+## 3c. Walking and looking by script
+
+The `motion` namespace moves the player the way the keyboard does (same collisions, same portal crossings) but by
+script, in fixed 1/60 s ticks, so the same script ends in the same place at any frame rate. A call waits until the
+motion ends and returns a report. Design: [design/016-scripted-motion.md](design/016-scripted-motion.md).
+
+```powershell
+npm run cdp -- call motion.usage                                   # the format, with examples
+npm run cdp -- call motion.locate right-tree                       # distance, bearing (+ = left), elevation, portals
+npm run cdp -- call motion.walkTo right-tree                       # walk to an object, through portals
+npm run cdp -- call motion.walkTo '{"cell":"front","x":-3,"y":6}'  # to a point in a cell
+npm run cdp -- call motion.lookAt back-butterfly                   # turn and pitch to it
+npm run cdp -- call motion.walk 3                                  # meters forward; motion.turn 90 turns left
+npm run cdp -- call motion.run '[{"walk":4,"turn":90,"duration":3},{"to":"right-tree","onStuck":"skip"},{"lookAt":"back-butterfly","duration":2}]'
+npm run cdp -- call motion.status                                  # report of the current or last run
+npm run cdp -- call motion.stop
+```
+
+- A step's channels run together: translation (`walk`, `to`), heading (`turn`, `yaw`, `lookAt`, `face`) and `pitch`.
+  `duration` makes them finish together. Angles are degrees, positive to the left (counterclockwise).
+- Errors are policies on the step or in the script's `defaults`: `onStuck` (`detour` by default, `retry`, `fail`,
+  `skip`, `stop`, or `{strategy, attempts, pause, backUp, detour, resetAfter, then}`), `onUnreachable`, `onTargetLost`
+  (also `lastKnown`), `onTimeout` (`timeout` seconds per step, default 60).
+- The report lists for each step its status and reason, seconds, meters walked, stuck events, retries, detours,
+  portals crossed, the last thing that blocked (`object <id>`, `wall`, ...) and the end pose. Take a screenshot after
+  the call returns: the player is then standing still.
+- A run is cancelled when you move in the window (pass `{"userInput": "ignore"}` as the second argument of
+  `motion.run` to prevent that), when the pose is set from elsewhere (`debug.setPlayerPose`, reset), and by a new run.
+- The DevTools backend waits up to 300 s for a call (`--timeout <seconds>` changes it). The server backend gives up
+  after 30 s: there pass `{"wait": false}` to `motion.run` and poll `motion.status`.
+- The page only advances while its window is visible; a hidden window pauses the walk (and the call waits).
+- `detour` is local avoidance, not path planning; `lookAt` does not check line of sight.
 
 ## 4. Ending the session
 

@@ -22,7 +22,8 @@
  * 2. Movement: `movePlayer` against `activeWorld()` (global coordinate frame), then
  *    `bodiesInCell`; in XR a second `movePlayer` applies physical head motion
  *    (room-scale walking). The result replaces `playerPose` and may change `playerPose.cellId` by crossing a
- *    portal. Then the camera/XR rig is synced to the pose, the aim ray is resolved, and the selected tool
+ *    portal. While a scripted motion runs (`scriptedPlayerMotion`, public API `motion`) it moves the player instead,
+ *    through the same `movePlayer`, until it ends or movement input takes over. Then the camera/XR rig is synced to the pose, the aim ray is resolved, and the selected tool
  *    handles the primary/carry/interact actions. Creatures and flags advance on frame time. Then the world engine: `applyControls` with the frame time, once
  *    per frame, then the ticks the simulation clock asks for from the elapsed real time: none, one or several `engine.step`. The client hooks that replay the
  *    frame's events run once, after the last tick, also in a frame with no tick.
@@ -104,6 +105,8 @@ import { isSimpleGeoCreatureObjectSpec } from "../../world-objects/simpleGeoCrea
 import { type SimpleGeoCreatureRuntime, createSimpleGeoCreatureRuntime } from "./creatures/simpleGeoCreatureView";
 import { createObjectHost, createPlainWorldObject, type PlainWorldObject } from "../../world-objects/worldObjectOwner";
 import { installModuleApis, setApiNamespace } from "../../runtime/publicApi";
+import { createScriptedPlayerMotion } from "./scriptedPlayerMotion";
+import type { RuntimeInputFrame } from "../../interaction/inputFrame";
 import { createDesktopToolIndicator } from "../dom/desktopToolIndicator";
 import { createFloatingObjectTooltip } from "../dom/floatingObjectTooltip";
 import { createAimCrossMarker } from "./aimCrossMarker";
@@ -975,6 +978,17 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   installRenderInspectionApi(runtimeObjectInstanceSync.inspection);
   geometryDebugHelpers.installIfAvailable();
   setApiNamespace("world", worldClient.api);
+  // Scripted walking and looking for the local player (public API `motion`); it moves the player in phase 2 of the frame.
+  const scriptedMotion = createScriptedPlayerMotion({
+    activeWorld,
+    readPose: () => readLocalPlayerPose(engine),
+    publishPose: (pose) => publishLocalPlayerPose(engine, pose),
+    playerBody: () => appState.playerBody,
+    bodiesInCell: playerBlockingBodiesInCell,
+    getObject: (id) => runtimeObjectRegistry.get(id),
+    isXrPresenting: () => renderer.xr.isPresenting,
+  });
+  setApiNamespace("motion", scriptedMotion.api);
   const uninstallModuleApis = installModuleApis(engine.publicApis);
   setApiNamespace("view", {
     screenshot() {
@@ -1172,10 +1186,19 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     const previousCellId = readLocalPlayerPose(engine).cellId;
     let moveResult: ReturnType<typeof movePlayer> | undefined;
 
-    // Phase 2: movement. A reset request skips movement entirely (moveResult stays undefined).
+    // Phase 2: movement. A reset request skips movement entirely (moveResult stays undefined). A scripted motion
+    // (public API `motion`) replaces the input's movement until it ends or the player takes over.
     if (frame.resetRequested) {
+      scriptedMotion.cancel("the world was reset");
       teleportPlayerHome();
       resetRuntimeWorld();
+    } else if (scriptedMotion.active && !playerTookOverFromScriptedMotion(frame)) {
+      const scriptedMoves = scriptedMotion.advance(deltaSeconds);
+      const lastScriptedMove = scriptedMoves.at(-1);
+      if (lastScriptedMove) {
+        moveResult = { ...lastScriptedMove, crossings: scriptedMoves.flatMap((move) => move.crossings) };
+        recordCellTransition(previousCellId, moveResult);
+      }
     } else {
       const yawDeltaRadians = xrActive
         ? xrRig.resolveCameraYawRadians(headLocalYawRadians) - readLocalPlayerPose(engine).yawRadians + frame.yawDeltaRadians
@@ -1611,6 +1634,8 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       uninstallGeneralDebugHelpers();
       uninstallRenderInspectionApi();
       uninstallGeometryDebugHelpers();
+      scriptedMotion.dispose();
+      setApiNamespace("motion", undefined);
       setApiNamespace("view", undefined);
       setApiNamespace("world", undefined);
       uninstallModuleApis();
@@ -1625,6 +1650,15 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       renderer.domElement.remove();
     },
   };
+
+  // Movement input ends a scripted motion that allows it (the default); the frame then moves the player as usual.
+  function playerTookOverFromScriptedMotion(frame: RuntimeInputFrame): boolean {
+    const d = frame.localDisplacement;
+    const moving = d.x !== 0 || d.y !== 0 || d.z !== 0 || frame.yawDeltaRadians !== 0 || frame.pitchDeltaRadians !== 0;
+    if (!moving || !scriptedMotion.cancelsOnUserInput) return false;
+    scriptedMotion.cancel("the player moved (keyboard, mouse or controller input)");
+    return true;
+  }
 
   function recordCellTransition(previousCellId: string, moveResult: ReturnType<typeof movePlayer>): void {
     if (readLocalPlayerPose(engine).cellId !== previousCellId) {

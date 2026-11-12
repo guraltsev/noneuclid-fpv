@@ -75,6 +75,8 @@ export interface MoveDynamicObjectResult {
    * Reason of the first contact (else the vertical clamp or an anchor wall stop); undefined for a body contact or an unfinishable move.
    */
   readonly blockingReason?: BlockingReason;
+  /** Id of the runtime body of the first contact, when that contact was a body from `bodiesInCell` that has an id. */
+  readonly blockingObjectId?: string;
   readonly crossedPortal: boolean;
   /**
    * Id of the first portal crossed (in the start cell), when crossedPortal is true.
@@ -176,6 +178,7 @@ export function moveDynamicObject(request: MoveDynamicObjectRequest): MoveDynami
     walkCrossings: readonly SegmentWalkCrossing[],
     reason: BlockingReason | undefined,
     blocked: boolean,
+    blockingObjectId?: string,
   ): MoveDynamicObjectResult => {
     const translated: DynamicObjectState = {
       ...object,
@@ -201,6 +204,7 @@ export function moveDynamicObject(request: MoveDynamicObjectRequest): MoveDynami
       appliedDisplacement: vec3(anchorEnd.x - anchor.x, anchorEnd.y - anchor.y, dz),
       blocked,
       ...(reason !== undefined ? { blockingReason: reason } : {}),
+      ...(blockingObjectId !== undefined ? { blockingObjectId } : {}),
       crossedPortal: crossings.length > 0,
       ...(crossings.length > 0 ? { crossedPortalId: crossings[0].portalId } : {}),
       crossings,
@@ -294,6 +298,7 @@ export function moveDynamicObject(request: MoveDynamicObjectRequest): MoveDynami
   const firstContact = slide.contacts[0];
   const contactReason = firstContact && firstContact.obstacle.reason !== "body" ? firstContact.obstacle.reason : undefined;
   const reason = firstContact ? contactReason : anchorStopped ? "wall" : verticalReason;
+  const blockingObjectId = firstContact?.obstacle.kind === "disc" && firstContact.obstacle.reason === "body" ? firstContact.obstacle.objectId : undefined;
 
   return build(
     anchorEnd,
@@ -301,6 +306,7 @@ export function moveDynamicObject(request: MoveDynamicObjectRequest): MoveDynami
     walkCrossings,
     reason,
     firstContact !== undefined || verticalReason !== undefined || anchorStopped,
+    blockingObjectId,
   );
 }
 

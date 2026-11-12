@@ -547,6 +547,58 @@ State of a movable object (player body, creature, geodesic emitter) inside a com
 | interface | `SimpleCollisionCylinder` | Upright cylinder with its axis parallel to +z, described in the object's own frame. |
 | function | `simpleCollisionCylinder` | Creates a {@link SimpleCollisionCylinder} from radius and height in meters and an optional center offset. |
 
+### `movement/dynamicObjectMotion.ts`
+
+Motion scripts for objects other than the player (NPCs): the trial move of a {@link MotionEnvironment} built on `moveDynamicObject`, so a creature's behavior can run the same scripts as the player (`createMotionRunner`).
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `DynamicObjectMotionOptions` | What the trial move of an object needs. |
+| function | `createDynamicObjectMotionMove` | Returns a trial move for a {@link MotionEnvironment}: turn by the yaw delta, then move by the displacement in the new heading frame, with the object's collisions. |
+| function | `dynamicObjectFromMotionPose` | The object's state at a pose the runner returned (pitch dropped). |
+
+### `movement/motionRunner.ts`
+
+Runs a {@link MotionScript} for one walker (the player or an NPC), with no renderer and no clock of its own.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| const | `MOTION_TICK_SECONDS` | Fixed simulation step of the runner, seconds. |
+| const | `STUCK_WINDOW_SECONDS` | Length of the window over which progress is judged, seconds. |
+| interface | `MotionTrialMove` | What a trial move tells the runner. |
+| interface | `MotionMoveRequest` | One move asked of the walker: turn first, then translate by `localDisplacement` in the new heading frame (x right, y forward, z up). |
+| interface | `MotionObjectLocation` | Where an object is, for targets: its cell, its feet/base point, and optional size (meters). |
+| interface | `MotionEnvironment` | What the runner needs from the world it runs in. |
+| interface | `DevelopedTarget` | A target as seen from the walker: its image in the walker's cell frame, through the portals of `portalIds`. |
+| type | `MotionStatus` | State of a whole run: still going, or how it ended. |
+| type | `MotionStepStatus` | State of one step: still going, or how it ended (`skipped` by a `skip` policy). |
+| interface | `MotionPoseReport` | Pose in report units: meters and degrees, rounded to micrometers and microdegrees. |
+| interface | `MotionStepReport` | What happened in one run of one step. |
+| interface | `MotionReport` | State of a whole run. |
+| interface | `MotionRunner` | A running script. |
+| function | `createMotionRunner` | Creates a runner for `script` in `env`. |
+| function | `locateMotionTarget` | Where `target` is as seen from `pose`: its nearest image through at most `maxHops` portals, in the walker's frame. |
+| function | `poseReport` | Pose in report units (meters, degrees), rounded. |
+
+### `movement/motionScript.ts`
+
+Motion scripts: a plain-data description of how a walker (the player or an NPC) moves and looks, and its normalization.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| type | `MotionOutcome` | What happens to the script when a step cannot be completed: abort it ("fail"), continue with the next step ("skip"), or end it without error ("stop"). |
+| type | `MotionTarget` | A place or thing to walk to or look at. |
+| type | `MotionMove` | Translation channel of a step. |
+| type | `MotionHeading` | Heading channel of a step. |
+| interface | `MotionStuckPolicy` | How the runner reacts when the walker makes no progress. |
+| interface | `MotionStep` | One step of a script, with all defaults filled in. |
+| interface | `MotionScript` | A normalized script. |
+| const | `MOTION_DEFAULTS` | Defaults of every step unless the script's `defaults` or the step override them. |
+| class | `MotionScriptError` | Error for an invalid script; the message starts with the path of the offending field (for example `steps[2].turn`). |
+| const | `MOTION_SCRIPT_USAGE` | Human-readable summary of the input format, served by the public API's help. |
+| function | `normalizeMotionScript` | Turns script input (shorthands allowed) into a {@link MotionScript}. |
+| function | `normalizeTarget` | Normalizes a target: a string is an object id; objects are `{object}`, `{cell, x, y, z?}` or `{forward?, right?, up?}`. |
+
 ### `movement/moveDynamicObject.ts`
 
 Advances a dynamic object by a displacement inside the glued cell complex with swept collision, wall sliding and any number of portal crossings.
@@ -2013,7 +2065,8 @@ Holder of the public API object `window.noneuclid.api`: a plain object of namesp
 | --- | --- | --- |
 | type | `PublicApi` | The mutable API object: namespace name to an object of functions. |
 | interface | `NoneuclidGlobal` | The shape of `window.noneuclid`. |
-| function | `getPublicApi` | Returns `window.noneuclid.api`, creating `window.noneuclid` on first use. |
+| function | `getPublicApi` | Returns `window.noneuclid.api`, creating `window.noneuclid` (with its `help` function) on first use. |
+| function | `describeApi` | The public API's own `help(path?)`: the names of its functions as `{ namespace: [names] }`, narrowed to `path` (a namespace such as `"motion"`, or one function such as `"motion.run"`) when given. |
 | function | `installModuleApis` | Installs the modules' public functions as `api.<moduleId>`; the function it returns removes them, for the app's dispose. |
 | function | `setApiNamespace` | Installs (or, with `undefined`, removes) one namespace of the public API. |
 
@@ -3375,6 +3428,18 @@ Per-source ray pointers that drive hover and select events on the XR scene palet
 | interface | `ScenePointers` | Pointer manager returned by `createScenePointers`. |
 | function | `createScenePointers` | Creates the pointer manager. |
 | function | `chooseActiveScenePointer` | Picks the single pointer that should drive palette UI: first a pressed one, then a hovering dominant one, then any hovering one, then any dominant one, then the first. |
+
+### `render/three/scriptedPlayerMotion.ts`
+
+Scripted motion of the local player: runs a motion script (src/movement/motionScript.ts) through the frame loop and serves it as the public API namespace `motion` (`window.noneuclid.api.motion`).
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| const | `LOCAL_PLAYER_TARGET_ID` | The id under which the local player names itself in targets (it cannot walk to or look at itself). |
+| interface | `ScriptedPlayerMotionDeps` | What the scripted motion reads from and writes to the shell. |
+| interface | `PlayerMotionReport` | Report of a run as the API returns it: the runner's report plus the player's pose now. |
+| interface | `ScriptedPlayerMotion` | The shell's handle on scripted motion. |
+| function | `createScriptedPlayerMotion` | Creates the scripted-motion controller; nothing runs until `motion.run` (or a shortcut) is called. |
 
 ### `render/three/staticAssetRenderRoot.ts`
 

@@ -289,19 +289,20 @@ export async function createCdpSession(webSocketDebuggerUrl) {
   // and reconnect, and its own outer test timeout must still have room left after several worst-case misses.
   const commandTimeoutMs = 6000;
 
-  const send = (method, params = {}) =>
+  // `timeoutMs` lengthens the deadline for one command that is expected to take long (an awaited page call such as a scripted walk).
+  const send = (method, params = {}, { timeoutMs = commandTimeoutMs } = {}) =>
     new Promise((resolve, reject) => {
       const id = ++nextId;
       const timer = setTimeout(() => {
         pending.delete(id);
-        reject(new Error(`CDP command "${method}" (id ${id}) got no response within ${commandTimeoutMs} ms`));
-      }, commandTimeoutMs);
+        reject(new Error(`CDP command "${method}" (id ${id}) got no response within ${timeoutMs} ms`));
+      }, timeoutMs);
       pending.set(id, { resolve, reject, timer });
       ws.send(JSON.stringify({ id, method, params }));
     });
 
-  const evaluate = async (expression, { awaitPromise = true, returnByValue = true } = {}) => {
-    const result = await send("Runtime.evaluate", { expression, awaitPromise, returnByValue });
+  const evaluate = async (expression, { awaitPromise = true, returnByValue = true, timeoutMs } = {}) => {
+    const result = await send("Runtime.evaluate", { expression, awaitPromise, returnByValue }, timeoutMs === undefined ? {} : { timeoutMs });
     if (result.exceptionDetails) {
       throw new Error(result.exceptionDetails.exception?.description ?? result.exceptionDetails.text);
     }
