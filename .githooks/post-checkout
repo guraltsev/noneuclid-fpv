@@ -1,0 +1,6 @@
+#!/bin/sh
+# current-branch post-checkout hook
+root=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
+file="$root/.git-current-branch"
+branch=$(git symbolic-ref --quiet --short HEAD 2>/dev/null) || branch=HEAD
+printf '%s\n' "$branch" > "$file"
