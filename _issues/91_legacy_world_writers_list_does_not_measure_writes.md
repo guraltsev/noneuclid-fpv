@@ -1,10 +1,14 @@
 # 91 - `legacyWorldWriters` does not measure who writes the world
 
-Status: open.
+Status: open; done in code by job 62 (done, needs review). Closes when the maintainer accepts job 62's Report. Re-verified 2026-11-11.
 
 Priority: P3 (tooling; the migration's progress measure is wrong). Found 2026-11-05.
 
-Jobs: [62](../.agents/jobs/62_client_write_check.md).
+Jobs: [62](../.agents/jobs/_done/62_client_write_check.md).
+
+## Status update 2026-11-11
+
+The check now measures writes; the list is 5 files (see issue 84). The count is a lower bound: writes through owners are not counted.
 
 ## Problem
 

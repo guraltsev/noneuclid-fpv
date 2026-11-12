@@ -1,11 +1,15 @@
 # 59 - Stereo with split roots: each eye's root cell is drawn unclipped in the other eye; union overflow favors eye 0
 
-Status: open; implemented by job 23, which ended "done, needs review" (headset check not run; this issue closes when it passes); see the Report in `.agents/jobs/_done/23_stereo_split_root_correctness.md`. Re-verified 2026-10-28.
+Status: open; code done by job 23 (done, needs review). Closes after M6. Re-verified 2026-11-11.
 
 Priority: P2 (correctness, XR only). Related to issue 21 (closed 2026-10-28; its remaining stereo items are merged here). That issue covered stereo union and allocation; it did not
 cover these defects.
 
-Jobs: [23](../.agents/jobs/23_stereo_split_root_correctness.md).
+Jobs: [23](../.agents/jobs/_done/23_stereo_split_root_correctness.md).
+
+## Status update 2026-11-11
+
+Left: the headset check M6. Nothing else.
 
 ## Status update 2026-10-28
 
@@ -24,7 +28,7 @@ test of the split-root case exists yet.
 Re-verified at 0b468e1; still open, nothing implemented. Line numbers moved: `syncStereoPortalInstanceRender` is at
 `createThreeApp.ts:2530` (split branch 2591-2618), the runtime-object -2 write at `renderPortalInstances.ts:309`, and
 `resolveXrPortalEyeRenderRoot` at `xrPortalEye.ts:40-86` (rewritten by job 17). Two new findings, both handled in job
-[23](../.agents/jobs/23_stereo_split_root_correctness.md): (1) the shared-root test compares root ids only, so in a
+[23](../.agents/jobs/_done/23_stereo_split_root_correctness.md): (1) the shared-root test compares root ids only, so in a
 self-glued cell (`torus-moduli`) an eye re-rooted to the same id with a +15 m translation is treated as shared and draws
 the other eye's placements; (2) job 17's runtime-object placement dedupe would hide objects in one eye once split
 roots are clipped, unless the dedupe key includes the eye's root.
@@ -85,7 +89,7 @@ Remaining stereo items from issue 21:
 
 - Debug state exposes per-eye totals (`PortalEyeRenderDebugState`) and the union through `portalInstances`, but not
   left-only, right-only and both-eye counts. Add them to renderer debug state. The in-headset readout is tracked in
-  issue [20](../.agents/jobs/19_vr_palette_and_in_headset_debug.md).
+  issue [20](../.agents/jobs/_done/19_vr_palette_and_in_headset_debug.md).
 - Manual headset checks, to record when the split-root fix lands:
   - Stand near a portal boundary and move the headset sideways. A portal image may be visible in one eye, but it must
     not blink out of both.

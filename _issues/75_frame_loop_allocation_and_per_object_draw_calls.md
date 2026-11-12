@@ -1,10 +1,14 @@
 # 75 - Frame-loop allocation churn and per-object draw calls outside the portal-visibility core
 
-Status: open; implemented by job 29, which ended "done, needs review" (manual checks not run); see the Report in `.agents/jobs/_done/29_frame_loop_allocation_and_draw_calls.md`. Re-verified 2026-10-28.
+Status: open; code done by job 29 (done, needs review). Closes after M7 and M10. Re-verified 2026-11-11.
 
 Priority: P2 (performance; matters most at 72-120 Hz in XR).
 
-Jobs: [29](../.agents/jobs/29_frame_loop_allocation_and_draw_calls.md).
+Jobs: [29](../.agents/jobs/_done/29_frame_loop_allocation_and_draw_calls.md).
+
+## Status update 2026-11-11
+
+Left: M7 (per-eye instancing) and the frame-time numbers of M10.
 
 ## Status update 2026-10-29
 
@@ -12,7 +16,7 @@ Re-checked at `0b468e1`. "Aim calls `getRuntimeObjectVisiblePaths` 3-6 times per
 the ray). Job 17 moved lines (`renderPortalInstances.ts:316-318` for the object `needsUpdate`, `runtimeSceneUtils.ts:180-186`
 for the key prefix, `xrPortalEye.ts:49/58/75/84/89/95` for the eye allocations) and added a `Map`, a `Set` and a key
 string per candidate instance (placement dedupe). The marmot proxy has 12 meshes, not 13. Everything else holds; job
-[29](../.agents/jobs/29_frame_loop_allocation_and_draw_calls.md) was rewritten with the per-item table and the fix.
+[29](../.agents/jobs/_done/29_frame_loop_allocation_and_draw_calls.md) was rewritten with the per-item table and the fix.
 
 ## Status update 2026-10-28
 

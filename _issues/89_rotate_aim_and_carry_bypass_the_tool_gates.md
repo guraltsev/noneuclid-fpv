@@ -1,10 +1,15 @@
 # 89 - Rotate, aim and carry bypass the tool gates
 
-Status: open.
+Status: open; done in code by job 64 (done, needs review). Closes after the desktop check. Re-verified 2026-11-11.
 
 Priority: P2 (design rule broken; no visible defect while no gate refuses these tools). Found 2026-11-05.
 
-Jobs: [64](../.agents/jobs/64_emitter_edits_and_length.md).
+Jobs: [64](../.agents/jobs/_done/64_emitter_edits_and_length.md).
+
+## Status update 2026-11-11
+
+`enter-tool-mode` is gone and rotate, aim and carry go through `world/requestTool`. Open question from job 64's Report:
+`beginEdit` and `endEdit` name `geodesicEmitters/rotate` as `requiresTool` although aim uses them too.
 
 ## Problem
 

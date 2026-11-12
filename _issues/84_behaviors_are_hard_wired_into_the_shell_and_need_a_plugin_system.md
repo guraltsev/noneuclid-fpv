@@ -1,6 +1,8 @@
 # 84 - Behaviors are hard-wired into the shell; the engine needs a designed plugin system for them
 
-Status: open; partly done (audit 2026-11-05). The flow, the geodesic model, measurements and carry are modules, and the shell names
+Status: open; mostly done. Re-verified 2026-11-11.
+
+Status before 2026-11-11: open; partly done (audit 2026-11-05). The flow, the geodesic model, measurements and carry are modules, and the shell names
 none of them. Still open: the emitters, flags, measurement tools and creatures write the world from the shell; `publicApi` on modules
 is not built, so the release scenarios of jobs 50, 53 and 54 do not exist; the manual checks of jobs 50, 54 and 55; the before and
 after measurement of requirement 3. The next batch (`geodesicEmitters`, then `publicApi`) carries most of this. Names in the
@@ -13,6 +15,16 @@ Jobs: [48 to 55](../.agents/jobs/README.md), specified in design 013, section 15
 Correction (2026-11-03): `free-geodesic-end` and the interval `motionState` are not owned by the flow; every shot
 geodesic uses a free end. In design 013 a curve has no lifecycle, so `curve-shortening-pair` and `motionState` are deleted
 (section 13.2).
+
+## Status update 2026-11-11
+
+Since 2026-11-05 jobs 63-66 moved the emitters, flags and measurement tools into modules and built `publicApi` (job 65), whose
+release scenarios now exist in `tests/app/moduleApi.release.test.ts`. `legacyWorldWriters` (`scripts/docs/lib.mjs`) is down to 5
+files: `createThreeApp.ts`, the two creature views (`geodesicMarmotView.ts`, `simpleGeoCreatureView.ts`), `geometryCommit.ts`
+and `runtime/worldGeometryComputedObjects.ts`.
+
+Left: creatures as a module; the geometry commit inside the world (job 30); the manual checks of jobs 50, 54 and 55; the before
+and after measurement of requirement 3.
 
 ## Problem
 

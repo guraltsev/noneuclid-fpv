@@ -1,10 +1,14 @@
 # 92 - Measurement kinds are declared transient, so a save would lose what the person placed
 
-Status: open.
+Status: open; done in code by job 66 (done, needs review). Closes when the maintainer accepts job 66's Report. Re-verified 2026-11-11.
 
 Priority: P3 (no save format exists yet; fix the declaration before one does). Found 2026-11-05.
 
-Jobs: [66](../.agents/jobs/66_measurement_tools_and_flags.md).
+Jobs: [66](../.agents/jobs/_done/66_measurement_tools_and_flags.md).
+
+## Status update 2026-11-11
+
+Nothing left but the review and a desktop look at the measurement tools.
 
 ## Problem
 

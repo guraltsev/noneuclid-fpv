@@ -1,15 +1,22 @@
 # 86 - Derived state is recomputed by scanning the world, and nothing guards it
 
-Status: open; the code is done (jobs 56 to 60). What is left is the manual `derived-verify` session of job 59: run the app with the
+Status: open; code done (jobs 56-60). Awaiting the maintainer's decision on job 65's evidence. Re-verified 2026-11-11.
+
+Status before 2026-11-11: open; the code is done (jobs 56 to 60). What is left is the manual `derived-verify` session of job 59: run the app with the
 option on, carry an emitter, shoot a geodesic, tie two ends and let the flow merge them; no "differs from compute" error may appear.
 
 Priority: P1 (it stopped the batch of jobs 48-55, and it blocks jobs 52 to 55 and with them issue 84).
 
-Jobs: [51](../.agents/jobs/51_geodesic_model_module_and_renames.md), [56](../.agents/jobs/56_bench_counters_and_ab_gate.md),
-[57](../.agents/jobs/57_change_ring.md), [58](../.agents/jobs/58_derived_cache.md), [59](../.agents/jobs/59_arc_index.md),
-[60](../.agents/jobs/60_materialized_state_is_a_function_of_real_state.md). Coordinator:
-[00_coordinate_jobs_51_60](../.agents/jobs/00_coordinate_jobs_51_60.md). Design:
+Jobs: [51](../.agents/jobs/_done/51_geodesic_model_module_and_renames.md), [56](../.agents/jobs/_done/56_bench_counters_and_ab_gate.md),
+[57](../.agents/jobs/_done/57_change_ring.md), [58](../.agents/jobs/_done/58_derived_cache.md), [59](../.agents/jobs/_done/59_arc_index.md),
+[60](../.agents/jobs/_done/60_materialized_state_is_a_function_of_real_state.md). Coordinator:
+[00_coordinate_jobs_51_60](../.agents/jobs/_done/00_coordinate_jobs_51_60.md). Design:
 [014](../_docs/design/014-derived-state-and-caches.md).
+
+## Status update 2026-11-11
+
+The manual `derived-verify` session is now a release scenario (job 65, `tests/app/moduleApi.release.test.ts`). It samples the arc
+index only (1 read in 64). The maintainer decides whether that closes this issue; job 65 recommends closing it.
 
 ## Problem
 

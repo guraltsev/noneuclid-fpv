@@ -1,11 +1,20 @@
 # 82 - Each deformation commit rebuilds the whole scene and re-uploads the floor texture
 
-Status: open; re-verified 2026-10-28.
+Status: open; re-verified 2026-11-11. Job 30 (rewritten 2026-11-11) fixes it.
 
 Priority: P2 (performance). Complements issue 55, which covers the worker build cost (~100 ms per step). This issue
 covers the main-thread cost of *applying* each step, which is what makes the frame rate drop during a deformation.
 
 Jobs: [30](../.agents/jobs/30_deformation_rebuild_pipeline.md).
+
+## Status update 2026-11-11
+
+What a commit still does, from the code on 2026-11-11: it disposes and rebuilds every cell archetype (geometry, two materials,
+`InstancedMesh` and two instanced attributes per part, at full capacity), every cell group, the portal debug runtime (with
+`portal-static-cull-debug` on, a full main-thread static cull per commit) and the runtime diagnostics, whose history resets. It no
+longer touches decorations or GLTFs: those are runtime-object archetypes built once at startup. The commit time has never been
+measured; job 30 adds `commitMs` first. The floor texture is fixed (job 10, then job 67's patch shader); the wall texture leak is
+issue 90.
 
 ## Status update 2026-11-05
 

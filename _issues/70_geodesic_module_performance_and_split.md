@@ -1,10 +1,15 @@
 # 70 - Per-frame cost of geodesic rebuilds
 
-Status: open; re-verified 2026-10-28. Implemented by job 27, which ended "done, needs review"; see the Report in `.agents/jobs/_done/27_geodesic_rebuild_performance.md`.
+Status: open; code done by job 27 (done, needs review). Closes when the maintainer accepts job 27's Report. Re-verified 2026-11-11.
 
 Priority: P2 (performance + design). Complements issue 38 (decompose monoliths) with a concrete cut for this file.
 
-Jobs: [27](../.agents/jobs/27_geodesic_rebuild_performance.md).
+Jobs: [27](../.agents/jobs/_done/27_geodesic_rebuild_performance.md).
+
+## Status update 2026-11-11
+
+No manual check is named. Since job 27 the geodesic code was split into modules again (jobs 51-66, `src/modules/` and
+`src/world-objects/geodesic/`), so most line references below are stale; read the job's Report, not this text.
 
 ## Status update 2026-10-29
 
@@ -24,7 +29,7 @@ The facts below are corrected to the current code: `getGeodesicSegments` has 42 
 `updateGeodesicIntersectionObjects` 26 in the file; the suite has 85 test files.
 
 Merged 2026-10-28: the module split that this issue used to propose is now tracked only in issue
-[76](../.agents/jobs/25_split_geodesic_cannon_modules.md). This issue keeps the performance items.
+[76](../.agents/jobs/_done/25_split_geodesic_cannon_modules.md). This issue keeps the performance items.
 
 ## Summary
 

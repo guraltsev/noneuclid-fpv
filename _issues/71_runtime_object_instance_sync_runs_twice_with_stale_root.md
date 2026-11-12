@@ -1,10 +1,14 @@
 # 71 - Runtime-object instance sync runs twice per frame, once against the wrong root table
 
-Status: open; implemented by job 28, which ended "done, needs review" (manual checks not run); see the Report in `.agents/jobs/_done/28_frame_snapshot_instance_sync.md`. Re-verified 2026-10-28. 2026-10-29: Aim no longer reads visible paths (job 16); only the instance-sync part of this issue remains.
+Status: open; code done by job 28 (done, needs review). Closes after M7. Re-verified 2026-11-11.
 
 Priority: P2 (performance, with a correctness defect in single-view XR and on portal-crossing frames).
 
-Jobs: [28](../.agents/jobs/28_frame_snapshot_instance_sync.md).
+Jobs: [28](../.agents/jobs/_done/28_frame_snapshot_instance_sync.md).
+
+## Status update 2026-11-11
+
+Left: M7 (mono-XR flag re-root). The line "Manual check: M10" at the end of this file was corrected to M7 today.
 
 ## Status update 2026-11-05
 
@@ -16,7 +20,7 @@ Re-checked at `0b468e1`; line numbers below are stale (the second sync is now `c
 `:2770` and `:2852`, `getRuntimeObjectVisiblePaths` `:2942-2963`). Evidence item 2 ("aim, tooltip and tool dispatch join
 last frame's result") is fixed for aim by job 16; on desktop the final sync is correct, so the wrong-root output remains
 only in single-view XR with a re-rooted eye. Also new: tools sync on their own during the frame (every frame while a
-cannon is carried, `geodesicCannonTools.ts:877`). Job [28](../.agents/jobs/28_frame_snapshot_instance_sync.md) was
+cannon is carried, `geodesicCannonTools.ts:877`). Job [28](../.agents/jobs/_done/28_frame_snapshot_instance_sync.md) was
 rewritten with the full claim table and the fix.
 
 ## Status update 2026-10-28
@@ -102,4 +106,4 @@ computed for. The same stale join feeds aim picking (issue 72).
 - With 40 placed flags, the `objectsMs + portalMs` debug timings drop measurably. Record before/after numbers in
   the PR.
 
-Manual check: tests/manual_smoke.md M10.
+Manual check: tests/manual_smoke.md M7.

@@ -1,16 +1,20 @@
 # 73 - Portal ghost records and XR eye re-rooting are single-hop
 
-Status: open; re-verified 2026-10-28; fix designed 2026-10-29. Implemented by job 17, which ended "done, needs review" (headset check not run; this issue closes when it passes); see the Report in [job 17](../.agents/jobs/_done/17_multi_hop_ghosts_and_eye_rerooting.md).
+Status: open; code done by job 17 (done, needs review). Closes after M8. Re-verified 2026-11-11.
 
 Priority: P2 (correctness, visible near cone vertices and portal corners).
 
-Jobs: [17](../.agents/jobs/17_multi_hop_ghosts_and_eye_rerooting.md).
+Jobs: [17](../.agents/jobs/_done/17_multi_hop_ghosts_and_eye_rerooting.md).
+
+## Status update 2026-11-11
+
+Left: the headset check M8.
 
 ## Status update 2026-10-29
 
-Design decided in [job 17](../.agents/jobs/17_multi_hop_ghosts_and_eye_rerooting.md) (not implemented yet):
+Design decided in [job 17](../.agents/jobs/_done/17_multi_hop_ghosts_and_eye_rerooting.md) (not implemented yet):
 
-- Ghosts come from the developed disk of [job 12](../.agents/jobs/12_segment_walk_kernel.md) instead of a vertex-link
+- Ghosts come from the developed disk of [job 12](../.agents/jobs/_done/12_segment_walk_kernel.md) instead of a vertex-link
   search. At a cone vertex the same cell can be reached in two copies; the explicit decision is: copies in the same cell
   whose centres are closer than 2·r **conflict**, and only the first one (breadth-first order) is kept. Prototype: the
   cube-vertex case gives one ghost each in `right` and `bottom`; the torus-corner case gives exactly 3 ghosts.

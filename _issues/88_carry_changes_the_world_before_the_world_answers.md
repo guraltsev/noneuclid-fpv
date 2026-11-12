@@ -1,10 +1,15 @@
 # 88 - Picking up an emitter changes the world and the tool before the world answers
 
-Status: open.
+Status: open; done in code by job 64 (done, needs review). Closes after the desktop carry check. Re-verified 2026-11-11.
 
 Priority: P2 (correctness; a refused pickup destroys geodesics). Found 2026-11-05.
 
-Jobs: [64](../.agents/jobs/64_emitter_edits_and_length.md).
+Jobs: [64](../.agents/jobs/_done/64_emitter_edits_and_length.md).
+
+## Status update 2026-11-11
+
+Every "Done when" item is implemented per job 64's Report: `carry/attach` lifts the emitter on success, the client enters the
+tool on `ok`, and a refused attach is tested. Left: a desktop check of pickup and drop, and the maintainer's review.
 
 ## Problem
 

@@ -1,15 +1,28 @@
 # 95 - The torus-moduli floor shears with the marking, and the deformation does not read as moduli space
 
-Status: open (job 67 landed parts 1 to 3 on 2026-11-06, awaiting the maintainer's check of the look: see its report; part 4 stays with job 35). Reported by the maintainer on 2026-11-05 ("the texture deforms terribly"). Analysed from the code at `f9aa317`;
-the design below was prototyped numerically outside the repository (see "How the design was checked"). Nothing is
-implemented.
+Status: open. Parts 1 to 3 landed with job 67 on 2026-11-06 and wait for the maintainer's check of the look (job 67's Report);
+part 4 is job 35, rewritten 2026-11-11. Re-verified 2026-11-11.
+
+Reported by the maintainer on 2026-11-05 ("the texture deforms terribly"). Analysed from the code at `f9aa317`; the design below
+was prototyped numerically outside the repository (see "How the design was checked").
 
 Priority: P1 (the maintainer called the torus moduli experience a very significant job).
 
-Jobs: [67](../.agents/jobs/67_rigid_floor_patches_and_moduli_readout.md) (parts 1 to 3 below);
+Jobs: [67](../.agents/jobs/_done/67_rigid_floor_patches_and_moduli_readout.md) (parts 1 to 3 below);
 [35](../.agents/jobs/35_torus_family_as_teichmuller_space.md) (part 4 and the GL2R generalization, after a rewrite).
 Related: closed issue [81](_closed/81_floor_texture_slides_under_objects_during_deformation.md), which this issue partly reverses on purpose;
 [55](55_live_deformation_rebuild_cost_and_se2_transforms.md) and [82](82_deformation_commit_rebuilds_whole_scene_and_reuploads_floor_texture.md) (commit cost).
+
+## Status update 2026-11-11
+
+Correction to part 4. "The new footprint may stay centred at the origin" is wrong. Every corner of the room is one point of the
+torus, and the app puts a forbidden-zone cylinder there. The corners of a parallelogram centred at the origin with basis (f1, f2)
+are congruent mod the lattice to (f1 + f2)/2. Which half-lattice point that is depends on the new basis mod 2, so a re-marking
+centred at the origin can move the corner zone to another point of the torus. Job 35 keeps the corner where it was by offsetting
+the room by a half-lattice vector (its decision 3). The rest of part 4 was confirmed from the code: a reduced parallelogram with
+the same portal ids passes `validateTopologyPreservingSnapshot`, provided it is counter-clockwise.
+
+The headless-sweep problem from job 67's Report (a headless tab did not advance a deformation) is job 30's first step.
 
 ## Summary
 

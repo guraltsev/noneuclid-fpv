@@ -1,12 +1,27 @@
 # 55 - Live-deformation rebuild cost, worker pipeline, and an SE(2) transform type
 
-Status: open; re-verified 2026-10-28.
+Status: open; re-verified 2026-11-11. Items 1 to 3 go to job 30 (rewritten 2026-11-11); item 4 (`Iso2`) goes to job 24.
 
 - Job 12 (2026-10-29): the segment-walk kernel uses `RigidTransform3`; no `Iso2` was introduced (job 30 owns it).
 
 Priority: P2 (performance / design).
 
-Jobs: [30](../.agents/jobs/30_deformation_rebuild_pipeline.md).
+Jobs: [30](../.agents/jobs/30_deformation_rebuild_pipeline.md) (items 1 to 3), [24](../.agents/jobs/24_lazy_path_trie.md) (item 4).
+
+## Status update 2026-11-11
+
+Re-measured on 2026-11-11 (slow machine; ratios only). The evidence table below is stale:
+
+- The build is no longer about 100 ms. Job 20 made the static cull about 5 times cheaper: 15 to 32 ms per step for `torus-moduli` here.
+- `structuredClone` of the response now costs more than the build (28 to 44 ms), and half of it lands on the main thread.
+- Steps are now Teichmuller steps of \(1/375\) (job 67), 0.08 m at \(b = 15\), not fixed metres.
+- Correction: the client does remove a stale resolver when the stale response arrives; the real cost of cancel is that the worker
+  stays busy with the stale build.
+- The duplicate Mat3 helpers in `compilePortalTransforms.ts` are gone. No `Iso2` exists.
+
+Job 30 now builds intermediate states on the main thread (compile is about 0.02 ms) and re-develops the kept path table from its
+words, so the worker only refreshes the kept set. That replaces this issue's items 1 and 2; item 3 (init and cancel messages) is in
+job 30; typed-array transport and `Iso2` (item 4) belong with the path trie of job 24.
 
 ## Status update 2026-10-28
 

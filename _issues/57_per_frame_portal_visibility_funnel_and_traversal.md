@@ -1,11 +1,16 @@
 # 57 - Per-frame portal visibility: visit only visible parents, use the exact 2.5D funnel, stop leaving background holes
 
-Status: open; implemented by job 21, which ended "done, needs review" (manual checks not run); see the Report in `.agents/jobs/_done/21_per_frame_visibility_funnel.md`. Re-verified 2026-10-28.
+Status: open; code done by job 21 (done, needs review). Closes after the manual check below. Re-verified 2026-11-11.
 
 Priority: P2 (performance / robustness). Issue 21 (closed 2026-10-28, merged here) covered the general goal of fewer hot-loop allocations; this issue gives
 the concrete algorithmic replacement.
 
-Jobs: [21](../.agents/jobs/21_per_frame_visibility_funnel.md).
+Jobs: [21](../.agents/jobs/_done/21_per_frame_visibility_funnel.md).
+
+## Status update 2026-11-11
+
+Only the manual check is left: the desktop grazing walk (no background lines), from job 21's Report. The line "Manual check: M6"
+at the end of this file was corrected today.
 
 ## Status update 2026-11-05
 
@@ -115,4 +120,4 @@ Issue 21's unfinished steps are tracked here:
   allocations: per-path `rigidTransformToThreeMatrix`, NDC projection arrays, Sutherland-Hodgman arrays, and a matrix
   `clone()` in `transformVisiblePortalResultToRenderFrame`.
 
-Manual check: tests/manual_smoke.md M6.
+Manual check: the desktop grazing walk of job 21's Report (not M6).

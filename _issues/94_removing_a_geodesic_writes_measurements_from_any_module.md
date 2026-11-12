@@ -1,10 +1,15 @@
 # 94 - Removing a geodesic writes measurement records from whichever module called it
 
-Status: open.
+Status: open; done in code by job 64 (done, needs review). Can close on review. Re-verified 2026-11-11.
 
 Priority: P3 (the write guard throws; with the guard off, as in the normal app, the behaviour is right). Found 2026-11-05.
 
-Jobs: [64](../.agents/jobs/64_emitter_edits_and_length.md).
+Jobs: [64](../.agents/jobs/_done/64_emitter_edits_and_length.md).
+
+## Status update 2026-11-11
+
+`removeGeodesicIntervalAndDerivedObjects` no longer touches measurement kinds, and carry's `writesCoreKinds` is gone (job 64's
+Report). One effect: a stale label lasts until the next measurement tick. Nothing left but the review.
 
 ## Problem
 

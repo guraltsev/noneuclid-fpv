@@ -1,11 +1,16 @@
 # 56 - The static cull is not provably conservative
 
-Status: open; implemented by job 20, which ended "done, needs review" (manual check not run); see the Report in `.agents/jobs/_done/20_exact_static_cull.md`. Re-verified 2026-10-28.
+Status: open; code done by job 20 (done, needs review). Closes after the manual check below. Re-verified 2026-11-11.
 
 Priority: P1 (correctness / design). This proposes the fix for the "static visibility cull is not provably conservative"
 item in issue 41. It does not file that defect again.
 
-Jobs: [20](../.agents/jobs/20_exact_static_cull.md).
+Jobs: [20](../.agents/jobs/_done/20_exact_static_cull.md).
+
+## Status update 2026-11-11
+
+Only the manual check is left: the desktop corner view at depth 10 against the previous build, from job 20's Report. The line
+"Manual check: M6" at the end of this file was wrong (M6 is headset stereo) and was corrected today.
 
 ## Status update 2026-11-05
 
@@ -72,7 +77,7 @@ p_i, so C_k cannot lie entirely on its inner side.
 
 ## Fix
 
-Tracked as job [20](../.agents/jobs/20_exact_static_cull.md). This issue is resolved when that job's acceptance criteria hold.
+Tracked as job [20](../.agents/jobs/_done/20_exact_static_cull.md). This issue is resolved when that job's acceptance criteria hold.
 
 ## Merged from issue 41 (2026-10-28)
 
@@ -88,4 +93,4 @@ defects; the LP in this issue replaces all of them:
 
 Needs rendering comparisons before and after, not a blind change.
 
-Manual check: tests/manual_smoke.md M6.
+Manual check: the desktop corner view of job 20's Report (not M6).

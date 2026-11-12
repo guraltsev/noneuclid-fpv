@@ -1,10 +1,14 @@
 # 85 - Audit every pose change that is not a collision-checked step
 
-Status: open. An audit; each defect it finds gets its own job.
+Status: open; not started. Re-verified 2026-11-11.
 
 Priority: P2 (one such defect froze a creature for good; others may exist, none is known).
 
 Jobs: none yet.
+
+## Status update 2026-11-11
+
+No change. An audit with no job yet; a good small next task.
 
 ## Status update 2026-11-05
 

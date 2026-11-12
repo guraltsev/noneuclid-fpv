@@ -1,10 +1,14 @@
 # 58 - GPU portal clipping: silent drop on vertex overflow, 32 texture fetches per fragment, no early-Z
 
-Status: open; implemented by job 22, which ended "done, needs review" (manual browser/GPU/Quest checks not run); see the Report in `.agents/jobs/_done/22_gpu_portal_clip_planes.md`. Re-verified 2026-10-28.
+Status: open; code done by job 22 (done, needs review). Closes after M9 and the GPU timing. Re-verified 2026-11-11.
 
 Priority: P2 (correctness for the overflow; performance for the rest).
 
-Jobs: [22](../.agents/jobs/22_gpu_portal_clip_planes.md).
+Jobs: [22](../.agents/jobs/_done/22_gpu_portal_clip_planes.md).
+
+## Status update 2026-11-11
+
+Left: M9 (`gl_ClipDistance` on the Quest's driver) and the GPU timing of the acceptance criteria. Nothing else.
 
 ## Status update 2026-10-29
 

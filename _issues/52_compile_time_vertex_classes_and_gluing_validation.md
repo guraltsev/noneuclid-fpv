@@ -1,12 +1,17 @@
 # 52 - The compiler never builds vertex classes: silent bad gluings, cylinders at flat vertices, mixed-unit predicates
 
-Status: open; re-verified 2026-10-28.
+Status: open; re-verified 2026-11-11.
 
 Priority: P2 (correctness / robustness / design). This extends the following items of
 [MATHEMATICAL_MODEL §11](../_docs/MATHEMATICAL_MODEL.md#11-assumptions-and-known-gaps) and issue 41: equal side lengths,
 exclusion cylinders at vertices of angle sum 2π, and validation gaps. It adds a concrete design and several new defects.
 
 Jobs: [18](../.agents/jobs/18_vertex_classes_and_gluing_validation.md).
+
+## Status update 2026-11-11
+
+Unchanged since 2026-11-05. Job 18 is still queued and its text predates the engine wave; it needs a rewrite before it runs. Its
+first step is still to stop `trace.ts` from turning a vertex-tie exit into `forbidden-zone-hit`.
 
 ## Status update 2026-10-28
 

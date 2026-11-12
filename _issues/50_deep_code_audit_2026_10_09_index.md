@@ -1,8 +1,18 @@
 ﻿# 50 - Deep code audit, 2026-10-09: index, cross-cutting themes, and order of work
 
-Status: open; re-verified 2026-11-05.
+Status: open; re-verified 2026-11-11.
 
 Priority: P1 (tracking issue). Close it when every issue listed below is closed or moved on.
+
+## Status update 2026-11-11
+
+No issue was closed between 2026-11-05 and today; the batch of jobs 61-66 and job 67 left every issue they touched open for manual
+checks or the maintainer's review.
+
+- Code done, a manual check or a review left: 56 (desktop corner view), 57 (desktop grazing walk), 58 (M9), 59 (M6), 70 (review of
+  job 27), 71 (M7), 72 (review of job 16, headset aim), 73 (M8), 75 (M7, M10).
+- Code left: 52 (job 18, text stale), 55 and 82 (job 30, rewritten 2026-11-11), 54 (job 35, rewritten 2026-11-11, with issue 95 part 4).
+- Encoding damage in this file (garbled section signs, dashes and umlauts) repaired on 2026-11-11.
 
 ## Status update 2026-11-05
 
@@ -18,9 +28,9 @@ Every open issue was checked against the code after the engine wave.
 
 Six parallel reviews covered the code: math core and gluing, portal visibility, movement, geodesics, the frame loop, and
 architecture. They produced issues 51-80. Items already recorded in
-[41](_closed/41_documentation_audit_findings.md), [38](../.agents/jobs/33_decompose_runtime_monoliths.md),
+[41](_closed/41_documentation_audit_findings.md), [38](../.agents/jobs/_done/33_decompose_runtime_monoliths.md),
 [21](_closed/21_vr_stereo_portal_visibility_union_and_hot_loop_allocation.md) and
-[MATHEMATICAL_MODEL.md Â§11](../_docs/MATHEMATICAL_MODEL.md#11-assumptions-and-known-gaps) were not filed again. Where this
+[MATHEMATICAL_MODEL.md §11](../_docs/MATHEMATICAL_MODEL.md#11-assumptions-and-known-gaps) were not filed again. Where this
 audit has a concrete fix design for one of those items, the new issue says so.
 
 Evidence levels differ between issues. The audit ran scratch scripts to confirm 51 (example invariants), 61 (escaping
@@ -34,9 +44,9 @@ to `src/cell-complex/validateCellComplexSpec.ts`.
 | # | Pri | Title |
 | --- | --- | --- |
 | [51](_closed/51_dodecahedron_example_is_a_genus_6_surface.md) | P1 | Closed 2026-10-28: the dodecahedron gluing is fixed and per-world invariants are tested |
-| [52](52_compile_time_vertex_classes_and_gluing_validation.md) | P2 | Compile-time vertex classes, cone angles, Gaussâ€“Bonnet, endpoint-matching validation |
+| [52](52_compile_time_vertex_classes_and_gluing_validation.md) | P2 | Compile-time vertex classes, cone angles, Gauss–Bonnet, endpoint-matching validation |
 | [53](_closed/53_torus_deformation_commit_transport_defects.md) | P1 | Deformation commit can trap the player in an exclusion zone; headings transported by the wrong vector |
-| [54](../.agents/jobs/35_torus_family_as_teichmuller_space.md) | P3 | Torus family as TeichmÃ¼ller space; lattice reduction; GL(2,â„) family for translation surfaces |
+| [54](../.agents/jobs/35_torus_family_as_teichmuller_space.md) | P3 | Torus family as Teichmüller space; lattice reduction; GL(2,ℝ) family for translation surfaces |
 | [55](55_live_deformation_rebuild_cost_and_se2_transforms.md) | P2 | ~100 ms rebuild per deformation step; worker pipeline; `Iso2` planar transform type |
 
 ### Portal visibility and rendering through portals (56-60)
@@ -62,8 +72,8 @@ to `src/cell-complex/validateCellComplexSpec.ts`.
 | --- | --- | --- |
 | [66](_closed/66_curve_shortening_stalls_at_high_frame_rate.md) | P1 | Curve shortening stalls above ~200 fps; near-fuse livelock |
 | [67](_closed/67_exact_curve_shortening_via_sleeve_funnel.md) | P1 | Exact taut-string solution via the sleeve/funnel algorithm replaces gradient descent |
-| [68](_closed/68_loop_endpoint_crossing_must_conjugate_portal_word.md) | P1 | Moving a loop's shared anchor across portal p must map w â†¦ pâ»Â¹wp (currently changes homotopy class) |
-| [69](_closed/69_geodesic_tracing_kernel_numerics.md) | P2 | Nudge drift kÂ·10â»â´ m, disk test from inside, missed self-intersections |
+| [68](_closed/68_loop_endpoint_crossing_must_conjugate_portal_word.md) | P1 | Moving a loop's shared anchor across portal p must map w ↦ p⁻¹wp (currently changes homotopy class) |
+| [69](_closed/69_geodesic_tracing_kernel_numerics.md) | P2 | Nudge drift k·10⁻⁴ m, disk test from inside, missed self-intersections |
 | [70](70_geodesic_module_performance_and_split.md) | P2 | Rebuild cost (registry copies, repeated all-pairs intersections); the module split moved to 76 |
 
 ### Frame loop, aiming, objects (71-75)
@@ -78,18 +88,18 @@ to `src/cell-complex/validateCellComplexSpec.ts`.
 ### Architecture, tooling, tests (76-80)
 | # | Pri | Title |
 | --- | --- | --- |
-| [76](../.agents/jobs/25_split_geodesic_cannon_modules.md) | P1 | Concrete seams for `geodesicCannon.ts` (5,942 lines) and `geodesicCannonTools.ts` |
+| [76](../.agents/jobs/_done/25_split_geodesic_cannon_modules.md) | P1 | Concrete seams for `geodesicCannon.ts` (5,942 lines) and `geodesicCannonTools.ts` |
 | [77](../.agents/jobs/_done/31_app_shell_state_holder.md) | P2 | One state holder and one command path for `createThreeApp` |
 | [78](_closed/78_enforce_layer_dag_and_move_domain_logic_out_of_render.md) | P2 | Make the layer rule a real DAG; 5 import cycles; move domain logic out of `render/three` |
-| [79](../.agents/jobs/11_property_tests_for_geometry_core.md) | P2 | Property-based invariants (fast-check) for the geometry core |
+| [79](../.agents/jobs/_done/11_property_tests_for_geometry_core.md) | P2 | Property-based invariants (fast-check) for the geometry core |
 | [80](../.agents/jobs/34_type_strictness_lint_bundle.md) | P2/P3 | `noUncheckedIndexedAccess` (353 errors), lint, bundle chunking (1.44 MB single chunk) |
 
 ## Cross-cutting themes
 
 1. **One developed-segment walk kernel.** The same primitive appears under four names: walking a segment through
-   convex cells in the developed frame of its start, crossing portal edges by exact segmentâ€“edge tests, and returning
+   convex cells in the developed frame of its start, crossing portal edges by exact segment–edge tests, and returning
    the cells and portals crossed. The four uses are geodesic tracing (69), body motion (62), aim picking (72) and eye
-   re-rooting and ghosts (73). Each now has its own approximation: the 10â»â´ m nudge, the anchor-side guess, the camera
+   re-rooting and ghosts (73). Each now has its own approximation: the 10⁻⁴ m nudge, the anchor-side guess, the camera
    clip polygon, and first-side-in-array-order. Build the kernel once, in `src/math` or `src/cell-complex`, on the
    `Iso2` type from 55, then migrate the four callers. The kernel must handle a segment that passes exactly through a
    vertex (see theme 3).
@@ -100,7 +110,7 @@ to `src/cell-complex/validateCellComplexSpec.ts`.
    together, sharing one oriented-portal representation. 60 (the lazy trie) then becomes the storage layer that 56
    memoizes into, and it removes the path-id inconsistencies of 41 and 71.
 
-3. **Vertex classes are first-class data (52).** Several fixes depend on knowing each vertex's cone angle Î¸_v:
+3. **Vertex classes are first-class data (52).** Several fixes depend on knowing each vertex's cone angle θ_v:
    - Dropping exclusion cylinders at flat vertices removes the trap in 53. Every torus corner is flat.
    - 63 needs to know when a body's disk contains a cone point.
    - The funnel in 67 wraps disks only at singular vertices.
@@ -113,7 +123,7 @@ to `src/cell-complex/validateCellComplexSpec.ts`.
    - curve shortening (67: taut string in the sleeve; closed form for free loops by holonomy type);
    - wall response (61: project the center onto the cell inset by r, which is convex);
    - the static cull (56);
-   - the torus moduli (54: reduced basis, TeichmÃ¼ller step).
+   - the torus moduli (54: reduced basis, Teichmüller step).
 
    The current heuristics fail at the edges of their domains. Examples: 66 at high frame rates, 61 at corners, 67
    near cone points, 41's cull-soundness gap.
@@ -127,7 +137,7 @@ to `src/cell-complex/validateCellComplexSpec.ts`.
 
    Put these operations in the `portalWord` module proposed in 70 and 76, and property-test them (79).
 
-6. **Content needs invariant tests (51, 79).** Every bundled world should assert its expected (V, E, F, Ï‡, cone
+6. **Content needs invariant tests (51, 79).** Every bundled world should assert its expected (V, E, F, χ, cone
    angles). The static-cull benchmark currently profiles the genus-6 surface by mistake.
 
 7. **Frame-loop hygiene (71, 74, 75, 77).** Contain errors per frame. Compute every derived quantity once per frame
@@ -145,4 +155,4 @@ and 32.
 
 - Each of issues 51-80 is closed, converted into a job, merged into another issue with a link, or explicitly deferred
   with a reason.
-- `MATHEMATICAL_MODEL.md` Â§11 is updated as each listed gap is closed.
+- `MATHEMATICAL_MODEL.md` §11 is updated as each listed gap is closed.

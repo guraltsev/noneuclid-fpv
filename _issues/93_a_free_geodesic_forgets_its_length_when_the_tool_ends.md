@@ -1,10 +1,15 @@
 # 93 - A free geodesic forgets its length when the aim or rotate tool ends
 
-Status: open.
+Status: open; done in code by job 64 (done, needs review). Closes after the desktop check. Re-verified 2026-11-11.
 
 Priority: P2 (correctness). Rule set by the maintainer on 2026-11-05.
 
-Jobs: [64](../.agents/jobs/64_emitter_edits_and_length.md).
+Jobs: [64](../.agents/jobs/_done/64_emitter_edits_and_length.md).
+
+## Status update 2026-11-11
+
+Every arc now stores its intended length as real state (job 64). Left: end the rotate tool at a corner, restart it, clear the
+corner, and see the full length return; the same at a wall.
 
 ## The rule
 

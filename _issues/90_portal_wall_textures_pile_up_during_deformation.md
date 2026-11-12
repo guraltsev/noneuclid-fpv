@@ -1,11 +1,18 @@
 # 90 - Portal wall textures pile up in the texture cache during deformation
 
-Status: open. Read from the code; not measured.
+Status: open; confirmed from the code on 2026-11-11, not measured. Job 30 (rewritten 2026-11-11) fixes it.
 
 Priority: P3 (a slow leak of GPU memory during long deformation sessions). Split from issue
 [82](82_deformation_commit_rebuilds_whole_scene_and_reuploads_floor_texture.md), whose floor half job 10 fixed.
 
 Jobs: [30](../.agents/jobs/30_deformation_rebuild_pipeline.md).
+
+## Status update 2026-11-11
+
+Confirmed: the repeat is `max(1, edgeLength / 8)` by `max(1, height / 8)` (`buildPortalMesh.ts`), and both the key and the
+`userData` of `getConfiguredTexture` contain it; nothing evicts entries, and `disposeObject3D` does not dispose maps. The wall map is a
+generated 64 by 64 `DataTexture` (`portalWallTexture.ts`), not a KTX2, so each leaked clone is small. Job 30 decision 5 moves walls
+to world-space UVs with a fixed repeat.
 
 ## Problem
 

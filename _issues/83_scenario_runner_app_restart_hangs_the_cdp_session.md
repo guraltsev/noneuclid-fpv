@@ -1,6 +1,8 @@
 # 83 - The release-tier scenario runner hangs when a page restarts the running app
 
-Status: open. A real, previously-unprotected transport bug was found and fixed (2026-10-31), measurably improving
+Status: open; unchanged since 2026-10-31. Re-verified 2026-11-11.
+
+Status before 2026-11-11: open. A real, previously-unprotected transport bug was found and fixed (2026-10-31), measurably improving
 the pass rate from 0% to roughly 60-70% across `tests/app/appCommands.release.test.ts`'s restart tests; the
 remaining failures are now clean and bounded instead of opaque hangs, but the underlying cause (the browser
 appears to genuinely pause for several seconds during a full app restart under software rendering, not just a
@@ -11,6 +13,10 @@ park that removes it from view; see `## Status update 2026-10-31`.
 Priority: P3 (test infrastructure; nothing in `src/` is implicated so far).
 
 Jobs: none yet.
+
+## Status update 2026-11-11
+
+No change. P3; no job.
 
 ## Status update 2026-10-31 (reliability fixes)
 
