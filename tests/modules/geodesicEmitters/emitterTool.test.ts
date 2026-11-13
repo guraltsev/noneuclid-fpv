@@ -128,7 +128,7 @@ describe("the emitter tool", () => {
     click(floorAt(3.05, 2.5));
     settle();
 
-    expect(log.messages).toEqual(["An emitter cannot stand there."]);
+    expect(log.messages).toEqual(["A laser cannot stand there."]);
     expect(log.ended).toBe(1);
     expect(registry.getObjectsOfKind("geodesicEmitters/emitter")).toHaveLength(1);
   });
@@ -171,7 +171,7 @@ describe("the emitter's page", () => {
     requestNewGeodesic(context, "gone");
     settle();
 
-    expect(log.messages).toEqual(["That is not an emitter."]);
+    expect(log.messages).toEqual(["That is not a laser."]);
     expect(log.ended).toBe(0);
     expect(log.pages).toEqual(["gone"]);
   });

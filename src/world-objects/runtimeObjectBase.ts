@@ -11,7 +11,7 @@ import type { TutorialPageSpec } from "../cell-complex/specs";
  * Used by aim/interaction code to show a prompt and dispatch the action named by `action`.
  */
 export interface RuntimeObjectInteraction {
-  /** Prompt text shown to the player (for example "Edit sign"). */
+  /** Prompt text shown to the player (for example "Rename sign"). */
   readonly label: string;
   readonly action: "edit-flag" | "select-geodesic-cannon" | "open-geometry-computer" | "open-tutorial";
   /** Maximum aimer-to-object distance, in meters, within which the interaction is offered; callers fall back to a default (2.5 m in rootAimRay) when absent. */

@@ -1,4 +1,4 @@
-﻿# Jobs
+# Jobs
 
 A **job** is a work order: carry out this change, in this scope, and verify it like this. An **issue**
 (`_issues/`) describes something that is wrong: the defect, the evidence and the impact. Small fixes and mitigation
@@ -172,7 +172,7 @@ can run as written. Job 68 (split from job 30) waits for the maintainer.
 | [68](68_deformation_commit_in_the_step.md) | Commit a deformation inside the engine step (phase 7) | blocked on the maintainer (013 API rows) | - |  |
 | [69](_done/69_vr_palette_scale_at_new_distance.md) | Scale the VR palette to its new distance and remove the unused auto-close check | done, needs review (branch `dev`) | - |  |
 | [00](00_coordinate_jobs_70_82.md) | Coordinate jobs 70-82 (design 017: discoverable UI and sandbox level design): order, gates, batch report | queued (branch `dev`) | - |  |
-| [70](70_student_vocabulary.md) | One student vocabulary: the vocabulary module, the renames and the retired-terms check | queued | - |  |
+| [70](_done/70_student_vocabulary.md) | One student vocabulary: the vocabulary module, the renames and the retired-terms check | done, needs review | - |  |
 | [71](71_toast_queue.md) | Toasts: a renderer-neutral message queue shown on desktop and in VR | queued | - |  |
 | [72](72_tools_stay_in_hand.md) | Tools stay in hand until put away | queued | - |  |
 | [73](73_guarded_start_over_and_undo.md) | Guarded "Start over", undo, and no reset on the VR stick press | queued | - |  |

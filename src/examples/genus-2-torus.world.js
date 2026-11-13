@@ -30,7 +30,7 @@ startingQuestionCube("genus-2-octagon", {
   turn: -18,
   goalPages: [{
     title: "Goal",
-    body: "Explore the regular octagon model of a genus-2 torus. Each paired portal wraps one side of the two-handled surface.",
+    body: "Explore the regular octagon model of a genus-2 torus. Each pair of glued edges wraps one side of the two-handled surface.",
   }],
 });
 

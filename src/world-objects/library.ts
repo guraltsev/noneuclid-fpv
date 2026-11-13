@@ -126,7 +126,7 @@ const staticLibraryDefinitions = {
     assetPath: "Bench/Bench.glb",
     mapIconPath: "Bench/map-icon.svg",
     class: "bench",
-    displayHelpMessage: "A static bench. It is a landmark and collision object in this cell.",
+    displayHelpMessage: "A static bench. It is a landmark and collision object in this face.",
     visualScale: 0.9,
     modelOffset: (scale) => [0, scale * 0.9 * 0.45, 0],
     collision: (scale) => ({
@@ -139,7 +139,7 @@ const staticLibraryDefinitions = {
     assetPath: "bicycle/Bicycle.glb",
     mapIconPath: "bicycle/map-icon.svg",
     class: "bike",
-    displayHelpMessage: "A static bicycle. It is a landmark and collision object in this cell.",
+    displayHelpMessage: "A static bicycle. It is a landmark and collision object in this face.",
     visualScale: 0.9,
     collision: (scale) => ({
       radius: scale * 0.85,
@@ -170,7 +170,7 @@ const staticLibraryDefinitions = {
     assetPath: "stopsign/stop_sign.glb",
     mapIconPath: "stopsign/map-icon.svg",
     class: "sign",
-    displayHelpMessage: "A static sign. Use it as a landmark while exploring portal connections.",
+    displayHelpMessage: "A static sign. Use it as a landmark while exploring how the edges connect.",
     visualScale: 0.03,
     collision: (scale) => ({
       radius: scale * 0.32,
@@ -194,7 +194,7 @@ const staticLibraryDefinitions = {
     assetPath: "questionblock/questionBlock.glb",
     mapIconPath: "questionblock/map-icon.svg",
     class: "question-cube",
-    displayHelpMessage: "A help cube. Aim at it to see a short tutorial prompt.",
+    displayHelpMessage: "A help cube. Aim at it to see how things work.",
     visualScale: questionCubeAssetScale,
     modelOffset: (scale) => [0, scale * questionCubeAssetScale * 0.13, 0],
     collision: (scale) => ({
@@ -224,7 +224,7 @@ const staticLibraryDefinitions = {
     assetPath: "_legacy/low_poly_rocks/scene.gltf",
     mapIconPath: "_legacy/low_poly_rocks/map-icon.svg",
     class: "rocks",
-    displayHelpMessage: "Static rocks. They are landmarks and collision objects in this cell.",
+    displayHelpMessage: "Static rocks. They are landmarks and collision objects in this face.",
     collision: (scale) => ({
       radius: scale * 0.45,
       height: scale * 0.35,
@@ -246,7 +246,7 @@ const staticLibraryDefinitions = {
     assetPath: "computerlarge/ComputerLarge.glb",
     mapIconPath: "computerlarge/map-icon.svg",
     class: "geometry-computer",
-    displayHelpMessage: "Use this computer to change world deformation when the current world supports live geometry changes.",
+    displayHelpMessage: "The shape machine changes the shape of this world, when this world can change shape.",
     visualScale: 0.9,
     modelOffset: (scale) => [0, 0, scale * 0.05],
     collision: (scale) => ({

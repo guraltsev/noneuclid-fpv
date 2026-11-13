@@ -77,9 +77,9 @@ function refuse(code: string, message: string): CommandResult {
 }
 
 const tieRefusals: Record<TieAtNewVertexRefusal, { readonly code: string; readonly message: string }> = {
-  sameEndpoint: { code: geodesicModelRefusals.sameEndpoint, message: "Pick two different geodesic ends." },
-  notAnEmitter: { code: geodesicModelRefusals.notAnEmitter, message: "That is not an emitter." },
-  notAttached: { code: geodesicModelRefusals.notAttached, message: "Both ends must be attached to the emitter." },
+  sameEndpoint: { code: geodesicModelRefusals.sameEndpoint, message: "Pick two different beam ends." },
+  notAnEmitter: { code: geodesicModelRefusals.notAnEmitter, message: "That is not a laser." },
+  notAttached: { code: geodesicModelRefusals.notAttached, message: "Both ends must be attached to the laser." },
   notConnected: { code: geodesicModelRefusals.notConnected, message: "Both geodesics must connect emitters." },
   rebuildFailed: { code: geodesicModelRefusals.rebuildFailed, message: "The tied geodesics could not be rebuilt." },
 };
@@ -117,7 +117,7 @@ function highlightEndpoint(command: GeodesicHighlightEndpointCommand, ctx: Comma
 function removeVertexCommand(command: GeodesicRemoveVertexCommand, ctx: CommandContext): CommandResult {
   const preview = previewVertexRemoval(ctx.world, ctx.objects, { vertexId: command.vertexId, arcs: command.arcs });
   if (preview.kind === "blocked") {
-    return refuse(geodesicModelRefusals.vertexBlocked, `The vertex cannot be removed (${preview.reason}).`);
+    return refuse(geodesicModelRefusals.vertexBlocked, `The corner cannot be removed (${preview.reason}).`);
   }
   return { ok: true, value: { arcIds: removeVertex(ctx.objects, command.vertexId, preview) } };
 }
@@ -132,7 +132,7 @@ function removeCurve(command: GeodesicRemoveCurveCommand, ctx: CommandContext): 
 
 function shootArc(command: GeodesicShootArcCommand, ctx: CommandContext): CommandResult {
   const emitter = ctx.objects.get(command.emitterId);
-  if (emitter?.kind !== "geodesicEmitters/emitter") return refuse(geodesicModelRefusals.notAnEmitter, "That is not an emitter.");
+  if (emitter?.kind !== "geodesicEmitters/emitter") return refuse(geodesicModelRefusals.notAnEmitter, "That is not a laser.");
   const arcId = ctx.ids.next("arc");
   shootGeodesic({ world: ctx.world, registry: ctx.objects, cannon: emitter, geodesicId: arcId, maxLengthMeters: command.lengthMeters });
   return { ok: true, value: { arcId } };
@@ -141,7 +141,7 @@ function shootArc(command: GeodesicShootArcCommand, ctx: CommandContext): Comman
 function extendArc(command: GeodesicExtendArcCommand, ctx: CommandContext): CommandResult {
   // `extendGeodesic` writes only once it knows the geodesic can go on.
   const extended = extendGeodesic({ world: ctx.world, registry: ctx.objects, geodesicId: command.arcId, maxLengthMeters: command.lengthMeters });
-  return extended === undefined ? refuse(geodesicModelRefusals.arcBlocked, "That geodesic cannot go any further.") : { ok: true };
+  return extended === undefined ? refuse(geodesicModelRefusals.arcBlocked, "That beam cannot go any further.") : { ok: true };
 }
 
 function cutAtSegment(command: GeodesicCutAtSegmentCommand, ctx: CommandContext): CommandResult {
@@ -149,7 +149,7 @@ function cutAtSegment(command: GeodesicCutAtSegmentCommand, ctx: CommandContext)
   const segment = ctx.objects.get(command.segmentId);
   const placed = ctx.objects.get(command.emitterId);
   if (interval?.kind !== "geodesicModel/arc" || segment?.kind !== "geodesicModel/segment" || placed?.kind !== "geodesicEmitters/emitter") {
-    return refuse(geodesicModelRefusals.unknownArc, "That geodesic cannot be cut there.");
+    return refuse(geodesicModelRefusals.unknownArc, "That beam cannot be cut there.");
   }
   splitGeodesicIntervalAtSegmentHit({
     world: ctx.world,
@@ -165,7 +165,7 @@ function cutAtSegment(command: GeodesicCutAtSegmentCommand, ctx: CommandContext)
 
 function cutAtVertex(command: GeodesicCutAtVertexCommand, ctx: CommandContext): CommandResult {
   const emitter = ctx.objects.get(command.emitterId);
-  if (emitter?.kind !== "geodesicEmitters/emitter") return refuse(geodesicModelRefusals.notAnEmitter, "That is not an emitter.");
+  if (emitter?.kind !== "geodesicEmitters/emitter") return refuse(geodesicModelRefusals.notAnEmitter, "That is not a laser.");
   const yawRadians = cutGeodesicsAtVertex({
     world: ctx.world,
     registry: ctx.objects,
@@ -179,7 +179,7 @@ function cutAtVertex(command: GeodesicCutAtVertexCommand, ctx: CommandContext): 
 
 function cutAtEmitter(command: GeodesicCutAtEmitterCommand, ctx: CommandContext): CommandResult {
   const emitter = ctx.objects.get(command.emitterId);
-  if (emitter?.kind !== "geodesicEmitters/emitter") return refuse(geodesicModelRefusals.notAnEmitter, "That is not an emitter.");
+  if (emitter?.kind !== "geodesicEmitters/emitter") return refuse(geodesicModelRefusals.notAnEmitter, "That is not a laser.");
   const arcIds = cutArcsPassingEmitter({ world: ctx.world, registry: ctx.objects, emitter, createArcId: () => ctx.ids.next("arc") });
   return { ok: true, value: { arcIds: [...arcIds] } };
 }

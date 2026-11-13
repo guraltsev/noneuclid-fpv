@@ -382,6 +382,14 @@ describe("geodesicEmitters/beginEdit", () => {
     refusedWith(run({ kind: "geodesicEmitters/beginEdit", emitterId } as EngineCommandBase), "geodesicEmitters/alreadyEdited");
   });
 
+  it("names each placed laser with the next free short id, L1, L2, ...", () => {
+    const { registry, value, emitterId } = setup();
+    const other = value({ kind: "geodesicEmitters/place", cellId: "a", point: { x: 3, y: 4, z: 0 }, yawRadians: 0 } as EngineCommandBase);
+
+    expect(registry.get(emitterId)?.tooltip?.label).toBe("Laser L1");
+    expect(registry.get(other.emitterId)?.tooltip?.label).toBe("Laser L2");
+  });
+
   it("refuses a second emitter while one is edited", () => {
     const { run, value, emitterId } = setup();
     const other = value({ kind: "geodesicEmitters/place", cellId: "a", point: { x: 3, y: 4, z: 0 }, yawRadians: 0 } as EngineCommandBase);

@@ -1069,7 +1069,7 @@ Help-hub copy shared by the authoring layer (world tutorial text) and the ui lay
 
 | Kind | Name | Summary |
 | --- | --- | --- |
-| const | `helpHubHomeGuidance` | Help-hub hint telling a stuck player to use the tool menu's Home button to return to the starting place. |
+| const | `helpHubHomeGuidance` | Help-hub hint telling a stuck player how to return to the starting place: the desktop sentence, which serves VR until the VR variant exists. |
 
 ### `world-objects/interactionRange.ts`
 
@@ -1099,7 +1099,7 @@ Measured-length tool: persistent "geodesic length = N m" labels attached to a ge
 
 | Kind | Name | Summary |
 | --- | --- | --- |
-| function | `geodesicDisplayName` | The name a person reads for a geodesic: "G" and its display number. |
+| function | `geodesicDisplayName` | The name a person reads for a beam: "Beam" and its display number. |
 | function | `createMeasuredGeodesicLengthObject` | Creates a length label for a geodesic, anchored on the segment of that geodesic in the player's cell that is closest to the player. |
 | function | `refreshMeasuredGeodesicLengthObject` | Recomputes a length label against the current registry and player position. |
 | function | `formatMeasuredGeodesicLengthLabel` | Formats the label text "<name> length = <value> m". |
@@ -1126,7 +1126,7 @@ Placed flags (signs): player-placed wooden signs carrying a short text label.
 | interface | `PlaceFlagAtFloorPointRequest` | Request to place a flag at a known floor point. |
 | interface | `PlaceFlagResult` | Outcome of a placement attempt: on success `placed` is true and `object` is the new (already registered) flag. |
 | function | `sanitizePlacedFlagMessage` | Normalizes a sign message: CRLF/CR become LF, runs of non-newline whitespace become a single space, and the result is truncated to `placedFlagMaxMessageLength` code points. |
-| function | `defaultPlacedFlagMessage` | Chooses the next default sign text for a flag type: the type's prefix ("A" or "B") followed by one more than the largest existing number among `existingObjects` whose message is exactly prefix+digits. |
+| function | `defaultPlacedFlagMessage` | Chooses the next default sign text (the same for both sign types, so `_flagType` is unused): the sign prefix ("S") followed by one more than the largest existing number among `existingObjects` whose message is exactly p… |
 | function | `createPlacedFlagObject` | Creates a flag record with default collision, tooltip and edit interaction. |
 | function | `updatePlacedFlagMessage` | Returns a copy of the flag with a sanitized message. |
 | function | `placedFlagToDynamicObjectState` | Returns the flag's cell id, pose and collision as a DynamicObjectState for collision queries. |
@@ -1246,6 +1246,28 @@ Read tracking for pure refresh functions (design 014 D1, D9): the exact set of r
 | interface | `ReadRecorder` | A recording reader and the read set of its last `run`. |
 | function | `createReadRecorder` | Wraps `registry` (or a guarded copy of it) in a recording reader. |
 | class | `ReadDigest` | The writes of a ring range, digested once per tick run so that each record's read set is tested against it in time proportional to the read set. |
+
+### `world-objects/vocabulary.ts`
+
+The student vocabulary (design 017 section 6): every student-visible noun, verb and subtitle of the app, in one place.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `ToolName` | A tool's name on the belt and its one-line subtitle, which gives the mathematical word once. |
+| const | `toolNames` | The names of the tools, by tool id (design 017 section 6.2). |
+| interface | `ObjectNoun` | A noun in the singular and the plural. |
+| const | `objectNouns` | The things in the world, as the student names them (design 017 section 6.2), each with a short first-mention sentence where the design gives one. |
+| const | `objectSubtitles` | The sentences that explain a noun when it first appears. |
+| const | `objectActions` | The object actions (design 017 section 6.3). |
+| const | `verbNames` | The input verbs (design 017 section 7): one meaning each, bound on desktop and in VR. |
+| const | `surfaceNames` | The parts of the interface (design 017 section 6.4). |
+| const | `shortIdLetters` | The first letter of a short id: the first letter of the noun (design 017 section 6.1 rule 6). |
+| function | `laserShortId` | The name of laser number `number`: "L1". |
+| function | `signShortId` | The name of sign number `number`: "S1". |
+| function | `beamName` | What a beam is called in a menu and on a label: "Beam 1". |
+| function | `laserLabel` | The tooltip of a laser: "Laser" with its short id when it has one, "Laser L1". |
+| const | `lostGuidance` | The sentence for a student who is lost. |
+| const | `retiredTerms` | The words that no student-visible string may use (the "Retire" columns of design 017 tables 6.2 and 6.3). |
 
 ### `world-objects/worldObjectOwner.ts`
 
@@ -2273,6 +2295,12 @@ Resolves the tooltip text for palette items from their string item ids.
 | Kind | Name | Summary |
 | --- | --- | --- |
 | function | `resolvePaletteTooltipLabel` | Returns the tooltip for a palette item id (prefix families like tool:, tutorial:, sign-key: are decoded, others looked up in a fixed table), or undefined for an undefined or unknown id. |
+
+### `ui/vocabulary.ts`
+
+The student vocabulary under the name design 017 section 6.5 gives it.
+
+_No exports._
 
 ### `ui/worldInteractionDefinition.ts`
 

@@ -51,8 +51,8 @@ describe("createPaletteDefinition", () => {
     const definition = createTestPaletteDefinition(createRuntimeMenuState({ selectedWorldId: "cube" }), defaultAppConfig, "desktop", 0, tools);
 
     expect((definition.content as MainPaletteContent).toolOptions).toEqual([
-      { id: "geodesicEmitters/emitter", label: "Geodesic emitter" },
-      { id: "geodesicMeasurements/length", label: "Length" },
+      { id: "geodesicEmitters/emitter", label: "Laser" },
+      { id: "geodesicMeasurements/length", label: "Ruler" },
       { id: "geodesicMeasurements/protractor", label: "Protractor" },
       { id: "worldMap/map", label: "Map" },
     ]);
@@ -96,7 +96,7 @@ describe("createPaletteDefinition", () => {
     const [connected, free] = content.geodesics;
 
     expect(connected.connected).toBe(true);
-    expect(connected.connectionSymbolLabel).toBe("Locked geodesic segment between emitters");
+    expect(connected.connectionSymbolLabel).toBe("Linked beam: a beam from one laser to another");
     expect(free.connected).toBe(false);
     expect(free.connectionSymbolLabel).toBeUndefined();
   });

@@ -2,6 +2,7 @@
  * Derived geodesic segments: lookup by geodesic, building segments from traces with the start/end half split, lengths, tangents at anchors and display numbers.
  */
 import { yawRigidTransform3 } from "../../math/rigidTransform3";
+import { beamName, objectSubtitles } from "../vocabulary";
 import { addVec3, scaleVec3, type Vec3 } from "../../math/vec3";
 import type { RuntimeObjectReader, RuntimeObjectRegistry, RuntimeWorldObject } from "../runtimeObjectRegistry";
 import {
@@ -338,7 +339,7 @@ export function createSegmentFromTrace(options: {
     cellId: options.trace.cellId,
     localPose: yawRigidTransform3(yaw, options.trace.start),
     portalRenderable: true,
-    displayHelpMessage: "A locally straight geodesic ray segment. Use the active tool to extend, measure, or select it.",
+    displayHelpMessage: `${objectSubtitles.beam}. Use the active tool to make it longer, measure it, or pick it.`,
     tooltip: createGeodesicSegmentTooltip(options.geodesicNumber),
     geodesicId: options.geodesicId,
     geodesicNumber: options.geodesicNumber,
@@ -354,7 +355,7 @@ export function createSegmentFromTrace(options: {
 
 /** Tooltip text of a derived segment. */
 export function createGeodesicSegmentTooltip(geodesicNumber: number | undefined): GeodesicSegmentObject["tooltip"] {
-  const label = geodesicNumber === undefined ? "Geodesic" : `Geodesic G${geodesicNumber}`;
+  const label = geodesicNumber === undefined ? "Beam" : beamName(geodesicNumber);
   return {
     label,
     rangeMeters: 6,

@@ -26,7 +26,7 @@ export function buildGeometryComputerActionsContent(
     borderColor,
     borderWidth: 2,
   });
-  panel.add(createSectionLabel("World deformation"));
+  panel.add(createSectionLabel("Shape machine"));
   panel.add(new Text({
     text: content.statusLabel,
     fontSize: 18,

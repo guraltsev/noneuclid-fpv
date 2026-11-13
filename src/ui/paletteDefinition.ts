@@ -16,6 +16,7 @@ import { getInputHintGlyph, type InputHintGlyph } from "./inputIntents";
 import { publicAssetUrl } from "../glue/assetUrls";
 import { worldCatalog } from "../authoring/worldCatalog";
 import { helpHubHomeGuidance } from "../world-objects/helpHubCopy";
+import { beamName, objectActions, surfaceNames } from "../world-objects/vocabulary";
 import { portalPanelModeDefinitions } from "../glue/portalPanelMode";
 import type { RuntimeMenuConsoleLogLevelId, RuntimeMenuPageId, RuntimeMenuState } from "../runtime/runtimeMenuState";
 import type { ToolsById } from "../runtime/toolRegistry";
@@ -395,8 +396,8 @@ export function createPaletteDefinition(
       content: {
         kind: "geodesic-cannon-actions",
         cannonId: state.geodesicCannonOptions.cannonId,
-        addAction: { label: "Add geodesic", disabled: false },
-        carryAction: { label: "Carry", disabled: false },
+        addAction: { label: objectActions.addBeam, disabled: false },
+        carryAction: { label: objectActions.pickUp, disabled: false },
         objectActions: state.geodesicCannonOptions.objectActions ?? [],
         geodesics: createGeodesicCannonEntries(
           state.geodesicCannonOptions.geodesicIds,
@@ -450,12 +451,12 @@ export function createPaletteDefinition(
         options: [
           {
             id: "tutorial",
-            label: "Tutorial",
+            label: surfaceNames.howTo,
             disabled: state.questionHelpOptions.tutorialPages.length === 0,
           },
           {
             id: "goal",
-            label: "Goal",
+            label: surfaceNames.thingsToTry,
             disabled: state.questionHelpOptions.goalPages.length === 0,
           },
         ],
@@ -545,11 +546,11 @@ function createPagedHelpContent(
   const pageIndex = pageCount === 0
     ? 0
     : Math.max(0, Math.min(pageCount - 1, options.pageIndex));
-  const page = options.pages[pageIndex] ?? { title: kind === "goal" ? "Goal" : "Tutorial", body: "" };
+  const page = options.pages[pageIndex] ?? { title: kind === "goal" ? surfaceNames.thingsToTry : surfaceNames.howTo, body: "" };
   const showIndex = kind === "tutorial" && "view" in options && options.view === "index";
   const common = {
     objectId: options.objectId,
-    title: showIndex ? "Tutorial" : page.title,
+    title: showIndex ? surfaceNames.howTo : page.title,
     body: showIndex ? tutorialIndexBody : resolveTutorialBodyForInputMode(page, inputMode),
     imageSrc: !showIndex && page.imagePath ? publicAssetUrl(page.imagePath) : undefined,
     controls: showIndex
@@ -614,7 +615,7 @@ function createGeometryComputerActionsContent(
   const targetB = clampIntegerMeters(options.targetDepthMeters ?? currentB, 0.5 * widthMeters, 2 * widthMeters);
   const statusLabel = available
     ? `Current (${formatMeters(currentA)}, ${formatMeters(currentB)}) / target (${formatMeters(targetA)}, ${formatMeters(targetB)})`
-    : "World deformation is only available in the torus world.";
+    : "The shape machine only works in the torus world.";
   const halfWidthStep = Math.round(widthMeters / 2);
   const start = {
     widthMeters,
@@ -682,9 +683,9 @@ function createGeodesicCannonEntries(
   const connectedIds = new Set(connectedGeodesicIds ?? []);
   return geodesicIds.map((geodesicId, index) => ({
     id: geodesicId,
-    label: geodesicLabelsById?.[geodesicId] ?? `G${index + 1}`,
+    label: geodesicLabelsById?.[geodesicId] ?? beamName(index + 1),
     connected: connectedIds.has(geodesicId),
-    connectionSymbolLabel: connectedIds.has(geodesicId) ? "Locked geodesic segment between emitters" : undefined,
+    connectionSymbolLabel: connectedIds.has(geodesicId) ? "Linked beam: a beam from one laser to another" : undefined,
     deleteDisabled: false,
   }));
 }

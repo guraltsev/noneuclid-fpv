@@ -403,7 +403,7 @@ export function createRuntimeObjectRegistry(
 
 /**
  * Builds the registry record for an authored static asset placed in `cellId`.
- * The pose is a yaw (`turnRadians`, falling back to `yawRadians`, else 0) at the spec's cell-local position. Assets of class "geometry-computer" get a fixed 3 m tooltip and the "open-geometry-computer" interaction; "question-cube" assets with tutorial or goal pages get a "Help hub" tooltip and the "open-tutorial" interaction (range from `autoDisplayHelpRangeMeters`, default 2.5 m). The record is portal-renderable: the renderer draws the asset model from it once a render root is registered for the id.
+ * The pose is a yaw (`turnRadians`, falling back to `yawRadians`, else 0) at the spec's cell-local position. Assets of class "geometry-computer" get a fixed 3 m tooltip and the "open-geometry-computer" interaction; "question-cube" assets with tutorial or goal pages get a "Help cube" tooltip and the "open-tutorial" interaction (range from `autoDisplayHelpRangeMeters`, default 2.5 m). The record is portal-renderable: the renderer draws the asset model from it once a render root is registered for the id.
  */
 export function createRuntimeStaticAssetObject(
   objectSpec: AssetObjectSpec,
@@ -414,16 +414,16 @@ export function createRuntimeStaticAssetObject(
   const questionCubeHasHelpMenu = questionCube &&
     ((objectSpec.tutorialPages?.length ?? 0) > 0 || (objectSpec.goalPages?.length ?? 0) > 0);
   const questionCubeRangeMeters = objectSpec.autoDisplayHelpRangeMeters ?? 2.5;
-  // Tooltip precedence: geometry computers use their own fixed tooltip below; question cubes with pages say "Help hub"; otherwise any help message yields a class-labelled tooltip.
+  // Tooltip precedence: geometry computers use their own fixed tooltip below; help cubes with pages say "Help cube"; otherwise any help message yields a class-labelled tooltip.
   const helpTooltip = !geometryComputer
     ? questionCubeHasHelpMenu
       ? {
-          label: "Help hub",
+          label: "Help cube",
           rangeMeters: questionCubeRangeMeters,
         }
       : objectSpec.displayHelpMessage
       ? {
-        label: questionCube ? "Help hub" : objectSpec.class ?? objectSpec.id,
+        label: questionCube ? "Help cube" : objectSpec.class ?? objectSpec.id,
         rangeMeters: questionCube ? questionCubeRangeMeters : objectSpec.autoDisplayHelpRangeMeters ?? 2.5,
       }
       : undefined
@@ -444,26 +444,26 @@ export function createRuntimeStaticAssetObject(
     do_not_collide_with: objectSpec.do_not_collide_with,
     portalRenderable: true,
     displayHelpMessage: objectSpec.displayHelpMessage ?? (geometryComputer
-      ? "Use this computer to change world deformation when the current world supports live geometry changes."
+      ? "The shape machine changes the shape of this world, when this world can change shape."
       : undefined),
     autoDisplayHelpRangeMeters: objectSpec.autoDisplayHelpRangeMeters,
     tutorialPages: objectSpec.tutorialPages,
     goalPages: objectSpec.goalPages,
     tooltip: geometryComputer
       ? {
-          label: "Geometry computer",
+          label: "Shape machine",
           rangeMeters: 3,
         }
       : helpTooltip,
     interactable: questionCubeHasHelpMenu
       ? {
-          label: "Read",
+          label: "Help",
           action: "open-tutorial",
           rangeMeters: questionCubeRangeMeters,
         }
       : geometryComputer
       ? {
-          label: "World deformation",
+          label: "Shape machine",
           action: "open-geometry-computer",
           rangeMeters: 3,
         }

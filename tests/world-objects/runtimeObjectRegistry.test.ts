@@ -196,11 +196,11 @@ describe("runtimeObjectRegistry", () => {
     const registry = createRuntimeObjectRegistry([computer]);
 
     expect(computer.tooltip).toEqual({
-      label: "Geometry computer",
+      label: "Shape machine",
       rangeMeters: 3,
     });
     expect(computer.interactable).toEqual({
-      label: "World deformation",
+      label: "Shape machine",
       action: "open-geometry-computer",
       rangeMeters: 3,
     });
@@ -220,11 +220,11 @@ describe("runtimeObjectRegistry", () => {
     const registry = createRuntimeObjectRegistry([questionCube]);
 
     expect(questionCube.tooltip).toEqual({
-      label: "Help hub",
+      label: "Help cube",
       rangeMeters: 2.5,
     });
     expect(questionCube.interactable).toEqual({
-      label: "Read",
+      label: "Help",
       action: "open-tutorial",
       rangeMeters: 2.5,
     });

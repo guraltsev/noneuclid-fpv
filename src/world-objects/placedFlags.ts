@@ -12,6 +12,7 @@ import type { RuntimeObjectInteraction } from "./runtimeObjectBase";
 import { runtimeObjectToDynamicObjectState } from "./runtimeObjectBase";
 import type { RuntimeObjectRegistry } from "./runtimeObjectRegistry";
 import { type PlacedFlagObject, type PlacedFlagType } from "./toolObjects";
+import { shortIdLetters } from "./vocabulary";
 
 /**
  * Maps each sign type to its glTF asset path under the assets directory.
@@ -83,7 +84,7 @@ const defaultFlagCollision: SimpleCollisionCylinder = {
 };
 
 const defaultFlagInteraction: RuntimeObjectInteraction = {
-  label: "Edit sign",
+  label: "Rename sign",
   action: "edit-flag",
   rangeMeters: 2.5,
 };
@@ -98,14 +99,14 @@ export function sanitizePlacedFlagMessage(message: string): string {
 }
 
 /**
- * Chooses the next default sign text for a flag type: the type's prefix ("A" or "B") followed by one more than the largest existing number among `existingObjects` whose message is exactly prefix+digits.
+ * Chooses the next default sign text (the same for both sign types, so `_flagType` is unused): the sign prefix ("S") followed by one more than the largest existing number among `existingObjects` whose message is exactly prefix+digits.
  * Only the message text is inspected, so renamed signs do not reserve numbers.
  */
 export function defaultPlacedFlagMessage(
-  flagType: PlacedFlagType,
+  _flagType: PlacedFlagType,
   existingObjects: readonly PlacedFlagObject[] = [],
 ): string {
-  const prefix = flagType === "WoodenSign1" ? "A" : "B";
+  const prefix = shortIdLetters.sign;
   let maxNumber = 0;
 
   for (const object of existingObjects) {
@@ -130,7 +131,7 @@ export function createPlacedFlagObject(options: CreatePlacedFlagOptions): Placed
     localPose: options.localPose,
     collision: options.collision ?? defaultFlagCollision,
     portalRenderable: true,
-    displayHelpMessage: "A placed note. Open its menu to edit the text or delete it.",
+    displayHelpMessage: "A sign marks a place with a name. Open its menu to rename or delete it.",
     tooltip: {
       label: "Sign",
       rangeMeters: 2.5,

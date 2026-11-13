@@ -19,6 +19,7 @@ import { normalizeFloorMaterial, type WorldFloorMaterialSpec } from "../world-as
 import { worldObjectLibrary } from "../world-objects/library";
 import { degreesToRadians, type StaticObjectAuthoringParams } from "../world-objects/staticAssets";
 import { helpHubHomeGuidance } from "../world-objects/helpHubCopy";
+import { objectSubtitles, toolNames } from "../world-objects/vocabulary";
 
 const defaultHeightMeters = 15;
 const startingHouseLookOffsetDegrees = 12;
@@ -26,7 +27,7 @@ const startingHouseLookOffsetDegrees = 12;
  * Default help message shown on the starting question cube when the author supplies none.
  */
 export const defaultStartingQuestionCubeMessage =
-  "Open this cube to page through the tutorial.";
+  "Open this help cube to see how things work.";
 /**
  * Default tutorial pages of the starting question cube: one page per thing a player can do, each with a screenshot and its controls (shown with the icons of the current device).
  * The tutorial opens on an index of these titles. A page that names `requiresTools` is left out when the app config (as it applies to the world) enables none of them.
@@ -34,106 +35,106 @@ export const defaultStartingQuestionCubeMessage =
 export const defaultStartingQuestionCubeTutorialPages: readonly TutorialPageSpec[] = [
   {
     title: "Look and walk",
-    body: "Look around and walk. Walk off the edge of a flat piece and you carry on onto the piece glued to it. Look at nearby objects to see what you can do with them.",
-    desktopBody: "Click the view once so the mouse turns your head; Esc gives the mouse back. Turn also with Q and E. Walk off the edge of a flat piece and you carry on onto the piece glued to it.",
-    xrBody: "Turn your head, or push the stick sideways, to look around. Walk off the edge of a flat piece and you carry on onto the piece glued to it.",
+    body: "Look around and walk. Walk across an edge of a face and you carry on onto the face glued to it. Look at nearby things to see what you can do with them.",
+    desktopBody: "Click the view once so the mouse turns your head; Esc gives the mouse back. Turn also with Q and E. Walk across an edge of a face and you carry on onto the face glued to it.",
+    xrBody: "Turn your head, or push the stick sideways, to look around. Walk across an edge of a face and you carry on onto the face glued to it.",
     imagePath: "tutorial/walk.jpg",
     controls: [
       { intent: "look", label: "look around" },
       { intent: "move", label: "walk" },
-      { intent: "reset", label: "start over: removes everything you placed" },
+      { intent: "reset", label: "Start over: removes everything you placed" },
     ],
   },
   {
     title: "Get help",
-    body: `Aim at anything to see its name. Ask for help about it, or open its menu. ${helpHubHomeGuidance}`,
+    body: `Aim at anything to see its name. Ask What's this? about it, or open its menu. ${helpHubHomeGuidance}`,
     imagePath: "tutorial/help.jpg",
     controls: [
-      { intent: "help", label: "help about what you aim at" },
+      { intent: "help", label: "What's this? about what you aim at" },
       { intent: "context-menu", label: "menu of what you aim at" },
     ],
   },
   {
-    title: "The tool menu",
-    body: "Aim at empty floor and open the tool menu, then pick a tool. The buttons at the top are Settings (choose another world), Home (back to the start) and Reload (press twice).",
+    title: "The menu",
+    body: "Aim at empty floor and open the menu, then pick a tool. The buttons at the top are Settings (choose another world), Go home (back to the start) and Start over (press twice).",
     imagePath: "tutorial/tool-menu.jpg",
     controls: [
-      { intent: "context-menu", label: "open the tool menu" },
+      { intent: "context-menu", label: "open the menu" },
       { intent: "primary", label: "pick a tool or press a button" },
       { intent: "cancel", label: "close the menu" },
     ],
   },
   {
-    title: "Straight rays",
-    body: "Pick Geodesic emitter and select a spot on the floor: a post appears and fires a short, locally straight ray the way you face. Select the ray to make it 2 m longer. A ray stops if it runs into a corner: each corner of the surface is surrounded by a thin column.",
+    title: "Lasers and beams",
+    body: `Pick ${toolNames["geodesicEmitters/emitter"].name} and select a spot on the floor: a laser appears and fires a short beam the way you face. ${objectSubtitles.beam}. Select the beam to make it 2 m longer. A beam stops if it runs into a corner of the world: every corner has a small round keep-out area around it.`,
     imagePath: "tutorial/rays.jpg",
     requiresTools: ["geodesicEmitters/emitter"],
     controls: [
-      { intent: "primary", label: "place a post, or lengthen a ray" },
-      { intent: "context-menu", label: "on a post: its menu" },
+      { intent: "primary", label: "place a laser, or make a beam longer" },
+      { intent: "context-menu", label: "on a laser: its menu" },
     ],
   },
   {
-    title: "Aim a ray",
-    body: "Open a post's menu: it lists the post's rays. Press Aim next to a free ray; the ray now points wherever you look. Select to fix it. If it ends on another post, or close to one, it locks there. The + button adds a ray, the bin deletes one.",
+    title: "Aim a beam",
+    body: "Open a laser's menu: it lists the laser's beams. Press Aim next to a free beam; the beam now points wherever you look. Select to fix it. If it ends on another laser, or close to one, it links there. Add beam fires one more beam, and the bin deletes one.",
     imagePath: "tutorial/post-menu.jpg",
     requiresTools: ["geodesicEmitters/emitter"],
     controls: [
-      { intent: "context-menu", label: "open the post's menu" },
-      { intent: "primary", label: "press Aim; select again to fix the ray" },
+      { intent: "context-menu", label: "open the laser's menu" },
+      { intent: "primary", label: "press Aim; select again to fix the beam" },
     ],
   },
   {
-    title: "Locked rays",
-    body: "A ray with a post at both ends is locked: it turns amber and shows a lock in the post's menu. It cannot be aimed or made longer. A ray locks when it reaches another post, or when you put a new post on a free ray, which cuts the ray in two.",
+    title: "Linked beams",
+    body: "A beam with a laser at both ends is a linked beam: it turns amber and shows a link in the laser's menu. It cannot be aimed or made longer. A beam links when it reaches another laser, or when you put a new laser on a free beam, which cuts the beam in two.",
     imagePath: "tutorial/locked.jpg",
     requiresTools: ["geodesicEmitters/emitter"],
     controls: [
-      { intent: "primary", label: "with Geodesic emitter, select a free ray to cut it with a post" },
+      { intent: "primary", label: "with Laser, select a free beam to cut it with a laser" },
     ],
   },
   {
-    title: "Move a post",
-    body: "Aim at a post and pick it up. Its locked rays stay attached: they are redrawn as straight rays between the posts while you walk, going the same way around the world. Its free rays are removed. Putting a post down on a ray cuts that ray.",
+    title: "Move a laser",
+    body: "Aim at a laser and pick it up. Its linked beams stay attached: they are redrawn as straight beams between the lasers while you walk, going the same way around the world. Its free beams are removed. Putting a laser down on a beam cuts that beam.",
     imagePath: "tutorial/carry.jpg",
     requiresTools: ["geodesicEmitters/emitter"],
     controls: [
-      { intent: "carry", label: "pick up or put down a post" },
+      { intent: "carry", label: "pick up or put down a laser" },
       { intent: "primary", label: "put it down" },
     ],
   },
   {
-    title: "Unite and shorten",
-    body: "The orange button in a post's menu unites two of the post's locked geodesic segments into one curve and detaches it from the post. Select the two segments near the post. The curve-shortening flow then moves the corner where they meet so that the curve gets shorter, until it is a geodesic between the other two posts, or a closed geodesic.",
+    title: "Join two beams",
+    body: `Join, in a laser's menu, turns two of the laser's linked beams into one string and lets it go from the laser. Select the two beams near the laser. ${objectSubtitles.string}: it moves the corner where the beams meet so that the string gets shorter, until it is a beam between the other two lasers, or a closed beam.`,
     imagePath: "tutorial/tie.jpg",
     requiresTools: ["geodesicEmitters/emitter"],
     controls: [
-      { intent: "context-menu", label: "open the post's menu" },
-      { intent: "primary", label: "press the orange button, then select the two segments" },
+      { intent: "context-menu", label: "open the laser's menu" },
+      { intent: "primary", label: "press Join, then select the two beams" },
     ],
   },
   {
     title: "Measure",
-    body: "Length: pick it and select a ray to see how long it is, all the way along. Protractor: select a post or a crossing, then two rays leaving it; the angle goes counter-clockwise from the first to the second. With no tool, select a measurement to remove it.",
+    body: "Ruler: pick it and select a beam to see how long it is, all the way along. Protractor: select a laser or a meeting point, then two beams leaving it; the angle goes counter-clockwise from the first to the second. With the Hand, select a measurement to delete it.",
     imagePath: "tutorial/measure.jpg",
     requiresTools: ["geodesicMeasurements/length", "geodesicMeasurements/protractor"],
     controls: [
-      { intent: "primary", label: "select a ray, a post, a crossing or a side" },
+      { intent: "primary", label: "select a beam, a laser, a meeting point or a beam of a laser" },
     ],
   },
   {
     title: "Signs",
-    body: "Pick Sign and select a spot on the floor. Signs are numbered A1, A2, and so on, so you can tell places apart. Open a sign's menu to type your own text on its keyboard, or delete it. The ... button on the Sign tool picks the style.",
+    body: "Pick Sign and select a spot on the floor. Signs are numbered S1, S2, and so on, so you can tell places apart. Open a sign's menu to type your own text on its keyboard, or delete it. The ... button on the Sign tool picks the style.",
     imagePath: "tutorial/signs.jpg",
     requiresTools: ["placedFlags/flag"],
     controls: [
       { intent: "primary", label: "put up a sign" },
-      { intent: "context-menu", label: "on a sign: edit or delete it" },
+      { intent: "context-menu", label: "on a sign: rename or delete it" },
     ],
   },
   {
-    title: "World map",
-    body: "Pick Map to see the whole world as a small solid in front of you, with you and the objects on it. Compare it with what you see around you.",
+    title: "Map",
+    body: `Pick Map to see the whole world, small enough to hold, as a small solid in front of you, with you and the objects on it. Compare it with what you see around you.`,
     imagePath: "tutorial/map.jpg",
     requiresTools: ["worldMap/map"],
     controls: [
@@ -146,10 +147,10 @@ export const defaultStartingQuestionCubeTutorialPages: readonly TutorialPageSpec
  */
 export const defaultStartingQuestionCubeGoalPages: readonly TutorialPageSpec[] = [
   {
-    title: "Goal",
-    body: "Explore this world and use its portals to learn how the faces connect.",
-    desktopBody: "Explore this world. Use Right click or F on objects for menus, and try to predict where each portal leads.",
-    xrBody: "Explore this world. Use the side trigger on objects for menus, and try to predict where each portal leads.",
+    title: "Things to try",
+    body: "Explore this world and cross its edges to learn how the faces connect.",
+    desktopBody: "Explore this world. Use Right click or F on objects for menus, and try to predict where each edge leads.",
+    xrBody: "Explore this world. Use the side trigger on objects for menus, and try to predict where each edge leads.",
   },
 ];
 

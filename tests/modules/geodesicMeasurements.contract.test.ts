@@ -71,7 +71,7 @@ describe("createLength", () => {
     const answer = value<{ outcome: string; id: string }>({ kind: "geodesicMeasurements/createLength", arcId });
 
     expect(answer).toEqual({ outcome: "lengthCreated", id: "geodesicMeasurements/length:0" });
-    expect(registry.get(answer.id)).toMatchObject({ kind: "geodesicMeasurements/length", geodesicId: arcId, label: "G1", portalRenderable: true });
+    expect(registry.get(answer.id)).toMatchObject({ kind: "geodesicMeasurements/length", geodesicId: arcId, label: "Beam 1", portalRenderable: true });
     expect(registry.get(answer.id)).toMatchObject({ lengthMeters: totalGeodesicLength(registry, arcId) });
   });
 

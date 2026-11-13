@@ -4,6 +4,7 @@
  * While a command of a tool is in flight, a press does nothing, so a double click measures once. An accepted measurement ends the tool; a refusal is shown, the tool stays, and the protractor starts its picks again.
  */
 import type { CommandResult, ModuleClient, ToolContext, ToolDescriptor } from "../../engine/moduleTypes";
+import { toolNames } from "../../world-objects/vocabulary";
 import { protractorSelectionsUseDifferentGeodesics, resolveProtractorCenterSelection, resolveProtractorSideAt, type ProtractorToolState } from "../../world-objects/protractorTool";
 import {
   geodesicLengthToolId,
@@ -55,8 +56,8 @@ function pickWithProtractor(tool: ToolContext): boolean {
 
 function protractorPrompt(tool: ToolContext): string {
   const { center, first } = tool.getToolState<ProtractorToolState>(geodesicMeasurementsModuleId) ?? {};
-  if (center === undefined) return "select: vertex";
-  return first === undefined ? "select: side1" : "select: side2";
+  if (center === undefined) return "select: laser or meeting point";
+  return first === undefined ? "select: first beam" : "select: second beam";
 }
 
 function onResult(tool: ToolContext, result: CommandResult): void {
@@ -90,15 +91,16 @@ function createLengthToolDescriptor(): ToolDescriptor {
   return {
     id: geodesicLengthToolId,
     ownerModuleId: geodesicMeasurementsModuleId,
-    label: "Length",
-    helpTitle: "Length tool",
-    helpBody: "Measures total length along a selected geodesic.",
-    helpRows: [{ input: "primary", label: "choose geodesic" }, { input: "context-menu", label: "open choices" }],
+    label: toolNames[geodesicLengthToolId].name,
+    badgeLabel: toolNames[geodesicLengthToolId].name,
+    helpTitle: toolNames[geodesicLengthToolId].name,
+    helpBody: `${toolNames[geodesicLengthToolId].subtitle}: all the way along it, through every edge it crosses.`,
+    helpRows: [{ input: "primary", label: "choose a beam" }, { input: "context-menu", label: "open the menu of what you aim at" }],
     indicatorColor: "#22c55e",
     iconId: "length",
     showsAimCross: true,
     entry: { kind: "main-tool" },
-    prompt: () => "select: geodesic",
+    prompt: () => "select: beam",
     onPrimaryAction: measureLength,
     onResult,
   };
@@ -108,10 +110,11 @@ function createProtractorDescriptor(): ToolDescriptor {
   return {
     id: geodesicProtractorToolId,
     ownerModuleId: geodesicMeasurementsModuleId,
-    label: "Protractor",
-    helpTitle: "Protractor tool",
-    helpBody: "Measures the angle between two geodesic sides at a vertex.",
-    helpRows: [{ input: "primary", label: "select vertex or side" }, { input: "context-menu", label: "open choices" }],
+    label: toolNames[geodesicProtractorToolId].name,
+    badgeLabel: toolNames[geodesicProtractorToolId].name,
+    helpTitle: toolNames[geodesicProtractorToolId].name,
+    helpBody: `${toolNames[geodesicProtractorToolId].subtitle} where they meet: pick a laser or a meeting point, then two beams leaving it.`,
+    helpRows: [{ input: "primary", label: "pick a laser, a meeting point or a beam" }, { input: "context-menu", label: "open the menu of what you aim at" }],
     indicatorColor: "#fb7185",
     iconId: "protractor",
     showsAimCross: true,

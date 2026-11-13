@@ -9,6 +9,7 @@ import type { ScenePaletteAdapterOptions } from "./adapterTypes";
 import { actionColor, textColor } from "./tokens";
 import { createHeaderIcon } from "./icons";
 import { createButtonText, createHeaderActionButton, createInteractiveSurface, headerActionIcon } from "./widgets";
+import { objectActions } from "../../../world-objects/vocabulary";
 
 /**
  * Header row: left (action, plus home/reload on the main page and a confirm tooltip), center contextual actions, right action. The unused title Text is an empty placeholder.
@@ -140,8 +141,8 @@ function createHeaderUtilityButton(
     backgroundColor: active ? "#991b1b" : actionColor,
   });
   button.name = actionId === "home"
-    ? "Home"
-    : active ? "Click again to confirm" : "Reload world";
+    ? objectActions.goHome
+    : active ? "Click again to confirm" : objectActions.startOver;
   button.userData.scenePaletteItemId = actionId === "home" ? "go-home" : "reload-world";
   button.add(actionId === "home"
     ? new House({

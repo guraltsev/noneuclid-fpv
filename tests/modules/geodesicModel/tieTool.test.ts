@@ -118,10 +118,10 @@ describe("the tie tool", () => {
   it("asks for the second pick with its prompt", () => {
     const { pick, step, tool, context } = setup();
 
-    expect(tool.prompt?.(context)).toBe("select: geodesic 1");
+    expect(tool.prompt?.(context)).toBe("select: first beam");
     pick(g1End);
     step();
-    expect(tool.prompt?.(context)).toBe("select: geodesic 2");
+    expect(tool.prompt?.(context)).toBe("select: second beam");
   });
 
   it("ignores a duplicate pick", () => {
@@ -211,7 +211,7 @@ describe("the tie tool in an experience", () => {
 
     const actions = objectActionsFor(toolsById, "geodesicEmitters/emitter", "e2", () => context);
 
-    expect(actions).toEqual([expect.objectContaining({ actionId: "tie-and-detach", label: "Unite & shorten", iconId: "tie-and-detach", enabled: true })]);
+    expect(actions).toEqual([expect.objectContaining({ actionId: "tie-and-detach", label: "Join", iconId: "tie-and-detach", enabled: true })]);
     expect(findObjectActionTool(toolsById, "geodesicEmitters/emitter", "tie-and-detach")?.id).toBe(geodesicTieToolId);
     expect(objectActionsFor(toolsById, "geodesicEmitters/emitter", "nobody", () => context)[0]?.enabled).toBe(false);
     expect(objectActionsFor(toolsById, "asset", "e2", () => context)).toEqual([]);

@@ -134,7 +134,7 @@ describe("geodesic cannon world objects: intersections", () => {
     expect(vertex).toMatchObject({
       kind: "geodesicModel/crossing",
       cellId: "a",
-      tooltip: { label: "vertex", rangeMeters: 3 },
+      tooltip: { label: "Meeting point", rangeMeters: 3 },
       geodesicIds: ["g-a", "g-b"],
       segmentIds: ["g-a:segment:0", "g-b:segment:0"],
     });

@@ -7,6 +7,7 @@ import type { PagedHelpControl, PaletteDefinition } from "../../../../ui/palette
 import type { ScenePaletteAdapterOptions } from "../adapterTypes";
 import { actionColor, borderColor, mutedTextColor, sectionColor, textColor } from "../tokens";
 import { createInteractiveSurface } from "../widgets";
+import { surfaceNames } from "../../../../world-objects/vocabulary";
 
 /**
  * Help hub page: title, body text and one button per option, dispatching to the tutorial or goal callback.
@@ -27,7 +28,7 @@ export function buildQuestionHelpContent(
     borderWidth: 2,
   });
   panel.add(new Text({
-    text: "Help hub",
+    text: surfaceNames.help,
     fontSize: 34,
     fontWeight: "bold",
     color: textColor,

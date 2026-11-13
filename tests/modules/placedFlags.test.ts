@@ -52,7 +52,7 @@ describe("the commands", () => {
     run(place(-3, 0.5));
     run(place(3, 3, "WoodenSign2"));
 
-    expect(flags().map((flag) => flag.message)).toEqual(["A1", "A2", "B1"]);
+    expect(flags().map((flag) => flag.message)).toEqual(["S1", "S2", "S3"]);
     expect(flags()[0]).toMatchObject({ kind: "placedFlags/flag", cellId: "room", flagType: "WoodenSign1", localPose: { translation: { x: 1, y: 0.5, z: 0 } } });
   });
 

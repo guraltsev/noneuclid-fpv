@@ -4,6 +4,7 @@
  * "none" and "aim" are not tools with descriptors: with neither selected the primary action acts on the focused object.
  */
 import type { CommandResult, ToolDescriptor } from "../engine/moduleTypes";
+import { objectActions } from "../world-objects/vocabulary";
 
 /** The emitter's sub-modes. */
 export type EmitterModeToolId = "geodesicEmitters/carry" | "geodesicEmitters/rotate" | "geodesicEmitters/aim";
@@ -27,10 +28,10 @@ export function createCoreToolDescriptors(handlers: CoreToolHandlers): readonly 
     {
       ...subMode,
       id: "geodesicEmitters/carry",
-      label: "Carry",
-      helpTitle: "Carry emitter",
-      helpBody: "Moves the selected geodesic emitter while preserving its editable rays.",
-      helpRows: [{ input: "primary", label: "place emitter" }],
+      label: objectActions.pickUp,
+      helpTitle: `${objectActions.pickUp} laser`,
+      helpBody: "Moves the laser. Its linked beams stay attached; its free beams are removed.",
+      helpRows: [{ input: "primary", label: "put the laser down" }],
       indicatorColor: "#fb7ac8",
       iconId: "carry",
       showsAimCross: false,
@@ -43,8 +44,8 @@ export function createCoreToolDescriptors(handlers: CoreToolHandlers): readonly 
       id: "geodesicEmitters/rotate",
       label: "Turn",
       badgeLabel: "Rotate",
-      helpTitle: "Rotate ray",
-      helpBody: "Turns the selected geodesic around its emitter.",
+      helpTitle: "Rotate beam",
+      helpBody: "Turns the selected beam around its laser.",
       helpRows: [{ input: "primary", label: "finish rotation" }],
       indicatorColor: "#a78bfa",
       iconId: "rotate",
@@ -56,10 +57,10 @@ export function createCoreToolDescriptors(handlers: CoreToolHandlers): readonly 
     {
       ...subMode,
       id: "geodesicEmitters/aim",
-      label: "Aim ray",
-      badgeLabel: "Aim",
-      helpTitle: "Aim ray",
-      helpBody: "Points the selected geodesic toward the aimed location.",
+      label: `${objectActions.aim} beam`,
+      badgeLabel: objectActions.aim,
+      helpTitle: `${objectActions.aim} beam`,
+      helpBody: "Points the selected beam where you look.",
       helpRows: [{ input: "primary", label: "accept aim" }],
       indicatorColor: "#facc15",
       iconId: "aim",

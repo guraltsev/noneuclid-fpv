@@ -9,6 +9,7 @@ import type { InputMode } from "./inputIntents";
 import { formatBodyForInputMode } from "./inputModeText";
 import { getInputHintGlyph, type InputHintGlyph } from "./inputIntents";
 import type { WorldFocusMessageDefinition } from "./worldInteractionDefinition";
+import { objectSubtitles, toolNames } from "../world-objects/vocabulary";
 
 /** One help line: an input hint glyph and what that input does. */
 export interface HelpLensRow {
@@ -82,11 +83,11 @@ function createToolHelpLens(selectedTool: RuntimeToolId, inputMode: InputMode, t
   }
   // No tool (none, aim): the explore text.
   return {
-    title: "Explore",
+    title: toolNames.none.name,
     body: inputMode === "desktop"
-      ? "Move with Arrow keys. Look at objects to see available actions, or open the tools menu."
-      : "Move with the left stick. Look at objects to see available actions, or open the tools menu.",
-    rows: [row(moveHint, "move"), row(primaryHint, "use selected/default action"), row(contextHint, "open tools or object menu")],
+      ? `Move with Arrow keys. ${toolNames.none.subtitle}: look at things to see what you can do, or open the menu.`
+      : `Move with the left stick. ${toolNames.none.subtitle}: look at things to see what you can do, or open the menu.`,
+    rows: [row(moveHint, "move"), row(primaryHint, "use what you aim at"), row(contextHint, "open the menu of what you aim at")],
   };
 }
 
@@ -96,32 +97,32 @@ function row(hint: InputHintGlyph, label: string): HelpLensRow {
 
 const helpBodyByTopic: Readonly<Record<string, Readonly<Record<InputMode, string>>>> = {
   sign: {
-    desktop: "A placed note in the world. Right click its menu to edit text or delete it.",
-    xr: "A placed note in the world. Use the side trigger menu to edit text or delete it.",
+    desktop: "A sign marks a place with a name. Right click its menu to rename or delete it.",
+    xr: "A sign marks a place with a name. Use the side trigger menu to rename or delete it.",
   },
   "geometry-computer": {
-    desktop: "Changes the shape of the torus. It tells you when two settings are the same flat torus.",
-    xr: "Changes the shape of the torus. It tells you when two settings are the same flat torus.",
+    desktop: "The shape machine changes the shape of this world. It tells you when two settings are the same flat torus.",
+    xr: "The shape machine changes the shape of this world. It tells you when two settings are the same flat torus.",
   },
   "geodesic-emitter": {
-    desktop: "Creates and edits geodesic rays from this point. Right click to open its menu.",
-    xr: "Creates and edits geodesic rays from this point. Use side trigger to open its menu.",
+    desktop: "A laser fires straight beams from this point. Right click to open its menu.",
+    xr: "A laser fires straight beams from this point. Use side trigger to open its menu.",
   },
   "geodesicModel/segment": {
-    desktop: "A locally straight ray segment. Left click with the active tool to extend, measure, or select it.",
-    xr: "A locally straight ray segment. Use trigger with the active tool to extend, measure, or select it.",
+    desktop: `${objectSubtitles.beam}. Left click with the active tool to make it longer, measure it, or pick it.`,
+    xr: `${objectSubtitles.beam}. Use trigger with the active tool to make it longer, measure it, or pick it.`,
   },
   "geodesic-vertex": {
-    desktop: "A meeting point where geodesic sides can be selected for angle measurement.",
-    xr: "A meeting point where geodesic sides can be selected for angle measurement.",
+    desktop: "A meeting point of two beams. Use the Protractor to pick beams leaving it and measure the angle.",
+    xr: "A meeting point of two beams. Use the Protractor to pick beams leaving it and measure the angle.",
   },
   "measured-length": {
-    desktop: "A persistent length result attached to a geodesic. Left click to remove it.",
-    xr: "A persistent length result attached to a geodesic. Use trigger to remove it.",
+    desktop: "A measurement of one beam. Left click to delete it.",
+    xr: "A measurement of one beam. Use trigger to delete it.",
   },
   "protractor-angle": {
-    desktop: "A persistent angle result between two selected geodesic sides. Left click to remove it.",
-    xr: "A persistent angle result between two selected geodesic sides. Use trigger to remove it.",
+    desktop: "A measurement of the angle between two beams. Left click to delete it.",
+    xr: "A measurement of the angle between two beams. Use trigger to delete it.",
   },
   creature: {
     desktop: "A moving object following the geometry of the world.",

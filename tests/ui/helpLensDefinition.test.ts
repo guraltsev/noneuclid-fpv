@@ -22,12 +22,12 @@ describe("helpLensDefinition", () => {
       focus: {
         title: "Sign",
         helpTopicId: "sign",
-        actions: [{ id: "edit-sign", label: "Edit", intent: "context-menu", available: true }],
+        actions: [{ id: "edit-sign", label: "Rename", intent: "context-menu", available: true }],
       },
     });
 
     expect(help.title).toBe("Sign");
-    expect(help.body).toBe("A placed note in the world. Right click its menu to edit text or delete it.");
+    expect(help.body).toBe("A sign marks a place with a name. Right click its menu to rename or delete it.");
     expect(help.rows).toEqual([{
       hint: {
         intent: "context-menu",
@@ -35,7 +35,7 @@ describe("helpLensDefinition", () => {
         label: "Right click",
         iconSrc: publicAssetUrl("icons/mouse-button-right.svg"),
       },
-      label: "Edit",
+      label: "Rename",
     }]);
   });
 
@@ -46,10 +46,10 @@ describe("helpLensDefinition", () => {
       selectedTool: "geodesicMeasurements/length",
     });
 
-    expect(help.title).toBe("Length tool");
+    expect(help.title).toBe("Ruler");
     expect(help.rows).toMatchObject([
-      { hint: { label: "Trigger" }, label: "choose geodesic" },
-      { hint: { label: "Side trigger" }, label: "open choices" },
+      { hint: { label: "Trigger" }, label: "choose a beam" },
+      { hint: { label: "Side trigger" }, label: "open the menu of what you aim at" },
     ]);
   });
 

@@ -42,7 +42,7 @@ describe("xrControllerHandModels", () => {
     expect(resolveWristToolIndicatorVisual(toolsById.get("geodesicEmitters/emitter"), "WoodenSign1")).toMatchObject({
       icon: "image",
       imageSource: publicAssetUrl("flashlight/Lightsaber.png"),
-      label: "Geodesic emitter",
+      label: "Laser",
     });
     expect(resolveWristToolIndicatorVisual(toolsById.get("geodesicMeasurements/protractor"), "WoodenSign1")).toMatchObject({
       icon: "image",
@@ -52,7 +52,7 @@ describe("xrControllerHandModels", () => {
     expect(resolveWristToolIndicatorVisual(toolsById.get("geodesicMeasurements/length"), "WoodenSign1")).toMatchObject({
       icon: "image",
       imageSource: publicAssetUrl("icons/ruler.svg"),
-      label: "Length",
+      label: "Ruler",
     });
     expect(resolveWristToolIndicatorVisual(toolsById.get("geodesicEmitters/rotate"), "WoodenSign1")).toMatchObject({
       icon: "image",
@@ -62,7 +62,7 @@ describe("xrControllerHandModels", () => {
     expect(resolveWristToolIndicatorVisual(toolsById.get("geodesicEmitters/carry"), "WoodenSign1")).toMatchObject({
       icon: "image",
       imageSource: publicAssetUrl("icons/carry.svg"),
-      label: "Carry",
+      label: "Pick up",
     });
     expect(resolveWristToolIndicatorVisual(toolsById.get("worldMap/map"), "WoodenSign1")).toMatchObject({
       icon: "image",

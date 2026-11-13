@@ -66,20 +66,20 @@ describe("geodesic cannon world objects: trace", () => {
       height: 0.75,
       offset: { x: 0, y: 0, z: 0.375 },
     });
-    expect(cannon.tooltip?.label).toBe("Geodesic emitter");
+    expect(cannon.tooltip?.label).toBe("Laser");
     expect(cannon.tooltip?.rangeMeters).toBe(2.5);
     expect(cannon.tooltip?.desktopPrompt).toBeUndefined();
     expect(cannon.tooltip?.xrPrompt).toBeUndefined();
     expect(first.lengthMeters).toBe(1);
     expect(first.geodesicNumber).toBe(1);
-    expect(first.tooltip?.label).toBe("Geodesic G1");
+    expect(first.tooltip?.label).toBe("Beam 1");
     expect(first.tooltip?.rangeMeters).toBe(6);
     expect(first.tooltip?.desktopPrompt).toBeUndefined();
     expect(first.tooltip?.xrPrompt).toBeUndefined();
     expect(second?.segmentIndex).toBe(1);
     expect(second?.lengthMeters).toBe(2);
     expect(second?.geodesicNumber).toBe(1);
-    expect(second?.tooltip?.label).toBe("Geodesic G1");
+    expect(second?.tooltip?.label).toBe("Beam 1");
     expect(second?.tooltip?.rangeMeters).toBe(6);
     expect(totalGeodesicLength(registry, "g-a")).toBeCloseTo(4);
     expect(getGeodesicSegments(registry, "g-a").map((segment) => segment.halfRole)).toEqual(["start", "end"]);
@@ -116,9 +116,9 @@ describe("geodesic cannon world objects: trace", () => {
     }
     const second = shootGeodesic({ maxLengthMeters: 2, world, registry, cannon: updatedCannon, geodesicId: "g-b" });
 
-    expect(first.tooltip?.label).toBe("Geodesic G1");
+    expect(first.tooltip?.label).toBe("Beam 1");
     expect(second.geodesicNumber).toBe(2);
-    expect(second.tooltip?.label).toBe("Geodesic G2");
+    expect(second.tooltip?.label).toBe("Beam 2");
     expect(second.start.y).toBeCloseTo(0);
     expect(getCannonGeodesicIds(registry, "cannon-a")).toEqual(["g-a", "g-b"]);
   });
@@ -143,9 +143,9 @@ describe("geodesic cannon world objects: trace", () => {
     const second = shootGeodesic({ maxLengthMeters: 2, world, registry, cannon: secondCannon, geodesicId: "g-b" });
 
     expect(first.geodesicNumber).toBe(1);
-    expect(first.tooltip?.label).toBe("Geodesic G1");
+    expect(first.tooltip?.label).toBe("Beam 1");
     expect(second.geodesicNumber).toBe(2);
-    expect(second.tooltip?.label).toBe("Geodesic G2");
+    expect(second.tooltip?.label).toBe("Beam 2");
     expect(resolveGeodesicNumber(registry, "g-a")).toBe(1);
     expect(resolveGeodesicNumber(registry, "g-b")).toBe(2);
   });

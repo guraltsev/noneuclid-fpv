@@ -22,7 +22,7 @@ startingQuestionCube("torus-room", {
   turn: -18,
   goalPages: [{
     title: "Goal",
-    body: "Cross opposite portals in the flat torus room and watch how the room wraps around.",
+    body: "Cross opposite edges in the flat torus room and watch how the room wraps around.",
   }],
 });
 

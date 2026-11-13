@@ -4,6 +4,7 @@
  * Typing is not a press: the page holds the text, each key sends the whole message, and the world takes them in order, so no key waits for the one before it.
  */
 import type { CommandResult, ModuleClient, ToolContext, ToolDescriptor } from "../../engine/moduleTypes";
+import { toolNames } from "../../world-objects/vocabulary";
 import { placedFlagToolId, type PlacedFlagsPlaceCommand, type PlacedFlagsRemoveCommand, type PlacedFlagsResult, type PlacedFlagsSetMessageCommand } from "./api";
 
 function primaryAction(tool: ToolContext): boolean {
@@ -39,10 +40,11 @@ function createSignToolDescriptor(): ToolDescriptor {
   return {
     id: placedFlagToolId,
     ownerModuleId: "placedFlags",
-    label: "Sign",
-    helpTitle: "Sign tool",
-    helpBody: "Places a note on the floor where you aim.",
-    helpRows: [{ input: "primary", label: "place sign" }, { input: "context-menu", label: "open tools" }],
+    label: toolNames[placedFlagToolId].name,
+    badgeLabel: toolNames[placedFlagToolId].name,
+    helpTitle: toolNames[placedFlagToolId].name,
+    helpBody: `${toolNames[placedFlagToolId].subtitle}: it stands on the floor where you aim.`,
+    helpRows: [{ input: "primary", label: "place a sign" }, { input: "context-menu", label: "open the menu of what you aim at" }],
     indicatorColor: "#22c55e",
     iconId: "sign",
     showsAimCross: true,

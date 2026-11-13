@@ -6,6 +6,7 @@ import { getDynamicObjectCollisionBounds, simpleCylinderIntersectsSimpleCylinder
 import { yawRigidTransform3, type RigidTransform3 } from "../../math/rigidTransform3";
 import { addVec3, distanceSquaredVec3, scaleVec3, type Vec3 } from "../../math/vec3";
 import { type RuntimeObjectRegistry } from "../runtimeObjectRegistry";
+import { laserLabel } from "../vocabulary";
 import { runtimeObjectToDynamicObjectState } from "../runtimeObjectBase";
 import {
   canExtendGeodesicSegment,
@@ -248,6 +249,18 @@ function findSegmentAtPoint(
   return found;
 }
 
+/** The smallest positive integer not used by a laser's label "Laser L<n>". Only the label text is inspected, as for signs. */
+function nextLaserNumber(registry: RuntimeObjectRegistry): number {
+  const used = new Set<number>();
+  for (const emitter of registry.getObjectsOfKind("geodesicEmitters/emitter")) {
+    const match = /^Laser L(\d+)$/.exec(emitter.tooltip?.label ?? "");
+    if (match) used.add(Number(match[1]));
+  }
+  let next = 1;
+  while (used.has(next)) next += 1;
+  return next;
+}
+
 /**
  * Adds a new cannon standing on the floor at `floorPoint` unless the spot is blocked.
  *
@@ -273,6 +286,7 @@ export function placeGeodesicCannonAtFloorPoint(
       z: 0,
     }),
     aimYawRadians: request.aimYawRadians,
+    label: laserLabel(nextLaserNumber(request.registry)),
   });
   const candidateState = runtimeObjectToDynamicObjectState(candidate);
   const collision = testCellCollision({ cell, object: candidateState });
@@ -763,7 +777,7 @@ export function placeGeodesicCannonAtGeodesicVertex(
 
   const yaw = request.cuts.cutAtVertex({ emitterId: result.object.id, cellId: request.cellId, vertexPoint: request.vertexPoint });
   if (yaw !== undefined) {
-    request.registry.update(createGeodesicEmitterObject({ ...result.object, aimYawRadians: yaw }));
+    request.registry.update(createGeodesicEmitterObject({ ...result.object, aimYawRadians: yaw, label: result.object.tooltip?.label }));
   }
 
   const placed = request.registry.get(result.object.id);
@@ -831,7 +845,7 @@ export function cutGeodesicsAtVertex(input: {
     const created = shootGeodesic({
       world: input.world,
       registry: input.registry,
-      cannon: createGeodesicEmitterObject({ ...input.emitter, aimYawRadians: lastYaw }),
+      cannon: createGeodesicEmitterObject({ ...input.emitter, aimYawRadians: lastYaw, label: input.emitter.tooltip?.label }),
       geodesicId: continuationGeodesicId,
       maxLengthMeters: continuationLengthMeters - geodesicRayBeamStartOffsetMeters + stoppedShortMeters,
     });

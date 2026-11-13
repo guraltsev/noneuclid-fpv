@@ -2,6 +2,8 @@
  * Resolves the tooltip text for palette items from their string item ids.
  * Item ids are namespaced strings produced by the palette renderers (for example "tool:placedFlags/flag", "geodesic-cannon-action:rotate:<id>", "sign-key:A"); this module is the single place that turns them into human-readable labels, so desktop and VR show the same tooltips. It is a pure lookup with no state.
  */
+import { objectActions, toolNames } from "../world-objects/vocabulary";
+
 /**
  * Returns the tooltip for a palette item id (prefix families like tool:, tutorial:, sign-key: are decoded, others looked up in a fixed table), or undefined for an undefined or unknown id.
  */
@@ -15,7 +17,7 @@ export function resolvePaletteTooltipLabel(itemId: string | undefined): string |
   }
 
   if (itemId.startsWith("geodesic-cannon-action:delete:")) {
-    return "Delete geodesic";
+    return `${objectActions.delete} beam`;
   }
 
   if (itemId.startsWith("geodesic-cannon-action:rotate:")) {
@@ -23,7 +25,7 @@ export function resolvePaletteTooltipLabel(itemId: string | undefined): string |
   }
 
   if (itemId.startsWith("geodesic-cannon-action:aim:")) {
-    return "Aim";
+    return objectActions.aim;
   }
 
   if (itemId.startsWith("geometry-computer:set:")) {
@@ -43,11 +45,11 @@ export function resolvePaletteTooltipLabel(itemId: string | undefined): string |
   }
 
   if (itemId === "question-help:tutorial") {
-    return "Tutorial";
+    return "How to";
   }
 
   if (itemId === "question-help:goal") {
-    return "Goal";
+    return "Things to try";
   }
 
   if (itemId.startsWith("sign-type:")) {
@@ -65,14 +67,14 @@ const fixedTooltips: Readonly<Record<string, string>> = {
   "settings": "Settings",
   "close": "Close",
   "back": "Back",
-  "go-home": "Home",
-  "reload-world": "Reload",
+  "go-home": objectActions.goHome,
+  "reload-world": objectActions.startOver,
   "debug-settings": "Debug settings",
   "debug-tools-toggle": "Debug tools",
   "tool-options:place-sign": "Sign options",
-  "geodesic-cannon-action:add-geodesic": "Add geodesic",
-  "geodesic-cannon-action:carry": "Carry the emitter: locked geodesics stay attached, free ones are removed",
-  "sign-action:trash": "Delete sign",
+  "geodesic-cannon-action:add-geodesic": objectActions.addBeam,
+  "geodesic-cannon-action:carry": `${objectActions.pickUp} the laser: linked beams stay attached, free ones are removed`,
+  "sign-action:trash": `${objectActions.delete} sign`,
   "sign-key:Space": "Space",
   "sign-key:Enter": "New line",
   "sign-key:Backspace": "Backspace",
@@ -81,13 +83,15 @@ const fixedTooltips: Readonly<Record<string, string>> = {
 function toolTooltip(toolId: string): string | undefined {
   switch (toolId) {
     case "placedFlags/flag":
-      return "Place sign";
+      return `${toolNames["placedFlags/flag"].name}: ${toolNames["placedFlags/flag"].subtitle}`;
     case "geodesicEmitters/emitter":
-      return "Create and terminate straight lines";
+      return `${toolNames["geodesicEmitters/emitter"].name}: ${toolNames["geodesicEmitters/emitter"].subtitle}`;
     case "geodesicMeasurements/length":
-      return "Measure length";
+      return `${toolNames["geodesicMeasurements/length"].name}: ${toolNames["geodesicMeasurements/length"].subtitle}`;
     case "geodesicMeasurements/protractor":
-      return "Measure angle";
+      return `${toolNames["geodesicMeasurements/protractor"].name}: ${toolNames["geodesicMeasurements/protractor"].subtitle}`;
+    case "worldMap/map":
+      return `${toolNames["worldMap/map"].name}: ${toolNames["worldMap/map"].subtitle}`;
     default:
       return undefined;
   }

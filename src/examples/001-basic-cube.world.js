@@ -45,7 +45,7 @@ startingQuestionCube("front", {
   goalPages: [
     {
     title: "Goal",
-    body: "Explore the world. Use landmarks and floor textures to tell the regions apart.\n\n You can use the tool menu to place signs to help you keep track of places you have visited.",
+    body: "Explore the world. Use landmarks and floor textures to tell the regions apart.\n\n You can open the menu to place signs to help you keep track of places you have visited.",
   },
 {
     title: "Questions",

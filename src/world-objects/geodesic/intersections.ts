@@ -300,9 +300,9 @@ function createGeodesicCrossingObject(options: {
       localPoint: options.targetPoint,
     },
     portalRenderable: true,
-    displayHelpMessage: "A geodesic vertex. Use the protractor tool to select sides incident to this point.",
+    displayHelpMessage: "A meeting point of two beams. Use the Protractor to pick beams leaving it.",
     tooltip: {
-      label: "vertex",
+      label: "Meeting point",
       rangeMeters: 3,
     },
     geodesicIds: options.geodesicIds,

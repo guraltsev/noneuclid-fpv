@@ -136,7 +136,7 @@ describe("the length tool", () => {
     click(onSegment(registry, arcId));
     settle();
 
-    expect(log.messages).toEqual(["That is not a geodesic."]);
+    expect(log.messages).toEqual(["That is not a beam."]);
     expect(log.ended).toBe(0);
   });
 
@@ -158,7 +158,7 @@ describe("the length tool", () => {
   it("prompts for a geodesic", () => {
     const { tool, context } = setup(geodesicLengthToolId);
 
-    expect(tool.prompt?.(context)).toBe("select: geodesic");
+    expect(tool.prompt?.(context)).toBe("select: beam");
   });
 });
 
@@ -181,17 +181,17 @@ describe("the protractor", () => {
 
   it("takes the vertex, then two sides, then asks the world and ends", () => {
     const { registry, tool, context, click, settle, log, state, vertex, sideOf, a, b, crossing } = atCrossing();
-    expect(tool.prompt?.(context)).toBe("select: vertex");
+    expect(tool.prompt?.(context)).toBe("select: laser or meeting point");
 
     click(vertex);
-    expect(tool.prompt?.(context)).toBe("select: side1");
+    expect(tool.prompt?.(context)).toBe("select: first beam");
     click(sideOf(a.arcId));
-    expect(tool.prompt?.(context)).toBe("select: side2");
+    expect(tool.prompt?.(context)).toBe("select: second beam");
     click(sideOf(b.arcId));
     settle();
 
     const [angle] = registry.getObjectsOfKind("geodesicMeasurements/angle");
-    expect(angle).toMatchObject({ centerObjectId: crossing.id, first: { geodesicId: a.arcId, label: "G1" }, second: { geodesicId: b.arcId, label: "G2" } });
+    expect(angle).toMatchObject({ centerObjectId: crossing.id, first: { geodesicId: a.arcId, label: "Beam 1" }, second: { geodesicId: b.arcId, label: "Beam 2" } });
     expect(angle?.angleDegrees).toBeCloseTo(90, 6);
     expect(log.ended).toBe(1);
     expect(state()).toBeUndefined();

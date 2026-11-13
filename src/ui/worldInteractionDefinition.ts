@@ -1,12 +1,13 @@
 /**
  * Renderer-neutral description of what the player can do with the world object they are focusing: its title and a prioritized list of actions, each bound to an abstract input intent.
- * createWorldFocusMessageDefinition decides the actions from the object's kind and the active tool (for example, a geodesic segment offers Measure under the length tool, Select side under the protractor, otherwise Extend or a disabled Connected entry). Both the desktop focus tooltip and the VR panel render this one definition, and the help lens reuses it.
+ * createWorldFocusMessageDefinition decides the actions from the object's kind and the active tool (for example, a beam offers Measure under the Ruler, Pick beam under the Protractor, otherwise Extend or a disabled Linked entry). Both the desktop focus tooltip and the VR panel render this one definition, and the help lens reuses it.
  * Everything is a pure function of its inputs and returns fresh immutable records.
  */
 import type { RuntimeToolId } from "../glue/toolIds";
 import type { RuntimeWorldObject } from "../world-objects/runtimeObjectRegistry";
 import type { InputIntent, InputMode } from "./inputIntents";
 import { getInputHintGlyph } from "./inputIntents";
+import { objectActions } from "../world-objects/vocabulary";
 
 /** Identifier of an action the player may perform on a focused world object. */
 export type WorldInteractionActionId =
@@ -58,7 +59,7 @@ export interface CreateWorldFocusMessageDefinitionOptions {
   readonly object: RuntimeWorldObject;
   readonly selectedTool: RuntimeToolId;
   /**
-   * Whether the focused geodesic segment may be extended; when false and no measuring tool is active the segment shows a disabled "Connected" action.
+   * Whether the focused geodesic segment may be extended; when false and no measuring tool is active the segment shows a disabled "Linked" action.
    */
   readonly canExtendGeodesic?: boolean;
 }
@@ -78,28 +79,28 @@ export function createWorldFocusMessageDefinition(
     case "placedFlags/flag":
       return withObjectHelp(options.object, {
         title,
-        actions: [contextAction("edit-sign", "Edit")],
+        actions: [contextAction("edit-sign", objectActions.rename)],
         helpTopicId: "sign",
       });
     case "asset":
       if (options.object.interactable?.action === "open-geometry-computer") {
         return withObjectHelp(options.object, {
           title,
-          actions: [contextAction("open-geometry-computer", "World deformation")],
+          actions: [contextAction("open-geometry-computer", "Shape machine")],
           helpTopicId: "geometry-computer",
         });
       }
       if (options.object.interactable?.action === "open-tutorial") {
         return withObjectHelp(options.object, {
           title,
-          actions: [primaryAction("open-tutorial", "Read")],
+          actions: [primaryAction("open-tutorial", "Help")],
         });
       }
       return withObjectHelp(options.object, { title, actions: [] });
     case "geodesicEmitters/emitter":
       return withObjectHelp(options.object, {
         title,
-        actions: [contextAction("open-object-menu", "Emitter menu")],
+        actions: [contextAction("open-object-menu", "Laser menu")],
         helpTopicId: "geodesic-emitter",
       });
     case "geodesicModel/segment":
@@ -112,20 +113,20 @@ export function createWorldFocusMessageDefinition(
       return withObjectHelp(options.object, {
         title,
         actions: options.selectedTool === "geodesicMeasurements/protractor"
-          ? [primaryAction("select-protractor-vertex", "Select for protractor")]
+          ? [primaryAction("select-protractor-vertex", "Pick for protractor")]
           : [],
         helpTopicId: "geodesic-vertex",
       });
     case "geodesicMeasurements/length":
       return withObjectHelp(options.object, {
         title,
-        actions: [primaryAction("remove-measurement", "Remove")],
+        actions: [primaryAction("remove-measurement", objectActions.delete)],
         helpTopicId: "measured-length",
       });
     case "geodesicMeasurements/angle":
       return withObjectHelp(options.object, {
         title,
-        actions: [primaryAction("remove-angle", "Delete measurement")],
+        actions: [primaryAction("remove-angle", `${objectActions.delete} measurement`)],
         helpTopicId: "protractor-angle",
       });
     case "geodesci-marmot":
@@ -170,20 +171,20 @@ function getGeodesicSegmentActions(
   options: CreateWorldFocusMessageDefinitionOptions,
 ): readonly WorldInteractionAction[] {
   if (options.selectedTool === "geodesicMeasurements/length") {
-    return [primaryAction("measure-length", "Measure length")];
+    return [primaryAction("measure-length", "Measure")];
   }
 
   if (options.selectedTool === "geodesicMeasurements/protractor") {
-    return [primaryAction("select-protractor-side", "Select side")];
+    return [primaryAction("select-protractor-side", "Pick beam")];
   }
 
   if (options.canExtendGeodesic) {
-    return [primaryAction("extend-geodesic", "Extend")];
+    return [primaryAction("extend-geodesic", objectActions.extend)];
   }
 
   return [{
     id: "extend-geodesic",
-    label: "Locked",
+    label: "Linked",
     intent: "primary",
     available: false,
   }];

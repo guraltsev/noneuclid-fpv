@@ -61,7 +61,7 @@ startingQuestionCube("face-0", {
   turn: -18,
   goalPages: [{
     title: "Goal",
-    body: "Explore the octahedron's eight triangular faces. Try to find the marker after crossing several portals.",
+    body: "Explore the octahedron's eight triangular faces. Try to find the marker after crossing several edges.",
   }],
 });
 

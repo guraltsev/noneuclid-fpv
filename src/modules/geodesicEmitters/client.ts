@@ -6,6 +6,7 @@
  */
 import type { CommandResult, ToolContext, ToolDescriptor, ModuleClient } from "../../engine/moduleTypes";
 import { defaultTraceLengthMeters } from "../../world-objects/geodesic/objects";
+import { toolNames } from "../../world-objects/vocabulary";
 import { geodesicModelToken } from "../geodesicModel/api";
 import {
   geodesicEmitterKind,
@@ -120,11 +121,11 @@ function createEmitterToolDescriptor(): ToolDescriptor {
   return {
     id: geodesicEmitterToolId,
     ownerModuleId: moduleId,
-    label: "Geodesic emitter",
-    badgeLabel: "Ray",
-    helpTitle: "Ray tool",
-    helpBody: "Places geodesic emitters and starts locally straight rays.",
-    helpRows: [{ input: "primary", label: "place or continue ray" }, { input: "context-menu", label: "open choices" }],
+    label: toolNames[geodesicEmitterToolId].name,
+    badgeLabel: toolNames[geodesicEmitterToolId].name,
+    helpTitle: toolNames[geodesicEmitterToolId].name,
+    helpBody: `${toolNames[geodesicEmitterToolId].subtitle}. Aim at the floor and Use to place a laser; Use on a laser fires a new beam, and Use on a free beam makes it longer.`,
+    helpRows: [{ input: "primary", label: "place a laser or make a beam longer" }, { input: "context-menu", label: "open the menu of what you aim at" }],
     indicatorColor: "#facc15",
     iconId: "ray",
     showsAimCross: true,

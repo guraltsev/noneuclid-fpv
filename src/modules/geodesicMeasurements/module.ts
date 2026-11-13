@@ -227,7 +227,7 @@ function createLength(command: GeodesicMeasurementsCreateLengthCommand, ctx: Com
   const participant = ctx.participant(ctx.participantId);
   if (participant === undefined) return refuse("world/unknownParticipant", `There is no participant "${ctx.participantId}".`);
   const [fallbackSegment] = ctx.objects.get(arcId)?.kind === "geodesicModel/arc" ? ctx.objects.getSegmentsOfGeodesic(arcId) : [];
-  if (fallbackSegment === undefined) return refuse(geodesicMeasurementsRefusals.notAnArc, "That is not a geodesic.");
+  if (fallbackSegment === undefined) return refuse(geodesicMeasurementsRefusals.notAnArc, "That is not a beam.");
 
   const existing = ctx.objects.getObjectsOfKind(lengthKind).find((length) => length.geodesicId === arcId);
   const measurement = createMeasuredGeodesicLengthObject({
@@ -246,7 +246,7 @@ function createLength(command: GeodesicMeasurementsCreateLengthCommand, ctx: Com
 }
 
 function removeLength(command: GeodesicMeasurementsRemoveLengthCommand, ctx: CommandContext): CommandResult {
-  if (ctx.objects.get(command.lengthId)?.kind !== lengthKind) return refuse(geodesicMeasurementsRefusals.notALength, "That is not a length.");
+  if (ctx.objects.get(command.lengthId)?.kind !== lengthKind) return refuse(geodesicMeasurementsRefusals.notALength, "That is not a measurement.");
   ctx.objects.remove(command.lengthId);
   return answer({ outcome: "lengthRemoved", id: command.lengthId });
 }
@@ -259,12 +259,12 @@ function isSide(value: ProtractorDirectedGeodesic | undefined): value is Protrac
 function createAngle(command: GeodesicMeasurementsCreateAngleCommand, ctx: CommandContext): CommandResult {
   const centerObject = ctx.objects.get(command.center);
   if (centerObject?.kind !== "geodesicEmitters/emitter" && centerObject?.kind !== "geodesicModel/crossing") {
-    return refuse(geodesicMeasurementsRefusals.notACenter, "That is not a vertex.");
+    return refuse(geodesicMeasurementsRefusals.notACenter, "That is not a laser or a meeting point.");
   }
-  if (!isSide(command.first) || !isSide(command.second)) return refuse(geodesicMeasurementsRefusals.notASide, "That is not a side of this vertex.");
+  if (!isSide(command.first) || !isSide(command.second)) return refuse(geodesicMeasurementsRefusals.notASide, "That is not a beam of this laser or meeting point.");
   const center = resolveProtractorCenterSelection(ctx.objects, centerObject);
   const sides = resolveProtractorSides(ctx.objects, center, command.first, command.second);
-  if (sides === undefined) return refuse(geodesicMeasurementsRefusals.notASide, "That is not a side of this vertex.");
+  if (sides === undefined) return refuse(geodesicMeasurementsRefusals.notASide, "That is not a beam of this laser or meeting point.");
   if (!protractorSelectionsUseDifferentGeodesics(sides.first, sides.second)) return refuse(geodesicMeasurementsRefusals.sameSide, "Those are the same side.");
 
   const angle = createProtractorAngleObject({ id: ctx.ids.next("angle"), center, ...sides });

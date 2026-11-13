@@ -53,6 +53,7 @@ import type { CarryHighlightShape } from "../carryHighlightShape";
 import { identityRigidTransform3, yawRigidTransform3, type RigidTransform3 } from "../../math/rigidTransform3";
 import { addVec3, normalizeVec3, scaleVec3, type Vec3 } from "../../math/vec3";
 import type { RuntimeWorldObjectBase } from "../runtimeObjectBase";
+import { laserLabel } from "../vocabulary";
 
 // ---- Runtime object shapes ----
 
@@ -278,6 +279,8 @@ export interface CreateGeodesicEmitterOptions {
   readonly localPose: RigidTransform3;
   readonly aimYawRadians?: number;
   readonly collision?: SimpleCollisionCylinder;
+  /** The tooltip label, "Laser L1"; "Laser" when absent. A placed laser takes the next free number (`nextLaserNumber`). */
+  readonly label?: string;
 }
 
 /** One traced piece: the cell, the (normalized) ray used, the length actually travelled, and why it stopped. */
@@ -389,9 +392,9 @@ export function createGeodesicEmitterObject(options: CreateGeodesicEmitterOption
     },
     collision: options.collision ?? defaultCannonCollision,
     portalRenderable: true,
-    displayHelpMessage: "Creates and edits geodesic rays. Open its menu to add, aim or delete rays, carry the emitter, or unite two of its geodesic segments.",
+    displayHelpMessage: "A laser fires straight beams. Open its menu to add, aim or delete beams, pick the laser up, or join two linked beams.",
     tooltip: {
-      label: "Geodesic emitter",
+      label: options.label ?? laserLabel(),
       rangeMeters: 2.5,
     },
     aimYawRadians,

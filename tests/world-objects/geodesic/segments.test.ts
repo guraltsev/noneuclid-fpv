@@ -88,7 +88,7 @@ describe("display numbers are stored on the arc", () => {
 
     expect(resolveGeodesicNumber(registry, "g-c")).toBe(3);
     expect(getGeodesicSegments(registry, "g-c").every((segment) => segment.geodesicNumber === 3)).toBe(true);
-    expect(getGeodesicSegments(registry, "g-c")[0]?.tooltip?.label).toBe("Geodesic G3");
+    expect(getGeodesicSegments(registry, "g-c")[0]?.tooltip?.label).toBe("Beam 3");
   });
 
   it("gives the continuation of a split the next free number", () => {

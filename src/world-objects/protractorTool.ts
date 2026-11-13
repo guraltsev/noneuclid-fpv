@@ -239,7 +239,7 @@ export function createProtractorAngleObject(options: {
       localPoint: labelHitbox.center,
     },
     portalRenderable: true,
-    displayHelpMessage: "A persistent angle result between two selected geodesic sides. Use the primary action to remove it.",
+    displayHelpMessage: "A measurement of the angle between two beams. Use the primary action to delete it.",
     tooltip: {
       label,
       rangeMeters: 3,

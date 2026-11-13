@@ -49,8 +49,8 @@ describe("paged help fallback titles", () => {
       tutorialOptions: { objectId: "t", pages: [], pageIndex: 0, view: "page" },
     });
 
-    expect(goal.content).toMatchObject({ kind: "goal", title: "Goal", pageLabel: "0 / 0" });
-    expect(tutorial.content).toMatchObject({ kind: "tutorial", title: "Tutorial", pageLabel: "0 / 0" });
+    expect(goal.content).toMatchObject({ kind: "goal", title: "Things to try", pageLabel: "0 / 0" });
+    expect(tutorial.content).toMatchObject({ kind: "tutorial", title: "How to", pageLabel: "0 / 0" });
   });
 });
 
@@ -183,11 +183,11 @@ describe("runtimeMenuState", () => {
     if (definition.content.kind !== "geodesic-cannon-actions") {
       throw new Error("Expected geodesic cannon actions.");
     }
-    expect(definition.content.addAction).toEqual({ label: "Add geodesic", disabled: false });
+    expect(definition.content.addAction).toEqual({ label: "Add beam", disabled: false });
     expect(definition.content.objectActions).toEqual([]);
     expect(definition.content.geodesics).toEqual([
-      { id: "g-a", label: "G1", connected: false, connectionSymbolLabel: undefined, deleteDisabled: false },
-      { id: "g-b", label: "G2", connected: false, connectionSymbolLabel: undefined, deleteDisabled: false },
+      { id: "g-a", label: "Beam 1", connected: false, connectionSymbolLabel: undefined, deleteDisabled: false },
+      { id: "g-b", label: "Beam 2", connected: false, connectionSymbolLabel: undefined, deleteDisabled: false },
     ]);
   });
 
@@ -213,7 +213,7 @@ describe("runtimeMenuState", () => {
     }), {
       cannonId: "cannon-b",
       geodesicIds: ["g-b"],
-      geodesicLabelsById: { "g-b": "G2" },
+      geodesicLabelsById: { "g-b": "Beam 2" },
     }));
 
     expect(definition.content.kind).toBe("geodesic-cannon-actions");
@@ -221,7 +221,7 @@ describe("runtimeMenuState", () => {
       throw new Error("Expected geodesic cannon actions.");
     }
     expect(definition.content.geodesics).toEqual([
-      { id: "g-b", label: "G2", connected: false, connectionSymbolLabel: undefined, deleteDisabled: false },
+      { id: "g-b", label: "Beam 2", connected: false, connectionSymbolLabel: undefined, deleteDisabled: false },
     ]);
   });
 
@@ -241,9 +241,9 @@ describe("runtimeMenuState", () => {
     expect(definition.content.geodesics).toEqual([
       {
         id: "g-b",
-        label: "G1",
+        label: "Beam 1",
         connected: true,
-        connectionSymbolLabel: "Locked geodesic segment between emitters",
+        connectionSymbolLabel: "Linked beam: a beam from one laser to another",
         deleteDisabled: false,
       },
     ]);
@@ -301,7 +301,7 @@ describe("runtimeMenuState", () => {
     expect(index.content).toMatchObject({
       kind: "tutorial",
       view: "index",
-      title: "Tutorial",
+      title: "How to",
       topics: [{ pageIndex: 0, title: "Move" }, { pageIndex: 1, title: "Act" }],
     });
     expect(showRuntimeMenuTutorialIndex(showRuntimeMenuTutorialPage(state, 1)).tutorialOptions?.view).toBe("index");
@@ -344,8 +344,8 @@ describe("runtimeMenuState", () => {
       kind: "question-help",
       body: questionHelpHubBody,
       options: [
-        { id: "tutorial", label: "Tutorial", disabled: false },
-        { id: "goal", label: "Goal", disabled: false },
+        { id: "tutorial", label: "How to", disabled: false },
+        { id: "goal", label: "Things to try", disabled: false },
       ],
     });
     expect(tutorial.content).toMatchObject({ kind: "tutorial", title: "Move" });

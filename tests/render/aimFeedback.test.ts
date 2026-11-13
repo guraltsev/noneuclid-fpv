@@ -153,7 +153,7 @@ describe("createAimFeedback", () => {
 
     feedback.requestHelpLensForFocusedObject(aimRay);
     feedback.updateTooltips(false, aimRay, undefined);
-    expect(helpUpdates.at(-1)).toEqual({ visible: true, title: "Length tool" });
+    expect(helpUpdates.at(-1)).toEqual({ visible: true, title: "Ruler" });
 
     feedback.requestHelpLensForFocusedObject(aimRay);
     feedback.updateTooltips(false, aimRay, undefined);
@@ -167,7 +167,7 @@ describe("createAimFeedback", () => {
     feedback.requestHelpLensForFocusedObject(aimRay);
     feedback.updateTooltips(false, aimRay, undefined);
 
-    expect(helpUpdates.at(-1)).toEqual({ visible: true, title: "Explore" });
+    expect(helpUpdates.at(-1)).toEqual({ visible: true, title: "Hand" });
   });
 
   it("drops the tool's help when it is dismissed or the aim finds an object", () => {

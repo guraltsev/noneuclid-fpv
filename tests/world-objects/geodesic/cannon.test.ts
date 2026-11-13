@@ -71,7 +71,7 @@ describe("geodesic cannon world objects: cannon", () => {
     expect(getGeodesicSegments(registry, "g-a").map((segment) => segment.connectionState)).toEqual(["connected", "connected"]);
     expect(getGeodesicTail(registry, "g-a")).toMatchObject({ terminal: { kind: "emitter-hit", emitterId: "cannon-b" } });
     expect(getGeodesicTail(registry, "g-a")?.tooltip).toEqual({
-      label: "Geodesic G1",
+      label: "Beam 1",
       rangeMeters: 6,
     });
     expect(arcConnectsEmitters(registry, "g-a")).toBe(true);
@@ -181,7 +181,7 @@ describe("geodesic cannon world objects: cannon", () => {
     expect(totalGeodesicLength(registry, "g-a")).toBeCloseTo(2.5);
     expect(getGeodesicTail(registry, "g-a")?.terminal).toEqual({ kind: "emitter-hit", emitterId: "cannon-b" });
     expect(getGeodesicTail(registry, "g-a")?.tooltip).toEqual({
-      label: "Geodesic G1",
+      label: "Beam 1",
       rangeMeters: 6,
     });
     expect(getGeodesicConnection(registry, "g-a")).toEqual({

@@ -11,6 +11,7 @@ import {
   type GeodesicHighlightEndpointCommand,
   type GeodesicTieAndDetachCommand,
 } from "./api";
+import { objectActions, objectNouns, objectSubtitles, toolNames } from "../../world-objects/vocabulary";
 
 /** The client tool state of the tie tool (stored under the module id). */
 interface TieToolState {
@@ -84,10 +85,10 @@ export function createTieToolDescriptor(): ToolDescriptor {
   return {
     id: geodesicTieToolId,
     ownerModuleId: moduleId,
-    label: "Unite",
-    helpTitle: "Unite and shorten",
-    helpBody: "Unites two geodesic segments at this emitter into one curve, detaches it from the emitter, and lets the curve-shortening flow shorten it.",
-    helpRows: [{ input: "primary", label: "select a geodesic segment near the emitter" }],
+    label: toolNames[geodesicTieToolId].name,
+    helpTitle: toolNames[geodesicTieToolId].name,
+    helpBody: `${objectActions.join} two linked beams at a laser into one ${objectNouns.string.singular}. ${objectSubtitles.string}.`,
+    helpRows: [{ input: "primary", label: "select a linked beam near the laser" }],
     indicatorColor: "#f59e0b",
     iconId: "ray",
     showsAimCross: true,
@@ -96,13 +97,13 @@ export function createTieToolDescriptor(): ToolDescriptor {
       objectKind: "geodesicEmitters/emitter",
       action: {
         actionId: "tie-and-detach",
-        label: "Unite & shorten",
+        label: objectActions.join,
         iconId: "tie-and-detach",
-        tooltip: "Unite two geodesic segments at this emitter, detach them, and let the curve-shortening flow shorten the curve",
+        tooltip: "Join two linked beams at this laser into a string that pulls itself tight",
       },
       isAvailable: (emitterId, tool) => tool.query(geodesicModelToken).tieableEnds(emitterId).length >= 2,
     },
-    prompt: (tool) => ((tool.getToolState<TieToolState>(moduleId)?.picks.length ?? 0) === 0 ? "select: geodesic 1" : "select: geodesic 2"),
+    prompt: (tool) => ((tool.getToolState<TieToolState>(moduleId)?.picks.length ?? 0) === 0 ? "select: first beam" : "select: second beam"),
     onPrimaryAction: primaryAction,
     onStart: (tool, objectId) => {
       if (objectId !== undefined) tool.setToolState(moduleId, { emitterId: objectId, picks: [] } satisfies TieToolState);

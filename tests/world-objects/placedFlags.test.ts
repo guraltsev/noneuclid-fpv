@@ -29,31 +29,31 @@ describe("placedFlags", () => {
     expect(sanitizePlacedFlagMessage("A\tB\r\nC\nD")).toBe("A B\nC\nD");
   });
 
-  it("defaults flag text by type and the next existing matching number", () => {
+  it("defaults sign text to S and the next number, whatever the sign type", () => {
     const a1 = createPlacedFlagObject({
       id: "flag-a1",
       cellId: "room-a",
       localPose: identityRigidTransform3,
       flagType: "WoodenSign1",
-      message: "A1",
+      message: "S1",
     });
     const a7 = createPlacedFlagObject({
       id: "flag-a7",
       cellId: "room-a",
       localPose: identityRigidTransform3,
       flagType: "WoodenSign1",
-      message: "A7",
+      message: "S7",
     });
     const b3 = createPlacedFlagObject({
       id: "flag-b3",
       cellId: "room-a",
       localPose: identityRigidTransform3,
       flagType: "WoodenSign2",
-      message: "B3",
+      message: "S3",
     });
 
-    expect(defaultPlacedFlagMessage("WoodenSign1", [a1, a7, b3])).toBe("A8");
-    expect(defaultPlacedFlagMessage("WoodenSign2", [a1, a7, b3])).toBe("B4");
+    expect(defaultPlacedFlagMessage("WoodenSign1", [a1, a7, b3])).toBe("S8");
+    expect(defaultPlacedFlagMessage("WoodenSign2", [a1, a7, b3])).toBe("S8");
   });
 
   it("places flags with numbered default text from existing runtime flags", () => {
@@ -64,14 +64,14 @@ describe("placedFlags", () => {
         cellId: "other-room",
         localPose: identityRigidTransform3,
         flagType: "WoodenSign1",
-        message: "A7",
+        message: "S7",
       }),
       createPlacedFlagObject({
         id: "flag-b3",
         cellId: "other-room",
         localPose: identityRigidTransform3,
         flagType: "WoodenSign2",
-        message: "B3",
+        message: "S3",
       }),
     ]);
 
@@ -94,8 +94,8 @@ describe("placedFlags", () => {
       createId: () => "flag-new-b",
     });
 
-    expect(sign1Result.object?.message).toBe("A8");
-    expect(sign2Result.object?.message).toBe("B4");
+    expect(sign1Result.object?.message).toBe("S8");
+    expect(sign2Result.object?.message).toBe("S9");
   });
 
   it("places flags at a resolved floor point in the resolved cell", () => {
@@ -148,7 +148,7 @@ describe("placedFlags", () => {
     expect(flag.tooltip?.desktopPrompt).toBeUndefined();
     expect(flag.tooltip?.xrPrompt).toBeUndefined();
     expect(flag.interactable).toMatchObject({
-      label: "Edit sign",
+      label: "Rename sign",
       action: "edit-flag",
       rangeMeters: 2.5,
     });

@@ -11,10 +11,11 @@ import type { GeodesicSegmentObject } from "./geodesic/objects";
 import { resolveGeodesicNumber } from "./geodesic/segments";
 import type { RuntimeObjectReader, RuntimeObjectRegistry } from "./runtimeObjectRegistry";
 import type { MeasuredGeodesicLengthObject } from "./toolObjects";
+import { beamName } from "./vocabulary";
 
-/** The name a person reads for a geodesic: "G" and its display number. */
+/** The name a person reads for a beam: "Beam" and its display number. */
 export function geodesicDisplayName(registry: RuntimeObjectReader, geodesicId: string): string {
-  return `G${resolveGeodesicNumber(registry, geodesicId)}`;
+  return beamName(resolveGeodesicNumber(registry, geodesicId));
 }
 
 /**
@@ -143,7 +144,7 @@ function withMeasuredGeodesicLengthTooltip(
   const label = formatMeasuredGeodesicLengthLabel(object, object.lengthMeters);
   return {
     ...object,
-    displayHelpMessage: "A persistent length result attached to a geodesic. Use the primary action to remove it.",
+    displayHelpMessage: "A measurement of one beam. Use the primary action to delete it.",
     tooltip: {
       label,
       rangeMeters: 3,

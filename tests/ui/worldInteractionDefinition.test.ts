@@ -22,37 +22,37 @@ describe("worldInteractionDefinition", () => {
       selectedTool: "none",
     });
 
-    expect(definition?.actions).toMatchObject([{ id: "edit-sign", intent: "context-menu", label: "Edit" }]);
-    expect(formatWorldFocusMessageTextForLegacyFallback(definition, "desktop")).toBe("Sign\nRight click / F - Edit");
+    expect(definition?.actions).toMatchObject([{ id: "edit-sign", intent: "context-menu", label: "Rename" }]);
+    expect(formatWorldFocusMessageTextForLegacyFallback(definition, "desktop")).toBe("Sign\nRight click / F - Rename");
   });
 
   it("emits context menu for geodesic emitters", () => {
     const definition = createWorldFocusMessageDefinition({
       object: {
-        ...baseObjectFields("geodesic-cannon-a", "geodesicEmitters/emitter", "Geodesic emitter"),
+        ...baseObjectFields("geodesic-cannon-a", "geodesicEmitters/emitter", "Laser"),
         geodesicIds: [],
         aimYawRadians: 0,
       } as RuntimeWorldObject,
       selectedTool: "none",
     });
 
-    expect(definition?.actions).toMatchObject([{ id: "open-object-menu", intent: "context-menu", label: "Emitter menu" }]);
-    expect(formatWorldFocusMessageTextForLegacyFallback(definition, "xr")).toBe("Geodesic emitter\nSide trigger - Emitter menu");
+    expect(definition?.actions).toMatchObject([{ id: "open-object-menu", intent: "context-menu", label: "Laser menu" }]);
+    expect(formatWorldFocusMessageTextForLegacyFallback(definition, "xr")).toBe("Laser\nSide trigger - Laser menu");
   });
 
   it("emits primary read action for help hubs", () => {
     const definition = createWorldFocusMessageDefinition({
       object: {
-        ...baseObjectFields("question-a", "asset", "Help hub"),
+        ...baseObjectFields("question-a", "asset", "Help cube"),
         assetPath: "questionblock/questionBlock.glb",
-        interactable: { label: "Read", action: "open-tutorial" },
+        interactable: { label: "Help", action: "open-tutorial" },
         tutorialPages: [{ title: "Move", body: "Use arrows." }],
       } as RuntimeWorldObject,
       selectedTool: "none",
     });
 
-    expect(definition?.actions).toMatchObject([{ id: "open-tutorial", intent: "primary", label: "Read" }]);
-    expect(formatWorldFocusMessageTextForLegacyFallback(definition, "desktop")).toBe("Help hub\nLeft click - Read");
+    expect(definition?.actions).toMatchObject([{ id: "open-tutorial", intent: "primary", label: "Help" }]);
+    expect(formatWorldFocusMessageTextForLegacyFallback(definition, "desktop")).toBe("Help cube\nLeft click - Help");
   });
 
   it("emits primary extend for open geodesic segments only when available", () => {
@@ -68,19 +68,19 @@ describe("worldInteractionDefinition", () => {
     });
 
     expect(definition?.actions).toMatchObject([{ id: "extend-geodesic", intent: "primary", label: "Extend" }]);
-    expect(formatWorldFocusMessageTextForLegacyFallback(definition, "desktop")).toBe("Geodesic G1\nLeft click - Extend");
-    expect(formatWorldFocusMessageTextForLegacyFallback(connected, "desktop")).toBe("Geodesic G1");
+    expect(formatWorldFocusMessageTextForLegacyFallback(definition, "desktop")).toBe("Beam 1\nLeft click - Extend");
+    expect(formatWorldFocusMessageTextForLegacyFallback(connected, "desktop")).toBe("Beam 1");
   });
 
   it("emits tool-specific primary actions for geodesic segments", () => {
     expect(createWorldFocusMessageDefinition({
       object: segment(),
       selectedTool: "geodesicMeasurements/length",
-    })?.actions).toMatchObject([{ id: "measure-length", label: "Measure length" }]);
+    })?.actions).toMatchObject([{ id: "measure-length", label: "Measure" }]);
     expect(createWorldFocusMessageDefinition({
       object: segment(),
       selectedTool: "geodesicMeasurements/protractor",
-    })?.actions).toMatchObject([{ id: "select-protractor-side", label: "Select side" }]);
+    })?.actions).toMatchObject([{ id: "select-protractor-side", label: "Pick beam" }]);
   });
 
   it("emits primary remove for measurements and angles", () => {
@@ -92,7 +92,7 @@ describe("worldInteractionDefinition", () => {
         labelPoint: { x: 0, y: 0, z: 0 },
       } as RuntimeWorldObject,
       selectedTool: "none",
-    })?.actions).toMatchObject([{ id: "remove-measurement", intent: "primary", label: "Remove" }]);
+    })?.actions).toMatchObject([{ id: "remove-measurement", intent: "primary", label: "Delete" }]);
 
     expect(createWorldFocusMessageDefinition({
       object: {
@@ -129,7 +129,7 @@ function baseObjectFields(id: string, kind: RuntimeWorldObject["kind"], label: s
 
 function segment(): RuntimeWorldObject {
   return {
-    ...baseObject("geodesicModel/segment", "Geodesic G1"),
+    ...baseObject("geodesicModel/segment", "Beam 1"),
     geodesicId: "g-a",
     segmentIndex: 0,
     start: { x: 0, y: 0, z: 0 },

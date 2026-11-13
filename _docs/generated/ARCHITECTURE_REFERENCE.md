@@ -5,7 +5,7 @@
 
 This reference is produced from the source code. For the *meaning* of the modules — the mathematical model they implement — read [../MATHEMATICAL_MODEL.md](../MATHEMATICAL_MODEL.md) and [../ARCHITECTURE.md](../ARCHITECTURE.md). For every exported symbol see [API_REFERENCE.md](API_REFERENCE.md).
 
-**289 modules, 57,267 lines** under `src/`.
+**291 modules, 57,483 lines** under `src/`.
 
 ## Layers
 
@@ -19,15 +19,15 @@ A module belongs to the layer named by its first path segment under `src/`. "May
 | `visibility` | 2 | 1,036 | `math`, `cell-complex` | Per-frame portal visibility: funnel clipping of portal-path tables against a camera. Pure; no renderer. |
 | `movement` | 13 | 2,929 | `math`, `cell-complex` | Player body, collision, movement and portal crossing in compiled cell complexes. |
 | `world-assets` | 1 | 201 | `cell-complex` | Floor-texture and asset descriptors. |
-| `world-objects` | 37 | 9,678 | `math`, `cell-complex`, `diagnostics`, `movement`, `world-assets` | Placeable runtime objects: registry, geodesic emitters, measurement tools, flags, creature behaviors. |
-| `authoring` | 5 | 762 | `math`, `cell-complex`, `examples`, `world-assets`, `world-objects` | World builder DSL, world-script compiler, validation and world catalog. |
+| `world-objects` | 38 | 9,868 | `math`, `cell-complex`, `diagnostics`, `movement`, `world-assets` | Placeable runtime objects: registry, geodesic emitters, measurement tools, flags, creature behaviors. |
+| `authoring` | 5 | 763 | `math`, `cell-complex`, `examples`, `world-assets`, `world-objects` | World builder DSL, world-script compiler, validation and world catalog. |
 | `glue` | 11 | 1,038 | `math`, `cell-complex`, `diagnostics`, `authoring` | Launch options, debug settings, tool ids, asset URLs, app configuration. |
 | `interaction` | 5 | 1,564 | `math`, `cell-complex`, `movement`, `world-objects`, `glue` | Renderer-free interaction logic: input frames, aim picking, VR locomotion, XR session state, carried-object portal transitions. |
 | `engine` | 10 | 1,667 | `math`, `cell-complex`, `diagnostics`, `movement`, `world-objects`, `glue`, `interaction` | The world engine core (design 013): step order, command queue, participants, module composition and ticks. Imports no module. |
-| `modules` | 29 | 2,739 | `math`, `cell-complex`, `diagnostics`, `movement`, `world-objects`, `glue`, `interaction`, `engine` | World modules (design 013): each owns a slice of world behaviour and exposes a typed api.ts to the others. |
-| `runtime` | 16 | 2,747 | `math`, `cell-complex`, `diagnostics`, `movement`, `world-objects`, `authoring`, `glue`, `engine`, `modules` | Application state, runtime menu state, command dispatch, geometry session/worker, server channel and public API. |
-| `ui` | 6 | 1,355 | `math`, `cell-complex`, `world-objects`, `authoring`, `glue`, `engine`, `modules`, `runtime` | Renderer-neutral palette, help, tooltip and input-intent definitions. |
-| `render` | 122 | 25,715 | every lower layer | Three.js / DOM / WebXR rendering and input adapters (the application shell). |
+| `modules` | 29 | 2,748 | `math`, `cell-complex`, `diagnostics`, `movement`, `world-objects`, `glue`, `interaction`, `engine` | World modules (design 013): each owns a slice of world behaviour and exposes a typed api.ts to the others. |
+| `runtime` | 16 | 2,748 | `math`, `cell-complex`, `diagnostics`, `movement`, `world-objects`, `authoring`, `glue`, `engine`, `modules` | Application state, runtime menu state, command dispatch, geometry session/worker, server channel and public API. |
+| `ui` | 7 | 1,367 | `math`, `cell-complex`, `world-objects`, `authoring`, `glue`, `engine`, `modules`, `runtime` | Renderer-neutral palette, help, tooltip and input-intent definitions. |
+| `render` | 122 | 25,718 | every lower layer | Three.js / DOM / WebXR rendering and input adapters (the application shell). |
 | `root` | 1 | 214 | every lower layer | Entry point. |
 
 ## Layer dependency graph
@@ -54,7 +54,7 @@ flowchart LR
   root["root"]
   authoring -->|6| cell_complex
   authoring -->|2| world_assets
-  authoring -->|4| world_objects
+  authoring -->|5| world_objects
   cell_complex -->|27| math
   diagnostics -->|1| cell_complex
   engine -->|3| cell_complex
@@ -73,7 +73,7 @@ flowchart LR
   modules -->|1| interaction
   modules -->|3| math
   modules -->|1| movement
-  modules -->|33| world_objects
+  modules -->|38| world_objects
   movement -->|15| cell_complex
   movement -->|24| math
   render -->|61| cell_complex
@@ -87,7 +87,7 @@ flowchart LR
   render -->|57| runtime
   render -->|18| ui
   render -->|8| visibility
-  render -->|89| world_objects
+  render -->|92| world_objects
   root -->|1| authoring
   root -->|2| cell_complex
   root -->|1| diagnostics
@@ -100,13 +100,13 @@ flowchart LR
   runtime -->|18| glue
   runtime -->|7| modules
   runtime -->|2| movement
-  runtime -->|8| world_objects
+  runtime -->|9| world_objects
   ui -->|1| authoring
   ui -->|2| cell_complex
   ui -->|1| engine
   ui -->|7| glue
   ui -->|3| runtime
-  ui -->|4| world_objects
+  ui -->|9| world_objects
   visibility -->|4| cell_complex
   visibility -->|4| math
   world_assets -->|1| cell_complex
@@ -211,7 +211,7 @@ None: every import respects the intended layering.
 | `world-objects/derived.ts` | 220 | The derived cache (design 014 section 4): a value defined by a full `compute` over a source, invalidated by relevant entries on the change ring and recomputed on the next read. | `world-objects/runtimeObjectChangeJournal` |
 | `world-objects/geodesic/anchors.ts` | 20 | Anchors of geodesic intervals: which registry objects can hold an endpoint, and where the beam of one starts in its cell frame. | `math/vec3`, `world-objects/geodesic/objects`, `world-objects/runtimeObjectRegistry` |
 | `world-objects/geodesic/arcIndex.ts` | 85 | The arc index (design 014 section 7.1): which arc ends sit on each anchor, built by one pass over the arcs and cached. | `world-objects/derived`, `world-objects/geodesic/objects`, `world-objects/runtimeObjectRegistry` |
-| `world-objects/geodesic/cannon.ts` | 885 | Emitter (cannon) operations: shooting, extending and re-aiming geodesics, connecting a geodesic to an emitter, rebuilding connected geodesics between emitters, and placing cannons on the floor, on a geodesic or at a geo… | `cell-complex/compileCellComplex`, `math/rigidTransform3`, `math/vec3`, `movement/collision`, `world-objects/geodesic/endpoints`, `world-objects/geodesic/intervals`, `world-objects/geodesic/lifecycle`, `world-objects/geodesic/objects`, `world-objects/geodesic/segments`, `world-objects/geodesic/trace`, `world-objects/runtimeObjectBase`, `world-objects/runtimeObjectRegistry` |
+| `world-objects/geodesic/cannon.ts` | 899 | Emitter (cannon) operations: shooting, extending and re-aiming geodesics, connecting a geodesic to an emitter, rebuilding connected geodesics between emitters, and placing cannons on the floor, on a geodesic or at a geo… | `cell-complex/compileCellComplex`, `math/rigidTransform3`, `math/vec3`, `movement/collision`, `world-objects/geodesic/endpoints`, `world-objects/geodesic/intervals`, `world-objects/geodesic/lifecycle`, `world-objects/geodesic/objects`, `world-objects/geodesic/segments`, `world-objects/geodesic/trace`, `world-objects/runtimeObjectBase`, `world-objects/runtimeObjectRegistry`, `world-objects/vocabulary` |
 | `world-objects/geodesic/cannonToolState.ts` | 13 | The editing state of the geodesic emitter (cannon) tools, as plain data: which cannon and geodesic the tool works on. | — |
 | `world-objects/geodesic/carryEnd.ts` | 86 | What an emitter does to its geodesics when it has been carried: the rebuild after a move and the final rebuild when the carry ends. | `cell-complex/compileCellComplex`, `world-objects/geodesic/cannon`, `world-objects/geodesic/endpoints`, `world-objects/geodesic/lifecycle`, `world-objects/geodesic/segments`, `world-objects/runtimeObjectRegistry` |
 | `world-objects/geodesic/cutAtEmitter.ts` | 167 | Cutting the arcs that pass through an emitter: an emitter set down on a geodesic's path becomes a point of it. | `cell-complex/compileCellComplex`, `world-objects/geodesic/intervals`, `world-objects/geodesic/objects`, `world-objects/geodesic/portalWord`, `world-objects/geodesic/segments`, `world-objects/runtimeObjectRegistry` |
@@ -220,18 +220,18 @@ None: every import respects the intended layering.
 | `world-objects/geodesic/intersections.ts` | 369 | Geodesic intersection markers: crossings of segments in the same cell, stable marker identities between updates, and the per-registry marker memory. | `math/rigidTransform3`, `math/vec2`, `math/vec3`, `world-objects/geodesic/objects`, `world-objects/runtimeObjectRegistry` |
 | `world-objects/geodesic/intervals.ts` | 877 | Interval rebuilds: realizing an interval's lifted chord, aiming free geodesics, splitting at a segment hit, rebuilding connected intervals after a carried anchor moved, and side-effect-free previews. | `cell-complex/compileCellComplex`, `math/rigidTransform3`, `math/vec3`, `world-objects/geodesic/anchors`, `world-objects/geodesic/endpoints`, `world-objects/geodesic/objects`, `world-objects/geodesic/portalWord`, `world-objects/geodesic/segments`, `world-objects/geodesic/trace`, `world-objects/runtimeObjectRegistry` |
 | `world-objects/geodesic/lifecycle.ts` | 118 | Queries whether an arc connects emitters or follows one, and removal of geodesics and cannons together with their derived objects. | `world-objects/geodesic/endpoints`, `world-objects/geodesic/objects`, `world-objects/geodesic/segments`, `world-objects/runtimeObjectRegistry` |
-| `world-objects/geodesic/objects.ts` | 557 | Geodesic emitters (formerly "cannons"), geodesic arcs and curve shortening on a glued cell complex. | `math/rigidTransform3`, `math/vec3`, `movement/dynamicObject`, `world-objects/carryHighlightShape`, `world-objects/runtimeObjectBase` |
+| `world-objects/geodesic/objects.ts` | 560 | Geodesic emitters (formerly "cannons"), geodesic arcs and curve shortening on a glued cell complex. | `math/rigidTransform3`, `math/vec3`, `movement/dynamicObject`, `world-objects/carryHighlightShape`, `world-objects/runtimeObjectBase`, `world-objects/vocabulary` |
 | `world-objects/geodesic/portalWord.ts` | 159 | Portal-word algebra of geodesic intervals: reversal, free reduction, comparison, role-aware sub-words and the update of a word when an anchor crosses a portal; pure, no registry access. | `cell-complex/compileCellComplex`, `world-objects/geodesic/objects` |
-| `world-objects/geodesic/segments.ts` | 403 | Derived geodesic segments: lookup by geodesic, building segments from traces with the start/end half split, lengths, tangents at anchors and display numbers. | `math/rigidTransform3`, `math/vec3`, `world-objects/geodesic/endpoints`, `world-objects/geodesic/objects`, `world-objects/runtimeObjectRegistry` |
+| `world-objects/geodesic/segments.ts` | 404 | Derived geodesic segments: lookup by geodesic, building segments from traces with the start/end half split, lengths, tangents at anchors and display numbers. | `math/rigidTransform3`, `math/vec3`, `world-objects/geodesic/endpoints`, `world-objects/geodesic/objects`, `world-objects/runtimeObjectRegistry`, `world-objects/vocabulary` |
 | `world-objects/geodesic/trace.ts` | 486 | Tracing a horizontal geodesic ray through a compiled cell complex: the single-cell tracer, the multi-cell walk on the segment-walk kernel, and forbidden-zone (open-disk) and emitter hits. | `cell-complex/compileCellComplex`, `cell-complex/segmentWalk`, `math/rigidTransform3`, `math/vec2`, `math/vec3`, `world-objects/geodesic/objects`, `world-objects/runtimeObjectRegistry` |
 | `world-objects/geodesic/vertices.ts` | 530 | Operations on the vertices of a piecewise-geodesic curve (design 013 section 13.1): the arcs at a vertex, their tangents and length, moving a vertex (each incident arc keeps its homotopy class: its word changes exactly … | `cell-complex/compileCellComplex`, `cell-complex/segmentWalk`, `math/rigidTransform3`, `math/vec3`, `world-objects/geodesic/anchors`, `world-objects/geodesic/arcIndex`, `world-objects/geodesic/endpoints`, `world-objects/geodesic/intervals`, `world-objects/geodesic/lifecycle`, `world-objects/geodesic/objects`, `world-objects/geodesic/portalWord`, `world-objects/geodesic/segments`, `world-objects/runtimeObjectRegistry` |
 | `world-objects/geodesicMarmot.ts` | 96 | Geodesic marmot: an autonomous creature that walks in a straight line (a locally straight geodesic) through the cell complex, crossing portals. | `cell-complex/specs`, `math/rigidTransform3`, `math/vec3`, `world-objects/runtimeObjectBase` |
-| `world-objects/helpHubCopy.ts` | 10 | Help-hub copy shared by the authoring layer (world tutorial text) and the ui layer (palette and help hubs), so both show identical wording. | — |
+| `world-objects/helpHubCopy.ts` | 11 | Help-hub copy shared by the authoring layer (world tutorial text) and the ui layer (palette and help hubs), so both show identical wording. | `world-objects/vocabulary` |
 | `world-objects/interactionRange.ts` | 12 | How far a person may be from a runtime object to interact with it: the one number the aim system (to focus and pick up) and the carry module (to refuse a pickup out of reach) both read. | `world-objects/runtimeObjectRegistry` |
 | `world-objects/library.ts` | 424 | World object library: the catalogue of named, ready-to-place objects available to world scripts (tree, house, bench, geo_mouse, geodesic_marmot, ...). | `cell-complex/specs`, `world-objects/geodesicMarmot`, `world-objects/objectMetadata`, `world-objects/simpleGeoCreature`, `world-objects/staticAssets` |
-| `world-objects/measureLengthTool.ts` | 238 | Measured-length tool: persistent "geodesic length = N m" labels attached to a geodesic. | `cell-complex/compileCellComplex`, `cell-complex/portalRoute`, `math/rigidTransform3`, `math/vec3`, `world-objects/geodesic/objects`, `world-objects/geodesic/segments`, `world-objects/runtimeObjectRegistry`, `world-objects/toolObjects` |
+| `world-objects/measureLengthTool.ts` | 239 | Measured-length tool: persistent "geodesic length = N m" labels attached to a geodesic. | `cell-complex/compileCellComplex`, `cell-complex/portalRoute`, `math/rigidTransform3`, `math/vec3`, `world-objects/geodesic/objects`, `world-objects/geodesic/segments`, `world-objects/runtimeObjectRegistry`, `world-objects/toolObjects`, `world-objects/vocabulary` |
 | `world-objects/objectMetadata.ts` | 8 | Collision class name ("user") of the player's avatar; objects listing it in `do_not_collide_with` do not block the player. | — |
-| `world-objects/placedFlags.ts` | 208 | Placed flags (signs): player-placed wooden signs carrying a short text label. | `cell-complex/compileCellComplex`, `math/rigidTransform3`, `math/vec3`, `movement/collision`, `movement/dynamicObject`, `world-objects/runtimeObjectBase`, `world-objects/runtimeObjectRegistry`, `world-objects/toolObjects` |
+| `world-objects/placedFlags.ts` | 209 | Placed flags (signs): player-placed wooden signs carrying a short text label. | `cell-complex/compileCellComplex`, `math/rigidTransform3`, `math/vec3`, `movement/collision`, `movement/dynamicObject`, `world-objects/runtimeObjectBase`, `world-objects/runtimeObjectRegistry`, `world-objects/toolObjects`, `world-objects/vocabulary` |
 | `world-objects/protractorTool.ts` | 587 | Protractor tool: persistent angle measurements between two geodesic directions at a common vertex. | `math/rigidTransform3`, `math/vec3`, `world-objects/geodesic/endpoints`, `world-objects/geodesic/intersections`, `world-objects/geodesic/objects`, `world-objects/geodesic/segments`, `world-objects/measureLengthTool`, `world-objects/runtimeObjectRegistry`, `world-objects/toolObjects` |
 | `world-objects/runtimeObjectBase.ts` | 94 | The fields every object in the runtime object registry shares, and the projection of such an object onto the movement/collision state. | `cell-complex/specs`, `math/rigidTransform3`, `movement/dynamicObject` |
 | `world-objects/runtimeObjectChangeJournal.ts` | 181 | Change journal of the runtime object registry (design 013 section 6.2) over a change ring with absolute sequence numbers (design 014 section 3.1). | — |
@@ -240,6 +240,7 @@ None: every import respects the intended layering.
 | `world-objects/staticAssets.ts` | 99 | Static asset authoring helper: converts author-facing parameters for a glTF decoration into an AssetObjectSpec. | `cell-complex/specs` |
 | `world-objects/toolObjects.ts` | 102 | Registry record types of the results of the player's tools: placed flags (signs), geodesic length labels and protractor angles. | `math/vec3`, `world-objects/geodesic/objects`, `world-objects/runtimeObjectBase` |
 | `world-objects/trackedReads.ts` | 153 | Read tracking for pure refresh functions (design 014 D1, D9): the exact set of registry reads a refresh made, and the test of whether a range of the change ring touches it. | `world-objects/derived`, `world-objects/runtimeObjectChangeJournal`, `world-objects/runtimeObjectRegistry` |
+| `world-objects/vocabulary.ts` | 169 | The student vocabulary (design 017 section 6): every student-visible noun, verb and subtitle of the app, in one place. | — |
 | `world-objects/worldObjectOwner.ts` | 137 | World object owners: the single authority on the pose of an object that can be moved (creatures, the marmot, collidable static assets). | `cell-complex/compileCellComplex`, `cell-complex/worldGeometryDeformations`, `math/rigidTransform3`, `movement/depenetrateDynamicObject`, `world-objects/runtimeObjectBase`, `world-objects/runtimeObjectRegistry` |
 
 ### `authoring`
@@ -249,7 +250,7 @@ None: every import respects the intended layering.
 | `authoring/compileWorldScript.ts` | 105 | World-script compiler: runs a world script's JavaScript text against a sandboxed name scope and returns the resulting CellComplexSpec (authoring script -> CellComplexSpec stage of the pipeline). | `authoring/worldBuilder`, `cell-complex/specs`, `world-assets/floorTextures`, `world-objects/library` |
 | `authoring/exampleWorlds.ts` | 62 | Bundled example worlds: compiles the .world.js scripts in src/examples/ (imported as raw text) into CellComplexSpec constants at module load. | `authoring/compileWorldScript`, `cell-complex/specs` |
 | `authoring/validateAuthoringSpec.ts` | 11 | Compatibility re-export of the spec validator, which now lives in cell-complex/validateCellComplexSpec so the compiler does not import the authoring layer. | `cell-complex/validateCellComplexSpec` |
-| `authoring/worldBuilder.ts` | 478 | World builder: the imperative API behind the world-script DSL that assembles a CellComplexSpec. | `cell-complex/prismBase`, `cell-complex/specs`, `world-assets/floorTextures`, `world-objects/helpHubCopy`, `world-objects/library`, `world-objects/staticAssets` |
+| `authoring/worldBuilder.ts` | 479 | World builder: the imperative API behind the world-script DSL that assembles a CellComplexSpec. | `cell-complex/prismBase`, `cell-complex/specs`, `world-assets/floorTextures`, `world-objects/helpHubCopy`, `world-objects/library`, `world-objects/staticAssets`, `world-objects/vocabulary` |
 | `authoring/worldCatalog.ts` | 106 | World catalog: the list of selectable bundled worlds and the lookup that turns a world id (or a file-like name) into a CellComplexSpec. | `authoring/exampleWorlds`, `cell-complex/specs` |
 
 ### `glue`
@@ -306,24 +307,24 @@ None: every import respects the intended layering.
 | `modules/curveShortening/module.ts` | 92 | The curve shortening module (design 013 section 13.2, design 014 sections 2.1 and 9): the flow that straightens the curves whose vertices the geodesic model has tied. | `engine/moduleTypes`, `modules/curveShortening/api`, `modules/curveShortening/flow`, `modules/curveShortening/policies`, `modules/geodesicModel/api`, `world-objects/runtimeObjectRegistry` |
 | `modules/curveShortening/policies.ts` | 23 | The policies of the curve shortening flow (design 013 section 13.2): how far a vertex may move in one step. | `modules/curveShortening/api` |
 | `modules/geodesicEmitters/api.ts` | 152 | The geodesic emitters' public face (design 013 sections 12.1 and 16): the emitter tool's id, the plain-data shapes of the module's commands and their results, and the stable refusal codes. | `engine/moduleTypes`, `math/rigidTransform3`, `world-objects/geodesic/objects` |
-| `modules/geodesicEmitters/client.ts` | 141 | The geodesic emitters' client part (design 013 sections 8.3 and 9.1): the emitter tool, and the requests the emitter's menu page and a click on a geodesic make. | `engine/moduleTypes`, `modules/geodesicEmitters/api`, `modules/geodesicModel/api`, `world-objects/geodesic/objects` |
+| `modules/geodesicEmitters/client.ts` | 142 | The geodesic emitters' client part (design 013 sections 8.3 and 9.1): the emitter tool, and the requests the emitter's menu page and a click on a geodesic make. | `engine/moduleTypes`, `modules/geodesicEmitters/api`, `modules/geodesicModel/api`, `world-objects/geodesic/objects`, `world-objects/vocabulary` |
 | `modules/geodesicEmitters/index.ts` | 6 | The geodesic emitters module's factories (design 013 section 12.1): `geodesicEmittersModule` is the world part, `geodesicEmittersClient` the client part (the emitter tool); the rotate and aim tools are the shell's yaw s… | `modules/geodesicEmitters/client`, `modules/geodesicEmitters/module` |
 | `modules/geodesicEmitters/module.ts` | 332 | The geodesic emitters module (design 013 section 16): an emitter and what a person does to create or remove it and its geodesics, as commands. | `engine/moduleTypes`, `math/rigidTransform3`, `modules/geodesicEmitters/api`, `modules/geodesicModel/api`, `world-objects/geodesic/cannon`, `world-objects/geodesic/objects`, `world-objects/runtimeObjectRegistry` |
 | `modules/geodesicMeasurements/api.ts` | 79 | The geodesic measurements' public face (design 013 sections 12.1 and 16): the ids of the two tools, the plain-data shapes of the module's commands and their results, and the stable refusal codes. | `engine/moduleTypes`, `world-objects/toolObjects` |
-| `modules/geodesicMeasurements/client.ts` | 129 | The geodesic measurements' client part (design 013 sections 8.3 and 9.1): the length tool and the protractor, and the removal a click on a label asks for. | `engine/moduleTypes`, `modules/geodesicMeasurements/api`, `world-objects/protractorTool` |
+| `modules/geodesicMeasurements/client.ts` | 132 | The geodesic measurements' client part (design 013 sections 8.3 and 9.1): the length tool and the protractor, and the removal a click on a label asks for. | `engine/moduleTypes`, `modules/geodesicMeasurements/api`, `world-objects/protractorTool`, `world-objects/vocabulary` |
 | `modules/geodesicMeasurements/index.ts` | 6 | The geodesic measurements module's factories (design 013 section 12.1): `geodesicMeasurementsModule` is the world part, `geodesicMeasurementsClient` the client part (the length tool and the protractor). | `modules/geodesicMeasurements/client`, `modules/geodesicMeasurements/module` |
 | `modules/geodesicMeasurements/module.ts` | 308 | The geodesic measurements module (design 013 section 6.4, design 014 D9): the length labels and protractor angles, made and removed by its commands and kept current by two derive ticks that read the change ring. | `engine/moduleTypes`, `engine/participants`, `modules/geodesicMeasurements/api`, `modules/geodesicModel/api`, `world-objects/derived`, `world-objects/measureLengthTool`, `world-objects/protractorTool`, `world-objects/runtimeObjectRegistry`, `world-objects/toolObjects`, `world-objects/trackedReads` |
 | `modules/geodesicModel/api.ts` | 239 | The geodesic model's public face (design 013 sections 12.1 and 13.1): its token, the read-only queries clients and dependents share, the operations only dependents hold, and the plain-data shapes of its commands and eve… | `engine/moduleTypes`, `world-objects/geodesic/objects`, `world-objects/geodesic/vertices` |
 | `modules/geodesicModel/client.ts` | 13 | The geodesic model's client part (design 013 sections 9.1 and 12.1): the tools the module contributes to the shell. | `engine/moduleTypes`, `modules/geodesicModel/api`, `modules/geodesicModel/tieTool` |
 | `modules/geodesicModel/index.ts` | 6 | The geodesic model module's factories (design 013 section 12.1): `geodesicModelModule` is the world part, `geodesicModelClient` the client part (the tie tool). | `modules/geodesicModel/client`, `modules/geodesicModel/module` |
 | `modules/geodesicModel/module.ts` | 273 | The geodesic model module (design 013 section 13.1): piecewise geodesics on the glued complex as a world module. | `engine/moduleTypes`, `modules/geodesicModel/api`, `world-objects/geodesic/cannon`, `world-objects/geodesic/carryEnd`, `world-objects/geodesic/cutAtEmitter`, `world-objects/geodesic/endpoints`, `world-objects/geodesic/intersections`, `world-objects/geodesic/intervals`, `world-objects/geodesic/lifecycle`, `world-objects/geodesic/segments`, `world-objects/geodesic/vertices` |
-| `modules/geodesicModel/tieTool.ts` | 114 | The tie tool, the client part of `geodesicModel/tie` (design 013 sections 8.3 and 13.1): started from an emitter's menu page, it takes two endpoint roles of the emitter's geodesics that connect emitters, then asks the w… | `engine/moduleTypes`, `modules/geodesicModel/api` |
+| `modules/geodesicModel/tieTool.ts` | 115 | The tie tool, the client part of `geodesicModel/tie` (design 013 sections 8.3 and 13.1): started from an emitter's menu page, it takes two endpoint roles of the emitter's geodesics that connect emitters, then asks the w… | `engine/moduleTypes`, `modules/geodesicModel/api`, `world-objects/vocabulary` |
 | `modules/placedFlags/api.ts` | 60 | The placed flags' public face (design 013 sections 12.1 and 16): the sign tool's id, the flag kind, the plain-data shapes of the module's commands and their results, and the stable refusal codes. | `engine/moduleTypes`, `world-objects/toolObjects` |
-| `modules/placedFlags/client.ts` | 59 | The placed flags' client part (design 013 sections 8.3 and 9.1): the sign tool, and the requests the sign's menu page makes. | `engine/moduleTypes`, `modules/placedFlags/api` |
+| `modules/placedFlags/client.ts` | 61 | The placed flags' client part (design 013 sections 8.3 and 9.1): the sign tool, and the requests the sign's menu page makes. | `engine/moduleTypes`, `modules/placedFlags/api`, `world-objects/vocabulary` |
 | `modules/placedFlags/index.ts` | 6 | The placed flags module's factories (design 013 section 12.1): `placedFlagsModule` is the world part, `placedFlagsClient` the client part (the sign tool). | `modules/placedFlags/client`, `modules/placedFlags/module` |
 | `modules/placedFlags/module.ts` | 83 | The placed flags module (design 013 section 16): a flag and what a person does to it, as commands over `src/world-objects/placedFlags.ts`. | `engine/moduleTypes`, `modules/placedFlags/api`, `world-objects/placedFlags`, `world-objects/toolObjects` |
 | `modules/worldMap/api.ts` | 14 | The world map's public face (design 013 section 12.1): the tool's id. | — |
-| `modules/worldMap/client.ts` | 32 | The world map's client part (design 013 sections 8.3 and 9.1): the map tool. | `engine/moduleTypes`, `modules/worldMap/api` |
+| `modules/worldMap/client.ts` | 34 | The world map's client part (design 013 sections 8.3 and 9.1): the map tool. | `engine/moduleTypes`, `modules/worldMap/api`, `world-objects/vocabulary` |
 | `modules/worldMap/index.ts` | 7 | The world map module's factories (design 013 section 12.1): `worldMapModule` is the world part, `worldMapClient` the client part (the map tool). | `modules/worldMap/api`, `modules/worldMap/client`, `modules/worldMap/module` |
 | `modules/worldMap/module.ts` | 20 | The world map module (design 013 section 16): it defines the map tool, so the engine can gate it. | `engine/moduleTypes`, `modules/worldMap/api` |
 
@@ -335,7 +336,7 @@ None: every import respects the intended layering.
 | `runtime/applyRuntimeCommand.ts` | 329 | The one command path: applyRuntimeCommand(session, command) changes the session through a pure reducer and returns the effects the host must run. | `glue/appConfig`, `glue/debugOptions`, `glue/debugSettings`, `glue/toolIds`, `runtime/clientSession`, `runtime/runtimeCommands`, `runtime/runtimeMenuState` |
 | `runtime/appState.ts` | 42 | Defines AppState, the initial immutable bundle of compiled world, player body and player pose that main.ts hands to the renderer, and the factory that builds it. | `cell-complex/compileCellComplex`, `movement/playerBody`, `movement/playerPose` |
 | `runtime/clientSession.ts` | 73 | The client session: the one record that holds how one person is interacting with a running world (menu, selected tool, tool picks, debug and comfort settings), and the cell that owns it. | `glue/appConfig`, `glue/debugSettings`, `glue/toolIds`, `glue/vrComfortOptions`, `runtime/runtimeMenuState`, `world-objects/geodesic/cannonToolState` |
-| `runtime/coreTools.ts` | 73 | The descriptors of the tools the shell defines itself (design 013 section 8.3): the emitter's carry, rotate and aim sub-modes. | `engine/moduleTypes` |
+| `runtime/coreTools.ts` | 74 | The descriptors of the tools the shell defines itself (design 013 section 8.3): the emitter's carry, rotate and aim sub-modes. | `engine/moduleTypes`, `world-objects/vocabulary` |
 | `runtime/experience.ts` | 27 | The default experience (design 013 section 12.1): the world modules the app composes into its engine, in list order. | `engine/moduleTypes`, `engine/worldEngine`, `modules/carry/index`, `modules/curveShortening/index`, `modules/geodesicEmitters/index`, `modules/geodesicMeasurements/index`, `modules/geodesicModel/index`, `modules/placedFlags/index`, `modules/worldMap/index` |
 | `runtime/publicApi.ts` | 69 | Holder of the public API object `window.noneuclid.api`: a plain object of namespaces of functions that are calls on the app's state. | `runtime/apiCall` |
 | `runtime/runtimeCommands.ts` | 165 | Defines RuntimeCommand, the closed discriminated union of every action the UI can request (a palette or menu press, a key, an API call), and RuntimeEffect, what a command asks the host to do beyond changing the session. | `cell-complex/specs`, `engine/moduleTypes`, `glue/debugSettings`, `glue/portalPanelMode`, `glue/toolIds`, `runtime/clientSession`, `runtime/runtimeMenuState`, `world-objects/geodesic/cannonToolState`, `world-objects/toolObjects` |
@@ -352,12 +353,13 @@ None: every import respects the intended layering.
 
 | Module | Lines | Summary | Imports |
 | --- | ---: | --- | --- |
-| `ui/helpLensDefinition.ts` | 131 | Renderer-neutral definition of the contextual "help lens" panel shown on desktop and in VR: a title, a body sentence and rows pairing an input glyph with an action label. | `glue/toolIds`, `runtime/toolRegistry`, `ui/inputIntents`, `ui/inputModeText`, `ui/worldInteractionDefinition` |
+| `ui/helpLensDefinition.ts` | 132 | Renderer-neutral definition of the contextual "help lens" panel shown on desktop and in VR: a title, a body sentence and rows pairing an input glyph with an action label. | `glue/toolIds`, `runtime/toolRegistry`, `ui/inputIntents`, `ui/inputModeText`, `ui/worldInteractionDefinition`, `world-objects/vocabulary` |
 | `ui/inputIntents.ts` | 116 | Maps abstract input intents (move, primary action, context menu, help, ...) to the label and optional icon that show the player which physical control performs them in desktop or XR mode. | `cell-complex/specs`, `glue/assetUrls` |
 | `ui/inputModeText.ts` | 49 | Shared text rewriter that turns device-neutral help sentences into desktop or XR wording. | `ui/inputIntents` |
-| `ui/paletteDefinition.ts` | 737 | Renderer-neutral definition of the tool/settings palette: createPaletteDefinition turns a RuntimeMenuState plus the app config and input mode into a PaletteDefinition, a plain-data description (header actions plus one p… | `authoring/worldCatalog`, `cell-complex/deformations/torusModuli`, `engine/moduleTypes`, `glue/appConfig`, `glue/assetUrls`, `glue/portalPanelMode`, `glue/toolIds`, `runtime/runtimeMenuState`, `runtime/toolRegistry`, `ui/inputIntents`, `ui/inputModeText`, `world-objects/helpHubCopy`, `world-objects/placedFlags`, `world-objects/toolObjects` |
-| `ui/paletteTooltips.ts` | 95 | Resolves the tooltip text for palette items from their string item ids. | — |
-| `ui/worldInteractionDefinition.ts` | 227 | Renderer-neutral description of what the player can do with the world object they are focusing: its title and a prioritized list of actions, each bound to an abstract input intent. | `glue/toolIds`, `ui/inputIntents`, `world-objects/runtimeObjectRegistry` |
+| `ui/paletteDefinition.ts` | 738 | Renderer-neutral definition of the tool/settings palette: createPaletteDefinition turns a RuntimeMenuState plus the app config and input mode into a PaletteDefinition, a plain-data description (header actions plus one p… | `authoring/worldCatalog`, `cell-complex/deformations/torusModuli`, `engine/moduleTypes`, `glue/appConfig`, `glue/assetUrls`, `glue/portalPanelMode`, `glue/toolIds`, `runtime/runtimeMenuState`, `runtime/toolRegistry`, `ui/inputIntents`, `ui/inputModeText`, `world-objects/helpHubCopy`, `world-objects/placedFlags`, `world-objects/toolObjects`, `world-objects/vocabulary` |
+| `ui/paletteTooltips.ts` | 99 | Resolves the tooltip text for palette items from their string item ids. | `world-objects/vocabulary` |
+| `ui/vocabulary.ts` | 5 | The student vocabulary under the name design 017 section 6.5 gives it. | `world-objects/vocabulary` |
+| `ui/worldInteractionDefinition.ts` | 228 | Renderer-neutral description of what the player can do with the world object they are focusing: its title and a prioritized list of actions, each bound to an abstract input intent. | `glue/toolIds`, `ui/inputIntents`, `world-objects/runtimeObjectRegistry`, `world-objects/vocabulary` |
 
 ### `render`
 
@@ -407,13 +409,13 @@ None: every import respects the intended layering.
 | `render/three/helpLensRenderer.ts` | 301 | Help panel ("help lens") renderer: shows the current contextual help definition either as a DOM panel (desktop) or as a floating textured plane in front of the camera (XR). | `glue/assetUrls`, `render/three/canvasDrawing`, `ui/helpLensDefinition` |
 | `render/three/measureLengthRenderer.ts` | 104 | Renderer for measured-geodesic-length labels placed in the world. | `render/three/runtimeSceneUtils`, `render/three/worldAxes`, `render/three/worldResultBadge`, `world-objects/measureLengthTool`, `world-objects/toolObjects` |
 | `render/three/palette/adapterTypes.ts` | 84 | Option and handle types of the in-scene palette panel adapter (the contract between the scene palette controller and the panel builders). | `glue/portalPanelMode`, `glue/toolIds`, `runtime/runtimeMenuState`, `ui/paletteDefinition`, `world-objects/toolObjects` |
-| `render/three/palette/header.ts` | 240 | The palette panel header row: left action (plus home and reload on the main page), contextual actions and the right action. | `render/three/palette/adapterTypes`, `render/three/palette/icons`, `render/three/palette/tokens`, `render/three/palette/widgets`, `render/three/vrPaletteHeaderActions`, `ui/paletteDefinition` |
+| `render/three/palette/header.ts` | 241 | The palette panel header row: left action (plus home and reload on the main page), contextual actions and the right action. | `render/three/palette/adapterTypes`, `render/three/palette/icons`, `render/three/palette/tokens`, `render/three/palette/widgets`, `render/three/vrPaletteHeaderActions`, `ui/paletteDefinition`, `world-objects/vocabulary` |
 | `render/three/palette/icons.ts` | 284 | Icon factories of the in-scene palette panel: each wraps an Image, a lucide icon or a small container and records its source in userData.scenePaletteIconSrc for inspection. | `glue/assetUrls`, `glue/toolIds`, `render/three/palette/tokens`, `ui/paletteDefinition`, `world-objects/toolObjects` |
 | `render/three/palette/latticeDiagram.ts` | 218 | The world-deformation lattice diagram shown on the geometry computer page: a small parallelogram of lattice points with labels, drawn with uikit containers. | `render/three/palette/tokens`, `ui/paletteDefinition` |
 | `render/three/palette/pages/debugSettings.ts` | 224 | Settings palette pages: the world, config, debug and comfort settings page and the debug settings page. | `glue/portalPanelMode`, `render/three/palette/adapterTypes`, `render/three/palette/tokens`, `render/three/palette/widgets`, `runtime/runtimeMenuState`, `ui/paletteDefinition` |
-| `render/three/palette/pages/geodesicActions.ts` | 117 | Geodesic cannon palette page: a scrollable list with one row per geodesic. | `render/three/palette/adapterTypes`, `render/three/palette/icons`, `render/three/palette/tokens`, `render/three/palette/widgets`, `ui/paletteDefinition` |
+| `render/three/palette/pages/geodesicActions.ts` | 118 | Geodesic cannon palette page: a scrollable list with one row per geodesic. | `render/three/palette/adapterTypes`, `render/three/palette/icons`, `render/three/palette/tokens`, `render/three/palette/widgets`, `ui/paletteDefinition`, `world-objects/vocabulary` |
 | `render/three/palette/pages/geometryComputer.ts` | 109 | Geometry computer palette page: target stepping controls, the lattice diagram and the go button. | `render/three/palette/adapterTypes`, `render/three/palette/latticeDiagram`, `render/three/palette/tokens`, `render/three/palette/widgets`, `ui/paletteDefinition` |
-| `render/three/palette/pages/help.ts` | 310 | Help palette pages: the question-mark hub, the tutorial's index of pages, and the paged tutorial and goal pages (title, optional picture, body, and control rows that show the input icon of the current device). | `render/three/palette/adapterTypes`, `render/three/palette/tokens`, `render/three/palette/widgets`, `ui/paletteDefinition` |
+| `render/three/palette/pages/help.ts` | 311 | Help palette pages: the question-mark hub, the tutorial's index of pages, and the paged tutorial and goal pages (title, optional picture, body, and control rows that show the input icon of the current device). | `render/three/palette/adapterTypes`, `render/three/palette/tokens`, `render/three/palette/widgets`, `ui/paletteDefinition`, `world-objects/vocabulary` |
 | `render/three/palette/pages/main.ts` | 96 | Main palette page: a row of tool tiles, with the place-flag tile showing the currently selected sign type. | `glue/toolIds`, `render/three/palette/adapterTypes`, `render/three/palette/icons`, `render/three/palette/tokens`, `render/three/palette/widgets`, `ui/paletteDefinition`, `world-objects/toolObjects` |
 | `render/three/palette/pages/signs.ts` | 218 | Sign palette pages: the place-sign options page and the sign editor with its on-panel keyboard. | `render/three/palette/adapterTypes`, `render/three/palette/icons`, `render/three/palette/tokens`, `render/three/palette/widgets`, `ui/paletteDefinition`, `world-objects/toolObjects` |
 | `render/three/palette/scenePaletteAdapter.ts` | 125 | Builds the in-scene tool palette panel as a @pmndrs/uikit component tree from a renderer-neutral PaletteDefinition (src/ui/paletteDefinition.ts). | `render/three/palette/adapterTypes`, `render/three/palette/header`, `render/three/palette/pages/debugSettings`, `render/three/palette/pages/geodesicActions`, `render/three/palette/pages/geometryComputer`, `render/three/palette/pages/help`, `render/three/palette/pages/main`, `render/three/palette/pages/signs`, `render/three/palette/tokens`, `render/three/palette/widgets`, `render/three/scenePaletteLayout`, `ui/paletteDefinition` |
@@ -500,3 +502,4 @@ Modules not reachable from `src/main.ts`. They are exercised only by tests; revi
 - `math/intersections.ts`
 - `math/planes.ts`
 - `movement/dynamicObjectMotion.ts`
+- `ui/vocabulary.ts`

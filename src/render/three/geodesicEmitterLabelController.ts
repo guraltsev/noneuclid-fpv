@@ -1,7 +1,7 @@
 /**
  * Keeps the floating geodesic-name labels next to nearby emitters in sync with the registry.
  *
- * Each frame, one billboard label ("G<number>") exists per (cannon, geodesic) pair in the runtime registry;
+ * Each frame, one billboard label ("Beam <number>") exists per (cannon, geodesic) pair in the runtime registry;
  * labels are shown only for cannons in the player's current cell within the label range (meters, measured
  * in the cell-local xy plane). Labels are created lazily, recreated when their text changes, and
  * removed and disposed when their cannon or geodesic disappears. The label map is owned by the caller.
@@ -64,7 +64,7 @@ export interface GeodesicEmitterLabelControllerDeps {
 /**
  * Creates the emitter-label controller and returns its update and naming functions.
  *
- * `updateGeodesicEmitterLabels` is called once per frame; `getGeodesicLabelsById` maps geodesic ids to their "G<n>" names. There is no dispose function: remaining labels live in
+ * `updateGeodesicEmitterLabels` is called once per frame; `getGeodesicLabelsById` maps geodesic ids to their "Beam <n>" names. There is no dispose function: remaining labels live in
  * the caller-owned map and scene.
  */
 export function createGeodesicEmitterLabelController(deps: GeodesicEmitterLabelControllerDeps) {

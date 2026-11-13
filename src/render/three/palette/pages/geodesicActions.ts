@@ -8,6 +8,7 @@ import type { ScenePaletteAdapterOptions } from "../adapterTypes";
 import { actionColor, borderColor, inactiveColor, scrollbarBorderColor, scrollbarColor, sectionColor, textColor } from "../tokens";
 import { createGeodesicCannonActionIcon, createConnectedGeodesicSegmentStatus } from "../icons";
 import { createButtonText, createInteractiveSurface, createSectionLabel } from "../widgets";
+import { objectActions, toolNames } from "../../../../world-objects/vocabulary";
 
 /**
  * Geodesic cannon page: a scrollable list with one row per geodesic (label, connected-status icon or Aim button, delete button).
@@ -27,7 +28,7 @@ export function buildGeodesicCannonActionsContent(
     borderColor,
     borderWidth: 2,
   });
-  panel.add(createSectionLabel("Geodesic emitter"));
+  panel.add(createSectionLabel(toolNames["geodesicEmitters/emitter"].name));
 
   const list = new Container({
     width: "100%",
@@ -86,7 +87,7 @@ export function buildGeodesicCannonActionsContent(
         backgroundColor: "#334155",
         onClick: () => {},
       });
-      status.name = geodesic.connectionSymbolLabel ?? "Locked geodesic segment between emitters";
+      status.name = geodesic.connectionSymbolLabel ?? "Linked beam: a beam from one laser to another";
       status.add(createConnectedGeodesicSegmentStatus());
       row.add(status);
     }
@@ -95,7 +96,7 @@ export function buildGeodesicCannonActionsContent(
       const aimButton = createInteractiveSurface({
         width: 112,
         height: 42,
-        label: "Aim",
+        label: objectActions.aim,
         labelFontSize: 16,
         disabled: false,
         backgroundColor: actionColor,

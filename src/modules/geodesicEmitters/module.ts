@@ -59,8 +59,8 @@ function answer(value: GeodesicEmittersResult): CommandResult {
 }
 
 // Functions, not constants: a result reaches an in-page caller by reference, and an edit there must not reach the next caller.
-const notAnEmitter = (): CommandResult => refuse(geodesicEmittersRefusals.notAnEmitter, "That is not an emitter.");
-const tooShort = (): CommandResult => refuse(geodesicEmittersRefusals.tooShort, "That is too short for a geodesic.");
+const notAnEmitter = (): CommandResult => refuse(geodesicEmittersRefusals.notAnEmitter, "That is not a laser.");
+const tooShort = (): CommandResult => refuse(geodesicEmittersRefusals.tooShort, "That is too short for a beam.");
 
 function emitterAt(objects: RuntimeObjectReader, id: string): GeodesicEmitterObject | undefined {
   const object = objects.get(id);
@@ -107,8 +107,8 @@ function createPlace(model: GeodesicModelQueries) {
     });
     if (!placed.placed || placed.object === undefined) {
       return placed.reason === "too-short"
-        ? refuse(geodesicEmittersRefusals.tooShort, "That is too near the start of the geodesic.")
-        : refuse(geodesicEmittersRefusals.blocked, "An emitter cannot stand there.");
+        ? refuse(geodesicEmittersRefusals.tooShort, "That is too near the start of the beam.")
+        : refuse(geodesicEmittersRefusals.blocked, "A laser cannot stand there.");
     }
     return answer({ outcome: "placed", emitterId: placed.object.id, arcIds: model.arcsOnEmitter(placed.object.id) });
   };
@@ -129,7 +129,7 @@ function shoot(command: GeodesicEmitterShootCommand, ctx: CommandContext): Comma
 function createExtend(model: GeodesicModelQueries) {
   return (command: GeodesicEmitterExtendCommand, ctx: CommandContext): CommandResult => {
     const emitterId = model.emitterOfArc(command.arcId);
-    if (emitterId === undefined) return refuse(geodesicEmittersRefusals.notAttached, "That geodesic has no emitter.");
+    if (emitterId === undefined) return refuse(geodesicEmittersRefusals.notAttached, "That beam has no laser.");
     if (!isLongEnough(command.lengthMeters)) return tooShort();
     const extension: GeodesicExtendArcCommand = { kind: "geodesicModel/extendArc", arcId: command.arcId, lengthMeters: command.lengthMeters };
     const extended = ctx.dispatch(extension);
@@ -142,7 +142,7 @@ function createDeleteGeodesic(model: GeodesicModelQueries) {
   return (command: GeodesicEmitterDeleteGeodesicCommand, ctx: CommandContext): CommandResult => {
     if (emitterAt(ctx.objects, command.emitterId) === undefined) return notAnEmitter();
     if (!model.arcsOnEmitter(command.emitterId).includes(command.arcId)) {
-      return refuse(geodesicEmittersRefusals.notAttached, "That geodesic is not on this emitter.");
+      return refuse(geodesicEmittersRefusals.notAttached, "That beam is not on this laser.");
     }
     const removal: GeodesicRemoveCurveCommand = { kind: "geodesicModel/removeCurve", arcIds: [command.arcId] };
     ctx.dispatch(removal);
@@ -181,7 +181,7 @@ function createBeginEdit(model: GeodesicModelQueries) {
     if (participant === undefined) return refuse("world/unknownParticipant", `There is no participant "${ctx.participantId}".`);
     if (emitterAt(ctx.objects, command.emitterId) === undefined) return notAnEmitter();
     const held = participantAttachment(participant, geodesicEmitterEditAttachmentKind);
-    if (held !== undefined && held.objectId !== command.emitterId) return refuse(geodesicEmittersRefusals.alreadyEdited, "You are already editing an emitter.");
+    if (held !== undefined && held.objectId !== command.emitterId) return refuse(geodesicEmittersRefusals.alreadyEdited, "You are already turning a laser.");
 
     // First come, first served: a carry and an edit are the same kind of hold on the emitter. Only this participant's own edit may go on.
     let holder: string | undefined;
@@ -195,8 +195,8 @@ function createBeginEdit(model: GeodesicModelQueries) {
 
     const { arcId } = command;
     if (arcId !== undefined) {
-      if (!model.arcsOnEmitter(command.emitterId).includes(arcId)) return refuse(geodesicEmittersRefusals.notAttached, "That geodesic is not on this emitter.");
-      if (model.connectsEmitters(arcId) || model.isTied(arcId)) return refuse(geodesicEmittersRefusals.blocked, "That geodesic cannot be turned.");
+      if (!model.arcsOnEmitter(command.emitterId).includes(arcId)) return refuse(geodesicEmittersRefusals.notAttached, "That beam is not on this laser.");
+      if (model.connectsEmitters(arcId) || model.isTied(arcId)) return refuse(geodesicEmittersRefusals.blocked, "That beam cannot be turned.");
     }
 
     ctx.setAttachments(participant.id, [
