@@ -215,7 +215,9 @@ export type TutorialInputIntent =
   | "cancel"
   | "reset"
   | "hand"
-  | "undo";
+  | "undo"
+  | "switch-tool"
+  | "main-menu";
 
 /** One row of a tutorial page's control list: the input, and what it does here. */
 export interface TutorialControlSpec {

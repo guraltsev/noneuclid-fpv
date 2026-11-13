@@ -729,113 +729,140 @@ img.desktop-tool-tile-icon {
   box-shadow: 0 0 10px rgb(56 242 255 / 35%);
 }
 
-.desktop-tool-indicator {
+.tool-belt {
   position: fixed;
-  left: 1rem;
-  bottom: 1rem;
-  z-index: 10;
+  left: 50%;
+  bottom: 0.75rem;
+  z-index: 40;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 0.55rem;
-  min-height: 2.75rem;
-  padding: 0.45rem 0.7rem;
-  border: 1px solid rgb(226 232 240 / 48%);
-  border-radius: 8px;
-  background: rgb(10 17 20 / 82%);
-  color: #f8fafc;
-  box-shadow: 0 0.45rem 1.25rem rgb(0 0 0 / 32%);
+  gap: 0.4rem;
+  transform: translateX(-50%);
+  max-width: calc(100vw - 1rem);
   pointer-events: none;
 }
 
-.desktop-tool-indicator[hidden] {
+.tool-belt[hidden] {
   display: none;
 }
 
-.desktop-tool-indicator-icon {
+.tool-belt-hint {
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  background: rgb(10 17 20 / 90%);
+  color: #f8fafc;
+  font: 600 0.85rem/1.2 system-ui, sans-serif;
+  white-space: nowrap;
+}
+
+.tool-belt-hint[hidden] {
+  display: none;
+}
+
+.tool-belt-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.35rem;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid rgb(226 232 240 / 48%);
+  border-radius: 10px;
+  background: rgb(10 17 20 / 82%);
+  box-shadow: 0 0.45rem 1.25rem rgb(0 0 0 / 32%);
+}
+
+.tool-belt-slot {
   position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.15rem;
+  min-width: 3.1rem;
+  padding: 0.2rem 0.3rem 0.25rem;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: #f8fafc;
+  font: inherit;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.tool-belt-slot:hover {
+  background: rgb(255 255 255 / 10%);
+}
+
+.tool-belt-slot-active {
+  transform: translateY(-0.35rem);
+  border-color: #facc15;
+  background: rgb(250 204 21 / 16%);
+}
+
+.tool-belt-slot-disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.tool-belt-key {
+  font: 800 0.7rem/1 system-ui, sans-serif;
+  color: #cbd5e1;
+}
+
+.tool-belt-icon {
   display: grid;
   place-items: center;
   width: 2rem;
   height: 2rem;
 }
 
-.desktop-tool-indicator-svg,
-.desktop-tool-indicator-sign-icon,
-.desktop-tool-indicator-ray-icon,
-.desktop-tool-indicator-carry-icon,
-.desktop-tool-indicator-protractor-icon,
-.desktop-tool-indicator-measure-icon,
-.desktop-tool-indicator-world-map-icon {
-  display: none;
+.tool-belt-icon img,
+.tool-belt-icon svg {
   width: 2rem;
   height: 2rem;
-}
-
-.desktop-tool-indicator-sign-icon,
-.desktop-tool-indicator-ray-icon,
-.desktop-tool-indicator-carry-icon,
-.desktop-tool-indicator-protractor-icon,
-.desktop-tool-indicator-measure-icon,
-.desktop-tool-indicator-world-map-icon {
   object-fit: contain;
 }
 
-.desktop-tool-indicator-carry-icon,
-.desktop-tool-indicator-measure-icon,
-.desktop-tool-indicator-world-map-icon {
+.tool-belt-icon-invert {
   filter: invert(1);
 }
 
-.desktop-tool-indicator-aim .desktop-tool-indicator-aim-icon {
-  display: block;
-  color: #f8fafc;
+.tool-belt-icon-text {
+  font-size: 1.5rem;
+  line-height: 1;
 }
 
-.desktop-tool-indicator-place-flag .desktop-tool-indicator-sign-icon,
-.desktop-tool-indicator-geodesic-cannon .desktop-tool-indicator-ray-icon,
-.desktop-tool-indicator-geodesic-cannon-carry .desktop-tool-indicator-carry-icon,
-.desktop-tool-indicator-measure-length .desktop-tool-indicator-measure-icon,
-.desktop-tool-indicator-protractor .desktop-tool-indicator-protractor-icon,
-.desktop-tool-indicator-world-map .desktop-tool-indicator-world-map-icon {
-  display: block;
-  color: #f8fafc;
-}
-
-.desktop-tool-indicator-label {
-  font: 800 0.92rem/1 system-ui, sans-serif;
+.tool-belt-name {
+  /* Visually hidden but still in the belt's text; the slot in hand shows its name. */
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  font: 800 0.7rem/1 system-ui, sans-serif;
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
 
-.desktop-tool-indicator-text {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 0.16rem;
-  min-width: 0;
+.tool-belt-slot-active .tool-belt-name {
+  position: static;
+  width: auto;
+  height: auto;
+  clip-path: none;
 }
 
-.desktop-tool-indicator-protractor .desktop-tool-indicator-text,
-.desktop-tool-indicator-measure-length .desktop-tool-indicator-text {
-  justify-content: flex-start;
-}
-
-.desktop-tool-indicator-protractor .desktop-tool-indicator-label,
-.desktop-tool-indicator-measure-length .desktop-tool-indicator-label {
-  line-height: 0.95;
-}
-
-.desktop-tool-indicator-prompt {
-  display: block;
+.tool-belt-prompt {
+  position: absolute;
+  bottom: calc(100% + 0.3rem);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: rgb(10 17 20 / 90%);
   color: #d9edf1;
-  font: 700 0.66rem/1.05 system-ui, sans-serif;
-  letter-spacing: 0;
-  text-transform: lowercase;
+  font: 700 0.7rem/1.1 system-ui, sans-serif;
   white-space: nowrap;
-}
-
-.desktop-tool-indicator-prompt[hidden] {
-  display: none;
 }
 
 .floating-object-tooltip {
@@ -944,7 +971,7 @@ img.desktop-tool-tile-icon {
 .toast-view {
   position: fixed;
   left: 50%;
-  bottom: 96px;
+  bottom: 8.5rem;
   z-index: 12;
   display: flex;
   flex-direction: column;

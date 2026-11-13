@@ -1282,6 +1282,8 @@ The student vocabulary (design 017 section 6): every student-visible noun, verb 
 | const | `lostGuidance` | The sentence for a student who is lost. |
 | const | `retiredTerms` | The words that no student-visible string may use (the "Retire" columns of design 017 tables 6.2 and 6.3). |
 | const | `pauseCardText` | The words of the pause card, the desktop main menu (design 017 section 8.1). |
+| const | `mainMenuText` | The words of the main menu's buttons that are not named elsewhere. |
+| const | `toolBeltText` | The words of the tool belt (design 017 section 7.4) and of the right click that finds nothing to open. |
 
 ### `world-objects/worldObjectOwner.ts`
 
@@ -2284,7 +2286,8 @@ Renderer-neutral definition of the tool/settings palette: createPaletteDefinitio
 | --- | --- | --- |
 | interface | `PaletteSelectOption` | Option of a select-style control: stable id and display label. |
 | interface | `PaletteHeaderAction` | Header button of the palette (left or right slot). |
-| interface | `MainPaletteContent` | Content of the main page: the tool picker. |
+| interface | `MainMenuActionEntry` | One entry of the main menu: Help, Settings, Go home or Start over. |
+| interface | `MainPaletteContent` | Content of the main page, the main menu (design 017 section 7.5): Help, Settings, Go home and Start over as text buttons. |
 | interface | `SettingsPaletteContent` | Content of the settings page: world and config pickers, debug entry, comfort and reload. |
 | interface | `DebugSettingsPaletteContent` | Content of the debug-settings page: console log level, overlay items and portal/collision debug switches. |
 | interface | `PlaceFlagOptionsPaletteContent` | Content of the place-flag options page: choice of sign type. |
@@ -2338,6 +2341,23 @@ The toast queue (design 017 section 8.3): short messages that appear for a momen
 | interface | `ToastQueue` | Handle created by {@link createToastQueue}. |
 | function | `createToastQueue` | Creates an empty queue. |
 
+### `ui/toolBeltDefinition.ts`
+
+The tool belt (design 017 section 7.4) as renderer-neutral data: an ordered list of slots, each with its key, icon id, name, subtitle, availability and whether it is the slot in hand.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| type | `ToolBeltSlotId` | What a slot stands for: the empty hand, a main tool, or the main menu. |
+| type | `ToolBeltIconId` | Which picture a slot shows; the renderer maps it to an image. |
+| interface | `ToolBeltSlot` | One slot of the belt. |
+| interface | `ToolBeltDefinition` | The belt: the slots in order. |
+| interface | `ToolBeltSource` | What the belt is built from. |
+| function | `isEmitterMode` | True for the laser's own modes (carry, rotate, aim), which end with their own action and are not left through the belt's Hand or the key 0. |
+| function | `activeBeltToolId` | The slot of the belt that stands for `selectedTool`: a sub-mode of the laser or of Join is the Laser; no tool or an unknown id is the Hand. |
+| function | `createToolBeltDefinition` | Builds the belt. |
+| function | `stepBeltSlot` | The slot the wheel reaches from `fromToolId`, stepping by `direction` (+1 next, -1 previous) over the enabled slots among the Hand and the tools, never the main menu; it wraps around. |
+| function | `beltSlotForKey` | The slot a key takes ("0" to "5"), if the belt has it. |
+
 ### `ui/vocabulary.ts`
 
 The student vocabulary under the name design 017 section 6.5 gives it.
@@ -2368,15 +2388,6 @@ Desktop crosshair (design 017 section 8.2 item 1): a 6 px white dot with a 1 px 
 | interface | `CrosshairState` | What the crosshair shows. |
 | interface | `Crosshair` | Handle to the crosshair created by {@link createCrosshair}. |
 | function | `createCrosshair` | Creates the hidden crosshair and appends it to `container`. |
-
-### `render/dom/desktopToolIndicator.ts`
-
-Small DOM badge showing the currently selected desktop tool (icon, name, and a selection prompt) near the HUD.
-
-| Kind | Name | Summary |
-| --- | --- | --- |
-| interface | `DesktopToolIndicator` | Handle to the tool indicator created by {@link createDesktopToolIndicator}. |
-| function | `createDesktopToolIndicator` | Creates the hidden tool indicator, with all icon images pre-created, and appends it to container. |
 
 ### `render/dom/floatingObjectTooltip.ts`
 
@@ -2414,6 +2425,16 @@ Desktop view of the toast queue (design 017 section 8.3): white text on dark tra
 | --- | --- | --- |
 | interface | `ToastView` | Handle to the view created by {@link createToastView}. |
 | function | `createToastView` | Creates the empty view and appends it to `container`. |
+
+### `render/dom/toolBelt.ts`
+
+The desktop tool belt (design 017 section 7.4): a row of slots at the bottom centre of the screen, one per entry of the renderer-neutral belt definition (`src/ui/toolBeltDefinition.ts`): its key, its icon, and the name under the slot in hand.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `ToolBeltHandlers` | What the belt tells the shell. |
+| interface | `ToolBelt` | Handle to the belt created by {@link createToolBelt}. |
+| function | `createToolBelt` | Creates the belt and appends it to `container`. |
 
 ### `render/three/aimCrossMarker.ts`
 
@@ -2701,7 +2722,7 @@ Desktop keyboard and pointer-lock mouse input, collected into one DesktopInputFr
 
 ### `render/three/desktopInputHandlers.ts`
 
-Desktop and XR input of the shell: the desktop event handlers (context menu, right click, Escape and Tab keys, wheel), the per-frame input frames, and the per-frame feed of the scene palette from XR controllers or the desktop pointer.
+Desktop and XR input of the shell: the desktop event handlers (context menu, right click, Escape and Tab keys, the wheel that switches tools), the per-frame input frames, and the per-frame feed of the scene palette from XR controllers or the desktop pointer.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
@@ -2985,11 +3006,11 @@ Help palette pages: the question-mark hub, the tutorial's index of pages, and th
 
 ### `render/three/palette/pages/main.ts`
 
-Main palette page: a row of tool tiles, with the place-flag tile showing the currently selected sign type.
+Main palette page, the main menu: Help, Settings, Go home and Start over as text buttons (Start over asks for a second press).
 
 | Kind | Name | Summary |
 | --- | --- | --- |
-| function | `buildMainContent` | Main page: a row of tool tiles, with the place-flag tile showing the currently selected sign type. |
+| function | `buildMainContent` | Main page: the main-menu buttons, then (VR only) a row of tool tiles. |
 
 ### `render/three/palette/pages/signs.ts`
 

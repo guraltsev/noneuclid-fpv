@@ -180,8 +180,8 @@ export const retiredTerms: readonly string[] = [
 /** The words of the pause card, the desktop main menu (design 017 section 8.1). */
 export const pauseCardText = {
   clickToPlay: "Click to play",
-  /** The "Switch tool" control until the number keys exist (job 75 changes it to "1-5"). */
-  switchToolControl: "Right click on the floor",
+  /** The "Switch tool" control on desktop: the number keys and the wheel. */
+  switchToolControl: "1–5 · wheel",
   help: surfaceNames.help,
   settings: "Settings",
   goHome: objectActions.goHome,
@@ -189,4 +189,24 @@ export const pauseCardText = {
   startOverQuestion: "Remove everything you placed?",
   yes: "Yes",
   no: "No",
+} as const;
+
+/** The words of the main menu's buttons that are not named elsewhere. */
+export const mainMenuText = {
+  settings: "Settings",
+  /** The start-over button while it waits for a second press. */
+  startOverConfirm: "Click again to confirm",
+} as const;
+
+/** The words of the tool belt (design 017 section 7.4) and of the right click that finds nothing to open. */
+export const toolBeltText = {
+  /** Why the Map slot is greyed out in a world that has no map. */
+  noMapForWorld: "No map for this world",
+  /** The toast of a right click or F with nothing aimed at. */
+  aimToOpenMenu: "Aim at something to open its menu",
+  /** The label of the last slot, which opens the main menu. */
+  mainMenuName: "Main menu",
+  mainMenuSubtitle: "Help, Settings, Go home, Start over",
+  /** The accessible name of the belt. */
+  ariaLabel: "Tool belt",
 } as const;

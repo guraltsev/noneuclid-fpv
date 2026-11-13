@@ -3,8 +3,9 @@
  *
  * `createDesktopInputHandlers` turns DOM events and controller input into shell actions. These tests drive the handle with a
  * shell session and recording stand-ins: Escape toggles the menu through the palette toggle (and dismisses a pinned help when
- * there is nothing to toggle), a right click on the canvas opens the context menu from the aim, Tab and the wheel cycle the focused
- * target only while no menu is open, the input frames carry their source, and the palette is fed from the desktop pointer.
+ * there is nothing to toggle), a right click on the canvas opens the menu of the aimed object only and says so when nothing is aimed,
+ * Tab cycles the focused target and the wheel steps the tool, both only while no menu is open, the input frames carry their source,
+ * and the palette is fed from the desktop pointer.
  */
 import * as THREE from "three";
 import { describe, expect, it, vi } from "vitest";
@@ -30,12 +31,16 @@ function emptyFrame(): Omit<RuntimeInputFrame, "source"> {
   };
 }
 
-function createHarness(options: { readonly menuOpen?: boolean; readonly presenting?: boolean; readonly pinnedHelp?: boolean } = {}) {
+function createHarness(
+  options: { readonly menuOpen?: boolean; readonly presenting?: boolean; readonly pinnedHelp?: boolean; readonly menuResult?: "closed" | "opened" | "nothing" } = {},
+) {
   const session = createTestClientSession(
     options.menuOpen ? { menuState: { ...createRuntimeMenuState({ selectedWorldId: "test" }), isOpen: true } } : {},
   );
   const calls = {
-    openContextMenu: vi.fn(),
+    openContextMenu: vi.fn(() => options.menuResult ?? "opened"),
+    showNotice: vi.fn(),
+    stepTool: vi.fn(),
     toggle: vi.fn(),
     cycle: vi.fn(() => true),
     dismissHelp: vi.fn(() => options.pinnedHelp ?? false),
@@ -59,6 +64,8 @@ function createHarness(options: { readonly menuOpen?: boolean; readonly presenti
     resolveActiveRootAimRay: () => undefined,
     cycleFocusedAimTarget: calls.cycle,
     openContextMenuFromAim: calls.openContextMenu,
+    showNotice: calls.showNotice,
+    stepTool: calls.stepTool,
     applyDesktopScenePaletteToggle: calls.toggle,
     dismissHelpLensFocus: calls.dismissHelp,
   });
@@ -77,7 +84,17 @@ describe("createDesktopInputHandlers", () => {
     handlers.onDesktopMouseDown(event);
 
     expect(calls.openContextMenu).toHaveBeenCalledTimes(1);
+    expect(calls.openContextMenu).toHaveBeenCalledWith(undefined, { objectOnly: true });
+    expect(calls.showNotice).not.toHaveBeenCalled();
     expect(event.preventDefault).toHaveBeenCalled();
+  });
+
+  it("says to aim at something when a right click finds no menu", () => {
+    const { handlers, calls } = createHarness({ menuResult: "nothing" });
+
+    handlers.onDesktopMouseDown({ button: 2, target: canvas, preventDefault: vi.fn() } as unknown as MouseEvent);
+
+    expect(calls.showNotice).toHaveBeenCalledWith("Aim at something to open its menu");
   });
 
   it("ignores a left click, a click off the canvas, and any click in XR", () => {
@@ -111,16 +128,37 @@ describe("createDesktopInputHandlers", () => {
     expect(event.preventDefault).toHaveBeenCalled();
   });
 
-  it("cycles the focused target on Tab and on the wheel only while no menu is open", () => {
+  it("cycles the focused target on Tab only while no menu is open", () => {
     const closed = createHarness();
     closed.handlers.onDesktopPaletteKeyDown(keyEvent("Tab"));
-    closed.handlers.onDesktopWheel({ target: canvas, preventDefault: vi.fn() } as unknown as WheelEvent);
     const open = createHarness({ menuOpen: true });
     open.handlers.onDesktopPaletteKeyDown(keyEvent("Tab"));
-    open.handlers.onDesktopWheel({ target: canvas, preventDefault: vi.fn() } as unknown as WheelEvent);
 
-    expect(closed.calls.cycle).toHaveBeenCalledTimes(2);
+    expect(closed.calls.cycle).toHaveBeenCalledTimes(1);
     expect(open.calls.cycle).not.toHaveBeenCalled();
+  });
+
+  function wheel(deltaY: number, timeStamp: number) {
+    return { target: canvas, deltaY, deltaMode: 0, timeStamp, preventDefault: vi.fn() } as unknown as WheelEvent;
+  }
+
+  it("steps the tool with the wheel, not the target, and only while no menu is open", () => {
+    const closed = createHarness();
+    closed.handlers.onDesktopWheel(wheel(100, 1000));
+    closed.handlers.onDesktopWheel(wheel(-100, 2000));
+    const open = createHarness({ menuOpen: true });
+    open.handlers.onDesktopWheel(wheel(100, 1000));
+
+    expect(closed.calls.stepTool.mock.calls).toEqual([[1], [-1]]);
+    expect(closed.calls.cycle).not.toHaveBeenCalled();
+    expect(open.calls.stepTool).not.toHaveBeenCalled();
+  });
+
+  it("takes one tool from a flick of small wheel events", () => {
+    const { handlers, calls } = createHarness();
+    for (let step = 0; step < 10; step += 1) handlers.onDesktopWheel(wheel(15, 1000 + step * 10));
+
+    expect(calls.stepTool).toHaveBeenCalledTimes(1);
   });
 
   it("tags its input frames with their source and sets the palette look mode", () => {

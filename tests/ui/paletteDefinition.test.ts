@@ -31,8 +31,16 @@ import {
 import { createTestPaletteDefinition, createTestToolsById } from "../support/tools";
 
 describe("createPaletteDefinition", () => {
-  it("lists only the app config's enabled main tools, with no default tool", () => {
+  it("makes the main page the main menu on desktop, with no tool tiles", () => {
     const definition = createTestPaletteDefinition(createRuntimeMenuState({ selectedWorldId: "cube" }));
+    const content = definition.content as MainPaletteContent;
+
+    expect(content.menuActions.map((action) => action.label)).toEqual(["Help", "Settings", "Go home", "Start over"]);
+    expect(content.toolOptions).toEqual([]);
+  });
+
+  it("lists only the app config's enabled main tools for VR, with no default tool", () => {
+    const definition = createTestPaletteDefinition(createRuntimeMenuState({ selectedWorldId: "cube" }), defaultAppConfig, "xr");
     const content = definition.content as MainPaletteContent;
 
     expect(content.kind).toBe("main");
@@ -48,7 +56,7 @@ describe("createPaletteDefinition", () => {
     const sign = tools.get("placedFlags/flag")!;
     tools.set("placedFlags/flag", { ...sign, entry: { kind: "sub-mode" } });
 
-    const definition = createTestPaletteDefinition(createRuntimeMenuState({ selectedWorldId: "cube" }), defaultAppConfig, "desktop", 0, tools);
+    const definition = createTestPaletteDefinition(createRuntimeMenuState({ selectedWorldId: "cube" }), defaultAppConfig, "xr", 0, tools);
 
     expect((definition.content as MainPaletteContent).toolOptions).toEqual([
       { id: "none", label: "Hand" },

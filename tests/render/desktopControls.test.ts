@@ -112,6 +112,24 @@ describe("desktopControls", () => {
     controls.dispose();
   });
 
+  it("maps the number keys 1 to 5 and the numpad to a one-frame belt key", () => {
+    const { canvas, windowTarget } = installPointerLockDom();
+    const controls = createDesktopControls(canvas);
+
+    dispatchKey(windowTarget, "keydown", "Digit2");
+    const first = controls.consumeFrame(1 / 60);
+    dispatchKey(windowTarget, "keydown", "Numpad5");
+    const second = controls.consumeFrame(1 / 60);
+    dispatchKey(windowTarget, "keydown", "Digit6");
+    const third = controls.consumeFrame(1 / 60);
+
+    expect(first.toolKeyRequested).toBe("2");
+    expect(second.toolKeyRequested).toBe("5");
+    expect(third.toolKeyRequested).toBeUndefined();
+
+    controls.dispose();
+  });
+
   it("clears held keys when the window loses focus", () => {
     const { canvas, windowTarget } = installPointerLockDom();
     const controls = createDesktopControls(canvas);

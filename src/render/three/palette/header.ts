@@ -19,8 +19,8 @@ export function buildHeader(
   options: ScenePaletteAdapterOptions,
 ): Container {
   const headerActions = resolveVrPaletteHeaderActions(definition);
-  // Home and reload buttons are shown only on the main page.
-  const showUtilityActions = definition.pageId === "main";
+  // Home and reload buttons are shown only on the VR main page; on desktop the main menu has them as text buttons.
+  const showUtilityActions = definition.content.kind === "main" && definition.content.toolOptions.length > 0;
   const header = new Container({
     width: "100%",
     height: 48,

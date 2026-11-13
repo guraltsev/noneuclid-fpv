@@ -35,8 +35,15 @@ const desktopHints: Readonly<Record<InputIntent, Omit<InputHintGlyph, "intent" |
     iconSrc: publicAssetUrl("icons/mouse-button-left.svg"),
   },
   "context-menu": {
-    label: "Right click",
+    label: "Right click / F",
     iconSrc: publicAssetUrl("icons/mouse-button-right.svg"),
+  },
+  "switch-tool": {
+    label: "1–5 · wheel",
+  },
+  "main-menu": {
+    label: "Esc",
+    iconSrc: publicAssetUrl("icons/esc-key.svg"),
   },
   "keyboard-context-fallback": {
     label: "F",
@@ -87,6 +94,13 @@ const xrHints: Readonly<Record<InputIntent, Omit<InputHintGlyph, "intent" | "mod
   },
   "keyboard-context-fallback": {
     label: "Context fallback",
+  },
+  // The belt-hand trigger and the main-menu button arrive with job 77.
+  "switch-tool": {
+    label: "Not available yet",
+  },
+  "main-menu": {
+    label: "Not available yet",
   },
   help: {
     label: "B",

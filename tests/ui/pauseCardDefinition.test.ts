@@ -14,7 +14,7 @@ describe("pause card definition", () => {
     expect(card.controls[2]?.glyphLabel).toBe(getInputHintGlyph("desktop", "primary").label);
     expect(card.controls[3]?.glyphLabel).toBe(getInputHintGlyph("desktop", "context-menu").label);
     expect(card.controls[5]?.glyphLabel).toBe(getInputHintGlyph("desktop", "help").label);
-    expect(card.controls[4]?.glyphLabel).toBe("Right click on the floor");
+    expect(card.controls[4]?.glyphLabel).toBe("1–5 · wheel");
   });
 
   it("lists the four main-menu actions", () => {

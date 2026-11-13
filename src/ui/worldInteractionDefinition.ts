@@ -219,9 +219,6 @@ function primaryAction(id: WorldInteractionActionId, label: string): WorldIntera
 }
 
 function getActionHintLabels(mode: InputMode, action: WorldInteractionAction): readonly string[] {
-  const hints = [getInputHintGlyph(mode, action.intent).label];
-  if (mode === "desktop" && action.intent === "context-menu") {
-    hints.push(getInputHintGlyph(mode, "keyboard-context-fallback").label);
-  }
-  return hints;
+  // The desktop label of the context-menu intent already names the F alias ("Right click / F").
+  return [getInputHintGlyph(mode, action.intent).label];
 }

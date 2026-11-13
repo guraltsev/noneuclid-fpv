@@ -72,6 +72,8 @@ export interface ScenePaletteControllerOptions {
   readonly onAimCollisionOutlinesToggled: (enabled: boolean) => void;
   /** Optional copy-URL-with-options action; the shell always passes a forwarder to its own optional host callback. */
   readonly onCopyUrlWithOptionsRequested?: () => void;
+  /** The main menu's Help button. */
+  readonly onHelpRequested?: () => void;
   /** A tool was picked; the shell closes the menu and selects it if enabled. */
   readonly onToolSelected: (toolId: RuntimeToolId) => void;
   /** Open the place-flag options page. */
@@ -192,6 +194,7 @@ export function createScenePaletteController(options: ScenePaletteControllerOpti
     onCollisionGeometryWireframesToggled: options.onCollisionGeometryWireframesToggled,
     onAimCollisionOutlinesToggled: options.onAimCollisionOutlinesToggled,
     onCopyUrlWithOptionsRequested: options.onCopyUrlWithOptionsRequested,
+    onHelpRequested: options.onHelpRequested,
     onToolSelected: options.onToolSelected,
     onPlaceFlagOptionsRequested: options.onPlaceFlagOptionsRequested,
     onPlaceFlagTypeSelected: options.onPlaceFlagTypeSelected,

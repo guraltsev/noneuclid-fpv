@@ -85,7 +85,7 @@ function buildContent(
   options: ScenePaletteAdapterOptions,
 ): Container {
   if (definition.content.kind === "main") {
-    return buildMainContent(definition.content, options);
+    return buildMainContent(definition.content, options, definition.reloadConfirmationActive);
   }
 
   if (definition.content.kind === "place-flag-options") {

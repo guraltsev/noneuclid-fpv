@@ -16,12 +16,25 @@ import {
 } from "../../src/runtime/runtimeMenuState";
 import { publicAssetUrl } from "../../src/glue/assetUrls";
 import { createScenePaletteAdapter } from "../../src/render/three/palette/scenePaletteAdapter";
+import { defaultAppConfig } from "../../src/glue/appConfig";
 import { createTestPaletteDefinition } from "../support/tools";
 
 describe("scenePaletteAdapter", () => {
-  it("maps each main tool and its nested options to the right icon", () => {
+  it("builds the desktop main page as the four main-menu buttons, without tool tiles", () => {
     const adapter = createScenePaletteAdapter(createNoopOptions());
     adapter.setDefinition(createTestPaletteDefinition(createRuntimeMenuState({ selectedWorldId: "cube" })));
+
+    const itemIds = collectPaletteItemIds(adapter.root);
+
+    expect(itemIds).toEqual(expect.arrayContaining(["main-menu:help", "main-menu:settings", "main-menu:go-home", "main-menu:start-over"]));
+    expect(itemIds.some((id) => id.startsWith("tool:"))).toBe(false);
+
+    adapter.dispose();
+  });
+
+  it("maps each main tool and its nested options to the right icon", () => {
+    const adapter = createScenePaletteAdapter(createNoopOptions());
+    adapter.setDefinition(createTestPaletteDefinition(createRuntimeMenuState({ selectedWorldId: "cube" }), defaultAppConfig, "xr"));
 
     const itemIds = collectPaletteItemIds(adapter.root);
     const imageSources = collectPaletteImageSources(adapter.root);

@@ -34,7 +34,9 @@ export interface ScenePaletteAdapterOptions {
   readonly onAimCollisionOutlinesToggled: (enabled: boolean) => void;
   /** When absent, the "Copy URL with options" button on the debug settings page is not rendered. */
   readonly onCopyUrlWithOptionsRequested?: () => void;
-  /** Main page: a tool tile was activated. */
+  /** Main menu: the Help button. */
+  readonly onHelpRequested?: () => void;
+  /** Main page: a tool tile was activated (VR only until job 77). */
   readonly onToolSelected?: (toolId: RuntimeToolId) => void;
   /** Place-sign tile's "..." options button. */
   readonly onPlaceFlagOptionsRequested?: () => void;

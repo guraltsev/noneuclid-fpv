@@ -31,6 +31,8 @@ export interface RuntimeInputFrame {
   readonly helpRequested: boolean;
   /** Request to put the tool away and have the empty hand (desktop key 0); absent means no request. */
   readonly handRequested?: boolean;
+  /** The belt key pressed this frame ("1" to "5", desktop number keys and numpad); absent means none. */
+  readonly toolKeyRequested?: string;
   /** Request to undo the last reset or deletion (desktop key U); absent means no request. */
   readonly undoRequested?: boolean;
   /** Which input device produced the frame. */

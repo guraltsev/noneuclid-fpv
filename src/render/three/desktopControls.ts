@@ -70,6 +70,12 @@ const movementKeys = new Set([
 const turnKeys = new Set(["KeyQ", "KeyE"]);
 
 /** True when the event target is a text-editing element that should receive keystrokes instead of gameplay input. */
+/** The belt key a key code stands for: Digit1 to Digit5 and the numpad's 1 to 5 give "1" to "5". */
+function toolKeyOf(code: string): string | undefined {
+  const match = /^(?:Digit|Numpad)([1-5])$/.exec(code);
+  return match === null ? undefined : match[1];
+}
+
 function isEditableTarget(target: EventTarget | null): boolean {
   if (target === null || typeof (target as Partial<Element>).tagName !== "string") {
     return false;
@@ -111,6 +117,7 @@ export function createDesktopControls(
   let carryActionRequested = false;
   let helpRequested = false;
   let handRequested = false;
+  let toolKeyRequested: string | undefined;
   let lookMode: DesktopLookMode = "camera";
 
   // One-shot keys set a flag and are not tracked as held; held keys go into pressedKeys. Handled keys have their default browser action prevented.
@@ -128,7 +135,8 @@ export function createDesktopControls(
       event.code === "KeyG" ||
       event.code === "KeyH" ||
       event.code === "Digit0" ||
-      event.code === "Numpad0"
+      event.code === "Numpad0" ||
+      toolKeyOf(event.code) !== undefined
     ) {
       event.preventDefault();
     }
@@ -165,6 +173,12 @@ export function createDesktopControls(
 
     if (event.code === "Digit0" || event.code === "Numpad0") {
       handRequested = true;
+      return;
+    }
+
+    const toolKey = toolKeyOf(event.code);
+    if (toolKey !== undefined) {
+      toolKeyRequested = toolKey;
       return;
     }
 
@@ -269,6 +283,7 @@ export function createDesktopControls(
     carryActionRequested = false;
     helpRequested = false;
     handRequested = false;
+    toolKeyRequested = undefined;
   }
 
   async function requestPointerLock(): Promise<boolean> {
@@ -364,6 +379,7 @@ export function createDesktopControls(
       const frameCarryActionRequested = lookMode === "camera" && carryActionRequested;
       const frameHelpRequested = helpRequested;
       const frameHandRequested = handRequested;
+      const frameToolKeyRequested = toolKeyRequested;
       const frameUndoRequested = undoRequested;
 
       pendingMouseYawDeltaRadians = 0;
@@ -377,6 +393,7 @@ export function createDesktopControls(
       carryActionRequested = false;
       helpRequested = false;
       handRequested = false;
+      toolKeyRequested = undefined;
       undoRequested = false;
 
       return {
@@ -393,6 +410,7 @@ export function createDesktopControls(
         carryActionRequested: frameCarryActionRequested,
         helpRequested: frameHelpRequested,
         handRequested: frameHandRequested,
+        toolKeyRequested: frameToolKeyRequested,
         undoRequested: frameUndoRequested,
       };
     },

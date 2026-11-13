@@ -16,7 +16,7 @@ import { createTestPaletteDefinition } from "../support/tools";
 const tool = worldMapClient().tools[0] as ToolDescriptor;
 
 function toolIdsOnPalette(config: typeof defaultAppConfig): readonly string[] {
-  const definition = createTestPaletteDefinition(createRuntimeMenuState({ selectedWorldId: "test" }), config);
+  const definition = createTestPaletteDefinition(createRuntimeMenuState({ selectedWorldId: "test" }), config, "xr");
   if (definition.content.kind !== "main") throw new Error("expected the main page");
   return definition.content.toolOptions.map((option) => option.id);
 }

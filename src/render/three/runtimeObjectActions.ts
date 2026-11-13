@@ -99,8 +99,10 @@ export interface RuntimeObjectActions {
   deleteEditingSign(): void;
   /** Primary action on the focused object (help, extend, remove a label); true when it did something. */
   tryUseFocusedObjectPrimaryInteraction(ray?: RootAimRay): boolean;
-  /** Secondary action: closes an open menu, else opens the focused object's menu, else the main menu. */
-  openContextMenuFromAim(ray?: RootAimRay): void;
+  /**
+   * Secondary action: closes (goes back in) an open menu, else opens the focused object's menu. With nothing to open, the VR path opens the main menu; with `objectOnly` (desktop) nothing opens and the result is "nothing", so the caller can say so.
+   */
+  openContextMenuFromAim(ray?: RootAimRay, options?: { readonly objectOnly?: boolean }): "closed" | "opened" | "nothing";
   /** Applies a desktop palette toggle (open, close, right action) to the menu. */
   applyDesktopScenePaletteToggle(action: "open" | "right-action" | "close" | "none"): void;
   /** Puts the player at the world's starting position and clears the rig. */
@@ -309,9 +311,10 @@ export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): Runt
       return false;
     }
 
+    // An object with no main action of its own opens its menu (design 017 section 7.1: Use with the Hand reaches every menu).
     switch (target?.object?.kind) {
       case "asset":
-        return tryOpenFocusedQuestionHelp(target.object);
+        return tryOpenFocusedQuestionHelp(target.object) || tryOpenFocusedObjectMenu(ray);
       case "geodesicModel/segment":
         logVerboseAimClick(target);
         return extendGeodesic(target.object.geodesicId);
@@ -320,7 +323,7 @@ export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): Runt
       case "geodesicMeasurements/angle":
         return tryRemoveFocusedProtractorAngle(ray);
       default:
-        return false;
+        return tryOpenFocusedObjectMenu(ray);
     }
   }
 
@@ -334,17 +337,22 @@ export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): Runt
     }
   }
 
-  function openContextMenuFromAim(ray?: RootAimRay): void {
+  function openContextMenuFromAim(ray?: RootAimRay, options?: { readonly objectOnly?: boolean }): "closed" | "opened" | "nothing" {
     if (currentMenuState().isOpen) {
       applyDesktopScenePaletteToggle(reduceDesktopScenePaletteToggle(true, "secondary-click"));
-      return;
+      return "closed";
     }
 
     if (tryOpenFocusedObjectMenu(ray)) {
-      return;
+      return "opened";
+    }
+
+    if (options?.objectOnly === true) {
+      return "nothing";
     }
 
     dispatchRuntimeCommand({ kind: "open-menu" });
+    return "opened";
   }
 
   // The menu page of an emitter, with its current geodesics; the active geodesic stays if it is still on the emitter. The one object page a tool can ask for: with no such emitter the page it showed is stale, so the menu closes.

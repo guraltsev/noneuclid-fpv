@@ -32,7 +32,7 @@ describe("helpLensDefinition", () => {
       hint: {
         intent: "context-menu",
         mode: "desktop",
-        label: "Right click",
+        label: "Right click / F",
         iconSrc: publicAssetUrl("icons/mouse-button-right.svg"),
       },
       label: "Rename",

@@ -107,7 +107,9 @@ import { createObjectHost, createPlainWorldObject, type PlainWorldObject } from 
 import { installModuleApis, setApiNamespace } from "../../runtime/publicApi";
 import { createScriptedPlayerMotion } from "./scriptedPlayerMotion";
 import type { RuntimeInputFrame } from "../../interaction/inputFrame";
-import { createDesktopToolIndicator } from "../dom/desktopToolIndicator";
+import { createToolBelt } from "../dom/toolBelt";
+import { activeBeltToolId, beltSlotForKey, isEmitterMode, createToolBeltDefinition, stepBeltSlot, type ToolBeltSlot } from "../../ui/toolBeltDefinition";
+import { findPlatonicSolid } from "../../cell-complex/platonicSolid";
 import { createFloatingObjectTooltip } from "../dom/floatingObjectTooltip";
 import { createAimCrossMarker } from "./aimCrossMarker";
 import { createAimFeedback } from "./aimFeedback";
@@ -156,7 +158,7 @@ import { createPauseCardDefinition } from "../../ui/pauseCardDefinition";
 import { restoreSavedSnapshot, savedKindsRemovedThisFrame, savedObjectKinds, takeSavedSnapshot, type SavedSnapshot } from "../../world-objects/savedSnapshot";
 import { objectNouns, toastMessages } from "../../ui/vocabulary";
 import { createToastQueue } from "../../ui/toastQueue";
-import { toolNames } from "../../ui/vocabulary";
+import { toolBeltText, toolNames } from "../../ui/vocabulary";
 import { createWorldMapPieceReader } from "./worldMapPieces";
 import { createWorldMapRenderer } from "./worldMapRenderer";
 import { worldMapToolId } from "../../modules/worldMap";
@@ -491,7 +493,47 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   });
   let frameDrawn = false;
   const debugOverlay = createDebugOverlay(container);
-  const desktopToolIndicator = createDesktopToolIndicator(document.body);
+  // The tool belt (design 017 section 7.4): built from the config as loaded, so a tool the world cannot support shows disabled with its reason.
+  const beltConfig = options.appConfig ?? defaultAppConfig;
+  const worldHasMap = findPlatonicSolid(appState.world) !== undefined;
+  function currentBeltDefinition() {
+    return createToolBeltDefinition({ appConfig: beltConfig, worldHasMap, selectedTool: currentMenuState().selectedTool });
+  }
+  /** Takes a belt slot: the Hand puts the tool away, a tool is asked of the world, a disabled slot says why, the menu slot opens the main menu. */
+  function selectBeltSlot(slot: ToolBeltSlot): void {
+    if (slot.toolId === "main-menu") {
+      dispatchRuntimeCommand({ kind: "open-menu" });
+      void controls.requestPointerLock();
+      return;
+    }
+    if (!slot.enabled) {
+      toastQueue.push(slot.disabledReason ?? slot.subtitle);
+      return;
+    }
+    if (slot.active) return;
+    if (slot.toolId === "hand") {
+      // The laser's modes end with their own action instead (as key 0 does).
+      if (!isEmitterMode(currentMenuState().selectedTool)) dispatchRuntimeCommand({ kind: "clear-selected-tool" });
+      return;
+    }
+    worldClient.requestTool(slot.toolId);
+  }
+  function stepBeltTool(direction: 1 | -1): void {
+    const slot = stepBeltSlot(currentBeltDefinition(), activeBeltToolId(currentMenuState().selectedTool), direction);
+    if (slot !== undefined) selectBeltSlot(slot);
+  }
+  /** Opens the help cube's page, or the main menu when the world has no help cube. */
+  function openHelpPage(): void {
+    dispatchRuntimeCommand({ kind: "open-menu" });
+    const helpCubeObject = runtimeObjectRegistry.get("startingQuestionCube");
+    if (helpCubeObject?.kind === "asset") dispatchRuntimeCommand({
+      kind: "show-question-help",
+      objectId: helpCubeObject.id,
+      tutorialPages: helpCubeObject.tutorialPages ?? [],
+      goalPages: helpCubeObject.goalPages ?? [],
+    });
+  }
+  const toolBelt = createToolBelt(document.body, { onSelect: selectBeltSlot }, toolBeltText.ariaLabel);
   // The pause card is the desktop main menu (design 017 section 8.1): shown whenever the pointer is not locked.
   const helpCubeSpec = options.worldSpec.cells.flatMap((cell) => cell.visuals?.objects ?? []).find((object) => object.id === "startingQuestionCube");
   const configCatalogLabel = appConfigCatalog.find((entry) => entry.id === options.appConfigName)?.label;
@@ -510,17 +552,11 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
           teleportPlayerHome();
         } else {
           // The palette is driven with the pointer locked, so the pointer is taken when the page opens.
-          dispatchRuntimeCommand({ kind: "open-menu" });
           if (action === "settings") {
+            dispatchRuntimeCommand({ kind: "open-menu" });
             dispatchRuntimeCommand({ kind: "show-settings" });
           } else {
-            const helpCubeObject = runtimeObjectRegistry.get("startingQuestionCube");
-            if (helpCubeObject?.kind === "asset") dispatchRuntimeCommand({
-              kind: "show-question-help",
-              objectId: helpCubeObject.id,
-              tutorialPages: helpCubeObject.tutorialPages ?? [],
-              goalPages: helpCubeObject.goalPages ?? [],
-            });
+            openHelpPage();
           }
         }
         void controls.requestPointerLock();
@@ -584,7 +620,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     scene,
     getCamera: () => camera,
     session,
-    ...createScenePaletteCommands({ dispatch: dispatchRuntimeCommand, requestTool: (toolId) => worldClient.requestTool(toolId), reloadConfirmationWindowMs }),
+    ...createScenePaletteCommands({ dispatch: dispatchRuntimeCommand, requestTool: (toolId) => worldClient.requestTool(toolId), reloadConfirmationWindowMs, showHelp: () => openHelpPage() }),
   });
 
   // One Three.js group per cell id (cell-local frame), rebuilt by rebuildCellMeshes. Only the group of the
@@ -1016,6 +1052,8 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     resolveActiveRootAimRay,
     cycleFocusedAimTarget,
     openContextMenuFromAim,
+    showNotice: (text) => toastQueue.push(text),
+    stepTool: stepBeltTool,
     applyDesktopScenePaletteToggle,
     dismissHelpLensFocus: aimFeedback.dismissHelpLensFocus,
   });
@@ -1392,7 +1430,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     }
     if (frame.undoRequested === true) performUndo();
     // Key 0 puts the tool away (design 017 section 8.3); the emitter's modes end with their own action instead.
-    if (frame.handRequested === true && !currentMenuState().isOpen && !currentMenuState().selectedTool.startsWith("geodesicEmitters/")) {
+    if (frame.handRequested === true && !currentMenuState().isOpen && !isEmitterMode(currentMenuState().selectedTool)) {
       if (currentMenuState().selectedTool !== "none") dispatchRuntimeCommand({ kind: "clear-selected-tool" });
     }
     const worldPrimaryActionRequested = frame.primaryActionRequested && !currentMenuState().isOpen;
@@ -1417,7 +1455,13 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     }
 
     if (frame.interactRequested) {
-      openContextMenuFromAim(activeAimRay);
+      // F: on desktop only an object's menu opens; VR keeps the main menu until job 77.
+      if (openContextMenuFromAim(activeAimRay, { objectOnly: !xrActive }) === "nothing") toastQueue.push(toolBeltText.aimToOpenMenu);
+    }
+    // The number keys take belt slots (design 017 section 7.1); like key 0, only with no menu open.
+    if (frame.toolKeyRequested !== undefined && !currentMenuState().isOpen) {
+      const slot = beltSlotForKey(currentBeltDefinition(), frame.toolKeyRequested);
+      if (slot !== undefined) selectBeltSlot(slot);
     }
     const frameAfterMoveMs = performance.now();
     const frameBeforeObjectsMs = frameAfterMoveMs;
@@ -1529,6 +1573,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     // Read the lock each frame, never cached: a headless browser stubs `document.pointerLockElement`.
     const pointerLocked = document.pointerLockElement === renderer.domElement;
     pauseCard.setVisible(!xrActive && !pointerLocked);
+    toolBelt.root.hidden = xrActive;
     const crosshairVisible = !xrActive && pointerLocked && !currentMenuState().isOpen;
     crosshair.update({
       visible: crosshairVisible,
@@ -1706,7 +1751,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       scenePaletteController.dispose();
       xrControllerHandModels.dispose();
       desktopScenePaletteInput.dispose();
-      desktopToolIndicator.dispose();
+      toolBelt.dispose();
       aimCrossMarker.dispose();
       aimFeedback.dispose();
       floatingObjectTooltip.dispose();
@@ -1893,7 +1938,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       toastQueue.push(descriptor === undefined ? toolNames.none.name : known?.name ?? descriptor.label);
     }
     announcedTool = selectedTool;
-    desktopToolIndicator.setTool(toolHost.toolsById.get(selectedTool), currentMenuState().placeFlagOptions.flagType, toolHost.promptOf(selectedTool));
+    toolBelt.update(currentBeltDefinition(), currentMenuState().placeFlagOptions.flagType, toolHost.promptOf(selectedTool));
   }
 
   function playerBlockingBodiesInCell(cellId: string) {

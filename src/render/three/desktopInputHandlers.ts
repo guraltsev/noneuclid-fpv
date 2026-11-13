@@ -1,5 +1,5 @@
 /**
- * Desktop and XR input of the shell: the desktop event handlers (context menu, right click, Escape and Tab keys, wheel), the
+ * Desktop and XR input of the shell: the desktop event handlers (context menu, right click, Escape and Tab keys, the wheel that switches tools), the
  * per-frame input frames, and the per-frame feed of the scene palette from XR controllers or the desktop pointer.
  *
  * The module owns the previous desktop palette placement (so the palette follows the camera smoothly) and the palette definition
@@ -20,9 +20,14 @@ import type { RootAimRay } from "./rootAimRay";
 import type { ScenePaletteController } from "./scenePaletteController";
 import { resolveVrPalettePlacement } from "./vrPalettePlacement";
 import type { Toast } from "../../ui/toastQueue";
+import { toolBeltText } from "../../ui/vocabulary";
 import type { XrControllerHandModels } from "./xrControllerHandModels";
 import type { XrControls } from "./xrControls";
 import type { XrScenePaletteInput } from "./xrScenePaletteInput";
+
+// One mouse wheel notch is 100 pixels; a step needs 40, and steps are at least this far apart so a trackpad's flick takes one tool.
+const wheelStepPixels = 40;
+const wheelStepIntervalMs = 120;
 
 /** Dependencies of {@link createDesktopInputHandlers}. */
 export interface DesktopInputHandlersDeps {
@@ -53,8 +58,12 @@ export interface DesktopInputHandlersDeps {
   resolveActiveRootAimRay(xrActive: boolean): RootAimRay | undefined;
   /** Moves the focus to the next aim target under the ray; true when it moved. */
   cycleFocusedAimTarget(ray: RootAimRay | undefined): boolean;
-  /** Opens the menu of the focused object, or applies the secondary click to an open menu. */
-  openContextMenuFromAim(ray?: RootAimRay): void;
+  /** Opens the menu of the focused object, or applies the secondary click to an open menu; "nothing" when the aim has no menu to open. */
+  openContextMenuFromAim(ray?: RootAimRay, options?: { readonly objectOnly?: boolean }): "closed" | "opened" | "nothing" | void;
+  /** Shows a short message in front of the player (a toast). */
+  showNotice(text: string): void;
+  /** Takes the next (+1) or previous (-1) tool from the belt: the Hand and the enabled tools, wrapping around. */
+  stepTool(direction: 1 | -1): void;
   /** Applies a desktop palette toggle (open, close, right action) to the menu. */
   applyDesktopScenePaletteToggle(action: "open" | "right-action" | "close" | "none"): void;
   /** Unpins the pinned help; true when there was one. */
@@ -65,11 +74,11 @@ export interface DesktopInputHandlersDeps {
 export interface DesktopInputHandlers {
   /** Blocks the browser context menu on the canvas. */
   onDesktopContextMenu(event: MouseEvent): void;
-  /** Right click on the canvas (or while the pointer is locked) opens the context menu from the aim. */
+  /** Right click on the canvas (or while the pointer is locked) opens the menu of the aimed object, closes an open menu, and says so when nothing is aimed. */
   onDesktopMouseDown(event: MouseEvent): void;
   /** Escape toggles the menu or dismisses a pinned help; Tab cycles the focused aim target. */
   onDesktopPaletteKeyDown(event: KeyboardEvent): void;
-  /** The wheel cycles the focused aim target while no menu is open. */
+  /** The wheel takes the next or previous tool from the belt while no menu is open; cycling targets is Tab only. */
   onDesktopWheel(event: WheelEvent): void;
   /** Consumes accumulated keyboard and mouse input; the palette look mode is used while the menu is open. */
   getDesktopInputFrame(deltaSeconds: number): RuntimeInputFrame;
@@ -105,6 +114,9 @@ export function createDesktopInputHandlers(deps: DesktopInputHandlersDeps): Desk
     applyDesktopScenePaletteToggle,
     dismissHelpLensFocus,
   } = deps;
+  // The wheel: pixels accumulated toward the next step, and when the last step happened (a trackpad sends many small events).
+  let wheelAccumulator = 0;
+  let lastWheelStepMs = Number.NEGATIVE_INFINITY;
   const currentMenuState = () => session.get().menuState;
   const paletteDefinitionCache = createPaletteDefinitionCache(deps.appConfig, deps.toolsById);
   // Desktop fallbacks of updateScenePalette's head pose; overwritten before each use.
@@ -196,7 +208,9 @@ export function createDesktopInputHandlers(deps: DesktopInputHandlersDeps): Desk
     }
 
     event.preventDefault();
-    openContextMenuFromAim(resolveActiveRootAimRay(false));
+    if (openContextMenuFromAim(resolveActiveRootAimRay(false), { objectOnly: true }) === "nothing") {
+      deps.showNotice(toolBeltText.aimToOpenMenu);
+    }
   }
 
   function onDesktopPaletteKeyDown(event: KeyboardEvent): void {
@@ -231,9 +245,19 @@ export function createDesktopInputHandlers(deps: DesktopInputHandlersDeps): Desk
       return;
     }
 
-    if (cycleFocusedAimTarget(resolveActiveRootAimRay(false))) {
-      event.preventDefault();
+    event.preventDefault();
+    const pixels = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? 400 : 1);
+    if (pixels === 0 || Math.sign(pixels) !== Math.sign(wheelAccumulator)) {
+      wheelAccumulator = 0;
     }
+    wheelAccumulator += pixels;
+    const now = event.timeStamp ?? performance.now();
+    if (Math.abs(wheelAccumulator) < wheelStepPixels || now - lastWheelStepMs < wheelStepIntervalMs) {
+      return;
+    }
+    deps.stepTool(wheelAccumulator > 0 ? 1 : -1);
+    wheelAccumulator = 0;
+    lastWheelStepMs = now;
   }
 
   function getDesktopInputFrame(deltaSeconds: number): RuntimeInputFrame {

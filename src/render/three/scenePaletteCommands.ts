@@ -16,6 +16,8 @@ export interface ScenePaletteCommandsDeps {
   requestTool(toolId: RuntimeToolId): void;
   /** How long after the first press of "reload" a second press confirms it, milliseconds. */
   readonly reloadConfirmationWindowMs: number;
+  /** Opens the help (the help cube's page); optional so tests need not give one. */
+  showHelp?(): void;
 }
 
 /** The palette controller's action callbacks. */
@@ -25,7 +27,7 @@ export type ScenePaletteCommands = Pick<
   | "onConfigSelected" | "onReloadRequested" | "onHomeRequested" | "onDebugEnabledChanged" | "onDebugSettingsRequested"
   | "onConsoleLogLevelSelected" | "onDebugOverlayToggled" | "onDebugOverlayItemToggled" | "onAntiNauseaModeToggled"
   | "onPortalPanelModeSelected" | "onPortalInspectionToggled" | "onCollisionGeometryWireframesToggled"
-  | "onAimCollisionOutlinesToggled" | "onCopyUrlWithOptionsRequested" | "onToolSelected" | "onPlaceFlagOptionsRequested"
+  | "onAimCollisionOutlinesToggled" | "onCopyUrlWithOptionsRequested" | "onToolSelected" | "onHelpRequested" | "onPlaceFlagOptionsRequested"
   | "onPlaceFlagTypeSelected" | "onGeodesicCannonAddRequested" | "onGeodesicCannonCarryRequested"
   | "onObjectActionRequested" | "onGeodesicCannonRotateRequested" | "onGeodesicCannonAimRequested"
   | "onGeodesicCannonDeleteRequested" | "onGeometryComputerStepTargetRequested" | "onGeometryComputerGoRequested"
@@ -94,6 +96,9 @@ export function createScenePaletteCommands(deps: ScenePaletteCommandsDeps): Scen
     },
     onCopyUrlWithOptionsRequested() {
       dispatch({ kind: "copy-url-with-options" });
+    },
+    onHelpRequested() {
+      deps.showHelp?.();
     },
     onToolSelected(toolId) {
       if (toolId === "none") {

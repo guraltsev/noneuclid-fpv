@@ -55,7 +55,6 @@ export function createPauseCardControls(): readonly PauseCardControl[] {
     { verb: verbNames.walk, glyphLabel: label("move") },
     { verb: verbNames.use, glyphLabel: label("primary") },
     { verb: verbNames.menu, glyphLabel: label("context-menu") },
-    // Until the number keys exist (job 75) the tool is chosen from the menu at the floor.
     { verb: verbNames.switchTool, glyphLabel: pauseCardText.switchToolControl },
     { verb: verbNames.whatsThis, glyphLabel: label("help") },
   ];

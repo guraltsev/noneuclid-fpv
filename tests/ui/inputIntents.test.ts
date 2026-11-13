@@ -17,7 +17,7 @@ describe("inputIntents", () => {
       iconSrc: publicAssetUrl("icons/mouse-button-left.svg"),
     });
     expect(getInputHintGlyph("desktop", "context-menu")).toMatchObject({
-      label: "Right click",
+      label: "Right click / F",
       iconSrc: publicAssetUrl("icons/mouse-button-right.svg"),
     });
     expect(getInputHintGlyph("desktop", "help")).toMatchObject({

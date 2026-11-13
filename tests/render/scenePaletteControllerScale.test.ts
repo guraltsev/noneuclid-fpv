@@ -14,6 +14,7 @@ import {
 import type { ScenePalettePlacement } from "../../src/render/three/scenePaletteInput";
 import { resolveFacingQuaternion } from "../../src/render/three/vrPalettePlacement";
 import { installFakeCanvas2d } from "../support/fakeCanvas2d";
+import { defaultAppConfig } from "../../src/glue/appConfig";
 import { createTestPaletteDefinition } from "../support/tools";
 
 // The uikit panels behind the adapter schedule a timer when they are disposed.
@@ -53,7 +54,7 @@ function hoverToolButton(scale: number | undefined): { tooltip: THREE.Object3D; 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera();
   const controller = createScenePaletteController(createOptions(scene, camera));
-  const definition = createTestPaletteDefinition(createRuntimeMenuState({ selectedWorldId: "cube" }));
+  const definition = createTestPaletteDefinition(createRuntimeMenuState({ selectedWorldId: "cube" }), defaultAppConfig, "xr");
   const headPosition = new THREE.Vector3(0, 1.6, 0);
   const palettePosition = new THREE.Vector3(0, 1.36, -1.44);
   const placement: ScenePalettePlacement = {

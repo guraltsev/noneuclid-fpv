@@ -1,21 +1,24 @@
 /**
- * Main palette page: a row of tool tiles, with the place-flag tile showing the currently selected sign type.
+ * Main palette page, the main menu: Help, Settings, Go home and Start over as text buttons (Start over asks for a second press).
+ * In VR, until job 77 puts the belt on the wrist, it also holds a row of tool tiles, with the place-flag tile showing the selected sign type.
  */
 import { Container } from "@pmndrs/uikit";
 import type { RuntimeToolId } from "../../../../glue/toolIds";
 import type { PaletteDefinition } from "../../../../ui/paletteDefinition";
 import type { PlacedFlagType } from "../../../../world-objects/toolObjects";
 import type { ScenePaletteAdapterOptions } from "../adapterTypes";
-import { activeColor, borderColor, inactiveColor, sectionColor } from "../tokens";
+import { actionColor, activeColor, borderColor, inactiveColor, sectionColor } from "../tokens";
 import { createToolIcon } from "../icons";
 import { createButtonText, createInteractiveSurface } from "../widgets";
+import { mainMenuText } from "../../../../world-objects/vocabulary";
 
 /**
- * Main page: a row of tool tiles, with the place-flag tile showing the currently selected sign type.
+ * Main page: the main-menu buttons, then (VR only) a row of tool tiles.
  */
 export function buildMainContent(
   content: Extract<PaletteDefinition["content"], { readonly kind: "main" }>,
   options: ScenePaletteAdapterOptions,
+  startOverConfirmationActive = false,
 ): Container {
   const panel = new Container({
     width: "100%",
@@ -28,6 +31,29 @@ export function buildMainContent(
     borderColor,
     borderWidth: 2,
   });
+
+  for (const entry of content.menuActions) {
+    const confirming = entry.id === "start-over" && startOverConfirmationActive;
+    const button = createInteractiveSurface({
+      width: "100%",
+      height: 56,
+      label: confirming ? mainMenuText.startOverConfirm : entry.label,
+      labelFontSize: 22,
+      backgroundColor: confirming ? "#991b1b" : actionColor,
+      onClick: () => {
+        if (entry.id === "help") options.onHelpRequested?.();
+        else if (entry.id === "settings") options.onLeftAction("settings");
+        else if (entry.id === "go-home") options.onHomeRequested();
+        else options.onReloadRequested();
+      },
+    });
+    button.userData.scenePaletteItemId = `main-menu:${entry.id}`;
+    panel.add(button);
+  }
+
+  if (content.toolOptions.length === 0) {
+    return panel;
+  }
 
   const row = new Container({
     width: "100%",
