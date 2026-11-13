@@ -75,6 +75,7 @@ Main tools stay selected, 0 and the Hand tile put them away, checks pass, commit
 - Hand tile: `createToolOptions` in `src/ui/paletteDefinition.ts` puts `{ id: "none", label: "Hand" }` first (name from `toolNames.none`); `onToolSelected("none")` in `scenePaletteCommands.ts` closes the menu and clears the tool; tooltip for it in `paletteTooltips.ts`. The toast comes from job 71's tool-change toast unchanged.
 - Tests: two signs in a row without reselecting (`tests/modules/placedFlags.test.ts`); key 0 edge (`tests/render/desktopControls.test.ts`).
 - `npm run docs:generate` was run.
+- Commit: 097993a.
 
 ### Deviations
 - Existing tests changed because they asserted the old ending: `emitterTool.test.ts` (5 expectations of `ended`, 2 titles; one title shortened for the 90-character rule), `geodesicMeasurementTools.test.ts` (4 expectations, 2 titles), `placedFlags.test.ts` (4 expectations, 1 title), `tests/render/toolHost.test.ts` (2 tests now expect the tool to stay selected; one title changed), `tests/runtime/runtimeMenuState.test.ts` (main page keeps the tool; title changed), `tests/ui/paletteDefinition.test.ts` (Hand first in the list).
