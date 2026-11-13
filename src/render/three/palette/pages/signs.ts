@@ -187,10 +187,23 @@ function createSignPreviewLines(message: string): Container {
   return block;
 }
 
-// One row of single-character key buttons.
+// One row of single-character key buttons of the sign editor.
 function createKeyboardRow(
   keys: readonly string[],
   options: ScenePaletteAdapterOptions,
+): Container {
+  return createKeypadRow(keys, (key) => options.onSignKeyboardCharacter?.(key), "sign-key:");
+}
+
+/**
+ * One centered row of single-character key buttons, shared by the sign editor's keyboard and the shape machine's number pad.
+ * `onKey` receives the key; each button's palette item id is `itemIdPrefix` followed by the key.
+ */
+export function createKeypadRow(
+  keys: readonly string[],
+  onKey: (key: string) => void,
+  itemIdPrefix: string,
+  keyWidth = 48,
 ): Container {
   const row = new Container({
     width: "100%",
@@ -198,18 +211,19 @@ function createKeyboardRow(
     flexDirection: "row",
     justifyContent: "center",
     gap: 6,
+    flexShrink: 0,
   });
 
   for (const key of keys) {
     const button = createInteractiveSurface({
-      width: 48,
+      width: keyWidth,
       height: 38,
       label: key,
       labelFontSize: 16,
       backgroundColor: inactiveColor,
-      onClick: () => options.onSignKeyboardCharacter?.(key),
+      onClick: () => onKey(key),
     });
-    button.userData.scenePaletteItemId = `sign-key:${key}`;
+    button.userData.scenePaletteItemId = `${itemIdPrefix}${key}`;
     row.add(button);
   }
 

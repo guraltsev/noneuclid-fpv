@@ -42,6 +42,18 @@ describe("paletteTooltips", () => {
     expect(resolvePaletteTooltipLabel("reset-tips")).toBe("Reset tips: show the tool tips again");
   });
 
+  it("names the shape machine controls in its own words", () => {
+    expect(resolvePaletteTooltipLabel("geometry-computer:step:a:-1")).toBe("Lower the Shift by 1 m");
+    expect(resolvePaletteTooltipLabel("geometry-computer:step:b:1")).toBe("Raise the Height by 1 m");
+    expect(resolvePaletteTooltipLabel("geometry-computer:value:a")).toBe("Type the Shift");
+    expect(resolvePaletteTooltipLabel("geometry-computer:preset:whole-shift")).toBe("Set the green shape: Shift by a whole width");
+    expect(resolvePaletteTooltipLabel("geometry-computer:preset:nothing")).toBeUndefined();
+    expect(resolvePaletteTooltipLabel("geometry-computer:key:7")).toBe("7");
+    expect(resolvePaletteTooltipLabel("geometry-computer:key:ok")).toBe("OK");
+    expect(resolvePaletteTooltipLabel("geometry-computer:go")).toBe("Change the shape of this world to the green shape");
+    expect(resolvePaletteTooltipLabel("geometry-computer:same-as-start")).toBe("Same world as the start");
+  });
+
   it("names the main menu buttons", () => {
     expect(resolvePaletteTooltipLabel("main-menu:help")).toBe("Help");
     expect(resolvePaletteTooltipLabel("main-menu:go-home")).toBe("Go home");

@@ -2,7 +2,7 @@
  * Resolves the tooltip text for palette items from their string item ids.
  * Item ids are namespaced strings produced by the palette renderers (for example "tool:placedFlags/flag", "geodesic-cannon-action:rotate:<id>", "sign-key:A"); this module is the single place that turns them into human-readable labels, so desktop and VR show the same tooltips. It is a pure lookup with no state.
  */
-import { helpText, mainMenuText, menuControlText, objectActions, settingsText, surfaceNames, toolNames } from "../world-objects/vocabulary";
+import { helpText, mainMenuText, menuControlText, objectActions, settingsText, shapeMachineText, surfaceNames, toolNames } from "../world-objects/vocabulary";
 
 /** The tooltips of the main menu buttons (design 017 section 7.5), by the id after "main-menu:". */
 const mainMenuTooltips: Readonly<Record<string, string | undefined>> = {
@@ -40,12 +40,8 @@ export function resolvePaletteTooltipLabel(itemId: string | undefined): string |
     return objectActions.aim;
   }
 
-  if (itemId.startsWith("geometry-computer:set:")) {
-    return "Set skew";
-  }
-
-  if (itemId.startsWith("geometry-computer:step:")) {
-    return "Step skew";
+  if (itemId.startsWith("geometry-computer:")) {
+    return shapeMachineTooltip(itemId.slice("geometry-computer:".length));
   }
 
   if (itemId.startsWith("tutorial:")) {
@@ -116,6 +112,40 @@ const fixedTooltips: Readonly<Record<string, string>> = {
   "sign-key:Enter": "New line",
   "sign-key:Backspace": "Backspace",
 };
+
+/** The tooltip of a shape machine control, from the part of its id after "geometry-computer:". */
+function shapeMachineTooltip(part: string): string | undefined {
+  const parameterName = (axis: string | undefined): string => (axis === "b" ? shapeMachineText.height : shapeMachineText.shift);
+  const [family, first, second] = part.split(":");
+  switch (family) {
+    case "step":
+      return shapeMachineText.stepTooltip(parameterName(first), Number(second));
+    case "value":
+      return shapeMachineText.valueTooltip(parameterName(first));
+    case "preset": {
+      const labels: Readonly<Record<string, string | undefined>> = {
+        square: shapeMachineText.presets.square,
+        "half-shift": shapeMachineText.presets.halfShift,
+        "whole-shift": shapeMachineText.presets.wholeShift,
+        tall: shapeMachineText.presets.tall,
+      };
+      const label = labels[first ?? ""];
+      return label === undefined ? undefined : shapeMachineText.presetTooltip(label);
+    }
+    case "key":
+      return first === "ok" ? shapeMachineText.ok : first === "cancel" ? shapeMachineText.cancel : first === "back" ? shapeMachineText.backspace : first;
+    case "more":
+      return shapeMachineText.moreTooltip;
+    case "go":
+      return shapeMachineText.reshapeTooltip;
+    case "diagram":
+      return shapeMachineText.diagramTooltip;
+    case "same-as-start":
+      return shapeMachineText.sameAsStart;
+    default:
+      return undefined;
+  }
+}
 
 function toolTooltip(toolId: string): string | undefined {
   switch (toolId) {

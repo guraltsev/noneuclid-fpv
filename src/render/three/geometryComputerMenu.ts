@@ -4,7 +4,7 @@
  * Only worlds whose current or target geometry has kind torus-skew are supported; otherwise the actions refresh the menu as unavailable and do nothing.
  */
 import type { ClientSession } from "../../runtime/clientSession";
-import type { RuntimeCommand, ShowGeometryComputerActionsPayload } from "../../runtime/runtimeCommands";
+import type { GeometryComputerEdit, RuntimeCommand, ShowGeometryComputerActionsPayload } from "../../runtime/runtimeCommands";
 import { createWorldGeometrySession } from "../../runtime/worldGeometrySession";
 import { clampInteger } from "./runtimeSceneUtils";
 
@@ -19,6 +19,9 @@ export interface GeometryComputerMenuDeps {
   /** Re-renders the desktop palette/menu UI after a menu state change. */
   syncDesktopPalette(): void;
 }
+
+/** Digits a typed value may have: the largest target is twice the width, so two digits cover every torus of a room up to 49 m wide. */
+const geometryComputerEntryMaxLength = 2;
 
 /**
  * Creates the geometry computer menu actions.
@@ -45,6 +48,9 @@ export function createGeometryComputerMenu(deps: GeometryComputerMenuDeps) {
       targetDepthMeters: pending?.targetDepthMeters ?? target?.depthMeters,
       startSkewXMeters: initial?.skewXMeters,
       startDepthMeters: initial?.depthMeters,
+      entryAxis: pending?.entryAxis,
+      entryText: pending?.entryText,
+      moreOpen: pending?.moreOpen,
     };
   }
 
@@ -75,8 +81,68 @@ export function createGeometryComputerMenu(deps: GeometryComputerMenuDeps) {
       ...createGeometryComputerMenuOptions(computerId),
       targetSkewXMeters: sanitized.aMeters,
       targetDepthMeters: sanitized.bMeters,
+      // A new target ends any typing.
+      entryAxis: undefined,
+      entryText: undefined,
     });
     syncDesktopPalette();
+  }
+
+  // A preset, a keypad press or the "More" row: updates the panel's state; only a target change reaches the session's target (and only through the Reshape world button).
+  function editGeometryComputer(computerId: string, edit: GeometryComputerEdit): void {
+    const base = getGeometryComputerBaseState();
+    if (!base) {
+      refreshOpenGeometryComputerMenu();
+      syncDesktopPalette();
+      return;
+    }
+
+    const pending = deps.session.get().menuState.geometryComputerOptions;
+    const show = (overrides: Partial<ShowGeometryComputerActionsPayload>): void => {
+      deps.dispatch({ kind: "show-geometry-computer-actions", ...createGeometryComputerMenuOptions(computerId), ...overrides });
+      syncDesktopPalette();
+    };
+
+    switch (edit.kind) {
+      case "set-target":
+        setGeometryComputerPendingTarget(computerId, { aMeters: edit.aMeters, bMeters: edit.bMeters });
+        return;
+      case "open-entry":
+        show({ entryAxis: edit.axis, entryText: "" });
+        return;
+      case "entry-digit": {
+        const text = pending?.entryText ?? "";
+        if (pending?.entryAxis === undefined || !/^[0-9]$/.test(edit.digit) || text.length >= geometryComputerEntryMaxLength) {
+          return;
+        }
+        show({ entryText: text + edit.digit });
+        return;
+      }
+      case "entry-backspace":
+        show({ entryText: (pending?.entryText ?? "").slice(0, -1) });
+        return;
+      case "entry-cancel":
+        show({ entryAxis: undefined, entryText: undefined });
+        return;
+      case "entry-apply": {
+        const axis = pending?.entryAxis;
+        const text = pending?.entryText ?? "";
+        if (axis === undefined || text === "") {
+          show({ entryAxis: undefined, entryText: undefined });
+          return;
+        }
+        const typed = Number(text);
+        const currentTarget = {
+          aMeters: pending?.targetSkewXMeters ?? base.skewXMeters,
+          bMeters: pending?.targetDepthMeters ?? base.depthMeters,
+        };
+        setGeometryComputerPendingTarget(computerId, axis === "a" ? { ...currentTarget, aMeters: typed } : { ...currentTarget, bMeters: typed });
+        return;
+      }
+      case "toggle-more":
+        show({ moreOpen: pending?.moreOpen !== true });
+        return;
+    }
   }
 
   function stepGeometryComputerPendingTarget(computerId: string, axis: "a" | "b", deltaMeters: number): void {
@@ -144,6 +210,7 @@ export function createGeometryComputerMenu(deps: GeometryComputerMenuDeps) {
     createGeometryComputerMenuOptions,
     refreshOpenGeometryComputerMenu,
     stepGeometryComputerPendingTarget,
+    editGeometryComputer,
     startGeometryComputerDeformation,
     setGeometryComputerPendingTarget,
   };

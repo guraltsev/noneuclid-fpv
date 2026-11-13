@@ -33,7 +33,22 @@ export interface ShowGeometryComputerActionsPayload {
   readonly targetDepthMeters?: number;
   readonly startSkewXMeters?: number;
   readonly startDepthMeters?: number;
+  /** The parameter being typed on the keypad and the digits so far; absent while no value is being typed. */
+  readonly entryAxis?: "a" | "b";
+  readonly entryText?: string;
+  /** Whether the "More" row is unfolded. */
+  readonly moreOpen?: boolean;
 }
+
+/** An edit of the shape machine panel other than a one-metre step: a preset, the keypad, the "More" row. Targets are in meters. */
+export type GeometryComputerEdit =
+  | { readonly kind: "set-target"; readonly aMeters: number; readonly bMeters: number }
+  | { readonly kind: "open-entry"; readonly axis: "a" | "b" }
+  | { readonly kind: "entry-digit"; readonly digit: string }
+  | { readonly kind: "entry-backspace" }
+  | { readonly kind: "entry-apply" }
+  | { readonly kind: "entry-cancel" }
+  | { readonly kind: "toggle-more" };
 
 /**
  * Application-level action requested by the UI.
@@ -142,6 +157,7 @@ export type RuntimeCommand =
       readonly axis: "a" | "b";
       readonly deltaMeters: number;
     }
+  | { readonly kind: "edit-geometry-computer"; readonly computerId: string; readonly edit: GeometryComputerEdit }
   | { readonly kind: "start-geometry-computer-deformation"; readonly computerId: string }
   // Sign editor page actions.
   | { readonly kind: "type-sign-character"; readonly character: string }
@@ -184,6 +200,7 @@ export type RuntimeEffect =
       readonly axis: "a" | "b";
       readonly deltaMeters: number;
     }
+  | { readonly kind: "edit-geometry-computer"; readonly computerId: string; readonly edit: GeometryComputerEdit }
   | { readonly kind: "start-geometry-computer-deformation"; readonly computerId: string }
   | { readonly kind: "type-sign-character"; readonly character: string }
   | { readonly kind: "backspace-sign" }

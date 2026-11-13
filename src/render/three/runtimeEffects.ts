@@ -5,7 +5,7 @@
  * geometry-computer action, applying debug or comfort state, asking the host to restart the app, editing a sign. This module only
  * routes: each case calls the handle that does the work, or dispatches a follow-up command. It owns the reload-confirmation timer.
  */
-import type { RuntimeCommand, RuntimeEffect } from "../../runtime/runtimeCommands";
+import type { GeometryComputerEdit, RuntimeCommand, RuntimeEffect } from "../../runtime/runtimeCommands";
 
 /** Callbacks the host passed to the app for restarts and URL copying. */
 export interface RuntimeEffectHostCallbacks {
@@ -41,6 +41,7 @@ export interface RuntimeEffectsDeps {
   /** Deletes a measurement, from its menu's Delete button. */
   deleteMeasurement(measurementKind: "length" | "angle", measurementId: string): void;
   stepGeometryComputerPendingTarget(computerId: string, axis: "a" | "b", deltaMeters: number): void;
+  editGeometryComputer(computerId: string, edit: GeometryComputerEdit): void;
   startGeometryComputerDeformation(computerId: string): void;
   appendEditingSignCharacter(character: string): void;
   backspaceEditingSignMessage(): void;
@@ -131,6 +132,9 @@ export function createRuntimeEffects(deps: RuntimeEffectsDeps): RuntimeEffects {
         return;
       case "step-geometry-computer-target":
         deps.stepGeometryComputerPendingTarget(effect.computerId, effect.axis, effect.deltaMeters);
+        return;
+      case "edit-geometry-computer":
+        deps.editGeometryComputer(effect.computerId, effect.edit);
         return;
       case "start-geometry-computer-deformation":
         deps.startGeometryComputerDeformation(effect.computerId);

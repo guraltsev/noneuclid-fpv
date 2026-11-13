@@ -40,6 +40,7 @@ function createHarness() {
     deleteLaser: noop,
     deleteMeasurement: noop,
     stepGeometryComputerPendingTarget: noop,
+    editGeometryComputer: noop,
     startGeometryComputerDeformation: noop,
     appendEditingSignCharacter: noop,
     backspaceEditingSignMessage: noop,

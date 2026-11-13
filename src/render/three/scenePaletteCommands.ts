@@ -30,7 +30,7 @@ export type ScenePaletteCommands = Pick<
   | "onAimCollisionOutlinesToggled" | "onCopyUrlWithOptionsRequested" | "onToolSelected" | "onHelpRequested" | "onPlaceFlagOptionsRequested"
   | "onPlaceFlagTypeSelected" | "onGeodesicCannonAddRequested" | "onGeodesicCannonCarryRequested"
   | "onObjectActionRequested" | "onGeodesicCannonRotateRequested" | "onGeodesicCannonAimRequested"
-  | "onGeodesicCannonDeleteRequested" | "onGeodesicCannonDeleteLaserRequested" | "onMeasurementDeleteRequested" | "onGeometryComputerStepTargetRequested" | "onGeometryComputerGoRequested"
+  | "onGeodesicCannonDeleteRequested" | "onGeodesicCannonDeleteLaserRequested" | "onMeasurementDeleteRequested" | "onGeometryComputerStepTargetRequested" | "onGeometryComputerEditRequested" | "onGeometryComputerGoRequested"
   | "onQuestionHelpTutorialRequested" | "onQuestionHelpGoalRequested" | "onTutorialPreviousRequested"
   | "onTutorialNextRequested" | "onTutorialPageRequested" | "onGoalPreviousRequested" | "onGoalNextRequested" | "onSignKeyboardCharacter"
   | "onSignKeyboardBackspace" | "onSignDeleteRequested"
@@ -164,6 +164,9 @@ export function createScenePaletteCommands(deps: ScenePaletteCommandsDeps): Scen
     },
     onGeometryComputerStepTargetRequested(computerId, axis, deltaMeters) {
       dispatch({ kind: "step-geometry-computer-target", computerId, axis, deltaMeters });
+    },
+    onGeometryComputerEditRequested(computerId, edit) {
+      dispatch({ kind: "edit-geometry-computer", computerId, edit });
     },
     onGeometryComputerGoRequested(computerId) {
       dispatch({ kind: "start-geometry-computer-deformation", computerId });

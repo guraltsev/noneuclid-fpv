@@ -155,6 +155,11 @@ export interface RuntimeMenuState {
     readonly targetDepthMeters?: number;
     readonly startSkewXMeters?: number;
     readonly startDepthMeters?: number;
+    /** The parameter whose value is being typed on the keypad, and the digits typed so far. */
+    readonly entryAxis?: "a" | "b";
+    readonly entryText?: string;
+    /** Whether the "More" row of the panel is unfolded. */
+    readonly moreOpen?: boolean;
   };
   /** Payload of the tutorial page; pageIndex is always within pages. `view` is "index" while the list of page titles shows, "page" while one page shows. */
   readonly tutorialOptions?: {
@@ -388,6 +393,9 @@ export function showRuntimeMenuGeometryComputerActions(
     readonly targetDepthMeters?: number;
     readonly startSkewXMeters?: number;
     readonly startDepthMeters?: number;
+    readonly entryAxis?: "a" | "b";
+    readonly entryText?: string;
+    readonly moreOpen?: boolean;
   },
 ): RuntimeMenuState {
   return {
@@ -404,6 +412,9 @@ export function showRuntimeMenuGeometryComputerActions(
       targetDepthMeters: options.targetDepthMeters,
       startSkewXMeters: options.startSkewXMeters,
       startDepthMeters: options.startDepthMeters,
+      entryAxis: options.entryAxis,
+      entryText: options.entryText,
+      moreOpen: options.moreOpen,
     },
   };
 }

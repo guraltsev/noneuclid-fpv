@@ -270,19 +270,15 @@ describe("runtimeMenuState", () => {
     if (definition.content.kind !== "geometry-computer-actions") {
       throw new Error("Expected geometry computer actions.");
     }
-    expect(definition.content.statusLabel).toBe("Current (1 m, 15 m) / target (1 m, 20 m)");
+    expect(definition.content.statusLabel).toBe("Now: Shift 1.0 m, Height 15.0 m. Target: Shift 1.0 m, Height 20.0 m.");
     expect(definition.content.widthMeters).toBe(15);
-    expect(definition.content.stepActions.map((action) => action.label)).toEqual([
-      "A -8 m",
-      "A -1 m",
-      "A +1 m",
-      "A +8 m",
-      "B -8 m",
-      "B -1 m",
-      "B +1 m",
-      "B +8 m",
+    expect(definition.content.stepActions.map((action) => `${action.axis} ${action.label}`)).toEqual([
+      "a -1 m",
+      "a +1 m",
+      "b -1 m",
+      "b +1 m",
     ]);
-    expect(definition.content.goAction).toEqual({ label: "GO!", disabled: false });
+    expect(definition.content.goAction).toEqual({ label: "Reshape world", disabled: false });
   });
 
   it("creates a paged tutorial menu", () => {

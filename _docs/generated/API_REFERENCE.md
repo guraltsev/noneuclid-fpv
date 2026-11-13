@@ -164,6 +164,9 @@ The modulus of a flat torus, for the geometry computer's readout.
 | interface | `TorusLatticeParameters` | The (a, b) parameters of a torus of width w. |
 | function | `reducedTorusModulus` | Reduces tau = (a + ib)/w. |
 | function | `torusShape` | Names the shape of a reduced modulus. |
+| type | `TorusRelation` | How a torus relates to the torus the world started with: the start itself, the start after Dehn twists, the same flat torus marked differently, or another flat torus. |
+| function | `torusRelation` | Classifies `state` against `start`; every kind but "different" means the same flat torus. |
+| function | `isSameFlatTorus` | Whether `state` is the same flat torus as `start` (the start itself, a Dehn twist of it, or the same torus marked differently). |
 | function | `describeTorusRelation` | One line for the geometry computer: how a torus relates to the torus the world started with. |
 
 ### `cell-complex/deformations/torusSkewDeformation.ts`
@@ -1303,6 +1306,7 @@ The student vocabulary (design 017 section 6): every student-visible noun, verb 
 | const | `hintStripText` | The words of the hint strip (design 017 section 8.2): what the listed input does right now, after the colon. |
 | const | `helpText` | The words of Help beyond the page names (design 017 section 8.6): the cards of How to, the Try it button and the first-use tips. |
 | const | `firstUseTipText` | The tool steps of the first-use tips (design 017 section 8.6). |
+| const | `shapeMachineText` | The words of the shape machine panel (design 017 section 8.9): the two parameters, the presets, the keypad and the buttons. |
 | const | `settingsText` | The words of the Settings sections that the comfort and display options added (design 017 section 8.7). |
 
 ### `world-objects/worldObjectOwner.ts`
@@ -2192,6 +2196,7 @@ Defines RuntimeCommand, the closed discriminated union of every action the UI ca
 | --- | --- | --- |
 | interface | `ShowGeodesicCannonActionsPayload` | Payload of the cannon actions page. |
 | interface | `ShowGeometryComputerActionsPayload` | Payload of the geometry computer page. |
+| type | `GeometryComputerEdit` | An edit of the shape machine panel other than a one-metre step: a preset, the keypad, the "More" row. |
 | type | `RuntimeCommand` | Application-level action requested by the UI. |
 | type | `RuntimeEffect` | What a command asks the host to do besides changing the session. |
 
@@ -3171,11 +3176,11 @@ Icon factories of the in-scene palette panel: each wraps an Image, a lucide icon
 
 ### `render/three/palette/latticeDiagram.ts`
 
-The world-deformation lattice diagram shown on the geometry computer page: a small parallelogram of lattice points with labels, drawn with uikit containers.
+The shape machine's picture: the current (white) and target (green) parallelograms, the target's Shift and Height labelled in meters, and the "Same world as the start" badge, drawn with uikit containers.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
-| function | `createWorldDeformationDiagram` | Draw the current (white) and target (green) deformation parallelograms into a 900x280 pixel box. |
+| function | `createWorldDeformationDiagram` | Draw the current (white) and target (green) deformation parallelograms into a 900x220 pixel box. |
 
 ### `render/three/palette/pages/debugSettings.ts`
 
@@ -3196,11 +3201,11 @@ Geodesic cannon palette page: a scrollable list with one row per geodesic.
 
 ### `render/three/palette/pages/geometryComputer.ts`
 
-Geometry computer palette page: target stepping controls, the lattice diagram and the go button.
+Shape machine palette page (design 017 section 8.9): one picture of the target torus, the Shift and Height rows with their steps and a number pad, the presets, the "Same world as the start" badge, a folded "More" row and the Reshape world button.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
-| function | `buildGeometryComputerActionsContent` | Geometry computer page: status text, deformation diagram, coordinate readout, a 4-column grid of step buttons and a Go button. |
+| function | `buildGeometryComputerActionsContent` | Shape machine page: status text, the labelled picture, the badge, a row per parameter (value, -1 m, +1 m), the number pad while a value is typed, the presets, the More row and the Reshape world button. |
 
 ### `render/three/palette/pages/help.ts`
 
@@ -3235,6 +3240,7 @@ Sign palette pages: the place-sign options page and the sign editor with its on-
 | --- | --- | --- |
 | function | `buildPlaceSignOptionsContent` | Sign type chooser: one tile per flag type option. |
 | function | `buildEditSignContent` | Sign editor: text preview, four key rows from signKeyboardRows, and an Enter / Space / Backspace row. |
+| function | `createKeypadRow` | One centered row of single-character key buttons, shared by the sign editor's keyboard and the shape machine's number pad. |
 
 ### `render/three/palette/scenePaletteAdapter.ts`
 

@@ -3,6 +3,7 @@
  */
 import { Container } from "@pmndrs/uikit";
 import type { PortalPanelModeId } from "../../../glue/portalPanelMode";
+import type { GeometryComputerEdit } from "../../../runtime/runtimeCommands";
 import type { RuntimeMenuConsoleLogLevelId, RuntimeMouseSensitivity, RuntimeTextSize, RuntimeTurnSpeed } from "../../../runtime/runtimeMenuState";
 import type { RuntimeDebugOverlayItemId, RuntimeToolId } from "../../../glue/toolIds";
 import type { PaletteDefinition } from "../../../ui/paletteDefinition";
@@ -71,6 +72,7 @@ export interface ScenePaletteAdapterOptions {
   readonly onMeasurementDeleteRequested?: (measurementKind: "length" | "angle", measurementId: string) => void;
   /** Geometry computer page callbacks (the set-target callback is part of the contract but not invoked by this adapter). Deltas and targets are in meters. */
   readonly onGeometryComputerStepTargetRequested?: (computerId: string, axis: "a" | "b", deltaMeters: number) => void;
+  readonly onGeometryComputerEditRequested?: (computerId: string, edit: GeometryComputerEdit) => void;
   readonly onGeometryComputerGoRequested?: (computerId: string) => void;
   /** Help hub and paged tutorial/goal navigation. */
   readonly onQuestionHelpTutorialRequested?: () => void;

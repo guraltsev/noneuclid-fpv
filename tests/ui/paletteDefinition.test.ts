@@ -273,7 +273,7 @@ describe("disabled controls in palette definitions", () => {
     const [, atTarget] = fixtures().find(([name]) => name === "shape machine at target")!;
     expect((atTarget.content as { goAction: unknown }).goAction).toMatchObject({ disabled: true, disabledReason: "Nothing to change" });
     const [, withChange] = fixtures().find(([name]) => name === "shape machine with a change")!;
-    expect((withChange.content as { goAction: unknown }).goAction).toEqual({ label: "GO!", disabled: false });
+    expect((withChange.content as { goAction: unknown }).goAction).toEqual({ label: "Reshape world", disabled: false });
   });
 
   it("puts text on the laser menu actions, with the key after a dot", () => {

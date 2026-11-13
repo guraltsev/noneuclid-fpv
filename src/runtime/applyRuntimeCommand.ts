@@ -322,6 +322,7 @@ export function reduceRuntimeCommand(state: ClientSessionState, command: Runtime
     case "delete-laser":
     case "delete-measurement":
     case "step-geometry-computer-target":
+    case "edit-geometry-computer":
     case "start-geometry-computer-deformation":
     case "type-sign-character":
     case "backspace-sign":

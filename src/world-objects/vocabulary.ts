@@ -367,6 +367,44 @@ export const firstUseTipText = {
   mapShown: "This is the whole world, small enough to hold. Put the Map away with {hand}",
 } as const;
 
+/** The words of the shape machine panel (design 017 section 8.9): the two parameters, the presets, the keypad and the buttons. */
+export const shapeMachineText = {
+  shift: "Shift",
+  height: "Height",
+  /** The button that starts the deformation. */
+  reshape: "Reshape world",
+  /** The badge shown while the target is the same flat torus as the start. */
+  sameAsStart: "Same world as the start",
+  more: "More",
+  less: "Less",
+  presetsHeading: "Shapes to try",
+  presets: {
+    square: "Square",
+    halfShift: "Shift by half",
+    wholeShift: "Shift by a whole width",
+    tall: "Tall",
+  },
+  typeValue: "Type a value",
+  ok: "OK",
+  cancel: "Cancel",
+  backspace: "Back",
+  stepDown: "-1 m",
+  stepUp: "+1 m",
+  /** A length in the panel: one decimal. */
+  metres: (value: number): string => `${value.toFixed(1)} m`,
+  /** The line over the keypad. */
+  entryPrompt: (name: string): string => `Type the ${name} in metres, then press OK`,
+  /** The line of the unfolded More row that gives the width. */
+  widthLine: (widthText: string): string => `Width ${widthText}, fixed`,
+  /** Tooltips. */
+  stepTooltip: (name: string, delta: number): string => `${delta < 0 ? "Lower" : "Raise"} the ${name} by 1 m`,
+  valueTooltip: (name: string): string => `Type the ${name}`,
+  presetTooltip: (label: string): string => `Set the green shape: ${label}`,
+  moreTooltip: "Show or hide the modulus of the two shapes",
+  reshapeTooltip: "Change the shape of this world to the green shape",
+  diagramTooltip: "White is the shape now; green is the shape you chose",
+} as const;
+
 /** The words of the Settings sections that the comfort and display options added (design 017 section 8.7). */
 export const settingsText = {
   controls: "Controls",

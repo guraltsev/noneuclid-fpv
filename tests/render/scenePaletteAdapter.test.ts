@@ -121,6 +121,114 @@ describe("scenePaletteAdapter", () => {
     adapter.dispose();
   });
 
+  it("draws the shape machine as Shift and Height, a badge, presets and Reshape world", () => {
+    const edits: unknown[] = [];
+    const adapter = createScenePaletteAdapter({
+      ...createNoopOptions(),
+      onGeometryComputerEditRequested: (_computerId, change) => edits.push(change),
+      onGeometryComputerStepTargetRequested: (_computerId, axis, delta) => edits.push({ step: axis, delta }),
+    });
+    adapter.setDefinition(createTestPaletteDefinition(showRuntimeMenuGeometryComputerActions(
+      createRuntimeMenuState({ selectedWorldId: "torus" }),
+      {
+        computerId: "torus-geometry-computer",
+        available: true,
+        widthMeters: 15,
+        currentSkewXMeters: 0,
+        currentDepthMeters: 15,
+        targetSkewXMeters: 15,
+        targetDepthMeters: 15,
+        startSkewXMeters: 0,
+        startDepthMeters: 15,
+      },
+    )));
+
+    const itemIds = collectPaletteItemIds(adapter.root);
+    const texts = collectTexts(adapter.root);
+    expect(itemIds).toContain("geometry-computer:same-as-start");
+    expect(itemIds).toEqual(expect.arrayContaining([
+      "geometry-computer:value:a", "geometry-computer:step:a:-1", "geometry-computer:step:a:1", "geometry-computer:step:b:-1", "geometry-computer:step:b:1",
+      "geometry-computer:preset:square", "geometry-computer:preset:half-shift", "geometry-computer:preset:whole-shift", "geometry-computer:preset:tall",
+      "geometry-computer:more", "geometry-computer:go",
+    ]));
+    expect(itemIds).not.toContain("geometry-computer:step:a:8");
+    expect(itemIds).not.toContain("geometry-computer:key:1");
+    expect(texts).toEqual(expect.arrayContaining(["Same world as the start", "Shift 15.0 m", "Height 15.0 m", "Reshape world", "More", "Square", "Tall"]));
+    expect(texts).not.toContain("GO!");
+    // Folded: the modulus lines are not drawn.
+    expect(texts.some((text) => text.includes("modulus"))).toBe(false);
+
+    clickItem(adapter.root, "geometry-computer:preset:tall");
+    clickItem(adapter.root, "geometry-computer:value:b");
+    clickItem(adapter.root, "geometry-computer:step:a:1");
+    clickItem(adapter.root, "geometry-computer:more");
+    expect(edits).toEqual([
+      { kind: "set-target", aMeters: 0, bMeters: 30 },
+      { kind: "open-entry", axis: "b" },
+      { step: "a", delta: 1 },
+      { kind: "toggle-more" },
+    ]);
+    adapter.dispose();
+  });
+
+  it("draws the number pad while a value is typed and sends its keys", () => {
+    const edits: unknown[] = [];
+    const adapter = createScenePaletteAdapter({ ...createNoopOptions(), onGeometryComputerEditRequested: (_computerId, change) => edits.push(change) });
+    adapter.setDefinition(createTestPaletteDefinition(showRuntimeMenuGeometryComputerActions(
+      createRuntimeMenuState({ selectedWorldId: "torus" }),
+      {
+        computerId: "torus-geometry-computer",
+        available: true,
+        widthMeters: 15,
+        currentSkewXMeters: 0,
+        currentDepthMeters: 15,
+        targetSkewXMeters: 0,
+        targetDepthMeters: 15,
+        entryAxis: "a",
+        entryText: "1",
+      },
+    )));
+
+    const texts = collectTexts(adapter.root);
+    expect(texts).toContain("1|");
+    // The pad takes the room of the presets and the More row while a value is typed.
+    expect(collectPaletteItemIds(adapter.root)).not.toContain("geometry-computer:preset:tall");
+    expect(collectPaletteItemIds(adapter.root)).not.toContain("geometry-computer:more");
+    for (const key of ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "back", "cancel", "ok"]) {
+      expect(collectPaletteItemIds(adapter.root)).toContain(`geometry-computer:key:${key}`);
+    }
+    clickItem(adapter.root, "geometry-computer:key:7");
+    clickItem(adapter.root, "geometry-computer:key:back");
+    clickItem(adapter.root, "geometry-computer:key:cancel");
+    clickItem(adapter.root, "geometry-computer:key:ok");
+    expect(edits).toEqual([
+      { kind: "entry-digit", digit: "7" },
+      { kind: "entry-backspace" },
+      { kind: "entry-cancel" },
+      { kind: "entry-apply" },
+    ]);
+    adapter.dispose();
+  });
+
+  it("draws the width and the modulus lines only when the More row is unfolded", () => {
+    const draw = (moreOpen: boolean) => {
+      const adapter = createScenePaletteAdapter(createNoopOptions());
+      adapter.setDefinition(createTestPaletteDefinition(showRuntimeMenuGeometryComputerActions(
+        createRuntimeMenuState({ selectedWorldId: "torus" }),
+        { computerId: "gc", available: true, widthMeters: 15, currentSkewXMeters: 0, currentDepthMeters: 15, targetSkewXMeters: 3, targetDepthMeters: 15, moreOpen },
+      )));
+      const texts = collectTexts(adapter.root);
+      adapter.dispose();
+      return texts;
+    };
+    expect(draw(false).some((text) => text.includes("modulus"))).toBe(false);
+    expect(draw(false)).toContain("More");
+    const unfolded = draw(true);
+    expect(unfolded).toContain("Less");
+    expect(unfolded).toContain("Width 15.0 m, fixed");
+    expect(unfolded.some((text) => text.startsWith("Target:") && text.includes("modulus"))).toBe(true);
+  });
+
   it("renders a fundamental tile picture on geometry computer action menus", () => {
     const adapter = createScenePaletteAdapter(createNoopOptions());
     adapter.setDefinition(createTestPaletteDefinition(showRuntimeMenuGeometryComputerActions(
@@ -174,6 +282,34 @@ function collectPaletteItemIds(root: { readonly children: readonly any[]; readon
   };
   visit(root);
   return ids;
+}
+
+function collectTexts(root: { readonly children: readonly any[] }): string[] {
+  const texts: string[] = [];
+  const visit = (node: { readonly children?: readonly any[]; readonly inputProperties?: any }) => {
+    const value = node.inputProperties?.text;
+    if (typeof value === "string") {
+      texts.push(value);
+    }
+    for (const child of node.children ?? []) {
+      visit(child);
+    }
+  };
+  visit(root);
+  return texts;
+}
+
+function clickItem(root: { readonly children: readonly any[]; readonly userData?: Record<string, unknown> }, itemId: string): void {
+  const visit = (node: { readonly children?: readonly any[]; readonly userData?: Record<string, unknown> }): boolean => {
+    if (node.userData?.scenePaletteItemId === itemId && typeof node.userData.scenePaletteAction === "function") {
+      node.userData.scenePaletteAction();
+      return true;
+    }
+    return (node.children ?? []).some(visit);
+  };
+  if (!visit(root)) {
+    throw new Error(`no clickable palette item ${itemId}`);
+  }
 }
 
 function collectDisabledReasons(root: { readonly children: readonly any[]; readonly userData?: Record<string, unknown> }): string[] {

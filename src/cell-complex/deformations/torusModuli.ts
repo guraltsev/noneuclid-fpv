@@ -50,19 +50,45 @@ export function torusShape(modulus: TorusModulus): TorusShape {
   return "oblique";
 }
 
-/** One line for the geometry computer: how a torus relates to the torus the world started with. */
-export function describeTorusRelation(state: TorusLatticeParameters, start: TorusLatticeParameters): string {
+/** How a torus relates to the torus the world started with: the start itself, the start after Dehn twists, the same flat torus marked differently, or another flat torus. */
+export type TorusRelation =
+  | { readonly kind: "start" }
+  | { readonly kind: "twisted"; readonly twists: number }
+  | { readonly kind: "marked-differently" }
+  | { readonly kind: "different" };
+
+/** Classifies `state` against `start`; every kind but "different" means the same flat torus. */
+export function torusRelation(state: TorusLatticeParameters, start: TorusLatticeParameters): TorusRelation {
   const sameWidth = Math.abs(state.widthMeters - start.widthMeters) <= moduliTolerance;
   const sameDepth = Math.abs(state.depthMeters - start.depthMeters) <= moduliTolerance;
   const twists = (state.skewXMeters - start.skewXMeters) / state.widthMeters;
   if (sameWidth && sameDepth && Math.abs(twists - Math.round(twists)) <= moduliTolerance) {
     const count = Math.abs(Math.round(twists));
-    if (count === 0) return "This is the starting torus.";
-    return `Same flat torus as the start: ${count} Dehn twist${count === 1 ? "" : "s"}.`;
+    return count === 0 ? { kind: "start" } : { kind: "twisted", twists: count };
   }
   const modulus = reducedTorusModulus(state);
   const startModulus = reducedTorusModulus(start);
   const same =
     Math.abs(modulus.re - startModulus.re) <= moduliTolerance && Math.abs(modulus.im - startModulus.im) <= moduliTolerance;
-  return same ? "Same flat torus as the start, marked differently." : "A different flat torus from the start.";
+  return same ? { kind: "marked-differently" } : { kind: "different" };
+}
+
+/** Whether `state` is the same flat torus as `start` (the start itself, a Dehn twist of it, or the same torus marked differently). */
+export function isSameFlatTorus(state: TorusLatticeParameters, start: TorusLatticeParameters): boolean {
+  return torusRelation(state, start).kind !== "different";
+}
+
+/** One line for the geometry computer: how a torus relates to the torus the world started with. */
+export function describeTorusRelation(state: TorusLatticeParameters, start: TorusLatticeParameters): string {
+  const relation = torusRelation(state, start);
+  switch (relation.kind) {
+    case "start":
+      return "This is the starting torus.";
+    case "twisted":
+      return `Same flat torus as the start: ${relation.twists} Dehn twist${relation.twists === 1 ? "" : "s"}.`;
+    case "marked-differently":
+      return "Same flat torus as the start, marked differently.";
+    case "different":
+      return "A different flat torus from the start.";
+  }
 }

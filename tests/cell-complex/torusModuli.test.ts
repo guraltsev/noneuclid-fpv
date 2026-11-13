@@ -4,7 +4,7 @@
  * The reduced modulus of a flat torus (ignoring orientation), the name of its shape, and the one-line relation between a torus and the torus the world started with.
  */
 import { describe, expect, it } from "vitest";
-import { describeTorusRelation, reducedTorusModulus, torusShape } from "../../src/cell-complex/deformations/torusModuli";
+import { describeTorusRelation, isSameFlatTorus, reducedTorusModulus, torusShape } from "../../src/cell-complex/deformations/torusModuli";
 
 const params = (skewXMeters: number, depthMeters: number, widthMeters = 15) => ({ widthMeters, skewXMeters, depthMeters });
 
@@ -40,5 +40,14 @@ describe("torus moduli", () => {
     expect(describeTorusRelation(params(30, 15), start)).toBe("Same flat torus as the start: 2 Dehn twists.");
     expect(describeTorusRelation(params(4, 15), start)).toBe("A different flat torus from the start.");
     expect(describeTorusRelation(params(30, 30), params(0, 7.5))).toBe("Same flat torus as the start, marked differently.");
+  });
+
+  it("says whether a torus is the same flat torus as the start", () => {
+    const start = params(0, 15);
+    expect(isSameFlatTorus(params(0, 15), start)).toBe(true);
+    expect(isSameFlatTorus(params(15, 15), start)).toBe(true);
+    expect(isSameFlatTorus(params(30, 30), params(0, 7.5))).toBe(true);
+    expect(isSameFlatTorus(params(4, 15), start)).toBe(false);
+    expect(isSameFlatTorus(params(0, 20), start)).toBe(false);
   });
 });

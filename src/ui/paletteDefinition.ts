@@ -8,6 +8,7 @@ import type { TutorialPageSpec } from "../cell-complex/specs";
 import { appConfigCatalog, type AppConfig, type ConfigurableToolId } from "../glue/appConfig";
 import {
   describeTorusRelation,
+  isSameFlatTorus,
   reducedTorusModulus,
   torusShape,
   type TorusLatticeParameters,
@@ -26,6 +27,7 @@ import {
   mainMenuText,
   menuControlText,
   objectActions,
+  shapeMachineText,
   surfaceNames,
   verbNames,
 } from "../world-objects/vocabulary";
@@ -217,6 +219,10 @@ export interface GeometryComputerActionsPaletteContent {
   readonly currentModuliLabel: string;
   /** Shape and relation to the start of the target torus; empty when unavailable. */
   readonly targetModuliLabel: string;
+  /** The lines of the unfolded "More" row: the width and the modulus of the two shapes (older students). */
+  readonly moreLines: readonly string[];
+  /** Whether the "More" row is unfolded. */
+  readonly moreOpen: boolean;
   readonly widthMeters: number;
   /** Currently committed skew a and depth b, clamped to limits and rounded to integer meters. */
   readonly current: {
@@ -237,8 +243,17 @@ export interface GeometryComputerActionsPaletteContent {
     readonly minBMeters: number;
     readonly maxBMeters: number;
   };
+  /** The two parameters of the target in the words of the panel: Shift (a) and Height (b), each with its value in meters to one decimal. */
+  readonly parameters: readonly {
+    readonly axis: "a" | "b";
+    readonly name: string;
+    readonly valueMeters: number;
+    readonly valueLabel: string;
+    readonly disabled: boolean;
+    readonly disabledReason?: string;
+  }[];
   /**
-   * Buttons that move the target along one axis by deltaMeters (+-1 m and +-w/2); all disabled when the page is unavailable.
+   * Buttons that move the target along one axis by deltaMeters (-1 m and +1 m); disabled when the page is unavailable or the target is at the end of its range.
    */
   readonly stepActions: readonly {
     readonly axis: "a" | "b";
@@ -247,6 +262,26 @@ export interface GeometryComputerActionsPaletteContent {
     readonly disabled: boolean;
     readonly disabledReason?: string;
   }[];
+  /** The keypad, while a value is being typed; absent otherwise. `text` is what was typed so far. */
+  readonly entry?: {
+    readonly axis: "a" | "b";
+    readonly name: string;
+    readonly text: string;
+    readonly prompt: string;
+    readonly maxLength: number;
+  };
+  /** Generic targets, relative to the world's starting torus: Square, Shift by half, Shift by a whole width, Tall. */
+  readonly presets: readonly {
+    readonly id: string;
+    readonly label: string;
+    readonly aMeters: number;
+    readonly bMeters: number;
+    readonly disabled: boolean;
+    readonly disabledReason?: string;
+  }[];
+  /** True while the target is the same flat torus as the starting one: the panel shows `sameAsStartLabel` as a badge. */
+  readonly sameAsStart: boolean;
+  readonly sameAsStartLabel: string;
   /**
    * The button that starts deforming toward the target; disabled when unavailable or when target equals current.
    */
@@ -760,31 +795,53 @@ function createGeometryComputerActionsContent(
   const currentB = clampIntegerMeters(options.currentDepthMeters ?? widthMeters, 0.5 * widthMeters, 2 * widthMeters);
   const targetA = clampIntegerMeters(options.targetSkewXMeters ?? currentA, 0, 2 * widthMeters);
   const targetB = clampIntegerMeters(options.targetDepthMeters ?? currentB, 0.5 * widthMeters, 2 * widthMeters);
+  const shift = shapeMachineText.shift;
+  const height = shapeMachineText.height;
   const statusLabel = available
-    ? `Current (${formatMeters(currentA)}, ${formatMeters(currentB)}) / target (${formatMeters(targetA)}, ${formatMeters(targetB)})`
+    ? `Now: ${shift} ${shapeMachineText.metres(currentA)}, ${height} ${shapeMachineText.metres(currentB)}. Target: ${shift} ${shapeMachineText.metres(targetA)}, ${height} ${shapeMachineText.metres(targetB)}.`
     : `${disabledReasons.shapeMachineOnlyInTorus}.`;
-  const halfWidthStep = Math.round(widthMeters / 2);
+  const minB = Math.ceil(0.5 * widthMeters);
+  const maxMeters = Math.floor(2 * widthMeters);
   const start = {
     widthMeters,
     skewXMeters: options.startSkewXMeters ?? options.currentSkewXMeters ?? currentA,
     depthMeters: options.startDepthMeters ?? options.currentDepthMeters ?? currentB,
   };
 
+  const offTorus = disabledWhen(!available, disabledReasons.shapeMachineOnlyInTorus);
+  const limitReason = (blocked: boolean) => disabledWhen(!available || blocked, available ? disabledReasons.atTheLimit : disabledReasons.shapeMachineOnlyInTorus);
+  const entryAxis = options.entryAxis;
+  const startA = clampIntegerMeters(start.skewXMeters, 0, 2 * widthMeters);
+  const startB = clampIntegerMeters(start.depthMeters, 0.5 * widthMeters, 2 * widthMeters);
+  // A shift of the start by `delta` metres that stays in range: forward when it fits, otherwise backward.
+  const shiftedStart = (delta: number): number => (startA + delta <= maxMeters ? startA + delta : startA - delta);
+  const presetTargets: readonly { readonly id: string; readonly label: string; readonly aMeters: number; readonly bMeters: number }[] = [
+    { id: "square", label: shapeMachineText.presets.square, aMeters: 0, bMeters: clampIntegerMeters(widthMeters, 0.5 * widthMeters, 2 * widthMeters) },
+    { id: "half-shift", label: shapeMachineText.presets.halfShift, aMeters: clampIntegerMeters(shiftedStart(Math.round(widthMeters / 2)), 0, 2 * widthMeters), bMeters: startB },
+    { id: "whole-shift", label: shapeMachineText.presets.wholeShift, aMeters: clampIntegerMeters(shiftedStart(widthMeters), 0, 2 * widthMeters), bMeters: startB },
+    { id: "tall", label: shapeMachineText.presets.tall, aMeters: startA, bMeters: clampIntegerMeters(2 * startB, 0.5 * widthMeters, 2 * widthMeters) },
+  ];
+  const parameterName = (axis: "a" | "b"): string => (axis === "a" ? shift : height);
+  const currentModuliLabel = available
+    ? formatTorusModuliLabel(
+        "Current",
+        { widthMeters, skewXMeters: options.currentSkewXMeters ?? currentA, depthMeters: options.currentDepthMeters ?? currentB },
+        start,
+      )
+    : "";
+  const targetModuliLabel = available
+    ? formatTorusModuliLabel("Target", { widthMeters, skewXMeters: targetA, depthMeters: targetB }, start)
+    : "";
+
   return {
     kind: "geometry-computer-actions",
     computerId: options.computerId,
     available,
     statusLabel,
-    currentModuliLabel: available
-      ? formatTorusModuliLabel(
-          "Current",
-          { widthMeters, skewXMeters: options.currentSkewXMeters ?? currentA, depthMeters: options.currentDepthMeters ?? currentB },
-          start,
-        )
-      : "",
-    targetModuliLabel: available
-      ? formatTorusModuliLabel("Target", { widthMeters, skewXMeters: targetA, depthMeters: targetB }, start)
-      : "",
+    moreLines: available ? [shapeMachineText.widthLine(shapeMachineText.metres(widthMeters)), currentModuliLabel, targetModuliLabel] : [],
+    moreOpen: options.moreOpen === true,
+    currentModuliLabel,
+    targetModuliLabel,
     widthMeters,
     current: {
       aMeters: currentA,
@@ -800,18 +857,32 @@ function createGeometryComputerActionsContent(
       minBMeters: 0.5 * widthMeters,
       maxBMeters: 2 * widthMeters,
     },
-    stepActions: [
-      { axis: "a", deltaMeters: -halfWidthStep, label: `A -${formatMeters(halfWidthStep)}`, ...disabledWhen(!available, disabledReasons.shapeMachineOnlyInTorus) },
-      { axis: "a", deltaMeters: -1, label: "A -1 m", ...disabledWhen(!available, disabledReasons.shapeMachineOnlyInTorus) },
-      { axis: "a", deltaMeters: 1, label: "A +1 m", ...disabledWhen(!available, disabledReasons.shapeMachineOnlyInTorus) },
-      { axis: "a", deltaMeters: halfWidthStep, label: `A +${formatMeters(halfWidthStep)}`, ...disabledWhen(!available, disabledReasons.shapeMachineOnlyInTorus) },
-      { axis: "b", deltaMeters: -halfWidthStep, label: `B -${formatMeters(halfWidthStep)}`, ...disabledWhen(!available, disabledReasons.shapeMachineOnlyInTorus) },
-      { axis: "b", deltaMeters: -1, label: "B -1 m", ...disabledWhen(!available, disabledReasons.shapeMachineOnlyInTorus) },
-      { axis: "b", deltaMeters: 1, label: "B +1 m", ...disabledWhen(!available, disabledReasons.shapeMachineOnlyInTorus) },
-      { axis: "b", deltaMeters: halfWidthStep, label: `B +${formatMeters(halfWidthStep)}`, ...disabledWhen(!available, disabledReasons.shapeMachineOnlyInTorus) },
+    parameters: [
+      { axis: "a", name: shift, valueMeters: targetA, valueLabel: shapeMachineText.metres(targetA), ...offTorus },
+      { axis: "b", name: height, valueMeters: targetB, valueLabel: shapeMachineText.metres(targetB), ...offTorus },
     ],
+    stepActions: [
+      { axis: "a", deltaMeters: -1, label: shapeMachineText.stepDown, ...limitReason(targetA - 1 < 0) },
+      { axis: "a", deltaMeters: 1, label: shapeMachineText.stepUp, ...limitReason(targetA + 1 > maxMeters) },
+      { axis: "b", deltaMeters: -1, label: shapeMachineText.stepDown, ...limitReason(targetB - 1 < minB) },
+      { axis: "b", deltaMeters: 1, label: shapeMachineText.stepUp, ...limitReason(targetB + 1 > maxMeters) },
+    ],
+    ...(available && entryAxis !== undefined
+      ? {
+          entry: {
+            axis: entryAxis,
+            name: parameterName(entryAxis),
+            text: options.entryText ?? "",
+            prompt: shapeMachineText.entryPrompt(parameterName(entryAxis)),
+            maxLength: 2,
+          },
+        }
+      : {}),
+    presets: presetTargets.map((preset) => ({ ...preset, ...offTorus })),
+    sameAsStart: available && isSameFlatTorus({ widthMeters, skewXMeters: targetA, depthMeters: targetB }, start),
+    sameAsStartLabel: shapeMachineText.sameAsStart,
     goAction: {
-      label: "GO!",
+      label: shapeMachineText.reshape,
       ...disabledWhen(
         !available || (currentA === targetA && currentB === targetB),
         available ? disabledReasons.nothingToChange : disabledReasons.shapeMachineOnlyInTorus,
@@ -845,11 +916,6 @@ function createGeodesicCannonEntries(
 /** `{ disabled }` for a control, with `reason` when it is disabled: every disabled control carries its reason. */
 function disabledWhen(disabled: boolean, reason: string): { readonly disabled: boolean; readonly disabledReason?: string } {
   return disabled ? { disabled, disabledReason: reason } : { disabled };
-}
-
-function formatMeters(value: number): string {
-  const rounded = Math.round(value * 100) / 100;
-  return Number.isInteger(rounded) ? `${rounded} m` : `${rounded.toFixed(2).replace(/0+$/, "").replace(/\.$/, "")} m`;
 }
 
 function clampIntegerMeters(value: number, min: number, max: number): number {

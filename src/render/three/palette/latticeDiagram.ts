@@ -1,18 +1,18 @@
 /**
- * The world-deformation lattice diagram shown on the geometry computer page: a small parallelogram of lattice points with labels, drawn with uikit containers.
+ * The shape machine's picture: the current (white) and target (green) parallelograms, the target's Shift and Height labelled in meters, and the "Same world as the start" badge, drawn with uikit containers.
  */
 import { Container, Text } from "@pmndrs/uikit";
 import type { PaletteDefinition } from "../../../ui/paletteDefinition";
-import { borderColor } from "./tokens";
+import { borderColor, textColor } from "./tokens";
 
 /**
- * Draw the current (white) and target (green) deformation parallelograms into a 900x280 pixel box. Lines are made of small dot Containers because uikit has no line primitive. Original meter-space lattice points are stored in userData for inspection.
+ * Draw the current (white) and target (green) deformation parallelograms into a 900x220 pixel box. Lines are made of small dot Containers because uikit has no line primitive. Original meter-space lattice points are stored in userData for inspection.
  */
 export function createWorldDeformationDiagram(
   content: Extract<PaletteDefinition["content"], { readonly kind: "geometry-computer-actions" }>,
 ): Container {
   const diagramWidthPixels = 900;
-  const diagramHeightPixels = 280;
+  const diagramHeightPixels = 220;
   const fitted = fitParallelogramDiagramPoints(
     diagramWidthPixels,
     diagramHeightPixels,
@@ -39,19 +39,29 @@ export function createWorldDeformationDiagram(
   addParallelogramLines(diagram, current, "#f8fafc", "current", 1004, 7);
   addParallelogramLines(diagram, target, "#34d399", "target", 1008, 4);
   diagram.add(createDiagramPoint(current[0], "#f8fafc"));
-  diagram.add(createDiagramLabel(`(0,0)`, clampDiagramLabelX(current[0].x - 12, diagramWidthPixels), current[0].y + 10, "#f8fafc"));
-  diagram.add(createDiagramLabel(
-    `(X,0)=(${content.widthMeters},0)`,
-    clampDiagramLabelX(current[1].x - 76, diagramWidthPixels),
-    current[1].y + 10,
-    "#d9edf1",
-  ));
-  diagram.add(createDiagramLabel(
-    `A+X,B=(${content.target.aMeters + content.widthMeters},${content.target.bMeters})`,
-    clampDiagramLabelX(target[2].x + 8, diagramWidthPixels),
-    Math.max(70, target[2].y - 24),
-    "#34d399",
-  ));
+  // The two sides of the target that carry its numbers: the top side is the Shift, the left side the Height.
+  const shiftLabel = content.parameters.find((parameter) => parameter.axis === "a");
+  const heightLabel = content.parameters.find((parameter) => parameter.axis === "b");
+  if (shiftLabel !== undefined) {
+    diagram.add(createDiagramLabel(
+      `${shiftLabel.name} ${shiftLabel.valueLabel}`,
+      clampDiagramLabelX((target[2].x + target[3].x) / 2 - 56, diagramWidthPixels),
+      Math.max(6, target[3].y - 30),
+      "#34d399",
+    ));
+  }
+  if (heightLabel !== undefined) {
+    diagram.add(createDiagramLabel(
+      `${heightLabel.name} ${heightLabel.valueLabel}`,
+      clampDiagramLabelX(Math.min(target[0].x, target[3].x) - 150, diagramWidthPixels),
+      (target[0].y + target[3].y) / 2 - 10,
+      "#34d399",
+    ));
+  }
+
+  if (content.sameAsStart) {
+    diagram.add(createSameAsStartBadge(content.sameAsStartLabel));
+  }
 
   diagram.userData.scenePaletteIconSrc = "world-deformation-parallelogram";
   diagram.userData.scenePaletteItemId = "geometry-computer:diagram";
@@ -60,6 +70,39 @@ export function createWorldDeformationDiagram(
     target: createDiagramLatticePoints(content.widthMeters, content.target.aMeters, content.target.bMeters),
   };
   return diagram;
+}
+
+// The green pill in the corner of the picture that says the target is the same flat torus as the start.
+function createSameAsStartBadge(label: string): Container {
+  const badge = new Container({
+    positionType: "absolute",
+    positionLeft: 12,
+    positionTop: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingX: 14,
+    paddingY: 6,
+    borderRadius: 999,
+    backgroundColor: "#166534",
+    borderColor: "#34d399",
+    borderWidth: 1,
+    renderOrder: 1010,
+    depthTest: false,
+    depthWrite: false,
+  });
+  badge.add(new Text({
+    text: label,
+    fontSize: 16,
+    fontWeight: "bold",
+    color: textColor,
+    fill: textColor,
+    wordBreak: "keep-all",
+    renderOrder: 1011,
+    depthTest: false,
+    depthWrite: false,
+  }));
+  badge.userData.scenePaletteItemId = "geometry-computer:same-as-start";
+  return badge;
 }
 
 // Four corners of the parallelogram in world meters: (0,0), (X,0), (X+a,b), (a,b).
@@ -89,8 +132,8 @@ function fitParallelogramDiagramPoints(
   const maxY = Math.max(...allPoints.map((point) => point.y));
   const paddingLeft = 128;
   const paddingRight = 42;
-  const paddingTop = 76;
-  const paddingBottom = 58;
+  const paddingTop = 52;
+  const paddingBottom = 28;
   const worldWidth = Math.max(maxX - minX, 1);
   const worldHeight = Math.max(maxY - minY, 1);
   const scale = Math.min(

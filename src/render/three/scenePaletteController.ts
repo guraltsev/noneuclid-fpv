@@ -8,6 +8,7 @@
 import * as THREE from "three";
 import type { PortalPanelModeId } from "../../glue/portalPanelMode";
 import type { ClientSession } from "../../runtime/clientSession";
+import type { GeometryComputerEdit } from "../../runtime/runtimeCommands";
 import type { RuntimeMenuConsoleLogLevelId, RuntimeMouseSensitivity, RuntimeTextSize, RuntimeTurnSpeed } from "../../runtime/runtimeMenuState";
 import type { RuntimeDebugOverlayItemId, RuntimeToolId } from "../../glue/toolIds";
 import type { PaletteDefinition } from "../../ui/paletteDefinition";
@@ -110,6 +111,7 @@ export interface ScenePaletteControllerOptions {
   readonly onMeasurementDeleteRequested?: (measurementKind: "length" | "angle", measurementId: string) => void;
   /** Geometry computer callbacks take the computer id; targets and deltas are in meters (aMeters/bMeters are the two target coordinates). */
   readonly onGeometryComputerStepTargetRequested: (computerId: string, axis: "a" | "b", deltaMeters: number) => void;
+  readonly onGeometryComputerEditRequested: (computerId: string, edit: GeometryComputerEdit) => void;
   readonly onGeometryComputerGoRequested: (computerId: string) => void;
   /** Help hub navigation (tutorial and goal pages) and the paging callbacks that follow. */
   readonly onQuestionHelpTutorialRequested: () => void;
@@ -243,6 +245,7 @@ export function createScenePaletteController(options: ScenePaletteControllerOpti
     onGeodesicCannonDeleteLaserRequested: options.onGeodesicCannonDeleteLaserRequested,
     onMeasurementDeleteRequested: options.onMeasurementDeleteRequested,
     onGeometryComputerStepTargetRequested: options.onGeometryComputerStepTargetRequested,
+    onGeometryComputerEditRequested: options.onGeometryComputerEditRequested,
     onGeometryComputerGoRequested: options.onGeometryComputerGoRequested,
     onQuestionHelpTutorialRequested: options.onQuestionHelpTutorialRequested,
     onQuestionHelpGoalRequested: options.onQuestionHelpGoalRequested,

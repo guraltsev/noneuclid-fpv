@@ -917,6 +917,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     createGeometryComputerMenuOptions,
     refreshOpenGeometryComputerMenu,
     stepGeometryComputerPendingTarget,
+    editGeometryComputer,
     startGeometryComputerDeformation,
   } = createGeometryComputerMenu({
     geometrySession,
@@ -1212,6 +1213,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       startOverRequested = true;
     },
     stepGeometryComputerPendingTarget,
+    editGeometryComputer,
     startGeometryComputerDeformation,
     appendEditingSignCharacter,
     backspaceEditingSignMessage,
