@@ -92,7 +92,7 @@ commit on `dev`; report appended.
 - Main page: `MainPaletteContent` has `menuActions` (Help, Settings, Go home, Start over); `toolOptions` is empty on desktop. `pages/main.ts` draws the four as text buttons (Start over keeps the two-press guard). New `onHelpRequested` plumbed to `openHelpPage()` in `createThreeApp.ts`, which the pause card's Help now also uses. The header's home and reload icons show only where tool tiles remain.
 - Vocabulary: `toolBeltText`, `mainMenuText`; pause card "Switch tool" row is "1-5 . wheel"; intents: `context-menu` label "Right click / F", new `switch-tool` ("1-5 . wheel", XR "Not available yet") and `main-menu` ("Esc", XR "Not available yet"); `worldInteractionDefinition` no longer appends a separate F.
 - Tests: `tests/ui/toolBeltDefinition.test.ts` (7), belt keys in `desktopControls.test.ts`, right click, wheel and Tab in `desktopInputHandlers.test.ts`, desktop main page in `paletteDefinition.test.ts` and `scenePaletteAdapter.test.ts`. `npm run docs:generate` run.
-- Commit: see the follow-up line below.
+- Commit: 36e6296 on `dev`.
 
 ### Deviations
 - XR path keeps the tool tiles on the main page (decision 6): `toolOptions` is filled only for `inputMode === "xr"`; job 77 removes them.
