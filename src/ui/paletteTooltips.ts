@@ -2,7 +2,7 @@
  * Resolves the tooltip text for palette items from their string item ids.
  * Item ids are namespaced strings produced by the palette renderers (for example "tool:placedFlags/flag", "geodesic-cannon-action:rotate:<id>", "sign-key:A"); this module is the single place that turns them into human-readable labels, so desktop and VR show the same tooltips. It is a pure lookup with no state.
  */
-import { mainMenuText, menuControlText, objectActions, surfaceNames, toolNames } from "../world-objects/vocabulary";
+import { helpText, mainMenuText, menuControlText, objectActions, settingsText, surfaceNames, toolNames } from "../world-objects/vocabulary";
 
 /** The tooltips of the main menu buttons (design 017 section 7.5), by the id after "main-menu:". */
 const mainMenuTooltips: Readonly<Record<string, string | undefined>> = {
@@ -64,6 +64,26 @@ export function resolvePaletteTooltipLabel(itemId: string | undefined): string |
     return "Things to try";
   }
 
+  if (itemId === "question-help:discoveries") {
+    return surfaceNames.discoveries;
+  }
+
+  if (itemId.startsWith("tutorial-topic:")) {
+    return surfaceNames.howTo;
+  }
+
+  if (itemId.startsWith("mouse-sensitivity:")) {
+    return settingsText.mouseSensitivity;
+  }
+
+  if (itemId.startsWith("turn-speed:")) {
+    return settingsText.turnSpeed;
+  }
+
+  if (itemId.startsWith("text-size:")) {
+    return settingsText.textSize;
+  }
+
   if (itemId.startsWith("sign-type:")) {
     return "Choose sign type";
   }
@@ -77,6 +97,9 @@ export function resolvePaletteTooltipLabel(itemId: string | undefined): string |
 
 const fixedTooltips: Readonly<Record<string, string>> = {
   "settings": "Settings",
+  "tutorial-try-it": `${helpText.tryIt}: take this tool and close Help`,
+  "invert-y-toggle": settingsText.invertY,
+  "reset-tips": `${settingsText.resetTips}: show the tool tips again`,
   "close": "Close",
   "back": "Back",
   "go-home": objectActions.goHome,

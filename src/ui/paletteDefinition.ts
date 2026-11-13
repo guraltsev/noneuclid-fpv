@@ -4,6 +4,7 @@
  * The module decides what is shown and enabled (config-gated sections, disabled buttons, tutorial text per input device, integer-meter limits for the geometry computer) but performs no rendering and holds no state; any page whose payload is missing falls back to the main page.
  */
 import type { ObjectActionEntry } from "../engine/moduleTypes";
+import type { TutorialPageSpec } from "../cell-complex/specs";
 import { appConfigCatalog, type AppConfig, type ConfigurableToolId } from "../glue/appConfig";
 import {
   describeTorusRelation,
@@ -12,22 +13,32 @@ import {
   type TorusLatticeParameters,
 } from "../cell-complex/deformations/torusModuli";
 import { formatBodyForInputMode } from "./inputModeText";
-import { getInputHintGlyph, type InputHintGlyph } from "./inputIntents";
+import { getInputHintGlyph, type InputHintGlyph, type InputIntent } from "./inputIntents";
 import { publicAssetUrl } from "../glue/assetUrls";
 import { worldCatalog } from "../authoring/worldCatalog";
 import { helpHubHomeGuidance } from "../world-objects/helpHubCopy";
+import { lostSentence, settingsSections } from "./howToCards";
 import {
   actionWithKey,
   beamName,
   disabledReasons,
+  helpText,
   mainMenuText,
   menuControlText,
   objectActions,
   surfaceNames,
+  verbNames,
 } from "../world-objects/vocabulary";
 import type { XrLayout } from "../glue/xrLayout";
 import { portalPanelModeDefinitions } from "../glue/portalPanelMode";
-import type { RuntimeMenuConsoleLogLevelId, RuntimeMenuPageId, RuntimeMenuState } from "../runtime/runtimeMenuState";
+import type {
+  RuntimeMenuConsoleLogLevelId,
+  RuntimeMenuPageId,
+  RuntimeMenuState,
+  RuntimeMouseSensitivity,
+  RuntimeTextSize,
+  RuntimeTurnSpeed,
+} from "../runtime/runtimeMenuState";
 import type { RuntimeDebugOverlayItemId, RuntimeToolId } from "../glue/toolIds";
 import type { InputMode } from "./inputIntents";
 import { placedFlagMaxMessageLength } from "../world-objects/placedFlags";
@@ -104,6 +115,16 @@ export interface SettingsPaletteContent {
   readonly useOneControllerEnabled: boolean;
   /** The "Left-handed" switch (VR). */
   readonly leftHandedEnabled: boolean;
+  /** Mouse sensitivity step (Controls). */
+  readonly mouseSensitivity: RuntimeMouseSensitivity;
+  /** The "Invert Y" switch (Controls). */
+  readonly invertYEnabled: boolean;
+  /** Turn speed step (Controls). */
+  readonly turnSpeed: RuntimeTurnSpeed;
+  /** Text size step (Display). */
+  readonly textSize: RuntimeTextSize;
+  /** The controls reference (Controls): one row per verb, with the name of the control of the current device. */
+  readonly controlsReference: readonly { readonly verb: string; readonly glyph: InputHintGlyph }[];
   /** True while a reload awaits its confirming second press. */
   readonly reloadConfirmationActive: boolean;
 }
@@ -252,8 +273,19 @@ export interface TutorialPaletteContent extends PagedHelpExtras {
   readonly kind: "tutorial";
   readonly objectId: string;
   readonly view: "index" | "page";
-  /** One entry per page, in order, for the index view. */
-  readonly topics: readonly { readonly pageIndex: number; readonly title: string }[];
+  /** One entry per page, in order, for the index view: "Start here" on the first card, a tick on a card that was opened, and the reason on a card of a tool the world cannot support. */
+  readonly topics: readonly {
+    readonly pageIndex: number;
+    readonly title: string;
+    readonly startHere: boolean;
+    readonly read: boolean;
+    readonly disabledReason?: string;
+  }[];
+  /** The page view's card: the tool it is about, the reason that tool is unavailable, and its "Try it" button (only on a card of a tool). */
+  readonly toolId?: string;
+  readonly disabledReason?: string;
+  readonly tryItAction?: PaletteTextAction;
+  readonly startHere?: boolean;
   readonly title: string;
   readonly body: string;
   readonly pageLabel: string;
@@ -279,7 +311,7 @@ export interface QuestionHelpPaletteContent {
   readonly body: string;
   /** Buttons for the subpages; each is disabled if that subpage has no pages. */
   readonly options: readonly {
-    readonly id: "tutorial" | "goal";
+    readonly id: "tutorial" | "goal" | "discoveries";
     readonly label: string;
     readonly disabled: boolean;
     readonly disabledReason?: string;
@@ -390,6 +422,11 @@ export function createPaletteDefinition(
         showHintsEnabled: state.showHintsEnabled !== false,
         useOneControllerEnabled: state.useOneControllerEnabled === true,
         leftHandedEnabled: state.leftHandedEnabled === true,
+        mouseSensitivity: state.mouseSensitivity ?? "medium",
+        invertYEnabled: state.invertYEnabled === true,
+        turnSpeed: state.turnSpeed ?? "medium",
+        textSize: state.textSize ?? "medium",
+        controlsReference: controlsReferenceIntents.map(({ verb, intent }) => ({ verb, glyph: getInputHintGlyph(inputMode, intent, xrLayout) })),
         reloadConfirmationActive,
       },
     };
@@ -486,7 +523,11 @@ export function createPaletteDefinition(
       leftAction: createHeaderAction("none"),
       rightAction: createHeaderAction("back"),
       reloadConfirmationActive,
-      content: createPagedHelpContent("tutorial", state.tutorialOptions, inputMode),
+      content: createPagedHelpContent("tutorial", state.tutorialOptions, inputMode, xrLayout, {
+        readTitles: state.helpCardsRead ?? [],
+        toolDisabledReasons: state.questionHelpOptions?.toolDisabledReasons ?? {},
+        settingsSentence: helpText.settingsHas(settingsSections(appConfig)),
+      }),
     };
   }
 
@@ -496,7 +537,7 @@ export function createPaletteDefinition(
       leftAction: createHeaderAction("none"),
       rightAction: createHeaderAction("back"),
       reloadConfirmationActive,
-      content: createPagedHelpContent("goal", state.goalOptions, inputMode),
+      content: createPagedHelpContent("goal", state.goalOptions, inputMode, xrLayout),
     };
   }
 
@@ -509,18 +550,20 @@ export function createPaletteDefinition(
       content: {
         kind: "question-help",
         objectId: state.questionHelpOptions.objectId,
-        body: questionHelpHubBody,
+        body: lostSentence(inputMode, xrLayout),
         options: [
-          {
-            id: "tutorial",
-            label: surfaceNames.howTo,
-            ...disabledWhen(state.questionHelpOptions.tutorialPages.length === 0, disabledReasons.nothingForThisWorld),
-          },
           {
             id: "goal",
             label: surfaceNames.thingsToTry,
             ...disabledWhen(state.questionHelpOptions.goalPages.length === 0, disabledReasons.nothingForThisWorld),
           },
+          {
+            id: "tutorial",
+            label: surfaceNames.howTo,
+            ...disabledWhen(state.questionHelpOptions.tutorialPages.length === 0, disabledReasons.nothingForThisWorld),
+          },
+          // The page of discoveries arrives with the discoveries themselves; until then the button says so.
+          { id: "discoveries", label: surfaceNames.discoveries, ...disabledWhen(true, disabledReasons.noDiscoveriesYet) },
         ],
       },
     };
@@ -594,20 +637,33 @@ export function createPaletteDefinitionCache(appConfig: AppConfig): PaletteDefin
   };
 }
 
+/** What the How to cards need beyond the pages: the titles already opened, and the reasons of the tools the world cannot support. */
+interface HowToContext {
+  readonly readTitles: readonly string[];
+  readonly toolDisabledReasons: Readonly<Record<string, string>>;
+  /** What Settings has with this config, generated; added to the card marked "Start here". */
+  readonly settingsSentence: string;
+}
+
 function createPagedHelpContent(
   kind: "tutorial",
   options: NonNullable<RuntimeMenuState["tutorialOptions"]>,
   inputMode: InputMode,
+  xrLayout: XrLayout | undefined,
+  howTo: HowToContext,
 ): TutorialPaletteContent;
 function createPagedHelpContent(
   kind: "goal",
   options: NonNullable<RuntimeMenuState["goalOptions"]>,
   inputMode: InputMode,
+  xrLayout: XrLayout | undefined,
 ): GoalPaletteContent;
 function createPagedHelpContent(
   kind: "tutorial" | "goal",
   options: NonNullable<RuntimeMenuState["tutorialOptions"]> | NonNullable<RuntimeMenuState["goalOptions"]>,
   inputMode: InputMode,
+  xrLayout: XrLayout | undefined,
+  howTo?: HowToContext,
 ): TutorialPaletteContent | GoalPaletteContent {
   const pageCount = options.pages.length;
   const pageIndex = pageCount === 0
@@ -618,11 +674,13 @@ function createPagedHelpContent(
   const common = {
     objectId: options.objectId,
     title: showIndex ? surfaceNames.howTo : page.title,
-    body: showIndex ? tutorialIndexBody : resolveTutorialBodyForInputMode(page, inputMode),
+    body: showIndex
+      ? helpText.howToIntro
+      : [resolveTutorialBodyForInputMode(page, inputMode, xrLayout), page.startHere === true ? howTo?.settingsSentence : undefined].filter(Boolean).join(" "),
     imageSrc: !showIndex && page.imagePath ? publicAssetUrl(page.imagePath) : undefined,
     controls: showIndex
       ? []
-      : (page.controls ?? []).map((control) => ({ hint: getInputHintGlyph(inputMode, control.intent), label: control.label })),
+      : (page.controls ?? []).map((control) => ({ hint: getInputHintGlyph(inputMode, control.intent, xrLayout), label: control.label })),
   };
   const paging = {
     pageLabel: pageCount === 0 ? "0 / 0" : `${pageIndex + 1} / ${pageCount}`,
@@ -634,27 +692,55 @@ function createPagedHelpContent(
     return { kind, ...common, ...paging };
   }
 
+  const reasonOf = (entry: TutorialPageSpec): string | undefined => entry.toolId === undefined ? undefined : howTo?.toolDisabledReasons[entry.toolId];
+  const pageReason = reasonOf(page);
   return {
     kind,
     ...common,
     ...paging,
     view: showIndex ? "index" : "page",
-    topics: options.pages.map((entry, index) => ({ pageIndex: index, title: entry.title })),
+    topics: options.pages.map((entry, index) => {
+      const reason = reasonOf(entry);
+      return {
+        pageIndex: index,
+        title: entry.title,
+        startHere: entry.startHere === true,
+        read: howTo?.readTitles.includes(entry.title) === true,
+        ...(reason !== undefined ? { disabledReason: reason } : {}),
+      };
+    }),
+    ...(!showIndex && page.toolId !== undefined
+      ? {
+          toolId: page.toolId,
+          tryItAction: { label: helpText.tryIt, ...disabledWhen(pageReason !== undefined, pageReason ?? disabledReasons.notAvailable) },
+        }
+      : {}),
+    ...(!showIndex && pageReason !== undefined ? { disabledReason: pageReason } : {}),
+    ...(!showIndex && page.startHere === true ? { startHere: true } : {}),
   };
 }
 
-/** Text above the tutorial's index of pages. */
-const tutorialIndexBody = "Choose a topic to see what you can do and how.";
+/** The controls Settings lists: the verbs of design 017 section 7 and the intent that performs each. */
+const controlsReferenceIntents: readonly { readonly verb: string; readonly intent: InputIntent }[] = [
+  { verb: verbNames.look, intent: "look" },
+  { verb: verbNames.walk, intent: "move" },
+  { verb: verbNames.use, intent: "primary" },
+  { verb: verbNames.menu, intent: "context-menu" },
+  { verb: verbNames.switchTool, intent: "switch-tool" },
+  { verb: verbNames.whatsThis, intent: "help" },
+  { verb: verbNames.mainMenu, intent: "main-menu" },
+];
 
+/** The page's text for the input device; the sentence for a student who is lost is written for this device's main-menu binding. */
 function resolveTutorialBodyForInputMode(
   page: NonNullable<RuntimeMenuState["tutorialOptions"]>["pages"][number],
   inputMode: InputMode,
+  xrLayout: XrLayout | undefined,
 ): string {
-  if (inputMode === "desktop") {
-    return page.desktopBody ?? formatBodyForInputMode(page.body, "desktop");
-  }
-
-  return page.xrBody ?? formatBodyForInputMode(page.body, "xr");
+  const body = inputMode === "desktop"
+    ? page.desktopBody ?? formatBodyForInputMode(page.body, "desktop")
+    : page.xrBody ?? formatBodyForInputMode(page.body, "xr");
+  return body.replace(helpHubHomeGuidance, lostSentence(inputMode, xrLayout));
 }
 
 /** The main menu's entries, in order. */

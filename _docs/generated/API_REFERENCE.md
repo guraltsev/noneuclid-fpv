@@ -1289,6 +1289,7 @@ The student vocabulary (design 017 section 6): every student-visible noun, verb 
 | function | `beamName` | What a beam is called in a menu and on a label: "Beam 1". |
 | function | `laserLabel` | The tooltip of a laser: "Laser" with its short id when it has one, "Laser L1". |
 | const | `lostGuidance` | The sentence for a student who is lost. |
+| function | `lostGuidanceFor` | The sentence for a student who is lost, from the words of the main-menu binding of the current layout: "Press Esc", "Press X", "Hold B". |
 | const | `retiredTerms` | The words that no student-visible string may use (the "Retire" columns of design 017 tables 6.2 and 6.3). |
 | const | `pauseCardText` | The words of the pause card, the desktop main menu (design 017 section 8.1). |
 | const | `mainMenuText` | The words of the main menu's buttons that are not named elsewhere. |
@@ -1300,6 +1301,9 @@ The student vocabulary (design 017 section 6): every student-visible noun, verb 
 | const | `controllersSettingsText` | The "Controllers" section of Settings (VR hand options, design 017 sections 7.2 and 7.3). |
 | const | `vrBeltText` | The words of the VR belt, its toasts and the VR start card (design 017 sections 7.3, 7.4 and 8.1). |
 | const | `hintStripText` | The words of the hint strip (design 017 section 8.2): what the listed input does right now, after the colon. |
+| const | `helpText` | The words of Help beyond the page names (design 017 section 8.6): the cards of How to, the Try it button and the first-use tips. |
+| const | `firstUseTipText` | The tool steps of the first-use tips (design 017 section 8.6). |
+| const | `settingsText` | The words of the Settings sections that the comfort and display options added (design 017 section 8.7). |
 
 ### `world-objects/worldObjectOwner.ts`
 
@@ -1356,7 +1360,7 @@ World builder: the imperative API behind the world-script DSL that assembles a C
 | Kind | Name | Summary |
 | --- | --- | --- |
 | const | `defaultStartingQuestionCubeMessage` | Default help message shown on the starting question cube when the author supplies none. |
-| const | `defaultStartingQuestionCubeTutorialPages` | Default tutorial pages of the starting question cube: one page per thing a player can do, each with a screenshot and its controls (shown with the icons of the current device). |
+| const | `defaultStartingQuestionCubeTutorialPages` | Default tutorial pages of the starting question cube, the cards of How to: "Basics" (marked "Start here"), then one card per tool, each with a picture and its controls (shown with the icons of the current device). |
 | const | `defaultStartingQuestionCubeGoalPages` | Default goal pages of the starting question cube. |
 | interface | `WorldBuilder` | The set of calls available to world scripts for assembling a world. |
 | interface | `StartingQuestionCubeAuthoringParams` | Parameters for startingQuestionCube: ordinary static-object parameters plus tutorial content. |
@@ -2197,6 +2201,9 @@ Renderer-neutral state machine for the in-game menu, shared by the desktop overl
 
 | Kind | Name | Summary |
 | --- | --- | --- |
+| type | `RuntimeTextSize` | Text size of the display setting: it scales the text of the heads-up display and of the palette. |
+| type | `RuntimeMouseSensitivity` | Steps of the "Mouse sensitivity" setting. |
+| type | `RuntimeTurnSpeed` | Steps of the "Turn speed" setting (keyboard turning on desktop). |
 | type | `RuntimeMenuPageId` | Identifier of a menu page; "main" is the tool palette and the default. |
 | type | `RuntimeMenuConsoleLogLevelId` | Console log levels selectable in the menu (every debug level except "off", which is the debug toggle). |
 | interface | `RuntimeMenuState` | Complete immutable menu state: visibility, current page, page payloads and user-adjustable settings. |
@@ -2233,6 +2240,12 @@ Renderer-neutral state machine for the in-game menu, shared by the desktop overl
 | function | `setRuntimeMenuAimCollisionOutlinesEnabled` | Enables or disables aim-collision outlines. |
 | function | `setRuntimeMenuAntiNauseaModeEnabled` | Enables or disables VR anti-nausea mode. |
 | function | `setRuntimeMenuShowHintsEnabled` | Shows or hides the hint strip. |
+| function | `setRuntimeMenuTextSize` | Sets the text size step. |
+| function | `setRuntimeMenuMouseSensitivity` | Sets the mouse sensitivity step. |
+| function | `setRuntimeMenuTurnSpeed` | Sets the turn speed step. |
+| function | `setRuntimeMenuInvertY` | Sets the "Invert Y" switch. |
+| function | `resetRuntimeMenuTips` | Counts a press of "Reset tips". |
+| function | `markRuntimeMenuHelpCardRead` | Remembers that the How to card with this title was opened; unchanged if it already is remembered. |
 | function | `setRuntimeMenuXrHandOption` | Sets one of the VR hand options ("Use one controller", "Left-handed"). |
 | function | `setRuntimeMenuSelectedTool` | Selects the active tool without changing the page. |
 | function | `setRuntimeMenuReloadConfirmUntilMs` | Sets or clears (undefined) the reload-confirmation deadline. |
@@ -2323,6 +2336,31 @@ Abstracts where world-geometry snapshots are built: a dedicated module Web Worke
 
 ## `ui`
 
+### `ui/firstUseTips.ts`
+
+First-use tips (design 017 section 8.6): the first time a tool is taken in a session, a small tip shows the first step of how to use it, and moves on to the next step when the student does what the step describes.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| type | `TipEvent` | What the student did that finishes a step. |
+| interface | `TipStep` | One step of a tip: its text with placeholders, and the event that moves on to the next step (none: the student moves on with "Next"). |
+| type | `TipToolId` | The belt tools that have a tip. |
+| const | `firstUseTips` | The steps of each tool's tip, in order. |
+| function | `tipStepsFor` | The steps of a tool's tip; empty for the Hand and for any tool without one. |
+| interface | `TipState` | The tip on show: whose it is and which step. |
+| function | `startTip` | Starts the tip of a tool at its first step; undefined for a tool without a tip. |
+| function | `currentTipStep` | The step the tip is on; undefined when the state does not name a step. |
+| function | `isLastTipStep` | True when the tip is on its last step. |
+| function | `nextTipStep` | The tip after "Next": the next step, or undefined (the tip ends) after the last. |
+| function | `advanceTipOnEvent` | The tip after an event: it moves on when the event is the one the current step waits for; otherwise it is unchanged. |
+| interface | `TipControlNames` | The names of the controls of the current device that a step's placeholders stand for. |
+| function | `renderTipText` | Fills the placeholders of a step's text with the control names. |
+| type | `SeenTips` | The tools whose tip has been seen this session or before, as the set a store remembers. |
+| function | `shouldShowFirstUseTip` | True when the tool's tip has not been seen yet and the tool has a tip. |
+| function | `markTipSeen` | The set with `toolId` added. |
+| function | `serializeSeenTips` | The stored form of a seen set: a JSON array of tool ids. |
+| function | `parseSeenTips` | The seen set from its stored form; anything unreadable gives the empty set. |
+
 ### `ui/helpLensDefinition.ts`
 
 Renderer-neutral definition of the contextual "help lens" panel shown on desktop and in VR: a title, a body sentence and rows pairing an input glyph with an action label.
@@ -2346,6 +2384,17 @@ The hint strip (design 017 section 8.2 item 3) as renderer-neutral data: up to t
 | interface | `HintStripSource` | What the strip is built from. |
 | function | `createHintStripDefinition` | Builds the strip: at most three entries, never empty. |
 | function | `formatHintStripLine` | The strip as one line of text: "Left click: open Help · H: what's this?". |
+
+### `ui/howToCards.ts`
+
+The cards of How to (design 017 section 8.6), generated against the world.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `HowToSelection` | The pages How to shows, and the reasons given for the tools the world cannot support. |
+| function | `selectHowToPages` | Orders and filters the tutorial pages against the belt. |
+| function | `settingsSections` | The sections Settings has with this config: always Controls, Display and Comfort, plus the ones the config adds. |
+| function | `lostSentence` | The sentence for a student who is lost, from the main-menu binding of this device and layout: "Lost? |
 
 ### `ui/inputIntents.ts`
 
@@ -2527,6 +2576,16 @@ Desktop ring that shows how long R has been held (design 017 section 8.8): a sma
 | --- | --- | --- |
 | interface | `ResetHoldRing` | Handle to the ring created by {@link createResetHoldRing}. |
 | function | `createResetHoldRing` | Creates the hidden ring and appends it to `container`. |
+
+### `render/dom/tipCard.ts`
+
+The desktop first-use tip (design 017 section 8.6): a small card pinned beside the tool belt that shows one step of how to use the tool in hand, with "Next" (when there is a later step) and "Got it".
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `TipCardHandlers` | What the card tells the shell. |
+| interface | `TipCard` | Handle to the card created by {@link createTipCard}. |
+| function | `createTipCard` | Creates a hidden card with class tip-card and appends it to `container`. |
 
 ### `render/dom/toastView.ts`
 
@@ -2828,6 +2887,7 @@ Desktop keyboard and pointer-lock mouse input, collected into one DesktopInputFr
 | type | `DesktopInputFrame` | Input accumulated since the previous consumeFrame call, ready to be applied for one frame. |
 | type | `DesktopLookMode` | Whether mouse movement drives the camera ("camera") or the menu/palette cursor ("palette"). |
 | interface | `DesktopControls` | Handle to the desktop input collector created by {@link createDesktopControls}; the creator must call dispose(). |
+| interface | `DesktopLookTuning` | The look settings that the player changes while playing. |
 | interface | `DesktopControlsOptions` | Tuning parameters for {@link createDesktopControls}; every field is optional. |
 | const | `resetHoldSeconds` | How long R must be held, in seconds, before it asks for a reset (design 017 section 8.8). |
 | function | `createDesktopControls` | Creates the desktop input collector for the given canvas and installs its listeners. |
@@ -2860,6 +2920,17 @@ Desktop placement of the in-scene palette: a panel floating 1.05 m in front of t
 | Kind | Name | Summary |
 | --- | --- | --- |
 | function | `resolveDesktopScenePalettePlacement` | Computes the palette pose for the desktop (non-XR) camera: 1.05 m along the camera's view direction, oriented to look back at the camera with the camera's up vector. |
+
+### `render/three/firstUseTipController.ts`
+
+The first-use tip of the tool in hand (design 017 section 8.6), driven by the shell.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| function | `tipEventsInChanges` | The tip events in the writes of one frame, in order: a laser or a sign added, a measurement added, a beam whose intended length grew. |
+| interface | `FirstUseTipControllerDeps` | What the controller needs from the shell. |
+| interface | `FirstUseTipController` | Handle to the controller. |
+| function | `createFirstUseTipController` | Creates the controller and its (hidden) card. |
 
 ### `render/three/floorPatchMaterial.ts`
 
@@ -3113,7 +3184,7 @@ Settings palette pages: the world, config, debug and comfort settings page and t
 | Kind | Name | Summary |
 | --- | --- | --- |
 | function | `buildDebugSettingsContent` | Debug settings page: log level, overlay toggles (items only when the overlay is on), portal options, wireframes, aim outlines and an optional copy-URL button. |
-| function | `buildSettingsContent` | Settings page: world, config, debug and comfort sections (the fallthrough of the page dispatcher). |
+| function | `buildSettingsContent` | Settings page: Controls (a reference of what each control does, mouse sensitivity, Invert Y, turn speed, the VR hand options), Display (text size, Show hints, Reset tips), Comfort, then the world, config and debug secti… |
 
 ### `render/three/palette/pages/geodesicActions.ts`
 
@@ -3188,6 +3259,9 @@ Color tokens (CSS hex strings) shared by every part of the in-scene palette pane
 | const | `textColor` | Main text and icon color. |
 | const | `mutedTextColor` | Text color of secondary lines. |
 | const | `scrollbarColor` | Scrollbar thumb color of the scrolling pages. |
+| const | `paletteTextScales` | The text size steps of the display setting and the factor each gives the font sizes of the panel. |
+| function | `setPaletteTextScale` | Sets the factor that `fontPx` applies; the panel is rebuilt afterwards (a new palette definition does that). |
+| function | `fontPx` | A font size of the panel, in pixels, at the chosen text size: the design size times the scale, rounded. |
 | const | `scrollbarBorderColor` | Scrollbar border color of the scrolling pages. |
 
 ### `render/three/palette/widgets.ts`
@@ -3202,6 +3276,7 @@ Generic uikit widgets of the in-scene palette panel (buttons, toggles, option gr
 | function | `createOptionGrid` | Two-column grid of option buttons; the selected one is highlighted. |
 | function | `createToggleRow` | Label plus On/Off toggle. |
 | function | `createToggleButton` | On/Off button; clicking calls onToggled with the inverted value of the state captured at build time (state is not read back). |
+| function | `createStepRow` | Label plus a row of exclusive steps (Low, Medium, High); the selected one is highlighted. |
 | function | `createActionButton` | Generic labelled action button with an optional home/reload icon. |
 | const | `disabledReasonColor` | Color of the reason text under a disabled control: warm, so that it reads as "why", not as a label. |
 | function | `createDisabledReasonText` | The small text that says why a control is disabled (design 017 section 8.5). |
@@ -3717,6 +3792,20 @@ Scripted motion of the local player: runs a motion script (src/movement/motionSc
 | interface | `PlayerMotionReport` | Report of a run as the API returns it: the runner's report plus the player's pose now. |
 | interface | `ScriptedPlayerMotion` | The shell's handle on scripted motion. |
 | function | `createScriptedPlayerMotion` | Creates the scripted-motion controller; nothing runs until `motion.run` (or a shortcut) is called. |
+
+### `render/three/settingsStorage.ts`
+
+What Settings and Help remember between visits (design 017 sections 8.6 and 8.7): the text size, the mouse sensitivity, the turn speed, Invert Y and the How to cards that were opened.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `SettingsStorage` | The part of `Storage` the module uses, so tests can pass a plain object. |
+| interface | `StoredSettings` | The remembered values; a field is absent when nothing valid was stored. |
+| function | `loadStoredSettings` | Reads the remembered values; anything missing, invalid or unreadable is left out. |
+| function | `createSettingsSaver` | Creates the saver: `save(menu)` writes the values that differ from what it last saw (the first call compares with `initialMenu`, the state the stored values seeded). |
+| const | `mouseSensitivityFactors` | The factor each mouse sensitivity step gives the mouse look gain. |
+| const | `turnSpeedFactors` | The factor each turn speed step gives the keyboard turn rate. |
+| const | `textSizeRootFactors` | The factor of the root font size of the page (the heads-up display is sized in rem) for each text size. |
 
 ### `render/three/staticAssetRenderRoot.ts`
 

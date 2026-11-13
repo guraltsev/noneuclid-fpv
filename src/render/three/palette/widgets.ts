@@ -3,7 +3,7 @@
  */
 import { Component, Container, Text } from "@pmndrs/uikit";
 import { House, RotateCw, Trash2 } from "@pmndrs/uikit-lucide";
-import { actionColor, activeColor, inactiveColor, mutedTextColor, scrollbarBorderColor, scrollbarColor, textColor } from "./tokens";
+import { actionColor, activeColor, inactiveColor, mutedTextColor, scrollbarBorderColor, scrollbarColor, textColor, fontPx } from "./tokens";
 import { createGeodesicCannonActionIcon, createUnlinkIcon } from "./icons";
 
 /**
@@ -30,7 +30,7 @@ export function createSettingsScrollContainer(): Container {
 export function createSectionLabel(text: string): Text {
   return new Text({
     text,
-    fontSize: 16,
+    fontSize: fontPx(16),
     fontWeight: "medium",
     color: mutedTextColor,
     fill: mutedTextColor,
@@ -145,6 +145,41 @@ export function createToggleButton(
 }
 
 /**
+ * Label plus a row of exclusive steps (Low, Medium, High); the selected one is highlighted. Item ids are "<prefix>:<step id>".
+ */
+export function createStepRow(
+  label: string,
+  steps: readonly { readonly id: string; readonly label: string }[],
+  selectedId: string,
+  onSelected: (id: string) => void,
+  itemPrefix: string,
+): Container {
+  const row = new Container({
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  });
+  row.add(createSectionLabel(label));
+  const buttons = new Container({ flexDirection: "row", gap: 6, flexShrink: 0 });
+  for (const step of steps) {
+    const button = createInteractiveSurface({
+      width: 96,
+      height: 34,
+      label: step.label,
+      labelFontSize: 15,
+      onClick: () => onSelected(step.id),
+      backgroundColor: step.id === selectedId ? activeColor : inactiveColor,
+    });
+    button.userData.scenePaletteItemId = `${itemPrefix}:${step.id}`;
+    buttons.add(button);
+  }
+  row.add(buttons);
+  return row;
+}
+
+/**
  * Generic labelled action button with an optional home/reload icon.
  */
 export function createActionButton(
@@ -194,7 +229,7 @@ export const disabledReasonColor = "#fcd34d";
 export function createDisabledReasonText(reason: string, width?: number): Text {
   const text = new Text({
     text: reason,
-    fontSize: 12,
+    fontSize: fontPx(12),
     fontWeight: "medium",
     color: disabledReasonColor,
     fill: disabledReasonColor,
@@ -351,7 +386,7 @@ export function createInteractiveSurface(options: {
 export function createButtonText(text: string, fontSize: number): Text {
   return new Text({
     text,
-    fontSize,
+    fontSize: fontPx(fontSize),
     fontWeight: "bold",
     color: textColor,
     fill: textColor,

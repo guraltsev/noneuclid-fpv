@@ -1,14 +1,14 @@
 /**
  * Settings palette pages: the world, config, debug and comfort settings page and the debug settings page.
  */
-import { Container } from "@pmndrs/uikit";
+import { Container, Text } from "@pmndrs/uikit";
 import type { PortalPanelModeId } from "../../../../glue/portalPanelMode";
-import type { RuntimeMenuConsoleLogLevelId } from "../../../../runtime/runtimeMenuState";
+import type { RuntimeMenuConsoleLogLevelId, RuntimeMouseSensitivity, RuntimeTextSize, RuntimeTurnSpeed } from "../../../../runtime/runtimeMenuState";
 import type { PaletteDefinition } from "../../../../ui/paletteDefinition";
 import type { ScenePaletteAdapterOptions } from "../adapterTypes";
-import { controllersSettingsText, hintStripText } from "../../../../ui/vocabulary";
-import { borderColor, scrollbarBorderColor, scrollbarColor, sectionColor } from "../tokens";
-import { createActionButton, createChoiceSection, createOptionGrid, createSectionLabel, createSettingsScrollContainer, createToggleButton, createToggleRow } from "../widgets";
+import { controllersSettingsText, hintStripText, settingsText } from "../../../../ui/vocabulary";
+import { borderColor, fontPx, scrollbarBorderColor, scrollbarColor, sectionColor, textColor } from "../tokens";
+import { createActionButton, createChoiceSection, createOptionGrid, createSectionLabel, createSettingsScrollContainer, createStepRow, createToggleButton, createToggleRow } from "../widgets";
 
 /**
  * Debug settings page: log level, overlay toggles (items only when the overlay is on), portal options, wireframes, aim outlines and an optional copy-URL button.
@@ -121,7 +121,7 @@ function createDebugToolsRow(
 }
 
 /**
- * Settings page: world, config, debug and comfort sections (the fallthrough of the page dispatcher).
+ * Settings page: Controls (a reference of what each control does, mouse sensitivity, Invert Y, turn speed, the VR hand options), Display (text size, Show hints, Reset tips), Comfort, then the world, config and debug sections the app config allows (the fallthrough of the page dispatcher).
  */
 export function buildSettingsContent(
   content: Extract<PaletteDefinition["content"], { readonly kind: "settings" }>,
@@ -142,124 +142,115 @@ export function buildSettingsContent(
     scrollbarZIndex: 1004,
   });
 
-  const worldSection = new Container({
-    width: "100%",
-    flexDirection: "column",
-    gap: 8,
-    padding: 12,
-    borderRadius: 20,
-    backgroundColor: sectionColor,
-    borderColor,
-    borderWidth: 1,
-  });
-  worldSection.add(createSectionLabel("World"));
-  worldSection.add(createOptionGrid(
-    content.worldOptions,
-    content.selectedWorldId,
-    "world",
-    options.onWorldSelected,
-  ));
+  const createSection = (label: string): Container => {
+    const section = new Container({
+      width: "100%",
+      flexShrink: 0,
+      flexDirection: "column",
+      gap: 8,
+      padding: 12,
+      borderRadius: 20,
+      backgroundColor: sectionColor,
+      borderColor,
+      borderWidth: 1,
+    });
+    section.add(createSectionLabel(label));
+    return section;
+  };
 
-  const configSection = new Container({
-    width: "100%",
-    flexDirection: "column",
-    gap: 8,
-    padding: 12,
-    borderRadius: 20,
-    backgroundColor: sectionColor,
-    borderColor,
-    borderWidth: 1,
-  });
-  configSection.add(createSectionLabel("Config"));
-  configSection.add(createOptionGrid(
-    content.appConfigOptions,
-    content.selectedAppConfigName,
-    "config",
-    options.onConfigSelected,
-  ));
+  // Controls.
+  const controlsSection = createSection(settingsText.controls);
+  controlsSection.add(createSectionLabel(settingsText.controlsReference));
+  for (const entry of content.controlsReference) {
+    controlsSection.add(createControlReferenceRow(entry.verb, entry.glyph.label));
+  }
+  if (options.onMouseSensitivitySelected !== undefined) {
+    const onSelected = options.onMouseSensitivitySelected;
+    controlsSection.add(createStepRow(settingsText.mouseSensitivity, [
+      { id: "low", label: settingsText.low },
+      { id: "medium", label: settingsText.medium },
+      { id: "high", label: settingsText.high },
+    ], content.mouseSensitivity, (id) => onSelected(id as RuntimeMouseSensitivity), "mouse-sensitivity"));
+  }
+  if (options.onInvertYToggled !== undefined) {
+    const onToggled = options.onInvertYToggled;
+    controlsSection.add(createToggleRow(settingsText.invertY, content.invertYEnabled, onToggled, "invert-y-toggle"));
+  }
+  if (options.onTurnSpeedSelected !== undefined) {
+    const onSelected = options.onTurnSpeedSelected;
+    controlsSection.add(createStepRow(settingsText.turnSpeed, [
+      { id: "slow", label: settingsText.slow },
+      { id: "medium", label: settingsText.medium },
+      { id: "fast", label: settingsText.fast },
+    ], content.turnSpeed, (id) => onSelected(id as RuntimeTurnSpeed), "turn-speed"));
+  }
+  const onXrHandOptionToggled = options.onXrHandOptionToggled;
+  if (onXrHandOptionToggled !== undefined) {
+    controlsSection.add(createToggleRow(controllersSettingsText.useOneController, content.useOneControllerEnabled, (enabled) => {
+      onXrHandOptionToggled("useOneController", enabled);
+    }, "use-one-controller-toggle"));
+    controlsSection.add(createToggleRow(controllersSettingsText.leftHanded, content.leftHandedEnabled, (enabled) => {
+      onXrHandOptionToggled("leftHanded", enabled);
+    }, "left-handed-toggle"));
+  }
+  settings.add(controlsSection);
 
-  const debugSection = new Container({
-    width: "100%",
-    flexDirection: "column",
-    gap: 8,
-    padding: 12,
-    borderRadius: 20,
-    backgroundColor: sectionColor,
-    borderColor,
-    borderWidth: 1,
-  });
-  debugSection.add(createSectionLabel("Debug"));
-  debugSection.add(createDebugToolsRow(content.debugEnabled, options));
+  // Display.
+  const displaySection = createSection(settingsText.display);
+  if (options.onTextSizeSelected !== undefined) {
+    const onSelected = options.onTextSizeSelected;
+    displaySection.add(createStepRow(settingsText.textSize, [
+      { id: "small", label: settingsText.small },
+      { id: "medium", label: settingsText.medium },
+      { id: "large", label: settingsText.large },
+    ], content.textSize, (id) => onSelected(id as RuntimeTextSize), "text-size"));
+  }
+  const onShowHintsToggled = options.onShowHintsToggled;
+  if (onShowHintsToggled !== undefined) {
+    displaySection.add(createToggleRow(hintStripText.showHintsSwitch, content.showHintsEnabled, (enabled) => {
+      onShowHintsToggled(enabled);
+    }, "show-hints-toggle"));
+  }
+  if (options.onResetTipsRequested !== undefined) {
+    displaySection.add(createActionButton(settingsText.resetTips, "reset-tips", options.onResetTipsRequested, { width: 160 }));
+  }
+  settings.add(displaySection);
 
-  const comfortSection = new Container({
-    width: "100%",
-    flexDirection: "column",
-    gap: 8,
-    padding: 12,
-    borderRadius: 20,
-    backgroundColor: sectionColor,
-    borderColor,
-    borderWidth: 1,
-  });
-  comfortSection.add(createSectionLabel("Comfort"));
-  comfortSection.add(createToggleRow("Anti-nausea vignette", content.antiNauseaModeEnabled, (enabled) => {
+  // Comfort.
+  const comfortSection = createSection(settingsText.comfort);
+  comfortSection.add(createToggleRow(settingsText.antiNausea, content.antiNauseaModeEnabled, (enabled) => {
     options.onAntiNauseaModeToggled(enabled);
   }, "anti-nausea-vignette-toggle"));
+  settings.add(comfortSection);
 
+  // The sections the app config gates.
   if (content.worldSelectionSectionEnabled) {
+    const worldSection = createSection("World");
+    worldSection.add(createOptionGrid(content.worldOptions, content.selectedWorldId, "world", options.onWorldSelected));
     settings.add(worldSection);
   }
 
   if (content.configSelectionSectionEnabled) {
+    const configSection = createSection("Config");
+    configSection.add(createOptionGrid(content.appConfigOptions, content.selectedAppConfigName, "config", options.onConfigSelected));
     settings.add(configSection);
   }
 
   if (content.debugSectionEnabled) {
+    const debugSection = createSection("Debug");
+    debugSection.add(createDebugToolsRow(content.debugEnabled, options));
     settings.add(debugSection);
   }
 
-  settings.add(comfortSection);
-
-  const onShowHintsToggled = options.onShowHintsToggled;
-  if (onShowHintsToggled !== undefined) {
-    const hintsSection = new Container({
-      width: "100%",
-      flexDirection: "column",
-      gap: 8,
-      padding: 12,
-      borderRadius: 20,
-      backgroundColor: sectionColor,
-      borderColor,
-      borderWidth: 1,
-    });
-    hintsSection.add(createSectionLabel("Hints"));
-    hintsSection.add(createToggleRow(hintStripText.showHintsSwitch, content.showHintsEnabled, (enabled) => {
-      onShowHintsToggled(enabled);
-    }, "show-hints-toggle"));
-    settings.add(hintsSection);
-  }
-
-  const onXrHandOptionToggled = options.onXrHandOptionToggled;
-  if (onXrHandOptionToggled !== undefined) {
-    const controllersSection = new Container({
-      width: "100%",
-      flexDirection: "column",
-      gap: 8,
-      padding: 12,
-      borderRadius: 20,
-      backgroundColor: sectionColor,
-      borderColor,
-      borderWidth: 1,
-    });
-    controllersSection.add(createSectionLabel(controllersSettingsText.section));
-    controllersSection.add(createToggleRow(controllersSettingsText.useOneController, content.useOneControllerEnabled, (enabled) => {
-      onXrHandOptionToggled("useOneController", enabled);
-    }, "use-one-controller-toggle"));
-    controllersSection.add(createToggleRow(controllersSettingsText.leftHanded, content.leftHandedEnabled, (enabled) => {
-      onXrHandOptionToggled("leftHanded", enabled);
-    }, "left-handed-toggle"));
-    settings.add(controllersSection);
-  }
-
   return settings;
+}
+
+// One row of the controls reference: what it does, and the name of the control that does it on this device.
+function createControlReferenceRow(verb: string, glyphLabel: string): Container {
+  const row = new Container({ width: "100%", flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 });
+  row.add(new Text({ text: verb, fontSize: fontPx(16), fontWeight: "medium", color: textColor, fill: textColor, flexShrink: 1, wordBreak: "break-word" }));
+  const chip = new Container({ paddingX: 10, paddingY: 3, borderRadius: 10, backgroundColor: "#f1f5f9", alignItems: "center", justifyContent: "center", flexShrink: 0 });
+  chip.add(new Text({ text: glyphLabel, fontSize: fontPx(15), fontWeight: "bold", color: "#0f172a", fill: "#0f172a" }));
+  row.add(chip);
+  return row;
 }

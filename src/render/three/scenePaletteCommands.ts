@@ -25,7 +25,7 @@ export type ScenePaletteCommands = Pick<
   ScenePaletteControllerOptions,
   | "onOpenRequested" | "onCloseRequested" | "onShowSettingsRequested" | "onShowMainRequested" | "onWorldSelected"
   | "onConfigSelected" | "onReloadRequested" | "onHomeRequested" | "onDebugEnabledChanged" | "onDebugSettingsRequested"
-  | "onConsoleLogLevelSelected" | "onDebugOverlayToggled" | "onDebugOverlayItemToggled" | "onAntiNauseaModeToggled" | "onShowHintsToggled" | "onXrHandOptionToggled"
+  | "onConsoleLogLevelSelected" | "onDebugOverlayToggled" | "onDebugOverlayItemToggled" | "onAntiNauseaModeToggled" | "onShowHintsToggled" | "onXrHandOptionToggled" | "onTextSizeSelected" | "onMouseSensitivitySelected" | "onTurnSpeedSelected" | "onInvertYToggled" | "onResetTipsRequested" | "onTutorialTryItRequested"
   | "onPortalPanelModeSelected" | "onPortalInspectionToggled" | "onCollisionGeometryWireframesToggled"
   | "onAimCollisionOutlinesToggled" | "onCopyUrlWithOptionsRequested" | "onToolSelected" | "onHelpRequested" | "onPlaceFlagOptionsRequested"
   | "onPlaceFlagTypeSelected" | "onGeodesicCannonAddRequested" | "onGeodesicCannonCarryRequested"
@@ -84,6 +84,24 @@ export function createScenePaletteCommands(deps: ScenePaletteCommandsDeps): Scen
     },
     onShowHintsToggled(enabled) {
       dispatch({ kind: "set-show-hints", enabled });
+    },
+    onTextSizeSelected(size) {
+      dispatch({ kind: "set-text-size", size });
+    },
+    onMouseSensitivitySelected(level) {
+      dispatch({ kind: "set-mouse-sensitivity", level });
+    },
+    onTurnSpeedSelected(level) {
+      dispatch({ kind: "set-turn-speed", level });
+    },
+    onInvertYToggled(enabled) {
+      dispatch({ kind: "set-invert-y", enabled });
+    },
+    onResetTipsRequested() {
+      dispatch({ kind: "reset-tips" });
+    },
+    onTutorialTryItRequested(toolId) {
+      dispatch({ kind: "try-tool", toolId });
     },
     onXrHandOptionToggled(option, enabled) {
       dispatch({ kind: "set-xr-hand-option", option, enabled });

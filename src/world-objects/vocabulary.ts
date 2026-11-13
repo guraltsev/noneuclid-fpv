@@ -128,6 +128,11 @@ export function laserLabel(number?: number): string {
 /** The sentence for a student who is lost. The desktop sentence serves VR until the VR variant exists. */
 export const lostGuidance = "Lost? Press Esc and choose Go home.";
 
+/** The sentence for a student who is lost, from the words of the main-menu binding of the current layout: "Press Esc", "Press X", "Hold B". */
+export function lostGuidanceFor(mainMenuAction: string): string {
+  return `Lost? ${mainMenuAction} and choose ${objectActions.goHome}.`;
+}
+
 /**
  * The words that no student-visible string may use (the "Retire" columns of design 017 tables 6.2 and 6.3).
  * Terms of one or two characters (R, G, +) are key names and symbols: the scan in `tests/ui/vocabulary.test.ts` does not look for them in prose.
@@ -223,6 +228,8 @@ export const disabledReasons = {
   lastPage: "This is the last page",
   /** A help page button for a topic with no pages in this world. */
   nothingForThisWorld: "Nothing here for this world",
+  /** The Discoveries button of Help, until a world has discoveries to show. */
+  noDiscoveriesYet: "Nothing to discover yet",
   /** A shape machine step button at the end of its range. */
   atTheLimit: "At the limit",
   /** The reason of a disabled control that had none given; a test fails on this being needed. */
@@ -330,4 +337,54 @@ export const hintStripText = {
   extend: (lengthMeters?: number): string => lengthMeters === undefined ? "extend" : `extend ${lengthMeters} m`,
   /** "put the Laser away": what key 0 does with a tool in hand. */
   putAway: (toolName: string): string => `put the ${toolName} away`,
+} as const;
+
+/** The words of Help beyond the page names (design 017 section 8.6): the cards of How to, the Try it button and the first-use tips. */
+export const helpText = {
+  /** The mark on the card a newcomer should read first. */
+  startHere: "Start here",
+  /** The button of a tool card: takes the tool, closes Help and shows the first step. */
+  tryIt: "Try it",
+  /** The line under the title of How to. */
+  howToIntro: "Choose a card to see what you can do and how.",
+  /** "Settings has Controls, Display and Comfort." with the sections the config adds. */
+  settingsHas: (sections: readonly string[]): string => `Settings has ${sections.join(", ").replace(/, ([^,]*)$/, " and $1")}.`,
+  /** The tip's buttons. */
+  tipNext: "Next",
+  tipGotIt: "Got it",
+} as const;
+
+/** The tool steps of the first-use tips (design 017 section 8.6). `{use}` and `{menu}` stand for the names of the controls of the current device. */
+export const firstUseTipText = {
+  laserPlace: "Aim at the floor and use {use} to place a laser",
+  laserExtend: "Aim at the beam and use {use} to make it longer",
+  laserMenu: "Aim at a laser and use {menu} for its menu: Aim, Add beam, Join, Delete",
+  rulerMeasure: "Aim at a beam and use {use} to measure it",
+  rulerDone: "Aim at a measurement with the Hand and use {menu} to delete it",
+  protractorMeasure: "Select a laser or a meeting point, then two beams leaving it, with {use}",
+  signPlace: "Aim at the floor and use {use} to put up a sign",
+  signMenu: "Aim at a sign and use {menu} to rename or delete it",
+  mapShown: "This is the whole world, small enough to hold. Put the Map away with {hand}",
+} as const;
+
+/** The words of the Settings sections that the comfort and display options added (design 017 section 8.7). */
+export const settingsText = {
+  controls: "Controls",
+  controlsReference: "What each control does",
+  display: "Display",
+  comfort: "Comfort",
+  mouseSensitivity: "Mouse sensitivity",
+  invertY: "Invert Y",
+  turnSpeed: "Turn speed",
+  textSize: "Text size",
+  resetTips: "Reset tips",
+  tipsReset: "Tips will show again",
+  low: "Low",
+  medium: "Medium",
+  high: "High",
+  slow: "Slow",
+  fast: "Fast",
+  small: "Small",
+  large: "Large",
+  antiNausea: "Anti-nausea vignette",
 } as const;

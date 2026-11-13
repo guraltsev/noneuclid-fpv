@@ -155,6 +155,11 @@ import { createGeometryComputerMenu } from "./geometryComputerMenu";
 import { createRuntimeObjectActions } from "./runtimeObjectActions";
 import { createHelpLensRenderer } from "./helpLensRenderer";
 import { createToastView } from "../dom/toastView";
+import { createFirstUseTipController, type FirstUseTipController } from "./firstUseTipController";
+import { createSettingsSaver, loadStoredSettings, mouseSensitivityFactors, textSizeRootFactors, turnSpeedFactors } from "./settingsStorage";
+import { paletteTextScales, setPaletteTextScale } from "./palette/tokens";
+import { selectHowToPages } from "../../ui/howToCards";
+import { getInputHintGlyph } from "../../ui/inputIntents";
 import { createResetHoldRing } from "../dom/resetHoldRing";
 import { createPauseCard } from "../dom/pauseCard";
 import { createCrosshair } from "../dom/crosshair";
@@ -162,7 +167,7 @@ import { createPauseCardDefinition } from "../../ui/pauseCardDefinition";
 import { restoreSavedSnapshot, savedKindsRemovedThisFrame, savedObjectKinds, takeSavedSnapshot, type SavedSnapshot } from "../../world-objects/savedSnapshot";
 import { objectNouns, toastMessages } from "../../ui/vocabulary";
 import { createToastQueue } from "../../ui/toastQueue";
-import { toolBeltText, toolNames, vrBeltText } from "../../ui/vocabulary";
+import { settingsText, toolBeltText, toolNames, vrBeltText } from "../../ui/vocabulary";
 import type { XrHandOptions, XrLayout } from "../../glue/xrLayout";
 import { createXrHandUi } from "./xrHandUi";
 import { createWorldMapPieceReader } from "./worldMapPieces";
@@ -384,8 +389,18 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   } catch {
     // Storage is only a convenience.
   }
+  // The display and control steps and the opened How to cards are remembered too.
+  const settingsStorage = ((): Storage | undefined => {
+    try {
+      return window.localStorage;
+    } catch {
+      return undefined;
+    }
+  })();
+  const storedSettings = loadStoredSettings(settingsStorage);
   const session = createClientSession({
     menuState: createRuntimeMenuState({
+      ...storedSettings,
       showHintsEnabled: persistedShowHints,
       xrHandOptions: persistedXrHandOptions,
       selectedWorldId: options.selectedWorldId,
@@ -443,6 +458,11 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   const resetHoldRing = createResetHoldRing(document.body);
   // The tool last announced by a toast. Declared here, before the first palette sync, which runs during construction.
   let announcedTool: string | undefined;
+  // The first-use tip of the tool in hand; created once the page's DOM exists, and used by the command path from then on.
+  let firstUseTips: FirstUseTipController | undefined;
+  // The text size last applied and the count of "Reset tips" presses last seen.
+  let appliedTextSize: string | undefined;
+  let seenTipsResetCount = 0;
   // VR: whether the last frame was in a session, and the layout the player was last told about (a toast on a change).
   let wasXrActive = false;
   let announcedXrLayout: XrLayout | undefined;
@@ -612,6 +632,22 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     });
   }
   const toolBelt = createToolBelt(document.body, { onSelect: selectBeltSlot }, toolBeltText.ariaLabel);
+  const saveSettings = createSettingsSaver(settingsStorage, currentMenuState());
+  firstUseTips = createFirstUseTipController({
+    container: document.body,
+    storage: settingsStorage,
+    controlNames: () => {
+      const xrNow = renderer.xr.isPresenting;
+      const mode = xrNow ? "xr" : "desktop";
+      return {
+        use: getInputHintGlyph(mode, "primary", announcedXrLayout).label,
+        menu: getInputHintGlyph(mode, "context-menu", announcedXrLayout).label,
+        hand: getInputHintGlyph(mode, "hand", announcedXrLayout).label,
+      };
+    },
+    isXr: () => renderer.xr.isPresenting,
+    pushToast: (text) => toastQueue.push(text),
+  });
   const hintStrip = createHintStrip(document.body);
   // The pause card is the desktop main menu (design 017 section 8.1): shown whenever the pointer is not locked.
   const helpCubeSpec = options.worldSpec.cells.flatMap((cell) => cell.visuals?.objects ?? []).find((object) => object.id === "startingQuestionCube");
@@ -1688,6 +1724,9 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       });
     });
     finishPendingDeletion(performance.now());
+    firstUseTips?.setCardAllowed(!xrActive);
+    firstUseTips?.observe(runtimeObjectRegistry.changes);
+    applyDisplayAndControlSettings();
     toastQueue.tick(performance.now());
     toastView.render(toastQueue.visible());
     resetHoldRing.render(controls.resetHoldProgress);
@@ -1891,6 +1930,8 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       desktopScenePaletteInput.dispose();
       toolBelt.dispose();
       hintStrip.dispose();
+      firstUseTips?.dispose();
+      document.documentElement.style.fontSize = "";
       aimCrossMarker.dispose();
       aimFeedback.dispose();
       floatingObjectTooltip.dispose();
@@ -2067,6 +2108,29 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     visibleCellId = currentlyVisibleCellId;
   }
 
+  /** Applies the text size, the look steps and the tips reset the menu state holds, and remembers the values that changed. */
+  function applyDisplayAndControlSettings(): void {
+    const menu = currentMenuState();
+    const textSize = menu.textSize ?? "medium";
+    if (textSize !== appliedTextSize) {
+      appliedTextSize = textSize;
+      setPaletteTextScale(paletteTextScales[textSize]);
+      document.documentElement.style.fontSize = textSize === "medium" ? "" : `${textSizeRootFactors[textSize] * 100}%`;
+    }
+    controls.setLookTuning({
+      mouseSensitivityFactor: mouseSensitivityFactors[menu.mouseSensitivity ?? "medium"],
+      turnSpeedFactor: turnSpeedFactors[menu.turnSpeed ?? "medium"],
+      invertY: menu.invertYEnabled === true,
+    });
+    const resetCount = menu.tipsResetCount ?? 0;
+    if (resetCount !== seenTipsResetCount) {
+      seenTipsResetCount = resetCount;
+      firstUseTips?.resetSeen();
+      toastQueue.push(settingsText.tipsReset);
+    }
+    saveSettings(menu);
+  }
+
   function syncDesktopPalette(): void {
     controls.setLookMode(currentMenuState().isOpen ? "palette" : "camera");
     const selectedTool = currentMenuState().selectedTool;
@@ -2126,12 +2190,27 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   }
 
   // The one command path: the reducer changes the session, then the effects run in the order it listed them.
-  function dispatchRuntimeCommand(command: RuntimeCommand): void {
+  function dispatchRuntimeCommand(rawCommand: RuntimeCommand): void {
+    // How to is chosen against the tool belt (design 017 section 8.6): its cards come in belt order, a tool the config switches off loses its card, and a tool the world cannot support keeps it with the reason.
+    let command = rawCommand;
+    if (command.kind === "show-question-help" && command.toolDisabledReasons === undefined) {
+      const howTo = selectHowToPages(command.tutorialPages, currentBeltDefinition());
+      command = { ...command, tutorialPages: howTo.pages, toolDisabledReasons: howTo.toolDisabledReasons };
+    }
     const toolBefore = session.get().menuState.selectedTool;
     const effects = applyRuntimeCommand(session, command);
     // A tool that is no longer selected has ended, whichever command ended it: it takes its marks off the world and drops its tool state.
     if (session.get().menuState.selectedTool !== toolBefore) {
       toolHost.toolEnded(toolBefore);
+    }
+    // The tip of a tool in hand: the first time a tool is taken it shows its first step, and "Try it" shows it again.
+    const beltToolBefore = activeBeltToolId(toolBefore);
+    const beltToolAfter = activeBeltToolId(session.get().menuState.selectedTool);
+    if (command.kind === "try-tool" && beltToolAfter !== "hand") {
+      firstUseTips?.toolTaken(beltToolAfter, true);
+    } else if (beltToolAfter !== beltToolBefore) {
+      if (beltToolAfter === "hand") firstUseTips?.toolPutAway();
+      else firstUseTips?.toolTaken(beltToolAfter);
     }
     for (const effect of effects) {
       runtimeEffects.run(effect);

@@ -19,6 +19,12 @@ import {
   setRuntimeMenuAimCollisionOutlinesEnabled,
   setRuntimeMenuAntiNauseaModeEnabled,
   setRuntimeMenuShowHintsEnabled,
+  setRuntimeMenuTextSize,
+  setRuntimeMenuMouseSensitivity,
+  setRuntimeMenuTurnSpeed,
+  setRuntimeMenuInvertY,
+  resetRuntimeMenuTips,
+  markRuntimeMenuHelpCardRead,
   setRuntimeMenuXrHandOption,
   setRuntimeMenuCollisionGeometryWireframesEnabled,
   setRuntimeMenuConsoleLogLevel,
@@ -133,11 +139,22 @@ export function reduceRuntimeCommand(state: ClientSessionState, command: Runtime
       return withMenu(
         showRuntimeMenuQuestionHelp(menu, {
           objectId: command.objectId,
+          // A card of a tool (it has a `toolId`) was already chosen against the tool belt by the shell: it stays for a tool the world cannot support.
           tutorialPages: command.tutorialPages.filter(
-            (page) => !page.requiresTools || page.requiresTools.some((toolId) => toolEnabled(toolId as RuntimeToolId)),
+            (page) => page.toolId !== undefined || !page.requiresTools || page.requiresTools.some((toolId) => toolEnabled(toolId as RuntimeToolId)),
           ),
           goalPages: command.goalPages,
+          ...(command.toolDisabledReasons !== undefined ? { toolDisabledReasons: command.toolDisabledReasons } : {}),
         }),
+        syncPalette,
+      );
+    case "try-tool":
+      if (!toolEnabled(command.toolId)) {
+        return nothing;
+      }
+      return withMenu(
+        closeRuntimeMenu(setRuntimeMenuSelectedTool(menu, command.toolId)),
+        { kind: "switch-tool-session", toolId: command.toolId },
         syncPalette,
       );
     case "show-question-tutorial":
@@ -148,12 +165,12 @@ export function reduceRuntimeCommand(state: ClientSessionState, command: Runtime
       if (menu.page !== "tutorial" || !menu.tutorialOptions) {
         return nothing;
       }
-      return withMenu(setRuntimeMenuTutorialPageIndex(menu, menu.tutorialOptions.pageIndex + command.delta), syncPalette);
+      return withMenu(markShownCardRead(setRuntimeMenuTutorialPageIndex(menu, menu.tutorialOptions.pageIndex + command.delta)), syncPalette);
     case "show-tutorial-page":
       if (menu.page !== "tutorial" || !menu.tutorialOptions) {
         return nothing;
       }
-      return withMenu(showRuntimeMenuTutorialPage(menu, command.pageIndex), syncPalette);
+      return withMenu(markShownCardRead(showRuntimeMenuTutorialPage(menu, command.pageIndex)), syncPalette);
     case "step-goal-page":
       if (menu.page !== "goal" || !menu.goalOptions) {
         return nothing;
@@ -245,6 +262,16 @@ export function reduceRuntimeCommand(state: ClientSessionState, command: Runtime
       };
     case "set-show-hints":
       return { state: { ...state, menuState: setRuntimeMenuShowHintsEnabled(menu, command.enabled) }, effects: [] };
+    case "set-text-size":
+      return { state: { ...state, menuState: setRuntimeMenuTextSize(menu, command.size) }, effects: [] };
+    case "set-mouse-sensitivity":
+      return { state: { ...state, menuState: setRuntimeMenuMouseSensitivity(menu, command.level) }, effects: [] };
+    case "set-turn-speed":
+      return { state: { ...state, menuState: setRuntimeMenuTurnSpeed(menu, command.level) }, effects: [] };
+    case "set-invert-y":
+      return { state: { ...state, menuState: setRuntimeMenuInvertY(menu, command.enabled) }, effects: [] };
+    case "reset-tips":
+      return { state: { ...state, menuState: resetRuntimeMenuTips(menu) }, effects: [] };
     case "set-xr-hand-option":
       return { state: { ...state, menuState: setRuntimeMenuXrHandOption(menu, command.option, command.enabled) }, effects: [] };
     case "set-show-cell-path-renders-instances":
@@ -326,6 +353,13 @@ function cancelMenuAndTool(
     { kind: "end-tool-session" },
     syncPalette,
   );
+}
+
+/** Remembers the card the open tutorial now shows as read (the tick on its button in How to). */
+function markShownCardRead(menu: RuntimeMenuState): RuntimeMenuState {
+  const options = menu.tutorialOptions;
+  const title = options?.pages[options.pageIndex]?.title;
+  return options === undefined || options.view !== "page" || title === undefined ? menu : markRuntimeMenuHelpCardRead(menu, title);
 }
 
 /** The page one level up: debug settings go to settings, a tutorial page to the tutorial's index, the index and goal to the help hub, everything else to the main page. */

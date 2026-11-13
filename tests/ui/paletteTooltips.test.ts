@@ -32,6 +32,16 @@ describe("paletteTooltips", () => {
     expect(resolvePaletteTooltipLabel("sign-type:WoodenSign1")).toBe("Choose sign type");
   });
 
+  it("names the help and settings controls", () => {
+    expect(resolvePaletteTooltipLabel("question-help:discoveries")).toBe("Discoveries");
+    expect(resolvePaletteTooltipLabel("tutorial-try-it")).toBe("Try it: take this tool and close Help");
+    expect(resolvePaletteTooltipLabel("text-size:large")).toBe("Text size");
+    expect(resolvePaletteTooltipLabel("mouse-sensitivity:low")).toBe("Mouse sensitivity");
+    expect(resolvePaletteTooltipLabel("turn-speed:fast")).toBe("Turn speed");
+    expect(resolvePaletteTooltipLabel("invert-y-toggle")).toBe("Invert Y");
+    expect(resolvePaletteTooltipLabel("reset-tips")).toBe("Reset tips: show the tool tips again");
+  });
+
   it("names the main menu buttons", () => {
     expect(resolvePaletteTooltipLabel("main-menu:help")).toBe("Help");
     expect(resolvePaletteTooltipLabel("main-menu:go-home")).toBe("Go home");

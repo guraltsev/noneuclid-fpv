@@ -9,7 +9,7 @@ import type { PortalPanelModeId } from "../glue/portalPanelMode";
 import type { RuntimeDebugOverlayItemId, RuntimeToolId } from "../glue/toolIds";
 import type { GeodesicCannonToolState } from "../world-objects/geodesic/cannonToolState";
 import type { PlacedFlagType } from "../world-objects/toolObjects";
-import type { RuntimeMenuConsoleLogLevelId } from "./runtimeMenuState";
+import type { RuntimeMenuConsoleLogLevelId, RuntimeMouseSensitivity, RuntimeTextSize, RuntimeTurnSpeed } from "./runtimeMenuState";
 import type { PendingToolRequest } from "./clientSession";
 
 /** Payload of the cannon actions page. */
@@ -61,7 +61,11 @@ export type RuntimeCommand =
       readonly objectId: string;
       readonly tutorialPages: readonly TutorialPageSpec[];
       readonly goalPages: readonly TutorialPageSpec[];
+      /** Tool id to the reason its How to card is disabled, for the tools the world cannot support. */
+      readonly toolDisabledReasons?: Readonly<Record<string, string>>;
     }
+  /** "Try it" on a How to card: takes the tool and closes Help; the shell shows the card's first step as a tip. */
+  | { readonly kind: "try-tool"; readonly toolId: RuntimeToolId }
   | { readonly kind: "show-question-tutorial" }
   | { readonly kind: "show-goal" }
   | { readonly kind: "step-tutorial-page"; readonly delta: -1 | 1 }
@@ -104,6 +108,16 @@ export type RuntimeCommand =
   | { readonly kind: "set-anti-nausea-mode"; readonly enabled: boolean }
   /** The "Show hints" switch of Settings. */
   | { readonly kind: "set-show-hints"; readonly enabled: boolean }
+  /** The "Text size" step of Settings. */
+  | { readonly kind: "set-text-size"; readonly size: RuntimeTextSize }
+  /** The "Mouse sensitivity" step of Settings. */
+  | { readonly kind: "set-mouse-sensitivity"; readonly level: RuntimeMouseSensitivity }
+  /** The "Turn speed" step of Settings. */
+  | { readonly kind: "set-turn-speed"; readonly level: RuntimeTurnSpeed }
+  /** The "Invert Y" switch of Settings. */
+  | { readonly kind: "set-invert-y"; readonly enabled: boolean }
+  /** The "Reset tips" button of Settings. */
+  | { readonly kind: "reset-tips" }
   /** One of the "Controllers" switches of Settings (VR hand options). */
   | { readonly kind: "set-xr-hand-option"; readonly option: "useOneController" | "leftHanded"; readonly enabled: boolean }
   /** The host changed the debug settings from outside (the URL, the API): mirror them into the menu. */

@@ -6,7 +6,7 @@ import { House, RotateCw } from "@pmndrs/uikit-lucide";
 import type { PaletteDefinition, PaletteHeaderAction } from "../../../ui/paletteDefinition";
 import { resolveVrPaletteHeaderActions } from "../vrPaletteHeaderActions";
 import type { ScenePaletteAdapterOptions } from "./adapterTypes";
-import { actionColor, textColor } from "./tokens";
+import { actionColor, textColor, fontPx } from "./tokens";
 import { createHeaderIcon } from "./icons";
 import { createButtonText, createHeaderActionButton, createInteractiveSurface, headerActionIcon } from "./widgets";
 import { objectActions } from "../../../world-objects/vocabulary";
@@ -66,14 +66,14 @@ export function buildHeader(
   } else {
     header.add(new Text({
       text: "",
-      fontSize: 1,
+      fontSize: fontPx(1),
       opacity: 0,
     }));
   }
 
   header.add(new Text({
     text: "",
-    fontSize: 28,
+    fontSize: fontPx(28),
     fontWeight: "bold",
     color: textColor,
     fill: textColor,
@@ -201,7 +201,7 @@ function createReloadConfirmTooltip(): Container {
   });
   tooltip.add(new Text({
     text: "Click again to confirm",
-    fontSize: 13,
+    fontSize: fontPx(13),
     fontWeight: "bold",
     color: textColor,
     fill: textColor,

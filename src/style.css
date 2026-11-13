@@ -1173,3 +1173,63 @@ img.desktop-tool-tile-icon {
   background: transparent;
   box-shadow: 0 0 0 1px rgb(0 0 0 / 70%), inset 0 0 0 1px rgb(0 0 0 / 70%);
 }
+
+/* The first-use tip: pinned beside the tool belt (above it on a narrow screen). */
+.tip-card {
+  position: fixed;
+  left: calc(50% + 17rem);
+  bottom: 0.75rem;
+  z-index: 41;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 17rem;
+  max-width: calc(50vw - 17.5rem);
+  min-width: 12rem;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid rgb(226 232 240 / 48%);
+  border-radius: 10px;
+  background: rgb(10 17 20 / 90%);
+  color: #f1f5f9;
+  font: 600 0.9rem/1.3 system-ui, sans-serif;
+}
+
+.tip-card[hidden] {
+  display: none;
+}
+
+.tip-card-text {
+  margin: 0;
+}
+
+.tip-card-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.tip-card-button {
+  padding: 0.15rem 0.7rem;
+  border: 1px solid rgb(226 232 240 / 60%);
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.tip-card-button[hidden] {
+  display: none;
+}
+
+.tip-card-button-primary {
+  background: rgb(15 118 110);
+}
+
+@media (max-width: 1200px) {
+  .tip-card {
+    left: 0.75rem;
+    bottom: 7.4rem;
+    max-width: calc(100vw - 1.5rem);
+  }
+}

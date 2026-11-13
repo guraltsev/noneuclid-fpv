@@ -29,5 +29,20 @@ export const mutedTextColor = "#e2e8f0";
 /** Scrollbar thumb color of the scrolling pages. */
 export const scrollbarColor = "#38bdf8";
 
+/** The text size steps of the display setting and the factor each gives the font sizes of the panel. */
+export const paletteTextScales = { small: 0.85, medium: 1, large: 1.25 } as const;
+
+let paletteTextScale: number = paletteTextScales.medium;
+
+/** Sets the factor that `fontPx` applies; the panel is rebuilt afterwards (a new palette definition does that). */
+export function setPaletteTextScale(scale: number): void {
+  paletteTextScale = Number.isFinite(scale) && scale > 0 ? scale : paletteTextScales.medium;
+}
+
+/** A font size of the panel, in pixels, at the chosen text size: the design size times the scale, rounded. */
+export function fontPx(designSize: number): number {
+  return Math.round(designSize * paletteTextScale);
+}
+
 /** Scrollbar border color of the scrolling pages. */
 export const scrollbarBorderColor = "#0f172a";

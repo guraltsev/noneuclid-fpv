@@ -3,7 +3,7 @@
  */
 import { Container } from "@pmndrs/uikit";
 import type { PortalPanelModeId } from "../../../glue/portalPanelMode";
-import type { RuntimeMenuConsoleLogLevelId } from "../../../runtime/runtimeMenuState";
+import type { RuntimeMenuConsoleLogLevelId, RuntimeMouseSensitivity, RuntimeTextSize, RuntimeTurnSpeed } from "../../../runtime/runtimeMenuState";
 import type { RuntimeDebugOverlayItemId, RuntimeToolId } from "../../../glue/toolIds";
 import type { PaletteDefinition } from "../../../ui/paletteDefinition";
 import type { PlacedFlagType } from "../../../world-objects/toolObjects";
@@ -30,6 +30,18 @@ export interface ScenePaletteAdapterOptions {
   readonly onAntiNauseaModeToggled: (enabled: boolean) => void;
   /** Settings: the "Show hints" switch. */
   readonly onShowHintsToggled?: (enabled: boolean) => void;
+  /** Settings: the "Text size" step chosen. */
+  readonly onTextSizeSelected?: (size: RuntimeTextSize) => void;
+  /** Settings: the "Mouse sensitivity" step chosen. */
+  readonly onMouseSensitivitySelected?: (level: RuntimeMouseSensitivity) => void;
+  /** Settings: the "Turn speed" step chosen. */
+  readonly onTurnSpeedSelected?: (level: RuntimeTurnSpeed) => void;
+  /** Settings: the "Invert Y" switch toggled. */
+  readonly onInvertYToggled?: (enabled: boolean) => void;
+  /** Settings: the "Reset tips" button pressed. */
+  readonly onResetTipsRequested?: () => void;
+  /** A How to card's "Try it" button: the tool to take. */
+  readonly onTutorialTryItRequested?: (toolId: RuntimeToolId) => void;
   /** Settings: a "Controllers" switch (Use one controller, Left-handed). */
   readonly onXrHandOptionToggled?: (option: "useOneController" | "leftHanded", enabled: boolean) => void;
   readonly onPortalPanelModeSelected: (mode: PortalPanelModeId) => void;

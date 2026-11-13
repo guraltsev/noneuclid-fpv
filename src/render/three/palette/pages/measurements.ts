@@ -3,7 +3,7 @@
  */
 import { Container, Text } from "@pmndrs/uikit";
 import type { PaletteDefinition } from "../../../../ui/paletteDefinition";
-import { borderColor, mutedTextColor, sectionColor, textColor } from "../tokens";
+import { borderColor, mutedTextColor, sectionColor, textColor, fontPx } from "../tokens";
 import { createSectionLabel } from "../widgets";
 
 /**
@@ -26,7 +26,7 @@ export function buildMeasurementActionsContent(
   panel.add(createSectionLabel(content.title));
   panel.add(new Text({
     text: content.body,
-    fontSize: 20,
+    fontSize: fontPx(20),
     fontWeight: "medium",
     color: mutedTextColor,
     fill: textColor,

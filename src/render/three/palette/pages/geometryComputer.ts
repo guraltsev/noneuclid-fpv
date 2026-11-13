@@ -4,7 +4,7 @@
 import { Container, Text } from "@pmndrs/uikit";
 import type { PaletteDefinition } from "../../../../ui/paletteDefinition";
 import type { ScenePaletteAdapterOptions } from "../adapterTypes";
-import { actionColor, borderColor, sectionColor, textColor } from "../tokens";
+import { actionColor, borderColor, sectionColor, textColor, fontPx } from "../tokens";
 import { createDisabledReasonText, createInteractiveSurface, createSectionLabel, withDisabledReason } from "../widgets";
 import { createWorldDeformationDiagram } from "../latticeDiagram";
 
@@ -29,7 +29,7 @@ export function buildGeometryComputerActionsContent(
   panel.add(createSectionLabel("Shape machine"));
   panel.add(new Text({
     text: content.statusLabel,
-    fontSize: 18,
+    fontSize: fontPx(18),
     fontWeight: "medium",
     color: textColor,
     fill: textColor,
@@ -40,7 +40,7 @@ export function buildGeometryComputerActionsContent(
 
   panel.add(new Text({
     text: `X = ${content.widthMeters} m   current white (${content.current.aMeters}, ${content.current.bMeters})   target green (${content.target.aMeters}, ${content.target.bMeters})`,
-    fontSize: 16,
+    fontSize: fontPx(16),
     fontWeight: "medium",
     color: "#bbf7d0",
     fill: "#bbf7d0",
@@ -55,7 +55,7 @@ export function buildGeometryComputerActionsContent(
   ] as const) {
     panel.add(new Text({
       text: label,
-      fontSize: 16,
+      fontSize: fontPx(16),
       fontWeight: "medium",
       color,
       fill: color,

@@ -200,6 +200,10 @@ export interface TutorialPageSpec {
   readonly controls?: readonly TutorialControlSpec[];
   /** Tool ids (such as "geodesicEmitters/emitter"); the page is shown only when the app config enables at least one of them. */
   readonly requiresTools?: readonly string[];
+  /** The belt tool this page is the How to card of (such as "geodesicEmitters/emitter"); it orders the card among the tools and gives the card its "Try it" button. */
+  readonly toolId?: string;
+  /** True for the card a newcomer should read first (marked "Start here" in How to). */
+  readonly startHere?: boolean;
 }
 
 /** An abstract input a tutorial control refers to; the palette shows the device-specific key, button or stick for it. */

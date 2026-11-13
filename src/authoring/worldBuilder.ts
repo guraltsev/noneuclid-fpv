@@ -29,101 +29,61 @@ const startingHouseLookOffsetDegrees = 12;
 export const defaultStartingQuestionCubeMessage =
   "Open this help cube to see how things work.";
 /**
- * Default tutorial pages of the starting question cube: one page per thing a player can do, each with a screenshot and its controls (shown with the icons of the current device).
- * The tutorial opens on an index of these titles. A page that names `requiresTools` is left out when the app config (as it applies to the world) enables none of them.
+ * Default tutorial pages of the starting question cube, the cards of How to: "Basics" (marked "Start here"), then one card per tool, each with a picture and its controls (shown with the icons of the current device).
+ * How to opens on an index of these titles, Basics first and the tools in belt order. A page that names `requiresTools` is left out when the app config (as it applies to the world) enables none of them; a page with a `toolId` stays for a tool the world cannot support and says so.
  */
 export const defaultStartingQuestionCubeTutorialPages: readonly TutorialPageSpec[] = [
   {
-    title: "Look and walk",
-    body: "Look around and walk. Walk across an edge of a face and you carry on onto the face glued to it. Look at nearby things to see what you can do with them.",
-    desktopBody: "Click the view once so the mouse turns your head; Esc gives the mouse back. Turn also with Q and E. Walk across an edge of a face and you carry on onto the face glued to it.",
-    xrBody: "Turn your head, or push the stick sideways, to look around. Walk across an edge of a face and you carry on onto the face glued to it.",
+    title: "Basics",
+    startHere: true,
+    body: `Look around and walk. Walk across an edge of a face and you carry on onto the face glued to it. Aim at anything to see its name; ask What's this? about it, or open its menu. Your tools are on the tool belt. The main menu has Help, Settings, Go home and Start over. ${helpHubHomeGuidance}`,
+    desktopBody: `Click the view once so the mouse turns your head; Esc gives the mouse back and opens the main menu. Turn also with Q and E. Walk across an edge of a face and you carry on onto the face glued to it. Aim at anything to see its name; press H to ask What's this? about it, or open its menu. Take a tool from the tool belt with its number key or the wheel. ${helpHubHomeGuidance}`,
+    xrBody: `Turn your head, or push the stick sideways, to look around. Walk across an edge of a face and you carry on onto the face glued to it. Aim at anything to see its name; ask What's this? about it, or open its menu. Your tools are on the tool belt. ${helpHubHomeGuidance}`,
     imagePath: "tutorial/walk.jpg",
     controls: [
       { intent: "look", label: "look around" },
       { intent: "move", label: "walk" },
-      { intent: "reset", label: "Start over: removes everything you placed" },
-    ],
-  },
-  {
-    title: "Get help",
-    body: `Aim at anything to see its name. Ask What's this? about it, or open its menu. ${helpHubHomeGuidance}`,
-    imagePath: "tutorial/help.jpg",
-    controls: [
+      { intent: "switch-tool", label: "take a tool from the tool belt" },
       { intent: "help", label: "What's this? about what you aim at" },
       { intent: "context-menu", label: "menu of what you aim at" },
+      { intent: "main-menu", label: "main menu: Help, Settings, Go home, Start over" },
     ],
   },
   {
-    title: "The menu",
-    body: "Aim at empty floor and open the menu, then pick a tool. The buttons at the top are Settings (choose another world), Go home (back to the start) and Start over (press twice).",
-    imagePath: "tutorial/tool-menu.jpg",
-    controls: [
-      { intent: "context-menu", label: "open the menu" },
-      { intent: "primary", label: "pick a tool or press a button" },
-      { intent: "cancel", label: "close the menu" },
-    ],
-  },
-  {
-    title: "Lasers and beams",
-    body: `Pick ${toolNames["geodesicEmitters/emitter"].name} and select a spot on the floor: a laser appears and fires a short beam the way you face. ${objectSubtitles.beam}. Select the beam to make it 2 m longer. A beam stops if it runs into a corner of the world: every corner has a small round keep-out area around it.`,
+    title: toolNames["geodesicEmitters/emitter"].name,
+    toolId: "geodesicEmitters/emitter",
+    body: `Pick the ${toolNames["geodesicEmitters/emitter"].name} and select a spot on the floor: a laser appears and fires a short beam the way you face. ${objectSubtitles.beam}. Select the beam to make it 2 m longer. A beam stops at a corner of the world. In a laser's menu, Aim points a free beam wherever you look (select to fix it), Add beam fires another and Delete removes one. A beam with a laser at both ends is a linked beam: ${objectSubtitles.linkedBeam}; it cannot be aimed. Pick a laser up to move it: its linked beams follow and its free beams go. Join turns two linked beams at a laser into one string. ${objectSubtitles.string}.`,
     imagePath: "tutorial/rays.jpg",
     requiresTools: ["geodesicEmitters/emitter"],
     controls: [
       { intent: "primary", label: "place a laser, or make a beam longer" },
-      { intent: "context-menu", label: "on a laser: its menu" },
-    ],
-  },
-  {
-    title: "Aim a beam",
-    body: "Open a laser's menu: it lists the laser's beams. Press Aim next to a free beam; the beam now points wherever you look. Select to fix it. If it ends on another laser, or close to one, it links there. Add beam fires one more beam, and the bin deletes one.",
-    imagePath: "tutorial/post-menu.jpg",
-    requiresTools: ["geodesicEmitters/emitter"],
-    controls: [
-      { intent: "context-menu", label: "open the laser's menu" },
-      { intent: "primary", label: "press Aim; select again to fix the beam" },
-    ],
-  },
-  {
-    title: "Linked beams",
-    body: "A beam with a laser at both ends is a linked beam: it turns amber and shows a link in the laser's menu. It cannot be aimed or made longer. A beam links when it reaches another laser, or when you put a new laser on a free beam, which cuts the beam in two.",
-    imagePath: "tutorial/locked.jpg",
-    requiresTools: ["geodesicEmitters/emitter"],
-    controls: [
-      { intent: "primary", label: "with Laser, select a free beam to cut it with a laser" },
-    ],
-  },
-  {
-    title: "Move a laser",
-    body: "Aim at a laser and pick it up. Its linked beams stay attached: they are redrawn as straight beams between the lasers while you walk, going the same way around the world. Its free beams are removed. Putting a laser down on a beam cuts that beam.",
-    imagePath: "tutorial/carry.jpg",
-    requiresTools: ["geodesicEmitters/emitter"],
-    controls: [
+      { intent: "context-menu", label: "on a laser: its menu (Aim, Add beam, Join, Delete)" },
       { intent: "carry", label: "pick up or put down a laser" },
-      { intent: "primary", label: "put it down" },
     ],
   },
   {
-    title: "Join two beams",
-    body: `Join, in a laser's menu, turns two of the laser's linked beams into one string and lets it go from the laser. Select the two beams near the laser. ${objectSubtitles.string}: it moves the corner where the beams meet so that the string gets shorter, until it is a beam between the other two lasers, or a closed beam.`,
-    imagePath: "tutorial/tie.jpg",
-    requiresTools: ["geodesicEmitters/emitter"],
-    controls: [
-      { intent: "context-menu", label: "open the laser's menu" },
-      { intent: "primary", label: "press Join, then select the two beams" },
-    ],
-  },
-  {
-    title: "Measure",
-    body: "Ruler: pick it and select a beam to see how long it is, all the way along. Protractor: select a laser or a meeting point, then two beams leaving it; the angle goes counter-clockwise from the first to the second. With the Hand, select a measurement to open its menu, then choose Delete.",
+    title: toolNames["geodesicMeasurements/length"].name,
+    toolId: "geodesicMeasurements/length",
+    body: `Pick the ${toolNames["geodesicMeasurements/length"].name} and select a beam to see how long it is, all the way along. With the Hand, select a measurement to open its menu, then choose Delete.`,
     imagePath: "tutorial/measure.jpg",
-    requiresTools: ["geodesicMeasurements/length", "geodesicMeasurements/protractor"],
+    requiresTools: ["geodesicMeasurements/length"],
     controls: [
-      { intent: "primary", label: "select a beam, a laser, a meeting point or a beam of a laser" },
+      { intent: "primary", label: "select a beam to measure it" },
     ],
   },
   {
-    title: "Signs",
+    title: toolNames["geodesicMeasurements/protractor"].name,
+    toolId: "geodesicMeasurements/protractor",
+    body: `Pick the ${toolNames["geodesicMeasurements/protractor"].name}, select a laser or a meeting point, then two beams leaving it; the angle goes counter-clockwise from the first to the second. With the Hand, select a measurement to open its menu, then choose Delete.`,
+    imagePath: "tutorial/measure.jpg",
+    requiresTools: ["geodesicMeasurements/protractor"],
+    controls: [
+      { intent: "primary", label: "select a laser or a meeting point, then two beams" },
+    ],
+  },
+  {
+    title: toolNames["placedFlags/flag"].name,
+    toolId: "placedFlags/flag",
     body: "Pick Sign and select a spot on the floor. Signs are numbered S1, S2, and so on, so you can tell places apart. Open a sign's menu to type your own text on its keyboard, or delete it. The ... button on the Sign tool picks the style.",
     imagePath: "tutorial/signs.jpg",
     requiresTools: ["placedFlags/flag"],
@@ -133,8 +93,9 @@ export const defaultStartingQuestionCubeTutorialPages: readonly TutorialPageSpec
     ],
   },
   {
-    title: "Map",
-    body: `Pick Map to see the whole world, small enough to hold, as a small solid in front of you, with you and the objects on it. Compare it with what you see around you.`,
+    title: toolNames["worldMap/map"].name,
+    toolId: "worldMap/map",
+    body: "Pick Map to see the whole world, small enough to hold, as a small solid in front of you, with you and the objects on it. Compare it with what you see around you.",
     imagePath: "tutorial/map.jpg",
     requiresTools: ["worldMap/map"],
     controls: [

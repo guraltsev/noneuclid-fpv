@@ -22,6 +22,13 @@ import {
   type RuntimeToolId,
 } from "../glue/toolIds";
 
+/** Text size of the display setting: it scales the text of the heads-up display and of the palette. */
+export type RuntimeTextSize = "small" | "medium" | "large";
+/** Steps of the "Mouse sensitivity" setting. */
+export type RuntimeMouseSensitivity = "low" | "medium" | "high";
+/** Steps of the "Turn speed" setting (keyboard turning on desktop). */
+export type RuntimeTurnSpeed = "slow" | "medium" | "fast";
+
 /** Identifier of a menu page; "main" is the tool palette and the default. */
 export type RuntimeMenuPageId =
   | "main"
@@ -89,6 +96,18 @@ export interface RuntimeMenuState {
   readonly antiNauseaModeEnabled: boolean;
   /** Whether the hint strip is shown (the "Show hints" switch of Settings); absent means on. */
   readonly showHintsEnabled?: boolean;
+  /** The "Text size" step of Settings; absent means medium. */
+  readonly textSize?: RuntimeTextSize;
+  /** The "Mouse sensitivity" step of Settings; absent means medium. */
+  readonly mouseSensitivity?: RuntimeMouseSensitivity;
+  /** The "Turn speed" step of Settings; absent means medium. */
+  readonly turnSpeed?: RuntimeTurnSpeed;
+  /** The "Invert Y" switch of Settings; absent means off. */
+  readonly invertYEnabled?: boolean;
+  /** The titles of the How to cards the student has opened, for the tick on the card; absent means none. */
+  readonly helpCardsRead?: readonly string[];
+  /** How many times "Reset tips" was pressed; the shell clears the remembered first-use tips when it changes. */
+  readonly tipsResetCount?: number;
   /** The "Use one controller" switch of Settings (VR); absent means off. */
   readonly useOneControllerEnabled?: boolean;
   /** The "Left-handed" switch of Settings (VR: pointer hand left, belt hand right); absent means off. */
@@ -157,6 +176,8 @@ export interface RuntimeMenuState {
     readonly objectId: string;
     readonly tutorialPages: readonly TutorialPageSpec[];
     readonly goalPages: readonly TutorialPageSpec[];
+    /** Tool id to the reason its How to card is disabled (the world cannot support the tool); absent when every tool is supported. */
+    readonly toolDisabledReasons?: Readonly<Record<string, string>>;
   };
   /** Id of the placed flag whose sign is being edited, if any. */
   readonly editingFlagId?: string;
@@ -174,6 +195,13 @@ export interface CreateRuntimeMenuStateOptions {
   readonly showHintsEnabled?: boolean;
   /** The remembered VR hand options; absent means both off. */
   readonly xrHandOptions?: XrHandOptions;
+  /** The remembered display and control steps; absent means medium (invert Y: off). */
+  readonly textSize?: RuntimeTextSize;
+  readonly mouseSensitivity?: RuntimeMouseSensitivity;
+  readonly turnSpeed?: RuntimeTurnSpeed;
+  readonly invertYEnabled?: boolean;
+  /** The remembered titles of the How to cards that were opened. */
+  readonly helpCardsRead?: readonly string[];
 }
 
 /**
@@ -200,6 +228,11 @@ export function createRuntimeMenuState(options: CreateRuntimeMenuStateOptions): 
     aimCollisionOutlinesEnabled: hasAnyDebugOption(debugSettings?.debugOptions, aimCollisionDebugOptions),
     antiNauseaModeEnabled: options.vrComfortOptions?.antiNauseaModeEnabled ?? true,
     ...(options.showHintsEnabled === false ? { showHintsEnabled: false } : {}),
+    ...(options.textSize !== undefined && options.textSize !== "medium" ? { textSize: options.textSize } : {}),
+    ...(options.mouseSensitivity !== undefined && options.mouseSensitivity !== "medium" ? { mouseSensitivity: options.mouseSensitivity } : {}),
+    ...(options.turnSpeed !== undefined && options.turnSpeed !== "medium" ? { turnSpeed: options.turnSpeed } : {}),
+    ...(options.invertYEnabled === true ? { invertYEnabled: true } : {}),
+    ...(options.helpCardsRead !== undefined && options.helpCardsRead.length > 0 ? { helpCardsRead: options.helpCardsRead } : {}),
     ...(options.xrHandOptions?.useOneController === true ? { useOneControllerEnabled: true } : {}),
     ...(options.xrHandOptions?.leftHanded === true ? { leftHandedEnabled: true } : {}),
     selectedTool: "none",
@@ -438,6 +471,7 @@ export function showRuntimeMenuQuestionHelp(
     readonly objectId: string;
     readonly tutorialPages?: readonly TutorialPageSpec[];
     readonly goalPages?: readonly TutorialPageSpec[];
+    readonly toolDisabledReasons?: Readonly<Record<string, string>>;
   },
 ): RuntimeMenuState {
   const questionHelpOptions = options
@@ -445,6 +479,7 @@ export function showRuntimeMenuQuestionHelp(
         objectId: options.objectId,
         tutorialPages: options.tutorialPages ?? [],
         goalPages: options.goalPages ?? [],
+        ...(options.toolDisabledReasons !== undefined ? { toolDisabledReasons: options.toolDisabledReasons } : {}),
       }
     : state.questionHelpOptions;
   if (!questionHelpOptions) {
@@ -685,6 +720,37 @@ export function setRuntimeMenuShowHintsEnabled(
     ...state,
     showHintsEnabled: enabled,
   };
+}
+
+/** Sets the text size step. */
+export function setRuntimeMenuTextSize(state: RuntimeMenuState, textSize: RuntimeTextSize): RuntimeMenuState {
+  return { ...state, textSize };
+}
+
+/** Sets the mouse sensitivity step. */
+export function setRuntimeMenuMouseSensitivity(state: RuntimeMenuState, mouseSensitivity: RuntimeMouseSensitivity): RuntimeMenuState {
+  return { ...state, mouseSensitivity };
+}
+
+/** Sets the turn speed step. */
+export function setRuntimeMenuTurnSpeed(state: RuntimeMenuState, turnSpeed: RuntimeTurnSpeed): RuntimeMenuState {
+  return { ...state, turnSpeed };
+}
+
+/** Sets the "Invert Y" switch. */
+export function setRuntimeMenuInvertY(state: RuntimeMenuState, enabled: boolean): RuntimeMenuState {
+  return { ...state, invertYEnabled: enabled };
+}
+
+/** Counts a press of "Reset tips". */
+export function resetRuntimeMenuTips(state: RuntimeMenuState): RuntimeMenuState {
+  return { ...state, tipsResetCount: (state.tipsResetCount ?? 0) + 1 };
+}
+
+/** Remembers that the How to card with this title was opened; unchanged if it already is remembered. */
+export function markRuntimeMenuHelpCardRead(state: RuntimeMenuState, title: string): RuntimeMenuState {
+  const read = state.helpCardsRead ?? [];
+  return read.includes(title) ? state : { ...state, helpCardsRead: [...read, title] };
 }
 
 /** Sets one of the VR hand options ("Use one controller", "Left-handed"). */

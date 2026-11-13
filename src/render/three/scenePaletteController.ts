@@ -8,7 +8,7 @@
 import * as THREE from "three";
 import type { PortalPanelModeId } from "../../glue/portalPanelMode";
 import type { ClientSession } from "../../runtime/clientSession";
-import type { RuntimeMenuConsoleLogLevelId } from "../../runtime/runtimeMenuState";
+import type { RuntimeMenuConsoleLogLevelId, RuntimeMouseSensitivity, RuntimeTextSize, RuntimeTurnSpeed } from "../../runtime/runtimeMenuState";
 import type { RuntimeDebugOverlayItemId, RuntimeToolId } from "../../glue/toolIds";
 import type { PaletteDefinition } from "../../ui/paletteDefinition";
 import type { PlacedFlagType } from "../../world-objects/toolObjects";
@@ -65,6 +65,18 @@ export interface ScenePaletteControllerOptions {
   readonly onAntiNauseaModeToggled: (enabled: boolean) => void;
   /** The "Show hints" switch of Settings toggled. */
   readonly onShowHintsToggled?: (enabled: boolean) => void;
+  /** Settings: the "Text size" step chosen. */
+  readonly onTextSizeSelected?: (size: RuntimeTextSize) => void;
+  /** Settings: the "Mouse sensitivity" step chosen. */
+  readonly onMouseSensitivitySelected?: (level: RuntimeMouseSensitivity) => void;
+  /** Settings: the "Turn speed" step chosen. */
+  readonly onTurnSpeedSelected?: (level: RuntimeTurnSpeed) => void;
+  /** Settings: the "Invert Y" switch toggled. */
+  readonly onInvertYToggled?: (enabled: boolean) => void;
+  /** Settings: the "Reset tips" button pressed. */
+  readonly onResetTipsRequested?: () => void;
+  /** A How to card's "Try it" button: the tool to take. */
+  readonly onTutorialTryItRequested?: (toolId: RuntimeToolId) => void;
   /** A "Controllers" switch of Settings toggled (Use one controller, Left-handed). */
   readonly onXrHandOptionToggled?: (option: "useOneController" | "leftHanded", enabled: boolean) => void;
   /** Portal panel rendering mode chosen. */
@@ -207,6 +219,12 @@ export function createScenePaletteController(options: ScenePaletteControllerOpti
     onAntiNauseaModeToggled: options.onAntiNauseaModeToggled,
     onShowHintsToggled: options.onShowHintsToggled,
     onXrHandOptionToggled: options.onXrHandOptionToggled,
+    onTextSizeSelected: options.onTextSizeSelected,
+    onMouseSensitivitySelected: options.onMouseSensitivitySelected,
+    onTurnSpeedSelected: options.onTurnSpeedSelected,
+    onInvertYToggled: options.onInvertYToggled,
+    onResetTipsRequested: options.onResetTipsRequested,
+    onTutorialTryItRequested: options.onTutorialTryItRequested,
     onPortalPanelModeSelected: options.onPortalPanelModeSelected,
     onPortalInspectionToggled: options.onPortalInspectionToggled,
     onCollisionGeometryWireframesToggled: options.onCollisionGeometryWireframesToggled,

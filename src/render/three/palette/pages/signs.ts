@@ -5,7 +5,7 @@ import { Container, Text } from "@pmndrs/uikit";
 import type { PaletteDefinition } from "../../../../ui/paletteDefinition";
 import type { PlacedFlagType } from "../../../../world-objects/toolObjects";
 import type { ScenePaletteAdapterOptions } from "../adapterTypes";
-import { actionColor, activeColor, borderColor, inactiveColor, sectionColor, textColor } from "../tokens";
+import { actionColor, activeColor, borderColor, inactiveColor, sectionColor, textColor, fontPx } from "../tokens";
 import { createSignImage } from "../icons";
 import { createButtonText, createInteractiveSurface, createSectionLabel } from "../widgets";
 
@@ -172,7 +172,7 @@ function createSignPreviewLines(message: string): Container {
     const displayLine = sourceLineIndex === cursorLineIndex ? `${line}|` : line;
     const text = new Text({
       text: displayLine || " ",
-      fontSize: 18,
+      fontSize: fontPx(18),
       fontWeight: "bold",
       color: textColor,
       fill: textColor,

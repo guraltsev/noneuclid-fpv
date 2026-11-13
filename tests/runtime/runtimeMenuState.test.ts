@@ -346,8 +346,9 @@ describe("runtimeMenuState", () => {
       kind: "question-help",
       body: questionHelpHubBody,
       options: [
-        { id: "tutorial", label: "How to", disabled: false },
         { id: "goal", label: "Things to try", disabled: false },
+        { id: "tutorial", label: "How to", disabled: false },
+        { id: "discoveries", label: "Discoveries", disabled: true, disabledReason: "Nothing to discover yet" },
       ],
     });
     expect(tutorial.content).toMatchObject({ kind: "tutorial", title: "Move" });

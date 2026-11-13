@@ -26,6 +26,8 @@ export interface DesktopControls {
   readonly enabled: boolean;
   /** Switches look mode; on an actual change it discards pending mouse deltas and click/select requests so stale input does not leak across modes. */
   setLookMode(mode: DesktopLookMode): void;
+  /** Sets how strongly the mouse and the turn keys turn the view and whether the mouse's vertical axis is inverted (the Settings steps); the defaults are 1, 1 and false. */
+  setLookTuning(tuning: DesktopLookTuning): void;
   /** Returns the input for this frame and clears the accumulated one-shot state; deltaSeconds scales key-driven movement and turning. While paused it clears everything and returns an all-zero frame. */
   consumeFrame(deltaSeconds: number): DesktopInputFrame;
   /** Stops collecting input, discards pending input and releases pointer lock. */
@@ -40,6 +42,16 @@ export interface DesktopControls {
   isPointerLocked(): boolean;
   /** Removes the event listeners installed at creation; does not release pointer lock. */
   dispose(): void;
+}
+
+/** The look settings that the player changes while playing. */
+export interface DesktopLookTuning {
+  /** Factor on the mouse look gain. */
+  readonly mouseSensitivityFactor: number;
+  /** Factor on the keyboard turn rate. */
+  readonly turnSpeedFactor: number;
+  /** True when moving the mouse up looks down. */
+  readonly invertY: boolean;
 }
 
 /** Tuning parameters for {@link createDesktopControls}; every field is optional. */
@@ -98,6 +110,7 @@ export function createDesktopControls(
   const turnSpeed = options.turnSpeedRadiansPerSecond ?? 2.25;
   const mouseSensitivity = options.mouseSensitivityRadiansPerPixel ?? 0.0025;
   let paused = false;
+  let lookTuning: DesktopLookTuning = { mouseSensitivityFactor: 1, turnSpeedFactor: 1, invertY: false };
   let pendingMouseYawDeltaRadians = 0;
   let pendingMousePitchDeltaRadians = 0;
   let pendingPalettePointerDeltaX = 0;
@@ -251,8 +264,8 @@ export function createDesktopControls(
         pendingPalettePointerDeltaX += event.movementX;
         pendingPalettePointerDeltaY += event.movementY;
       } else {
-        pendingMouseYawDeltaRadians -= event.movementX * mouseSensitivity;
-        pendingMousePitchDeltaRadians -= event.movementY * mouseSensitivity;
+        pendingMouseYawDeltaRadians -= event.movementX * mouseSensitivity * lookTuning.mouseSensitivityFactor;
+        pendingMousePitchDeltaRadians -= event.movementY * mouseSensitivity * lookTuning.mouseSensitivityFactor * (lookTuning.invertY ? -1 : 1);
       }
     }
   }
@@ -307,6 +320,9 @@ export function createDesktopControls(
     get resetHoldProgress() {
       return resetHeld && !resetHoldFired ? Math.min(1, resetHeldSeconds / resetHoldSeconds) : 0;
     },
+    setLookTuning(tuning) {
+      lookTuning = tuning;
+    },
     setLookMode(mode) {
       if (lookMode === mode) {
         return;
@@ -342,8 +358,8 @@ export function createDesktopControls(
       let yawDeltaRadians = lookMode === "camera" ? pendingMouseYawDeltaRadians : 0;
       const pitchDeltaRadians = lookMode === "camera" ? pendingMousePitchDeltaRadians : 0;
       if (lookMode === "camera") {
-        yawDeltaRadians += (pressedKeys.has("KeyQ") ? 1 : 0) * turnSpeed * deltaSeconds;
-        yawDeltaRadians -= (pressedKeys.has("KeyE") ? 1 : 0) * turnSpeed * deltaSeconds;
+        yawDeltaRadians += (pressedKeys.has("KeyQ") ? 1 : 0) * turnSpeed * lookTuning.turnSpeedFactor * deltaSeconds;
+        yawDeltaRadians -= (pressedKeys.has("KeyE") ? 1 : 0) * turnSpeed * lookTuning.turnSpeedFactor * deltaSeconds;
       }
 
       const movementEnabled = lookMode === "camera";

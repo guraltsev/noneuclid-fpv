@@ -2,12 +2,13 @@
  * Help palette pages: the question-mark hub, the tutorial's index of pages, and the paged tutorial and goal pages (title, optional picture, body, and control rows that show the input icon of the current device).
  */
 import { Container, Image, Text } from "@pmndrs/uikit";
-import { ChevronLeft, ChevronRight } from "@pmndrs/uikit-lucide";
+import { Check, ChevronLeft, ChevronRight } from "@pmndrs/uikit-lucide";
 import type { PagedHelpControl, PaletteDefinition } from "../../../../ui/paletteDefinition";
+import type { RuntimeToolId } from "../../../../glue/toolIds";
 import type { ScenePaletteAdapterOptions } from "../adapterTypes";
-import { actionColor, borderColor, mutedTextColor, sectionColor, textColor } from "../tokens";
-import { createButtonText, createInteractiveSurface, withDisabledReason } from "../widgets";
-import { surfaceNames } from "../../../../world-objects/vocabulary";
+import { actionColor, activeColor, borderColor, mutedTextColor, scrollbarBorderColor, scrollbarColor, sectionColor, textColor, fontPx } from "../tokens";
+import { createButtonText, createInteractiveSurface, disabledReasonColor, withDisabledReason } from "../widgets";
+import { helpText, surfaceNames } from "../../../../world-objects/vocabulary";
 
 /**
  * Help hub page: title, body text and one button per option, dispatching to the tutorial or goal callback.
@@ -29,7 +30,7 @@ export function buildQuestionHelpContent(
   });
   panel.add(new Text({
     text: surfaceNames.help,
-    fontSize: 34,
+    fontSize: fontPx(34),
     fontWeight: "bold",
     color: textColor,
     fill: textColor,
@@ -38,7 +39,7 @@ export function buildQuestionHelpContent(
   }));
   panel.add(new Text({
     text: content.body,
-    fontSize: 20,
+    fontSize: fontPx(20),
     fontWeight: "medium",
     lineHeight: "140%",
     color: textColor,
@@ -63,7 +64,7 @@ export function buildQuestionHelpContent(
       onClick: () => {
         if (entry.id === "tutorial") {
           options.onQuestionHelpTutorialRequested?.();
-        } else {
+        } else if (entry.id === "goal") {
           options.onQuestionHelpGoalRequested?.();
         }
       },
@@ -89,9 +90,10 @@ export function buildPagedHelpContent(
   }
 
   // A fixed height keeps the paging arrows in the same place on every page.
+  const isCard = content.kind === "tutorial";
   const panel = new Container({
     width: "100%",
-    height: 560,
+    height: isCard ? 600 : 560,
     flexDirection: "column",
     gap: 14,
     padding: 16,
@@ -100,27 +102,64 @@ export function buildPagedHelpContent(
     borderColor,
     borderWidth: 2,
   });
-  panel.add(new Text({
+  const titleRow = new Container({ width: "100%", flexDirection: "row", alignItems: "center", gap: 14, flexShrink: 0 });
+  titleRow.add(new Text({
     text: content.title,
-    fontSize: 34,
+    fontSize: fontPx(34),
     fontWeight: "bold",
     color: textColor,
     fill: textColor,
     flexShrink: 0,
     wordBreak: "break-word",
   }));
-  const main = new Container({
-    width: "100%",
-    flexGrow: 1,
-    flexShrink: 1,
-    flexDirection: "row",
-    gap: 20,
-  });
+  if (content.kind === "tutorial" && content.startHere === true) {
+    titleRow.add(createStartHereChip());
+  }
+  panel.add(titleRow);
+  // A card of a tool the world cannot support says so at the top.
+  if (content.kind === "tutorial" && content.disabledReason !== undefined) {
+    const reason = new Text({
+      text: content.disabledReason,
+      fontSize: fontPx(20),
+      fontWeight: "bold",
+      color: disabledReasonColor,
+      fill: disabledReasonColor,
+      flexShrink: 0,
+      wordBreak: "break-word",
+    });
+    reason.userData.scenePaletteDisabledReason = content.disabledReason;
+    panel.add(reason);
+  }
+  // A How to card scrolls as one column with its picture above the text at full panel width; a Things to try page keeps its picture beside the text.
+  const main = isCard
+    ? new Container({
+        width: "100%",
+        flexGrow: 1,
+        flexShrink: 1,
+        flexDirection: "column",
+        gap: 12,
+        overflow: "scroll",
+        paddingRight: 24,
+        scrollbarWidth: 14,
+        scrollbarColor,
+        scrollbarBorderColor,
+        scrollbarBorderWidth: 2,
+        scrollbarBorderRadius: 7,
+        scrollbarZIndex: 1004,
+      })
+    : new Container({
+        width: "100%",
+        flexGrow: 1,
+        flexShrink: 1,
+        flexDirection: "row",
+        gap: 20,
+      });
   if (content.imageSrc) {
     const picture = new Image({
       src: content.imageSrc,
-      width: 420,
-      height: 236,
+      width: isCard ? "100%" : 420,
+      height: isCard ? 150 : 236,
+      keepAspectRatio: false,
       flexShrink: 0,
       objectFit: "cover",
       borderRadius: 14,
@@ -132,14 +171,13 @@ export function buildPagedHelpContent(
     main.add(picture);
   }
   const text = new Container({
-    flexGrow: 1,
-    flexShrink: 1,
+    ...(isCard ? { width: "100%" as const, flexShrink: 0 } : { flexGrow: 1, flexShrink: 1 }),
     flexDirection: "column",
     gap: 10,
   });
   text.add(new Text({
     text: content.body,
-    fontSize: content.imageSrc ? 19 : 22,
+    fontSize: fontPx(content.imageSrc && !isCard ? 19 : 20),
     fontWeight: "medium",
     lineHeight: "140%",
     color: textColor,
@@ -152,6 +190,23 @@ export function buildPagedHelpContent(
   }
   main.add(text);
   panel.add(main);
+
+  // "Try it": takes the card's tool, closes Help and shows the first step of the tool's tip.
+  if (content.kind === "tutorial" && content.toolId !== undefined && content.tryItAction !== undefined) {
+    const toolId = content.toolId;
+    const tryIt = content.tryItAction;
+    const tryItButton = createInteractiveSurface({
+      width: 220,
+      height: 46,
+      label: tryIt.label,
+      labelFontSize: 20,
+      disabled: tryIt.disabled,
+      backgroundColor: tryIt.disabled ? "#334155" : activeColor,
+      onClick: () => options.onTutorialTryItRequested?.(toolId as RuntimeToolId),
+    });
+    tryItButton.userData.scenePaletteItemId = "tutorial-try-it";
+    panel.add(withDisabledReason(tryItButton, tryIt.disabled ? tryIt.disabledReason : undefined, 220));
+  }
 
   const controls = new Container({
     width: "100%",
@@ -185,7 +240,7 @@ export function buildPagedHelpContent(
 
   const pageLabel = new Text({
     text: content.pageLabel,
-    fontSize: 18,
+    fontSize: fontPx(18),
     fontWeight: "bold",
     color: mutedTextColor,
     fill: mutedTextColor,
@@ -256,12 +311,12 @@ function createControlRow(control: PagedHelpControl): Container {
     icon.userData.scenePaletteIconSrc = control.hint.iconSrc;
     chip.add(icon);
   } else {
-    chip.add(new Text({ text: control.hint.label, fontSize: 18, fontWeight: "bold", color: "#0f172a", fill: "#0f172a" }));
+    chip.add(new Text({ text: control.hint.label, fontSize: fontPx(18), fontWeight: "bold", color: "#0f172a", fill: "#0f172a" }));
   }
   row.add(chip);
   row.add(new Text({
     text: control.hint.iconSrc ? `${control.hint.label}: ${control.label}` : control.label,
-    fontSize: 18,
+    fontSize: fontPx(18),
     fontWeight: "medium",
     color: textColor,
     fill: textColor,
@@ -269,6 +324,21 @@ function createControlRow(control: PagedHelpControl): Container {
     wordBreak: "break-word",
   }));
   return row;
+}
+
+// The small mark on the card a newcomer should read first.
+function createStartHereChip(): Container {
+  const chip = new Container({
+    paddingX: 10,
+    paddingY: 3,
+    borderRadius: 999,
+    backgroundColor: "#f1f5f9",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  });
+  chip.add(new Text({ text: helpText.startHere, fontSize: fontPx(16), fontWeight: "bold", color: "#0f172a", fill: "#0f172a" }));
+  return chip;
 }
 
 // The tutorial's index: its title, a line of text and one button per page, two to a row.
@@ -287,8 +357,8 @@ function buildTutorialIndex(
     borderColor,
     borderWidth: 2,
   });
-  panel.add(new Text({ text: content.title, fontSize: 34, fontWeight: "bold", color: textColor, fill: textColor, flexShrink: 0 }));
-  panel.add(new Text({ text: content.body, fontSize: 20, fontWeight: "medium", color: mutedTextColor, fill: mutedTextColor, flexShrink: 0 }));
+  panel.add(new Text({ text: content.title, fontSize: fontPx(34), fontWeight: "bold", color: textColor, fill: textColor, flexShrink: 0 }));
+  panel.add(new Text({ text: content.body, fontSize: fontPx(20), fontWeight: "medium", color: mutedTextColor, fill: mutedTextColor, flexShrink: 0 }));
   const grid = new Container({
     width: "100%",
     flexDirection: "row",
@@ -299,15 +369,22 @@ function buildTutorialIndex(
     const button = createInteractiveSurface({
       width: 436,
       height: 58,
-      label: topic.title,
-      labelFontSize: 20,
+      label: "",
       justifyContent: "flex-start",
       paddingLeft: 18,
-      backgroundColor: actionColor,
+      backgroundColor: topic.startHere ? activeColor : actionColor,
       onClick: () => options.onTutorialPageRequested?.(topic.pageIndex),
     });
     button.userData.scenePaletteItemId = `tutorial-topic:${topic.pageIndex}`;
-    grid.add(button);
+    button.add(createButtonText(topic.title, 20));
+    if (topic.startHere) button.add(createStartHereChip());
+    if (topic.read) {
+      // The tick of a card that was opened.
+      const tick = new Check({ width: 26, height: 26, color: textColor, fill: textColor });
+      tick.userData.scenePaletteReadTick = true;
+      button.add(tick);
+    }
+    grid.add(topic.disabledReason !== undefined ? withDisabledReason(button, topic.disabledReason, 436) : button);
   }
   panel.add(grid);
   return panel;
