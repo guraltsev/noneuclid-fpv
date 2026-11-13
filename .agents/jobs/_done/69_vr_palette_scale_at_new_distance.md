@@ -116,6 +116,7 @@ the auto-close helper is gone; the checks above pass; the commit is pushed to `d
 ### Uncertain
 - No in-headset check was possible here. The maintainer should check the palette's size and the readability of its text,
   tooltip and hover marker at https://guraltsev.github.io/noneuclid-fpv/dev/.
+- The Pages publish workflow for `dev` was not checked (`gh` unavailable here); check it in the repository's Actions tab.
 
 ### Not done
 (none)
@@ -132,3 +133,5 @@ the auto-close helper is gone; the checks above pass; the commit is pushed to `d
 - Final, after `npm run docs:generate` and moving this file: `npm run docs:check` green (all checks ok);
   `npm run typecheck` green; `npm test` 195 files, 1848 tests, all passed (the baseline moduleImportRules timeout did
   not recur).
+- `git push origin dev` succeeded (`35593da..ad77274`). `gh run list --branch dev --limit 1` could not run: the `gh`
+  wrapper on this machine is switched off (it printed only `off @ ...gh.exe`), so the Pages publish result is unchecked.
