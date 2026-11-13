@@ -60,6 +60,9 @@ const desktopHints: Readonly<Record<InputIntent, Omit<InputHintGlyph, "intent" |
   reset: {
     label: "R",
   },
+  hand: {
+    label: "0",
+  },
 };
 
 const xrHints: Readonly<Record<InputIntent, Omit<InputHintGlyph, "intent" | "mode">>> = {
@@ -101,6 +104,10 @@ const xrHints: Readonly<Record<InputIntent, Omit<InputHintGlyph, "intent" | "mod
   reset: {
     label: "Stick press",
     iconSrc: publicAssetUrl("icons/xr-thumbstick.svg"),
+  },
+  // The belt arrives with the VR hand roles (job 77).
+  hand: {
+    label: "Not available yet",
   },
 };
 

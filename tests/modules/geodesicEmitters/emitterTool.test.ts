@@ -59,7 +59,7 @@ function setup(scene: { readonly world: ReturnType<typeof compileLargePortalWorl
 const floorAt = (x: number, y: number): AimPick => ({ objectKind: "floor", cellId: "a", point: { x, y, z: 0 }, withinRange: true, eyePoint: { x: 0, y: 0, z: 1.6 } });
 
 describe("the emitter tool", () => {
-  it("places on the floor, shoots a first geodesic along the aim, selects both and ends", () => {
+  it("places on the floor, shoots along the aim, selects both and stays selected", () => {
     const { registry, click, settle, log } = setup();
 
     expect(click(floorAt(3, 2.5), Math.PI / 2)).toBe(true);
@@ -70,10 +70,10 @@ describe("the emitter tool", () => {
     expect(emitter.aimYawRadians).toBeCloseTo(Math.PI / 2, 12);
     expect(totalGeodesicLength(registry, arcId)).toBeCloseTo(defaultTraceLengthMeters, 6);
     expect(log.selected).toEqual([[emitter.id, arcId]]);
-    expect(log.ended).toBe(1);
+    expect(log.ended).toBe(0);
   });
 
-  it("selects the cut geodesic and ends, shooting nothing more, on a geodesic", () => {
+  it("selects the cut geodesic and stays selected, shooting nothing more, on a geodesic", () => {
     const { registry, click, settle, log } = setup();
     click(floorAt(3, 2.5));
     settle();
@@ -85,7 +85,7 @@ describe("the emitter tool", () => {
     const placed = registry.getObjectsOfKind("geodesicEmitters/emitter")[1]!;
     expect(log.selected.at(-1)).toEqual([placed.id, arcId]);
     expect(getEmitterGeodesicIds(registry, placed.id)).toHaveLength(2);
-    expect(log.ended).toBe(2);
+    expect(log.ended).toBe(0);
   });
 
   it("adds a geodesic to an emitter in reach, and ignores one out of reach", () => {
@@ -102,7 +102,7 @@ describe("the emitter tool", () => {
     click(pick);
     settle();
     expect(getEmitterGeodesicIds(registry, emitter.id)).toHaveLength(2);
-    expect(log.ended).toBe(2);
+    expect(log.ended).toBe(0);
   });
 
   it("does nothing for a vertical aim or for anything else it can hit", () => {
@@ -129,7 +129,7 @@ describe("the emitter tool", () => {
     settle();
 
     expect(log.messages).toEqual(["A laser cannot stand there."]);
-    expect(log.ended).toBe(1);
+    expect(log.ended).toBe(0);
     expect(registry.getObjectsOfKind("geodesicEmitters/emitter")).toHaveLength(1);
   });
 });
@@ -209,7 +209,7 @@ describe("a press while the world has not answered", () => {
 
     expect(registry.getObjectsOfKind("geodesicEmitters/emitter")).toHaveLength(1);
     expect(registry.getObjectsOfKind("geodesicModel/arc")).toHaveLength(1);
-    expect(log.ended).toBe(1);
+    expect(log.ended).toBe(0);
   });
 
   it("shows no refusal when the same spot is pressed again", () => {

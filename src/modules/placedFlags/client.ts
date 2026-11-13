@@ -5,7 +5,7 @@
  */
 import type { CommandResult, ModuleClient, ToolContext, ToolDescriptor } from "../../engine/moduleTypes";
 import { toolNames } from "../../world-objects/vocabulary";
-import { placedFlagToolId, type PlacedFlagsPlaceCommand, type PlacedFlagsRemoveCommand, type PlacedFlagsResult, type PlacedFlagsSetMessageCommand } from "./api";
+import { placedFlagToolId, type PlacedFlagsPlaceCommand, type PlacedFlagsRemoveCommand, type PlacedFlagsSetMessageCommand } from "./api";
 
 function primaryAction(tool: ToolContext): boolean {
   if (tool.commandInFlight()) return true;
@@ -21,7 +21,7 @@ function onResult(tool: ToolContext, result: CommandResult): void {
     tool.showMessage(result.refusal.message);
     return;
   }
-  if ((result.value as unknown as PlacedFlagsResult).outcome === "placed") tool.endTool();
+  // A placed sign leaves the sign tool in hand (design 017 section 8.3).
 }
 
 /** The sign's menu page changed the message. `tool` is the context of the sign tool. */

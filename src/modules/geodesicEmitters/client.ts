@@ -67,7 +67,6 @@ function onResult(tool: ToolContext, result: CommandResult): void {
       const firstArcId = value.arcIds[0];
       if (firstArcId !== undefined) {
         tool.selectObject(value.emitterId, firstArcId);
-        tool.endTool();
         return;
       }
       // On the floor: the emitter fires its first geodesic the way it faces. The tool ends with that answer.
@@ -77,11 +76,8 @@ function onResult(tool: ToolContext, result: CommandResult): void {
     }
     case "shot":
       tool.selectObject(value.emitterId, value.arcId);
-      if (pageEmitterId !== undefined) {
-        tool.showObjectPage(pageEmitterId);
-      } else {
-        tool.endTool();
-      }
+      // The laser tool stays in hand (design 017 section 8.3); only the emitter's page returns to its menu.
+      if (pageEmitterId !== undefined) tool.showObjectPage(pageEmitterId);
       return;
     case "extended":
       tool.selectObject(value.emitterId, value.arcId);

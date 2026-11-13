@@ -1264,6 +1264,10 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     if (frame.helpRequested) {
       aimFeedback.requestHelpLensForFocusedObject(activeAimRay);
     }
+    // Key 0 puts the tool away (design 017 section 8.3); the emitter's modes end with their own action instead.
+    if (frame.handRequested === true && !currentMenuState().isOpen && !currentMenuState().selectedTool.startsWith("geodesicEmitters/")) {
+      if (currentMenuState().selectedTool !== "none") dispatchRuntimeCommand({ kind: "clear-selected-tool" });
+    }
     const worldPrimaryActionRequested = frame.primaryActionRequested && !currentMenuState().isOpen;
     // Tool dispatch: the selected tool's descriptor takes the primary action (the emitter's modal tools every frame, the others when no
     // menu is open). primaryActionConsumed stops the generic focused-object interaction.

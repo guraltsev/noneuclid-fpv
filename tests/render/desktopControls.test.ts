@@ -98,6 +98,20 @@ describe("desktopControls", () => {
     controls.dispose();
   });
 
+  it("maps 0 to a hand edge that puts the tool away", () => {
+    const { canvas, windowTarget } = installPointerLockDom();
+    const controls = createDesktopControls(canvas);
+
+    dispatchKey(windowTarget, "keydown", "Digit0");
+    const frame = controls.consumeFrame(1 / 60);
+    const nextFrame = controls.consumeFrame(1 / 60);
+
+    expect(frame.handRequested).toBe(true);
+    expect(nextFrame.handRequested).toBe(false);
+
+    controls.dispose();
+  });
+
   it("clears held keys when the window loses focus", () => {
     const { canvas, windowTarget } = installPointerLockDom();
     const controls = createDesktopControls(canvas);

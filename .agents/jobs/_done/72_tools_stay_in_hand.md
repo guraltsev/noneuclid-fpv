@@ -1,7 +1,7 @@
 # Job 72 - Tools stay in hand until put away
 
-Status: queued.
-Resolves: nothing filed; design [017](../../_docs/design/017-discoverable-ui-and-level-design.md) section 8.3 (F11, F13).
+Status: done, needs review on 2026-11-13.
+Resolves: nothing filed; design [017](../../../_docs/design/017-discoverable-ui-and-level-design.md) section 8.3 (F11, F13).
 
 ## Goal
 
@@ -64,3 +64,29 @@ Job 71 (toasts announce the tool change). Branch `dev`.
 ## Done when
 
 Main tools stay selected, 0 and the Hand tile put them away, checks pass, commit on `dev`, report appended.
+
+## Report
+
+### Done
+- Main tools stay selected: removed `endTool()` after a placed laser (floor and on a beam), a shot with no page, a placed sign, and a created length or angle (`src/modules/geodesicEmitters/client.ts`, `placedFlags/client.ts`, `geodesicMeasurements/client.ts`).
+- Kept `endTool()` calls: `worldMap/client.ts` (Use closes the Map, decision 2), `geodesicModel/tieTool.ts` (Join is a sub-mode), `geodesicCannonTools.ts` `leaveMode` (aim, rotate, carry modes). The emitter client's error path never called `endTool()` (it shows the refusal and stays), so no error-path call needed keeping.
+- `showRuntimeMenuMainPage` no longer resets `selectedTool`.
+- Key `Digit0`/`Numpad0`: `desktopControls.ts` claims it and reports `handRequested` (new optional field of `InputFrame`); `createThreeApp.ts` dispatches `clear-selected-tool` when no menu is open. New `hand` intent in `TutorialInputIntent` and `src/ui/inputIntents.ts` (desktop "0", XR "Not available yet").
+- Hand tile: `createToolOptions` in `src/ui/paletteDefinition.ts` puts `{ id: "none", label: "Hand" }` first (name from `toolNames.none`); `onToolSelected("none")` in `scenePaletteCommands.ts` closes the menu and clears the tool; tooltip for it in `paletteTooltips.ts`. The toast comes from job 71's tool-change toast unchanged.
+- Tests: two signs in a row without reselecting (`tests/modules/placedFlags.test.ts`); key 0 edge (`tests/render/desktopControls.test.ts`).
+- `npm run docs:generate` was run.
+
+### Deviations
+- Existing tests changed because they asserted the old ending: `emitterTool.test.ts` (5 expectations of `ended`, 2 titles; one title shortened for the 90-character rule), `geodesicMeasurementTools.test.ts` (4 expectations, 2 titles), `placedFlags.test.ts` (4 expectations, 1 title), `tests/render/toolHost.test.ts` (2 tests now expect the tool to stay selected; one title changed), `tests/runtime/runtimeMenuState.test.ts` (main page keeps the tool; title changed), `tests/ui/paletteDefinition.test.ts` (Hand first in the list).
+- Key 0 is ignored while the selected tool is one of the emitter's modes (`geodesicEmitters/...`), so it cannot drop a carried beam; the job did not say this.
+- `handRequested` is optional on `InputFrame` to avoid editing every frame constructor.
+
+### Uncertain
+- Emitter `shot` with no object page now keeps the laser tool (it is only reached from the main-tool laser); confirm no sub-mode relies on the old end.
+
+### Not done
+- The CDP check (select the Laser, click the floor twice, read `dumpAllGeodesics()`) was not run: no browser session was available. Module-level tests cover two placements in a row for signs.
+- Pages check skipped (`gh` is disabled).
+
+### Checks
+- `npm run typecheck`: clean. `npm test`: 197 files, 1860 tests passed. `npm run docs:check`: ok. No intermittent timeout appeared.

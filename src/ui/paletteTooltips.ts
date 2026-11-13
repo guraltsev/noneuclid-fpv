@@ -82,6 +82,8 @@ const fixedTooltips: Readonly<Record<string, string>> = {
 
 function toolTooltip(toolId: string): string | undefined {
   switch (toolId) {
+    case "none":
+      return `${toolNames.none.name}: ${toolNames.none.subtitle}`;
     case "placedFlags/flag":
       return `${toolNames["placedFlags/flag"].name}: ${toolNames["placedFlags/flag"].subtitle}`;
     case "geodesicEmitters/emitter":

@@ -16,7 +16,7 @@ import { getInputHintGlyph, type InputHintGlyph } from "./inputIntents";
 import { publicAssetUrl } from "../glue/assetUrls";
 import { worldCatalog } from "../authoring/worldCatalog";
 import { helpHubHomeGuidance } from "../world-objects/helpHubCopy";
-import { beamName, objectActions, surfaceNames } from "../world-objects/vocabulary";
+import { beamName, objectActions, surfaceNames, toolNames } from "../world-objects/vocabulary";
 import { portalPanelModeDefinitions } from "../glue/portalPanelMode";
 import type { RuntimeMenuConsoleLogLevelId, RuntimeMenuPageId, RuntimeMenuState } from "../runtime/runtimeMenuState";
 import type { ToolsById } from "../runtime/toolRegistry";
@@ -48,7 +48,7 @@ export interface MainPaletteContent {
   readonly placeFlagType: PlacedFlagType;
   /** Tools enabled by the app config, in display order. */
   readonly toolOptions: readonly {
-    readonly id: ConfigurableToolId;
+    readonly id: ConfigurableToolId | "none";
     readonly label: string;
   }[];
 }
@@ -598,10 +598,12 @@ function resolveTutorialBodyForInputMode(
 
 // The tools the config enables that have an entry on the main list, in the config's order.
 function createToolOptions(appConfig: AppConfig, toolsById: ToolsById): MainPaletteContent["toolOptions"] {
-  return getEnabledMainTools(appConfig).flatMap((id) => {
+  const tools = getEnabledMainTools(appConfig).flatMap((id) => {
     const tool = toolsById.get(id);
     return tool?.entry.kind === "main-tool" ? [{ id, label: tool.label }] : [];
   });
+  // The empty hand comes first: selecting it puts the tool away (design 017 section 8.3; the belt of job 75 replaces this list).
+  return [{ id: "none" as const, label: toolNames.none.name }, ...tools];
 }
 
 function createGeometryComputerActionsContent(

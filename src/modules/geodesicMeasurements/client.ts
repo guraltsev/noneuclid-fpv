@@ -69,7 +69,6 @@ function onResult(tool: ToolContext, result: CommandResult): void {
   const { outcome } = result.value as unknown as GeodesicMeasurementsResult;
   if (outcome === "lengthCreated" || outcome === "angleCreated") {
     tool.setToolState(geodesicMeasurementsModuleId, undefined);
-    tool.endTool();
   }
 }
 

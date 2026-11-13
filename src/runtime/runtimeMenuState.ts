@@ -247,7 +247,6 @@ export function showRuntimeMenuMainPage(state: RuntimeMenuState): RuntimeMenuSta
   return {
     ...state,
     page: "main",
-    selectedTool: "none",
     editSignOptions: undefined,
     geodesicCannonOptions: undefined,
     geometryComputerOptions: undefined,

@@ -92,7 +92,7 @@ function onSegment(registry: ReturnType<typeof createRuntimeObjectRegistry>, arc
 }
 
 describe("the length tool", () => {
-  it("measures the geodesic of the aimed segment and ends", () => {
+  it("measures the geodesic of the aimed segment and stays selected", () => {
     const { registry, click, settle, log, shoot } = setup(geodesicLengthToolId);
     const { arcId } = shoot(1, 2.5, 0, 2);
 
@@ -100,7 +100,7 @@ describe("the length tool", () => {
     settle();
 
     expect(registry.getObjectsOfKind("geodesicMeasurements/length").map((length) => length.geodesicId)).toEqual([arcId]);
-    expect(log.ended).toBe(1);
+    expect(log.ended).toBe(0);
   });
 
   it("does nothing for a second press during the wait", () => {
@@ -113,7 +113,7 @@ describe("the length tool", () => {
     settle();
 
     expect(registry.getObjectsOfKind("geodesicMeasurements/length")).toHaveLength(1);
-    expect(log.ended).toBe(1);
+    expect(log.ended).toBe(0);
   });
 
   it("asks nothing out of reach, off a geodesic, or with nothing aimed at", () => {
@@ -179,7 +179,7 @@ describe("the protractor", () => {
     return { ...scene, a, b, crossing, vertex, sideOf };
   }
 
-  it("takes the vertex, then two sides, then asks the world and ends", () => {
+  it("takes the vertex, then two sides, then asks the world and stays selected", () => {
     const { registry, tool, context, click, settle, log, state, vertex, sideOf, a, b, crossing } = atCrossing();
     expect(tool.prompt?.(context)).toBe("select: laser or meeting point");
 
@@ -193,7 +193,7 @@ describe("the protractor", () => {
     const [angle] = registry.getObjectsOfKind("geodesicMeasurements/angle");
     expect(angle).toMatchObject({ centerObjectId: crossing.id, first: { geodesicId: a.arcId, label: "Beam 1" }, second: { geodesicId: b.arcId, label: "Beam 2" } });
     expect(angle?.angleDegrees).toBeCloseTo(90, 6);
-    expect(log.ended).toBe(1);
+    expect(log.ended).toBe(0);
     expect(state()).toBeUndefined();
   });
 
@@ -209,7 +209,7 @@ describe("the protractor", () => {
     settle();
 
     expect(registry.getObjectsOfKind("geodesicMeasurements/angle")).toHaveLength(1);
-    expect(log.ended).toBe(1);
+    expect(log.ended).toBe(0);
   });
 
   it("takes an emitter as the vertex, and its geodesic as a side", () => {

@@ -96,6 +96,11 @@ export function createScenePaletteCommands(deps: ScenePaletteCommandsDeps): Scen
       dispatch({ kind: "copy-url-with-options" });
     },
     onToolSelected(toolId) {
+      if (toolId === "none") {
+        dispatch({ kind: "close-menu" });
+        dispatch({ kind: "clear-selected-tool" });
+        return;
+      }
       requestTool(toolId);
     },
     onPlaceFlagOptionsRequested() {

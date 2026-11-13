@@ -289,7 +289,7 @@ describe("a tool's answer arriving later", () => {
 
     expect(engine.registry.getObjectsOfKind("geodesicEmitters/emitter")).toHaveLength(1);
     expect(engine.registry.getObjectsOfKind("geodesicModel/arc")).toHaveLength(1);
-    expect(deps.session.get().menuState.selectedTool).toBe("none");
+    expect(deps.session.get().menuState.selectedTool).toBe("geodesicEmitters/emitter");
   });
 });
 
@@ -369,14 +369,14 @@ describe("a tool switch with a command of the new tools in flight", () => {
     expect(session.get().menuState.selectedTool).toBe("placedFlags/flag");
   });
 
-  it("ends the tool that is still selected when its answer arrives", () => {
+  it("keeps the tool that is still selected when its answer arrives", () => {
     const { dispatch, frame, press, session } = emitterScene();
     dispatch({ kind: "select-tool", toolId: "placedFlags/flag" });
 
     press({ kind: "floor", localPoint: { x: 4, y: 4, z: 0 } });
     frame();
 
-    expect(session.get().menuState.selectedTool).toBe("none");
+    expect(session.get().menuState.selectedTool).toBe("placedFlags/flag");
   });
 });
 

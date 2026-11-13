@@ -174,7 +174,7 @@ can run as written. Job 68 (split from job 30) waits for the maintainer.
 | [00](00_coordinate_jobs_70_82.md) | Coordinate jobs 70-82 (design 017: discoverable UI and sandbox level design): order, gates, batch report | queued (branch `dev`) | - |  |
 | [70](_done/70_student_vocabulary.md) | One student vocabulary: the vocabulary module, the renames and the retired-terms check | done, needs review | - |  |
 | [71](_done/71_toast_queue.md) | Toasts: a renderer-neutral message queue shown on desktop and in VR | done, needs review | - |  |
-| [72](72_tools_stay_in_hand.md) | Tools stay in hand until put away | queued | - |  |
+| [72](_done/72_tools_stay_in_hand.md) | Tools stay in hand until put away | done, needs review | - |  |
 | [73](73_guarded_start_over_and_undo.md) | Guarded "Start over", undo, and no reset on the VR stick press | queued | - |  |
 | [74](74_pause_card_and_crosshair.md) | Pause card (the desktop main menu) and an always-on crosshair | queued | - |  |
 | [75](75_desktop_tool_belt_and_verbs.md) | The tool belt and the input verbs on desktop | queued | - |  |

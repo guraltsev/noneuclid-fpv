@@ -172,7 +172,7 @@ describe("the sign tool", () => {
     return { ...scene, tool, context, log, submitted, settle, click, chooseFlagType: (next: PlacedFlagType) => void (flagType = next) };
   }
 
-  it("places the chosen sign on the aimed floor and ends", () => {
+  it("places the chosen sign on the aimed floor and stays selected", () => {
     const { flags, click, settle, log, chooseFlagType } = toolSetup();
     chooseFlagType("WoodenSign2");
 
@@ -181,7 +181,19 @@ describe("the sign tool", () => {
 
     expect(flags()).toHaveLength(1);
     expect(flags()[0]).toMatchObject({ flagType: "WoodenSign2", localPose: { translation: { x: 1, y: 0.5, z: 0 } } });
-    expect(log.ended).toBe(1);
+    expect(log.ended).toBe(0);
+  });
+
+  it("places two signs in a row without the tool being selected again", () => {
+    const { flags, click, settle, log } = toolSetup();
+
+    click(floorAt(1, 0.5));
+    settle();
+    click(floorAt(-3, 0.5));
+    settle();
+
+    expect(flags()).toHaveLength(2);
+    expect(log.ended).toBe(0);
   });
 
   it("does nothing for a second press during the wait", () => {
@@ -193,7 +205,7 @@ describe("the sign tool", () => {
     settle();
 
     expect(flags()).toHaveLength(1);
-    expect(log.ended).toBe(1);
+    expect(log.ended).toBe(0);
   });
 
   it("asks nothing off the floor, or with nothing aimed at", () => {
@@ -214,7 +226,7 @@ describe("the sign tool", () => {
     settle();
 
     expect(log.messages).toEqual(["A sign cannot stand there."]);
-    expect(log.ended).toBe(1);
+    expect(log.ended).toBe(0);
     expect(flags()).toHaveLength(1);
   });
 
@@ -243,6 +255,6 @@ describe("the sign tool", () => {
 
     expect(flags()).toEqual([]);
     expect(log.messages).toEqual([]);
-    expect(log.ended).toBe(1);
+    expect(log.ended).toBe(0);
   });
 });

@@ -100,6 +100,7 @@ export function createDesktopControls(
   let interactRequested = false;
   let carryActionRequested = false;
   let helpRequested = false;
+  let handRequested = false;
   let lookMode: DesktopLookMode = "camera";
 
   // One-shot keys set a flag and are not tracked as held; held keys go into pressedKeys. Handled keys have their default browser action prevented.
@@ -115,7 +116,9 @@ export function createDesktopControls(
       event.code === "KeyR" ||
       event.code === "KeyF" ||
       event.code === "KeyG" ||
-      event.code === "KeyH"
+      event.code === "KeyH" ||
+      event.code === "Digit0" ||
+      event.code === "Numpad0"
     ) {
       event.preventDefault();
     }
@@ -137,6 +140,11 @@ export function createDesktopControls(
 
     if (event.code === "KeyH") {
       helpRequested = true;
+      return;
+    }
+
+    if (event.code === "Digit0" || event.code === "Numpad0") {
+      handRequested = true;
       return;
     }
 
@@ -228,6 +236,7 @@ export function createDesktopControls(
     interactRequested = false;
     carryActionRequested = false;
     helpRequested = false;
+    handRequested = false;
   }
 
   async function requestPointerLock(): Promise<boolean> {
@@ -311,6 +320,7 @@ export function createDesktopControls(
       const frameInteractRequested = interactRequested;
       const frameCarryActionRequested = lookMode === "camera" && carryActionRequested;
       const frameHelpRequested = helpRequested;
+      const frameHandRequested = handRequested;
 
       pendingMouseYawDeltaRadians = 0;
       pendingMousePitchDeltaRadians = 0;
@@ -322,6 +332,7 @@ export function createDesktopControls(
       interactRequested = false;
       carryActionRequested = false;
       helpRequested = false;
+      handRequested = false;
 
       return {
         localDisplacement: vec3((rightInput / inputLength) * stepMeters, (forwardInput / inputLength) * stepMeters, 0),
@@ -336,6 +347,7 @@ export function createDesktopControls(
         interactRequested: frameInteractRequested,
         carryActionRequested: frameCarryActionRequested,
         helpRequested: frameHelpRequested,
+        handRequested: frameHandRequested,
       };
     },
     pause(): void {

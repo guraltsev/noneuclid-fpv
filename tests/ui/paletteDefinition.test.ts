@@ -51,6 +51,7 @@ describe("createPaletteDefinition", () => {
     const definition = createTestPaletteDefinition(createRuntimeMenuState({ selectedWorldId: "cube" }), defaultAppConfig, "desktop", 0, tools);
 
     expect((definition.content as MainPaletteContent).toolOptions).toEqual([
+      { id: "none", label: "Hand" },
       { id: "geodesicEmitters/emitter", label: "Laser" },
       { id: "geodesicMeasurements/length", label: "Ruler" },
       { id: "geodesicMeasurements/protractor", label: "Protractor" },

@@ -128,7 +128,7 @@ describe("runtimeMenuState", () => {
     });
   });
 
-  it("clears the selected tool when backing out to the main menu", () => {
+  it("keeps the selected tool when backing out to the main menu", () => {
     const state = setRuntimeMenuSelectedTool(createRuntimeMenuState({
       selectedWorldId: "cube",
     }), "placedFlags/flag");
@@ -136,7 +136,7 @@ describe("runtimeMenuState", () => {
     const next = showRuntimeMenuMainPage(state);
 
     expect(next.page).toBe("main");
-    expect(next.selectedTool).toBe("none");
+    expect(next.selectedTool).toBe("placedFlags/flag");
   });
 
   it("tracks the active in-game sign editor message", () => {

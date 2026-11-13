@@ -29,6 +29,8 @@ export interface RuntimeInputFrame {
   readonly carryActionRequested: boolean;
   /** Request to show the help overlay. */
   readonly helpRequested: boolean;
+  /** Request to put the tool away and have the empty hand (desktop key 0); absent means no request. */
+  readonly handRequested?: boolean;
   /** Which input device produced the frame. */
   readonly source: "desktop" | "xr";
 }
