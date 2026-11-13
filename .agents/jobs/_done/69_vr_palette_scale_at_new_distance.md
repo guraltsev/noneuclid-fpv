@@ -103,7 +103,7 @@ the auto-close helper is gone; the checks above pass; the commit is pushed to `d
   is faked with `tests/support/fakeCanvas2d.ts`), aims an XR pointer at a tool button and checks that the tooltip root
   and the hover marker are visible with scale 2 when `placement.scale` is 2, and scale 1 when it is absent.
 - Generated documents refreshed with `npm run docs:generate`.
-- Commit: the commit on `dev` that moves this file to `_done/` (its hash is recorded by a follow-up commit).
+- Commit: `fa9b54e` on `dev` (the hash was recorded by a follow-up commit).
 
 ### Deviations
 - Step 3 says to add the controller case to an existing test of `scenePaletteController` in `tests/render/`. The only
