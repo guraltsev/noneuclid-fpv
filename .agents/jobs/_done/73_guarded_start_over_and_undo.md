@@ -81,7 +81,7 @@ its absence is reported, checks pass, commit on `dev`, report appended.
 - Deletes covered: the sign Delete, the ruler and protractor removals, and the beam bin on a laser's page. A delete remembers the world when asked, and announces it in the frame in which a saved object is actually removed.
 - Palette "Start over" button (decision 5): it did not do what R does; it restarted the whole app (`restartApp`). It now routes to the same reset path (`requestStartOver` in `runtimeEffects.ts`, performed in the next frame like R), keeping the double press and its tooltip.
 - Tests: hold-R (1499 ms, 1500 ms, release and restart, U) in `tests/render/desktopControls.test.ts`; `tests/world-objects/savedSnapshot.test.ts`; a `durationMs` test in `tests/ui/toastQueue.test.ts`; `tests/render/xrControls.test.ts` changed (below).
-- Commit: see the follow-up commit that records the hash (the work commit is the one before it on `dev`).
+- Commit: e109c51 on `dev`.
 
 ### Deviations
 - The hold is timed by the frames' `deltaSeconds`, not by a timer, so the test steps `consumeFrame(1.499)` then `consumeFrame(0.001)` instead of using fake timers; it is deterministic and equal to wall time in the app.
