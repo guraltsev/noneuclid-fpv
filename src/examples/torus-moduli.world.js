@@ -17,7 +17,7 @@ startingHouse("torus-room", {
 });
 
 startingQuestionCube("torus-room", {
-  position: [-2.45, 0.05, 3.25],
+  position: [0.46, 0.05, 1.7],
   scale: 1,
   turn: -18,
   goalPages: [{
@@ -65,3 +65,20 @@ OnFace("torus-room", [
   torus_flower_group,
   torus_geometry_computer,
 ]);
+
+// The first view (design 017 section 9): the help cube and the tool stand ahead, the demonstration beside them, open space behind.
+toolStand("torus-room", {
+  position: [-0.58, 0, 2.67],
+  facing: -14,
+});
+
+demo("torus-room", {
+  laser: { position: [1.44, 0, 1.92], yawDegrees: 200, beamLength: 12 },
+  ruler: true,
+  sign: { position: [-0.4, 0, 0.8], text: "Start" },
+});
+
+startingPosition("torus-room", {
+  position: [0, 0, 5],
+  faceToward: "startingQuestionCube",
+});

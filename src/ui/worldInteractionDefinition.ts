@@ -15,6 +15,7 @@ export type WorldInteractionActionId =
   | "edit-sign"
   | "open-geometry-computer"
   | "open-tutorial"
+  | "take-tool"
   | "extend-geodesic"
   | "measure-length"
   | "select-protractor-side"
@@ -92,6 +93,12 @@ export function createWorldFocusMessageDefinition(
         return withObjectHelp(options.object, {
           title,
           actions: [primaryAction("open-tutorial", "Help")],
+        });
+      }
+      if (options.object.interactable?.action === "take-tool") {
+        return withObjectHelp(options.object, {
+          title,
+          actions: [primaryAction("take-tool", options.object.interactable.label)],
         });
       }
       return withObjectHelp(options.object, { title, actions: [] });

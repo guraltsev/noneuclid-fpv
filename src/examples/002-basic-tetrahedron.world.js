@@ -25,10 +25,11 @@ startingHouse("face-a", {
   position: [-3.0, 0, 0.6],
   scale: 1,
   turn: 12,
+  landmark: true,
 });
 
 startingQuestionCube("face-a", {
-  position: [-2.45, 0.05, 3.25],
+  position: [0.46, 0.05, 1.7],
   scale: 1,
   turn: -18,
   goalPages: [
@@ -58,6 +59,7 @@ face_a_mouse = geo_mouse("face-a-geo-mouse", {
 });
 
 face_b_butterfly = geo_butterfly("face-b-centerpiece", {
+  landmark: true,
   position: [0, 1.5, 0],
   turn: 20,
   speed: 0.7,
@@ -66,6 +68,7 @@ face_b_butterfly = geo_butterfly("face-b-centerpiece", {
 });
 
 face_c_tree = tree("face-c-centerpiece", {
+  landmark: true,
   position: [0, 0, 0],
 });
 
@@ -81,6 +84,7 @@ face_d_grass = grass("face-d-centerpiece", {
 });
 
 face_d_stop_sign = stop_sign("face-d-stop-sign", {
+  landmark: true,
   position: [-3.2, 0, 1.8],
   scale: 0.8,
   turn: -25,
@@ -90,3 +94,20 @@ OnFace("face-a", [face_a_mouse]);
 OnFace("face-b", [face_b_butterfly]);
 OnFace("face-c", [face_c_tree, face_c_flower_pot]);
 OnFace("face-d", [face_d_grass, face_d_stop_sign]);
+
+// The first view (design 017 section 9): the help cube and the tool stand ahead, the demonstration beside them, open space behind.
+toolStand("face-a", {
+  position: [-0.58, 0, 2.67],
+  facing: -14,
+});
+
+demo("face-a", {
+  laser: { position: [1.44, 0, 1.92], yawDegrees: 200, beamLength: 12 },
+  ruler: true,
+  sign: { position: [-0.4, 0, 0.8], text: "Start" },
+});
+
+startingPosition("face-a", {
+  position: [0, 0, 5],
+  faceToward: "startingQuestionCube",
+});

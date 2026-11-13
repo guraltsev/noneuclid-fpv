@@ -339,6 +339,20 @@ export const hintStripText = {
   putAway: (toolName: string): string => `put the ${toolName} away`,
 } as const;
 
+/** The words of the tool stand (design 017 section 9.2) and of the help cube's invitation (section 9.1). */
+export const toolStandText = {
+  /** The name of the stand's table. */
+  tableName: "Tool stand",
+  /** The action on an item: "Take the Laser". */
+  take: (toolName: string): string => `Take the ${toolName}`,
+  /** The toast on desktop: "Laser · press 1 next time". */
+  nextTimeKey: (toolName: string, key: string): string => `${toolName} \u00b7 press ${key} next time`,
+  /** The toast in VR: "Laser · it is on your belt". */
+  nextTimeBelt: (toolName: string): string => `${toolName} \u00b7 it is on your belt`,
+  /** The floating label over the help cube until it has been opened once. */
+  helpInvite: "? Help",
+} as const;
+
 /** The words of Help beyond the page names (design 017 section 8.6): the cards of How to, the Try it button and the first-use tips. */
 export const helpText = {
   /** The mark on the card a newcomer should read first. */

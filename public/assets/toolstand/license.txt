@@ -1,0 +1,1 @@
+Tool stand models: original to this project, made by scripts/assets/make-tool-stand-models.mjs. CC0 1.0 (https://creativecommons.org/publicdomain/zero/1.0/).

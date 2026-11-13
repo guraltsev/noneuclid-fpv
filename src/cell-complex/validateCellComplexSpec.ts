@@ -167,6 +167,30 @@ export function validateCellComplexSpec(
     }
   }
 
+  if (spec.demo) {
+    const { demo } = spec;
+    if (!cellsById.has(demo.cellId)) {
+      errors.push(`Demo targets missing cell "${demo.cellId}".`);
+    }
+
+    const points = [demo.laser.position, ...(demo.sign ? [demo.sign.position] : [])];
+    for (const point of points) {
+      for (const [axis, value] of Object.entries(point)) {
+        if (!Number.isFinite(value)) {
+          errors.push(`Demo ${axis} coordinate must be finite.`);
+        }
+      }
+    }
+
+    if (!Number.isFinite(demo.laser.yawRadians)) {
+      errors.push("Demo laser yawRadians must be finite.");
+    }
+
+    if (!Number.isFinite(demo.laser.beamLengthMeters) || demo.laser.beamLengthMeters <= 0) {
+      errors.push("Demo beam length must be a positive number of meters.");
+    }
+  }
+
   return errors;
 }
 

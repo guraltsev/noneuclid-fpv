@@ -13,7 +13,9 @@ import type { TutorialPageSpec } from "../cell-complex/specs";
 export interface RuntimeObjectInteraction {
   /** Prompt text shown to the player (for example "Rename sign"). */
   readonly label: string;
-  readonly action: "edit-flag" | "select-geodesic-cannon" | "open-geometry-computer" | "open-tutorial";
+  readonly action: "edit-flag" | "select-geodesic-cannon" | "open-geometry-computer" | "open-tutorial" | "take-tool";
+  /** For "take-tool": the id of the tool an item of a tool stand stands for. */
+  readonly toolId?: string;
   /** Maximum aimer-to-object distance, in meters, within which the interaction is offered; callers fall back to a default (2.5 m in rootAimRay) when absent. */
   readonly rangeMeters?: number;
 }

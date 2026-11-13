@@ -20,6 +20,10 @@ export interface CompiledCellComplex {
    * Authored starting pose (cell id, cell-local position, yaw/pitch in radians), passed through unchanged from the spec.
    */
   readonly startingPosition?: CellComplexSpec["startingPosition"];
+  /**
+   * The authored demonstration, passed through unchanged from the spec; the shell makes it once when the world loads.
+   */
+  readonly demo?: CellComplexSpec["demo"];
 }
 
 /**
@@ -55,5 +59,6 @@ export function compileCellComplex(spec: CellComplexSpec, options: CompileCellCo
     cells,
     cellsById: new Map(cells.map((cell) => [cell.id, cell])),
     startingPosition: spec.startingPosition,
+    demo: spec.demo,
   };
 }

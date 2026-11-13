@@ -36,10 +36,11 @@ startingHouse("front", {
   position: [-3.0, 0, 0.6],
   scale: 1,
   turn: 12,
+  landmark: true,
 });
 
 startingQuestionCube("front", {
-  position: [-2.45, 0.05, 3.25],
+  position: [0.46, 0.05, 1.7],
   scale: 1,
   turn: -18,
   goalPages: [
@@ -54,10 +55,6 @@ startingQuestionCube("front", {
 ],
 });
 
-startingPosition("front", {
-  position: [-3.769270715138527, 0, 4.219146347597855],
-  turn: 225,
-});
 
 front_mouse = geo_mouse("front-runner", {
   position: [-4.2, 0, -1.8],
@@ -68,11 +65,13 @@ front_mouse = geo_mouse("front-runner", {
 });
 
 right_tree = tree("right-tree", {
+  landmark: true,
   position: [0.8, 0, -0.5],
   turn: -20,
 });
 
 back_butterfly = geo_butterfly("back-butterfly", {
+  landmark: true,
   position: [0.4, 1.5, 0.9],
   turn: 66,
   speed: 0.8,
@@ -81,18 +80,21 @@ back_butterfly = geo_butterfly("back-butterfly", {
 });
 
 left_bench = bench("left-bench", {
+  landmark: true,
   position: [-0.9, 0, 0.7],
   scale: 0.9,
   turn: 46,
 });
 
 top_grass = grass("top-grass", {
+  landmark: true,
   position: [0.2, 0, -0.2],
   scale: 1.2,
   turn: -9,
 });
 
 bottom_bicycle = bicycle("bottom-bicycle", {
+  landmark: true,
   position: [-0.5, 0, -0.8],
   scale: 0.85,
   turn: 29,
@@ -104,3 +106,20 @@ OnFace("back", [back_butterfly]);
 OnFace("left", [left_bench]);
 OnFace("top", [top_grass]);
 OnFace("bottom", [bottom_bicycle]);
+
+// The first view (design 017 section 9): the help cube and the tool stand ahead, the demonstration beside them, open space behind.
+toolStand("front", {
+  position: [-0.58, 0, 2.67],
+  facing: -14,
+});
+
+demo("front", {
+  laser: { position: [1.44, 0, 1.92], yawDegrees: 200, beamLength: 12 },
+  ruler: true,
+  sign: { position: [-0.4, 0, 0.8], text: "Start" },
+});
+
+startingPosition("front", {
+  position: [0, 0, 5],
+  faceToward: "startingQuestionCube",
+});

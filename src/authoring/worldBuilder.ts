@@ -12,9 +12,18 @@ import type {
   PrismCellSpec,
   StartingPositionSpec,
   TutorialPageSpec,
+  WorldDemoSpec,
 } from "../cell-complex/specs";
 import { createConvexPrismBaseVertices, type ConvexPrismBaseVertices } from "../cell-complex/prismBase";
-import { isWorldLibraryObjectSpec, type WorldLibraryObjectSpec } from "../world-objects/library";
+import {
+  createToolStandItem,
+  createToolStandTable,
+  isWorldLibraryObjectSpec,
+  toolStandItems,
+  toolStandItemSpacingMeters,
+  toolStandTableHeightMeters,
+  type WorldLibraryObjectSpec,
+} from "../world-objects/library";
 import { normalizeFloorMaterial, type WorldFloorMaterialSpec } from "../world-assets/floorTextures";
 import { worldObjectLibrary } from "../world-objects/library";
 import { degreesToRadians, type StaticObjectAuthoringParams } from "../world-objects/staticAssets";
@@ -23,6 +32,8 @@ import { objectSubtitles, toolNames } from "../world-objects/vocabulary";
 
 const defaultHeightMeters = 15;
 const startingHouseLookOffsetDegrees = 12;
+/** How far left of the middle of the first view the object named by `faceToward` appears, in degrees, unless the author says otherwise (design 017 section 9.1). */
+export const defaultFaceTowardLeftOfCenterDegrees = 8;
 /**
  * Default help message shown on the starting question cube when the author supplies none.
  */
@@ -143,8 +154,12 @@ export interface WorldBuilder {
   startingHouse(faceName: string, params: StaticObjectAuthoringParams): void;
   /** Places the help question cube (object id "startingQuestionCube") with default or supplied tutorial and goal pages. */
   startingQuestionCube(faceName: string, params: StartingQuestionCubeAuthoringParams): void;
-  /** Sets the player's start explicitly; the last of startingHouse / startingPosition called wins. */
+  /** Sets the player's start explicitly; the last of startingHouse / startingPosition called wins. With `faceToward` the yaw is computed from the position of the named object (resolved by build()). */
   startingPosition(faceName: string, params: StartingPositionAuthoringParams): void;
+  /** Places a tool stand in a face: a low table with one item for each tool (ids "toolStand" and "toolStand-<tool>"); Use on an item takes that tool. At most one per world. */
+  toolStand(faceName: string, params: ToolStandAuthoringParams): void;
+  /** Declares the demonstration made when the world starts: a laser firing a beam, a ruler measurement of it and a sign. At most one per world. */
+  demo(faceName: string, params: DemoAuthoringParams): void;
   /** Snapshots the accumulated cells (copying their arrays) and start position into a CellComplexSpec; the builder remains usable. */
   build(): CellComplexSpec;
 }
@@ -170,6 +185,44 @@ export interface StartingPositionAuthoringParams {
   readonly position: readonly [x: number, height: number, y: number];
   readonly turn?: number;
   readonly pitch?: number;
+  /**
+   * Id of an object of the same face to look at: the yaw is computed so that the object's middle appears `leftOfCenterDegrees` left of the middle of the view. `turn` is ignored when this is given.
+   * The spawn framing test (tests/authoring/spawnFraming.test.ts) checks the result for the activity worlds.
+   */
+  readonly faceToward?: string;
+  /** With `faceToward`: how far left of the middle of the view the object appears, in degrees; default 8. */
+  readonly leftOfCenterDegrees?: number;
+}
+
+/**
+ * Parameters for toolStand: where the table stands and which way it faces.
+ */
+export interface ToolStandAuthoringParams {
+  /** Position of the middle of the table's base in authored [x, height, y] axes. */
+  readonly position: readonly [x: number, height: number, y: number];
+  /** The way the table faces, in degrees, as for `turn` of any object: its front is where a player stands to read the tools from left to right. */
+  readonly facing: number;
+}
+
+/**
+ * Parameters for demo: a laser with one beam, a ruler on it, and a sign.
+ */
+export interface DemoAuthoringParams {
+  readonly laser: {
+    /** Position of the laser in authored [x, height, y] axes; the height is ignored. */
+    readonly position: readonly [x: number, height: number, y: number];
+    /** The beam's direction in degrees, as for `turn` of any object (0 faces +y, positive turns left). */
+    readonly yawDegrees: number;
+    /** Length of the beam in meters. */
+    readonly beamLength: number;
+  };
+  /** True to measure the beam with the Ruler. */
+  readonly ruler?: boolean;
+  /** The sign: where it stands and what it reads. */
+  readonly sign?: {
+    readonly position: readonly [x: number, height: number, y: number];
+    readonly text: string;
+  };
 }
 
 /**
@@ -181,6 +234,18 @@ export function createWorldBuilder(): WorldBuilder {
   const portalAssignments = new Map<string, Set<string>>();
   const objectIds = new Set<string>();
   let startingPosition: StartingPositionSpec | undefined;
+  // A start whose yaw waits for the object it looks at, which may be declared after the start; resolved by build().
+  let pendingFacing: { readonly objectId: string; readonly leftOfCenterDegrees: number } | undefined;
+  let demoSpec: WorldDemoSpec | undefined;
+
+  function registerObject(cell: MutableCell, object: WorldLibraryObjectSpec): void {
+    if (objectIds.has(object.id)) {
+      throw new Error(`Duplicate object id "${object.id}".`);
+    }
+
+    objectIds.add(object.id);
+    cell.visuals.objects.push(stripLibraryBrand(object));
+  }
 
   return {
     PolygonFace(name, floor, vertices) {
@@ -286,6 +351,7 @@ export function createWorldBuilder(): WorldBuilder {
       objectIds.add(house.id);
       cell.visuals.objects.push(stripLibraryBrand(house));
       startingPosition = createStartingPositionInFrontOfHouse(faceName, params);
+      pendingFacing = undefined;
     },
 
     startingQuestionCube(faceName, params) {
@@ -315,6 +381,60 @@ export function createWorldBuilder(): WorldBuilder {
         yawRadians: degreesToRadians(params.turn ?? 0),
         pitchRadians: degreesToRadians(params.pitch ?? 0),
       };
+      pendingFacing = params.faceToward === undefined
+        ? undefined
+        : { objectId: params.faceToward, leftOfCenterDegrees: params.leftOfCenterDegrees ?? defaultFaceTowardLeftOfCenterDegrees };
+    },
+
+    toolStand(faceName, params) {
+      const cell = requireCell(cells, faceName, "toolStand");
+      if (objectIds.has("toolStand")) {
+        throw new Error('Duplicate object id "toolStand": a world has one tool stand.');
+      }
+
+      if (!Array.isArray(params.position) || params.position.length !== 3 || !params.position.every(Number.isFinite) || !Number.isFinite(params.facing)) {
+        throw new Error(`toolStand("${faceName}", ...) needs a [x, height, y] position and a facing in degrees.`);
+      }
+
+      const [x, height, y] = params.position;
+      const yawRadians = degreesToRadians(params.facing);
+      registerObject(cell, createToolStandTable("toolStand", { position: params.position, turn: params.facing }));
+      toolStandItems.forEach((item, index) => {
+        // Along the table's long axis (its local x). A player in front of the table sees its local +x on the left, so the first item lies at +x.
+        const along = ((toolStandItems.length - 1) / 2 - index) * toolStandItemSpacingMeters;
+        const suffix = item.toolId.slice(item.toolId.indexOf("/") + 1);
+        registerObject(cell, createToolStandItem(`toolStand-${suffix}`, item.toolId, {
+          position: [x + along * Math.cos(yawRadians), height + toolStandTableHeightMeters, y + along * Math.sin(yawRadians)],
+          turn: params.facing,
+        }));
+      });
+    },
+
+    demo(faceName, params) {
+      requireCell(cells, faceName, "demo");
+      if (demoSpec) {
+        throw new Error("A world has one demo.");
+      }
+
+      const { laser } = params;
+      if (!laser || !Array.isArray(laser.position) || !laser.position.every(Number.isFinite) || !Number.isFinite(laser.yawDegrees) || !(laser.beamLength > 0)) {
+        throw new Error(`demo("${faceName}", ...) needs a laser with a [x, height, y] position, a yawDegrees and a positive beamLength.`);
+      }
+
+      if (params.sign !== undefined && (!Array.isArray(params.sign.position) || !params.sign.position.every(Number.isFinite) || typeof params.sign.text !== "string")) {
+        throw new Error(`demo("${faceName}", ...) needs a sign with a [x, height, y] position and a text.`);
+      }
+
+      demoSpec = {
+        cellId: faceName,
+        laser: {
+          position: authorPositionToWorld(laser.position),
+          yawRadians: degreesToRadians(laser.yawDegrees),
+          beamLengthMeters: laser.beamLength,
+        },
+        ruler: params.ruler === true,
+        ...(params.sign ? { sign: { position: authorPositionToWorld(params.sign.position), text: params.sign.text } } : {}),
+      };
     },
 
     build() {
@@ -330,10 +450,38 @@ export function createWorldBuilder(): WorldBuilder {
             objects: [...cell.visuals.objects],
           },
         })),
-        startingPosition,
+        startingPosition: startingPosition === undefined ? undefined : resolveFacing(startingPosition, pendingFacing, cells),
+        ...(demoSpec ? { demo: demoSpec } : {}),
       };
     },
   };
+}
+
+/**
+ * Gives a start that looks at an object the yaw that does it: the object's middle appears `leftOfCenterDegrees` left of the middle of the view.
+ * The object must be in the start's own face. Yaw 0 faces +y and a positive yaw turns left, so the direction (dx, dy) is at yaw atan2(-dx, dy); looking `leftOfCenterDegrees` to its right puts it that far left.
+ */
+function resolveFacing(
+  start: StartingPositionSpec,
+  facing: { readonly objectId: string; readonly leftOfCenterDegrees: number } | undefined,
+  cells: ReadonlyMap<string, MutableCell>,
+): StartingPositionSpec {
+  if (facing === undefined) {
+    return start;
+  }
+
+  const target = cells.get(start.cellId)?.visuals.objects.find((object) => object.id === facing.objectId);
+  if (!target) {
+    throw new Error(`startingPosition: faceToward "${facing.objectId}" is not an object of face "${start.cellId}".`);
+  }
+
+  const dx = target.position.x - start.position.x;
+  const dy = target.position.y - start.position.y;
+  if (Math.hypot(dx, dy) < 0.01) {
+    throw new Error(`startingPosition: faceToward "${facing.objectId}" is where the player starts.`);
+  }
+
+  return { ...start, yawRadians: Math.atan2(-dx, dy) - degreesToRadians(facing.leftOfCenterDegrees) };
 }
 
 /**

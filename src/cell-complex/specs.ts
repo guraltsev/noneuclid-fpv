@@ -10,6 +10,30 @@ import type { RigidTransform3 } from "../math/rigidTransform3";
 export interface CellComplexSpec {
   readonly cells: readonly PrismCellSpec[];
   readonly startingPosition?: StartingPositionSpec;
+  /** A small demonstration made once when the world starts, through the modules' ordinary commands (see {@link WorldDemoSpec}). */
+  readonly demo?: WorldDemoSpec;
+}
+
+/**
+ * The demonstration an activity world starts with (design 017 section 9.2): a laser firing one beam, a length measurement of that beam and a sign.
+ * They are made when the world loads by the modules' own commands, so they are ordinary objects the student can aim, change and delete; a tool the world's configuration switches off leaves its part out.
+ * Positions are cell-local meters in `cellId`; angles are radians.
+ */
+export interface WorldDemoSpec {
+  readonly cellId: string;
+  readonly laser: {
+    readonly position: { readonly x: number; readonly y: number; readonly z: number };
+    /** Direction of the beam: yaw about +z in radians, counterclockwise. */
+    readonly yawRadians: number;
+    readonly beamLengthMeters: number;
+  };
+  /** True to measure the beam with the Ruler. */
+  readonly ruler: boolean;
+  /** The sign, with the text it reads. */
+  readonly sign?: {
+    readonly position: { readonly x: number; readonly y: number; readonly z: number };
+    readonly text: string;
+  };
 }
 
 /**
@@ -174,6 +198,8 @@ export interface PositionedCellObjectSpec {
    * The object's icon on the world map, an image relative to the assets directory, kept next to its model; without one the map leaves the object out.
    */
   readonly mapIconPath?: string;
+  /** True when this object is the landmark of its face: one per face, visible from the far side of the face, unique in shape and color (design 017 section 9.3). */
+  readonly landmark?: boolean;
 }
 
 /**
@@ -183,6 +209,8 @@ export interface AssetObjectSpec extends PositionedCellObjectSpec {
   readonly kind: "asset";
   readonly assetPath: string;
   readonly collision?: SimpleCollisionCylinderSpec;
+  /** Tool id (such as "geodesicEmitters/emitter") when this object is an item of a tool stand: Use on it takes that tool (design 017 section 9.2). The world leaves the item out when the tool is not available. */
+  readonly standsTool?: string;
 }
 
 /**

@@ -167,7 +167,10 @@ import { createPauseCardDefinition } from "../../ui/pauseCardDefinition";
 import { restoreSavedSnapshot, savedKindsRemovedThisFrame, savedObjectKinds, takeSavedSnapshot, type SavedSnapshot } from "../../world-objects/savedSnapshot";
 import { objectNouns, toastMessages } from "../../ui/vocabulary";
 import { createToastQueue } from "../../ui/toastQueue";
-import { settingsText, toolBeltText, toolNames, vrBeltText } from "../../ui/vocabulary";
+import { settingsText, toolBeltText, toolNames, toolStandText, vrBeltText } from "../../ui/vocabulary";
+import { createHelpCubeInvite, type HelpCubeInvite } from "./helpCubeInvite";
+import { runWorldDemo } from "./worldDemo";
+import { toolStandClass } from "../../world-objects/objectMetadata";
 import type { XrHandOptions, XrLayout } from "../../glue/xrLayout";
 import { createXrHandUi } from "./xrHandUi";
 import { createWorldMapPieceReader } from "./worldMapPieces";
@@ -460,6 +463,8 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   let announcedTool: string | undefined;
   // The first-use tip of the tool in hand; created once the page's DOM exists, and used by the command path from then on.
   let firstUseTips: FirstUseTipController | undefined;
+  // The help cube's "? Help" label and bob until it has been opened once; created with the other scene helpers below.
+  let helpCubeInvite: HelpCubeInvite | undefined;
   // The text size last applied and the count of "Reset tips" presses last seen.
   let appliedTextSize: string | undefined;
   let seenTipsResetCount = 0;
@@ -567,6 +572,14 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       return;
     }
     worldClient.requestTool(slot.toolId);
+  }
+  /** Use on an item of the tool stand: takes the tool as its belt slot does, and says which key takes it next time (on the belt in VR). */
+  function takeStandTool(toolId: string): void {
+    const slot = currentBeltDefinition().slots.find((candidate) => candidate.toolId === toolId);
+    if (slot === undefined) return;
+    selectBeltSlot(slot);
+    if (!slot.enabled) return;
+    toastQueue.push(renderer.xr.isPresenting ? toolStandText.nextTimeBelt(slot.name) : toolStandText.nextTimeKey(slot.name, slot.key));
   }
   /** The VR hand options as the menu state holds them. */
   function currentXrHandOptions(): XrHandOptions {
@@ -955,6 +968,15 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       getRegistryVersion: () => runtimeObjectRegistry.getVersion(),
     });
 
+  helpCubeInvite = createHelpCubeInvite({
+    scene,
+    camera,
+    engine,
+    registry: runtimeObjectRegistry,
+    objectHost,
+    getWorld: activeWorld,
+    cubeId: "startingQuestionCube",
+  });
   const { updateXrObjectTooltip, clearXrObjectTooltip } = createXrObjectTooltipController({ scene, camera });
   const xrDebugPanel = createXrDebugPanel();
   scene.add(xrDebugPanel.object);
@@ -1101,6 +1123,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       beginDeletion("placedFlags/flag");
       requestFlagRemoval(toolHost.contextOf(placedFlagToolId), flagId);
     },
+    takeStandTool,
     removeLength: (lengthId) => {
       beginDeletion("geodesicMeasurements/length");
       requestLengthRemoval(toolHost.contextOf(geodesicLengthToolId), lengthId);
@@ -1296,10 +1319,22 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   });
   syncDesktopPalette();
 
+  // The tool stand lists a tool only when the belt can take it here; with none to show, the table stays out too.
+  const standTools = new Set<string>(
+    createToolBeltDefinition({ appConfig: beltConfig, worldHasMap, selectedTool: "none" }).slots
+      .filter((slot) => slot.enabled && slot.toolId !== "hand" && slot.toolId !== "main-menu")
+      .map((slot) => slot.toolId),
+  );
+  const standHasItems = activeWorld().cells.some((cell) => cell.objects.some((objectSpec) => objectSpec.kind === "asset" && objectSpec.standsTool !== undefined && standTools.has(objectSpec.standsTool)));
+
   // Instantiate the world's authored objects: creatures become per-frame updated runtimes, collidable assets
   // become static registry objects.
   for (const cell of activeWorld().cells) {
     for (const objectSpec of cell.objects) {
+      if (objectSpec.kind === "asset" && (objectSpec.standsTool !== undefined ? !standTools.has(objectSpec.standsTool) : objectSpec.class === toolStandClass && !standHasItems)) {
+        continue;
+      }
+
       if (isGeodesicMarmotObjectSpec(objectSpec)) {
         const runtime = createGeodesicMarmotRuntime(objectSpec, cell.id, options.assets, runtimeObjectRegistry);
         runtime.syncParent(cellMeshes);
@@ -1337,6 +1372,15 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   }
   syncStaticObjectCollisionWireframes();
   runtimeObjectInstanceSync.sync(currentFrameSnapshot());
+  // The world's demonstration is made once, by the modules' own commands, as the frames start to run.
+  const worldDemo = activeWorld().demo;
+  if (worldDemo !== undefined) {
+    void runWorldDemo(worldDemo, {
+      submit: (command) => worldClient.submit(command),
+      isToolEnabled: (toolId) => isRuntimeToolEnabled(appConfig, toolId),
+      viewerPoint: appState.playerPose.position,
+    });
+  }
   syncSelectableHitboxDebugIfChanged({
     registryVersion: runtimeObjectRegistry.getVersion(),
     cellRootsGeneration,
@@ -1708,6 +1752,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     frameErrorGuard.runPhase("ui", () => {
       aimFeedback.updateAim(xrActive, activeAimRay);
       updateGeodesicEmitterLabels();
+      helpCubeInvite?.update(performance.now() / 1000);
       xrSession.syncDebugState(frame.source, moveResult);
       updateScenePalette(xrActive, xrFrame, xrReferenceSpace, xrHeadWorldPose, deltaSeconds, frame);
       updateWorldMap(xrActive, xrActive ? xrSession.resolveXrHeadWorldPose(xrViewerPose) : undefined, deltaSeconds);
@@ -2018,6 +2063,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       setApiNamespace("view", undefined);
       setApiNamespace("world", undefined);
       uninstallModuleApis();
+      helpCubeInvite?.dispose();
       worldClient.dispose();
       geometrySession.dispose();
       debugOverlay.dispose();
@@ -2199,6 +2245,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       const howTo = selectHowToPages(command.tutorialPages, currentBeltDefinition());
       command = { ...command, tutorialPages: howTo.pages, toolDisabledReasons: howTo.toolDisabledReasons };
     }
+    if (command.kind === "show-question-help" && command.objectId === "startingQuestionCube") helpCubeInvite?.markOpened();
     const toolBefore = session.get().menuState.selectedTool;
     const effects = applyRuntimeCommand(session, command);
     // A tool that is no longer selected has ended, whichever command ended it: it takes its marks off the world and drops its tool state.

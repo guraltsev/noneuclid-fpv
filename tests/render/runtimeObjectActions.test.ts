@@ -16,7 +16,8 @@ import { createDefaultPlayerPose } from "../../src/movement/playerPose";
 import type { ClientSessionState } from "../../src/runtime/clientSession";
 import type { RuntimeCommand } from "../../src/runtime/runtimeCommands";
 import { createRuntimeMenuState } from "../../src/runtime/runtimeMenuState";
-import { createRuntimeObjectRegistry } from "../../src/world-objects/runtimeObjectRegistry";
+import { createRuntimeObjectRegistry, createRuntimeStaticAssetObject } from "../../src/world-objects/runtimeObjectRegistry";
+import type { RootAimRay } from "../../src/render/three/rootAimRay";
 import { createRuntimeObjectActions } from "../../src/render/three/runtimeObjectActions";
 import { yawRigidTransform3 } from "../../src/math/rigidTransform3";
 import { createPlacedFlagObject } from "../../src/world-objects/placedFlags";
@@ -46,6 +47,7 @@ function createHarness(target: AimTarget | undefined, sessionOverrides: Partial<
   const commands: RuntimeCommand[] = [];
   const messages: (readonly [string, string])[] = [];
   const removedFlags: string[] = [];
+  const takenTools: string[] = [];
   const rigResets = vi.fn();
   const none = vi.fn();
   const actions = createRuntimeObjectActions({
@@ -74,12 +76,13 @@ function createHarness(target: AimTarget | undefined, sessionOverrides: Partial<
     },
     setFlagMessage: (flagId, message) => void messages.push([flagId, message]),
     removeFlag: (flagId) => void removedFlags.push(flagId),
+    takeStandTool: (toolId) => void takenTools.push(toolId),
     removeLength: none,
     removeAngle: none,
     removeGeodesicRuntimeObjects: none,
     clearProtractorToolFeedback: none,
   });
-  return { actions, registry, commands, messages, removedFlags, rigResets, engine };
+  return { actions, registry, commands, messages, removedFlags, takenTools, rigResets, engine };
 }
 
 describe("createRuntimeObjectActions", () => {
@@ -160,6 +163,21 @@ describe("createRuntimeObjectActions", () => {
 
     expect(commands.map((command) => command.kind)).toEqual(["cancel-menu-and-tool"]);
     expect(readLocalPlayerPose(engine).position).toEqual({ x: 1, y: 2, z: 0 });
+  });
+
+  it("takes the tool of a tool stand item when it is used, and opens nothing", () => {
+    const item = createRuntimeStaticAssetObject(
+      { id: "item", kind: "asset", assetPath: "toolstand/laser.glb", position: { x: 1, y: 1, z: 0.6 }, standsTool: "geodesicEmitters/emitter" },
+      "room",
+    );
+    const { actions, registry, commands, takenTools } = createHarness({ object: item } as unknown as AimTarget);
+    registry.add(item);
+
+    const used = actions.tryUseFocusedObjectPrimaryInteraction({} as RootAimRay);
+
+    expect(used).toBe(true);
+    expect(takenTools).toEqual(["geodesicEmitters/emitter"]);
+    expect(commands).toEqual([]);
   });
 
   it("rejects a debug pose in a cell the world does not have", () => {

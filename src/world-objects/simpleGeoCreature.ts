@@ -40,6 +40,8 @@ export interface SimpleGeoCreatureAuthoringParams {
   readonly doNotCollideWith?: readonly string[];
   /** Help text for the help lens; a generic creature message is used when absent. */
   readonly displayHelpMessage?: string;
+  /** True when the creature is the landmark of its face (one per face). */
+  readonly landmark?: boolean;
 }
 
 const defaultScale = 1;
@@ -98,6 +100,7 @@ export function createSimpleGeoCreature(
     class: params.class ?? "creature",
     do_not_collide_with: params.do_not_collide_with ?? params.doNotCollideWith,
     displayHelpMessage: params.displayHelpMessage,
+    ...(params.landmark === true ? { landmark: true } : {}),
   };
 }
 

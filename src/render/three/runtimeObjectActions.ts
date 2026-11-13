@@ -77,6 +77,8 @@ export interface RuntimeObjectActionsDeps {
   setFlagMessage(flagId: string, message: string): void;
   /** Asks the world to remove a sign. */
   removeFlag(flagId: string): void;
+  /** Takes the tool an item of a tool stand stands for, through the same path as its belt slot; the shell also says which key takes it next time. */
+  takeStandTool(toolId: string): void;
   /** Asks the world to remove a length, from its menu's Delete button. */
   removeLength(lengthId: string): void;
   /** Asks the world to remove an angle, from its menu's Delete button. */
@@ -302,6 +304,10 @@ export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): Runt
     // An object with no main action of its own opens its menu (design 017 section 7.1: Use with the Hand reaches every menu).
     switch (target?.object?.kind) {
       case "asset":
+        if (target.object.interactable?.action === "take-tool" && target.object.interactable.toolId !== undefined) {
+          deps.takeStandTool(target.object.interactable.toolId);
+          return true;
+        }
         return tryOpenFocusedQuestionHelp(target.object) || tryOpenFocusedObjectMenu(ray);
       case "geodesicModel/segment":
         logVerboseAimClick(target);

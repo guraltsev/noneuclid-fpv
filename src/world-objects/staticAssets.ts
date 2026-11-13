@@ -41,6 +41,8 @@ export interface StaticObjectAuthoringParams {
   readonly sideTilt?: number;
   /** Yaw about the vertical axis, in degrees. */
   readonly turn?: number;
+  /** True when the object is the landmark of its face (one per face). */
+  readonly landmark?: boolean;
 }
 
 /**
@@ -87,6 +89,7 @@ export function createStaticAssetObject(
     autoDisplayHelpRangeMeters: params.autoDisplayHelpRangeMeters,
     tutorialPages: params.tutorialPages,
     goalPages: params.goalPages,
+    ...(params.landmark === true ? { landmark: true } : {}),
   };
 }
 

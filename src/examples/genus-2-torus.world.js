@@ -25,7 +25,7 @@ startingHouse("genus-2-octagon", {
 });
 
 startingQuestionCube("genus-2-octagon", {
-  position: [-2.45, 0.05, 3.25],
+  position: [0.46, 0.05, 1.7],
   scale: 1,
   turn: -18,
   goalPages: [{
@@ -108,3 +108,20 @@ OnFace("genus-2-octagon", [
   genus_2_side_7_bench,
   genus_2_flower_group,
 ]);
+
+// The first view (design 017 section 9): the help cube and the tool stand ahead, the demonstration beside them, open space behind.
+toolStand("genus-2-octagon", {
+  position: [-0.58, 0, 2.67],
+  facing: -14,
+});
+
+demo("genus-2-octagon", {
+  laser: { position: [1.44, 0, 1.92], yawDegrees: 200, beamLength: 12 },
+  ruler: true,
+  sign: { position: [-0.4, 0, 0.8], text: "Start" },
+});
+
+startingPosition("genus-2-octagon", {
+  position: [0, 0, 5],
+  faceToward: "startingQuestionCube",
+});

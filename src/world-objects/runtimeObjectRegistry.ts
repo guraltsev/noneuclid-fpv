@@ -21,7 +21,8 @@ import type {
 import type { MeasuredGeodesicLengthObject } from "./toolObjects";
 import type { PlacedFlagObject } from "./toolObjects";
 import type { ProtractorAngleObject } from "./toolObjects";
-import { userObjectClass } from "./objectMetadata";
+import { toolStandClass, userObjectClass } from "./objectMetadata";
+import { toolNames, toolStandText } from "./vocabulary";
 import { ChangeOp, createRuntimeObjectChangeJournal, type RuntimeObjectChangeJournal, type RuntimeObjectChangeReader } from "./runtimeObjectChangeJournal";
 import type { RuntimeCreatureObject, RuntimeWorldObjectBase } from "./runtimeObjectBase";
 
@@ -414,9 +415,17 @@ export function createRuntimeStaticAssetObject(
   const questionCubeHasHelpMenu = questionCube &&
     ((objectSpec.tutorialPages?.length ?? 0) > 0 || (objectSpec.goalPages?.length ?? 0) > 0);
   const questionCubeRangeMeters = objectSpec.autoDisplayHelpRangeMeters ?? 2.5;
+  // An item of a tool stand is named for its tool and Use on it takes the tool; the table is the "Tool stand".
+  const standToolId = objectSpec.standsTool;
+  const standToolName = standToolId !== undefined && standToolId in toolNames ? toolNames[standToolId as keyof typeof toolNames].name : undefined;
+  const standRangeMeters = objectSpec.autoDisplayHelpRangeMeters ?? 3.5;
   // Tooltip precedence: geometry computers use their own fixed tooltip below; help cubes with pages say "Help cube"; otherwise any help message yields a class-labelled tooltip.
   const helpTooltip = !geometryComputer
-    ? questionCubeHasHelpMenu
+    ? standToolName !== undefined
+      ? { label: standToolName, rangeMeters: standRangeMeters }
+      : objectSpec.class === toolStandClass
+      ? { label: toolStandText.tableName, rangeMeters: standRangeMeters }
+      : questionCubeHasHelpMenu
       ? {
           label: "Help cube",
           rangeMeters: questionCubeRangeMeters,
@@ -455,7 +464,14 @@ export function createRuntimeStaticAssetObject(
           rangeMeters: 3,
         }
       : helpTooltip,
-    interactable: questionCubeHasHelpMenu
+    interactable: standToolName !== undefined
+      ? {
+          label: toolStandText.take(standToolName),
+          action: "take-tool",
+          toolId: standToolId,
+          rangeMeters: standRangeMeters,
+        }
+      : questionCubeHasHelpMenu
       ? {
           label: "Help",
           action: "open-tutorial",

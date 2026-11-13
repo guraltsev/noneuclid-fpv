@@ -115,6 +115,8 @@ function primaryActionText(action: WorldInteractionAction, extendLengthMeters: n
   switch (action.id) {
     case "open-tutorial":
       return hintStripText.openHelp;
+    case "take-tool":
+      return action.label.charAt(0).toLowerCase() + action.label.slice(1);
     case "extend-geodesic":
       return hintStripText.extend(extendLengthMeters);
     case "measure-length":

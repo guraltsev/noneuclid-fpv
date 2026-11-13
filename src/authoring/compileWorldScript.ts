@@ -28,6 +28,8 @@ export function compileWorldScript(sourceText: string, options: CompileWorldScri
     startingHouse: builder.startingHouse,
     startingQuestionCube: builder.startingQuestionCube,
     startingPosition: builder.startingPosition,
+    toolStand: builder.toolStand,
+    demo: builder.demo,
     ...worldFloorTextureLibrary,
     ...worldObjectLibrary,
   } as const;

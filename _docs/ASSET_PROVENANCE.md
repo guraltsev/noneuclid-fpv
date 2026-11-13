@@ -59,6 +59,7 @@ link to [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/).
 | `flashlight/Flashlight.glb` (public only) | [Flashlight, Jarlan Perez](https://poly.pizza/m/1UrYBPWN1U_) | CC BY 3.0 | “Flashlight by Jarlan Perez via Poly Pizza.” |
 | `flashlight/Lightsaber.glb`, `flashlight/Lightsaber.png` | [My First Lightsaber, Derek Elsby](https://poly.pizza/m/3KZ2s28Fohm) | CC BY 3.0 | “My First Lightsaber by Derek Elsby via Poly Pizza.” |
 | `flashlight/Post.glb` | [Post, Quaternius](https://poly.pizza/m/jnuIFJsXZJ) | CC0 1.0 | Credit not required; “Post by Quaternius via Poly Pizza” is retained. |
+| `toolstand/*.glb` | Original to this project: simple primitives written by `scripts/assets/make-tool-stand-models.mjs` (a table, a laser, a ruler, a protractor, a sign and a map for the tool stand) | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) | None. |
 
 The first four Quaternius and iPoly3D entries above correct earlier local
 records that named a creator but omitted the page’s CC0 grant. The local

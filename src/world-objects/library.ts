@@ -7,7 +7,8 @@ import type { CellObjectSpec, GeodesicMarmotObjectSpec, SimpleCollisionCylinderS
 import { createGeodesicMarmot } from "./geodesicMarmot";
 import { createSimpleGeoCreature, type SimpleGeoCreatureAuthoringParams } from "./simpleGeoCreature";
 import { createStaticAssetObject, type StaticObjectAuthoringParams } from "./staticAssets";
-import { userObjectClass } from "./objectMetadata";
+import { toolStandClass, userObjectClass } from "./objectMetadata";
+import { toolNames } from "./vocabulary";
 
 const libraryObjectBrand = Symbol("world-library-object");
 
@@ -365,6 +366,63 @@ export const worldObjectLibrary: WorldObjectLibrary = {
       }),
     ),
 };
+
+/**
+ * The items of a tool stand, in the order they lie on the table, left to right: the tool each stands for and the model drawn for it (design 017 section 9.2).
+ */
+export const toolStandItems = [
+  { toolId: "geodesicEmitters/emitter", assetPath: "toolstand/laser.glb" },
+  { toolId: "geodesicMeasurements/length", assetPath: "toolstand/ruler.glb" },
+  { toolId: "geodesicMeasurements/protractor", assetPath: "toolstand/protractor.glb" },
+  { toolId: "placedFlags/flag", assetPath: "toolstand/sign.glb" },
+  { toolId: "worldMap/map", assetPath: "toolstand/map.glb" },
+] as const;
+
+/** The height of the tool stand's table top above the floor, in meters; the items stand on it. */
+export const toolStandTableHeightMeters = 0.6;
+/** The distance between the middles of two neighbouring items on the table, in meters. */
+export const toolStandItemSpacingMeters = 0.22;
+
+/**
+ * Builds the table of a tool stand: a low table whose long side is the model's x axis. `params.turn` is its yaw in degrees.
+ * The table blocks the player like any piece of furniture; the items on it do not.
+ */
+export function createToolStandTable(name: string, params: StaticObjectAuthoringParams): WorldLibraryObjectSpec {
+  return createStaticLibraryObject(name, "toolstand/table.glb", undefined, {
+    ...params,
+    class: params.class ?? toolStandClass,
+    displayHelpMessage: params.displayHelpMessage ?? "A low table. The tools lie on it: aim at one and use it to take it.",
+    collision: params.collision ?? {
+      radius: 0.7,
+      height: toolStandTableHeightMeters,
+      offset: { x: 0, y: 0, z: toolStandTableHeightMeters / 2 },
+    },
+  });
+}
+
+/**
+ * Builds one item of a tool stand: the model of `toolId`'s tool standing at `params.position`, with a small collision cylinder the aim can pick and the player walks through.
+ * Use on it takes the tool (the shell reads `standsTool`). Throws for a tool that is not in {@link toolStandItems}.
+ */
+export function createToolStandItem(
+  name: string,
+  toolId: (typeof toolStandItems)[number]["toolId"],
+  params: StaticObjectAuthoringParams,
+): WorldLibraryObjectSpec {
+  const item = toolStandItems.find((candidate) => candidate.toolId === toolId);
+  if (item === undefined) {
+    throw new Error(`There is no tool stand item for "${toolId}".`);
+  }
+
+  const spec = createStaticAssetObject(name, item.assetPath, {
+    ...params,
+    class: params.class ?? "tool-stand-item",
+    do_not_collide_with: params.do_not_collide_with ?? [userObjectClass],
+    displayHelpMessage: params.displayHelpMessage ?? toolNames[toolId].subtitle,
+    collision: params.collision ?? { radius: 0.1, height: 0.16, offset: { x: 0, y: 0, z: 0.08 } },
+  });
+  return brandLibraryObject({ ...spec, standsTool: toolId });
+}
 
 /**
  * Type guard: true when the value carries the object-library brand (and so was built by `worldObjectLibrary`).

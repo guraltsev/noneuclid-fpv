@@ -340,6 +340,7 @@ Authoring-level data model for a cell complex: the plain-data spec that world fi
 | Kind | Name | Summary |
 | --- | --- | --- |
 | interface | `CellComplexSpec` | Complete authored world: its cells and an optional starting pose. |
+| interface | `WorldDemoSpec` | The demonstration an activity world starts with (design 017 section 9.2): a laser firing one beam, a length measurement of that beam and a sign. |
 | interface | `StartingPositionSpec` | Where the player starts: a cell, a cell-local position in meters, and optional yaw and pitch in radians. |
 | interface | `PrismCellSpec` | One authored prism cell: convex counterclockwise base polygon, height, portals on its sides and optional visuals. |
 | interface | `AuthoredPortalSpec` | A hand-authored portal: a side of this cell glued to a side of another cell's portal. |
@@ -1102,6 +1103,11 @@ World object library: the catalogue of named, ready-to-place objects available t
 | type | `WorldLibraryObjectSpec` | A CellObjectSpec carrying a non-enumerable brand proving it was produced by the object library. |
 | interface | `WorldObjectLibrary` | The set of constructors injected as globals into world scripts. |
 | const | `worldObjectLibrary` | The object library instance; `house` aliases `small_house`. |
+| const | `toolStandItems` | The items of a tool stand, in the order they lie on the table, left to right: the tool each stands for and the model drawn for it (design 017 section 9.2). |
+| const | `toolStandTableHeightMeters` | The height of the tool stand's table top above the floor, in meters; the items stand on it. |
+| const | `toolStandItemSpacingMeters` | The distance between the middles of two neighbouring items on the table, in meters. |
+| function | `createToolStandTable` | Builds the table of a tool stand: a low table whose long side is the model's x axis. |
+| function | `createToolStandItem` | Builds one item of a tool stand: the model of `toolId`'s tool standing at `params.position`, with a small collision cylinder the aim can pick and the player walks through. |
 | function | `isWorldLibraryObjectSpec` | Type guard: true when the value carries the object-library brand (and so was built by `worldObjectLibrary`). |
 
 ### `world-objects/measureLengthTool.ts`
@@ -1122,6 +1128,7 @@ Collision class name ("user") of the player's avatar; objects listing it in `do_
 | Kind | Name | Summary |
 | --- | --- | --- |
 | const | `userObjectClass` | Shared object metadata constants: the collision class name used for the player avatar, referenced by object specs' `do_not_collide_with` lists and by the registry's player-blocking filter. |
+| const | `toolStandClass` | Collision class name ("tool-stand") of a tool stand's table; the registry gives it the name "Tool stand". |
 
 ### `world-objects/placedFlags.ts`
 
@@ -1304,6 +1311,7 @@ The student vocabulary (design 017 section 6): every student-visible noun, verb 
 | const | `controllersSettingsText` | The "Controllers" section of Settings (VR hand options, design 017 sections 7.2 and 7.3). |
 | const | `vrBeltText` | The words of the VR belt, its toasts and the VR start card (design 017 sections 7.3, 7.4 and 8.1). |
 | const | `hintStripText` | The words of the hint strip (design 017 section 8.2): what the listed input does right now, after the colon. |
+| const | `toolStandText` | The words of the tool stand (design 017 section 9.2) and of the help cube's invitation (section 9.1). |
 | const | `helpText` | The words of Help beyond the page names (design 017 section 8.6): the cards of How to, the Try it button and the first-use tips. |
 | const | `firstUseTipText` | The tool steps of the first-use tips (design 017 section 8.6). |
 | const | `shapeMachineText` | The words of the shape machine panel (design 017 section 8.9): the two parameters, the presets, the keypad and the buttons. |
@@ -1363,12 +1371,15 @@ World builder: the imperative API behind the world-script DSL that assembles a C
 
 | Kind | Name | Summary |
 | --- | --- | --- |
+| const | `defaultFaceTowardLeftOfCenterDegrees` | How far left of the middle of the first view the object named by `faceToward` appears, in degrees, unless the author says otherwise (design 017 section 9.1). |
 | const | `defaultStartingQuestionCubeMessage` | Default help message shown on the starting question cube when the author supplies none. |
 | const | `defaultStartingQuestionCubeTutorialPages` | Default tutorial pages of the starting question cube, the cards of How to: "Basics" (marked "Start here"), then one card per tool, each with a picture and its controls (shown with the icons of the current device). |
 | const | `defaultStartingQuestionCubeGoalPages` | Default goal pages of the starting question cube. |
 | interface | `WorldBuilder` | The set of calls available to world scripts for assembling a world. |
 | interface | `StartingQuestionCubeAuthoringParams` | Parameters for startingQuestionCube: ordinary static-object parameters plus tutorial content. |
 | interface | `StartingPositionAuthoringParams` | Parameters for startingPosition: where the player's eye reference point starts. |
+| interface | `ToolStandAuthoringParams` | Parameters for toolStand: where the table stands and which way it faces. |
+| interface | `DemoAuthoringParams` | Parameters for demo: a laser with one beam, a ruler on it, and a sign. |
 | function | `createWorldBuilder` | Creates an empty WorldBuilder. |
 | function | `authorSideToSideIndex` | Validates an author-facing side number against a polygon's vertex count and returns it as the spec's `sideIndex`. |
 
@@ -3114,6 +3125,20 @@ The `window.noneuclidGeometry` helpers and the `geometry` API namespace that dri
 | interface | `GeometryDebugHelpersHandle` | Handle to the geometry helpers created by {@link createGeometryDebugHelpers}. |
 | function | `createGeometryDebugHelpers` | Creates the installer of the geometry debug helpers. |
 
+### `render/three/helpCubeInvite.ts`
+
+The help cube's invitation (design 017 section 9.1): a floating "?
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| const | `helpCubeBobAmplitudeMeters` | The height the cube bobs by, in meters (amplitude). |
+| const | `helpCubeBobPeriodSeconds` | The period of the bob, in seconds. |
+| const | `helpCubeLabelHeightMeters` | The label's height above the cube's base, in meters. |
+| function | `helpCubeBobOffset` | The bob's offset at `seconds`, in meters: a sine of the given amplitude and period. |
+| interface | `HelpCubeInviteDeps` | What the invitation needs from the shell. |
+| interface | `HelpCubeInvite` | Handle of the invitation. |
+| function | `createHelpCubeInvite` | Creates the invitation for the cube with `deps.cubeId`. |
+
 ### `render/three/helpLensRenderer.ts`
 
 Help panel ("help lens") renderer: shows the current contextual help definition either as a DOM panel (desktop) or as a floating textured plane in front of the camera (XR).
@@ -3944,6 +3969,15 @@ The shell's side of its conversation with the world engine (design 013 sections 
 | interface | `WorldClientDeps` | What the world client needs from the shell. |
 | interface | `WorldClient` | Handle returned by {@link createWorldClient}. |
 | function | `createWorldClient` | Creates the world client over the shell's engine, session and command path. |
+
+### `render/three/worldDemo.ts`
+
+The world's demonstration (design 017 section 9.2): a laser firing one beam, a Ruler measurement of that beam and a sign, made once when the world loads.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `WorldDemoDeps` | What the demo needs from the shell. |
+| function | `runWorldDemo` | Makes the demo: the laser and its beam, the ruler on it, the sign. |
 
 ### `render/three/worldMapPieces.ts`
 
