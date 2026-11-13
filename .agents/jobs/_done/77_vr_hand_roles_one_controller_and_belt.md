@@ -108,7 +108,7 @@ and the start card exist, checks pass, commit on `dev`, report appended with the
 - The VR hint strip shows inside the XR focus label: the object's name and up to three hint lines with the layout's glyphs (`xrObjectTooltipMesh.ts` draws up to four lines now); it follows "Show hints".
 - Main-menu buttons got tooltips (`main-menu:*` in `paletteTooltips.ts`).
 - Tests: `tests/render/xrControlsHandRoles.test.ts` (26), `tests/interaction/xrBeltMath.test.ts` (12), `tests/render/xrToolBelt.test.ts` (7), `tests/render/xrHandUi.test.ts` (8), `tests/ui/vrStartCardDefinition.test.ts` (3); glyph tests in `tests/ui/inputIntents.test.ts`, VR rows in `hintStripDefinition.test.ts`, the command in `applyRuntimeCommand.test.ts`, hands by handedness in `xrControllerHandModels.test.ts`, the XR palette feed in `desktopInputHandlers.test.ts`, tooltips in `paletteTooltips.test.ts`. `npm run docs:generate` run.
-- Commit: see the last line of this report.
+- Commit: e7a60e2 on `dev`.
 
 ### Deviations
 - Existing tests changed: `xrControls.test.ts` "help edges" now uses two controllers (with one controller the What's this? tap fires on release, per the decisions); `paletteDefinition.test.ts` (the two VR tile tests became one "no tiles in VR" test; the third, about the `entry` kind choosing the main list, was deleted because that list no longer exists); `worldMap.test.ts` reads the belt definition instead of the palette tiles; `scenePaletteAdapter.test.ts` lost "maps each main tool and its nested options to the right icon" (the tiles are gone); `scenePaletteControllerScale.test.ts` hovers a main-menu button instead of a tool tile (hence the new main-menu tooltips); `paletteDefinitionCache.test.ts` and `tests/support/tools.ts` follow the removed `toolsById` argument.
