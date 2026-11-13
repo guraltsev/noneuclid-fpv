@@ -80,7 +80,7 @@ on `dev`, report appended.
 
 ### Done
 
-Commit: HASH_PLACEHOLDER (branch `dev`).
+Commit: c4e21f3 (branch `dev`).
 
 - Authoring (`src/authoring/worldBuilder.ts`, `compileWorldScript.ts`): `startingPosition(face, { position, faceToward,
   leftOfCenterDegrees })` computes the yaw from the position of an object of the same face, resolved in `build()` so the
