@@ -3543,9 +3543,8 @@ Placement math for the XR palette: where the panel floats relative to the head a
 | interface | `VrPoseSample` | A world-space pose sample of the head, in meters. |
 | interface | `ResolveVrPalettePlacementOptions` | Inputs for resolveVrPalettePlacement. |
 | interface | `VrPalettePlacement` | Resolved palette pose in the Three.js world frame (meters), with the kind of anchor it follows. |
-| const | `VR_PALETTE_AUTO_CLOSE_DISTANCE_METERS` | Default head-to-palette distance in meters beyond which the VR palette should auto-close. |
+| const | `VR_PALETTE_SCALE` | Uniform scale of the VR palette. |
 | function | `resolveVrPalettePlacement` | Computes where the XR palette should sit this frame: a head-relative target, smoothed from the previous pose. |
-| function | `shouldAutoCloseVrPalette` | Returns whether the head has moved farther than the allowed distance from the palette, meaning the palette should close. |
 | function | `resolveFacingQuaternion` | Builds an orientation whose local -Z axis points from position toward targetPosition, with world +Y as up. |
 | function | `resolveFrontFacingQuaternion` | Builds an orientation whose local +Z axis (the front of a plane mesh) faces from position toward targetPosition. |
 

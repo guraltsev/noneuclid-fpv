@@ -246,7 +246,8 @@ export function createScenePaletteController(options: ScenePaletteControllerOpti
       // Apply the placement and refresh matrices so ray casting uses the current pose.
       paletteRoot.position.copy(frame.placement.position);
       paletteRoot.quaternion.copy(frame.placement.quaternion);
-      paletteRoot.scale.setScalar(frame.placement.scale ?? 1);
+      const placementScale = frame.placement.scale ?? 1;
+      paletteRoot.scale.setScalar(placementScale);
       paletteRoot.updateMatrixWorld(true);
       adapter.setVisible(options.session.get().menuState.isOpen);
       // The adapter animates in milliseconds.
@@ -265,8 +266,8 @@ export function createScenePaletteController(options: ScenePaletteControllerOpti
         ?? (activePointerSource?.kind === "desktop-aimer"
           ? resolvePalettePlanePoint(adapter.root, activePointerSource.object)
           : undefined);
-      updatePaletteHitMarker(paletteHitMarker, adapter.root, cursorPoint);
-      updatePaletteTooltip(paletteTooltip, adapter.root, paletteHit?.point, paletteHit?.tooltipLabel);
+      updatePaletteHitMarker(paletteHitMarker, adapter.root, cursorPoint, placementScale);
+      updatePaletteTooltip(paletteTooltip, adapter.root, paletteHit?.point, paletteHit?.tooltipLabel, placementScale);
       // Activate on the press edge, not the release.
       if (paletteHit?.action && activePointer?.selectStarted) {
         paletteHit.action();
@@ -391,19 +392,22 @@ function createPaletteHitMarker(): THREE.Mesh<THREE.CircleGeometry, THREE.MeshBa
 }
 
 // Place the marker on the panel surface, offset 2 mm along the panel normal; hide it when there is no point.
+// The marker's size and offset follow the placement scale, like the panel itself.
 function updatePaletteHitMarker(
   marker: THREE.Mesh,
   paletteSurface: THREE.Object3D,
   point: THREE.Vector3 | undefined,
+  scale: number,
 ): void {
   if (!point) {
     marker.visible = false;
     return;
   }
 
+  marker.scale.setScalar(scale);
   paletteSurface.getWorldQuaternion(marker.quaternion);
   menuSurfaceNormal.set(0, 0, 1).applyQuaternion(marker.quaternion).normalize();
-  marker.position.copy(point).addScaledVector(menuSurfaceNormal, 0.002);
+  marker.position.copy(point).addScaledVector(menuSurfaceNormal, 0.002 * scale);
   marker.visible = true;
   marker.updateMatrixWorld(true);
 }
@@ -547,11 +551,13 @@ function createPaletteTooltip(): PaletteTooltip {
 }
 
 // Show the tooltip near the hit point, offset 6 mm off the panel and 4 cm up and right; hide it without a point or label.
+// The tooltip's size and offsets follow the placement scale, like the panel itself.
 function updatePaletteTooltip(
   tooltip: PaletteTooltip,
   paletteSurface: THREE.Object3D,
   point: THREE.Vector3 | undefined,
   label: string | undefined,
+  scale: number,
 ): void {
   if (!point || !label) {
     tooltip.root.visible = false;
@@ -559,11 +565,12 @@ function updatePaletteTooltip(
   }
 
   tooltip.update(label);
+  tooltip.root.scale.setScalar(scale);
   paletteSurface.getWorldQuaternion(tooltip.root.quaternion);
   menuSurfaceNormal.set(0, 0, 1).applyQuaternion(tooltip.root.quaternion).normalize();
   tooltip.root.position.copy(point)
-    .addScaledVector(menuSurfaceNormal, 0.006)
-    .add(new THREE.Vector3(0.04, 0.04, 0).applyQuaternion(tooltip.root.quaternion));
+    .addScaledVector(menuSurfaceNormal, 0.006 * scale)
+    .add(new THREE.Vector3(0.04 * scale, 0.04 * scale, 0).applyQuaternion(tooltip.root.quaternion));
   tooltip.root.visible = true;
   tooltip.root.updateMatrixWorld(true);
 }

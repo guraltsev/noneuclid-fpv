@@ -2,7 +2,8 @@
  * Placement math for the XR palette: where the panel floats relative to the head and how it faces the viewer.
  * All positions and quaternions are in the Three.js world frame, in meters; the head pose is the XR viewer pose already converted to world space.
  * The panel target is a fixed offset in head-local space (0.24 m below, 1.44 m ahead), smoothed toward over time and optionally frozen.
- * Also provides the auto-close distance check and facing-quaternion helpers reused elsewhere.
+ * The panel is drawn at VR_PALETTE_SCALE so it keeps its angular size at that distance.
+ * Also provides facing-quaternion helpers reused elsewhere.
  */
 import * as THREE from "three";
 
@@ -42,12 +43,15 @@ export interface VrPalettePlacement {
   readonly anchorKind: VrPaletteAnchorKind;
   readonly position: THREE.Vector3;
   readonly quaternion: THREE.Quaternion;
+  /** Uniform scale of the panel root (and of its tooltip and hover marker); always VR_PALETTE_SCALE. */
+  readonly scale: number;
 }
 
 /**
- * Default head-to-palette distance in meters beyond which the VR palette should auto-close.
+ * Uniform scale of the VR palette. It matches the doubled head offset (0.72 m ahead became 1.44 m), so the palette
+ * keeps the angular size it had at 0.72 m.
  */
-export const VR_PALETTE_AUTO_CLOSE_DISTANCE_METERS = 1;
+export const VR_PALETTE_SCALE = 2;
 
 const upAxis = new THREE.Vector3(0, 1, 0);
 const headOffset = new THREE.Vector3(0, -0.24, -1.44);
@@ -57,6 +61,7 @@ const positiveZFacingFlip = new THREE.Quaternion().setFromAxisAngle(upAxis, Math
 /**
  * Computes where the XR palette should sit this frame: a head-relative target, smoothed from the previous pose.
  * The target is the head position plus the offset (0, -0.24, -1.44) m rotated by the head orientation, facing back toward the head via resolveFacingQuaternion.
+ * The scale is always VR_PALETTE_SCALE, frozen or not.
  * With no previous pose the target is returned directly; with freeze set and a full previous pose, a clone of the previous pose is returned.
  * Never mutates its inputs. Position uses lerp and orientation uses slerp with the same factor.
  */
@@ -70,6 +75,7 @@ export function resolveVrPalettePlacement(options: ResolveVrPalettePlacementOpti
       anchorKind,
       position: options.previousPosition.clone(),
       quaternion: options.previousQuaternion.clone(),
+      scale: VR_PALETTE_SCALE,
     };
   }
 
@@ -85,21 +91,8 @@ export function resolveVrPalettePlacement(options: ResolveVrPalettePlacementOpti
     anchorKind,
     position,
     quaternion,
+    scale: VR_PALETTE_SCALE,
   };
-}
-
-/**
- * Returns whether the head has moved farther than the allowed distance from the palette, meaning the palette should close.
- * Distance is Euclidean in world meters; the limit defaults to VR_PALETTE_AUTO_CLOSE_DISTANCE_METERS and the comparison is strict.
- */
-export function shouldAutoCloseVrPalette(request: {
-  readonly headPosition: THREE.Vector3;
-  readonly palettePosition: THREE.Vector3;
-  readonly maxDistanceMeters?: number;
-}): boolean {
-  const maxDistanceMeters = request.maxDistanceMeters ?? VR_PALETTE_AUTO_CLOSE_DISTANCE_METERS;
-
-  return request.headPosition.distanceTo(request.palettePosition) > maxDistanceMeters;
 }
 
 // Rotate offset into the head frame, or just copy it when the head has no orientation.

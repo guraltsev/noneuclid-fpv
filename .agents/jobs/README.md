@@ -170,7 +170,7 @@ can run as written. Job 68 (split from job 30) waits for the maintainer.
 | [66](_done/66_measurement_tools_and_flags.md) | Move the measurement tools and the flags into modules | done, needs review | [92](../../_issues/92_measurement_kinds_are_declared_transient.md) |  |
 | [67](_done/67_rigid_floor_patches_and_moduli_readout.md) | Rigid floor patches, Teichmuller steps and a moduli readout for the torus | done, needs review | [95](../../_issues/95_torus_moduli_floor_shears_and_the_deformation_does_not_read_as_moduli_space.md) |  |
 | [68](68_deformation_commit_in_the_step.md) | Commit a deformation inside the engine step (phase 7) | blocked on the maintainer (013 API rows) | - |  |
-| [69](69_vr_palette_scale_at_new_distance.md) | Scale the VR palette to its new distance and remove the unused auto-close check | queued (branch `dev`) | - |  |
+| [69](_done/69_vr_palette_scale_at_new_distance.md) | Scale the VR palette to its new distance and remove the unused auto-close check | done, needs review (branch `dev`) | - |  |
 | [00](00_coordinate_jobs_70_82.md) | Coordinate jobs 70-82 (design 017: discoverable UI and sandbox level design): order, gates, batch report | queued (branch `dev`) | - |  |
 | [70](70_student_vocabulary.md) | One student vocabulary: the vocabulary module, the renames and the retired-terms check | queued | - |  |
 | [71](71_toast_queue.md) | Toasts: a renderer-neutral message queue shown on desktop and in VR | queued | - |  |

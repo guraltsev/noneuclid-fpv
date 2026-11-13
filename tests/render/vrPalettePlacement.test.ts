@@ -1,16 +1,16 @@
 /**
  * VR palette placement (src/render/three/vrPalettePlacement.ts): the in-scene palette floats at a head-relative
  * target (0, -0.24, -1.44) m from the headset, facing back toward it, smoothed from the previous pose; freezing
- * keeps it at its previous pose instead. The palette auto-closes once the headset moves more than
- * `VR_PALETTE_AUTO_CLOSE_DISTANCE_METERS` away from it. `resolveFrontFacingQuaternion` orients a tooltip plane's
+ * keeps it at its previous pose instead. The placement always carries scale `VR_PALETTE_SCALE` (2), so the panel
+ * keeps the angular size it had at half the distance. `resolveFrontFacingQuaternion` orients a tooltip plane's
  * front face toward a target position.
  */
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import {
+  VR_PALETTE_SCALE,
   resolveFrontFacingQuaternion,
   resolveVrPalettePlacement,
-  shouldAutoCloseVrPalette,
 } from "../../src/render/three/vrPalettePlacement";
 
 describe("vrPalettePlacement", () => {
@@ -47,19 +47,23 @@ describe("vrPalettePlacement", () => {
     expect(placement.position.toArray()).toEqual([1, 2, 3]);
   });
 
-  it("auto-closes once the headset moves more than a meter from the fixed panel", () => {
-    expect(
-      shouldAutoCloseVrPalette({
-        headPosition: new THREE.Vector3(0, 1.6, 0),
-        palettePosition: new THREE.Vector3(0, 1.6, 0.99),
-      }),
-    ).toBe(false);
-    expect(
-      shouldAutoCloseVrPalette({
-        headPosition: new THREE.Vector3(0, 1.6, 0),
-        palettePosition: new THREE.Vector3(0, 1.6, 1.01),
-      }),
-    ).toBe(true);
+  it("draws the panel at twice its size, frozen or not, to match the doubled distance", () => {
+    expect(VR_PALETTE_SCALE).toBe(2);
+
+    const unfrozen = resolveVrPalettePlacement({
+      head: { position: new THREE.Vector3(0, 1.6, 0), quaternion: new THREE.Quaternion() },
+      previousPosition: new THREE.Vector3(0, 1.4, -1.4),
+      previousQuaternion: new THREE.Quaternion(),
+    });
+    const frozen = resolveVrPalettePlacement({
+      head: { position: new THREE.Vector3(0, 1.6, 0) },
+      previousPosition: new THREE.Vector3(1, 2, 3),
+      previousQuaternion: new THREE.Quaternion(0, 0, 0, 1),
+      freeze: true,
+    });
+
+    expect(unfrozen.scale).toBe(2);
+    expect(frozen.scale).toBe(2);
   });
 
   it("can orient tooltip planes so their front faces the headset", () => {
