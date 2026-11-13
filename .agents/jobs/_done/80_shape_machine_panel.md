@@ -59,7 +59,7 @@ The panel matches the decisions, checks pass, commit on `dev`, report appended.
 
 ### Done
 
-The shape machine page now matches the decisions. Commit: COMMIT_HASH (branch `dev`).
+The shape machine page now matches the decisions. Commit: 385e5d3 (branch `dev`).
 
 - Picture (`src/render/three/palette/latticeDiagram.ts`): one parallelogram, current outline white, target green, the
   target's top side labelled "Shift 15.0 m" and its left side "Height 15.0 m" (one decimal), the "Same world as the
