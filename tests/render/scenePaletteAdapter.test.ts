@@ -74,10 +74,12 @@ describe("scenePaletteAdapter", () => {
     expect(itemIds).not.toContain("go-home");
     expect(itemIds).not.toContain("reload-world");
     expect(itemIds).not.toContain("geodesic-cannon-action:rotate:g-a");
-    expect(itemIds).not.toContain("geodesic-cannon-action:aim:g-a");
+    // A linked beam keeps its Aim button, greyed out and inert, with the reason under it.
+    expect(itemIds).toContain("geodesic-cannon-action:aim:g-a");
     expect(itemIds).toContain("geodesic-cannon-action:delete:g-a");
     expect(actionIds).not.toContain("geodesic-cannon-action:rotate:g-a");
     expect(actionIds).not.toContain("geodesic-cannon-action:aim:g-a");
+    expect(collectDisabledReasons(adapter.root)).toContain("Linked beams cannot be aimed");
     expect(actionIds).toContain("geodesic-cannon-action:delete:g-a");
     expect(imageSources).toContain(publicAssetUrl("icons/lock.png"));
 
@@ -172,6 +174,20 @@ function collectPaletteItemIds(root: { readonly children: readonly any[]; readon
   };
   visit(root);
   return ids;
+}
+
+function collectDisabledReasons(root: { readonly children: readonly any[]; readonly userData?: Record<string, unknown> }): string[] {
+  const reasons: string[] = [];
+  const visit = (node: { readonly children?: readonly any[]; readonly userData?: Record<string, unknown> }) => {
+    if (typeof node.userData?.scenePaletteDisabledReason === "string") {
+      reasons.push(node.userData.scenePaletteDisabledReason);
+    }
+    for (const child of node.children ?? []) {
+      visit(child);
+    }
+  };
+  visit(root);
+  return reasons;
 }
 
 function collectPaletteImageSources(root: { readonly children: readonly any[]; readonly userData?: Record<string, unknown> }): string[] {

@@ -2,7 +2,7 @@
  * Resolves the tooltip text for palette items from their string item ids.
  * Item ids are namespaced strings produced by the palette renderers (for example "tool:placedFlags/flag", "geodesic-cannon-action:rotate:<id>", "sign-key:A"); this module is the single place that turns them into human-readable labels, so desktop and VR show the same tooltips. It is a pure lookup with no state.
  */
-import { mainMenuText, objectActions, surfaceNames, toolNames } from "../world-objects/vocabulary";
+import { mainMenuText, menuControlText, objectActions, surfaceNames, toolNames } from "../world-objects/vocabulary";
 
 /** The tooltips of the main menu buttons (design 017 section 7.5), by the id after "main-menu:". */
 const mainMenuTooltips: Readonly<Record<string, string | undefined>> = {
@@ -84,7 +84,9 @@ const fixedTooltips: Readonly<Record<string, string>> = {
   "debug-settings": "Debug settings",
   "debug-tools-toggle": "Debug tools",
   "tool-options:place-sign": "Sign options",
-  "geodesic-cannon-action:add-geodesic": objectActions.addBeam,
+  "geodesic-cannon-action:add-geodesic": "Fire one more beam from this laser",
+  "geodesic-cannon-action:delete-laser": menuControlText.deleteLaserTooltip,
+  "measurement-action:delete": menuControlText.deleteMeasurementTooltip,
   "geodesic-cannon-action:carry": `${objectActions.pickUp} the laser: linked beams stay attached, free ones are removed`,
   "sign-action:trash": `${objectActions.delete} sign`,
   "sign-key:Space": "Space",

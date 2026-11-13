@@ -9,6 +9,7 @@
 import * as THREE from "three";
 import type { RuntimeInputFrame } from "../../interaction/inputFrame";
 import type { AppConfig } from "../../glue/appConfig";
+import type { XrLayout } from "../../glue/xrLayout";
 import type { ClientSession } from "../../runtime/clientSession";
 import type { ToolsById } from "../../runtime/toolRegistry";
 import { createPaletteDefinitionCache } from "../../ui/paletteDefinition";
@@ -130,8 +131,8 @@ export function createDesktopInputHandlers(deps: DesktopInputHandlersDeps): Desk
   const paletteHeadQuaternionScratch = new THREE.Quaternion();
   let previousDesktopPalettePlacement: ReturnType<typeof resolveDesktopScenePalettePlacement> | undefined;
 
-  function paletteDefinitionFrame(inputMode: "xr" | "desktop") {
-    const cached = paletteDefinitionCache.get(currentMenuState(), inputMode);
+  function paletteDefinitionFrame(inputMode: "xr" | "desktop", xrLayout?: XrLayout) {
+    const cached = paletteDefinitionCache.get(currentMenuState(), inputMode, undefined, xrLayout);
     return { definition: cached.definition, definitionVersion: cached.version };
   }
 
@@ -173,7 +174,7 @@ export function createDesktopInputHandlers(deps: DesktopInputHandlersDeps): Desk
           referenceSpaceToWorldMatrix: xrRig.root.matrixWorld,
           inputSources: handUi.paletteSources as readonly XRInputSource[],
         }),
-        ...paletteDefinitionFrame("xr"),
+        ...paletteDefinitionFrame("xr", frame.xrLayout),
         placement,
       });
       xrControllerHandModels.update({

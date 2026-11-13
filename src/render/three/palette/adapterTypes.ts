@@ -53,6 +53,10 @@ export interface ScenePaletteAdapterOptions {
   readonly onGeodesicCannonRotateRequested?: (cannonId: string, geodesicId?: string) => void;
   readonly onGeodesicCannonAimRequested?: (cannonId: string, geodesicId?: string) => void;
   readonly onGeodesicCannonDeleteRequested?: (cannonId: string, geodesicId: string) => void;
+  /** The Delete button of a laser's menu: the laser and its beams. */
+  readonly onGeodesicCannonDeleteLaserRequested?: (cannonId: string) => void;
+  /** The Delete button of a measurement's menu. */
+  readonly onMeasurementDeleteRequested?: (measurementKind: "length" | "angle", measurementId: string) => void;
   /** Geometry computer page callbacks (the set-target callback is part of the contract but not invoked by this adapter). Deltas and targets are in meters. */
   readonly onGeometryComputerStepTargetRequested?: (computerId: string, axis: "a" | "b", deltaMeters: number) => void;
   readonly onGeometryComputerGoRequested?: (computerId: string) => void;

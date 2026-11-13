@@ -213,7 +213,7 @@ describe("the tie tool in an experience", () => {
 
     expect(actions).toEqual([expect.objectContaining({ actionId: "tie-and-detach", label: "Join", iconId: "tie-and-detach", enabled: true })]);
     expect(findObjectActionTool(toolsById, "geodesicEmitters/emitter", "tie-and-detach")?.id).toBe(geodesicTieToolId);
-    expect(objectActionsFor(toolsById, "geodesicEmitters/emitter", "nobody", () => context)[0]?.enabled).toBe(false);
+    expect(objectActionsFor(toolsById, "geodesicEmitters/emitter", "nobody", () => context)[0]).toMatchObject({ enabled: false, disabledReason: "Needs two linked beams at this laser" });
     expect(objectActionsFor(toolsById, "asset", "e2", () => context)).toEqual([]);
   });
 

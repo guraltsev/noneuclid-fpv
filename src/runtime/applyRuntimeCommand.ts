@@ -40,6 +40,7 @@ import {
   showRuntimeMenuEditSign,
   showRuntimeMenuGeodesicCannonActions,
   showRuntimeMenuGeometryComputerActions,
+  showRuntimeMenuMeasurementActions,
   showRuntimeMenuGoal,
   showRuntimeMenuMainPage,
   showRuntimeMenuPlaceFlagOptions,
@@ -97,6 +98,7 @@ export function reduceRuntimeCommand(state: ClientSessionState, command: Runtime
       if (
         menu.page === "main" ||
         menu.page === "edit-sign" ||
+        menu.page === "measurement-actions" ||
         menu.page === "geodesic-cannon-actions" ||
         menu.page === "geometry-computer-actions" ||
         menu.page === "question-help"
@@ -114,6 +116,11 @@ export function reduceRuntimeCommand(state: ClientSessionState, command: Runtime
       return toolEnabled("placedFlags/flag") ? withMenu(showRuntimeMenuPlaceFlagOptions(menu), syncPalette) : nothing;
     case "show-edit-sign":
       return withMenu(showRuntimeMenuEditSign(menu, { flagId: command.flagId, message: command.message }), syncPalette);
+    case "show-measurement-actions":
+      return withMenu(
+        showRuntimeMenuMeasurementActions(menu, { measurementId: command.measurementId, measurementKind: command.measurementKind }),
+        syncPalette,
+      );
     case "show-geodesic-cannon-actions": {
       const { kind: _kind, ...payload } = command;
       return withMenu(showRuntimeMenuGeodesicCannonActions(menu, payload), syncPalette);
@@ -285,6 +292,8 @@ export function reduceRuntimeCommand(state: ClientSessionState, command: Runtime
       // The world decides whether the tool is allowed (the tool request); nothing is checked here.
       return effectsOnly({ ...command });
     case "delete-geodesic-from-cannon":
+    case "delete-laser":
+    case "delete-measurement":
     case "step-geometry-computer-target":
     case "start-geometry-computer-deformation":
     case "type-sign-character":

@@ -14,6 +14,7 @@ import {
   type GeodesicEmitterDeleteGeodesicCommand,
   type GeodesicEmitterExtendCommand,
   type GeodesicEmitterPlaceCommand,
+  type GeodesicEmitterRemoveCommand,
   type GeodesicEmittersResult,
   type GeodesicEmitterShootCommand,
 } from "./api";
@@ -85,6 +86,10 @@ function onResult(tool: ToolContext, result: CommandResult): void {
     case "geodesicDeleted":
       if (pageEmitterId !== undefined) tool.showObjectPage(pageEmitterId);
       return;
+    case "removed":
+      // The laser is gone, so its page has nothing to show and closes.
+      if (pageEmitterId !== undefined) tool.showObjectPage(pageEmitterId);
+      return;
   }
 }
 
@@ -101,6 +106,14 @@ export function requestGeodesicDeletion(tool: ToolContext, emitterId: string, ar
   tool.setToolState(moduleId, { pageEmitterId: emitterId } satisfies EmitterToolState);
   const deletion: GeodesicEmitterDeleteGeodesicCommand = { kind: "geodesicEmitters/deleteGeodesic", emitterId, arcId };
   tool.submit(deletion);
+}
+
+/** The emitter's menu page asks to delete the laser and its beams; the page closes when the world has answered. */
+export function requestLaserRemoval(tool: ToolContext, emitterId: string): void {
+  if (tool.commandInFlight()) return;
+  tool.setToolState(moduleId, { pageEmitterId: emitterId } satisfies EmitterToolState);
+  const removal: GeodesicEmitterRemoveCommand = { kind: "geodesicEmitters/remove", emitterId };
+  tool.submit(removal);
 }
 
 /** A click on a free geodesic asks to lengthen it. False, asking nothing, for a geodesic that connects emitters or is tied: a click on one means nothing. */

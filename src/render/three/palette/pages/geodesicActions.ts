@@ -7,7 +7,7 @@ import type { PaletteDefinition } from "../../../../ui/paletteDefinition";
 import type { ScenePaletteAdapterOptions } from "../adapterTypes";
 import { actionColor, borderColor, inactiveColor, scrollbarBorderColor, scrollbarColor, sectionColor, textColor } from "../tokens";
 import { createGeodesicCannonActionIcon, createConnectedGeodesicSegmentStatus } from "../icons";
-import { createButtonText, createInteractiveSurface, createSectionLabel } from "../widgets";
+import { createButtonText, createInteractiveSurface, createSectionLabel, withDisabledReason } from "../widgets";
 import { objectActions, toolNames } from "../../../../world-objects/vocabulary";
 
 /**
@@ -48,7 +48,7 @@ export function buildGeodesicCannonActionsContent(
   for (const geodesic of content.geodesics) {
     const row = new Container({
       width: "100%",
-      height: 58,
+      minHeight: 58,
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
@@ -62,17 +62,18 @@ export function buildGeodesicCannonActionsContent(
     row.add(createButtonText(geodesic.label, 18));
 
     const deleteButton = createInteractiveSurface({
-      width: 46,
+      width: 112,
       height: 42,
-      label: "",
+      label: objectActions.delete,
+      labelFontSize: 16,
       disabled: geodesic.deleteDisabled,
       backgroundColor: geodesic.deleteDisabled ? "#334155" : "#7f1d1d",
       onClick: () => options.onGeodesicCannonDeleteRequested?.(content.cannonId, geodesic.id),
     });
     deleteButton.userData.scenePaletteItemId = `geodesic-cannon-action:delete:${geodesic.id}`;
     deleteButton.add(new Trash2({
-      width: 24,
-      height: 24,
+      width: 22,
+      height: 22,
       color: textColor,
       fill: textColor,
     }));
@@ -92,23 +93,21 @@ export function buildGeodesicCannonActionsContent(
       row.add(status);
     }
 
-    if (!geodesic.connected) {
-      const aimButton = createInteractiveSurface({
-        width: 112,
-        height: 42,
-        label: objectActions.aim,
-        labelFontSize: 16,
-        disabled: false,
-        backgroundColor: actionColor,
-        onClick: () => options.onGeodesicCannonAimRequested?.(content.cannonId, geodesic.id),
-      });
-      aimButton.userData.scenePaletteItemId = `geodesic-cannon-action:aim:${geodesic.id}`;
-      aimButton.add(createGeodesicCannonActionIcon("aim"));
+    // A linked beam cannot be aimed: its Aim button stays, greyed out, with the reason under it.
+    const aimButton = createInteractiveSurface({
+      width: 112,
+      height: 42,
+      label: objectActions.aim,
+      labelFontSize: 16,
+      disabled: geodesic.aimDisabled,
+      backgroundColor: actionColor,
+      onClick: () => options.onGeodesicCannonAimRequested?.(content.cannonId, geodesic.id),
+    });
+    aimButton.userData.scenePaletteItemId = `geodesic-cannon-action:aim:${geodesic.id}`;
+    aimButton.add(createGeodesicCannonActionIcon("aim"));
+    row.add(withDisabledReason(aimButton, geodesic.aimDisabled ? geodesic.aimDisabledReason : undefined, geodesic.aimDisabled ? 180 : 112));
 
-      row.add(aimButton);
-    }
-
-    row.add(deleteButton);
+    row.add(withDisabledReason(deleteButton, geodesic.deleteDisabled ? geodesic.deleteDisabledReason : undefined, geodesic.deleteDisabled ? 180 : 112));
     list.add(row);
   }
 

@@ -83,7 +83,7 @@ describe("worldInteractionDefinition", () => {
     })?.actions).toMatchObject([{ id: "select-protractor-side", label: "Pick beam" }]);
   });
 
-  it("emits primary remove for measurements and angles", () => {
+  it("opens the measurement menu for measurements and angles", () => {
     expect(createWorldFocusMessageDefinition({
       object: {
         ...baseObjectFields("measurement-a", "geodesicMeasurements/length", "G1 length = 5 m"),
@@ -92,7 +92,7 @@ describe("worldInteractionDefinition", () => {
         labelPoint: { x: 0, y: 0, z: 0 },
       } as RuntimeWorldObject,
       selectedTool: "none",
-    })?.actions).toMatchObject([{ id: "remove-measurement", intent: "primary", label: "Delete" }]);
+    })?.actions).toMatchObject([{ id: "open-object-menu", intent: "context-menu", label: "Measurement menu" }]);
 
     expect(createWorldFocusMessageDefinition({
       object: {
@@ -106,7 +106,7 @@ describe("worldInteractionDefinition", () => {
         radiusMeters: 0.3,
       } as RuntimeWorldObject,
       selectedTool: "none",
-    })?.actions).toMatchObject([{ id: "remove-angle", intent: "primary", label: "Delete measurement" }]);
+    })?.actions).toMatchObject([{ id: "open-object-menu", intent: "context-menu", label: "Measurement menu" }]);
   });
 });
 

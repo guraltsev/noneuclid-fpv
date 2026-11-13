@@ -65,7 +65,7 @@ export interface RuntimeObjectActionsDeps {
   findFocusedRuntimeObject(ray?: RootAimRay): FocusedRuntimeObject | undefined;
   /** Asks the world to lengthen a free geodesic; false, asking nothing, when a click on it means nothing. */
   extendGeodesic(arcId: string): boolean;
-  /** Maps geodesic ids to their display names for menus. */
+  /** Maps geodesic ids to their rows in the Laser menu ("Beam 1 · 4.0 m · free"). */
   getGeodesicLabelsById(geodesicIds: readonly string[]): Readonly<Record<string, string>>;
   /** Ids among the given geodesics that are connected. */
   getConnectedGeodesicIds(geodesicIds: readonly string[]): readonly string[];
@@ -77,9 +77,9 @@ export interface RuntimeObjectActionsDeps {
   setFlagMessage(flagId: string, message: string): void;
   /** Asks the world to remove a sign. */
   removeFlag(flagId: string): void;
-  /** Asks the world to remove a length, after a click on its label. */
+  /** Asks the world to remove a length, from its menu's Delete button. */
   removeLength(lengthId: string): void;
-  /** Asks the world to remove an angle, after a click on its label. */
+  /** Asks the world to remove an angle, from its menu's Delete button. */
   removeAngle(angleId: string): void;
   /** Drops every geodesic object and clears the cannon tool state (world reset). */
   removeGeodesicRuntimeObjects(): void;
@@ -97,7 +97,9 @@ export interface RuntimeObjectActions {
   backspaceEditingSignMessage(): void;
   /** Deletes the sign being edited and closes the menu. */
   deleteEditingSign(): void;
-  /** Primary action on the focused object (help, extend, remove a label); true when it did something. */
+  /** Deletes a measurement from its menu's Delete button, and closes the menu. */
+  deleteMeasurement(measurementKind: "length" | "angle", measurementId: string): void;
+  /** Primary action on the focused object (help, extend; or the menu of what has no main action); true when it did something. */
   tryUseFocusedObjectPrimaryInteraction(ray?: RootAimRay): boolean;
   /**
    * Secondary action: closes (goes back in) an open menu, else opens the focused object's menu. With nothing to open, the VR path opens the main menu; with `objectOnly` (desktop) nothing opens and the result is "nothing", so the caller can say so.
@@ -281,24 +283,10 @@ export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): Runt
     clearProtractorToolFeedback();
   }
 
-  function tryRemoveFocusedProtractorAngle(ray?: RootAimRay): boolean {
-    const focused = findFocusedRuntimeObject(ray);
-    if (focused?.object.kind !== "geodesicMeasurements/angle") {
-      return false;
-    }
-
-    deps.removeAngle(focused.object.id);
-    return true;
-  }
-
-  function tryRemoveFocusedMeasuredGeodesicLength(ray?: RootAimRay): boolean {
-    const focused = findFocusedRuntimeObject(ray);
-    if (focused?.object.kind !== "geodesicMeasurements/length") {
-      return false;
-    }
-
-    deps.removeLength(focused.object.id);
-    return true;
+  function deleteMeasurement(measurementKind: "length" | "angle", measurementId: string): void {
+    if (measurementKind === "length") deps.removeLength(measurementId);
+    else deps.removeAngle(measurementId);
+    dispatchRuntimeCommand({ kind: "close-menu" });
   }
 
   function tryUseFocusedObjectPrimaryInteraction(ray?: RootAimRay): boolean {
@@ -318,10 +306,6 @@ export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): Runt
       case "geodesicModel/segment":
         logVerboseAimClick(target);
         return extendGeodesic(target.object.geodesicId);
-      case "geodesicMeasurements/length":
-        return tryRemoveFocusedMeasuredGeodesicLength(ray);
-      case "geodesicMeasurements/angle":
-        return tryRemoveFocusedProtractorAngle(ray);
       default:
         return tryOpenFocusedObjectMenu(ray);
     }
@@ -402,6 +386,15 @@ export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): Runt
       return true;
     }
 
+    if (focused.object.kind === "geodesicMeasurements/length" || focused.object.kind === "geodesicMeasurements/angle") {
+      dispatchRuntimeCommand({
+        kind: "show-measurement-actions",
+        measurementId: focused.object.id,
+        measurementKind: focused.object.kind === "geodesicMeasurements/length" ? "length" : "angle",
+      });
+      return true;
+    }
+
     if (focused.object.kind === "asset" && focused.object.interactable?.action === "open-geometry-computer") {
       dispatchRuntimeCommand({
         kind: "show-geometry-computer-actions",
@@ -436,6 +429,7 @@ export function createRuntimeObjectActions(deps: RuntimeObjectActionsDeps): Runt
     appendEditingSignCharacter,
     backspaceEditingSignMessage,
     deleteEditingSign,
+    deleteMeasurement,
     tryUseFocusedObjectPrimaryInteraction,
     showObjectPage,
     openContextMenuFromAim,

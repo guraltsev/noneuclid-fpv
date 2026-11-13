@@ -21,12 +21,13 @@ export function buildHeader(
   const headerActions = resolveVrPaletteHeaderActions(definition);
   // Home and reload buttons are shown only on the VR main page; on desktop the main menu has them as text buttons.
   const showUtilityActions = definition.content.kind === "main" && definition.content.toolOptions.length > 0;
+  // Top-aligned and at least 48 tall: a disabled action draws its reason under its button, which makes the row taller.
   const header = new Container({
     width: "100%",
-    height: 48,
+    minHeight: 48,
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
+    alignItems: "flex-start",
   });
 
   const leftActions = new Container({
@@ -56,7 +57,7 @@ export function buildHeader(
   if (contextualActions.length > 0) {
     const contextualActionRow = new Container({
       flexDirection: "row",
-      alignItems: "center",
+      alignItems: "flex-start",
       gap: 8,
       flexShrink: 0,
     });
@@ -94,32 +95,51 @@ function createContextualHeaderActions(
     return [
       createHeaderActionButton(
         "geodesic-cannon-action:add-geodesic",
-        "",
+        content.addAction.label,
         () => options.onGeodesicCannonAddRequested?.(content.cannonId),
-        { icon: "add-geodesic", disabled: content.addAction.disabled, width: 52 },
+        { icon: "add-geodesic", disabled: content.addAction.disabled, disabledReason: content.addAction.disabledReason, width: 140 },
       ),
       createHeaderActionButton(
         "geodesic-cannon-action:carry",
-        "",
+        content.carryAction.label,
         () => options.onGeodesicCannonCarryRequested?.(content.cannonId),
-        { icon: "carry", disabled: content.carryAction.disabled, width: 52 },
+        { icon: "carry", disabled: content.carryAction.disabled, disabledReason: content.carryAction.disabledReason, width: 150 },
       ),
       ...content.objectActions.map((action) => createHeaderActionButton(
         `geodesic-cannon-action:${action.actionId}`,
-        "",
+        action.label,
         () => options.onObjectActionRequested?.("geodesicEmitters/emitter", content.cannonId, action.actionId),
-        { icon: headerActionIcon(action.iconId), disabled: !action.enabled, backgroundColor: "#b45309", width: 52, tooltip: action.tooltip },
+        { icon: headerActionIcon(action.iconId), disabled: !action.enabled, disabledReason: action.disabledReason, backgroundColor: "#b45309", width: 100, tooltip: action.tooltip },
       )),
+      createHeaderActionButton(
+        "geodesic-cannon-action:delete-laser",
+        content.deleteAction.label,
+        () => options.onGeodesicCannonDeleteLaserRequested?.(content.cannonId),
+        { icon: "trash", disabled: content.deleteAction.disabled, disabledReason: content.deleteAction.disabledReason, backgroundColor: "#7f1d1d", width: 110, tooltip: content.deleteAction.tooltip },
+      ),
     ];
   }
 
   if (definition.content.kind === "edit-sign") {
+    const content = definition.content;
     return [
       createHeaderActionButton(
         "sign-action:trash",
-        "",
+        content.deleteAction.label,
         () => options.onSignDeleteRequested?.(),
-        { icon: "trash", backgroundColor: "#7f1d1d", width: 52 },
+        { icon: "trash", disabled: content.deleteAction.disabled, disabledReason: content.deleteAction.disabledReason, backgroundColor: "#7f1d1d", width: 110 },
+      ),
+    ];
+  }
+
+  if (definition.content.kind === "measurement-actions") {
+    const content = definition.content;
+    return [
+      createHeaderActionButton(
+        "measurement-action:delete",
+        content.deleteAction.label,
+        () => options.onMeasurementDeleteRequested?.(content.measurementKind, content.measurementId),
+        { icon: "trash", disabled: content.deleteAction.disabled, disabledReason: content.deleteAction.disabledReason, backgroundColor: "#7f1d1d", width: 110, tooltip: content.deleteAction.tooltip },
       ),
     ];
   }

@@ -123,9 +123,6 @@ function primaryActionText(action: WorldInteractionAction, extendLengthMeters: n
       return hintStripText.pickBeam;
     case "select-protractor-vertex":
       return hintStripText.pickMeetingPoint;
-    case "remove-measurement":
-    case "remove-angle":
-      return hintStripText.deleteMeasurement;
     default:
       return action.label;
   }

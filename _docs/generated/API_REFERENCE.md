@@ -788,6 +788,14 @@ The arc index (design 014 section 7.1): which arc ends sit on each anchor, built
 | const | `arcIndex` | Read with `arcIndex.read(registry)`. |
 | const | `computeArcIndex` | The index computed from scratch, for the oracle tests. |
 
+### `world-objects/geodesic/beamRows.ts`
+
+The rows of the Laser menu's beam list (design 017 section 8.5): one readable line per beam, from the registry.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| function | `beamRowLabelsById` | The row text of each of `geodesicIds`, by id. |
+
 ### `world-objects/geodesic/cannon.ts`
 
 Emitter (cannon) operations: shooting, extending and re-aiming geodesics, connecting a geodesic to an emitter, rebuilding connected geodesics between emitters, and placing cannons on the floor, on a geodesic or at a geodesic vertex.
@@ -1277,12 +1285,17 @@ The student vocabulary (design 017 section 6): every student-visible noun, verb 
 | const | `shortIdLetters` | The first letter of a short id: the first letter of the noun (design 017 section 6.1 rule 6). |
 | function | `laserShortId` | The name of laser number `number`: "L1". |
 | function | `signShortId` | The name of sign number `number`: "S1". |
+| function | `laserShortIdOfLabel` | The short id inside a laser's label: "L1" from "Laser L1"; the label itself when it has no short id. |
 | function | `beamName` | What a beam is called in a menu and on a label: "Beam 1". |
 | function | `laserLabel` | The tooltip of a laser: "Laser" with its short id when it has one, "Laser L1". |
 | const | `lostGuidance` | The sentence for a student who is lost. |
 | const | `retiredTerms` | The words that no student-visible string may use (the "Retire" columns of design 017 tables 6.2 and 6.3). |
 | const | `pauseCardText` | The words of the pause card, the desktop main menu (design 017 section 8.1). |
 | const | `mainMenuText` | The words of the main menu's buttons that are not named elsewhere. |
+| const | `disabledReasons` | The reasons a control is greyed out (design 017 section 8.5): every disabled control shows one in small text under it. |
+| const | `menuControlText` | The words of the controls of the object menus (design 017 section 8.5): text on every button, the key or button after a dot. |
+| function | `actionWithKey` | The text of a menu action with its key or button: "Pick up · G"; the bare action without a key. |
+| function | `beamRowLabel` | A beam's row in the Laser menu (design 017 section 8.5): "Beam 1 · 4.0 m · free", "Beam 2 · L1–L3 · linked", "Beam 3 · string" for a beam of a string. |
 | const | `toolBeltText` | The words of the tool belt (design 017 section 7.4) and of the right click that finds nothing to open. |
 | const | `controllersSettingsText` | The "Controllers" section of Settings (VR hand options, design 017 sections 7.2 and 7.3). |
 | const | `vrBeltText` | The words of the VR belt, its toasts and the VR start card (design 017 sections 7.3, 7.4 and 8.1). |
@@ -1711,7 +1724,7 @@ The types of the world engine and of its modules (design 013 sections 5 and 9): 
 | interface | `AimPick` | One thing along the current aim ray, as plain data (the subset of the shell's aim target that tools read). |
 | interface | `ToolContext` | What a tool may do. |
 | interface | `ObjectActionPresentation` | How an action on an object's menu page looks. |
-| interface | `ObjectActionEntry` | An action offered on an object's menu page; `enabled` false shows it disabled. |
+| interface | `ObjectActionEntry` | An action offered on an object's menu page; `enabled` false shows it disabled, with `disabledReason` drawn under it (design 017 section 8.5). |
 | interface | `ToolDescriptor` | The client part of a tool: everything the shell shows and does for it. |
 | interface | `ModuleClient` | The client part of a module: a separate export of the module directory (`geodesicModelClient(options)`). |
 
@@ -1890,6 +1903,7 @@ The geodesic emitters' client part (design 013 sections 8.3 and 9.1): the emitte
 | --- | --- | --- |
 | function | `requestNewGeodesic` | The emitter's menu page asks for a new geodesic; the page shows it when the world has answered. |
 | function | `requestGeodesicDeletion` | The emitter's menu page asks to delete a geodesic; the page shows the emitter without it when the world has answered. |
+| function | `requestLaserRemoval` | The emitter's menu page asks to delete the laser and its beams; the page closes when the world has answered. |
 | function | `requestGeodesicExtension` | A click on a free geodesic asks to lengthen it. |
 | function | `geodesicEmittersClient` | Creates the client part. |
 
@@ -2194,6 +2208,7 @@ Renderer-neutral state machine for the in-game menu, shared by the desktop overl
 | function | `showRuntimeMenuDebugSettings` | Switches to the debug-settings page without changing visibility. |
 | function | `showRuntimeMenuPlaceFlagOptions` | Switches to the place-flag options page without changing visibility. |
 | function | `showRuntimeMenuMainPage` | Returns to the main page, resets the selected tool to "none" and clears all page payloads and editingFlagId. |
+| function | `showRuntimeMenuMeasurementActions` | Opens the menu on the page of one measurement (a length or an angle). |
 | function | `showRuntimeMenuEditSign` | Opens the menu on the edit-sign page for the given flag and message. |
 | function | `showRuntimeMenuGeodesicCannonActions` | Opens the menu on the cannon actions page for the given cannon; geodesicIds defaults to empty. |
 | function | `showRuntimeMenuGeometryComputerActions` | Opens the menu on the geometry-computer page with the computer's availability and the torus measurements (all optional numbers in meters). |
@@ -2359,12 +2374,14 @@ Renderer-neutral definition of the tool/settings palette: createPaletteDefinitio
 | --- | --- | --- |
 | interface | `PaletteSelectOption` | Option of a select-style control: stable id and display label. |
 | interface | `PaletteHeaderAction` | Header button of the palette (left or right slot). |
+| interface | `PaletteTextAction` | A text button of an object menu: its label (with its key or button after a dot), and why it is disabled when it is. |
 | interface | `MainMenuActionEntry` | One entry of the main menu: Help, Settings, Go home or Start over. |
 | interface | `MainPaletteContent` | Content of the main page, the main menu (design 017 section 7.5): Help, Settings, Go home and Start over as text buttons. |
 | interface | `SettingsPaletteContent` | Content of the settings page: world and config pickers, debug entry, comfort and reload. |
 | interface | `DebugSettingsPaletteContent` | Content of the debug-settings page: console log level, overlay items and portal/collision debug switches. |
 | interface | `PlaceFlagOptionsPaletteContent` | Content of the place-flag options page: choice of sign type. |
 | interface | `EditSignPaletteContent` | Content of the edit-sign page for one placed flag. |
+| interface | `MeasurementActionsPaletteContent` | Content of the menu of one measurement (a length or an angle): its words and a Delete button, the one way to remove it (design 017 section 8.5). |
 | interface | `GeodesicCannonActionsPaletteContent` | Content of the geodesic emitter menu: the add and carry actions, the actions tools contribute, and one row per geodesic. |
 | interface | `GeometryComputerActionsPaletteContent` | Content of the world-deformation (geometry computer) page, in whole meters: torus width, current and target (a, b), limits and step buttons. |
 | interface | `PagedHelpControl` | A control row of a tutorial or goal page: the device's input for it and what it does. |
@@ -3129,7 +3146,15 @@ Main palette page, the main menu: Help, Settings, Go home and Start over as text
 
 | Kind | Name | Summary |
 | --- | --- | --- |
-| function | `buildMainContent` | Main page: the main-menu buttons, then (VR only) a row of tool tiles. |
+| function | `buildMainContent` | Main page: the main-menu buttons. |
+
+### `render/three/palette/pages/measurements.ts`
+
+Measurement menu page: the title and one sentence about a length or an angle.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| function | `buildMeasurementActionsContent` | Measurement menu page body: a section label with the menu's title, then the sentence that says what Delete does. |
 
 ### `render/three/palette/pages/signs.ts`
 
@@ -3178,9 +3203,12 @@ Generic uikit widgets of the in-scene palette panel (buttons, toggles, option gr
 | function | `createToggleRow` | Label plus On/Off toggle. |
 | function | `createToggleButton` | On/Off button; clicking calls onToggled with the inverted value of the state captured at build time (state is not read back). |
 | function | `createActionButton` | Generic labelled action button with an optional home/reload icon. |
+| const | `disabledReasonColor` | Color of the reason text under a disabled control: warm, so that it reads as "why", not as a label. |
+| function | `createDisabledReasonText` | The small text that says why a control is disabled (design 017 section 8.5). |
+| function | `withDisabledReason` | A control with its reason under it while it is disabled; the control itself when it is not (or has no reason). |
 | type | `HeaderActionIcon` | The icons a contextual header action can show. |
 | function | `headerActionIcon` | The header icon for an icon id a tool contributed; throws on an id the palette has no icon for. |
-| function | `createHeaderActionButton` | Square icon button for contextual header actions; disabled ones are dimmed and inert. |
+| function | `createHeaderActionButton` | Icon-and-text button for contextual header actions ("+ Add beam", "Pick up · G", "Join", "Delete"); disabled ones are dimmed and inert, with their reason drawn under them. |
 | function | `createInteractiveSurface` | Base clickable Container. |
 | function | `createButtonText` | Bold label text that wraps and may shrink. |
 | function | `disposeRenderedChildren` | Dispose each top-level child tree. |

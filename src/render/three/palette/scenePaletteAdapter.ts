@@ -19,6 +19,7 @@ import { buildGeodesicCannonActionsContent } from "./pages/geodesicActions";
 import { buildGeometryComputerActionsContent } from "./pages/geometryComputer";
 import { buildPagedHelpContent, buildQuestionHelpContent } from "./pages/help";
 import { buildEditSignContent, buildPlaceSignOptionsContent } from "./pages/signs";
+import { buildMeasurementActionsContent } from "./pages/measurements";
 import { buildDebugSettingsContent, buildSettingsContent } from "./pages/debugSettings";
 
 /**
@@ -94,6 +95,10 @@ function buildContent(
 
   if (definition.content.kind === "edit-sign") {
     return buildEditSignContent(definition.content, options);
+  }
+
+  if (definition.content.kind === "measurement-actions") {
+    return buildMeasurementActionsContent(definition.content);
   }
 
   if (definition.content.kind === "geodesic-cannon-actions") {

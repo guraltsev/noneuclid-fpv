@@ -16,7 +16,16 @@ import { getInputHintGlyph, type InputHintGlyph } from "./inputIntents";
 import { publicAssetUrl } from "../glue/assetUrls";
 import { worldCatalog } from "../authoring/worldCatalog";
 import { helpHubHomeGuidance } from "../world-objects/helpHubCopy";
-import { beamName, mainMenuText, objectActions, surfaceNames } from "../world-objects/vocabulary";
+import {
+  actionWithKey,
+  beamName,
+  disabledReasons,
+  mainMenuText,
+  menuControlText,
+  objectActions,
+  surfaceNames,
+} from "../world-objects/vocabulary";
+import type { XrLayout } from "../glue/xrLayout";
 import { portalPanelModeDefinitions } from "../glue/portalPanelMode";
 import type { RuntimeMenuConsoleLogLevelId, RuntimeMenuPageId, RuntimeMenuState } from "../runtime/runtimeMenuState";
 import type { RuntimeDebugOverlayItemId, RuntimeToolId } from "../glue/toolIds";
@@ -38,6 +47,18 @@ export interface PaletteHeaderAction {
   /** Accessible name for the button. */
   readonly ariaLabel: string;
   readonly disabled: boolean;
+  /** Why the button is disabled, drawn under it; every disabled button has one except the inert "none" placeholder. */
+  readonly disabledReason?: string;
+}
+
+/** A text button of an object menu: its label (with its key or button after a dot), and why it is disabled when it is. */
+export interface PaletteTextAction {
+  readonly label: string;
+  readonly disabled: boolean;
+  /** Present whenever `disabled` is true; drawn under the button in small text. */
+  readonly disabledReason?: string;
+  /** The longer explanation shown when the button is pointed at. */
+  readonly tooltip?: string;
 }
 
 /** One entry of the main menu: Help, Settings, Go home or Start over. */
@@ -122,20 +143,29 @@ export interface EditSignPaletteContent {
   readonly message: string;
   /** Maximum number of characters allowed in the sign message. */
   readonly maxLength: number;
+  /** The Delete button of the sign's menu. */
+  readonly deleteAction: PaletteTextAction;
+}
+
+/** Content of the menu of one measurement (a length or an angle): its words and a Delete button, the one way to remove it (design 017 section 8.5). */
+export interface MeasurementActionsPaletteContent {
+  readonly kind: "measurement-actions";
+  readonly measurementId: string;
+  readonly measurementKind: "length" | "angle";
+  readonly title: string;
+  readonly body: string;
+  readonly deleteAction: PaletteTextAction;
 }
 
 /** Content of the geodesic emitter menu: the add and carry actions, the actions tools contribute, and one row per geodesic. */
 export interface GeodesicCannonActionsPaletteContent {
   readonly kind: "geodesic-cannon-actions";
   readonly cannonId: string;
-  readonly addAction: {
-    readonly label: string;
-    readonly disabled: boolean;
-  };
-  readonly carryAction: {
-    readonly label: string;
-    readonly disabled: boolean;
-  };
+  readonly addAction: PaletteTextAction;
+  /** "Pick up · G" on desktop, the layout's button in VR. */
+  readonly carryAction: PaletteTextAction;
+  /** Deletes the laser; its beams go with it. */
+  readonly deleteAction: PaletteTextAction;
   /** The actions the tools contribute to the page (design 013 section 8.3), in order, each with its availability. */
   readonly objectActions: readonly ObjectActionEntry[];
   /**
@@ -147,6 +177,10 @@ export interface GeodesicCannonActionsPaletteContent {
     readonly connected: boolean;
     readonly connectionSymbolLabel?: string;
     readonly deleteDisabled: boolean;
+    readonly deleteDisabledReason?: string;
+    /** Linked beams cannot be aimed; the Aim button is drawn disabled, with its reason. */
+    readonly aimDisabled: boolean;
+    readonly aimDisabledReason?: string;
   }[];
 }
 
@@ -190,14 +224,12 @@ export interface GeometryComputerActionsPaletteContent {
     readonly deltaMeters: number;
     readonly label: string;
     readonly disabled: boolean;
+    readonly disabledReason?: string;
   }[];
   /**
    * The button that starts deforming toward the target; disabled when unavailable or when target equals current.
    */
-  readonly goAction: {
-    readonly label: string;
-    readonly disabled: boolean;
-  };
+  readonly goAction: PaletteTextAction;
 }
 
 /** A control row of a tutorial or goal page: the device's input for it and what it does. */
@@ -225,14 +257,8 @@ export interface TutorialPaletteContent extends PagedHelpExtras {
   readonly title: string;
   readonly body: string;
   readonly pageLabel: string;
-  readonly previousAction: {
-    readonly label: string;
-    readonly disabled: boolean;
-  };
-  readonly nextAction: {
-    readonly label: string;
-    readonly disabled: boolean;
-  };
+  readonly previousAction: PaletteTextAction;
+  readonly nextAction: PaletteTextAction;
 }
 
 /** Content of one goal page, with previous/next paging controls. */
@@ -242,14 +268,8 @@ export interface GoalPaletteContent extends PagedHelpExtras {
   readonly title: string;
   readonly body: string;
   readonly pageLabel: string;
-  readonly previousAction: {
-    readonly label: string;
-    readonly disabled: boolean;
-  };
-  readonly nextAction: {
-    readonly label: string;
-    readonly disabled: boolean;
-  };
+  readonly previousAction: PaletteTextAction;
+  readonly nextAction: PaletteTextAction;
 }
 
 /** Content of the help hub page that offers the tutorial and goal subpages. */
@@ -262,6 +282,7 @@ export interface QuestionHelpPaletteContent {
     readonly id: "tutorial" | "goal";
     readonly label: string;
     readonly disabled: boolean;
+    readonly disabledReason?: string;
   }[];
 }
 
@@ -288,6 +309,7 @@ export interface PaletteDefinition {
     | EditSignPaletteContent
     | GeodesicCannonActionsPaletteContent
     | GeometryComputerActionsPaletteContent
+    | MeasurementActionsPaletteContent
     | TutorialPaletteContent
     | GoalPaletteContent
     | QuestionHelpPaletteContent;
@@ -301,6 +323,7 @@ export function createPaletteDefinition(
   appConfig: AppConfig,
   inputMode: InputMode,
   nowMs: number,
+  xrLayout?: XrLayout,
 ): PaletteDefinition {
   const reloadConfirmationActive = (state.reloadConfirmUntilMs ?? 0) > nowMs;
 
@@ -400,6 +423,24 @@ export function createPaletteDefinition(
         flagId: state.editSignOptions.flagId,
         message: state.editSignOptions.message,
         maxLength: placedFlagMaxMessageLength,
+        deleteAction: { label: menuControlText.delete, disabled: false, tooltip: menuControlText.deleteSignTooltip },
+      },
+    };
+  }
+
+  if (state.page === "measurement-actions" && state.measurementOptions) {
+    return {
+      pageId: "measurement-actions",
+      leftAction: createHeaderAction("none"),
+      rightAction: createHeaderAction("close"),
+      reloadConfirmationActive,
+      content: {
+        kind: "measurement-actions",
+        measurementId: state.measurementOptions.measurementId,
+        measurementKind: state.measurementOptions.measurementKind,
+        title: menuControlText.measurementMenu,
+        body: menuControlText.measurementMenuBody,
+        deleteAction: { label: menuControlText.delete, disabled: false, tooltip: menuControlText.deleteMeasurementTooltip },
       },
     };
   }
@@ -413,8 +454,12 @@ export function createPaletteDefinition(
       content: {
         kind: "geodesic-cannon-actions",
         cannonId: state.geodesicCannonOptions.cannonId,
-        addAction: { label: objectActions.addBeam, disabled: false },
-        carryAction: { label: objectActions.pickUp, disabled: false },
+        addAction: { label: menuControlText.addBeam, disabled: false },
+        carryAction: {
+          label: actionWithKey(objectActions.pickUp, getInputHintGlyph(inputMode, "carry", xrLayout).label),
+          disabled: false,
+        },
+        deleteAction: { label: menuControlText.deleteLaser, disabled: false, tooltip: menuControlText.deleteLaserTooltip },
         objectActions: state.geodesicCannonOptions.objectActions ?? [],
         geodesics: createGeodesicCannonEntries(
           state.geodesicCannonOptions.geodesicIds,
@@ -469,12 +514,12 @@ export function createPaletteDefinition(
           {
             id: "tutorial",
             label: surfaceNames.howTo,
-            disabled: state.questionHelpOptions.tutorialPages.length === 0,
+            ...disabledWhen(state.questionHelpOptions.tutorialPages.length === 0, disabledReasons.nothingForThisWorld),
           },
           {
             id: "goal",
             label: surfaceNames.thingsToTry,
-            disabled: state.questionHelpOptions.goalPages.length === 0,
+            ...disabledWhen(state.questionHelpOptions.goalPages.length === 0, disabledReasons.nothingForThisWorld),
           },
         ],
       },
@@ -506,6 +551,7 @@ export interface PaletteDefinitionCache {
     state: RuntimeMenuState,
     inputMode: InputMode,
     nowMs?: number,
+    xrLayout?: XrLayout,
   ): { readonly definition: PaletteDefinition; readonly version: number };
 }
 
@@ -517,25 +563,28 @@ export interface PaletteDefinitionCache {
 export function createPaletteDefinitionCache(appConfig: AppConfig): PaletteDefinitionCache {
   let lastState: RuntimeMenuState | undefined;
   let lastInputMode: InputMode | undefined;
+  let lastXrLayout: XrLayout | undefined;
   let lastReloadConfirmationActive = false;
   let definition: PaletteDefinition | undefined;
   let version = 0;
   let result: { readonly definition: PaletteDefinition; readonly version: number } | undefined;
 
   return {
-    get(state, inputMode, nowMs = Date.now()) {
+    get(state, inputMode, nowMs = Date.now(), xrLayout) {
       const reloadConfirmationActive = (state.reloadConfirmUntilMs ?? 0) > nowMs;
 
       if (
         result === undefined ||
         state !== lastState ||
         inputMode !== lastInputMode ||
+        xrLayout !== lastXrLayout ||
         reloadConfirmationActive !== lastReloadConfirmationActive
       ) {
         lastState = state;
         lastInputMode = inputMode;
+        lastXrLayout = xrLayout;
         lastReloadConfirmationActive = reloadConfirmationActive;
-        definition = createPaletteDefinition(state, appConfig, inputMode, nowMs);
+        definition = createPaletteDefinition(state, appConfig, inputMode, nowMs, xrLayout);
         version += 1;
         result = { definition, version };
       }
@@ -577,14 +626,8 @@ function createPagedHelpContent(
   };
   const paging = {
     pageLabel: pageCount === 0 ? "0 / 0" : `${pageIndex + 1} / ${pageCount}`,
-    previousAction: {
-      label: "<",
-      disabled: pageIndex <= 0,
-    },
-    nextAction: {
-      label: ">",
-      disabled: pageIndex >= pageCount - 1,
-    },
+    previousAction: { label: menuControlText.previousPage, ...disabledWhen(pageIndex <= 0, disabledReasons.firstPage) },
+    nextAction: { label: menuControlText.nextPage, ...disabledWhen(pageIndex >= pageCount - 1, disabledReasons.lastPage) },
   };
 
   if (kind === "goal") {
@@ -633,7 +676,7 @@ function createGeometryComputerActionsContent(
   const targetB = clampIntegerMeters(options.targetDepthMeters ?? currentB, 0.5 * widthMeters, 2 * widthMeters);
   const statusLabel = available
     ? `Current (${formatMeters(currentA)}, ${formatMeters(currentB)}) / target (${formatMeters(targetA)}, ${formatMeters(targetB)})`
-    : "The shape machine only works in the torus world.";
+    : `${disabledReasons.shapeMachineOnlyInTorus}.`;
   const halfWidthStep = Math.round(widthMeters / 2);
   const start = {
     widthMeters,
@@ -672,18 +715,21 @@ function createGeometryComputerActionsContent(
       maxBMeters: 2 * widthMeters,
     },
     stepActions: [
-      { axis: "a", deltaMeters: -halfWidthStep, label: `A -${formatMeters(halfWidthStep)}`, disabled: !available },
-      { axis: "a", deltaMeters: -1, label: "A -1 m", disabled: !available },
-      { axis: "a", deltaMeters: 1, label: "A +1 m", disabled: !available },
-      { axis: "a", deltaMeters: halfWidthStep, label: `A +${formatMeters(halfWidthStep)}`, disabled: !available },
-      { axis: "b", deltaMeters: -halfWidthStep, label: `B -${formatMeters(halfWidthStep)}`, disabled: !available },
-      { axis: "b", deltaMeters: -1, label: "B -1 m", disabled: !available },
-      { axis: "b", deltaMeters: 1, label: "B +1 m", disabled: !available },
-      { axis: "b", deltaMeters: halfWidthStep, label: `B +${formatMeters(halfWidthStep)}`, disabled: !available },
+      { axis: "a", deltaMeters: -halfWidthStep, label: `A -${formatMeters(halfWidthStep)}`, ...disabledWhen(!available, disabledReasons.shapeMachineOnlyInTorus) },
+      { axis: "a", deltaMeters: -1, label: "A -1 m", ...disabledWhen(!available, disabledReasons.shapeMachineOnlyInTorus) },
+      { axis: "a", deltaMeters: 1, label: "A +1 m", ...disabledWhen(!available, disabledReasons.shapeMachineOnlyInTorus) },
+      { axis: "a", deltaMeters: halfWidthStep, label: `A +${formatMeters(halfWidthStep)}`, ...disabledWhen(!available, disabledReasons.shapeMachineOnlyInTorus) },
+      { axis: "b", deltaMeters: -halfWidthStep, label: `B -${formatMeters(halfWidthStep)}`, ...disabledWhen(!available, disabledReasons.shapeMachineOnlyInTorus) },
+      { axis: "b", deltaMeters: -1, label: "B -1 m", ...disabledWhen(!available, disabledReasons.shapeMachineOnlyInTorus) },
+      { axis: "b", deltaMeters: 1, label: "B +1 m", ...disabledWhen(!available, disabledReasons.shapeMachineOnlyInTorus) },
+      { axis: "b", deltaMeters: halfWidthStep, label: `B +${formatMeters(halfWidthStep)}`, ...disabledWhen(!available, disabledReasons.shapeMachineOnlyInTorus) },
     ],
     goAction: {
       label: "GO!",
-      disabled: !available || (currentA === targetA && currentB === targetB),
+      ...disabledWhen(
+        !available || (currentA === targetA && currentB === targetB),
+        available ? disabledReasons.nothingToChange : disabledReasons.shapeMachineOnlyInTorus,
+      ),
     },
   };
 }
@@ -705,7 +751,14 @@ function createGeodesicCannonEntries(
     connected: connectedIds.has(geodesicId),
     connectionSymbolLabel: connectedIds.has(geodesicId) ? "Linked beam: a beam from one laser to another" : undefined,
     deleteDisabled: false,
+    aimDisabled: connectedIds.has(geodesicId),
+    ...(connectedIds.has(geodesicId) ? { aimDisabledReason: disabledReasons.linkedBeamsCannotBeAimed } : {}),
   }));
+}
+
+/** `{ disabled }` for a control, with `reason` when it is disabled: every disabled control carries its reason. */
+function disabledWhen(disabled: boolean, reason: string): { readonly disabled: boolean; readonly disabledReason?: string } {
+  return disabled ? { disabled, disabledReason: reason } : { disabled };
 }
 
 function formatMeters(value: number): string {

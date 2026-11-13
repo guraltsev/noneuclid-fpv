@@ -345,9 +345,11 @@ export interface ObjectActionPresentation {
   readonly tooltip: string;
 }
 
-/** An action offered on an object's menu page; `enabled` false shows it disabled. */
+/** An action offered on an object's menu page; `enabled` false shows it disabled, with `disabledReason` drawn under it (design 017 section 8.5). */
 export interface ObjectActionEntry extends ObjectActionPresentation {
   readonly enabled: boolean;
+  /** Why the action is disabled, in the student's words; present whenever `enabled` is false. */
+  readonly disabledReason?: string;
 }
 
 /** The client part of a tool: everything the shell shows and does for it. A renderer-free record, in the module directory. */
@@ -380,6 +382,8 @@ export interface ToolDescriptor {
         readonly objectKind: string;
         readonly action: ObjectActionPresentation;
         readonly isAvailable: (objectId: string, tool: ToolContext) => boolean;
+        /** Why the action is unavailable for this object, as a sentence from the vocabulary; read only when `isAvailable` is false. */
+        readonly unavailableReason?: (objectId: string, tool: ToolContext) => string;
       };
   /** The prompt shown while the tool is active, from its client tool state; undefined shows none. */
   readonly prompt?: (tool: ToolContext) => string | undefined;

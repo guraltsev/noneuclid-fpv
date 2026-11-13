@@ -37,6 +37,8 @@ function createHarness() {
     startGeodesicCannonRotation: noop,
     startGeodesicCannonAim: noop,
     deleteGeodesicFromCannon: noop,
+    deleteLaser: noop,
+    deleteMeasurement: noop,
     stepGeometryComputerPendingTarget: noop,
     startGeometryComputerDeformation: noop,
     appendEditingSignCharacter: noop,

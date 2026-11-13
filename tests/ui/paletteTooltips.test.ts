@@ -13,7 +13,7 @@ describe("paletteTooltips", () => {
   it("names global and object palette controls concisely", () => {
     expect(resolvePaletteTooltipLabel("go-home")).toBe("Go home");
     expect(resolvePaletteTooltipLabel("reload-world")).toBe("Start over");
-    expect(resolvePaletteTooltipLabel("geodesic-cannon-action:add-geodesic")).toBe("Add beam");
+    expect(resolvePaletteTooltipLabel("geodesic-cannon-action:add-geodesic")).toBe("Fire one more beam from this laser");
     expect(resolvePaletteTooltipLabel("geodesic-cannon-action:carry")).toBe("Pick up the laser: linked beams stay attached, free ones are removed");
     // The tie action comes from the tie tool's descriptor, and its button carries its own tooltip, so the table has no entry for it.
     expect(resolvePaletteTooltipLabel("geodesic-cannon-action:tie-and-detach")).toBeUndefined();

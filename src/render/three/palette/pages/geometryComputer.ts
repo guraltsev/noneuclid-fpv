@@ -5,7 +5,7 @@ import { Container, Text } from "@pmndrs/uikit";
 import type { PaletteDefinition } from "../../../../ui/paletteDefinition";
 import type { ScenePaletteAdapterOptions } from "../adapterTypes";
 import { actionColor, borderColor, sectionColor, textColor } from "../tokens";
-import { createInteractiveSurface, createSectionLabel } from "../widgets";
+import { createDisabledReasonText, createInteractiveSurface, createSectionLabel, withDisabledReason } from "../widgets";
 import { createWorldDeformationDiagram } from "../latticeDiagram";
 
 /**
@@ -103,6 +103,11 @@ export function buildGeometryComputerActionsContent(
   });
   goButton.userData.scenePaletteItemId = "geometry-computer:go";
 
-  panel.add(presetGrid, goButton);
+  // The step buttons all share one reason (the machine is off in this world): it is drawn once, under the grid.
+  const stepReason = content.stepActions.find((action) => action.disabled)?.disabledReason;
+  if (stepReason !== undefined) {
+    presetGrid.add(createDisabledReasonText(stepReason));
+  }
+  panel.add(presetGrid, withDisabledReason(goButton, content.goAction.disabled ? content.goAction.disabledReason : undefined, "100%"));
   return panel;
 }

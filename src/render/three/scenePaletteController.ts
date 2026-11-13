@@ -16,6 +16,7 @@ import { resolvePaletteTooltipLabel } from "../../ui/paletteTooltips";
 import { roundRect } from "./canvasDrawing";
 import { disposeObject3DWithTextures } from "./runtimeSceneUtils";
 import { createScenePaletteAdapter } from "./palette/scenePaletteAdapter";
+import { scenePalettePanelHeightMeters, scenePalettePanelWidthMeters } from "./scenePaletteLayout";
 import type {
   ScenePaletteInputFrame,
   ScenePalettePlacement,
@@ -91,6 +92,10 @@ export interface ScenePaletteControllerOptions {
   readonly onGeodesicCannonRotateRequested: (cannonId: string, geodesicId?: string) => void;
   readonly onGeodesicCannonAimRequested: (cannonId: string, geodesicId?: string) => void;
   readonly onGeodesicCannonDeleteRequested: (cannonId: string, geodesicId: string) => void;
+  /** The Delete button of a laser's menu: the laser and its beams go. */
+  readonly onGeodesicCannonDeleteLaserRequested?: (cannonId: string) => void;
+  /** The Delete button of a measurement's menu. */
+  readonly onMeasurementDeleteRequested?: (measurementKind: "length" | "angle", measurementId: string) => void;
   /** Geometry computer callbacks take the computer id; targets and deltas are in meters (aMeters/bMeters are the two target coordinates). */
   readonly onGeometryComputerStepTargetRequested: (computerId: string, axis: "a" | "b", deltaMeters: number) => void;
   readonly onGeometryComputerGoRequested: (computerId: string) => void;
@@ -146,6 +151,13 @@ const rayDirection = new THREE.Vector3();
 const raycaster = new THREE.Raycaster();
 const pointerRay = new THREE.Ray();
 const menuSurfaceNormal = new THREE.Vector3();
+const tooltipLocalScratch = new THREE.Vector3();
+/** Width of the tooltip's label plane. */
+const tooltipPlaneWidthMeters = 0.4;
+/** Gap between the panel's top edge and the tooltip. */
+const tooltipEdgeGapMeters = 0.012;
+/** How far the tooltip floats in front of the panel's plane. */
+const tooltipOffPanelMeters = 0.006;
 const palettePlane = new THREE.Plane();
 const palettePlanePoint = new THREE.Vector3();
 const palettePlaneIntersection = new THREE.Vector3();
@@ -210,6 +222,8 @@ export function createScenePaletteController(options: ScenePaletteControllerOpti
     onGeodesicCannonRotateRequested: options.onGeodesicCannonRotateRequested,
     onGeodesicCannonAimRequested: options.onGeodesicCannonAimRequested,
     onGeodesicCannonDeleteRequested: options.onGeodesicCannonDeleteRequested,
+    onGeodesicCannonDeleteLaserRequested: options.onGeodesicCannonDeleteLaserRequested,
+    onMeasurementDeleteRequested: options.onMeasurementDeleteRequested,
     onGeometryComputerStepTargetRequested: options.onGeometryComputerStepTargetRequested,
     onGeometryComputerGoRequested: options.onGeometryComputerGoRequested,
     onQuestionHelpTutorialRequested: options.onQuestionHelpTutorialRequested,
@@ -528,6 +542,8 @@ function findPaletteTooltip(object: THREE.Object3D | null): string | undefined {
 // Hover tooltip object: update(label) rebuilds the label mesh only when the text changes.
 interface PaletteTooltip {
   readonly root: THREE.Object3D;
+  /** Height of the label plane in the tooltip's own units (before the placement scale). */
+  heightMeters(): number;
   update(label: string): void;
   dispose(): void;
 }
@@ -537,15 +553,18 @@ function createPaletteTooltip(): PaletteTooltip {
   root.name = "scene-palette-hover-tooltip";
   root.visible = false;
   let currentLabel = "";
+  let currentHeightMeters = 0;
 
   return {
     root,
+    heightMeters: () => currentHeightMeters,
     update(label) {
       if (label === currentLabel) {
         return;
       }
 
       currentLabel = label;
+      currentHeightMeters = tooltipHeightMeters(label);
       for (const child of [...root.children]) {
         disposeObject3DWithTextures(child);
       }
@@ -559,7 +578,7 @@ function createPaletteTooltip(): PaletteTooltip {
   };
 }
 
-// Show the tooltip near the hit point, offset 6 mm off the panel and 4 cm up and right; hide it without a point or label.
+// Show the tooltip outside the panel's top edge, above the hit point and 6 mm off the panel, so it never covers a sibling control (design 017 section 8.5); hide it without a point or label.
 // The tooltip's size and offsets follow the placement scale, like the panel itself.
 function updatePaletteTooltip(
   tooltip: PaletteTooltip,
@@ -576,12 +595,26 @@ function updatePaletteTooltip(
   tooltip.update(label);
   tooltip.root.scale.setScalar(scale);
   paletteSurface.getWorldQuaternion(tooltip.root.quaternion);
-  menuSurfaceNormal.set(0, 0, 1).applyQuaternion(tooltip.root.quaternion).normalize();
-  tooltip.root.position.copy(point)
-    .addScaledVector(menuSurfaceNormal, 0.006 * scale)
-    .add(new THREE.Vector3(0.04 * scale, 0.04 * scale, 0).applyQuaternion(tooltip.root.quaternion));
+  // In the panel's own frame (meters, origin at its center): above the top edge, as far across as the hit point lets the tooltip stay over the panel's width.
+  const local = paletteSurface.worldToLocal(tooltipLocalScratch.copy(point));
+  const halfTooltipWidth = tooltipPlaneWidthMeters / 2;
+  const halfTooltipHeight = tooltip.heightMeters() / 2;
+  const reach = Math.max(0, scenePalettePanelWidthMeters / 2 - halfTooltipWidth);
+  tooltipLocalScratch.set(
+    Math.min(reach, Math.max(-reach, local.x)),
+    scenePalettePanelHeightMeters / 2 + halfTooltipHeight + tooltipEdgeGapMeters,
+    tooltipOffPanelMeters,
+  );
+  paletteSurface.localToWorld(tooltipLocalScratch);
+  tooltip.root.position.copy(tooltipLocalScratch);
   tooltip.root.visible = true;
   tooltip.root.updateMatrixWorld(true);
+}
+
+// The label plane's height for a label: the canvas grows by one text line per wrapped line, at the plane's width.
+function tooltipHeightMeters(label: string): number {
+  const lines = wrapPaletteTooltipLabel(label);
+  return tooltipPlaneWidthMeters * ((120 + Math.max(0, lines.length - 1) * 46) / 560);
 }
 
 // Draw the wrapped label into a canvas texture and put it on a 0.4 m wide plane; falls back to an empty Object3D without a 2D context.
@@ -613,7 +646,7 @@ function createPaletteTooltipMesh(label: string): THREE.Object3D {
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
-  const planeWidth = 0.4;
+  const planeWidth = tooltipPlaneWidthMeters;
   const mesh = new THREE.Mesh(
     new THREE.PlaneGeometry(planeWidth, planeWidth * (canvas.height / canvas.width)),
     new THREE.MeshBasicMaterial({

@@ -15,12 +15,14 @@ import {
   showRuntimeMenuEditSign,
   showRuntimeMenuGeodesicCannonActions,
   showRuntimeMenuGeometryComputerActions,
+  showRuntimeMenuMeasurementActions,
   showRuntimeMenuPlaceFlagOptions,
   showRuntimeMenuQuestionHelp,
   showRuntimeMenuSettings,
   showRuntimeMenuTutorial,
 } from "../../src/runtime/runtimeMenuState";
 import {
+  createPaletteDefinition,
   type GeodesicCannonActionsPaletteContent,
   type MainPaletteContent,
   type PlaceFlagOptionsPaletteContent,
@@ -191,5 +193,105 @@ describe("createPaletteDefinition", () => {
 
     expect(content).toMatchObject({ kind: "edit-sign", flagId: "sign-a", message: "A\nB" });
     expect((content as { maxLength: number }).maxLength).toBeGreaterThan(0);
+  });
+});
+
+describe("disabled controls in palette definitions", () => {
+  const cube = createRuntimeMenuState({ selectedWorldId: "cube" });
+  const tutorialPages = [
+    { title: "One", body: "First." },
+    { title: "Two", body: "Second." },
+  ];
+
+  /** Every control a definition marks disabled, with the reason it carries ("" when it has none). The inert header placeholder is skipped. */
+  function disabledControls(value: unknown, path = "content"): { path: string; reason: string }[] {
+    if (value === null || typeof value !== "object") return [];
+    if (Array.isArray(value)) return value.flatMap((item, index) => disabledControls(item, `${path}[${index}]`));
+    const record = value as Record<string, unknown>;
+    const found: { path: string; reason: string }[] = [];
+    const reasonOf = (key: string): string => (typeof record[key] === "string" ? (record[key] as string) : "");
+    if (record.id !== "none" && record.disabled === true) found.push({ path, reason: reasonOf("disabledReason") });
+    if (record.enabled === false) found.push({ path, reason: reasonOf("disabledReason") });
+    if (record.deleteDisabled === true) found.push({ path: `${path}.delete`, reason: reasonOf("deleteDisabledReason") });
+    if (record.aimDisabled === true) found.push({ path: `${path}.aim`, reason: reasonOf("aimDisabledReason") });
+    for (const [key, child] of Object.entries(record)) found.push(...disabledControls(child, `${path}.${key}`));
+    return found;
+  }
+
+  const fixtures = (): readonly (readonly [string, ReturnType<typeof createTestPaletteDefinition>])[] => {
+    const geometry = (available: boolean, target: number) => showRuntimeMenuGeometryComputerActions(
+      createRuntimeMenuState({ selectedWorldId: "torus" }),
+      { computerId: "gc", available, widthMeters: 15, currentSkewXMeters: 0, currentDepthMeters: 15, targetSkewXMeters: target, targetDepthMeters: 15 },
+    );
+    return [
+      ["main", createTestPaletteDefinition(cube)],
+      ["settings", createTestPaletteDefinition(showRuntimeMenuSettings(cube))],
+      ["place sign options", createTestPaletteDefinition(showRuntimeMenuPlaceFlagOptions(cube))],
+      ["edit sign", createTestPaletteDefinition(showRuntimeMenuEditSign(cube, { flagId: "s", message: "A" }))],
+      ["laser with a free and a linked beam", createTestPaletteDefinition(showRuntimeMenuGeodesicCannonActions(cube, {
+        cannonId: "c",
+        geodesicIds: ["g-a", "g-b"],
+        connectedGeodesicIds: ["g-b"],
+        objectActions: [
+          { actionId: "tie-and-detach", label: "Join", iconId: "tie-and-detach", tooltip: "Join", enabled: false, disabledReason: "Needs two linked beams at this laser" },
+        ],
+      }))],
+      ["shape machine off", createTestPaletteDefinition(geometry(false, 0))],
+      ["shape machine at target", createTestPaletteDefinition(geometry(true, 0))],
+      ["shape machine with a change", createTestPaletteDefinition(geometry(true, 15))],
+      ["tutorial first page", createTestPaletteDefinition(showRuntimeMenuTutorial(cube, { objectId: "q", pages: tutorialPages, pageIndex: 0, view: "page" }))],
+      ["tutorial last page", createTestPaletteDefinition(showRuntimeMenuTutorial(cube, { objectId: "q", pages: tutorialPages, pageIndex: 1, view: "page" }))],
+      ["help hub with no goals", createTestPaletteDefinition(showRuntimeMenuQuestionHelp(cube, { objectId: "q", tutorialPages, goalPages: [] }))],
+      ["help hub with no tutorial", createTestPaletteDefinition(showRuntimeMenuQuestionHelp(cube, { objectId: "q", tutorialPages: [], goalPages: tutorialPages }))],
+    ];
+  };
+
+  it("gives every disabled control a reason in words", () => {
+    let checked = 0;
+    for (const [name, definition] of fixtures()) {
+      const disabled = [
+        ...disabledControls(definition.content),
+        ...disabledControls({ ...definition.leftAction }, "leftAction"),
+        ...disabledControls({ ...definition.rightAction }, "rightAction"),
+      ];
+      for (const control of disabled) {
+        checked += 1;
+        expect(control.reason.length, `${name}: ${control.path} has no reason`).toBeGreaterThan(3);
+      }
+    }
+    // The walk must see the disabled controls of the fixtures, or it proves nothing.
+    expect(checked).toBeGreaterThanOrEqual(15);
+  });
+
+  it("names the reasons the design asks for", () => {
+    const [, laser] = fixtures().find(([name]) => name.startsWith("laser"))!;
+    const content = laser.content as GeodesicCannonActionsPaletteContent;
+    expect(content.objectActions[0]).toMatchObject({ enabled: false, disabledReason: "Needs two linked beams at this laser" });
+    expect(content.geodesics[1]).toMatchObject({ aimDisabled: true, aimDisabledReason: "Linked beams cannot be aimed" });
+    expect(content.geodesics[0]).toMatchObject({ aimDisabled: false });
+
+    const [, atTarget] = fixtures().find(([name]) => name === "shape machine at target")!;
+    expect((atTarget.content as { goAction: unknown }).goAction).toMatchObject({ disabled: true, disabledReason: "Nothing to change" });
+    const [, withChange] = fixtures().find(([name]) => name === "shape machine with a change")!;
+    expect((withChange.content as { goAction: unknown }).goAction).toEqual({ label: "GO!", disabled: false });
+  });
+
+  it("puts text on the laser menu actions, with the key after a dot", () => {
+    const state = showRuntimeMenuGeodesicCannonActions(cube, { cannonId: "c", geodesicIds: [] });
+    const desktop = createTestPaletteDefinition(state).content as GeodesicCannonActionsPaletteContent;
+    expect(desktop.addAction.label).toBe("+ Add beam");
+    expect(desktop.carryAction.label).toBe("Pick up · G");
+    expect(desktop.deleteAction.label).toBe("Delete");
+
+    const oneLeft = createPaletteDefinition(state, defaultAppConfig, "xr", Date.now(), "one-left").content as GeodesicCannonActionsPaletteContent;
+    expect(oneLeft.carryAction.label).toBe("Pick up · X");
+    const twoControllers = createPaletteDefinition(state, defaultAppConfig, "xr", Date.now(), "two-controllers").content as GeodesicCannonActionsPaletteContent;
+    expect(twoControllers.carryAction.label).toBe("Pick up · A");
+  });
+
+  it("opens the measurement menu with a Delete button", () => {
+    const definition = createTestPaletteDefinition(showRuntimeMenuMeasurementActions(cube, { measurementId: "m1", measurementKind: "length" }));
+    expect(definition.pageId).toBe("measurement-actions");
+    expect(definition.content).toMatchObject({ kind: "measurement-actions", measurementId: "m1", deleteAction: { label: "Delete", disabled: false } });
   });
 });

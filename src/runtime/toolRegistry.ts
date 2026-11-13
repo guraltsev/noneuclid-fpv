@@ -4,6 +4,7 @@
  */
 import type { ModuleClient, ObjectActionEntry, ToolContext, ToolDescriptor } from "../engine/moduleTypes";
 import type { RuntimeToolId } from "../glue/toolIds";
+import { disabledReasons } from "../world-objects/vocabulary";
 
 /** The descriptors by tool id. */
 export type ToolsById = ReadonlyMap<RuntimeToolId, ToolDescriptor>;
@@ -37,7 +38,11 @@ export function objectActionsFor(
   for (const descriptor of toolsById.values()) {
     const entry = descriptor.entry;
     if (entry.kind !== "object-action" || entry.objectKind !== objectKind) continue;
-    entries.push({ ...entry.action, enabled: entry.isAvailable(objectId, contextFor(descriptor.id)) });
+    const context = contextFor(descriptor.id);
+    const enabled = entry.isAvailable(objectId, context);
+    entries.push(enabled
+      ? { ...entry.action, enabled }
+      : { ...entry.action, enabled, disabledReason: entry.unavailableReason?.(objectId, context) ?? disabledReasons.notAvailable });
   }
   return entries;
 }

@@ -11,7 +11,7 @@ import {
   type GeodesicHighlightEndpointCommand,
   type GeodesicTieAndDetachCommand,
 } from "./api";
-import { objectActions, objectNouns, objectSubtitles, toolNames } from "../../world-objects/vocabulary";
+import { disabledReasons, objectActions, objectNouns, objectSubtitles, toolNames } from "../../world-objects/vocabulary";
 
 /** The client tool state of the tie tool (stored under the module id). */
 interface TieToolState {
@@ -102,6 +102,7 @@ export function createTieToolDescriptor(): ToolDescriptor {
         tooltip: "Join two linked beams at this laser into a string that pulls itself tight",
       },
       isAvailable: (emitterId, tool) => tool.query(geodesicModelToken).tieableEnds(emitterId).length >= 2,
+      unavailableReason: () => disabledReasons.joinNeedsTwoLinkedBeams,
     },
     prompt: (tool) => ((tool.getToolState<TieToolState>(moduleId)?.picks.length ?? 0) === 0 ? "select: first beam" : "select: second beam"),
     onPrimaryAction: primaryAction,

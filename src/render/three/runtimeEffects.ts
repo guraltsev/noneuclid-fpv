@@ -36,6 +36,10 @@ export interface RuntimeEffectsDeps {
   startGeodesicCannonRotation(cannonId: string, geodesicId: string | undefined): void;
   startGeodesicCannonAim(cannonId: string, geodesicId: string | undefined): void;
   deleteGeodesicFromCannon(cannonId: string, geodesicId: string): void;
+  /** Deletes a laser and its beams, from its menu's Delete button. */
+  deleteLaser(cannonId: string): void;
+  /** Deletes a measurement, from its menu's Delete button. */
+  deleteMeasurement(measurementKind: "length" | "angle", measurementId: string): void;
   stepGeometryComputerPendingTarget(computerId: string, axis: "a" | "b", deltaMeters: number): void;
   startGeometryComputerDeformation(computerId: string): void;
   appendEditingSignCharacter(character: string): void;
@@ -118,6 +122,12 @@ export function createRuntimeEffects(deps: RuntimeEffectsDeps): RuntimeEffects {
         return;
       case "delete-geodesic-from-cannon":
         deps.deleteGeodesicFromCannon(effect.cannonId, effect.geodesicId);
+        return;
+      case "delete-laser":
+        deps.deleteLaser(effect.cannonId);
+        return;
+      case "delete-measurement":
+        deps.deleteMeasurement(effect.measurementKind, effect.measurementId);
         return;
       case "step-geometry-computer-target":
         deps.stepGeometryComputerPendingTarget(effect.computerId, effect.axis, effect.deltaMeters);

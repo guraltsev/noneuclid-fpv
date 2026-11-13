@@ -184,6 +184,52 @@ export function createActionButton(
   return button;
 }
 
+/** Color of the reason text under a disabled control: warm, so that it reads as "why", not as a label. */
+export const disabledReasonColor = "#fcd34d";
+
+/**
+ * The small text that says why a control is disabled (design 017 section 8.5). It is always drawn while the control is disabled, not only on hover.
+ * `userData.scenePaletteDisabledReason` carries the sentence, so tests and checks can find it without reading pixels.
+ */
+export function createDisabledReasonText(reason: string, width?: number): Text {
+  const text = new Text({
+    text: reason,
+    fontSize: 12,
+    fontWeight: "medium",
+    color: disabledReasonColor,
+    fill: disabledReasonColor,
+    width,
+    flexShrink: 1,
+    wordBreak: "break-word",
+  });
+  text.name = `disabled-reason:${reason}`;
+  text.userData.scenePaletteDisabledReason = reason;
+  return text;
+}
+
+/**
+ * A control with its reason under it while it is disabled; the control itself when it is not (or has no reason).
+ * `width` is the column's width, at least the control's: a short button can have a wider reason.
+ */
+export function withDisabledReason(
+  control: Container,
+  reason: string | undefined,
+  width: number | "100%",
+): Container {
+  if (reason === undefined) {
+    return control;
+  }
+  const column = new Container({
+    width,
+    flexDirection: "column",
+    alignItems: "flex-start",
+    gap: 3,
+    flexShrink: 0,
+  });
+  column.add(control, createDisabledReasonText(reason, typeof width === "number" ? width : undefined));
+  return column;
+}
+
 /** The icons a contextual header action can show. */
 export type HeaderActionIcon = "add-geodesic" | "carry" | "tie-and-detach" | "trash";
 
@@ -196,7 +242,8 @@ export function headerActionIcon(iconId: string): HeaderActionIcon {
 }
 
 /**
- * Square icon button for contextual header actions; disabled ones are dimmed and inert.
+ * Icon-and-text button for contextual header actions ("+ Add beam", "Pick up · G", "Join", "Delete"); disabled ones are dimmed and inert, with their reason drawn under them.
+ * The returned Container is the button alone, or the button above its reason; the clickable surface is inside it.
  */
 export function createHeaderActionButton(
   itemId: string,
@@ -205,17 +252,19 @@ export function createHeaderActionButton(
   options: {
     readonly icon: HeaderActionIcon;
     readonly disabled?: boolean;
+    /** Why the button is disabled; drawn under it while it is. */
+    readonly disabledReason?: string;
     readonly width?: number;
     readonly backgroundColor?: string;
     /** Text shown when the button is pointed at, for buttons whose id has no entry in the tooltip table. */
     readonly tooltip?: string;
   },
 ): Container {
+  const width = options.width ?? 52;
   const button = createInteractiveSurface({
-    width: options.width ?? 52,
+    width,
     height: 44,
-    label,
-    labelFontSize: 13,
+    label: "",
     onClick,
     disabled: options.disabled,
     backgroundColor: options.disabled ? "#334155" : (options.backgroundColor ?? actionColor),
@@ -236,7 +285,14 @@ export function createHeaderActionButton(
   } else {
     button.add(createGeodesicCannonActionIcon(options.icon));
   }
-  return button;
+  if (label) {
+    button.add(createButtonText(label, 14));
+  }
+  return withDisabledReason(
+    button,
+    options.disabled ? options.disabledReason : undefined,
+    Math.max(width, options.disabledReason !== undefined && options.disabled ? 170 : width),
+  );
 }
 
 /**

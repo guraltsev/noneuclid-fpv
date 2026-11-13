@@ -115,7 +115,7 @@ export const defaultStartingQuestionCubeTutorialPages: readonly TutorialPageSpec
   },
   {
     title: "Measure",
-    body: "Ruler: pick it and select a beam to see how long it is, all the way along. Protractor: select a laser or a meeting point, then two beams leaving it; the angle goes counter-clockwise from the first to the second. With the Hand, select a measurement to delete it.",
+    body: "Ruler: pick it and select a beam to see how long it is, all the way along. Protractor: select a laser or a meeting point, then two beams leaving it; the angle goes counter-clockwise from the first to the second. With the Hand, select a measurement to open its menu, then choose Delete.",
     imagePath: "tutorial/measure.jpg",
     requiresTools: ["geodesicMeasurements/length", "geodesicMeasurements/protractor"],
     controls: [

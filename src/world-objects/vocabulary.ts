@@ -110,6 +110,11 @@ export function signShortId(number: number): string {
   return `${shortIdLetters.sign}${number}`;
 }
 
+/** The short id inside a laser's label: "L1" from "Laser L1"; the label itself when it has no short id. */
+export function laserShortIdOfLabel(label: string | undefined): string {
+  return (label ?? "").replace(/^Laser\s+/, "") || "Laser";
+}
+
 /** What a beam is called in a menu and on a label: "Beam 1". */
 export function beamName(number: number): string {
   return `Beam ${number}`;
@@ -198,10 +203,79 @@ export const mainMenuText = {
   startOverConfirm: "Click again to confirm",
 } as const;
 
+/**
+ * The reasons a control is greyed out (design 017 section 8.5): every disabled control shows one in small text under it.
+ */
+export const disabledReasons = {
+  /** Join, with fewer than two linked beams at the laser. */
+  joinNeedsTwoLinkedBeams: "Needs two linked beams at this laser",
+  /** Aim or Extend on a linked beam. */
+  linkedBeamsCannotBeAimed: "Linked beams cannot be aimed",
+  /** The Map slot in a world that has no map. */
+  noMapForWorld: "No map for this world",
+  /** Reshape world, when the target equals the current shape. */
+  nothingToChange: "Nothing to change",
+  /** The shape machine, in a world that is not the torus. */
+  shapeMachineOnlyInTorus: "The shape machine only works in the torus world",
+  /** Previous page, on the first page. */
+  firstPage: "This is the first page",
+  /** Next page, on the last page. */
+  lastPage: "This is the last page",
+  /** A help page button for a topic with no pages in this world. */
+  nothingForThisWorld: "Nothing here for this world",
+  /** A shape machine step button at the end of its range. */
+  atTheLimit: "At the limit",
+  /** The reason of a disabled control that had none given; a test fails on this being needed. */
+  notAvailable: "Not available now",
+} as const;
+
+/** The words of the controls of the object menus (design 017 section 8.5): text on every button, the key or button after a dot. */
+export const menuControlText = {
+  /** "+ Add beam": the plus is a symbol, not the retired word. */
+  addBeam: `+ ${objectActions.addBeam}`,
+  /** The separator between an action and its key or button: "Pick up · G". */
+  keySeparator: " · ",
+  join: objectActions.join,
+  delete: objectActions.delete,
+  /** The paging buttons of the help pages. */
+  previousPage: "Previous",
+  nextPage: "Next",
+  /** The title of the menu of a measurement. */
+  measurementMenu: "Measurement menu",
+  /** The one-line explanation under the title of the measurement menu. */
+  measurementMenuBody: "Choose Delete to remove this measurement.",
+  /** The header Delete of a laser; its tooltip says what goes with it. */
+  deleteLaser: objectActions.delete,
+  deleteLaserTooltip: "Delete this laser; its beams go with it",
+  deleteSignTooltip: "Delete this sign",
+  deleteMeasurementTooltip: "Delete this measurement",
+} as const;
+
+/** The text of a menu action with its key or button: "Pick up · G"; the bare action without a key. */
+export function actionWithKey(action: string, key?: string): string {
+  return key === undefined || key === "" ? action : `${action}${menuControlText.keySeparator}${key}`;
+}
+
+/**
+ * A beam's row in the Laser menu (design 017 section 8.5): "Beam 1 · 4.0 m · free", "Beam 2 · L1–L3 · linked", "Beam 3 · string" for a beam of a string.
+ * `ends` are the short ids of the two lasers a linked beam runs between; `lengthMeters` is shown with one decimal.
+ */
+export function beamRowLabel(number: number, state: { readonly kind: "free"; readonly lengthMeters: number } | { readonly kind: "linked"; readonly ends: readonly [string, string] } | { readonly kind: "string" }): string {
+  const name = beamName(number);
+  switch (state.kind) {
+    case "free":
+      return `${name} · ${state.lengthMeters.toFixed(1)} m · free`;
+    case "linked":
+      return `${name} · ${state.ends[0]}–${state.ends[1]} · linked`;
+    case "string":
+      return `${name} · ${objectNouns.string.singular}`;
+  }
+}
+
 /** The words of the tool belt (design 017 section 7.4) and of the right click that finds nothing to open. */
 export const toolBeltText = {
   /** Why the Map slot is greyed out in a world that has no map. */
-  noMapForWorld: "No map for this world",
+  noMapForWorld: disabledReasons.noMapForWorld,
   /** The toast of a right click or F with nothing aimed at. */
   aimToOpenMenu: "Aim at something to open its menu",
   /** The label of the last slot, which opens the main menu. */
@@ -252,7 +326,6 @@ export const hintStripText = {
   measureBeam: "measure this beam",
   pickBeam: "pick this beam",
   pickMeetingPoint: "pick this meeting point",
-  deleteMeasurement: "delete this measurement",
   /** "extend 2 m": the beam grows by `lengthMeters`; without a length, just "extend". */
   extend: (lengthMeters?: number): string => lengthMeters === undefined ? "extend" : `extend ${lengthMeters} m`,
   /** "put the Laser away": what key 0 does with a tool in hand. */

@@ -1,19 +1,16 @@
 /**
  * Main palette page, the main menu: Help, Settings, Go home and Start over as text buttons (Start over asks for a second press).
- * In VR, until job 77 puts the belt on the wrist, it also holds a row of tool tiles, with the place-flag tile showing the selected sign type.
+ * The tools are on the belt, on desktop and in VR (design 017 section 7.4), so the page draws no tool tiles.
  */
 import { Container } from "@pmndrs/uikit";
-import type { RuntimeToolId } from "../../../../glue/toolIds";
 import type { PaletteDefinition } from "../../../../ui/paletteDefinition";
-import type { PlacedFlagType } from "../../../../world-objects/toolObjects";
 import type { ScenePaletteAdapterOptions } from "../adapterTypes";
-import { actionColor, activeColor, borderColor, inactiveColor, sectionColor } from "../tokens";
-import { createToolIcon } from "../icons";
-import { createButtonText, createInteractiveSurface } from "../widgets";
+import { actionColor, borderColor, sectionColor } from "../tokens";
+import { createInteractiveSurface } from "../widgets";
 import { mainMenuText } from "../../../../world-objects/vocabulary";
 
 /**
- * Main page: the main-menu buttons, then (VR only) a row of tool tiles.
+ * Main page: the main-menu buttons.
  */
 export function buildMainContent(
   content: Extract<PaletteDefinition["content"], { readonly kind: "main" }>,
@@ -51,71 +48,5 @@ export function buildMainContent(
     panel.add(button);
   }
 
-  if (content.toolOptions.length === 0) {
-    return panel;
-  }
-
-  const row = new Container({
-    width: "100%",
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 12,
-  });
-  for (const tool of content.toolOptions) {
-    row.add(createToolTile(
-      tool.id,
-      tool.label,
-      content.selectedTool,
-      options,
-      tool.id === "placedFlags/flag" ? content.placeFlagType : undefined,
-    ));
-  }
-
-  panel.add(row);
   return panel;
-}
-
-// Tool tile button with icon and label; the place-flag tile also gets a small options button.
-function createToolTile(
-  toolId: RuntimeToolId,
-  label: string,
-  selectedTool: RuntimeToolId,
-  options: ScenePaletteAdapterOptions,
-  signType?: PlacedFlagType,
-): Container {
-  const selected = toolId === selectedTool;
-  const button = createInteractiveSurface({
-    width: "23%",
-    height: 150,
-    label: "",
-    labelFontSize: 18,
-    positionType: "relative",
-    flexDirection: "column",
-    backgroundColor: selected ? activeColor : inactiveColor,
-    onClick: () => options.onToolSelected?.(toolId),
-  });
-  button.userData.scenePaletteItemId = `tool:${toolId}`;
-  button.add(createToolIcon(toolId, signType), createButtonText(label, 16));
-  if (toolId === "placedFlags/flag") {
-    button.add(createSignOptionsButton(options));
-  }
-  return button;
-}
-
-// "..." button pinned to the tile's top right corner (absolute position, above the tile via zIndexOffset).
-function createSignOptionsButton(options: ScenePaletteAdapterOptions): Container {
-  const optionsButton = createInteractiveSurface({
-    width: 34,
-    height: 24,
-    label: "...",
-    labelFontSize: 13,
-    positionType: "absolute",
-    positionTop: 8,
-    positionRight: 8,
-    zIndexOffset: 8,
-    backgroundColor: "#0f172a",
-    onClick: () => options.onPlaceFlagOptionsRequested?.(),
-  });
-  optionsButton.userData.scenePaletteItemId = "tool-options:place-sign";
-  return optionsButton;
 }

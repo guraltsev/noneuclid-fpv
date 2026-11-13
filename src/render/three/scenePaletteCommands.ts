@@ -30,7 +30,7 @@ export type ScenePaletteCommands = Pick<
   | "onAimCollisionOutlinesToggled" | "onCopyUrlWithOptionsRequested" | "onToolSelected" | "onHelpRequested" | "onPlaceFlagOptionsRequested"
   | "onPlaceFlagTypeSelected" | "onGeodesicCannonAddRequested" | "onGeodesicCannonCarryRequested"
   | "onObjectActionRequested" | "onGeodesicCannonRotateRequested" | "onGeodesicCannonAimRequested"
-  | "onGeodesicCannonDeleteRequested" | "onGeometryComputerStepTargetRequested" | "onGeometryComputerGoRequested"
+  | "onGeodesicCannonDeleteRequested" | "onGeodesicCannonDeleteLaserRequested" | "onMeasurementDeleteRequested" | "onGeometryComputerStepTargetRequested" | "onGeometryComputerGoRequested"
   | "onQuestionHelpTutorialRequested" | "onQuestionHelpGoalRequested" | "onTutorialPreviousRequested"
   | "onTutorialNextRequested" | "onTutorialPageRequested" | "onGoalPreviousRequested" | "onGoalNextRequested" | "onSignKeyboardCharacter"
   | "onSignKeyboardBackspace" | "onSignDeleteRequested"
@@ -137,6 +137,12 @@ export function createScenePaletteCommands(deps: ScenePaletteCommandsDeps): Scen
     },
     onGeodesicCannonDeleteRequested(cannonId, geodesicId) {
       dispatch({ kind: "delete-geodesic-from-cannon", cannonId, geodesicId });
+    },
+    onGeodesicCannonDeleteLaserRequested(cannonId) {
+      dispatch({ kind: "delete-laser", cannonId });
+    },
+    onMeasurementDeleteRequested(measurementKind, measurementId) {
+      dispatch({ kind: "delete-measurement", measurementKind, measurementId });
     },
     onGeometryComputerStepTargetRequested(computerId, axis, deltaMeters) {
       dispatch({ kind: "step-geometry-computer-target", computerId, axis, deltaMeters });

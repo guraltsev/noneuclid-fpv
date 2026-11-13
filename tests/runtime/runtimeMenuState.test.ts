@@ -183,11 +183,11 @@ describe("runtimeMenuState", () => {
     if (definition.content.kind !== "geodesic-cannon-actions") {
       throw new Error("Expected geodesic cannon actions.");
     }
-    expect(definition.content.addAction).toEqual({ label: "Add beam", disabled: false });
+    expect(definition.content.addAction).toEqual({ label: "+ Add beam", disabled: false });
     expect(definition.content.objectActions).toEqual([]);
     expect(definition.content.geodesics).toEqual([
-      { id: "g-a", label: "Beam 1", connected: false, connectionSymbolLabel: undefined, deleteDisabled: false },
-      { id: "g-b", label: "Beam 2", connected: false, connectionSymbolLabel: undefined, deleteDisabled: false },
+      { id: "g-a", label: "Beam 1", connected: false, connectionSymbolLabel: undefined, deleteDisabled: false, aimDisabled: false },
+      { id: "g-b", label: "Beam 2", connected: false, connectionSymbolLabel: undefined, deleteDisabled: false, aimDisabled: false },
     ]);
   });
 
@@ -221,7 +221,7 @@ describe("runtimeMenuState", () => {
       throw new Error("Expected geodesic cannon actions.");
     }
     expect(definition.content.geodesics).toEqual([
-      { id: "g-b", label: "Beam 2", connected: false, connectionSymbolLabel: undefined, deleteDisabled: false },
+      { id: "g-b", label: "Beam 2", connected: false, connectionSymbolLabel: undefined, deleteDisabled: false, aimDisabled: false },
     ]);
   });
 
@@ -245,6 +245,8 @@ describe("runtimeMenuState", () => {
         connected: true,
         connectionSymbolLabel: "Linked beam: a beam from one laser to another",
         deleteDisabled: false,
+        aimDisabled: true,
+        aimDisabledReason: "Linked beams cannot be aimed",
       },
     ]);
   });
@@ -313,16 +315,16 @@ describe("runtimeMenuState", () => {
       title: "Move",
       body: "Use arrows.",
       pageLabel: "1 / 2",
-      previousAction: { label: "<", disabled: true },
-      nextAction: { label: ">", disabled: false },
+      previousAction: { label: "Previous", disabled: true },
+      nextAction: { label: "Next", disabled: false },
     });
     expect(secondPage.content).toMatchObject({
       kind: "tutorial",
       title: "Act",
       body: "Click things.",
       pageLabel: "2 / 2",
-      previousAction: { label: "<", disabled: false },
-      nextAction: { label: ">", disabled: true },
+      previousAction: { label: "Previous", disabled: false },
+      nextAction: { label: "Next", disabled: true },
     });
   });
 

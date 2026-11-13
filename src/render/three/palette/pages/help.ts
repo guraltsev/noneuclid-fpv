@@ -6,7 +6,7 @@ import { ChevronLeft, ChevronRight } from "@pmndrs/uikit-lucide";
 import type { PagedHelpControl, PaletteDefinition } from "../../../../ui/paletteDefinition";
 import type { ScenePaletteAdapterOptions } from "../adapterTypes";
 import { actionColor, borderColor, mutedTextColor, sectionColor, textColor } from "../tokens";
-import { createInteractiveSurface } from "../widgets";
+import { createButtonText, createInteractiveSurface, withDisabledReason } from "../widgets";
 import { surfaceNames } from "../../../../world-objects/vocabulary";
 
 /**
@@ -69,7 +69,7 @@ export function buildQuestionHelpContent(
       },
     });
     button.userData.scenePaletteItemId = `question-help:${entry.id}`;
-    optionRows.add(button);
+    optionRows.add(withDisabledReason(button, entry.disabled ? entry.disabledReason : undefined, "100%"));
   }
 
   panel.add(optionRows);
@@ -155,14 +155,14 @@ export function buildPagedHelpContent(
 
   const controls = new Container({
     width: "100%",
-    height: 54,
+    minHeight: 54,
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "space-between",
     gap: 12,
   });
   const previousButton = createInteractiveSurface({
-    width: 72,
+    width: 140,
     height: 46,
     label: "",
     disabled: content.previousAction.disabled,
@@ -181,7 +181,7 @@ export function buildPagedHelpContent(
     height: 28,
     color: textColor,
     fill: textColor,
-  }));
+  }), createButtonText(content.previousAction.label, 18));
 
   const pageLabel = new Text({
     text: content.pageLabel,
@@ -193,7 +193,7 @@ export function buildPagedHelpContent(
   });
 
   const nextButton = createInteractiveSurface({
-    width: 72,
+    width: 140,
     height: 46,
     label: "",
     disabled: content.nextAction.disabled,
@@ -207,14 +207,18 @@ export function buildPagedHelpContent(
     },
   });
   nextButton.userData.scenePaletteItemId = `${content.kind}:next`;
-  nextButton.add(new ChevronRight({
+  nextButton.add(createButtonText(content.nextAction.label, 18), new ChevronRight({
     width: 28,
     height: 28,
     color: textColor,
     fill: textColor,
   }));
 
-  controls.add(previousButton, pageLabel, nextButton);
+  controls.add(
+    withDisabledReason(previousButton, content.previousAction.disabled ? content.previousAction.disabledReason : undefined, 140),
+    pageLabel,
+    withDisabledReason(nextButton, content.nextAction.disabled ? content.nextAction.disabledReason : undefined, 140),
+  );
   panel.add(controls);
   return panel;
 }

@@ -7,7 +7,7 @@ import type { RuntimeToolId } from "../glue/toolIds";
 import type { RuntimeWorldObject } from "../world-objects/runtimeObjectRegistry";
 import type { InputIntent, InputMode } from "./inputIntents";
 import { getInputHintGlyph } from "./inputIntents";
-import { objectActions } from "../world-objects/vocabulary";
+import { menuControlText, objectActions } from "../world-objects/vocabulary";
 
 /** Identifier of an action the player may perform on a focused world object. */
 export type WorldInteractionActionId =
@@ -19,8 +19,6 @@ export type WorldInteractionActionId =
   | "measure-length"
   | "select-protractor-side"
   | "select-protractor-vertex"
-  | "remove-measurement"
-  | "remove-angle"
   | "add-geodesic"
   | "carry-emitter"
   | "rotate-geodesic"
@@ -120,13 +118,13 @@ export function createWorldFocusMessageDefinition(
     case "geodesicMeasurements/length":
       return withObjectHelp(options.object, {
         title,
-        actions: [primaryAction("remove-measurement", objectActions.delete)],
+        actions: [contextAction("open-object-menu", menuControlText.measurementMenu)],
         helpTopicId: "measured-length",
       });
     case "geodesicMeasurements/angle":
       return withObjectHelp(options.object, {
         title,
-        actions: [primaryAction("remove-angle", `${objectActions.delete} measurement`)],
+        actions: [contextAction("open-object-menu", menuControlText.measurementMenu)],
         helpTopicId: "protractor-angle",
       });
     case "geodesci-marmot":

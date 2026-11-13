@@ -140,7 +140,8 @@ import {
 } from "./frameDiagnostics";
 import { type FrameRenderSnapshot } from "./frameRenderSnapshot";
 import { createGeodesicRuntimeRenderSources } from "./geodesicCannonRenderer";
-import { requestGeodesicDeletion, requestGeodesicExtension, requestNewGeodesic } from "../../modules/geodesicEmitters/client";
+import { beamRowLabelsById } from "../../world-objects/geodesic/beamRows";
+import { requestGeodesicDeletion, requestGeodesicExtension, requestLaserRemoval, requestNewGeodesic } from "../../modules/geodesicEmitters/client";
 import { geodesicLengthToolId, geodesicMeasurementsModuleId, geodesicProtractorToolId } from "../../modules/geodesicMeasurements/api";
 import { requestAngleRemoval, requestLengthRemoval } from "../../modules/geodesicMeasurements/client";
 import { placedFlagToolId } from "../../modules/placedFlags/api";
@@ -905,7 +906,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       session,
     });
 
-  const { updateGeodesicEmitterLabels, getGeodesicLabelsById } =
+  const { updateGeodesicEmitterLabels } =
     createGeodesicEmitterLabelController({
       engine,
       scene,
@@ -1025,6 +1026,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     appendEditingSignCharacter,
     backspaceEditingSignMessage,
     deleteEditingSign,
+    deleteMeasurement,
     tryUseFocusedObjectPrimaryInteraction,
     showObjectPage,
     openContextMenuFromAim,
@@ -1053,7 +1055,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     logVerboseAimClick,
     findFocusedRuntimeObject,
     extendGeodesic: (arcId) => requestGeodesicExtension(emitterTool(), arcId),
-    getGeodesicLabelsById,
+    getGeodesicLabelsById: (geodesicIds) => beamRowLabelsById(runtimeObjectRegistry, geodesicIds, getConnectedGeodesicIds(geodesicIds)),
     getConnectedGeodesicIds,
     objectActionsFor: (objectKind, objectId) => toolHost.objectActionsFor(objectKind, objectId),
     createGeometryComputerMenuOptions,
@@ -1165,6 +1167,11 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       beginDeletion("geodesicModel/arc");
       requestGeodesicDeletion(emitterTool(), cannonId, geodesicId);
     },
+    deleteLaser: (cannonId) => {
+      beginDeletion("geodesicEmitters/emitter");
+      requestLaserRemoval(emitterTool(), cannonId);
+    },
+    deleteMeasurement,
     requestStartOver: () => {
       startOverRequested = true;
     },

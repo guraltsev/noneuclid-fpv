@@ -29,6 +29,7 @@ export type RuntimeMenuPageId =
   | "debug-settings"
   | "place-flag-options"
   | "edit-sign"
+  | "measurement-actions"
   | "geodesic-cannon-actions"
   | "geometry-computer-actions"
   | "question-help"
@@ -106,6 +107,11 @@ export interface RuntimeMenuState {
   readonly editSignOptions?: {
     readonly flagId: string;
     readonly message: string;
+  };
+  /** Payload of the measurement-actions page: the measurement whose menu is shown. */
+  readonly measurementOptions?: {
+    readonly measurementId: string;
+    readonly measurementKind: "length" | "angle";
   };
   /**
    * Payload of the geodesic-cannon-actions page: cannon id, its geodesics with optional display labels, which are connected, and the actions the tools contribute (with their availability).
@@ -221,6 +227,7 @@ export function closeRuntimeMenu(state: RuntimeMenuState): RuntimeMenuState {
     isOpen: false,
     page: "main",
     editSignOptions: undefined,
+    measurementOptions: undefined,
     geodesicCannonOptions: undefined,
     geometryComputerOptions: undefined,
     tutorialOptions: undefined,
@@ -262,12 +269,29 @@ export function showRuntimeMenuMainPage(state: RuntimeMenuState): RuntimeMenuSta
     ...state,
     page: "main",
     editSignOptions: undefined,
+    measurementOptions: undefined,
     geodesicCannonOptions: undefined,
     geometryComputerOptions: undefined,
     tutorialOptions: undefined,
     goalOptions: undefined,
     questionHelpOptions: undefined,
     editingFlagId: undefined,
+  };
+}
+
+/** Opens the menu on the page of one measurement (a length or an angle). */
+export function showRuntimeMenuMeasurementActions(
+  state: RuntimeMenuState,
+  options: {
+    readonly measurementId: string;
+    readonly measurementKind: "length" | "angle";
+  },
+): RuntimeMenuState {
+  return {
+    ...state,
+    isOpen: true,
+    page: "measurement-actions",
+    measurementOptions: { measurementId: options.measurementId, measurementKind: options.measurementKind },
   };
 }
 

@@ -52,6 +52,8 @@ export type RuntimeCommand =
   | { readonly kind: "show-debug-settings" }
   | { readonly kind: "show-place-flag-options" }
   | { readonly kind: "show-edit-sign"; readonly flagId: string; readonly message: string }
+  /** Opens the menu of one measurement; its Delete button is the one way to remove it. */
+  | { readonly kind: "show-measurement-actions"; readonly measurementId: string; readonly measurementKind: "length" | "angle" }
   | ({ readonly kind: "show-geodesic-cannon-actions" } & ShowGeodesicCannonActionsPayload)
   | ({ readonly kind: "show-geometry-computer-actions" } & ShowGeometryComputerActionsPayload)
   | {
@@ -115,6 +117,10 @@ export type RuntimeCommand =
   | { readonly kind: "start-cannon-rotation"; readonly cannonId: string; readonly geodesicId?: string }
   | { readonly kind: "start-cannon-aim"; readonly cannonId: string; readonly geodesicId?: string }
   | { readonly kind: "delete-geodesic-from-cannon"; readonly cannonId: string; readonly geodesicId: string }
+  /** The Delete button of a laser's menu: the laser and its beams go. */
+  | { readonly kind: "delete-laser"; readonly cannonId: string }
+  /** The Delete button of a measurement's menu. */
+  | { readonly kind: "delete-measurement"; readonly measurementId: string; readonly measurementKind: "length" | "angle" }
   // Geometry computer page actions.
   | {
       readonly kind: "step-geometry-computer-target";
@@ -156,6 +162,8 @@ export type RuntimeEffect =
   | { readonly kind: "start-cannon-rotation"; readonly cannonId: string; readonly geodesicId?: string }
   | { readonly kind: "start-cannon-aim"; readonly cannonId: string; readonly geodesicId?: string }
   | { readonly kind: "delete-geodesic-from-cannon"; readonly cannonId: string; readonly geodesicId: string }
+  | { readonly kind: "delete-laser"; readonly cannonId: string }
+  | { readonly kind: "delete-measurement"; readonly measurementId: string; readonly measurementKind: "length" | "angle" }
   | {
       readonly kind: "step-geometry-computer-target";
       readonly computerId: string;
