@@ -19,6 +19,7 @@ import { resolveDesktopScenePalettePlacement } from "./desktopScenePalettePlacem
 import type { RootAimRay } from "./rootAimRay";
 import type { ScenePaletteController } from "./scenePaletteController";
 import { resolveVrPalettePlacement } from "./vrPalettePlacement";
+import type { Toast } from "../../ui/toastQueue";
 import type { XrControllerHandModels } from "./xrControllerHandModels";
 import type { XrControls } from "./xrControls";
 import type { XrScenePaletteInput } from "./xrScenePaletteInput";
@@ -46,6 +47,8 @@ export interface DesktopInputHandlersDeps {
   readonly desktopScenePaletteInput: Pick<DesktopScenePaletteInput, "update">;
   readonly xrScenePaletteInput: Pick<XrScenePaletteInput, "update">;
   readonly xrControllerHandModels: Pick<XrControllerHandModels, "update">;
+  /** The toasts on screen now; the VR wrist panel draws them. */
+  visibleToasts?(): readonly Toast[];
   /** The aim ray of the desktop crosshair. */
   resolveActiveRootAimRay(xrActive: boolean): RootAimRay | undefined;
   /** Moves the focus to the next aim target under the ray; true when it moved. */
@@ -151,6 +154,7 @@ export function createDesktopInputHandlers(deps: DesktopInputHandlersDeps): Desk
         referenceSpaceToWorldMatrix: xrRig.root.matrixWorld,
         tool: deps.toolsById.get(currentMenuState().selectedTool),
         placeFlagType: currentMenuState().placeFlagOptions.flagType,
+        toasts: deps.visibleToasts?.(),
       });
       return;
     }

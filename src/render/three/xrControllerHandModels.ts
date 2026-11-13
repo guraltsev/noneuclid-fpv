@@ -11,7 +11,9 @@ import { clone as cloneSkeleton } from "three/examples/jsm/utils/SkeletonUtils.j
 import { publicAssetUrl } from "../../glue/assetUrls";
 import type { ToolDescriptor } from "../../engine/moduleTypes";
 import type { PlacedFlagType } from "../../world-objects/toolObjects";
+import { roundRect } from "./canvasDrawing";
 import { xrRigidTransformLocalMatrix } from "./xrPlayerRig";
+import type { Toast } from "../../ui/toastQueue";
 
 /**
  * Per-frame inputs for `XrControllerHandModels.update` (createThreeApp#shell fills these during the XR frame).
@@ -29,6 +31,8 @@ export interface XrControllerHandModelsUpdate {
   readonly tool?: ToolDescriptor;
   /** Sign variant shown when the tool is "placedFlags/flag"; defaults to "WoodenSign1". */
   readonly placeFlagType?: PlacedFlagType;
+  /** Toasts to show in a panel above the right wrist (design 017 section 8.3); absent or empty hides the panel. */
+  readonly toasts?: readonly Toast[];
 }
 
 /**
@@ -57,6 +61,10 @@ const handSideSplitEpsilon = 1e-5;
 const wristToolIndicatorLocalOffset = new THREE.Vector3(0, 0.18, -0.06);
 const wristToolIndicatorScaleMeters = 0.082;
 const wristToolIndicatorRenderOrder = 1004;
+// Toast panel: above the wrist indicator, in the hand's local axes; width in meters (height follows the canvas).
+const toastPanelLocalOffset = new THREE.Vector3(0, 0.3, -0.06);
+const toastPanelWidthMeters = 0.26;
+const toastPanelRenderOrder = 1005;
 const wristToolIndicatorCarryIconSource = publicAssetUrl("icons/carry.svg");
 
 type XrFrameWithJointPose = XRFrame & {
@@ -75,6 +83,8 @@ export function createXrControllerHandModels(scene: THREE.Scene): XrControllerHa
   const loader = new GLTFLoader();
   const instances = new Map<"left" | "right", THREE.Object3D>();
   const rightToolIndicator = createWristToolIndicator();
+  // Created on the first toast, so a session that never shows one (and a test without a DOM) never builds it.
+  let toastPanel: ToastPanel | undefined;
   for (const handedness of ["left", "right"] as const) {
     const anchor = new THREE.Group();
     anchor.name = `xr-controller-${handedness}-hand`;
@@ -126,6 +136,12 @@ export function createXrControllerHandModels(scene: THREE.Scene): XrControllerHa
         model.visible = true;
         if (handedness === "right") {
           updateWristToolIndicator(rightToolIndicator, model, frame.tool, placeFlagType);
+          const toasts = frame.toasts ?? [];
+          if (toastPanel === undefined && toasts.length > 0) {
+            toastPanel = createToastPanel();
+            scene.add(toastPanel.root);
+          }
+          if (toastPanel) updateToastPanel(toastPanel, model, toasts);
         }
       }
 
@@ -136,6 +152,7 @@ export function createXrControllerHandModels(scene: THREE.Scene): XrControllerHa
       }
       if (!seenHands.has("right")) {
         rightToolIndicator.root.visible = false;
+        if (toastPanel) toastPanel.root.visible = false;
       }
     },
     rightHand() {
@@ -145,11 +162,18 @@ export function createXrControllerHandModels(scene: THREE.Scene): XrControllerHa
     reset() {
       hideInstances(instances);
       rightToolIndicator.root.visible = false;
+      if (toastPanel) toastPanel.root.visible = false;
     },
     dispose() {
       disposed = true;
       rightToolIndicator.root.removeFromParent();
       disposeWristToolIndicator(rightToolIndicator);
+      if (toastPanel) {
+        toastPanel.root.removeFromParent();
+        toastPanel.texture.dispose();
+        toastPanel.material.dispose();
+        toastPanel = undefined;
+      }
       for (const model of instances.values()) {
         model.removeFromParent();
         disposeObject3D(model);
@@ -361,6 +385,69 @@ function applyXrPoseToObject(
   const worldMatrix = referenceSpaceToWorldMatrix.clone().multiply(xrRigidTransformLocalMatrix(transform));
   worldMatrix.decompose(object.position, object.quaternion, object.scale);
   object.scale.multiplyScalar(scaleMultiplier);
+}
+
+interface ToastPanel {
+  readonly root: THREE.Sprite;
+  readonly material: THREE.SpriteMaterial;
+  readonly canvas: HTMLCanvasElement;
+  readonly texture: THREE.CanvasTexture;
+  key: string;
+}
+
+const toastPanelCanvasWidth = 640;
+const toastPanelRowHeight = 72;
+const toastPanelMaxRows = 2;
+
+// One canvas texture, redrawn only when the toast set changes; hidden while there is nothing to show.
+function createToastPanel(): ToastPanel {
+  const canvas = document.createElement("canvas");
+  canvas.width = toastPanelCanvasWidth;
+  canvas.height = toastPanelRowHeight * toastPanelMaxRows;
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  const material = new THREE.SpriteMaterial({ map: texture, depthTest: false, depthWrite: false, transparent: true });
+  const root = new THREE.Sprite(material);
+  root.name = "xr-toast-panel";
+  root.visible = false;
+  root.renderOrder = toastPanelRenderOrder;
+  root.frustumCulled = false;
+  root.scale.set(toastPanelWidthMeters, (toastPanelWidthMeters * canvas.height) / canvas.width, 1);
+  return { root, material, canvas, texture, key: "" };
+}
+
+// Positions the panel above the wrist and redraws it when the toasts changed. An action shows its label only.
+function updateToastPanel(panel: ToastPanel, wrist: THREE.Object3D, toasts: readonly Toast[]): void {
+  if (toasts.length === 0) {
+    panel.root.visible = false;
+    return;
+  }
+  const key = toasts.map((toast) => `${toast.id}:${toast.text}:${toast.action?.label ?? ""}`).join("|");
+  if (key !== panel.key) {
+    panel.key = key;
+    const context = panel.canvas.getContext("2d");
+    if (context) {
+      context.clearRect(0, 0, panel.canvas.width, panel.canvas.height);
+      context.font = "600 34px system-ui, sans-serif";
+      context.textAlign = "center";
+      context.textBaseline = "middle";
+      // The newest toast is the lowest row, nearest the wrist.
+      const rows = toasts.slice(-toastPanelMaxRows);
+      const top = (toastPanelMaxRows - rows.length) * toastPanelRowHeight;
+      rows.forEach((toast, index) => {
+        const y = top + index * toastPanelRowHeight;
+        const label = toast.action ? `${toast.text}  [${toast.action.label}]` : toast.text;
+        context.fillStyle = "rgba(15, 23, 42, 0.88)";
+        roundRect(context, 6, y + 6, panel.canvas.width - 12, toastPanelRowHeight - 12, 26);
+        context.fill();
+        context.fillStyle = "#ffffff";
+        context.fillText(label, panel.canvas.width / 2, y + toastPanelRowHeight / 2, panel.canvas.width - 40);
+      });
+      panel.texture.needsUpdate = true;
+    }
+  }
+  panel.root.position.copy(toastPanelLocalOffset).applyQuaternion(wrist.quaternion).add(wrist.position);
+  panel.root.visible = wrist.visible;
 }
 
 interface WristToolIndicator {

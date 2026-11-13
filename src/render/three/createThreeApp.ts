@@ -148,7 +148,9 @@ import { createGeodesicEmitterLabelController } from "./geodesicEmitterLabelCont
 import { createGeometryComputerMenu } from "./geometryComputerMenu";
 import { createRuntimeObjectActions } from "./runtimeObjectActions";
 import { createHelpLensRenderer } from "./helpLensRenderer";
-import { createWorldMessageDisplay } from "./worldMessageDisplay";
+import { createToastView } from "../dom/toastView";
+import { createToastQueue } from "../../ui/toastQueue";
+import { toolNames } from "../../ui/vocabulary";
 import { createWorldMapPieceReader } from "./worldMapPieces";
 import { createWorldMapRenderer } from "./worldMapRenderer";
 import { worldMapToolId } from "../../modules/worldMap";
@@ -396,13 +398,15 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   });
   // The world's and the tools' sentences (a refused action, a notice) show briefly in front of the player, and also go
   // to the console and the diagnostics, always (not only in debug mode).
-  const worldMessageDisplay = createWorldMessageDisplay(scene);
+  const toastQueue = createToastQueue({ durationMs: 2500, maxVisible: 2 });
+  // The action button of a toast (undo, from job 73) is wired where its message is pushed; none exists yet.
+  const toastView = createToastView(document.body, () => {});
   function showWorldMessage(message: string, detail: EngineEventBase | { readonly code: string }): void {
     console.info(`[noneuclid] ${message}`);
     runtimeDiagnostics().recordDebugEvent(message, detail);
     // A performance notice is for diagnostics only; on a slow device it would cover the view again and again.
     if ("kind" in detail && detail.kind === "world/behindRealTime") return;
-    worldMessageDisplay.show(message);
+    toastQueue.push(message);
   }
   // The tool-switch protocol, the generic event sink and api.world.
   const worldClient = createWorldClient({
@@ -894,6 +898,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     desktopScenePaletteInput,
     xrScenePaletteInput,
     xrControllerHandModels,
+    visibleToasts: () => toastQueue.visible(),
     resolveActiveRootAimRay,
     cycleFocusedAimTarget,
     openContextMenuFromAim,
@@ -1386,7 +1391,8 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
         nowMs: performance.now(),
       });
     });
-    worldMessageDisplay.update(camera, performance.now());
+    toastQueue.tick(performance.now());
+    toastView.render(toastQueue.visible());
     const frameAfterUiMs = performance.now();
     // Phase 5: draw. In XR the renderer renders each eye from `camera` as updated by the WebXR manager.
     const frameBeforeRenderMs = performance.now();
@@ -1563,7 +1569,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       aimFeedback.dispose();
       floatingObjectTooltip.dispose();
       helpLensRenderer.dispose();
-      worldMessageDisplay.dispose();
+      toastView.dispose();
       worldMapRenderer.dispose();
       vrComfortVignette.dispose();
       clearXrObjectTooltip();
@@ -1731,9 +1737,17 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     visibleCellId = currentlyVisibleCellId;
   }
 
+  let announcedTool: string | undefined;
   function syncDesktopPalette(): void {
     controls.setLookMode(currentMenuState().isOpen ? "palette" : "camera");
     const selectedTool = currentMenuState().selectedTool;
+    // A tool change is announced (design 017 section 8.3); the first sync only records the starting tool. No tool is the Hand.
+    if (announcedTool !== undefined && announcedTool !== selectedTool) {
+      const descriptor = toolHost.toolsById.get(selectedTool);
+      const known = (toolNames as Readonly<Record<string, { readonly name: string } | undefined>>)[selectedTool];
+      toastQueue.push(descriptor === undefined ? toolNames.none.name : known?.name ?? descriptor.label);
+    }
+    announcedTool = selectedTool;
     desktopToolIndicator.setTool(toolHost.toolsById.get(selectedTool), currentMenuState().placeFlagOptions.flagType, toolHost.promptOf(selectedTool));
   }
 

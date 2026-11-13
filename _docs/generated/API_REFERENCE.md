@@ -2296,6 +2296,19 @@ Resolves the tooltip text for palette items from their string item ids.
 | --- | --- | --- |
 | function | `resolvePaletteTooltipLabel` | Returns the tooltip for a palette item id (prefix families like tool:, tutorial:, sign-key: are decoded, others looked up in a fixed table), or undefined for an undefined or unknown id. |
 
+### `ui/toastQueue.ts`
+
+The toast queue (design 017 section 8.3): short messages that appear for a moment, at most two at a time.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `ToastAction` | An optional button on a toast, for example the undo that follows "World reset". |
+| interface | `Toast` | A message on screen. |
+| interface | `ToastQueueOptions` | Tuning of {@link createToastQueue}. |
+| interface | `ToastPushOptions` | Options of one `push`. |
+| interface | `ToastQueue` | Handle created by {@link createToastQueue}. |
+| function | `createToastQueue` | Creates an empty queue. |
+
 ### `ui/vocabulary.ts`
 
 The student vocabulary under the name design 017 section 6.5 gives it.
@@ -2334,6 +2347,15 @@ Floating tooltip DOM element that follows a screen position, used for object foc
 | --- | --- | --- |
 | interface | `FloatingObjectTooltip` | Handle to the tooltip created by {@link createFloatingObjectTooltip}. |
 | function | `createFloatingObjectTooltip` | Creates a hidden tooltip element with class floating-object-tooltip and appends it to container. |
+
+### `render/dom/toastView.ts`
+
+Desktop view of the toast queue (design 017 section 8.3): white text on dark translucent pills, bottom center, above where the tool belt will be.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `ToastView` | Handle to the view created by {@link createToastView}. |
+| function | `createToastView` | Creates the empty view and appends it to `container`. |
 
 ### `render/three/aimCrossMarker.ts`
 
