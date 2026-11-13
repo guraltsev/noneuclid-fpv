@@ -56,4 +56,13 @@ describe("toast queue", () => {
     queue.tick(7500);
     expect(queue.visible()).toHaveLength(0);
   });
+
+  it("keeps a toast for its own duration when the push names one", () => {
+    const queue = createToastQueue(config);
+    queue.push("World reset", { nowMs: 0, durationMs: 10_000, action: { label: "Undo", id: "undo" } });
+    queue.tick(9999);
+    expect(queue.visible()).toHaveLength(1);
+    queue.tick(10_000);
+    expect(queue.visible()).toHaveLength(0);
+  });
 });

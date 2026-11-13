@@ -58,10 +58,13 @@ const desktopHints: Readonly<Record<InputIntent, Omit<InputHintGlyph, "intent" |
     iconSrc: publicAssetUrl("icons/esc-key.svg"),
   },
   reset: {
-    label: "R",
+    label: "Hold R",
   },
   hand: {
     label: "0",
+  },
+  undo: {
+    label: "U",
   },
 };
 
@@ -101,12 +104,15 @@ const xrHints: Readonly<Record<InputIntent, Omit<InputHintGlyph, "intent" | "mod
     label: "Side trigger",
     iconSrc: publicAssetUrl("icons/xr-grip.svg"),
   },
+  // The stick press no longer resets (job 73); starting over is a menu entry, which the VR main menu adds (job 77).
   reset: {
-    label: "Stick press",
-    iconSrc: publicAssetUrl("icons/xr-thumbstick.svg"),
+    label: "Main menu",
   },
   // The belt arrives with the VR hand roles (job 77).
   hand: {
+    label: "Not available yet",
+  },
+  undo: {
     label: "Not available yet",
   },
 };

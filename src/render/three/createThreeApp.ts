@@ -149,6 +149,9 @@ import { createGeometryComputerMenu } from "./geometryComputerMenu";
 import { createRuntimeObjectActions } from "./runtimeObjectActions";
 import { createHelpLensRenderer } from "./helpLensRenderer";
 import { createToastView } from "../dom/toastView";
+import { createResetHoldRing } from "../dom/resetHoldRing";
+import { restoreSavedSnapshot, savedKindsRemovedThisFrame, savedObjectKinds, takeSavedSnapshot, type SavedSnapshot } from "../../world-objects/savedSnapshot";
+import { objectNouns, toastMessages } from "../../ui/vocabulary";
 import { createToastQueue } from "../../ui/toastQueue";
 import { toolNames } from "../../ui/vocabulary";
 import { createWorldMapPieceReader } from "./worldMapPieces";
@@ -385,12 +388,13 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   const runtimeObjectRegistry = createRuntimeObjectRegistry();
   // `derived-verify`: every 64th derived-cache read also recomputes and compares (the module-level switch of world-objects/derived).
   setDerivedVerification(hasActiveDebugOption(options.debugLevel, options.debugOptions, "derived-verify") ? 64 : 0);
+  const worldModules = createDefaultWorldModules();
   const engine = createWorldEngine({
     registry: runtimeObjectRegistry,
     // The active world is replaced by a geometry commit; `activeWorld` exists only after the geometry-commit factory below.
     getWorld: () => activeWorld(),
     participants: [createLocalPlayerParticipant(appState.playerPose)],
-    modules: createDefaultWorldModules(),
+    modules: worldModules,
     isToolEnabled: (toolId) => isRuntimeToolEnabled(appConfig, toolId),
     writeGuard: hasActiveDebugOption(options.debugLevel, options.debugOptions, "module-write-guard"),
     // Called by scripts only, so `worldClient` below exists by then.
@@ -399,8 +403,57 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   // The world's and the tools' sentences (a refused action, a notice) show briefly in front of the player, and also go
   // to the console and the diagnostics, always (not only in debug mode).
   const toastQueue = createToastQueue({ durationMs: 2500, maxVisible: 2 });
-  // The action button of a toast (undo, from job 73) is wired where its message is pushed; none exists yet.
-  const toastView = createToastView(document.body, () => {});
+  // The undo toast stays this long (design 017 section 8.8); every other toast stays for the queue's duration.
+  const undoWindowMs = 10_000;
+  const toastView = createToastView(document.body, (actionId) => {
+    if (actionId === "undo") performUndo();
+  });
+  const resetHoldRing = createResetHoldRing(document.body);
+  // Undo (design 017 section 8.8): one level. A start over or a deletion keeps the saved objects as they were before it;
+  // U (or the toast's button) within the window puts them back.
+  const savedKinds = savedObjectKinds(worldModules);
+  let undoRecord: { readonly snapshot: SavedSnapshot; readonly expiresAtMs: number } | undefined;
+  // A deletion was asked for and the world has not answered yet: what the world held, and what is being deleted.
+  let pendingDeletion: { readonly snapshot: SavedSnapshot; readonly noun: string; readonly askedAtMs: number } | undefined;
+  let startOverRequested = false;
+  const deletionNouns: Readonly<Record<string, string>> = {
+    "placedFlags/flag": objectNouns.sign.singular,
+    "geodesicMeasurements/length": objectNouns.measurement.singular,
+    "geodesicMeasurements/angle": objectNouns.measurement.singular,
+    "geodesicModel/arc": objectNouns.beam.singular,
+    "geodesicEmitters/emitter": objectNouns.laser.singular,
+  };
+  function pushUndoToast(text: string): void {
+    toastQueue.push(text, { action: { label: "Undo", id: "undo" }, durationMs: undoWindowMs });
+  }
+  function performUndo(): boolean {
+    const record = undoRecord;
+    undoRecord = undefined;
+    if (record === undefined || performance.now() > record.expiresAtMs) return false;
+    restoreSavedSnapshot(runtimeObjectRegistry, record.snapshot);
+    requestSelectableHitboxDebugSync();
+    toastQueue.push(toastMessages.undone);
+    return true;
+  }
+  /** Called when a delete is requested: remembers the world so the answer can offer an undo. */
+  function beginDeletion(objectKind: string): void {
+    const noun = deletionNouns[objectKind];
+    if (noun === undefined) return;
+    pendingDeletion = { snapshot: takeSavedSnapshot(runtimeObjectRegistry, savedKinds), noun, askedAtMs: performance.now() };
+  }
+  /** Once per frame, after the world's step: announces a deletion the world carried out. */
+  function finishPendingDeletion(nowMs: number): void {
+    const pending = pendingDeletion;
+    if (pending === undefined) return;
+    if (savedKindsRemovedThisFrame(runtimeObjectRegistry, savedKinds).length > 0) {
+      pendingDeletion = undefined;
+      undoRecord = { snapshot: pending.snapshot, expiresAtMs: nowMs + undoWindowMs };
+      pushUndoToast(toastMessages.deleted(pending.noun));
+    } else if (nowMs - pending.askedAtMs > 3000) {
+      // The world refused or answered with no removal.
+      pendingDeletion = undefined;
+    }
+  }
   function showWorldMessage(message: string, detail: EngineEventBase | { readonly code: string }): void {
     console.info(`[noneuclid] ${message}`);
     runtimeDiagnostics().recordDebugEvent(message, detail);
@@ -832,9 +885,18 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     objectActionsFor: (objectKind, objectId) => toolHost.objectActionsFor(objectKind, objectId),
     createGeometryComputerMenuOptions,
     setFlagMessage: (flagId, message) => requestFlagMessage(toolHost.contextOf(placedFlagToolId), flagId, message),
-    removeFlag: (flagId) => requestFlagRemoval(toolHost.contextOf(placedFlagToolId), flagId),
-    removeLength: (lengthId) => requestLengthRemoval(toolHost.contextOf(geodesicLengthToolId), lengthId),
-    removeAngle: (angleId) => requestAngleRemoval(toolHost.contextOf(geodesicProtractorToolId), angleId),
+    removeFlag: (flagId) => {
+      beginDeletion("placedFlags/flag");
+      requestFlagRemoval(toolHost.contextOf(placedFlagToolId), flagId);
+    },
+    removeLength: (lengthId) => {
+      beginDeletion("geodesicMeasurements/length");
+      requestLengthRemoval(toolHost.contextOf(geodesicLengthToolId), lengthId);
+    },
+    removeAngle: (angleId) => {
+      beginDeletion("geodesicMeasurements/angle");
+      requestAngleRemoval(toolHost.contextOf(geodesicProtractorToolId), angleId);
+    },
     removeGeodesicRuntimeObjects,
     clearProtractorToolFeedback,
   });
@@ -922,7 +984,13 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     startObjectAction: (objectKind, objectId, actionId) => toolHost.startObjectAction(objectKind, objectId, actionId),
     startGeodesicCannonRotation,
     startGeodesicCannonAim,
-    deleteGeodesicFromCannon: (cannonId, geodesicId) => requestGeodesicDeletion(emitterTool(), cannonId, geodesicId),
+    deleteGeodesicFromCannon: (cannonId, geodesicId) => {
+      beginDeletion("geodesicModel/arc");
+      requestGeodesicDeletion(emitterTool(), cannonId, geodesicId);
+    },
+    requestStartOver: () => {
+      startOverRequested = true;
+    },
     stepGeometryComputerPendingTarget,
     startGeometryComputerDeformation,
     appendEditingSignCharacter,
@@ -1193,8 +1261,14 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
 
     // Phase 2: movement. A reset request skips movement entirely (moveResult stays undefined). A scripted motion
     // (public API `motion`) replaces the input's movement until it ends or the player takes over.
-    if (frame.resetRequested) {
+    const resetThisFrame = frame.resetRequested || startOverRequested;
+    startOverRequested = false;
+    if (resetThisFrame) {
       scriptedMotion.cancel("the world was reset");
+      // What the student made is kept for one undo before it is wiped.
+      pendingDeletion = undefined;
+      undoRecord = { snapshot: takeSavedSnapshot(runtimeObjectRegistry, savedKinds), expiresAtMs: performance.now() + undoWindowMs };
+      pushUndoToast(toastMessages.worldReset);
       teleportPlayerHome();
       resetRuntimeWorld();
     } else if (scriptedMotion.active && !playerTookOverFromScriptedMotion(frame)) {
@@ -1264,6 +1338,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     if (frame.helpRequested) {
       aimFeedback.requestHelpLensForFocusedObject(activeAimRay);
     }
+    if (frame.undoRequested === true) performUndo();
     // Key 0 puts the tool away (design 017 section 8.3); the emitter's modes end with their own action instead.
     if (frame.handRequested === true && !currentMenuState().isOpen && !currentMenuState().selectedTool.startsWith("geodesicEmitters/")) {
       if (currentMenuState().selectedTool !== "none") dispatchRuntimeCommand({ kind: "clear-selected-tool" });
@@ -1301,7 +1376,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     // Each object is its own contained phase: one failing creature must not stop the others or the frame.
     for (const runtime of dynamicObjectRuntimes) {
       frameErrorGuard.runPhase(`object ${runtime.objectId}`, () => {
-        runtime.update(activeWorld(), frame.resetRequested ? 0 : deltaSeconds, [playerObstacle]);
+        runtime.update(activeWorld(), resetThisFrame ? 0 : deltaSeconds, [playerObstacle]);
         runtime.syncParent(cellMeshes);
       });
     }
@@ -1311,7 +1386,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     }
     // The world engine: the fast channel first (what follows a participant keeps up with this frame), then the frame's ticks: queued commands and the modules' ticks. A frame with no tick runs only the fast channel. Contained like any phase.
     frameErrorGuard.runPhase("world engine", () => {
-      if (frame.resetRequested) {
+      if (resetThisFrame) {
         engine.applyControls(0);
         engine.step(0);
         return;
@@ -1395,8 +1470,10 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
         nowMs: performance.now(),
       });
     });
+    finishPendingDeletion(performance.now());
     toastQueue.tick(performance.now());
     toastView.render(toastQueue.visible());
+    resetHoldRing.render(controls.resetHoldProgress);
     const frameAfterUiMs = performance.now();
     // Phase 5: draw. In XR the renderer renders each eye from `camera` as updated by the WebXR manager.
     const frameBeforeRenderMs = performance.now();
@@ -1574,6 +1651,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       floatingObjectTooltip.dispose();
       helpLensRenderer.dispose();
       toastView.dispose();
+      resetHoldRing.dispose();
       worldMapRenderer.dispose();
       vrComfortVignette.dispose();
       clearXrObjectTooltip();

@@ -153,6 +153,52 @@ describe("desktopControls", () => {
   });
 });
 
+describe("desktopControls hold-to-reset", () => {
+  it("fires no reset at 1499 ms and one reset at 1500 ms of holding R", () => {
+    const { canvas, windowTarget } = installPointerLockDom();
+    const controls = createDesktopControls(canvas);
+
+    dispatchKey(windowTarget, "keydown", "KeyR");
+    expect(controls.consumeFrame(1.499).resetRequested).toBe(false);
+    expect(controls.resetHoldProgress).toBeGreaterThan(0.99);
+    expect(controls.consumeFrame(0.001).resetRequested).toBe(true);
+    // The same hold never fires twice, and its ring is gone.
+    expect(controls.consumeFrame(1).resetRequested).toBe(false);
+    expect(controls.resetHoldProgress).toBe(0);
+
+    controls.dispose();
+  });
+
+  it("does nothing for a short press and restarts the hold after a release", () => {
+    const { canvas, windowTarget } = installPointerLockDom();
+    const controls = createDesktopControls(canvas);
+
+    dispatchKey(windowTarget, "keydown", "KeyR");
+    expect(controls.consumeFrame(1).resetRequested).toBe(false);
+    expect(controls.resetHoldProgress).toBeCloseTo(1 / 1.5, 6);
+    dispatchKey(windowTarget, "keyup", "KeyR");
+    expect(controls.resetHoldProgress).toBe(0);
+    expect(controls.consumeFrame(5).resetRequested).toBe(false);
+
+    dispatchKey(windowTarget, "keydown", "KeyR");
+    expect(controls.consumeFrame(1).resetRequested).toBe(false);
+    expect(controls.consumeFrame(0.5).resetRequested).toBe(true);
+
+    controls.dispose();
+  });
+
+  it("reports U as a one-shot undo request", () => {
+    const { canvas, windowTarget } = installPointerLockDom();
+    const controls = createDesktopControls(canvas);
+
+    dispatchKey(windowTarget, "keydown", "KeyU");
+    expect(controls.consumeFrame(1 / 60).undoRequested).toBe(true);
+    expect(controls.consumeFrame(1 / 60).undoRequested).toBe(false);
+
+    controls.dispose();
+  });
+});
+
 function installPointerLockDom(): {
   readonly canvas: HTMLCanvasElement;
   readonly windowTarget: EventTarget;

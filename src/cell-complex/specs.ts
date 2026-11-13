@@ -214,7 +214,8 @@ export type TutorialInputIntent =
   | "next-focus-target"
   | "cancel"
   | "reset"
-  | "hand";
+  | "hand"
+  | "undo";
 
 /** One row of a tutorial page's control list: the input, and what it does here. */
 export interface TutorialControlSpec {

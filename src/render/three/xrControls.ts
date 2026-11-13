@@ -3,7 +3,7 @@
  * Reads the thumbstick axes and button states of every XR input source's gamepad, combines them,
  * and produces a frame in the player-local frame (x right, y forward, z up; meters and radians).
  * Stick-forward moves along y and stick-x turns the player (continuous turn, no strafing). Pitch is never driven from XR.
- * Button layout follows the WebXR `xr-standard` gamepad mapping: 0 trigger, 1 squeeze, 3 thumbstick click, 4 lower face button (carry), 5 upper face button (help).
+ * Button layout follows the WebXR `xr-standard` gamepad mapping: 0 trigger, 1 squeeze, 3 thumbstick click (unused: it no longer resets), 4 lower face button (carry), 5 upper face button (help).
  * Held buttons in `createXrInputFrame` are level signals; only `createXrControls` converts them to rising-edge requests.
  */
 import { vec3 } from "../../math/vec3";
@@ -37,7 +37,7 @@ export interface XrControls {
   /**
    * Converts the current XR input sources into one input frame, advancing the edge-detection state.
    * `deltaSeconds` is the frame time in seconds (scales stick locomotion and turn). Call exactly once per rendered XR frame:
-   * every action `*Requested` flag (including reset) is true only on the frame where any source's button went from released to pressed.
+   * every action `*Requested` flag (reset is never requested from VR) is true only on the frame where any source's button went from released to pressed.
    * `carryActionRequested` follows button 4 (A on the right controller, X on the left) on any source.
    */
   consumeFrame(inputSources: Iterable<XrInputSourceLike>, deltaSeconds: number): RuntimeInputFrame;
@@ -46,7 +46,6 @@ export interface XrControls {
 // Button indices in the WebXR `xr-standard` gamepad mapping.
 const primaryTriggerButtonIndex = 0;
 const sideTriggerButtonIndex = 1;
-const thumbstickButtonIndex = 3;
 const carryFaceButtonIndex = 4;
 const helpFaceButtonIndex = 5;
 
@@ -57,7 +56,6 @@ const helpFaceButtonIndex = 5;
  */
 export function createXrControls(options: Partial<VrComfortOptions> = {}): XrControls {
   const comfort = { ...defaultVrComfortOptions, ...options };
-  let previousResetPressed = false;
   let previousPrimaryActionPressed = false;
   let previousInteractPressed = false;
   let previousCarryActionPressed = false;
@@ -68,8 +66,6 @@ export function createXrControls(options: Partial<VrComfortOptions> = {}): XrCon
       // Edge detection: a request fires only when some source is pressed now and none was pressed on the previous call.
       const sources = [...inputSources];
       const frame = createXrInputFrame(sources, deltaSeconds, comfort);
-      const resetPressed = sources.some((source) => isResetPressed(source.gamepad));
-      const resetRequested = resetPressed && !previousResetPressed;
       const primaryActionPressed = sources.some((source) => isPrimaryActionPressed(source.gamepad));
       const primaryActionRequested = primaryActionPressed && !previousPrimaryActionPressed;
       const interactPressed = sources.some((source) => isInteractPressed(source.gamepad));
@@ -78,14 +74,13 @@ export function createXrControls(options: Partial<VrComfortOptions> = {}): XrCon
       const carryActionRequested = carryActionPressed && !previousCarryActionPressed;
       const helpPressed = sources.some((source) => isHelpPressed(source.gamepad));
       const helpRequested = helpPressed && !previousHelpPressed;
-      previousResetPressed = resetPressed;
       previousPrimaryActionPressed = primaryActionPressed;
       previousInteractPressed = interactPressed;
       previousCarryActionPressed = carryActionPressed;
       previousHelpPressed = helpPressed;
       return {
         ...frame,
-        resetRequested,
+        resetRequested: false,
         primaryActionRequested,
         interactRequested,
         carryActionRequested,
@@ -119,7 +114,8 @@ export function createXrInputFrame(
     localDisplacement: locomotion.localDisplacement,
     yawDeltaRadians,
     pitchDeltaRadians: 0,
-    resetRequested: sources.some((source) => isResetPressed(source.gamepad)),
+    // The stick press no longer resets the world (design 017 section 8.8): a frame from VR never asks for it.
+    resetRequested: false,
     primaryActionRequested: sources.some((source) => isPrimaryActionPressed(source.gamepad)),
     interactRequested: sources.some((source) => isInteractPressed(source.gamepad)),
     carryActionRequested: sources.some((source) => isCarryActionPressed(source)),
@@ -179,19 +175,6 @@ function clampStickAxis(value: number): number {
   }
 
   return Math.max(-1, Math.min(1, value));
-}
-
-/**
- * True while the thumbstick-click button (index 3) is held; false for a missing gamepad or button.
- */
-export function isResetPressed(gamepad: GamepadLike | undefined): boolean {
-  const buttons = gamepad?.buttons;
-
-  if (!buttons) {
-    return false;
-  }
-
-  return buttons[thumbstickButtonIndex]?.pressed === true;
 }
 
 /**

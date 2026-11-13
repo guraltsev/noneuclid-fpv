@@ -19,7 +19,7 @@ export interface RuntimeInputFrame {
   readonly paletteSelectPressed?: boolean;
   /** Request to select the highlighted palette entry. */
   readonly paletteSelectRequested?: boolean;
-  /** Request to reset the player/scene. */
+  /** Request to reset the player/scene (desktop: R held for 1.5 s; VR: never). */
   readonly resetRequested: boolean;
   /** Request for the primary action (e.g. fire or place) of the active tool. */
   readonly primaryActionRequested: boolean;
@@ -31,6 +31,8 @@ export interface RuntimeInputFrame {
   readonly helpRequested: boolean;
   /** Request to put the tool away and have the empty hand (desktop key 0); absent means no request. */
   readonly handRequested?: boolean;
+  /** Request to undo the last reset or deletion (desktop key U); absent means no request. */
+  readonly undoRequested?: boolean;
   /** Which input device produced the frame. */
   readonly source: "desktop" | "xr";
 }

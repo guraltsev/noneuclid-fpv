@@ -1201,6 +1201,18 @@ Runtime object registry: the per-cell, id-indexed store of every live (non-terra
 | function | `createRuntimeObjectRegistry` | Creates a registry, optionally pre-populated with `initialObjects`. |
 | function | `createRuntimeStaticAssetObject` | Builds the registry record for an authored static asset placed in `cellId`. |
 
+### `world-objects/savedSnapshot.ts`
+
+Snapshot and restore of the student's work, for undo (design 017 section 8.8).
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| type | `SavedSnapshot` | The saved objects at one moment, in registry order. |
+| function | `savedObjectKinds` | The object kinds that modules declare saved. |
+| function | `takeSavedSnapshot` | Keeps every object whose kind is in `savedKinds`. |
+| function | `restoreSavedSnapshot` | Writes back the objects of `snapshot` that are absent from the registry (added) or differ from the snapshot (replaced). |
+| function | `savedKindsRemovedThisFrame` | The kinds of the saved objects removed by the writes since the last `changes.clear()` (this frame), one entry per removal. |
+
 ### `world-objects/simpleGeoCreature.ts`
 
 Simple geodesic creatures: the mouse and the butterfly, autonomous walkers that follow straight lines (geodesics) through the cell complex.
@@ -1259,6 +1271,7 @@ The student vocabulary (design 017 section 6): every student-visible noun, verb 
 | const | `objectNouns` | The things in the world, as the student names them (design 017 section 6.2), each with a short first-mention sentence where the design gives one. |
 | const | `objectSubtitles` | The sentences that explain a noun when it first appears. |
 | const | `objectActions` | The object actions (design 017 section 6.3). |
+| const | `toastMessages` | The sentences of the toasts that follow a start over, an undo and a deletion (design 017 section 8.8). |
 | const | `verbNames` | The input verbs (design 017 section 7): one meaning each, bound on desktop and in VR. |
 | const | `surfaceNames` | The parts of the interface (design 017 section 6.4). |
 | const | `shortIdLetters` | The first letter of a short id: the first letter of the noun (design 017 section 6.1 rule 6). |
@@ -2348,6 +2361,15 @@ Floating tooltip DOM element that follows a screen position, used for object foc
 | interface | `FloatingObjectTooltip` | Handle to the tooltip created by {@link createFloatingObjectTooltip}. |
 | function | `createFloatingObjectTooltip` | Creates a hidden tooltip element with class floating-object-tooltip and appends it to container. |
 
+### `render/dom/resetHoldRing.ts`
+
+Desktop ring that shows how long R has been held (design 017 section 8.8): a small SVG circle around the screen center whose stroke fills as the hold progresses.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `ResetHoldRing` | Handle to the ring created by {@link createResetHoldRing}. |
+| function | `createResetHoldRing` | Creates the hidden ring and appends it to `container`. |
+
 ### `render/dom/toastView.ts`
 
 Desktop view of the toast queue (design 017 section 8.3): white text on dark translucent pills, bottom center, above where the tool belt will be.
@@ -2638,6 +2660,7 @@ Desktop keyboard and pointer-lock mouse input, collected into one DesktopInputFr
 | type | `DesktopLookMode` | Whether mouse movement drives the camera ("camera") or the menu/palette cursor ("palette"). |
 | interface | `DesktopControls` | Handle to the desktop input collector created by {@link createDesktopControls}; the creator must call dispose(). |
 | interface | `DesktopControlsOptions` | Tuning parameters for {@link createDesktopControls}; every field is optional. |
+| const | `resetHoldSeconds` | How long R must be held, in seconds, before it asks for a reset (design 017 section 8.8). |
 | function | `createDesktopControls` | Creates the desktop input collector for the given canvas and installs its listeners. |
 
 ### `render/three/desktopInputHandlers.ts`
@@ -3695,7 +3718,6 @@ WebXR gamepad input -> `RuntimeInputFrame` (the XR input path for locomotion and
 | function | `createXrInputFrame` | Builds a stateless input frame from the given sources; all action flags reflect the instantaneous held state, not edges. |
 | function | `combineStickAxes` | Sums stick vectors from several controllers and clamps each component to [-1, 1]. |
 | function | `readPrimaryStickAxes` | Reads the thumbstick of one gamepad, preferring axes (2,3) (xr-standard thumbstick) over axes (0,1) (touchpad slot) when that pair is finite and non-zero. |
-| function | `isResetPressed` | True while the thumbstick-click button (index 3) is held; false for a missing gamepad or button. |
 | function | `isPrimaryActionPressed` | True while the primary trigger (button 0) is held. |
 | function | `isInteractPressed` | True while the side trigger / squeeze (button 1) is held. |
 | function | `isCarryActionPressed` | True while the lower face button (button 4: A on the right controller, X on the left) is held on `source`. |

@@ -2,7 +2,7 @@
  * Desktop keyboard and pointer-lock mouse input, collected into one DesktopInputFrame per rendered frame.
  * Role: this is the desktop (non-XR) input path. Listeners accumulate events between frames; the app shell calls consumeFrame once per frame, which converts the accumulated state into a displacement, look deltas and one-shot action flags and resets the one-shot state.
  * Frames and units: localDisplacement is the player's local frame in meters for that frame (x right, y forward, z up, always 0), yaw and pitch deltas are radians (positive yaw turns left, counter-clockwise seen from above), palette pointer deltas are screen pixels.
- * Bindings: W/A/S/D or arrow keys move, Q/E turn, R reset, F interact, G carry, H help, left click acts (the first click captures the pointer lock). In palette look mode the mouse drives the palette cursor instead of the camera and movement is disabled.
+ * Bindings: W/A/S/D or arrow keys move, Q/E turn, hold R for 1.5 s to start over, U undo, F interact, G carry, H help, left click acts (the first click captures the pointer lock). In palette look mode the mouse drives the palette cursor instead of the camera and movement is disabled.
  * Focus: editable targets (input, textarea, select, contenteditable) are ignored, and window blur clears held keys and buttons.
  * Lifecycle: listeners are installed on window/document/canvas at creation; the owner must call dispose() to remove them.
  */
@@ -34,6 +34,8 @@ export interface DesktopControls {
   resume(options?: { readonly requestPointerLock?: boolean }): Promise<boolean>;
   /** Asks the browser to lock the pointer to the canvas; resolves to true on success, false when paused or on failure (a warning is logged). */
   requestPointerLock(): Promise<boolean>;
+  /** How far the R hold has got, from 0 (not held) to 1 (the moment the reset fires); the app draws a ring from it. */
+  readonly resetHoldProgress: number;
   /** True when the canvas currently holds pointer lock. */
   isPointerLocked(): boolean;
   /** Removes the event listeners installed at creation; does not release pointer lock. */
@@ -49,6 +51,9 @@ export interface DesktopControlsOptions {
   /** Mouse look gain in radians per pixel of pointer movement; default 0.0025. */
   readonly mouseSensitivityRadiansPerPixel?: number;
 }
+
+/** How long R must be held, in seconds, before it asks for a reset (design 017 section 8.8). */
+export const resetHoldSeconds = 1.5;
 
 // Physical key codes (event.code) treated as movement; arrow keys mirror WASD.
 const movementKeys = new Set([
@@ -92,6 +97,11 @@ export function createDesktopControls(
   let pendingPalettePointerDeltaX = 0;
   let pendingPalettePointerDeltaY = 0;
   let resetRequested = false;
+  // R is held: the seconds it has been down (counted from the frames' deltas) and whether this hold already fired.
+  let resetHeld = false;
+  let resetHeldSeconds = 0;
+  let resetHoldFired = false;
+  let undoRequested = false;
   let primaryActionRequested = false;
   let paletteSelectPressed = false;
   let paletteSelectRequested = false;
@@ -124,7 +134,17 @@ export function createDesktopControls(
     }
 
     if (event.code === "KeyR") {
-      resetRequested = true;
+      // Auto-repeat keydowns do not restart the hold.
+      if (!resetHeld) {
+        resetHeld = true;
+        resetHeldSeconds = 0;
+        resetHoldFired = false;
+      }
+      return;
+    }
+
+    if (event.code === "KeyU") {
+      undoRequested = true;
       return;
     }
 
@@ -151,13 +171,23 @@ export function createDesktopControls(
     pressedKeys.add(event.code);
   }
 
+  function cancelResetHold(): void {
+    resetHeld = false;
+    resetHeldSeconds = 0;
+    resetHoldFired = false;
+  }
+
   function onKeyUp(event: KeyboardEvent): void {
     pressedKeys.delete(event.code);
+    if (event.code === "KeyR") {
+      cancelResetHold();
+    }
   }
 
   // Losing window focus swallows key/button release events, so held state is cleared to avoid stuck movement.
   function onWindowBlur(): void {
     pressedKeys.clear();
+    cancelResetHold();
     paletteSelectPressed = false;
   }
 
@@ -224,6 +254,8 @@ export function createDesktopControls(
   // Drops all held keys and pending events.
   function clearPendingInput(): void {
     pressedKeys.clear();
+    cancelResetHold();
+    undoRequested = false;
     pendingMouseYawDeltaRadians = 0;
     pendingMousePitchDeltaRadians = 0;
     pendingPalettePointerDeltaX = 0;
@@ -256,6 +288,9 @@ export function createDesktopControls(
   return {
     get enabled() {
       return !paused;
+    },
+    get resetHoldProgress() {
+      return resetHeld && !resetHoldFired ? Math.min(1, resetHeldSeconds / resetHoldSeconds) : 0;
     },
     setLookMode(mode) {
       if (lookMode === mode) {
@@ -308,6 +343,14 @@ export function createDesktopControls(
       // Normalizes diagonal movement; falls back to 1 so zero input does not divide by zero.
       const inputLength = Math.hypot(forwardInput, rightInput) || 1;
       const stepMeters = moveSpeed * deltaSeconds;
+      // A held R counts the frames' time; reaching the hold time fires one reset, and the hold must be released and pressed again to fire another.
+      if (resetHeld && !resetHoldFired) {
+        resetHeldSeconds += deltaSeconds;
+        if (resetHeldSeconds >= resetHoldSeconds - 1e-9) {
+          resetRequested = true;
+          resetHoldFired = true;
+        }
+      }
       // Snapshot the per-frame flags, applying look-mode gating, before clearing them below.
       const frameResetRequested = resetRequested;
       const framePrimaryActionRequested = lookMode === "camera" ? primaryActionRequested : false;
@@ -321,6 +364,7 @@ export function createDesktopControls(
       const frameCarryActionRequested = lookMode === "camera" && carryActionRequested;
       const frameHelpRequested = helpRequested;
       const frameHandRequested = handRequested;
+      const frameUndoRequested = undoRequested;
 
       pendingMouseYawDeltaRadians = 0;
       pendingMousePitchDeltaRadians = 0;
@@ -333,6 +377,7 @@ export function createDesktopControls(
       carryActionRequested = false;
       helpRequested = false;
       handRequested = false;
+      undoRequested = false;
 
       return {
         localDisplacement: vec3((rightInput / inputLength) * stepMeters, (forwardInput / inputLength) * stepMeters, 0),
@@ -348,6 +393,7 @@ export function createDesktopControls(
         carryActionRequested: frameCarryActionRequested,
         helpRequested: frameHelpRequested,
         handRequested: frameHandRequested,
+        undoRequested: frameUndoRequested,
       };
     },
     pause(): void {

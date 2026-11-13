@@ -982,3 +982,24 @@ img.desktop-tool-tile-icon {
   pointer-events: none;
   cursor: default;
 }
+
+.reset-hold-ring {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  z-index: 12;
+  width: 64px;
+  height: 64px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.reset-hold-ring[hidden] {
+  display: none;
+}
+
+.reset-hold-ring svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}

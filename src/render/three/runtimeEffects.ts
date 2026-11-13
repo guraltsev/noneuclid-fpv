@@ -27,6 +27,8 @@ export interface RuntimeEffectsDeps {
   /** Ends an XR session if one is presenting, then runs the restart. */
   requestAppRestart(restart: () => void): void;
   teleportPlayerHome(): void;
+  /** Asks for the same guarded reset that holding R does (the next frame wipes what the student made and offers an undo). */
+  requestStartOver(): void;
   addGeodesicToCannon(cannonId: string): void;
   startGeodesicCannonCarry(cannonId: string): void;
   /** Asks the world to start the tool behind an action on an object's menu page. */
@@ -75,7 +77,8 @@ export function createRuntimeEffects(deps: RuntimeEffectsDeps): RuntimeEffects {
         deps.applyMenuComfortState();
         return;
       case "reload-world":
-        deps.requestAppRestart(() => host.onReloadRequested?.());
+        // "Start over" on the menu is the same reset as holding R, with the same undo.
+        deps.requestStartOver();
         return;
       case "go-home":
         deps.teleportPlayerHome();

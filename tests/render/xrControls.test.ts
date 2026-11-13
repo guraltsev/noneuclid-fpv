@@ -1,12 +1,12 @@
 /**
  * WebXR gamepad input (src/render/three/xrControls.ts): turns the thumbstick axes and button states of every XR
  * input source's gamepad into a `RuntimeInputFrame` (continuous turn from stick-x, forward motion from stick-y, no
- * strafing, no pitch) and into rising-edge action requests (reset, primary action, interact, carry, help) that fire
+ * strafing, no pitch) and into rising-edge action requests (primary action, interact, carry, help) that fire
  * once per press. Follows the WebXR `xr-standard` gamepad button layout. Gamepad and input-source objects here are
  * plain literals (the `GamepadLike` structural type accepts them directly), not a fake of a boundary.
  */
 import { describe, expect, it } from "vitest";
-import { combineStickAxes, createXrControls, createXrInputFrame, isCarryActionPressed, isHelpPressed, isInteractPressed, isResetPressed, readPrimaryStickAxes } from "../../src/render/three/xrControls";
+import { combineStickAxes, createXrControls, createXrInputFrame, isCarryActionPressed, isHelpPressed, isInteractPressed, readPrimaryStickAxes } from "../../src/render/three/xrControls";
 
 describe("XR controls", () => {
   it("never throws and returns no movement when gamepad data is missing", () => {
@@ -78,26 +78,21 @@ describe("XR controls", () => {
     expect(frame.yawDeltaRadians).toBe(0);
   });
 
-  it("maps thumbstick click style buttons to reset without consuming menu buttons", () => {
-    expect(isResetPressed({ buttons: [{ pressed: false }, { pressed: false }, { pressed: false }, { pressed: true }] }))
-      .toBe(true);
-    expect(isResetPressed({ buttons: [{ pressed: false }, { pressed: true }] })).toBe(false);
-    expect(
-      createXrInputFrame([
-        { gamepad: { buttons: [{ pressed: false }, { pressed: false }, { pressed: false }, { pressed: true }] } },
-      ], 1).resetRequested,
-    ).toBe(true);
+  it("never requests a reset from the thumbstick click or any other button", () => {
+    const clicked = { gamepad: { buttons: [{ pressed: false }, { pressed: false }, { pressed: false }, { pressed: true }] } };
+    const allDown = { gamepad: { buttons: Array.from({ length: 6 }, () => ({ pressed: true })) } };
+
+    expect(createXrInputFrame([clicked], 1).resetRequested).toBe(false);
+    expect(createXrInputFrame([allDown], 1).resetRequested).toBe(false);
   });
 
-  it("reports reset as a thumbstick-click edge in stateful controls", () => {
+  it("keeps resetRequested false across thumbstick-click presses in stateful controls", () => {
     const controls = createXrControls();
     const buttons = (down: boolean) => ({ gamepad: { buttons: [{ pressed: false }, { pressed: false }, { pressed: false }, { pressed: down }] } });
 
-    expect(controls.consumeFrame([buttons(false)], 1).resetRequested).toBe(false);
-    expect(controls.consumeFrame([buttons(true)], 1).resetRequested).toBe(true);
-    expect(controls.consumeFrame([buttons(true)], 1).resetRequested).toBe(false);
-    expect(controls.consumeFrame([buttons(false)], 1).resetRequested).toBe(false);
-    expect(controls.consumeFrame([buttons(true)], 1).resetRequested).toBe(true);
+    for (const down of [false, true, true, false, true]) {
+      expect(controls.consumeFrame([buttons(down)], 1).resetRequested).toBe(false);
+    }
   });
 
   it("treats NaN stick axes as zero", () => {

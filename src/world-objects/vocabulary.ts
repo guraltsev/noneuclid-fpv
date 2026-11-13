@@ -67,6 +67,14 @@ export const objectActions = {
   startOver: "Start over",
 } as const;
 
+/** The sentences of the toasts that follow a start over, an undo and a deletion (design 017 section 8.8). */
+export const toastMessages = {
+  worldReset: "World reset",
+  undone: "Undone",
+  /** "Sign deleted": what a deletion announces, from the noun of the thing. */
+  deleted: (noun: string): string => `${noun.charAt(0).toUpperCase()}${noun.slice(1)} deleted`,
+} as const;
+
 /** The input verbs (design 017 section 7): one meaning each, bound on desktop and in VR. */
 export const verbNames = {
   use: "Use",

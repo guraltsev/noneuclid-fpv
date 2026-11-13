@@ -35,6 +35,8 @@ export interface ToastQueueOptions {
 /** Options of one `push`. */
 export interface ToastPushOptions {
   readonly action?: ToastAction;
+  /** How long this toast stays, in milliseconds; defaults to the queue's `durationMs` (the undo toast stays 10 s). */
+  readonly durationMs?: number;
   /** Time of the push in milliseconds; defaults to the queue's clock. */
   readonly nowMs?: number;
 }
@@ -56,7 +58,7 @@ export function createToastQueue(options: ToastQueueOptions): ToastQueue {
   let nextId = 1;
   return {
     push(text, pushOptions = {}) {
-      const expiresAtMs = (pushOptions.nowMs ?? now()) + options.durationMs;
+      const expiresAtMs = (pushOptions.nowMs ?? now()) + (pushOptions.durationMs ?? options.durationMs);
       const existing = toasts.find((toast) => toast.text === text);
       if (existing) {
         const restarted: Toast = { ...existing, action: pushOptions.action, expiresAtMs };
