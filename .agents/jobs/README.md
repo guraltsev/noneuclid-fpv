@@ -171,3 +171,17 @@ can run as written. Job 68 (split from job 30) waits for the maintainer.
 | [67](_done/67_rigid_floor_patches_and_moduli_readout.md) | Rigid floor patches, Teichmuller steps and a moduli readout for the torus | done, needs review | [95](../../_issues/95_torus_moduli_floor_shears_and_the_deformation_does_not_read_as_moduli_space.md) |  |
 | [68](68_deformation_commit_in_the_step.md) | Commit a deformation inside the engine step (phase 7) | blocked on the maintainer (013 API rows) | - |  |
 | [69](69_vr_palette_scale_at_new_distance.md) | Scale the VR palette to its new distance and remove the unused auto-close check | queued (branch `dev`) | - |  |
+| [00](00_coordinate_jobs_70_82.md) | Coordinate jobs 70-82 (design 017: discoverable UI and sandbox level design): order, gates, batch report | queued (branch `dev`) | - |  |
+| [70](70_student_vocabulary.md) | One student vocabulary: the vocabulary module, the renames and the retired-terms check | queued | - |  |
+| [71](71_toast_queue.md) | Toasts: a renderer-neutral message queue shown on desktop and in VR | queued | - |  |
+| [72](72_tools_stay_in_hand.md) | Tools stay in hand until put away | queued | - |  |
+| [73](73_guarded_start_over_and_undo.md) | Guarded "Start over", undo, and no reset on the VR stick press | queued | - |  |
+| [74](74_pause_card_and_crosshair.md) | Pause card (the desktop main menu) and an always-on crosshair | queued | - |  |
+| [75](75_desktop_tool_belt_and_verbs.md) | The tool belt and the input verbs on desktop | queued | - |  |
+| [76](76_hint_strip_and_targeting.md) | Hint strip, focus outline, angular picking and sticky focus | queued | - |  |
+| [77](77_vr_hand_roles_one_controller_and_belt.md) | VR: hand roles, one-controller layout, the belt on the wrist or the waist, the VR main menu | queued | - |  |
+| [78](78_self_explaining_menus.md) | Self-explaining menus: text labels, disabled reasons, readable beam rows, one way to delete | queued | - |  |
+| [79](79_help_that_teaches.md) | Help that teaches: three pages, generated How to, "Try it", first-use tips, Settings | queued | - |  |
+| [80](80_shape_machine_panel.md) | Shape machine panel: one picture, Shift and Height, direct entry, presets | queued | - |  |
+| [81](81_spawn_tool_stand_and_demo.md) | Spawn framing, a help cube that says "click me", the tool stand and the demo | queued | - |  |
+| [82](82_discoveries.md) | Discoveries, curiosity markers and "Show edges" | queued | - |  |
