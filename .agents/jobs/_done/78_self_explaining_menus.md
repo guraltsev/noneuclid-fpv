@@ -69,7 +69,7 @@ commit on `dev`, report appended.
 
 ### Done
 
-Commit: `COMMIT_HASH` on `dev`.
+Commit: `a1192f2` on `dev`.
 
 - Vocabulary (`src/world-objects/vocabulary.ts`): `disabledReasons` (Join, Aim/Extend on a linked beam, Map, Reshape world, shape machine off, first/last page, empty help topic), `menuControlText` ("+ Add beam", Delete, Previous/Next, the measurement menu), `actionWithKey` ("Pick up · G"), `beamRowLabel`, `laserShortIdOfLabel`. `toolBeltText.noMapForWorld` now reads from `disabledReasons`.
 - Types: `ObjectActionEntry.disabledReason`; object-action tool entries get `unavailableReason(objectId, tool)` (the Join tool gives its reason; `objectActionsFor` fills `disabledReason`, with a generic fallback). `PaletteHeaderAction.disabledReason`, a shared `PaletteTextAction`, `disabledReason` on the shape machine steps and Reshape button ("GO!" keeps its label, reason "Nothing to change"), on the page buttons and on the help hub buttons. The Aim button of a linked beam is now drawn disabled with "Linked beams cannot be aimed" (it was hidden).
