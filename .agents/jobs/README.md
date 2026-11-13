@@ -181,7 +181,7 @@ can run as written. Job 68 (split from job 30) waits for the maintainer.
 | [76](_done/76_hint_strip_and_targeting.md) | Hint strip, focus outline, angular picking and sticky focus | done, needs review | - |  |
 | [77](_done/77_vr_hand_roles_one_controller_and_belt.md) | VR: hand roles, one-controller layout, the belt on the wrist or the waist, the VR main menu | done, needs review | - |  |
 | [78](_done/78_self_explaining_menus.md) | Self-explaining menus: text labels, disabled reasons, readable beam rows, one way to delete | done, needs review | - |  |
-| [79](79_help_that_teaches.md) | Help that teaches: three pages, generated How to, "Try it", first-use tips, Settings | queued | - |  |
+| [79](_done/79_help_that_teaches.md) | Help that teaches: three pages, generated How to, "Try it", first-use tips, Settings | done, needs review | - |  |
 | [80](80_shape_machine_panel.md) | Shape machine panel: one picture, Shift and Height, direct entry, presets | queued | - |  |
 | [81](81_spawn_tool_stand_and_demo.md) | Spawn framing, a help cube that says "click me", the tool stand and the demo | queued | - |  |
 | [82](82_discoveries.md) | Discoveries, curiosity markers and "Show edges" | queued | - |  |
