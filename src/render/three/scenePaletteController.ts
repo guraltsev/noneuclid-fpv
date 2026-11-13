@@ -62,6 +62,8 @@ export interface ScenePaletteControllerOptions {
   readonly onDebugOverlayItemToggled: (itemId: RuntimeDebugOverlayItemId, enabled: boolean) => void;
   /** Comfort (anti-nausea) mode toggled. */
   readonly onAntiNauseaModeToggled: (enabled: boolean) => void;
+  /** The "Show hints" switch of Settings toggled. */
+  readonly onShowHintsToggled?: (enabled: boolean) => void;
   /** Portal panel rendering mode chosen. */
   readonly onPortalPanelModeSelected: (mode: PortalPanelModeId) => void;
   /** Portal inspection toggled. */
@@ -189,6 +191,7 @@ export function createScenePaletteController(options: ScenePaletteControllerOpti
     onDebugOverlayToggled: options.onDebugOverlayToggled,
     onDebugOverlayItemToggled: options.onDebugOverlayItemToggled,
     onAntiNauseaModeToggled: options.onAntiNauseaModeToggled,
+    onShowHintsToggled: options.onShowHintsToggled,
     onPortalPanelModeSelected: options.onPortalPanelModeSelected,
     onPortalInspectionToggled: options.onPortalInspectionToggled,
     onCollisionGeometryWireframesToggled: options.onCollisionGeometryWireframesToggled,

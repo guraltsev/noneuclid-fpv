@@ -1284,6 +1284,7 @@ The student vocabulary (design 017 section 6): every student-visible noun, verb 
 | const | `pauseCardText` | The words of the pause card, the desktop main menu (design 017 section 8.1). |
 | const | `mainMenuText` | The words of the main menu's buttons that are not named elsewhere. |
 | const | `toolBeltText` | The words of the tool belt (design 017 section 7.4) and of the right click that finds nothing to open. |
+| const | `hintStripText` | The words of the hint strip (design 017 section 8.2): what the listed input does right now, after the colon. |
 
 ### `world-objects/worldObjectOwner.ts`
 
@@ -1514,6 +1515,7 @@ Aim picking: finds what an aim ray (desktop crosshair or XR controller) hits, ac
 | interface | `AimRay` | An aim ray in the root cell's frame (world axes, meters); the direction need not be unit length. |
 | interface | `ResolveAimTargetRequest` | Inputs for {@link resolveAimTarget} and {@link resolveAimTargets}. |
 | const | `geodesicSegmentAimRadiusMeters` | Radius of the capsule used to pick geodesic segments, meters. |
+| const | `aimPickAngularRadiusRadians` | Angular radius of the minimum target size (design 017 section 8.4), radians (1.5 degrees): when the exact ray hits no object, the nearest object whose hit proxy lies within this angle of the ray is picked, so thin objec… |
 | function | `resolveAimTarget` | Returns the best aim target under the camera crosshair, or `undefined` if nothing is hit. |
 | function | `resolveAimTargetsByRayWalk` | Returns every aim target along the ray, best first, found by walking the ray through the glued cells. |
 | function | `resolveAimTargets` | Returns the best aim target along the ray, or `undefined` if nothing is hit. |
@@ -2159,6 +2161,7 @@ Renderer-neutral state machine for the in-game menu, shared by the desktop overl
 | function | `setRuntimeMenuCollisionGeometryWireframesEnabled` | Enables or disables collision-geometry wireframes. |
 | function | `setRuntimeMenuAimCollisionOutlinesEnabled` | Enables or disables aim-collision outlines. |
 | function | `setRuntimeMenuAntiNauseaModeEnabled` | Enables or disables VR anti-nausea mode. |
+| function | `setRuntimeMenuShowHintsEnabled` | Shows or hides the hint strip. |
 | function | `setRuntimeMenuSelectedTool` | Selects the active tool without changing the page. |
 | function | `setRuntimeMenuReloadConfirmUntilMs` | Sets or clears (undefined) the reload-confirmation deadline. |
 | function | `setRuntimeMenuPlaceFlagType` | Sets the flag type the place-flag tool will place. |
@@ -2258,6 +2261,19 @@ Renderer-neutral definition of the contextual "help lens" panel shown on desktop
 | interface | `HelpLensDefinition` | Content of the help lens: title, explanatory body and action rows. |
 | interface | `CreateHelpLensDefinitionOptions` | Inputs that decide what the help lens describes. |
 | function | `createHelpLensDefinition` | Builds the help lens for the focused object when there is one, else for the selected tool; rows list only available actions (object case) with glyphs for the given input mode. |
+
+### `ui/hintStripDefinition.ts`
+
+The hint strip (design 017 section 8.2 item 3) as renderer-neutral data: up to three inputs that do something right now, each a glyph label and a short text ("Left click", "open Help").
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| const | `maxHintStripEntries` | The most entries the strip ever shows. |
+| interface | `HintStripEntry` | One entry of the strip: the input that does something, and what it does. |
+| interface | `HintStripFocus` | The focused object, as far as the strip needs it: its kind and the actions its focus message offers under the tool in hand. |
+| interface | `HintStripSource` | What the strip is built from. |
+| function | `createHintStripDefinition` | Builds the strip: at most three entries, never empty. |
+| function | `formatHintStripLine` | The strip as one line of text: "Left click: open Help · H: what's this?". |
 
 ### `ui/inputIntents.ts`
 
@@ -2398,6 +2414,15 @@ Floating tooltip DOM element that follows a screen position, used for object foc
 | interface | `FloatingObjectTooltip` | Handle to the tooltip created by {@link createFloatingObjectTooltip}. |
 | function | `createFloatingObjectTooltip` | Creates a hidden tooltip element with class floating-object-tooltip and appends it to container. |
 
+### `render/dom/hintStrip.ts`
+
+The desktop hint strip (design 017 section 8.2 item 3): one line just above the tool belt that names up to three inputs that do something right now, each as a key cap and a short text.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `HintStrip` | Handle to the strip created by {@link createHintStrip}. |
+| function | `createHintStrip` | Creates a hidden strip with class hint-strip and appends it to `container`. |
+
 ### `render/dom/pauseCard.ts`
 
 The pause card, the desktop main menu (design 017 sections 7.5 and 8.1): a DOM overlay that dims the scene by 35 percent and shows the activity title, a one-line description, "Click to play", the controls table and the main-menu actions.
@@ -2449,7 +2474,7 @@ Red cross decal drawn on the surface point that the aim ray currently hits.
 
 ### `render/three/aimFeedback.ts`
 
-Per-frame feedback on what the player aims at: the floating object tooltip, the help lens, the aim cross marker with the XR controller ray, and the protractor tool's preview drawing.
+Per-frame feedback on what the player aims at: the floating object tooltip, the focus outline, the help lens, the aim cross marker with the XR controller ray, the Laser's placement preview and the protractor tool's preview drawing.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
@@ -2463,6 +2488,7 @@ Aim-ray resolution for both input modes: the desktop camera center ray and the r
 
 | Kind | Name | Summary |
 | --- | --- | --- |
+| const | `stickyFocusMilliseconds` | How long the display focus stays on an object after the ray leaves it, milliseconds (design 017 section 8.4). |
 | interface | `AimInteractionDeps` | Dependencies for {@link createAimInteraction}; createThreeApp#shell supplies the live camera, renderer and rig objects as values and the changing state as getters. |
 | function | `createAimInteraction` | Creates the aim-interaction helpers bound to the given dependencies. |
 
@@ -2757,6 +2783,18 @@ Rigid floor patches for a textured floor material.
 | --- | --- | --- |
 | function | `patchFloorPatchMaterial` | Installs the rigid floor patches on a material whose `userData.floorPatchField` is set, and leaves any other material alone. |
 
+### `render/three/focusOutline.ts`
+
+The outline of the focused object (design 017 section 8.4): a translucent shell in the tool's color around the object the aim is on.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| const | `focusOutlineOpacity` | Opacity of the outline shell. |
+| const | `focusOutlineRenderOrder` | Render order of the outline: above the scene, below the debug overlays. |
+| const | `handOutlineColor` | The outline color when no tool is in hand (the Hand): white. |
+| interface | `FocusOutline` | Handle to the outline created by {@link createFocusOutline}. |
+| function | `createFocusOutline` | Creates the outline; `cellMeshes` maps a cell id to the root the outline is parented to. |
+
 ### `render/three/frameDiagnostics.ts`
 
 Frame-timing smoothing, WebGL render-info capture, and the initial XR debug state used by the debug overlay.
@@ -2922,6 +2960,18 @@ Help panel ("help lens") renderer: shows the current contextual help definition 
 | --- | --- | --- |
 | interface | `HelpLensRenderer` | Handle to the help panel created by {@link createHelpLensRenderer}; the creator must call dispose(). |
 | function | `createHelpLensRenderer` | Creates a hidden help panel: a DOM element with class help-lens appended to container, plus a lazily created XR panel added to scene. |
+
+### `render/three/laserPreview.ts`
+
+The Laser's placement preview (design 017 section 8.3): with the Laser in hand and the aim on the floor, a translucent ghost of a laser stands at the aim point, with an arrow along the direction a placed laser would fire.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| const | `laserPreviewPostRadiusMeters` | Radius of the ghost's post, meters. |
+| const | `laserPreviewPostHeightMeters` | Height of the ghost's post, meters. |
+| const | `laserPreviewArrowLengthMeters` | Length of the direction arrow from the post, meters. |
+| interface | `LaserPreview` | Handle to the preview created by {@link createLaserPreview}. |
+| function | `createLaserPreview` | Creates the preview, adds it (hidden) to `scene`, and returns its handle. |
 
 ### `render/three/measureLengthRenderer.ts`
 

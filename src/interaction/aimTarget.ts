@@ -134,6 +134,12 @@ const geodesicEmitterGeodesicHandleRadiusMeters = 0.16 / 2.5;
 const defaultMaxEmitterAimDistanceMeters = 200;
 /** Radius of the capsule used to pick geodesic segments, meters. */
 export const geodesicSegmentAimRadiusMeters = 0.28 / 1.5;
+/**
+ * Angular radius of the minimum target size (design 017 section 8.4), radians (1.5 degrees): when the exact ray hits no object, the nearest object whose hit proxy lies within this angle of the ray is picked, so thin objects (lasers, beams, crossings) are easy to aim at.
+ */
+export const aimPickAngularRadiusRadians = (1.5 * Math.PI) / 180;
+// The angular radius as a lateral miss per meter of ray distance (the tangent, which is what a miss distance grows with).
+const aimPickAngularTolerance = Math.tan(aimPickAngularRadiusRadians);
 
 /**
  * Returns the best aim target under the camera crosshair, or `undefined` if nothing is hit.
@@ -187,6 +193,8 @@ export function resolveAimTargetsByRayWalk(request: ResolveAimTargetRequest): re
     : walkRayPieces(request.world, originCellId, o, d, s, maxEmitterDistanceMeters);
 
   const candidates: AimTarget[] = [];
+  // What each piece was tested with, kept for the angular pass when the exact ray hits no object.
+  const testedPieces: Array<{ readonly cell: CompiledPrismCell; readonly ray: CellRay; readonly window: HitWindow; readonly hopCount: number }> = [];
   for (let k = 0; k < pieces.length; k += 1) {
     const piece = pieces[k];
     const cell = request.world.cellsById.get(piece.cellId);
@@ -220,6 +228,7 @@ export function resolveAimTargetsByRayWalk(request: ResolveAimTargetRequest): re
       direction: transformDirection3(piece.cellFromStart, d),
       rootFromCell,
     };
+    testedPieces.push({ cell, ray, window: { tMin, tMax }, hopCount: k });
     candidates.push(
       ...resolveObjectAimTargets(
         request.registry,
@@ -230,6 +239,7 @@ export function resolveAimTargetsByRayWalk(request: ResolveAimTargetRequest): re
         maxEmitterDistanceMeters,
         ignoredGeodesicIds,
         k,
+        0,
       ),
     );
     if (floorT !== undefined && floorT <= maxDistanceMeters) {
@@ -247,6 +257,25 @@ export function resolveAimTargetsByRayWalk(request: ResolveAimTargetRequest): re
       if (!target || zAtExit > Math.min(cell.heightMeters, target.heightMeters) + aimPointToleranceMeters) {
         break;
       }
+    }
+  }
+
+  // Minimum target size: with no exact object hit, accept objects whose hit proxy lies within the angular radius of the ray. Floor and wall limits are already in the windows, so nothing nearer is blocked.
+  if (!candidates.some((candidate) => candidate.kind === "object")) {
+    for (const tested of testedPieces) {
+      candidates.push(
+        ...resolveObjectAimTargets(
+          request.registry,
+          tested.cell,
+          tested.ray,
+          tested.window,
+          maxDistanceMeters,
+          maxEmitterDistanceMeters,
+          ignoredGeodesicIds,
+          tested.hopCount,
+          aimPickAngularTolerance,
+        ),
+      );
     }
   }
 
@@ -303,6 +332,19 @@ function intersectAimObject(
   origin: Vec3,
   direction: Vec3,
   ignoredGeodesicIds: ReadonlySet<string>,
+  angularTolerance: number,
+): ObjectAimHit | undefined {
+  const exact = intersectAimObjectExactly(registry, object, origin, direction, ignoredGeodesicIds);
+  return exact ?? (angularTolerance > 0 ? intersectAimObjectWithinAngle(registry, object, origin, direction, ignoredGeodesicIds, angularTolerance) : undefined);
+}
+
+// Exact ray-vs-proxy test of one object.
+function intersectAimObjectExactly(
+  registry: RuntimeObjectReader,
+  object: RuntimeWorldObject,
+  origin: Vec3,
+  direction: Vec3,
+  ignoredGeodesicIds: ReadonlySet<string>,
 ): ObjectAimHit | undefined {
   const bounds = getDynamicObjectCollisionBounds(runtimeObjectToDynamicObjectState(object));
   // Pick the proxy shape by object kind: protractor label box, geodesic capsule, cannon cylinder+sphere+handles, collision cylinder, else a small sphere at the pose.
@@ -317,6 +359,122 @@ function intersectAimObject(
       : intersectRayWithSphere(origin, direction, object.localPose.translation, fallbackObjectRadiusMeters);
 }
 
+// Angular fallback of the minimum target size: the ray passes within `tolerance` (a tangent) of the object's proxy axis. Creatures and protractor labels are not picked this way: creatures wander through the aim, and the label box is already large.
+function intersectAimObjectWithinAngle(
+  registry: RuntimeObjectReader,
+  object: RuntimeWorldObject,
+  origin: Vec3,
+  direction: Vec3,
+  ignoredGeodesicIds: ReadonlySet<string>,
+  tolerance: number,
+): ObjectAimHit | undefined {
+  switch (object.kind) {
+    case "geodesci-marmot":
+    case "geo-mouse":
+    case "geo-butterfly":
+    case "geodesicMeasurements/angle":
+      return undefined;
+    case "geodesicModel/segment": {
+      const hit = axisHitWithinAngle(origin, direction, object.start, object.direction, object.lengthMeters, geodesicSegmentAimRadiusMeters, tolerance);
+      return hit === undefined ? undefined : { ...hit, geodesicSegmentDistanceMeters: hit.axisDistance };
+    }
+    case "geodesicEmitters/emitter": {
+      const bounds = getGeodesicEmitterAimCylinderBounds(object);
+      if (!bounds) return undefined;
+      const sphereCenter = getGeodesicEmitterAimSphereCenter(object);
+      const bodyBase = { x: bounds.center.x, y: bounds.center.y, z: bounds.center.z - bounds.halfHeight };
+      const body = axisHitWithinAngle(origin, direction, bodyBase, { x: 0, y: 0, z: 1 }, bounds.halfHeight * 2, bounds.radius, tolerance);
+      const handle = intersectEmitterHandlesWithinAngle(registry, origin, direction, object, ignoredGeodesicIds, tolerance);
+      const hit = chooseEmitterAimHit(body, handle);
+      return hit === undefined ? undefined : {
+        ...hit,
+        targetPoint: sphereCenter,
+        geodesicEmitterGeodesicId: hit.geodesicEmitterGeodesicId ?? resolveDefaultEmitterGeodesicId(registry, object, ignoredGeodesicIds),
+      };
+    }
+    default: {
+      const bounds = getDynamicObjectCollisionBounds(runtimeObjectToDynamicObjectState(object));
+      return bounds
+        ? axisHitWithinAngle(origin, direction, { x: bounds.center.x, y: bounds.center.y, z: bounds.center.z - bounds.halfHeight }, { x: 0, y: 0, z: 1 }, bounds.halfHeight * 2, bounds.radius, tolerance)
+        : axisHitWithinAngle(origin, direction, object.localPose.translation, { x: 0, y: 0, z: 1 }, 0, fallbackObjectRadiusMeters, tolerance);
+    }
+  }
+}
+
+// The handle capsules of an emitter, each tested within the angle; nearest wins.
+function intersectEmitterHandlesWithinAngle(
+  registry: RuntimeObjectReader,
+  origin: Vec3,
+  direction: Vec3,
+  emitter: Extract<RuntimeWorldObject, { readonly kind: "geodesicEmitters/emitter" }>,
+  ignoredGeodesicIds: ReadonlySet<string>,
+  tolerance: number,
+): ObjectAimHit | undefined {
+  const center = {
+    x: emitter.localPose.translation.x,
+    y: emitter.localPose.translation.y,
+    z: emitter.localPose.translation.z + geodesicRayBeamHeightMeters,
+  };
+  let best: ObjectAimHit | undefined;
+  for (const geodesicId of getEmitterGeodesicIds(registry, emitter.id)) {
+    if (ignoredGeodesicIds.has(geodesicId)) continue;
+    const yawRadians = resolveEmitterLaunchYaw(registry, emitter, geodesicId);
+    const handleDirection = { x: Math.cos(yawRadians), y: Math.sin(yawRadians), z: 0 };
+    const handleStart = {
+      x: center.x + handleDirection.x * geodesicRayBeamStartOffsetMeters,
+      y: center.y + handleDirection.y * geodesicRayBeamStartOffsetMeters,
+      z: center.z,
+    };
+    const hit = axisHitWithinAngle(origin, direction, handleStart, handleDirection, geodesicEmitterGeodesicHandleLengthMeters, geodesicEmitterGeodesicHandleRadiusMeters, tolerance);
+    if (hit && (!best || hit.distance < best.distance)) {
+      best = { ...hit, targetPoint: center, geodesicEmitterGeodesicId: geodesicId };
+    }
+  }
+  return best;
+}
+
+// The ray's closest approach to a proxy axis segment (a capsule of `radius` around it) counts as a hit when the miss is within `radius` plus `tolerance` per meter of ray distance. The hit distance is the ray parameter of the closest approach.
+function axisHitWithinAngle(
+  origin: Vec3,
+  direction: Vec3,
+  axisStart: Vec3,
+  axisDirection: Vec3,
+  axisLength: number,
+  radius: number,
+  tolerance: number,
+): (ObjectAimHit & { readonly axisDistance: number }) | undefined {
+  const offset = subVec3(origin, axisStart);
+  const along = dotVec3(direction, axisDirection);
+  const rayOnOffset = dotVec3(direction, offset);
+  const axisOnOffset = dotVec3(axisDirection, offset);
+  const denominator = 1 - along * along;
+  let axisDistance = denominator < 1e-9 ? axisOnOffset : axisOnOffset + along * ((along * axisOnOffset - rayOnOffset) / denominator);
+  axisDistance = Math.min(Math.max(axisDistance, 0), Math.max(axisLength, 0));
+  const rayDistance = axisDistance * along - rayOnOffset;
+  if (!(rayDistance > aimPointToleranceMeters)) {
+    return undefined;
+  }
+
+  const point = pointOnRay(origin, direction, rayDistance);
+  const axisPoint = pointOnSegmentCenterline(axisStart, axisDirection, axisDistance);
+  const miss = Math.sqrt(distanceSquared3(point, axisPoint));
+  if (miss > radius + rayDistance * tolerance) {
+    return undefined;
+  }
+
+  return {
+    distance: rayDistance,
+    normal: normalizeVec3OrFallback(subVec3(point, axisPoint)),
+    point,
+    targetPoint: axisPoint,
+    axisDistance,
+  };
+}
+
+function distanceSquared3(a: Vec3, b: Vec3): number {
+  return (a.x - b.x) ** 2 + (a.y - b.y) ** 2 + (a.z - b.z) ** 2;
+}
+
 function resolveObjectAimTargets(
   registry: RuntimeObjectReader,
   cell: CompiledPrismCell,
@@ -326,6 +484,7 @@ function resolveObjectAimTargets(
   maxEmitterDistanceMeters: number,
   ignoredGeodesicIds: ReadonlySet<string>,
   hopCount: number,
+  angularTolerance: number,
 ): readonly AimTarget[] {
   const hits: AimTarget[] = [];
 
@@ -338,11 +497,11 @@ function resolveObjectAimTargets(
       continue;
     }
 
-    let hit = intersectAimObject(registry, object, ray.origin, ray.direction, ignoredGeodesicIds);
+    let hit = intersectAimObject(registry, object, ray.origin, ray.direction, ignoredGeodesicIds, angularTolerance);
     if (hit && hit.distance < window.tMin - hitWindowToleranceMeters && window.tMin > 0) {
       // The nearest surface lies before this cell copy (the proxy pokes across the entry portal); the part of the proxy
       // inside this cell is what the ray can hit here, so test again from the window start.
-      const shifted = intersectAimObject(registry, object, pointOnRay(ray.origin, ray.direction, window.tMin), ray.direction, ignoredGeodesicIds);
+      const shifted = intersectAimObject(registry, object, pointOnRay(ray.origin, ray.direction, window.tMin), ray.direction, ignoredGeodesicIds, angularTolerance);
       hit = shifted ? { ...shifted, distance: shifted.distance + window.tMin } : undefined;
     }
 

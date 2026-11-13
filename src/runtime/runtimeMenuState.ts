@@ -85,6 +85,8 @@ export interface RuntimeMenuState {
   readonly aimCollisionOutlinesEnabled: boolean;
   /** VR comfort setting; defaults to true. */
   readonly antiNauseaModeEnabled: boolean;
+  /** Whether the hint strip is shown (the "Show hints" switch of Settings); absent means on. */
+  readonly showHintsEnabled?: boolean;
   /** Currently active tool. */
   readonly selectedTool: RuntimeToolId;
   /**
@@ -157,6 +159,8 @@ export interface CreateRuntimeMenuStateOptions {
   readonly debugOverlayEnabled?: boolean;
   readonly debugOverlayItems?: readonly RuntimeDebugOverlayItemId[];
   readonly vrComfortOptions?: Pick<VrComfortOptions, "antiNauseaModeEnabled">;
+  /** The remembered "Show hints" switch; absent or true means on. */
+  readonly showHintsEnabled?: boolean;
 }
 
 /**
@@ -182,6 +186,7 @@ export function createRuntimeMenuState(options: CreateRuntimeMenuStateOptions): 
     ),
     aimCollisionOutlinesEnabled: hasAnyDebugOption(debugSettings?.debugOptions, aimCollisionDebugOptions),
     antiNauseaModeEnabled: options.vrComfortOptions?.antiNauseaModeEnabled ?? true,
+    ...(options.showHintsEnabled === false ? { showHintsEnabled: false } : {}),
     selectedTool: "none",
     placeFlagOptions: {
       flagType: "WoodenSign1",
@@ -635,6 +640,17 @@ export function setRuntimeMenuAntiNauseaModeEnabled(
   return {
     ...state,
     antiNauseaModeEnabled: enabled,
+  };
+}
+
+/** Shows or hides the hint strip. */
+export function setRuntimeMenuShowHintsEnabled(
+  state: RuntimeMenuState,
+  enabled: boolean,
+): RuntimeMenuState {
+  return {
+    ...state,
+    showHintsEnabled: enabled,
   };
 }
 

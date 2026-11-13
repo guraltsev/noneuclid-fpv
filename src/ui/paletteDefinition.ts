@@ -78,6 +78,8 @@ export interface SettingsPaletteContent {
   readonly debugSectionEnabled: boolean;
   readonly debugEnabled: boolean;
   readonly antiNauseaModeEnabled: boolean;
+  /** Whether the hint strip is shown (the "Show hints" switch). */
+  readonly showHintsEnabled: boolean;
   /** True while a reload awaits its confirming second press. */
   readonly reloadConfirmationActive: boolean;
 }
@@ -360,6 +362,7 @@ export function createPaletteDefinition(
         debugSectionEnabled: appConfig.menu.debugSectionEnabled,
         debugEnabled: state.debugEnabled,
         antiNauseaModeEnabled: state.antiNauseaModeEnabled,
+        showHintsEnabled: state.showHintsEnabled !== false,
         reloadConfirmationActive,
       },
     };

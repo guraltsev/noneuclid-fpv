@@ -22,11 +22,15 @@ import { resolveAimTargets as defaultResolveAimTargets } from "./aimTarget";
 import { formatVec3, roundNumber } from "./appDebugHelpers";
 import { renderCameraFarMeters, renderCameraNearMeters } from "./renderCameraClip";
 import {
+  FocusedRuntimeObject,
   RootAimRay,
   createAimTargetCycleSignature,
   getRuntimeObjectInteractionRangeMeters,
 } from "./rootAimRay";
 import { createXrPlayerRig, xrRigidTransformLocalMatrix } from "./xrPlayerRig";
+
+/** How long the display focus stays on an object after the ray leaves it, milliseconds (design 017 section 8.4). */
+export const stickyFocusMilliseconds = 150;
 
 /** Dependencies for {@link createAimInteraction}; createThreeApp#shell supplies the live camera, renderer and rig objects as values and the changing state as getters. */
 export interface AimInteractionDeps {
@@ -48,6 +52,8 @@ export interface AimInteractionDeps {
   getFrameSerial(): number;
   /** Optional override of the ray-walk resolver (tests count resolutions through it). */
   readonly resolveAimTargets?: typeof defaultResolveAimTargets;
+  /** Optional clock in milliseconds for the sticky display focus; defaults to `performance.now`. */
+  readonly nowMilliseconds?: () => number;
 }
 
 /**
@@ -64,6 +70,9 @@ export function createAimInteraction(deps: AimInteractionDeps) {
   const aimRayCamera = new THREE.PerspectiveCamera(70, 1, renderCameraNearMeters, renderCameraFarMeters);
   // Which of several overlapping candidates is selected; valid only while the candidate signature is unchanged.
   let aimTargetCycleState: { readonly signature: string; readonly index: number } | undefined;
+  // The object the display focus last rested on and when, for the sticky focus.
+  let stickyFocus: { readonly objectId: string; readonly focused: FocusedRuntimeObject; readonly seenAtMilliseconds: number } | undefined;
+  const nowMilliseconds = deps.nowMilliseconds ?? (() => performance.now());
 
   // Selected target: the cycled object candidate if any interactable object is in range, otherwise the first hit of any kind.
   // Side effect: clears the cycle state when there are no candidates or the candidate set changed.
@@ -177,7 +186,11 @@ export function createAimInteraction(deps: AimInteractionDeps) {
       return undefined;
     }
 
-    const target = resolveCurrentAimTarget(ray);
+    return focusedFromTarget(resolveCurrentAimTarget(ray));
+  }
+
+  // The focused object of a target: an interactable object within its range.
+  function focusedFromTarget(target: AimTarget | undefined): FocusedRuntimeObject | undefined {
     const object = target?.object;
     if (target?.kind !== "object" || !object || (!object.tooltip && !object.interactable)) {
       return undefined;
@@ -196,6 +209,47 @@ export function createAimInteraction(deps: AimInteractionDeps) {
         z: target.rootPoint.z + 0.18,
       },
     };
+  }
+
+  // A creature is focusable only when the selected tool has an action on it (the focus message offers none today); the help lens names it through findFocusedRuntimeObject.
+  function isFocusable(target: AimTarget): boolean {
+    const object = target.object;
+    if (object === undefined || !isCreatureKind(object.kind)) {
+      return true;
+    }
+
+    return getWorldFocusMessageDefinition(object)?.actions.some((action) => action.available) === true;
+  }
+
+  /**
+   * The object to show as focused (tooltip, outline, hint strip, crosshair ring): the aimed object, skipping creatures with no action for the tool in hand, and held for {@link stickyFocusMilliseconds} after the ray leaves it unless the ray lands on another usable object.
+   * Actions and the help key use findFocusedRuntimeObject, which is exact.
+   */
+  function findDisplayFocusedRuntimeObject(ray?: RootAimRay): FocusedRuntimeObject | undefined {
+    const now = nowMilliseconds();
+    let fresh: FocusedRuntimeObject | undefined;
+    if (ray) {
+      const selected = resolveCurrentAimTarget(ray);
+      const target = selected !== undefined && isFocusable(selected)
+        ? selected
+        : getAimTargetCycleCandidates(resolveCurrentAimTargets(ray)).find(isFocusable);
+      fresh = target === undefined ? undefined : focusedFromTarget(target);
+    }
+
+    if (fresh) {
+      stickyFocus = { objectId: fresh.object.id, focused: fresh, seenAtMilliseconds: now };
+      return fresh;
+    }
+
+    if (stickyFocus && now - stickyFocus.seenAtMilliseconds <= stickyFocusMilliseconds) {
+      const object = runtimeObjectRegistry.get(stickyFocus.objectId);
+      if (object) {
+        return object === stickyFocus.focused.object ? stickyFocus.focused : { ...stickyFocus.focused, object };
+      }
+    }
+
+    stickyFocus = undefined;
+    return undefined;
   }
 
   // True for object hits farther than 1 mm and within the object's interaction range (meters).
@@ -327,6 +381,7 @@ export function createAimInteraction(deps: AimInteractionDeps) {
     invalidateAimCache,
     cycleFocusedAimTarget,
     findFocusedRuntimeObject,
+    findDisplayFocusedRuntimeObject,
     targetIsWithinInteractionRange,
     logVerboseAimClick,
     resolveActiveRootAimRay,
@@ -335,4 +390,8 @@ export function createAimInteraction(deps: AimInteractionDeps) {
     getRuntimeObjectTooltipText,
     getWorldFocusMessageDefinition,
   };
+}
+
+function isCreatureKind(kind: RuntimeWorldObject["kind"]): boolean {
+  return kind === "geodesci-marmot" || kind === "geo-mouse" || kind === "geo-butterfly";
 }

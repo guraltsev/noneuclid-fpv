@@ -85,6 +85,9 @@ function createHarness(sessionOverrides: Partial<ClientSessionState> = {}) {
     findFocusedRuntimeObject: () => focus.object
       ? { object: focus.object, distance: 1, tooltipAnchor: { x: 0, y: 0, z: 1 } }
       : undefined,
+    findDisplayFocusedRuntimeObject: () => focus.object
+      ? { object: focus.object, distance: 1, tooltipAnchor: { x: 0, y: 0, z: 1 } }
+      : undefined,
     resolveDesktopTooltipScreenPosition: () => ({ x: 10, y: 20 }),
     getRuntimeObjectTooltipText: () => "Sign",
     getWorldFocusMessageDefinition: (object) =>

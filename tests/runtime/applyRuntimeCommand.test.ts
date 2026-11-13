@@ -406,6 +406,11 @@ describe("applyRuntimeCommand: debug and comfort settings", () => {
     expect(result.effects).toEqual([{ kind: "apply-comfort-state" }]);
   });
 
+  it("switches the hint strip off and on", () => {
+    expect(reduce({ kind: "set-show-hints", enabled: false }).state.menuState.showHintsEnabled).toBe(false);
+    expect(reduce({ kind: "set-show-hints", enabled: true }).state.menuState.showHintsEnabled).toBe(true);
+  });
+
   it("mirrors debug settings that changed from outside into the menu", () => {
     const result = reduce({
       kind: "adopt-debug-settings",

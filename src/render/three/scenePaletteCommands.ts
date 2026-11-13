@@ -25,7 +25,7 @@ export type ScenePaletteCommands = Pick<
   ScenePaletteControllerOptions,
   | "onOpenRequested" | "onCloseRequested" | "onShowSettingsRequested" | "onShowMainRequested" | "onWorldSelected"
   | "onConfigSelected" | "onReloadRequested" | "onHomeRequested" | "onDebugEnabledChanged" | "onDebugSettingsRequested"
-  | "onConsoleLogLevelSelected" | "onDebugOverlayToggled" | "onDebugOverlayItemToggled" | "onAntiNauseaModeToggled"
+  | "onConsoleLogLevelSelected" | "onDebugOverlayToggled" | "onDebugOverlayItemToggled" | "onAntiNauseaModeToggled" | "onShowHintsToggled"
   | "onPortalPanelModeSelected" | "onPortalInspectionToggled" | "onCollisionGeometryWireframesToggled"
   | "onAimCollisionOutlinesToggled" | "onCopyUrlWithOptionsRequested" | "onToolSelected" | "onHelpRequested" | "onPlaceFlagOptionsRequested"
   | "onPlaceFlagTypeSelected" | "onGeodesicCannonAddRequested" | "onGeodesicCannonCarryRequested"
@@ -81,6 +81,9 @@ export function createScenePaletteCommands(deps: ScenePaletteCommandsDeps): Scen
     },
     onAntiNauseaModeToggled(enabled) {
       dispatch({ kind: "set-anti-nausea-mode", enabled });
+    },
+    onShowHintsToggled(enabled) {
+      dispatch({ kind: "set-show-hints", enabled });
     },
     onPortalPanelModeSelected(mode) {
       dispatch({ kind: "set-portal-panel-mode", mode });

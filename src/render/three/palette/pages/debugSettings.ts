@@ -6,6 +6,7 @@ import type { PortalPanelModeId } from "../../../../glue/portalPanelMode";
 import type { RuntimeMenuConsoleLogLevelId } from "../../../../runtime/runtimeMenuState";
 import type { PaletteDefinition } from "../../../../ui/paletteDefinition";
 import type { ScenePaletteAdapterOptions } from "../adapterTypes";
+import { hintStripText } from "../../../../ui/vocabulary";
 import { borderColor, scrollbarBorderColor, scrollbarColor, sectionColor } from "../tokens";
 import { createActionButton, createChoiceSection, createOptionGrid, createSectionLabel, createSettingsScrollContainer, createToggleButton, createToggleRow } from "../widgets";
 
@@ -218,6 +219,25 @@ export function buildSettingsContent(
   }
 
   settings.add(comfortSection);
+
+  const onShowHintsToggled = options.onShowHintsToggled;
+  if (onShowHintsToggled !== undefined) {
+    const hintsSection = new Container({
+      width: "100%",
+      flexDirection: "column",
+      gap: 8,
+      padding: 12,
+      borderRadius: 20,
+      backgroundColor: sectionColor,
+      borderColor,
+      borderWidth: 1,
+    });
+    hintsSection.add(createSectionLabel("Hints"));
+    hintsSection.add(createToggleRow(hintStripText.showHintsSwitch, content.showHintsEnabled, (enabled) => {
+      onShowHintsToggled(enabled);
+    }, "show-hints-toggle"));
+    settings.add(hintsSection);
+  }
 
   return settings;
 }

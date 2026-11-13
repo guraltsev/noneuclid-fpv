@@ -55,6 +55,63 @@ describe("createAimInteraction", () => {
   });
 });
 
+describe("createAimInteraction display focus", () => {
+  function setup() {
+    const world = compileCellComplex(rayWalkWorld());
+    const registry = createRuntimeObjectRegistry([createGeodesicSegment({ cellId: "room-a", start: { x: 0, y: 0, z: 1.08 } })]);
+    let nowMilliseconds = 1000;
+    let frameSerial = 1;
+    const interaction = createAimInteraction({
+      camera: new THREE.PerspectiveCamera(),
+      renderer: {} as THREE.WebGLRenderer,
+      xrRig: {} as never,
+      runtimeObjectRegistry: registry,
+      getWorld: () => world,
+      session: createTestClientSession(),
+      engine: createTestEngine({ playerPose: { cellId: "room-a", position: { x: 0, y: 0, z: 0 }, yawRadians: 0, pitchRadians: 0 } }),
+      getFrameSerial: () => frameSerial,
+      nowMilliseconds: () => nowMilliseconds,
+    });
+    const rayAt = (target: { x: number; y: number; z: number }) => {
+      const camera = cameraLookingAt({ x: 0, y: -0.5, z: 1.08 }, target);
+      return { origin: camera.position.clone(), direction: new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion), quaternion: camera.quaternion.clone() };
+    };
+    return {
+      interaction,
+      onSegment: rayAt({ x: 0, y: 0, z: 1.08 }),
+      onFloor: rayAt({ x: 0.6, y: 0.6, z: 0 }),
+      advance(toMilliseconds: number) {
+        nowMilliseconds = toMilliseconds;
+        frameSerial += 1;
+      },
+    };
+  }
+
+  it("keeps the focus 149 ms after the ray leaves the object and drops it at 151 ms", () => {
+    const { interaction, onSegment, onFloor, advance } = setup();
+    expect(interaction.findDisplayFocusedRuntimeObject(onSegment)?.object.id).toBe("segment-a");
+
+    advance(1149);
+    expect(interaction.findDisplayFocusedRuntimeObject(onFloor)?.object.id).toBe("segment-a");
+    expect(interaction.findFocusedRuntimeObject(onFloor)).toBeUndefined();
+
+    advance(1151);
+    expect(interaction.findDisplayFocusedRuntimeObject(onFloor)).toBeUndefined();
+  });
+
+  it("refreshes the hold while the ray rests on the object and releases it after the ray is lost", () => {
+    const { interaction, onSegment, advance } = setup();
+    expect(interaction.findDisplayFocusedRuntimeObject(onSegment)?.object.id).toBe("segment-a");
+
+    advance(1010);
+    expect(interaction.findDisplayFocusedRuntimeObject(onSegment)?.object.id).toBe("segment-a");
+    advance(1020);
+    expect(interaction.findDisplayFocusedRuntimeObject(undefined)?.object.id).toBe("segment-a");
+    advance(1300);
+    expect(interaction.findDisplayFocusedRuntimeObject(undefined)).toBeUndefined();
+  });
+});
+
 // room-a (north, south, west walls; east portal) glued to room-b (west portal), both 2 m by 2 m; room-b sits at x = 2 in room-a's frame.
 function rayWalkWorld(): CellComplexSpec {
   return {

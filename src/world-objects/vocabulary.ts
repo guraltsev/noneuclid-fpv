@@ -210,3 +210,26 @@ export const toolBeltText = {
   /** The accessible name of the belt. */
   ariaLabel: "Tool belt",
 } as const;
+
+/** The words of the hint strip (design 017 section 8.2): what the listed input does right now, after the colon. Lowercase, since a glyph label comes first. */
+export const hintStripText = {
+  /** The label of the "Show hints" switch in Settings. */
+  showHintsSwitch: "Show hints",
+  tools: "tools",
+  whatsThis: "what's this?",
+  choose: "choose",
+  close: "close",
+  pickUp: "pick up",
+  putDown: "put down",
+  placeLaser: "place a laser",
+  placeSign: "place a sign",
+  openHelp: "open Help",
+  measureBeam: "measure this beam",
+  pickBeam: "pick this beam",
+  pickMeetingPoint: "pick this meeting point",
+  deleteMeasurement: "delete this measurement",
+  /** "extend 2 m": the beam grows by `lengthMeters`; without a length, just "extend". */
+  extend: (lengthMeters?: number): string => lengthMeters === undefined ? "extend" : `extend ${lengthMeters} m`,
+  /** "put the Laser away": what key 0 does with a tool in hand. */
+  putAway: (toolName: string): string => `put the ${toolName} away`,
+} as const;

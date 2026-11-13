@@ -1,6 +1,6 @@
 /**
- * Per-frame feedback on what the player aims at: the floating object tooltip, the help lens, the aim cross marker with the
- * XR controller ray, and the protractor tool's preview drawing.
+ * Per-frame feedback on what the player aims at: the floating object tooltip, the focus outline, the help lens, the aim cross marker with the
+ * XR controller ray, the Laser's placement preview and the protractor tool's preview drawing.
  *
  * The module owns the controller ray line (added to `scene`), the protractor feedback group (parented into a cell root),
  * the id of the object whose help the player pinned and whether the player pinned the selected tool's help. Menu, tool and protractor selection state are read from the session.
@@ -23,6 +23,8 @@ import {
 import type { FloatingObjectTooltip } from "../dom/floatingObjectTooltip";
 import type { AimCrossMarker } from "./aimCrossMarker";
 import type { HelpLensRenderer } from "./helpLensRenderer";
+import { createFocusOutline, handOutlineColor } from "./focusOutline";
+import { createLaserPreview } from "./laserPreview";
 import { createProtractorToolFeedback, protractorToolFeedbackSignature } from "./protractorToolFeedback";
 import type { XrHeadWorldPose } from "./carriedGeodesicCannon";
 import type { FocusedRuntimeObject, RootAimRay } from "./rootAimRay";
@@ -65,6 +67,8 @@ export interface AimFeedbackDeps {
   targetIsWithinInteractionRange(target: AimTarget | undefined): boolean;
   /** Finds the interactable runtime object under the (optional) ray. */
   findFocusedRuntimeObject(ray?: RootAimRay): FocusedRuntimeObject | undefined;
+  /** The object to show as focused: sticky for 150 ms and skipping creatures with no action. */
+  findDisplayFocusedRuntimeObject(ray?: RootAimRay): FocusedRuntimeObject | undefined;
   /** Viewport pixel where the desktop tooltip is anchored. */
   resolveDesktopTooltipScreenPosition(): { readonly x: number; readonly y: number };
   /** Tooltip text of an object for the input mode, if it has one. */
@@ -103,6 +107,8 @@ export function createAimFeedback(deps: AimFeedbackDeps): AimFeedback {
     depthTest: false,
     depthWrite: false,
   });
+  const focusOutline = createFocusOutline(cellMeshes);
+  const laserPreview = createLaserPreview(scene);
   const aimControllerRay = new THREE.Line(aimControllerRayGeometry, aimControllerRayMaterial);
   aimControllerRay.name = "aim-controller-ray";
   aimControllerRay.renderOrder = 49;
@@ -133,7 +139,35 @@ export function createAimFeedback(deps: AimFeedbackDeps): AimFeedback {
 
   function updateAim(xrActive: boolean, activeAimRay: RootAimRay | undefined): void {
     updateAimCrossMarker(xrActive, activeAimRay);
+    updateFocusOutline(activeAimRay);
+    updateLaserPreview(activeAimRay);
     updateProtractorToolFeedback(activeAimRay);
+  }
+
+  // The outline of the focused object in the tool's color (white for the Hand); hidden while a menu is open.
+  function updateFocusOutline(activeAimRay: RootAimRay | undefined): void {
+    if (currentMenuState().isOpen) {
+      focusOutline.update(undefined, handOutlineColor);
+      return;
+    }
+
+    const color = deps.toolsById().get(currentMenuState().selectedTool)?.indicatorColor ?? handOutlineColor;
+    focusOutline.update(deps.findDisplayFocusedRuntimeObject(activeAimRay)?.object, color);
+  }
+
+  // With the Laser in hand and the aim on the floor, a ghost laser shows where it would stand and which way it would fire.
+  function updateLaserPreview(activeAimRay: RootAimRay | undefined): void {
+    const menuState = currentMenuState();
+    if (menuState.selectedTool !== "geodesicEmitters/emitter" || menuState.isOpen || !activeAimRay) {
+      laserPreview.update(undefined, undefined, "#ffffff");
+      return;
+    }
+
+    const target = deps.resolveCurrentAimTarget(activeAimRay);
+    const horizontal = Math.hypot(activeAimRay.direction.x, activeAimRay.direction.z);
+    // Three's -z is the world's +y.
+    const heading = horizontal > 1e-6 ? Math.atan2(-activeAimRay.direction.z, activeAimRay.direction.x) : undefined;
+    laserPreview.update(target, heading, deps.toolsById().get(menuState.selectedTool)?.indicatorColor ?? "#facc15");
   }
 
   function updateFloatingObjectTooltip(
@@ -147,8 +181,13 @@ export function createAimFeedback(deps: AimFeedbackDeps): AimFeedback {
       return;
     }
 
-    const focused = deps.findFocusedRuntimeObject(activeAimRay);
-    const text = focused ? deps.getRuntimeObjectTooltipText(focused.object, xrActive ? "xr" : "desktop") : undefined;
+    const focused = deps.findDisplayFocusedRuntimeObject(activeAimRay);
+    // Desktop shows only the object's name: what its inputs do is on the hint strip. VR keeps the action rows until its hint strip arrives.
+    const text = focused
+      ? xrActive
+        ? deps.getRuntimeObjectTooltipText(focused.object, "xr")
+        : deps.getWorldFocusMessageDefinition(focused.object)?.title
+      : undefined;
     if (xrActive) {
       floatingObjectTooltip.update({ visible: false });
       deps.updateXrObjectTooltip(text && focused ? {
@@ -379,6 +418,8 @@ export function createAimFeedback(deps: AimFeedbackDeps): AimFeedback {
     clearProtractorToolFeedback,
     dispose() {
       clearProtractorToolFeedback();
+      focusOutline.dispose();
+      laserPreview.dispose();
       aimControllerRay.removeFromParent();
       aimControllerRayGeometry.dispose();
       aimControllerRayMaterial.dispose();

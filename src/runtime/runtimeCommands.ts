@@ -100,6 +100,8 @@ export type RuntimeCommand =
   | { readonly kind: "set-collision-geometry-wireframes"; readonly enabled: boolean }
   | { readonly kind: "set-aim-collision-outlines"; readonly enabled: boolean }
   | { readonly kind: "set-anti-nausea-mode"; readonly enabled: boolean }
+  /** The "Show hints" switch of Settings. */
+  | { readonly kind: "set-show-hints"; readonly enabled: boolean }
   /** The host changed the debug settings from outside (the URL, the API): mirror them into the menu. */
   | { readonly kind: "adopt-debug-settings"; readonly settings: DebugSettings }
   /** The portal debug helper flips the portal-path overlay's instance switch. */

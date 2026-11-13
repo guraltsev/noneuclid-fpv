@@ -111,7 +111,7 @@ describe("resolveAimTarget", () => {
     expect(target?.distanceMeters).toBeGreaterThan(39);
   });
 
-  it("misses geodesic emitters just outside the narrowed cylindrical aim outline", () => {
+  it("misses geodesic emitters well outside the cylindrical aim outline and the angular radius", () => {
     const world = compileCellComplex(largeRoomWorld());
     const emitter = createGeodesicEmitterObject({
       id: "emitter-a",
@@ -120,7 +120,7 @@ describe("resolveAimTarget", () => {
     });
     const registry = createRuntimeObjectRegistry([emitter]);
     const rootPath = buildPortalPathTables(world, { maxDepth: 0 }).tablesByRootCellId.get("room")!.pathsById.get(0)!;
-    const ray = aimRayLookingAt({ x: 0, y: 0.2, z: 1.08 }, { x: 40, y: 0.2, z: 1.08 });
+    const ray = aimRayLookingAt({ x: 0, y: 1.6, z: 1.08 }, { x: 40, y: 1.6, z: 1.08 });
 
     const target = resolveAimTarget({
       world,
@@ -192,6 +192,41 @@ describe("resolveAimTarget", () => {
     expect(target?.object?.id).toBe("segment-a");
     expect(target?.localPoint.x).toBeCloseTo(0);
     expect(target?.localPoint.z).toBeCloseTo(1.08);
+  });
+
+  it("picks a thin segment whose proxy lies 1 degree off the ray and not one 3 degrees off", () => {
+    const world = compileCellComplex(largeRoomWorld());
+    const registry = createRuntimeObjectRegistry([createGeodesicSegment()]);
+    // 20 m away, the segment capsule (radius 0.19 m) is about 0.5 degrees wide, so these rays pass beside it.
+    const distance = 20;
+    const aimAtDegreesAbove = (degrees: number) => resolveAimTarget({
+      world,
+      registry,
+      ray: aimRayLookingAt({ x: 0, y: -distance, z: 1.08 }, { x: 0, y: 0, z: 1.08 + distance * Math.tan((degrees * Math.PI) / 180) }),
+      rootCellId: "room",
+    });
+
+    expect(aimAtDegreesAbove(0)?.object?.id).toBe("segment-a");
+    const oneDegree = aimAtDegreesAbove(1);
+    expect(oneDegree?.kind).toBe("object");
+    expect(oneDegree?.object?.id).toBe("segment-a");
+    expect(oneDegree?.localPoint.z).toBeCloseTo(1.08);
+    expect(aimAtDegreesAbove(3)?.object).toBeUndefined();
+  });
+
+  it("does not let the angular radius pick an object behind a nearer exact hit", () => {
+    const world = compileCellComplex(largeRoomWorld());
+    const near = createGeodesicSegment({ id: "near", start: { x: -0.5, y: -4, z: 1.08 } });
+    const far = createGeodesicSegment({ id: "far", start: { x: -0.5, y: 0, z: 1.2 } });
+    const registry = createRuntimeObjectRegistry([far, near]);
+    const target = resolveAimTarget({
+      world,
+      registry,
+      ray: aimRayLookingAt({ x: 0, y: -10, z: 1.08 }, { x: 0, y: 0, z: 1.08 }),
+      rootCellId: "room",
+    });
+
+    expect(target?.object?.id).toBe("near");
   });
 
   it("resolves a segment of a tied arc like any other segment", () => {

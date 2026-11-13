@@ -28,6 +28,8 @@ export interface ScenePaletteAdapterOptions {
   readonly onDebugOverlayToggled: (enabled: boolean) => void;
   readonly onDebugOverlayItemToggled: (itemId: RuntimeDebugOverlayItemId, enabled: boolean) => void;
   readonly onAntiNauseaModeToggled: (enabled: boolean) => void;
+  /** Settings: the "Show hints" switch. */
+  readonly onShowHintsToggled?: (enabled: boolean) => void;
   readonly onPortalPanelModeSelected: (mode: PortalPanelModeId) => void;
   readonly onPortalInspectionToggled: (enabled: boolean) => void;
   readonly onCollisionGeometryWireframesToggled: (enabled: boolean) => void;

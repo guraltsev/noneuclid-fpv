@@ -108,6 +108,9 @@ import { installModuleApis, setApiNamespace } from "../../runtime/publicApi";
 import { createScriptedPlayerMotion } from "./scriptedPlayerMotion";
 import type { RuntimeInputFrame } from "../../interaction/inputFrame";
 import { createToolBelt } from "../dom/toolBelt";
+import { createHintStrip } from "../dom/hintStrip";
+import { createHintStripDefinition, type HintStripFocus } from "../../ui/hintStripDefinition";
+import { defaultTraceLengthMeters } from "../../world-objects/geodesic/objects";
 import { activeBeltToolId, beltSlotForKey, isEmitterMode, createToolBeltDefinition, stepBeltSlot, type ToolBeltSlot } from "../../ui/toolBeltDefinition";
 import { findPlatonicSolid } from "../../cell-complex/platonicSolid";
 import { createFloatingObjectTooltip } from "../dom/floatingObjectTooltip";
@@ -359,8 +362,17 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   let latestWebGlRenderInfo: WebGlRenderInfoState | undefined;
   // The session: the one record of shell state that commands change (clientSession.ts). The menu state (page,
   // selected tool, debug toggles) is replaced only by applyRuntimeCommand; read it with currentMenuState().
+  // "Show hints" is remembered per browser; storage can throw (private windows, blocked site data), and then the default (on) holds.
+  const showHintsStorageKey = "noneuclid.showHints";
+  let persistedShowHints = true;
+  try {
+    persistedShowHints = window.localStorage.getItem(showHintsStorageKey) !== "false";
+  } catch {
+    persistedShowHints = true;
+  }
   const session = createClientSession({
     menuState: createRuntimeMenuState({
+      showHintsEnabled: persistedShowHints,
       selectedWorldId: options.selectedWorldId,
       selectedAppConfigName: options.appConfigName,
       debugSettings: {
@@ -534,6 +546,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     });
   }
   const toolBelt = createToolBelt(document.body, { onSelect: selectBeltSlot }, toolBeltText.ariaLabel);
+  const hintStrip = createHintStrip(document.body);
   // The pause card is the desktop main menu (design 017 section 8.1): shown whenever the pointer is not locked.
   const helpCubeSpec = options.worldSpec.cells.flatMap((cell) => cell.visuals?.objects ?? []).find((object) => object.id === "startingQuestionCube");
   const configCatalogLabel = appConfigCatalog.find((entry) => entry.id === options.appConfigName)?.label;
@@ -844,6 +857,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     resolveCurrentAimTargets,
     cycleFocusedAimTarget,
     findFocusedRuntimeObject,
+    findDisplayFocusedRuntimeObject,
     targetIsWithinInteractionRange,
     logVerboseAimClick,
     resolveActiveRootAimRay,
@@ -879,6 +893,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     resolveCurrentAimTarget,
     targetIsWithinInteractionRange,
     findFocusedRuntimeObject,
+    findDisplayFocusedRuntimeObject,
     resolveDesktopTooltipScreenPosition,
     getRuntimeObjectTooltipText,
     getWorldFocusMessageDefinition,
@@ -1575,11 +1590,37 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     pauseCard.setVisible(!xrActive && !pointerLocked);
     toolBelt.root.hidden = xrActive;
     const crosshairVisible = !xrActive && pointerLocked && !currentMenuState().isOpen;
+    const displayFocus = crosshairVisible ? findDisplayFocusedRuntimeObject(activeAimRay) : undefined;
     crosshair.update({
       visible: crosshairVisible,
-      usable: crosshairVisible && findFocusedRuntimeObject(activeAimRay) !== undefined,
+      usable: displayFocus !== undefined,
       color: toolHost.toolsById.get(currentMenuState().selectedTool)?.indicatorColor,
     });
+    // The hint strip names what the inputs do now; it follows the "Show hints" switch, and shows only while the player is playing on desktop.
+    const showHints = currentMenuState().showHintsEnabled !== false;
+    if (showHints !== persistedShowHints) {
+      persistedShowHints = showHints;
+      try {
+        window.localStorage.setItem(showHintsStorageKey, String(showHints));
+      } catch {
+        // Storage is only a convenience.
+      }
+    }
+    if (showHints && crosshairVisible) {
+      const focus: HintStripFocus | undefined = displayFocus === undefined
+        ? undefined
+        : { objectKind: displayFocus.object.kind, actions: getWorldFocusMessageDefinition(displayFocus.object)?.actions ?? [] };
+      hintStrip.update(createHintStripDefinition({
+        inputMode: "desktop",
+        selectedTool: currentMenuState().selectedTool,
+        focus,
+        carrying: currentMenuState().selectedTool === "geodesicEmitters/carry",
+        menuOpen: false,
+        extendLengthMeters: defaultTraceLengthMeters,
+      }));
+    } else {
+      hintStrip.update(undefined);
+    }
     const frameAfterUiMs = performance.now();
     // Phase 5: draw. In XR the renderer renders each eye from `camera` as updated by the WebXR manager.
     const frameBeforeRenderMs = performance.now();
@@ -1752,6 +1793,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       xrControllerHandModels.dispose();
       desktopScenePaletteInput.dispose();
       toolBelt.dispose();
+      hintStrip.dispose();
       aimCrossMarker.dispose();
       aimFeedback.dispose();
       floatingObjectTooltip.dispose();

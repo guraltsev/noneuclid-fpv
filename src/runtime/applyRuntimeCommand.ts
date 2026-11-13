@@ -18,6 +18,7 @@ import {
   selectRuntimeMenuPlaceFlagToolType,
   setRuntimeMenuAimCollisionOutlinesEnabled,
   setRuntimeMenuAntiNauseaModeEnabled,
+  setRuntimeMenuShowHintsEnabled,
   setRuntimeMenuCollisionGeometryWireframesEnabled,
   setRuntimeMenuConsoleLogLevel,
   setRuntimeMenuDebugEnabled,
@@ -234,6 +235,8 @@ export function reduceRuntimeCommand(state: ClientSessionState, command: Runtime
         },
         effects: [{ kind: "apply-comfort-state" }],
       };
+    case "set-show-hints":
+      return { state: { ...state, menuState: setRuntimeMenuShowHintsEnabled(menu, command.enabled) }, effects: [] };
     case "set-show-cell-path-renders-instances":
       return { state: { ...state, showCellPathRendersInstances: command.enabled }, effects: [] };
     case "set-cannon-tool-state":
