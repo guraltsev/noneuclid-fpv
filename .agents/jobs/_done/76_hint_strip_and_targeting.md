@@ -75,7 +75,7 @@ The strip matches the table, thin targets are picked, focus is stable, checks pa
 - Sticky focus (`src/render/three/aimInteraction.ts`): `findDisplayFocusedRuntimeObject` holds the focus `stickyFocusMilliseconds` (150) after the ray leaves it unless another usable object is aimed at; creatures are not focusable unless the focus message offers an available action under the tool in hand (none today), and the next focusable candidate is used instead. Tests in `tests/render/aimInteraction.test.ts` (149 ms kept, 151 ms dropped, injected clock). Tooltip, outline, hint strip and crosshair ring use it; actions, menus and the help key still use the exact `findFocusedRuntimeObject`, so H still names creatures.
 - Focus outline (`src/render/three/focusOutline.ts`): the object's hit proxy built with the debug hit-box builders, as a translucent shell tinted with the tool's `indicatorColor` (white for the Hand), parented to the object's cell root so it shows through portals. Test in `tests/render/focusOutline.test.ts`.
 - Laser preview (`src/render/three/laserPreview.ts`, driven from `aimFeedback.updateAim`): with the Laser selected and the aim on the floor, a translucent post and head in the Laser color at the aim point and an arrow along the aim ray's horizontal heading.
-- Commit: see the follow-up line below.
+- Commit: c72efc7 on `dev`.
 
 ### Deviations
 - Existing test changed: `tests/interaction/aimTarget.test.ts` "misses geodesic emitters just outside the narrowed cylindrical aim outline" now aims 1.6 m off at 40 m (2.3 degrees) and is renamed; the old 0.2 m miss (0.3 degrees) is picked by design now.
