@@ -169,6 +169,11 @@ import { objectNouns, toastMessages } from "../../ui/vocabulary";
 import { createToastQueue } from "../../ui/toastQueue";
 import { settingsText, toolBeltText, toolNames, toolStandText, vrBeltText } from "../../ui/vocabulary";
 import { createHelpCubeInvite, type HelpCubeInvite } from "./helpCubeInvite";
+import { createCuriosityMarkers, type CuriosityMarkers } from "./curiosityMarkers";
+import { createDiscoveryController, type DiscoveryController } from "./discoveryController";
+import { buildEdgeLines, setEdgeLinesVisible } from "./edgeLines";
+import type { DiscoveryCrossing } from "../../modules/discoveries";
+import { tiedVertexCount } from "../../world-objects/geodesic/endpoints";
 import { runWorldDemo } from "./worldDemo";
 import { toolStandClass } from "../../world-objects/objectMetadata";
 import type { XrHandOptions, XrLayout } from "../../glue/xrLayout";
@@ -465,6 +470,12 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   let firstUseTips: FirstUseTipController | undefined;
   // The help cube's "? Help" label and bob until it has been opened once; created with the other scene helpers below.
   let helpCubeInvite: HelpCubeInvite | undefined;
+  // The discoveries of this world and their markers (design 017 section 9.4), and the portals the player crossed in the frame being run.
+  let discoveries: DiscoveryController | undefined;
+  let curiosityMarkers: CuriosityMarkers | undefined;
+  const frameCrossings: DiscoveryCrossing[] = [];
+  // Whether the edge lines were last shown.
+  let appliedShowEdges = false;
   // The text size last applied and the count of "Reset tips" presses last seen.
   let appliedTextSize: string | undefined;
   let seenTipsResetCount = 0;
@@ -976,6 +987,26 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     objectHost,
     getWorld: activeWorld,
     cubeId: "startingQuestionCube",
+  });
+  discoveries = createDiscoveryController({
+    spec: options.worldSpec.discoveries,
+    homeCellId: activeWorld().startingPosition?.cellId,
+    pushToast: (text, durationMs) => toastQueue.push(text, { durationMs }),
+    getObject: (id) => runtimeObjectRegistry.get(id),
+    tiedVertexCount: () => tiedVertexCount(runtimeObjectRegistry),
+    curvesAtRest: () => (engine.publicApis.get("curveShortening")?.isAtRest as (() => boolean) | undefined)?.() ?? true,
+    beamCount: () => runtimeObjectRegistry.getObjectsOfKind("geodesicModel/arc").length,
+    warn: (message) => console.warn(`[noneuclid] discoveries: ${message}`),
+  });
+  curiosityMarkers = createCuriosityMarkers({
+    scene,
+    camera,
+    engine,
+    getWorld: activeWorld,
+    entries: discoveries.definitions().flatMap((definition) =>
+      definition.marker === undefined ? [] : [{ discoveryId: definition.id, marker: definition.marker, teaser: definition.teaser }],
+    ),
+    isFound: (id) => discoveries?.isFound(id) ?? false,
   });
   const { updateXrObjectTooltip, clearXrObjectTooltip } = createXrObjectTooltipController({ scene, camera });
   const xrDebugPanel = createXrDebugPanel();
@@ -1541,6 +1572,9 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       scriptedMotion.cancel("the world was reset");
       // What the student made is kept for one undo before it is wiped.
       pendingDeletion = undefined;
+      // Start over forgets what was found (design 017 section 9.4).
+      discoveries?.reset(activeWorld().startingPosition?.cellId);
+      frameCrossings.length = 0;
       undoRecord = { snapshot: takeSavedSnapshot(runtimeObjectRegistry, savedKinds), expiresAtMs: performance.now() + undoWindowMs };
       pushUndoToast(toastMessages.worldReset);
       teleportPlayerHome();
@@ -1753,6 +1787,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       aimFeedback.updateAim(xrActive, activeAimRay);
       updateGeodesicEmitterLabels();
       helpCubeInvite?.update(performance.now() / 1000);
+      curiosityMarkers?.update(performance.now() / 1000);
       xrSession.syncDebugState(frame.source, moveResult);
       updateScenePalette(xrActive, xrFrame, xrReferenceSpace, xrHeadWorldPose, deltaSeconds, frame);
       updateWorldMap(xrActive, xrActive ? xrSession.resolveXrHeadWorldPose(xrViewerPose) : undefined, deltaSeconds);
@@ -1773,6 +1808,11 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     finishPendingDeletion(performance.now());
     firstUseTips?.setCardAllowed(!xrActive);
     firstUseTips?.observe(runtimeObjectRegistry.changes);
+    frameErrorGuard.runPhase("discoveries", () => {
+      const pose = readLocalPlayerPose(engine);
+      discoveries?.observe({ cellId: pose.cellId, position: pose.position, crossings: frameCrossings, changes: runtimeObjectRegistry.changes });
+      frameCrossings.length = 0;
+    });
     applyDisplayAndControlSettings();
     toastQueue.tick(performance.now());
     toastView.render(toastQueue.visible());
@@ -1832,6 +1872,8 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   // What the shell redraws after the geometry commit swapped the active world: visibility caches, tool state, meshes,
   // portal instances, debug runtime and diagnostics. Runs inside geometryCommit.commit, after the swap.
   function finishGeometryCommit(): void {
+    // The shape machine changed the world: "A new shape" (design 017 section 9.4).
+    discoveries?.noteShapeChanged();
     // Visibility results refer to old path ids; drop them until the next sync.
     portalFrame.reset();
     clearGeometryToolStateAfterCommit();
@@ -2064,6 +2106,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       setApiNamespace("world", undefined);
       uninstallModuleApis();
       helpCubeInvite?.dispose();
+      curiosityMarkers?.dispose();
       worldClient.dispose();
       geometrySession.dispose();
       debugOverlay.dispose();
@@ -2086,6 +2129,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   }
 
   function recordCellTransition(previousCellId: string, moveResult: ReturnType<typeof movePlayer>): void {
+    for (const crossing of moveResult.crossings) frameCrossings.push(crossing);
     if (readLocalPlayerPose(engine).cellId !== previousCellId) {
         runtimeDiagnostics().recordCellEntered(
           previousCellId,
@@ -2131,6 +2175,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       if (showForbiddenZoneWireframes) {
         cellMesh.add(buildCurrentCellForbiddenZoneWireframes(cell));
       }
+      cellMesh.add(buildEdgeLines(cell, currentMenuState().showEdgesEnabled === true));
       cellMeshes.set(cell.id, cellMesh);
       scene.add(cellMesh);
     }
@@ -2170,6 +2215,11 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       turnSpeedFactor: turnSpeedFactors[menu.turnSpeed ?? "medium"],
       invertY: menu.invertYEnabled === true,
     });
+    const showEdges = menu.showEdgesEnabled === true;
+    if (showEdges !== appliedShowEdges) {
+      appliedShowEdges = showEdges;
+      setEdgeLinesVisible(cellMeshes.values(), showEdges);
+    }
     const resetCount = menu.tipsResetCount ?? 0;
     if (resetCount !== seenTipsResetCount) {
       seenTipsResetCount = resetCount;
@@ -2246,6 +2296,10 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       command = { ...command, tutorialPages: howTo.pages, toolDisabledReasons: howTo.toolDisabledReasons };
     }
     if (command.kind === "show-question-help" && command.objectId === "startingQuestionCube") helpCubeInvite?.markOpened();
+    // The Discoveries page lists what was found and the teasers of the rest, as they stand now.
+    if (command.kind === "show-discoveries" && command.entries === undefined && discoveries !== undefined) {
+      command = { ...command, entries: discoveries.pageEntries() };
+    }
     const toolBefore = session.get().menuState.selectedTool;
     const effects = applyRuntimeCommand(session, command);
     // A tool that is no longer selected has ended, whichever command ended it: it takes its marks off the world and drops its tool state.

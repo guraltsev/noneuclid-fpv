@@ -66,6 +66,8 @@ export function buildQuestionHelpContent(
           options.onQuestionHelpTutorialRequested?.();
         } else if (entry.id === "goal") {
           options.onQuestionHelpGoalRequested?.();
+        } else if (entry.id === "discoveries") {
+          options.onQuestionHelpDiscoveriesRequested?.();
         }
       },
     });

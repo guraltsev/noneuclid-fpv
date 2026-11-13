@@ -123,3 +123,16 @@ startingPosition("front", {
   position: [0, 0, 5],
   faceToward: "startingQuestionCube",
 });
+
+// Discoveries (design 017 section 9.4): no shape machine here, and a marker at one cube corner where three squares meet.
+discoveries({
+  disable: ["new-shape"],
+  add: [{
+    id: "cube-corner",
+    name: "Where three squares meet",
+    question: "Three squares meet at this corner, each with a right angle here. Do the three together make a full turn?",
+    teaser: "something is odd where three squares meet",
+    detector: { approach: { face: "front", position: [6.4, 0, -6.4], radius: 1.2 } },
+    marker: { face: "front", position: [6.4, 0, -6.4] },
+  }],
+});

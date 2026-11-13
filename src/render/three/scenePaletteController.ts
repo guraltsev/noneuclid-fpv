@@ -66,6 +66,8 @@ export interface ScenePaletteControllerOptions {
   readonly onAntiNauseaModeToggled: (enabled: boolean) => void;
   /** The "Show hints" switch of Settings toggled. */
   readonly onShowHintsToggled?: (enabled: boolean) => void;
+  /** The "Show edges" switch of Settings, or the button of the Discoveries page. */
+  readonly onShowEdgesToggled?: (enabled: boolean) => void;
   /** Settings: the "Text size" step chosen. */
   readonly onTextSizeSelected?: (size: RuntimeTextSize) => void;
   /** Settings: the "Mouse sensitivity" step chosen. */
@@ -116,6 +118,7 @@ export interface ScenePaletteControllerOptions {
   /** Help hub navigation (tutorial and goal pages) and the paging callbacks that follow. */
   readonly onQuestionHelpTutorialRequested: () => void;
   readonly onQuestionHelpGoalRequested: () => void;
+  readonly onQuestionHelpDiscoveriesRequested: () => void;
   readonly onTutorialPreviousRequested: () => void;
   readonly onTutorialNextRequested: () => void;
   readonly onTutorialPageRequested: (pageIndex: number) => void;
@@ -220,6 +223,7 @@ export function createScenePaletteController(options: ScenePaletteControllerOpti
     onDebugOverlayItemToggled: options.onDebugOverlayItemToggled,
     onAntiNauseaModeToggled: options.onAntiNauseaModeToggled,
     onShowHintsToggled: options.onShowHintsToggled,
+    onShowEdgesToggled: options.onShowEdgesToggled,
     onXrHandOptionToggled: options.onXrHandOptionToggled,
     onTextSizeSelected: options.onTextSizeSelected,
     onMouseSensitivitySelected: options.onMouseSensitivitySelected,
@@ -249,6 +253,7 @@ export function createScenePaletteController(options: ScenePaletteControllerOpti
     onGeometryComputerGoRequested: options.onGeometryComputerGoRequested,
     onQuestionHelpTutorialRequested: options.onQuestionHelpTutorialRequested,
     onQuestionHelpGoalRequested: options.onQuestionHelpGoalRequested,
+    onQuestionHelpDiscoveriesRequested: options.onQuestionHelpDiscoveriesRequested,
     onTutorialPreviousRequested: options.onTutorialPreviousRequested,
     onTutorialNextRequested: options.onTutorialNextRequested,
     onTutorialPageRequested: options.onTutorialPageRequested,

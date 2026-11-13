@@ -199,3 +199,6 @@ flutter = geo_butterfly("face-18-butterfly", {
 });
 
 OnFace("face-18", [flutter]);
+
+// What this world can show the student: there is no shape machine here, so that discovery is left out (design 017 section 9.4).
+discoveries({ disable: ["new-shape"] });

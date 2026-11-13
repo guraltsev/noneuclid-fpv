@@ -23,6 +23,7 @@ import {
   actionWithKey,
   beamName,
   disabledReasons,
+  discoveryText,
   helpText,
   mainMenuText,
   menuControlText,
@@ -113,6 +114,8 @@ export interface SettingsPaletteContent {
   readonly antiNauseaModeEnabled: boolean;
   /** Whether the hint strip is shown (the "Show hints" switch). */
   readonly showHintsEnabled: boolean;
+  /** Whether the glued edges are drawn on the floor (the "Show edges" switch). */
+  readonly showEdgesEnabled: boolean;
   /** The "Use one controller" switch (VR). */
   readonly useOneControllerEnabled: boolean;
   /** The "Left-handed" switch (VR). */
@@ -339,6 +342,27 @@ export interface GoalPaletteContent extends PagedHelpExtras {
   readonly nextAction: PaletteTextAction;
 }
 
+/** One line of the Discoveries page: a discovery found (its name and question) or a teaser, and the button it offers if any. */
+export interface DiscoveryPaletteEntry {
+  readonly id: string;
+  readonly found: boolean;
+  readonly title: string;
+  /** The question of a found discovery; empty for a teaser. */
+  readonly text: string;
+  /** The Show edges button under "Across an edge", with the invitation that goes with it. */
+  readonly showEdges?: { readonly invitation: string; readonly action: PaletteTextAction; readonly shown: boolean };
+}
+
+/** Content of the Discoveries page (design 017 sections 9.4 and 9.5). */
+export interface DiscoveriesPaletteContent {
+  readonly kind: "discoveries";
+  readonly title: string;
+  readonly body: string;
+  /** For example "2 of 6 found"; empty when the world has no discoveries. */
+  readonly countLabel: string;
+  readonly entries: readonly DiscoveryPaletteEntry[];
+}
+
 /** Content of the help hub page that offers the tutorial and goal subpages. */
 export interface QuestionHelpPaletteContent {
   readonly kind: "question-help";
@@ -379,6 +403,7 @@ export interface PaletteDefinition {
     | MeasurementActionsPaletteContent
     | TutorialPaletteContent
     | GoalPaletteContent
+    | DiscoveriesPaletteContent
     | QuestionHelpPaletteContent;
 }
 
@@ -455,6 +480,7 @@ export function createPaletteDefinition(
         debugEnabled: state.debugEnabled,
         antiNauseaModeEnabled: state.antiNauseaModeEnabled,
         showHintsEnabled: state.showHintsEnabled !== false,
+        showEdgesEnabled: state.showEdgesEnabled === true,
         useOneControllerEnabled: state.useOneControllerEnabled === true,
         leftHandedEnabled: state.leftHandedEnabled === true,
         mouseSensitivity: state.mouseSensitivity ?? "medium",
@@ -576,6 +602,38 @@ export function createPaletteDefinition(
     };
   }
 
+  if (state.page === "discoveries" && state.discoveriesOptions) {
+    const entries = state.discoveriesOptions.entries;
+    const edgesShown = state.showEdgesEnabled === true;
+    return {
+      pageId: "discoveries",
+      leftAction: createHeaderAction("none"),
+      rightAction: createHeaderAction("back"),
+      reloadConfirmationActive,
+      content: {
+        kind: "discoveries",
+        title: surfaceNames.discoveries,
+        body: entries.length === 0 ? discoveryText.none : discoveryText.pageIntro,
+        countLabel: entries.length === 0 ? "" : discoveryText.foundCount(entries.filter((entry) => entry.found).length, entries.length),
+        entries: entries.map((entry): DiscoveryPaletteEntry => ({
+          id: entry.id,
+          found: entry.found,
+          title: entry.title,
+          text: entry.text,
+          ...(entry.action === "show-edges"
+            ? {
+                showEdges: {
+                  invitation: discoveryText.showEdgesInvite,
+                  shown: edgesShown,
+                  action: { label: edgesShown ? discoveryText.hideEdges : discoveryText.showEdges, disabled: false },
+                },
+              }
+            : {}),
+        })),
+      },
+    };
+  }
+
   if (state.page === "question-help" && state.questionHelpOptions) {
     return {
       pageId: "question-help",
@@ -597,8 +655,7 @@ export function createPaletteDefinition(
             label: surfaceNames.howTo,
             ...disabledWhen(state.questionHelpOptions.tutorialPages.length === 0, disabledReasons.nothingForThisWorld),
           },
-          // The page of discoveries arrives with the discoveries themselves; until then the button says so.
-          { id: "discoveries", label: surfaceNames.discoveries, ...disabledWhen(true, disabledReasons.noDiscoveriesYet) },
+          { id: "discoveries", label: surfaceNames.discoveries, disabled: false },
         ],
       },
     };

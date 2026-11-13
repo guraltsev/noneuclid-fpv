@@ -2,7 +2,7 @@
  * Resolves the tooltip text for palette items from their string item ids.
  * Item ids are namespaced strings produced by the palette renderers (for example "tool:placedFlags/flag", "geodesic-cannon-action:rotate:<id>", "sign-key:A"); this module is the single place that turns them into human-readable labels, so desktop and VR show the same tooltips. It is a pure lookup with no state.
  */
-import { helpText, mainMenuText, menuControlText, objectActions, settingsText, shapeMachineText, surfaceNames, toolNames } from "../world-objects/vocabulary";
+import { discoveryText, helpText, mainMenuText, menuControlText, objectActions, settingsText, shapeMachineText, surfaceNames, toolNames } from "../world-objects/vocabulary";
 
 /** The tooltips of the main menu buttons (design 017 section 7.5), by the id after "main-menu:". */
 const mainMenuTooltips: Readonly<Record<string, string | undefined>> = {
@@ -95,6 +95,8 @@ const fixedTooltips: Readonly<Record<string, string>> = {
   "settings": "Settings",
   "tutorial-try-it": `${helpText.tryIt}: take this tool and close Help`,
   "invert-y-toggle": settingsText.invertY,
+  "show-edges-toggle": `${discoveryText.showEdges}: draw a line on the floor where faces are glued`,
+  "discoveries:show-edges": `${discoveryText.showEdges}: draw a line on the floor where faces are glued`,
   "reset-tips": `${settingsText.resetTips}: show the tool tips again`,
   "close": "Close",
   "back": "Back",

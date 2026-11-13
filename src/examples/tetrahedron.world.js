@@ -83,3 +83,6 @@ OnFace("face-a", [face_a_mouse]);
 OnFace("face-b", [face_b_butterfly]);
 OnFace("face-c", [face_c_tree, face_c_flower_pot]);
 OnFace("face-d", [face_d_grass, face_d_stop_sign]);
+
+// What this world can show the student: there is no shape machine here, so that discovery is left out (design 017 section 9.4).
+discoveries({ disable: ["new-shape"] });

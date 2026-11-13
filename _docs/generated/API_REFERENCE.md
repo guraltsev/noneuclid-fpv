@@ -340,6 +340,10 @@ Authoring-level data model for a cell complex: the plain-data spec that world fi
 | Kind | Name | Summary |
 | --- | --- | --- |
 | interface | `CellComplexSpec` | Complete authored world: its cells and an optional starting pose. |
+| interface | `DiscoveryMarkerSpec` | Where a discovery's curiosity marker stands: a face (a cell id) and a cell-local floor point in meters (the height is ignored). |
+| type | `AuthoredDiscoveryDetector` | What notices an authored discovery: the first visit to a face, or a visit within `radius` meters of a floor point of a face. |
+| interface | `AuthoredDiscoverySpec` | A discovery an author added to a world (design 017 section 9.6): its words, its detector and, optionally, its marker. |
+| interface | `WorldDiscoveriesSpec` | The authored part of a world's discoveries (design 017 sections 9.4 and 9.6). |
 | interface | `WorldDemoSpec` | The demonstration an activity world starts with (design 017 section 9.2): a laser firing one beam, a length measurement of that beam and a sign. |
 | interface | `StartingPositionSpec` | Where the player starts: a cell, a cell-local position in meters, and optional yaw and pitch in radians. |
 | interface | `PrismCellSpec` | One authored prism cell: convex counterclockwise base polygon, height, portals on its sides and optional visuals. |
@@ -1316,6 +1320,8 @@ The student vocabulary (design 017 section 6): every student-visible noun, verb 
 | const | `firstUseTipText` | The tool steps of the first-use tips (design 017 section 8.6). |
 | const | `shapeMachineText` | The words of the shape machine panel (design 017 section 8.9): the two parameters, the presets, the keypad and the buttons. |
 | const | `settingsText` | The words of the Settings sections that the comfort and display options added (design 017 section 8.7). |
+| const | `builtinDiscoveryText` | The words of the discoveries (design 017 section 9.4): the name, the question shown when it is found and the teaser shown until then, for each discovery the app notices by itself. |
+| const | `discoveryText` | The words around the discoveries: the toasts, the Discoveries page, the curiosity markers and the Show edges switch (design 017 sections 9.4 and 9.5). |
 
 ### `world-objects/worldObjectOwner.ts`
 
@@ -1380,6 +1386,8 @@ World builder: the imperative API behind the world-script DSL that assembles a C
 | interface | `StartingPositionAuthoringParams` | Parameters for startingPosition: where the player's eye reference point starts. |
 | interface | `ToolStandAuthoringParams` | Parameters for toolStand: where the table stands and which way it faces. |
 | interface | `DemoAuthoringParams` | Parameters for demo: a laser with one beam, a ruler on it, and a sign. |
+| interface | `MarkerAuthoringParams` | Where a curiosity marker stands: a face and a floor point in authored [x, height, y] axes (the height is ignored). |
+| interface | `DiscoveriesAuthoringParams` | Parameters for discoveries. |
 | function | `createWorldBuilder` | Creates an empty WorldBuilder. |
 | function | `authorSideToSideIndex` | Validates an author-facing side number against a polygon's vertex count and returns it as the spec's `sideIndex`. |
 
@@ -1888,6 +1896,63 @@ The policies of the curve shortening flow (design 013 section 13.2): how far a v
 | const | `curveShorteningSpeedMetersPerSecond` | Speed (meters per second) at which a vertex moves along its descent direction; the exact line search never overshoots the minimum. |
 | function | `speedLawNamed` | The speed law an option names. |
 
+### `modules/discoveries/api.ts`
+
+The discoveries' public face (design 017 section 9.4): the plain-data shapes of a discovery, of what a detector is shown each frame, and of an entry of the Discoveries page.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| type | `BuiltinDiscoveryId` | The ids of the discoveries the app notices by itself. |
+| type | `DiscoveryDetector` | What notices a discovery: a built-in detector (named by the discovery's own id), or one a world script may name (`visitFace`, `approach`). |
+| interface | `DiscoveryDefinition` | One discovery of a world: its words, its detector and, if an author placed one, its curiosity marker. |
+| interface | `DiscoveryCrossing` | One portal crossing of the player, as the movement reports it. |
+| type | `StringPhase` | How the strings of joined beams stand: none exist, some are still straightening, or all are taut. |
+| interface | `DiscoveryFrame` | What the world did this frame that a detector may care about. |
+| interface | `DiscoveryPageEntry` | An entry of the Discoveries page. |
+
+### `modules/discoveries/catalog.ts`
+
+A world's discoveries (design 017 sections 9.4 and 9.6): the built-in ones with their words from the student vocabulary, minus the ones the world switches off, plus the ones its author adds, with the markers authors placed.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| const | `builtinDiscoveryIds` | The built-in discoveries in the order the Discoveries page lists them (the order of the design's table). |
+| interface | `DiscoveryCatalog` | The discoveries of a world and what was wrong with its authored part. |
+| function | `createDiscoveryCatalog` | Builds the catalog of a world whose author wrote `spec` (absent for a world with no discoveries section). |
+
+### `modules/discoveries/events.ts`
+
+What the world's writes of one frame say about beams (design 017 section 9.4): a beam that stopped at a corner, and a beam that came home to its own laser.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `BeamDiscoveryEvents` | What a frame's writes say about beams. |
+| type | `BeamChangeReader` | The part of the journal's reader these functions use. |
+| function | `beamEventsInChanges` | The beam events in the writes of one frame. |
+
+### `modules/discoveries/index.ts`
+
+The discoveries module's factories (design 017 section 9.4): the catalog of a world's discoveries, the tracker that notices them, the beam events read from the world's writes and the entries of the Discoveries page.
+
+_No exports._
+
+### `modules/discoveries/pageEntries.ts`
+
+The entries of the Discoveries page (design 017 sections 9.4 and 9.5): a found discovery shows its name and its question, a discovery not found yet shows "???
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| function | `discoveryPageEntries` | The entries for `definitions`, given which of them are found. |
+
+### `modules/discoveries/tracker.ts`
+
+The discovery tracker (design 017 section 9.4): the session's record of what was found, and the detectors that find it.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `DiscoveryTracker` | Handle to a tracker. |
+| function | `createDiscoveryTracker` | Creates a tracker for the discoveries of a world; `homeCellId` is the face the player starts in. |
+
 ### `modules/geodesicEmitters/api.ts`
 
 The geodesic emitters' public face (design 013 sections 12.1 and 16): the emitter tool's id, the plain-data shapes of the module's commands and their results, and the stable refusal codes.
@@ -2239,6 +2304,7 @@ Renderer-neutral state machine for the in-game menu, shared by the desktop overl
 | function | `showRuntimeMenuTutorialPage` | Shows one page of the open tutorial (index clamped to range); unchanged if no tutorial is showing. |
 | function | `showRuntimeMenuTutorialIndex` | Returns the open tutorial to its index of pages; unchanged if no tutorial is showing or it has a single page. |
 | function | `showRuntimeMenuQuestionHelp` | Opens the question-help page, using the given options or else the stored questionHelpOptions; returns the state unchanged if neither exists. |
+| function | `showRuntimeMenuDiscoveries` | Opens the Discoveries page with `entries`; unchanged if the help hub is not what the menu stands on. |
 | function | `showRuntimeMenuQuestionTutorial` | Opens the tutorial subpage from stored question-help options; unchanged if they are missing or have no tutorial pages. |
 | function | `showRuntimeMenuGoal` | Opens the goal page from the given options or the stored question-help goal pages; unchanged if there are no pages. |
 | function | `setRuntimeMenuTutorialPageIndex` | Sets the tutorial page index, clamped to range, and shows that page; unchanged if no tutorial is showing. |
@@ -2256,6 +2322,7 @@ Renderer-neutral state machine for the in-game menu, shared by the desktop overl
 | function | `setRuntimeMenuAimCollisionOutlinesEnabled` | Enables or disables aim-collision outlines. |
 | function | `setRuntimeMenuAntiNauseaModeEnabled` | Enables or disables VR anti-nausea mode. |
 | function | `setRuntimeMenuShowHintsEnabled` | Shows or hides the hint strip. |
+| function | `setRuntimeMenuShowEdgesEnabled` | Shows or hides the glued edges on the floor. |
 | function | `setRuntimeMenuTextSize` | Sets the text size step. |
 | function | `setRuntimeMenuMouseSensitivity` | Sets the mouse sensitivity step. |
 | function | `setRuntimeMenuTurnSpeed` | Sets the turn speed step. |
@@ -2453,6 +2520,8 @@ Renderer-neutral definition of the tool/settings palette: createPaletteDefinitio
 | interface | `PagedHelpExtras` | Picture and control rows of a tutorial or goal page; both are optional on a page, so these may be absent and empty. |
 | interface | `TutorialPaletteContent` | Content of the tutorial: in the "index" view a button per page (title and `topics`), in the "page" view one page with previous/next paging controls. |
 | interface | `GoalPaletteContent` | Content of one goal page, with previous/next paging controls. |
+| interface | `DiscoveryPaletteEntry` | One line of the Discoveries page: a discovery found (its name and question) or a teaser, and the button it offers if any. |
+| interface | `DiscoveriesPaletteContent` | Content of the Discoveries page (design 017 sections 9.4 and 9.5). |
 | interface | `QuestionHelpPaletteContent` | Content of the help hub page that offers the tutorial and goal subpages. |
 | const | `questionHelpHubBody` | Body text of the help hub page (the shared home guidance). |
 | interface | `PaletteDefinition` | Complete renderer-neutral description of the palette for the current menu state. |
@@ -2826,6 +2895,19 @@ Three.js view of a simple geodesic creature (the mouse or the butterfly): the gl
 | function | `placeSimpleGeoCreatureModel` | Puts a creature's glTF scene in the creature's own frame: the spec's scale, tilts, the half turn that makes the model face forward and the model offset (world axes to Three.js axes). |
 | function | `createSimpleGeoCreatureRuntime` | Creates the runtime (three.js model instance, behavior, registry entry) for a creature starting in `startCellId`. |
 
+### `render/three/curiosityMarkers.ts`
+
+Curiosity markers (design 017 section 9.4, "Places worth a look"): a small glowing "?" disc on the floor where an author put one.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| const | `curiosityMarkerLabelRangeMeters` | The distance within which a marker shows its teaser, in meters. |
+| interface | `CuriosityMarkerEntry` | One marker to show: the discovery it belongs to, where it stands and the teaser it shows. |
+| interface | `CuriosityMarkersDeps` | What the markers need from the shell. |
+| interface | `CuriosityMarkers` | Handle to the markers. |
+| function | `createCuriosityMarkers` | Creates the markers for `deps.entries` (none: a handle that does nothing). |
+| function | `wrapText` | Breaks `text` into lines no wider than `maxWidth` pixels in the context's current font, at spaces. |
+
 ### `render/three/debugCollisionWireframes.ts`
 
 Debug wireframes for collision volumes: forbidden-zone (singularity) columns and object collision cylinders.
@@ -2936,6 +3018,30 @@ Desktop placement of the in-scene palette: a panel floating 1.05 m in front of t
 | Kind | Name | Summary |
 | --- | --- | --- |
 | function | `resolveDesktopScenePalettePlacement` | Computes the palette pose for the desktop (non-XR) camera: 1.05 m along the camera's view direction, oriented to look back at the camera with the camera's up vector. |
+
+### `render/three/discoveryController.ts`
+
+The shell's side of the discoveries (design 017 section 9.4): it owns the world's catalog and the tracker, is shown what happened once per frame, and announces each discovery with two toasts, "Discovery!
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| const | `discoveryToastDurationMs` | How long the "Discovery!" toast stays, in milliseconds. |
+| const | `discoveryQuestionDurationMs` | How long the toast with the question that follows it stays, in milliseconds. |
+| interface | `DiscoveryControllerDeps` | What the controller needs from the shell. |
+| interface | `DiscoveryObservation` | What the player and the world did in one frame. |
+| interface | `DiscoveryController` | Handle to the controller. |
+| function | `createDiscoveryController` | Creates the controller for a world. |
+
+### `render/three/edgeLines.ts`
+
+"Show edges" (design 017 section 9.5): the glued edges of a face drawn as a thin line on the floor, from the sides that have a portal.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| const | `edgeLinesGroupName` | The name of the group a face's edge lines hang in. |
+| const | `edgeLineWidthMeters` | The line's width in meters, measured inward from the wall, and its height above the floor. |
+| function | `buildEdgeLines` | The edge lines of `cell`: one flat strip along every side that has a portal; an empty group for a face with none. |
+| function | `setEdgeLinesVisible` | Shows or hides the edge lines under each of `roots` (the faces' root groups). |
 
 ### `render/three/firstUseTipController.ts`
 
@@ -3215,6 +3321,14 @@ Settings palette pages: the world, config, debug and comfort settings page and t
 | --- | --- | --- |
 | function | `buildDebugSettingsContent` | Debug settings page: log level, overlay toggles (items only when the overlay is on), portal options, wireframes, aim outlines and an optional copy-URL button. |
 | function | `buildSettingsContent` | Settings page: Controls (a reference of what each control does, mouse sensitivity, Invert Y, turn speed, the VR hand options), Display (text size, Show hints, Reset tips), Comfort, then the world, config and debug secti… |
+
+### `render/three/palette/pages/discoveries.ts`
+
+The Discoveries palette page (design 017 sections 9.4 and 9.5): the discoveries found, each with its name and question, and "???
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| function | `buildDiscoveriesContent` | The page: title and count, a line of text and the entries. |
 
 ### `render/three/palette/pages/geodesicActions.ts`
 

@@ -191,7 +191,57 @@ export function validateCellComplexSpec(
     }
   }
 
+  if (spec.discoveries) {
+    validateDiscoveries(spec.discoveries, cellsById, errors);
+  }
+
   return errors;
+}
+
+// Checks the authored discoveries: the faces they name exist, the points are finite, the radii positive and the ids of the added ones unique and non-empty.
+function validateDiscoveries(
+  discoveries: NonNullable<CellComplexSpec["discoveries"]>,
+  cellsById: ReadonlyMap<string, unknown>,
+  errors: string[],
+): void {
+  const checkPlace = (what: string, cellId: string, position: { readonly x: number; readonly y: number; readonly z: number }): void => {
+    if (!cellsById.has(cellId)) {
+      errors.push(`${what} names missing cell "${cellId}".`);
+    }
+    if (![position.x, position.y, position.z].every(Number.isFinite)) {
+      errors.push(`${what} needs a finite position.`);
+    }
+  };
+
+  const ids = new Set<string>();
+  for (const entry of discoveries.add) {
+    if (entry.id === "") {
+      errors.push("A discovery needs an id.");
+    } else if (ids.has(entry.id)) {
+      errors.push(`Discovery "${entry.id}" is added twice.`);
+    }
+    ids.add(entry.id);
+    if (entry.name === "" || entry.question === "" || entry.teaser === "") {
+      errors.push(`Discovery "${entry.id}" needs a name, a question and a teaser.`);
+    }
+    if (entry.detector.kind === "visitFace") {
+      if (!cellsById.has(entry.detector.cellId)) {
+        errors.push(`Discovery "${entry.id}" names missing cell "${entry.detector.cellId}".`);
+      }
+    } else {
+      checkPlace(`The approach of discovery "${entry.id}"`, entry.detector.cellId, entry.detector.position);
+      if (!(entry.detector.radius > 0) || !Number.isFinite(entry.detector.radius)) {
+        errors.push(`The approach of discovery "${entry.id}" needs a positive radius.`);
+      }
+    }
+    if (entry.marker) {
+      checkPlace(`The marker of discovery "${entry.id}"`, entry.marker.cellId, entry.marker.position);
+    }
+  }
+
+  for (const marker of discoveries.markers) {
+    checkPlace(`The marker of discovery "${marker.discovery}"`, marker.cellId, marker.position);
+  }
 }
 
 // Returns an error fragment if the polygon is not counterclockwise (shoelace signed area <= 0) or has a non-left turn at any vertex (cross product of consecutive edges <= 0); undefined when strictly convex.

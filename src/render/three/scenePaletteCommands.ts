@@ -25,13 +25,13 @@ export type ScenePaletteCommands = Pick<
   ScenePaletteControllerOptions,
   | "onOpenRequested" | "onCloseRequested" | "onShowSettingsRequested" | "onShowMainRequested" | "onWorldSelected"
   | "onConfigSelected" | "onReloadRequested" | "onHomeRequested" | "onDebugEnabledChanged" | "onDebugSettingsRequested"
-  | "onConsoleLogLevelSelected" | "onDebugOverlayToggled" | "onDebugOverlayItemToggled" | "onAntiNauseaModeToggled" | "onShowHintsToggled" | "onXrHandOptionToggled" | "onTextSizeSelected" | "onMouseSensitivitySelected" | "onTurnSpeedSelected" | "onInvertYToggled" | "onResetTipsRequested" | "onTutorialTryItRequested"
+  | "onConsoleLogLevelSelected" | "onDebugOverlayToggled" | "onDebugOverlayItemToggled" | "onAntiNauseaModeToggled" | "onShowHintsToggled" | "onShowEdgesToggled" | "onXrHandOptionToggled" | "onTextSizeSelected" | "onMouseSensitivitySelected" | "onTurnSpeedSelected" | "onInvertYToggled" | "onResetTipsRequested" | "onTutorialTryItRequested"
   | "onPortalPanelModeSelected" | "onPortalInspectionToggled" | "onCollisionGeometryWireframesToggled"
   | "onAimCollisionOutlinesToggled" | "onCopyUrlWithOptionsRequested" | "onToolSelected" | "onHelpRequested" | "onPlaceFlagOptionsRequested"
   | "onPlaceFlagTypeSelected" | "onGeodesicCannonAddRequested" | "onGeodesicCannonCarryRequested"
   | "onObjectActionRequested" | "onGeodesicCannonRotateRequested" | "onGeodesicCannonAimRequested"
   | "onGeodesicCannonDeleteRequested" | "onGeodesicCannonDeleteLaserRequested" | "onMeasurementDeleteRequested" | "onGeometryComputerStepTargetRequested" | "onGeometryComputerEditRequested" | "onGeometryComputerGoRequested"
-  | "onQuestionHelpTutorialRequested" | "onQuestionHelpGoalRequested" | "onTutorialPreviousRequested"
+  | "onQuestionHelpTutorialRequested" | "onQuestionHelpGoalRequested" | "onQuestionHelpDiscoveriesRequested" | "onTutorialPreviousRequested"
   | "onTutorialNextRequested" | "onTutorialPageRequested" | "onGoalPreviousRequested" | "onGoalNextRequested" | "onSignKeyboardCharacter"
   | "onSignKeyboardBackspace" | "onSignDeleteRequested"
 >;
@@ -84,6 +84,9 @@ export function createScenePaletteCommands(deps: ScenePaletteCommandsDeps): Scen
     },
     onShowHintsToggled(enabled) {
       dispatch({ kind: "set-show-hints", enabled });
+    },
+    onShowEdgesToggled(enabled) {
+      dispatch({ kind: "set-show-edges", enabled });
     },
     onTextSizeSelected(size) {
       dispatch({ kind: "set-text-size", size });
@@ -176,6 +179,10 @@ export function createScenePaletteCommands(deps: ScenePaletteCommandsDeps): Scen
     },
     onQuestionHelpGoalRequested() {
       dispatch({ kind: "show-goal" });
+    },
+    onQuestionHelpDiscoveriesRequested() {
+      // The shell fills in the entries.
+      dispatch({ kind: "show-discoveries" });
     },
     onTutorialPreviousRequested() {
       dispatch({ kind: "step-tutorial-page", delta: -1 });

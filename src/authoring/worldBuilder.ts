@@ -13,6 +13,7 @@ import type {
   StartingPositionSpec,
   TutorialPageSpec,
   WorldDemoSpec,
+  WorldDiscoveriesSpec,
 } from "../cell-complex/specs";
 import { createConvexPrismBaseVertices, type ConvexPrismBaseVertices } from "../cell-complex/prismBase";
 import {
@@ -160,6 +161,8 @@ export interface WorldBuilder {
   toolStand(faceName: string, params: ToolStandAuthoringParams): void;
   /** Declares the demonstration made when the world starts: a laser firing a beam, a ruler measurement of it and a sign. At most one per world. */
   demo(faceName: string, params: DemoAuthoringParams): void;
+  /** Declares the world's discoveries (design 017 section 9.6): built-in ones to switch off, the world's own to add and curiosity markers to place. At most one call per world. */
+  discoveries(params: DiscoveriesAuthoringParams): void;
   /** Snapshots the accumulated cells (copying their arrays) and start position into a CellComplexSpec; the builder remains usable. */
   build(): CellComplexSpec;
 }
@@ -225,6 +228,28 @@ export interface DemoAuthoringParams {
   };
 }
 
+/** Where a curiosity marker stands: a face and a floor point in authored [x, height, y] axes (the height is ignored). */
+export interface MarkerAuthoringParams {
+  readonly face: string;
+  readonly position: readonly [x: number, height: number, y: number];
+}
+
+/**
+ * Parameters for discoveries. `disable` switches off built-in discoveries that cannot happen in the world (an id that names none is ignored). `add` brings the world's own: `detector` is `{ visitFace: "<face>" }` or `{ approach: { face, position, radius } }`, and `marker` places a curiosity marker for it. `markers` places markers for discoveries by id, built-in ones included.
+ */
+export interface DiscoveriesAuthoringParams {
+  readonly disable?: readonly string[];
+  readonly add?: readonly {
+    readonly id: string;
+    readonly name: string;
+    readonly question: string;
+    readonly teaser: string;
+    readonly detector: { readonly visitFace: string } | { readonly approach: { readonly face: string; readonly position: readonly [x: number, height: number, y: number]; readonly radius: number } };
+    readonly marker?: MarkerAuthoringParams;
+  }[];
+  readonly markers?: readonly (MarkerAuthoringParams & { readonly discovery: string })[];
+}
+
 /**
  * Creates an empty WorldBuilder.
  * Each builder owns its state; calling `build` does not reset it. Cells are emitted in the order their PolygonFace calls were made.
@@ -237,6 +262,7 @@ export function createWorldBuilder(): WorldBuilder {
   // A start whose yaw waits for the object it looks at, which may be declared after the start; resolved by build().
   let pendingFacing: { readonly objectId: string; readonly leftOfCenterDegrees: number } | undefined;
   let demoSpec: WorldDemoSpec | undefined;
+  let discoveriesSpec: WorldDiscoveriesSpec | undefined;
 
   function registerObject(cell: MutableCell, object: WorldLibraryObjectSpec): void {
     if (objectIds.has(object.id)) {
@@ -437,6 +463,65 @@ export function createWorldBuilder(): WorldBuilder {
       };
     },
 
+    discoveries(params) {
+      if (discoveriesSpec) {
+        throw new Error("A world has one discoveries section.");
+      }
+
+      const markerOf = (marker: MarkerAuthoringParams, owner: string) => {
+        requireCell(cells, marker.face, "discoveries");
+        requireFinitePosition(marker.position, `The marker of ${owner} in discoveries()`);
+        return { cellId: marker.face, position: authorPositionToWorld(marker.position) };
+      };
+      const ids = new Set<string>();
+      discoveriesSpec = {
+        disable: [...(params.disable ?? [])],
+        add: (params.add ?? []).map((entry) => {
+          for (const field of ["id", "name", "question", "teaser"] as const) {
+            if (typeof entry[field] !== "string" || entry[field].trim() === "") {
+              throw new Error(`discoveries() needs a non-empty ${field} for every added discovery.`);
+            }
+          }
+          if (ids.has(entry.id)) {
+            throw new Error(`discoveries() adds "${entry.id}" twice.`);
+          }
+          ids.add(entry.id);
+          const detector = entry.detector;
+          if (detector === undefined || typeof detector !== "object") {
+            throw new Error(`The discovery "${entry.id}" needs a detector: { visitFace } or { approach }.`);
+          }
+          const marker = entry.marker === undefined ? undefined : markerOf(entry.marker, `"${entry.id}"`);
+          if ("visitFace" in detector) {
+            requireCell(cells, detector.visitFace, "discoveries");
+            return { id: entry.id, name: entry.name, question: entry.question, teaser: entry.teaser, detector: { kind: "visitFace" as const, cellId: detector.visitFace }, ...(marker ? { marker } : {}) };
+          }
+          const approach = detector.approach;
+          if (approach === undefined) {
+            throw new Error(`The discovery "${entry.id}" needs a detector: { visitFace } or { approach }.`);
+          }
+          requireCell(cells, approach.face, "discoveries");
+          requireFinitePosition(approach.position, `The approach of "${entry.id}" in discoveries()`);
+          if (!(approach.radius > 0) || !Number.isFinite(approach.radius)) {
+            throw new Error(`The approach of "${entry.id}" in discoveries() needs a positive radius.`);
+          }
+          return {
+            id: entry.id,
+            name: entry.name,
+            question: entry.question,
+            teaser: entry.teaser,
+            detector: { kind: "approach" as const, cellId: approach.face, position: authorPositionToWorld(approach.position), radius: approach.radius },
+            ...(marker ? { marker } : {}),
+          };
+        }),
+        markers: (params.markers ?? []).map((marker) => {
+          if (typeof marker.discovery !== "string" || marker.discovery === "") {
+            throw new Error("discoveries() needs the id of a discovery for every marker.");
+          }
+          return { discovery: marker.discovery, ...markerOf(marker, `"${marker.discovery}"`) };
+        }),
+      };
+    },
+
     build() {
       return {
         cells: [...cells.values()].map((cell): PrismCellSpec => ({
@@ -452,6 +537,7 @@ export function createWorldBuilder(): WorldBuilder {
         })),
         startingPosition: startingPosition === undefined ? undefined : resolveFacing(startingPosition, pendingFacing, cells),
         ...(demoSpec ? { demo: demoSpec } : {}),
+        ...(discoveriesSpec ? { discoveries: discoveriesSpec } : {}),
       };
     },
   };
@@ -576,6 +662,12 @@ function createStartingPositionInFrontOfHouse(
 }
 
 // Reorders an authored [x, height, y] triple into cell-local {x, y, z} with z up.
+function requireFinitePosition(position: readonly number[] | undefined, what: string): void {
+  if (!Array.isArray(position) || position.length !== 3 || !position.every(Number.isFinite)) {
+    throw new Error(`${what} needs a [x, height, y] position.`);
+  }
+}
+
 function authorPositionToWorld(
   position: readonly [x: number, height: number, y: number],
 ): StartingPositionSpec["position"] {

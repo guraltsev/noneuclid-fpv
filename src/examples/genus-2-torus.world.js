@@ -125,3 +125,16 @@ startingPosition("genus-2-octagon", {
   position: [0, 0, 5],
   faceToward: "startingQuestionCube",
 });
+
+// Discoveries (design 017 section 9.4): no shape machine here, and a marker by the corner where all eight corners of the octagon are one point.
+discoveries({
+  disable: ["new-shape"],
+  add: [{
+    id: "genus-2-corner",
+    name: "One corner, eight corners",
+    question: "All eight corners of the octagon are this one point. How many full turns of the world meet here? Try the Protractor at this corner.",
+    teaser: "a corner where the world is stranger than anywhere else",
+    detector: { approach: { face: "genus-2-octagon", position: [64.7, 0, -26.8], radius: 1.5 } },
+    marker: { face: "genus-2-octagon", position: [64.7, 0, -26.8] },
+  }],
+});

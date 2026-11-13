@@ -12,6 +12,39 @@ export interface CellComplexSpec {
   readonly startingPosition?: StartingPositionSpec;
   /** A small demonstration made once when the world starts, through the modules' ordinary commands (see {@link WorldDemoSpec}). */
   readonly demo?: WorldDemoSpec;
+  /** The world's own discoveries and the built-in ones it switches off (see {@link WorldDiscoveriesSpec}). */
+  readonly discoveries?: WorldDiscoveriesSpec;
+}
+
+/** Where a discovery's curiosity marker stands: a face (a cell id) and a cell-local floor point in meters (the height is ignored). */
+export interface DiscoveryMarkerSpec {
+  readonly cellId: string;
+  readonly position: { readonly x: number; readonly y: number; readonly z: number };
+}
+
+/** What notices an authored discovery: the first visit to a face, or a visit within `radius` meters of a floor point of a face. */
+export type AuthoredDiscoveryDetector =
+  | { readonly kind: "visitFace"; readonly cellId: string }
+  | { readonly kind: "approach"; readonly cellId: string; readonly position: { readonly x: number; readonly y: number; readonly z: number }; readonly radius: number };
+
+/** A discovery an author added to a world (design 017 section 9.6): its words, its detector and, optionally, its marker. */
+export interface AuthoredDiscoverySpec {
+  readonly id: string;
+  readonly name: string;
+  readonly question: string;
+  readonly teaser: string;
+  readonly detector: AuthoredDiscoveryDetector;
+  readonly marker?: DiscoveryMarkerSpec;
+}
+
+/**
+ * The authored part of a world's discoveries (design 017 sections 9.4 and 9.6).
+ * `disable` names built-in discoveries that cannot happen here (an id that names none is ignored), `add` brings the world's own, and `markers` places curiosity markers for discoveries by id, built-in ones included.
+ */
+export interface WorldDiscoveriesSpec {
+  readonly disable: readonly string[];
+  readonly add: readonly AuthoredDiscoverySpec[];
+  readonly markers: readonly (DiscoveryMarkerSpec & { readonly discovery: string })[];
 }
 
 /**

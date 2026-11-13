@@ -228,8 +228,6 @@ export const disabledReasons = {
   lastPage: "This is the last page",
   /** A help page button for a topic with no pages in this world. */
   nothingForThisWorld: "Nothing here for this world",
-  /** The Discoveries button of Help, until a world has discoveries to show. */
-  noDiscoveriesYet: "Nothing to discover yet",
   /** A shape machine step button at the end of its range. */
   atTheLimit: "At the limit",
   /** The reason of a disabled control that had none given; a test fails on this being needed. */
@@ -439,4 +437,63 @@ export const settingsText = {
   small: "Small",
   large: "Large",
   antiNausea: "Anti-nausea vignette",
+} as const;
+
+/**
+ * The words of the discoveries (design 017 section 9.4): the name, the question shown when it is found and the teaser shown until then, for each discovery the app notices by itself.
+ * A world's own discoveries bring their own words with the world script.
+ */
+export const builtinDiscoveryText = {
+  "across-an-edge": {
+    name: "Across an edge",
+    question: "Which face did you land on? Was it the one you expected?",
+    teaser: "something happens when you walk off the edge of a face",
+  },
+  "back-where-you-started": {
+    name: "Back where you started",
+    question: "How many faces did you pass through?",
+    teaser: "there is more than one way back to where you began",
+  },
+  "beam-came-home": {
+    name: "The beam came home",
+    question: "Did you aim it at the laser? How long is the loop?",
+    teaser: "a beam can find its way back to its own laser",
+  },
+  "beam-hits-corner": {
+    name: "A beam hits a corner",
+    question: "Why can't a beam go through a corner?",
+    teaser: "something happens when a beam reaches a corner",
+  },
+  "tight-string": {
+    name: "Tight string",
+    question: "Is this beam shorter than the string? Why?",
+    teaser: "a string made of joined beams pulls itself tight",
+  },
+  "new-shape": {
+    name: "A new shape",
+    question: "Is this a different world? How could you tell from inside?",
+    teaser: "the shape machine can change the whole world",
+  },
+} as const;
+
+/** The words around the discoveries: the toasts, the Discoveries page, the curiosity markers and the Show edges switch (design 017 sections 9.4 and 9.5). */
+export const discoveryText = {
+  /** The first toast of a discovery. */
+  toast: (name: string): string => `Discovery! ${name}`,
+  /** A discovery not found yet, on the Discoveries page: a mystery mark and the teaser. */
+  teaserLine: (teaser: string): string => `??? - ${teaser}`,
+  /** The line under the title of the Discoveries page. */
+  pageIntro: "Things the world noticed while you explored. Nothing here has to be done in order.",
+  /** The line on the page when the world has no discoveries at all. */
+  none: "This world has nothing to discover.",
+  /** The count shown on the page, for example "2 of 6 found". */
+  foundCount: (found: number, total: number): string => `${found} of ${total} found`,
+  /** The invitation under "Across an edge" once it has been found. */
+  showEdgesInvite: "Want to see where the faces are glued?",
+  /** The switch in Settings, and the button under the invitation. */
+  showEdges: "Show edges",
+  /** The button when the edges are already shown. */
+  hideEdges: "Hide edges",
+  /** The floating label of a marker whose discovery is found (the marker itself shows a tick). */
+  markerFound: "Found",
 } as const;

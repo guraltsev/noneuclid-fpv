@@ -6,7 +6,7 @@ import type { PortalPanelModeId } from "../../../../glue/portalPanelMode";
 import type { RuntimeMenuConsoleLogLevelId, RuntimeMouseSensitivity, RuntimeTextSize, RuntimeTurnSpeed } from "../../../../runtime/runtimeMenuState";
 import type { PaletteDefinition } from "../../../../ui/paletteDefinition";
 import type { ScenePaletteAdapterOptions } from "../adapterTypes";
-import { controllersSettingsText, hintStripText, settingsText } from "../../../../ui/vocabulary";
+import { controllersSettingsText, discoveryText, hintStripText, settingsText } from "../../../../ui/vocabulary";
 import { borderColor, fontPx, scrollbarBorderColor, scrollbarColor, sectionColor, textColor } from "../tokens";
 import { createActionButton, createChoiceSection, createOptionGrid, createSectionLabel, createSettingsScrollContainer, createStepRow, createToggleButton, createToggleRow } from "../widgets";
 
@@ -210,6 +210,12 @@ export function buildSettingsContent(
     displaySection.add(createToggleRow(hintStripText.showHintsSwitch, content.showHintsEnabled, (enabled) => {
       onShowHintsToggled(enabled);
     }, "show-hints-toggle"));
+  }
+  const onShowEdgesToggled = options.onShowEdgesToggled;
+  if (onShowEdgesToggled !== undefined) {
+    displaySection.add(createToggleRow(discoveryText.showEdges, content.showEdgesEnabled, (enabled) => {
+      onShowEdgesToggled(enabled);
+    }, "show-edges-toggle"));
   }
   if (options.onResetTipsRequested !== undefined) {
     displaySection.add(createActionButton(settingsText.resetTips, "reset-tips", options.onResetTipsRequested, { width: 160 }));

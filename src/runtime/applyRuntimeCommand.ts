@@ -18,6 +18,7 @@ import {
   selectRuntimeMenuPlaceFlagToolType,
   setRuntimeMenuAimCollisionOutlinesEnabled,
   setRuntimeMenuAntiNauseaModeEnabled,
+  setRuntimeMenuShowEdgesEnabled,
   setRuntimeMenuShowHintsEnabled,
   setRuntimeMenuTextSize,
   setRuntimeMenuMouseSensitivity,
@@ -47,6 +48,7 @@ import {
   showRuntimeMenuGeodesicCannonActions,
   showRuntimeMenuGeometryComputerActions,
   showRuntimeMenuMeasurementActions,
+  showRuntimeMenuDiscoveries,
   showRuntimeMenuGoal,
   showRuntimeMenuMainPage,
   showRuntimeMenuPlaceFlagOptions,
@@ -161,6 +163,8 @@ export function reduceRuntimeCommand(state: ClientSessionState, command: Runtime
       return withMenu(showRuntimeMenuQuestionTutorial(menu), syncPalette);
     case "show-goal":
       return withMenu(showRuntimeMenuGoal(menu), syncPalette);
+    case "show-discoveries":
+      return command.entries === undefined ? nothing : withMenu(showRuntimeMenuDiscoveries(menu, command.entries), syncPalette);
     case "step-tutorial-page":
       if (menu.page !== "tutorial" || !menu.tutorialOptions) {
         return nothing;
@@ -260,6 +264,8 @@ export function reduceRuntimeCommand(state: ClientSessionState, command: Runtime
         },
         effects: [{ kind: "apply-comfort-state" }],
       };
+    case "set-show-edges":
+      return { state: { ...state, menuState: setRuntimeMenuShowEdgesEnabled(menu, command.enabled) }, effects: [] };
     case "set-show-hints":
       return { state: { ...state, menuState: setRuntimeMenuShowHintsEnabled(menu, command.enabled) }, effects: [] };
     case "set-text-size":
@@ -371,7 +377,7 @@ function menuOneLevelUp(menu: RuntimeMenuState): RuntimeMenuState {
   if (menu.page === "tutorial" && menu.tutorialOptions?.view === "page" && menu.tutorialOptions.pages.length > 1) {
     return showRuntimeMenuTutorialIndex(menu);
   }
-  if (menu.page === "tutorial" || menu.page === "goal") {
+  if (menu.page === "tutorial" || menu.page === "goal" || menu.page === "discoveries") {
     return showRuntimeMenuQuestionHelp(menu);
   }
   return showRuntimeMenuMainPage(menu);

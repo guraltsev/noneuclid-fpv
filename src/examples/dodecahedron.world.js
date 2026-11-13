@@ -135,3 +135,6 @@ OnFace("lower-1", [lower_1_traffic_cone]);
 OnFace("lower-2", [lower_2_bench]);
 OnFace("lower-3", [lower_3_bicycle]);
 OnFace("bottom", [bottom_stop_sign]);
+
+// What this world can show the student: there is no shape machine here, so that discovery is left out (design 017 section 9.4).
+discoveries({ disable: ["new-shape"] });

@@ -14,6 +14,7 @@ import type { VrComfortOptions } from "../glue/vrComfortOptions";
 import type { XrHandOptions } from "../glue/xrLayout";
 import type { PlacedFlagType } from "../world-objects/toolObjects";
 import type { TutorialPageSpec } from "../cell-complex/specs";
+import type { DiscoveryPageEntry } from "../modules/discoveries";
 import { defaultAppConfigName } from "../glue/appConfig";
 import {
   defaultRuntimeDebugOverlayItems,
@@ -41,7 +42,8 @@ export type RuntimeMenuPageId =
   | "geometry-computer-actions"
   | "question-help"
   | "tutorial"
-  | "goal";
+  | "goal"
+  | "discoveries";
 /**
  * Console log levels selectable in the menu (every debug level except "off", which is the debug toggle).
  */
@@ -96,6 +98,8 @@ export interface RuntimeMenuState {
   readonly antiNauseaModeEnabled: boolean;
   /** Whether the hint strip is shown (the "Show hints" switch of Settings); absent means on. */
   readonly showHintsEnabled?: boolean;
+  /** Whether the glued edges are drawn on the floor (the "Show edges" switch of Settings); absent means off. */
+  readonly showEdgesEnabled?: boolean;
   /** The "Text size" step of Settings; absent means medium. */
   readonly textSize?: RuntimeTextSize;
   /** The "Mouse sensitivity" step of Settings; absent means medium. */
@@ -173,6 +177,10 @@ export interface RuntimeMenuState {
     readonly objectId: string;
     readonly pages: readonly TutorialPageSpec[];
     readonly pageIndex: number;
+  };
+  /** Payload of the discoveries page: the entries as they stood when the page was opened. */
+  readonly discoveriesOptions?: {
+    readonly entries: readonly DiscoveryPageEntry[];
   };
   /**
    * Tutorial and goal pages offered by a help object on the question-help page, retained across tutorial/goal subpages.
@@ -270,6 +278,7 @@ export function closeRuntimeMenu(state: RuntimeMenuState): RuntimeMenuState {
     geometryComputerOptions: undefined,
     tutorialOptions: undefined,
     goalOptions: undefined,
+    discoveriesOptions: undefined,
     questionHelpOptions: undefined,
     editingFlagId: undefined,
   };
@@ -312,6 +321,7 @@ export function showRuntimeMenuMainPage(state: RuntimeMenuState): RuntimeMenuSta
     geometryComputerOptions: undefined,
     tutorialOptions: undefined,
     goalOptions: undefined,
+    discoveriesOptions: undefined,
     questionHelpOptions: undefined,
     editingFlagId: undefined,
   };
@@ -502,6 +512,23 @@ export function showRuntimeMenuQuestionHelp(
     isOpen: true,
     page: "question-help",
     questionHelpOptions,
+    tutorialOptions: undefined,
+    goalOptions: undefined,
+    discoveriesOptions: undefined,
+  };
+}
+
+/** Opens the Discoveries page with `entries`; unchanged if the help hub is not what the menu stands on. */
+export function showRuntimeMenuDiscoveries(state: RuntimeMenuState, entries: readonly DiscoveryPageEntry[]): RuntimeMenuState {
+  if (!state.questionHelpOptions) {
+    return state;
+  }
+
+  return {
+    ...state,
+    isOpen: true,
+    page: "discoveries",
+    discoveriesOptions: { entries },
     tutorialOptions: undefined,
     goalOptions: undefined,
   };
@@ -731,6 +758,11 @@ export function setRuntimeMenuShowHintsEnabled(
     ...state,
     showHintsEnabled: enabled,
   };
+}
+
+/** Shows or hides the glued edges on the floor. */
+export function setRuntimeMenuShowEdgesEnabled(state: RuntimeMenuState, enabled: boolean): RuntimeMenuState {
+  return { ...state, showEdgesEnabled: enabled };
 }
 
 /** Sets the text size step. */

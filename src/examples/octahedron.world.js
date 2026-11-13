@@ -135,3 +135,6 @@ OnFace("face-4", [marker, face_4_stop_sign]);
 OnFace("face-5", [face_5_bicycle]);
 OnFace("face-6", [face_6_grass]);
 OnFace("face-7", [face_7_tree_swirl]);
+
+// What this world can show the student: there is no shape machine here, so that discovery is left out (design 017 section 9.4).
+discoveries({ disable: ["new-shape"] });

@@ -82,3 +82,9 @@ startingPosition("torus-room", {
   position: [0, 0, 5],
   faceToward: "startingQuestionCube",
 });
+
+// Discoveries (design 017 section 9.4): the world is one face, so there is no way back to the starting face by another edge. The shape machine has a marker beside it.
+discoveries({
+  disable: ["back-where-you-started"],
+  markers: [{ discovery: "new-shape", face: "torus-room", position: [-3.7, 0, -5.0] }],
+});

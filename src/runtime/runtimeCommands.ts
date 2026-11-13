@@ -4,6 +4,7 @@
  */
 import type { ObjectActionEntry } from "../engine/moduleTypes";
 import type { TutorialPageSpec } from "../cell-complex/specs";
+import type { DiscoveryPageEntry } from "../modules/discoveries";
 import type { DebugSettings } from "../glue/debugSettings";
 import type { PortalPanelModeId } from "../glue/portalPanelMode";
 import type { RuntimeDebugOverlayItemId, RuntimeToolId } from "../glue/toolIds";
@@ -83,6 +84,8 @@ export type RuntimeCommand =
   | { readonly kind: "try-tool"; readonly toolId: RuntimeToolId }
   | { readonly kind: "show-question-tutorial" }
   | { readonly kind: "show-goal" }
+  /** Opens the Discoveries page from the help hub; the shell fills `entries` (the discoveries found and the teasers of the rest) and a command without them does nothing. */
+  | { readonly kind: "show-discoveries"; readonly entries?: readonly DiscoveryPageEntry[] }
   | { readonly kind: "step-tutorial-page"; readonly delta: -1 | 1 }
   /** Shows one page of the open tutorial, chosen from its index. */
   | { readonly kind: "show-tutorial-page"; readonly pageIndex: number }
@@ -123,6 +126,8 @@ export type RuntimeCommand =
   | { readonly kind: "set-anti-nausea-mode"; readonly enabled: boolean }
   /** The "Show hints" switch of Settings. */
   | { readonly kind: "set-show-hints"; readonly enabled: boolean }
+  /** The "Show edges" switch of Settings, and the button of the Discoveries page. */
+  | { readonly kind: "set-show-edges"; readonly enabled: boolean }
   /** The "Text size" step of Settings. */
   | { readonly kind: "set-text-size"; readonly size: RuntimeTextSize }
   /** The "Mouse sensitivity" step of Settings. */

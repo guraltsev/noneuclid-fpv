@@ -31,6 +31,8 @@ export interface ScenePaletteAdapterOptions {
   readonly onAntiNauseaModeToggled: (enabled: boolean) => void;
   /** Settings: the "Show hints" switch. */
   readonly onShowHintsToggled?: (enabled: boolean) => void;
+  /** Settings and the Discoveries page: the "Show edges" switch. */
+  readonly onShowEdgesToggled?: (enabled: boolean) => void;
   /** Settings: the "Text size" step chosen. */
   readonly onTextSizeSelected?: (size: RuntimeTextSize) => void;
   /** Settings: the "Mouse sensitivity" step chosen. */
@@ -77,6 +79,7 @@ export interface ScenePaletteAdapterOptions {
   /** Help hub and paged tutorial/goal navigation. */
   readonly onQuestionHelpTutorialRequested?: () => void;
   readonly onQuestionHelpGoalRequested?: () => void;
+  readonly onQuestionHelpDiscoveriesRequested?: () => void;
   readonly onTutorialPreviousRequested?: () => void;
   readonly onTutorialNextRequested?: () => void;
   /** A page was chosen from the tutorial's index. */

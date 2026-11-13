@@ -30,6 +30,7 @@ export function compileWorldScript(sourceText: string, options: CompileWorldScri
     startingPosition: builder.startingPosition,
     toolStand: builder.toolStand,
     demo: builder.demo,
+    discoveries: builder.discoveries,
     ...worldFloorTextureLibrary,
     ...worldObjectLibrary,
   } as const;

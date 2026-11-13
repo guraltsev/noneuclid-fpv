@@ -28,7 +28,7 @@ function howToDefinition(options: { worldHasMap: boolean; config?: AppConfig; pa
 }
 
 describe("Help: the three pages", () => {
-  it("offers Things to try, How to and Discoveries, the last one empty for now", () => {
+  it("offers Things to try, How to and Discoveries, all three open", () => {
     const state = showRuntimeMenuQuestionHelp(createRuntimeMenuState({ selectedWorldId: "cube" }), {
       objectId: "startingQuestionCube",
       tutorialPages: defaultStartingQuestionCubeTutorialPages,
@@ -38,7 +38,7 @@ describe("Help: the three pages", () => {
     expect(hub.kind).toBe("question-help");
     if (hub.kind !== "question-help") return;
     expect(hub.options.map((option) => option.label)).toEqual(["Things to try", "How to", "Discoveries"]);
-    expect(hub.options[2]).toMatchObject({ disabled: true, disabledReason: "Nothing to discover yet" });
+    expect(hub.options[2]).toMatchObject({ id: "discoveries", disabled: false });
     expect(hub.body).toBe("Lost? Press Esc and choose Go home.");
   });
 

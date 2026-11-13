@@ -17,6 +17,7 @@ import { buildHeader } from "./header";
 import { buildMainContent } from "./pages/main";
 import { buildGeodesicCannonActionsContent } from "./pages/geodesicActions";
 import { buildGeometryComputerActionsContent } from "./pages/geometryComputer";
+import { buildDiscoveriesContent } from "./pages/discoveries";
 import { buildPagedHelpContent, buildQuestionHelpContent } from "./pages/help";
 import { buildEditSignContent, buildPlaceSignOptionsContent } from "./pages/signs";
 import { buildMeasurementActionsContent } from "./pages/measurements";
@@ -115,6 +116,10 @@ function buildContent(
 
   if (definition.content.kind === "goal") {
     return buildPagedHelpContent(definition.content, options);
+  }
+
+  if (definition.content.kind === "discoveries") {
+    return buildDiscoveriesContent(definition.content, options);
   }
 
   if (definition.content.kind === "question-help") {

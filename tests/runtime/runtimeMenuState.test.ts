@@ -344,7 +344,7 @@ describe("runtimeMenuState", () => {
       options: [
         { id: "goal", label: "Things to try", disabled: false },
         { id: "tutorial", label: "How to", disabled: false },
-        { id: "discoveries", label: "Discoveries", disabled: true, disabledReason: "Nothing to discover yet" },
+        { id: "discoveries", label: "Discoveries", disabled: false },
       ],
     });
     expect(tutorial.content).toMatchObject({ kind: "tutorial", title: "Move" });
