@@ -97,7 +97,7 @@ commit is on `dev` and the report is appended.
 - `tests/ui/vocabulary.test.ts`: shape test, the retired-terms scan over the listed files plus the module, world-object and example files named in it, and tests of the scanner itself. Allow-list: Go home, carry on, length =, two debug-page switches (each with a reason). Strings that are arguments of `Error(` or a console call are skipped (author/developer text).
 - New test: `tests/modules/geodesicEmitters/edit.test.ts` "names each placed laser with the next free short id".
 - Generated documents regenerated (`npm run docs:generate`).
-- Commits: see the final commit of this job on `dev` (hash recorded in the next commit).
+- Commits: a793495 (the work), and the commit after it that records the push in this report.
 
 ### Deviations
 - The vocabulary lives in `src/world-objects/vocabulary.ts`, not `src/ui/vocabulary.ts`: the layer rules (`scripts/docs/lib.mjs`) let `modules` and `authoring` import neither `ui` nor `glue`, but both may import `world-objects` (where `helpHubCopy.ts` already lives). `src/ui/vocabulary.ts` is a re-export so the design's path works.
