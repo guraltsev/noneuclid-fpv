@@ -75,7 +75,7 @@ Show edges works, checks pass, commit on `dev`, report appended.
 
 ### Done
 
-Commit: COMMIT_HASH on `dev`.
+Commit: c0cc5a5 on `dev`.
 
 - Module `src/modules/discoveries/` (a client-side module: pure code, no engine module registered): `api.ts` (plain data:
   `DiscoveryDefinition`, `DiscoveryFrame`, `DiscoveryPageEntry`), `catalog.ts` (built-in discoveries from the vocabulary,
