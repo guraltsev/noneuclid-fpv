@@ -1,11 +1,13 @@
 /**
- * Builds the billboard mesh for the XR object tooltip: a rounded dark panel with up to three centered text lines, drawn on a canvas texture.
- * The plane is 0.92 x 0.31 meters, rendered without depth test on top of the scene so it stays readable through geometry.
+ * Builds the billboard mesh for the XR object tooltip: a rounded dark panel with up to four centered text lines (the name, then the hint strip), drawn on a canvas texture.
+ * The plane is 0.92 x 0.383 meters, rendered without depth test on top of the scene so it stays readable through geometry.
  * Positioning and orientation are done by the caller (see xrObjectTooltipController).
  */
 import * as THREE from "three";
 import { roundRect } from "./canvasDrawing";
 
+/** The most text lines the tooltip draws: the object's name, then up to three hint entries (design 017 section 8.2). */
+export const maxXrObjectTooltipLines = 4;
 /**
  * Three.js `renderOrder` of the tooltip mesh; high so it draws after scene geometry.
  */
@@ -16,14 +18,14 @@ export const xrObjectTooltipRenderOrder = 960;
 export const xrObjectTooltipYOffsetMeters = 0.18;
 
 /**
- * Creates a hidden (`visible = false`) billboard mesh showing `text`; only the first three newline-separated lines are drawn.
+ * Creates a hidden (`visible = false`) billboard mesh showing `text`; only the first four newline-separated lines are drawn.
  * Throws if a 2D canvas context cannot be created. Lifecycle: the caller owns the mesh and must dispose its geometry, material, and map
  * (e.g. with `disposeObject3D`).
  */
 export function createXrObjectTooltip(text: string): THREE.Object3D {
   const canvas = document.createElement("canvas");
   canvas.width = 768;
-  canvas.height = 256;
+  canvas.height = 320;
   const context = canvas.getContext("2d");
   if (!context) {
     throw new Error("Could not create XR object tooltip canvas context.");
@@ -41,8 +43,8 @@ export function createXrObjectTooltip(text: string): THREE.Object3D {
   context.textBaseline = "middle";
 
   // Fewer than three lines get a larger font; text is squeezed horizontally via maxWidth if too long.
-  const lines = text.split("\n").slice(0, 3);
-  const fontSize = lines.length > 2 ? 44 : 50;
+  const lines = text.split("\n").slice(0, maxXrObjectTooltipLines);
+  const fontSize = lines.length > 3 ? 40 : lines.length > 2 ? 44 : 50;
   const lineHeight = fontSize * 1.18;
   const firstLineY = canvas.height / 2 - ((lines.length - 1) * lineHeight) / 2;
   context.font = `bold ${fontSize}px system-ui, sans-serif`;
@@ -59,7 +61,7 @@ export function createXrObjectTooltip(text: string): THREE.Object3D {
     depthWrite: false,
     side: THREE.DoubleSide,
   });
-  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(0.92, 0.31), material);
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(0.92, 0.383), material);
   mesh.name = "xr-object-tooltip:billboard";
   mesh.renderOrder = xrObjectTooltipRenderOrder;
   mesh.frustumCulled = false;

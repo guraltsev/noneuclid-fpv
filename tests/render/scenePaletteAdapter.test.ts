@@ -16,7 +16,6 @@ import {
 } from "../../src/runtime/runtimeMenuState";
 import { publicAssetUrl } from "../../src/glue/assetUrls";
 import { createScenePaletteAdapter } from "../../src/render/three/palette/scenePaletteAdapter";
-import { defaultAppConfig } from "../../src/glue/appConfig";
 import { createTestPaletteDefinition } from "../support/tools";
 
 describe("scenePaletteAdapter", () => {
@@ -28,22 +27,6 @@ describe("scenePaletteAdapter", () => {
 
     expect(itemIds).toEqual(expect.arrayContaining(["main-menu:help", "main-menu:settings", "main-menu:go-home", "main-menu:start-over"]));
     expect(itemIds.some((id) => id.startsWith("tool:"))).toBe(false);
-
-    adapter.dispose();
-  });
-
-  it("maps each main tool and its nested options to the right icon", () => {
-    const adapter = createScenePaletteAdapter(createNoopOptions());
-    adapter.setDefinition(createTestPaletteDefinition(createRuntimeMenuState({ selectedWorldId: "cube" }), defaultAppConfig, "xr"));
-
-    const itemIds = collectPaletteItemIds(adapter.root);
-    const imageSources = collectPaletteImageSources(adapter.root);
-
-    expect(itemIds).toContain("tool-options:place-sign");
-    expect(imageSources).toContain(publicAssetUrl("WoodenSign1/WoodenSign1.png"));
-    expect(imageSources).toContain(publicAssetUrl("flashlight/Lightsaber.png"));
-    expect(imageSources).toContain(publicAssetUrl("icons/ruler-inverted.svg"));
-    expect(imageSources).toContain(publicAssetUrl("icons/protractor.png"));
 
     adapter.dispose();
   });

@@ -4,7 +4,7 @@
  * The module decides what is shown and enabled (config-gated sections, disabled buttons, tutorial text per input device, integer-meter limits for the geometry computer) but performs no rendering and holds no state; any page whose payload is missing falls back to the main page.
  */
 import type { ObjectActionEntry } from "../engine/moduleTypes";
-import { appConfigCatalog, getEnabledMainTools, type AppConfig, type ConfigurableToolId } from "../glue/appConfig";
+import { appConfigCatalog, type AppConfig, type ConfigurableToolId } from "../glue/appConfig";
 import {
   describeTorusRelation,
   reducedTorusModulus,
@@ -16,10 +16,9 @@ import { getInputHintGlyph, type InputHintGlyph } from "./inputIntents";
 import { publicAssetUrl } from "../glue/assetUrls";
 import { worldCatalog } from "../authoring/worldCatalog";
 import { helpHubHomeGuidance } from "../world-objects/helpHubCopy";
-import { beamName, mainMenuText, objectActions, surfaceNames, toolNames } from "../world-objects/vocabulary";
+import { beamName, mainMenuText, objectActions, surfaceNames } from "../world-objects/vocabulary";
 import { portalPanelModeDefinitions } from "../glue/portalPanelMode";
 import type { RuntimeMenuConsoleLogLevelId, RuntimeMenuPageId, RuntimeMenuState } from "../runtime/runtimeMenuState";
-import type { ToolsById } from "../runtime/toolRegistry";
 import type { RuntimeDebugOverlayItemId, RuntimeToolId } from "../glue/toolIds";
 import type { InputMode } from "./inputIntents";
 import { placedFlagMaxMessageLength } from "../world-objects/placedFlags";
@@ -49,14 +48,14 @@ export interface MainMenuActionEntry {
 
 /**
  * Content of the main page, the main menu (design 017 section 7.5): Help, Settings, Go home and Start over as text buttons.
- * The tool tiles belong to the belt now; `toolOptions` is empty on desktop and is filled only for VR, until the VR belt of job 77 replaces it.
+ * The tool tiles belong to the belt now, on desktop and in VR (job 77); `toolOptions` is always empty.
  */
 export interface MainPaletteContent {
   readonly kind: "main";
   readonly selectedTool: RuntimeToolId;
   readonly placeFlagType: PlacedFlagType;
   readonly menuActions: readonly MainMenuActionEntry[];
-  /** VR only, until job 77: the tools enabled by the app config, in display order. Empty on desktop. */
+  /** Always empty: tools are taken from the belt (design 017 section 7.4), never from a menu. */
   readonly toolOptions: readonly {
     readonly id: ConfigurableToolId | "none";
     readonly label: string;
@@ -80,6 +79,10 @@ export interface SettingsPaletteContent {
   readonly antiNauseaModeEnabled: boolean;
   /** Whether the hint strip is shown (the "Show hints" switch). */
   readonly showHintsEnabled: boolean;
+  /** The "Use one controller" switch (VR). */
+  readonly useOneControllerEnabled: boolean;
+  /** The "Left-handed" switch (VR). */
+  readonly leftHandedEnabled: boolean;
   /** True while a reload awaits its confirming second press. */
   readonly reloadConfirmationActive: boolean;
 }
@@ -298,7 +301,6 @@ export function createPaletteDefinition(
   appConfig: AppConfig,
   inputMode: InputMode,
   nowMs: number,
-  toolsById: ToolsById,
 ): PaletteDefinition {
   const reloadConfirmationActive = (state.reloadConfirmUntilMs ?? 0) > nowMs;
 
@@ -363,6 +365,8 @@ export function createPaletteDefinition(
         debugEnabled: state.debugEnabled,
         antiNauseaModeEnabled: state.antiNauseaModeEnabled,
         showHintsEnabled: state.showHintsEnabled !== false,
+        useOneControllerEnabled: state.useOneControllerEnabled === true,
+        leftHandedEnabled: state.leftHandedEnabled === true,
         reloadConfirmationActive,
       },
     };
@@ -487,7 +491,7 @@ export function createPaletteDefinition(
       selectedTool: state.selectedTool,
       placeFlagType: state.placeFlagOptions.flagType,
       menuActions: mainMenuActions,
-      toolOptions: inputMode === "xr" ? createToolOptions(appConfig, toolsById) : [],
+      toolOptions: [],
     },
   };
 }
@@ -510,7 +514,7 @@ export interface PaletteDefinitionCache {
  * immutably, so reference equality of `state` is a complete change test; the clock enters only through the
  * reload-confirmation flag, which is part of the key.
  */
-export function createPaletteDefinitionCache(appConfig: AppConfig, toolsById: ToolsById): PaletteDefinitionCache {
+export function createPaletteDefinitionCache(appConfig: AppConfig): PaletteDefinitionCache {
   let lastState: RuntimeMenuState | undefined;
   let lastInputMode: InputMode | undefined;
   let lastReloadConfirmationActive = false;
@@ -531,7 +535,7 @@ export function createPaletteDefinitionCache(appConfig: AppConfig, toolsById: To
         lastState = state;
         lastInputMode = inputMode;
         lastReloadConfirmationActive = reloadConfirmationActive;
-        definition = createPaletteDefinition(state, appConfig, inputMode, nowMs, toolsById);
+        definition = createPaletteDefinition(state, appConfig, inputMode, nowMs);
         version += 1;
         result = { definition, version };
       }
@@ -617,16 +621,6 @@ const mainMenuActions: readonly MainMenuActionEntry[] = [
   { id: "go-home", label: objectActions.goHome },
   { id: "start-over", label: objectActions.startOver },
 ];
-
-// The tools the config enables that have an entry on the main list, in the config's order.
-function createToolOptions(appConfig: AppConfig, toolsById: ToolsById): MainPaletteContent["toolOptions"] {
-  const tools = getEnabledMainTools(appConfig).flatMap((id) => {
-    const tool = toolsById.get(id);
-    return tool?.entry.kind === "main-tool" ? [{ id, label: tool.label }] : [];
-  });
-  // The empty hand comes first: selecting it puts the tool away (design 017 section 8.3; the belt replaces this list on desktop, job 77 in VR).
-  return [{ id: "none" as const, label: toolNames.none.name }, ...tools];
-}
 
 function createGeometryComputerActionsContent(
   options: NonNullable<RuntimeMenuState["geometryComputerOptions"]>,

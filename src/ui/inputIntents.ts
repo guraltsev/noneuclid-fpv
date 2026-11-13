@@ -4,9 +4,12 @@
  */
 import type { TutorialInputIntent } from "../cell-complex/specs";
 import { publicAssetUrl } from "../glue/assetUrls";
+import type { XrLayout } from "../glue/xrLayout";
 
 /** Input device family a hint is written for: keyboard and mouse ("desktop") or VR controllers ("xr"). */
 export type InputMode = "desktop" | "xr";
+
+export type { XrLayout };
 
 /** Abstract user action that is bound to a different physical control per input mode; the same list that tutorial pages name their controls by. */
 export type InputIntent = TutorialInputIntent;
@@ -131,9 +134,51 @@ const xrHints: Readonly<Record<InputIntent, Omit<InputHintGlyph, "intent" | "mod
   },
 };
 
-/** Returns the label and optional icon for an intent in a mode; total over all intents. */
-export function getInputHintGlyph(mode: InputMode, intent: InputIntent): InputHintGlyph {
-  const hint = mode === "desktop" ? desktopHints[intent] : xrHints[intent];
+type HintOverrides = Partial<Record<InputIntent, Omit<InputHintGlyph, "intent" | "mode">>>;
+
+const gripGlyph = { label: "Grip", iconSrc: publicAssetUrl("icons/xr-grip.svg") } as const;
+const twoControllerHints: HintOverrides = {
+  "context-menu": gripGlyph,
+  cancel: gripGlyph,
+  move: { label: "Left stick", iconSrc: publicAssetUrl("icons/xr-thumbstick.svg") },
+  help: { label: "B", iconSrc: publicAssetUrl("icons/b-alphabet.svg") },
+  carry: { label: "A", iconSrc: publicAssetUrl("icons/a-alphabet.svg") },
+  "switch-tool": { label: "Left trigger", iconSrc: publicAssetUrl("icons/xr-trigger.svg") },
+  hand: { label: "Left grip", iconSrc: publicAssetUrl("icons/xr-grip.svg") },
+  "main-menu": { label: "X" },
+  reset: { label: "X" },
+};
+const stickPressGlyph = { label: "Stick press", iconSrc: publicAssetUrl("icons/xr-thumbstick.svg") } as const;
+const oneRightHints: HintOverrides = {
+  "context-menu": gripGlyph,
+  cancel: gripGlyph,
+  move: { label: "Stick", iconSrc: publicAssetUrl("icons/xr-thumbstick.svg") },
+  help: { label: "B", iconSrc: publicAssetUrl("icons/b-alphabet.svg") },
+  carry: { label: "A", iconSrc: publicAssetUrl("icons/a-alphabet.svg") },
+  "switch-tool": stickPressGlyph,
+  hand: stickPressGlyph,
+  "main-menu": { label: "Hold B", iconSrc: publicAssetUrl("icons/b-alphabet.svg") },
+  reset: { label: "Hold B", iconSrc: publicAssetUrl("icons/b-alphabet.svg") },
+};
+const oneLeftHints: HintOverrides = {
+  ...oneRightHints,
+  help: { label: "Y" },
+  carry: { label: "X" },
+  "main-menu": { label: "Hold Y" },
+  reset: { label: "Hold Y" },
+};
+const xrLayoutHints: Readonly<Record<XrLayout, HintOverrides>> = {
+  "two-controllers": twoControllerHints,
+  "one-left": oneLeftHints,
+  "one-right": oneRightHints,
+};
+
+/**
+ * Returns the label and optional icon for an intent in a mode; total over all intents.
+ * `layout` only matters in "xr" mode: it names the controllers the player holds (see {@link XrLayout}); without it the glyph is the one written for two controllers before the hand roles existed.
+ */
+export function getInputHintGlyph(mode: InputMode, intent: InputIntent, layout?: XrLayout): InputHintGlyph {
+  const hint = mode === "desktop" ? desktopHints[intent] : (layout === undefined ? undefined : xrLayoutHints[layout][intent]) ?? xrHints[intent];
   return {
     intent,
     mode,

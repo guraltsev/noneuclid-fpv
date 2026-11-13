@@ -1,14 +1,16 @@
 /**
- * WebXR gamepad input -> `RuntimeInputFrame` (the XR input path for locomotion and actions).
- * Reads the thumbstick axes and button states of every XR input source's gamepad, combines them,
- * and produces a frame in the player-local frame (x right, y forward, z up; meters and radians).
- * Stick-forward moves along y and stick-x turns the player (continuous turn, no strafing). Pitch is never driven from XR.
- * Button layout follows the WebXR `xr-standard` gamepad mapping: 0 trigger, 1 squeeze, 3 thumbstick click (unused: it no longer resets), 4 lower face button (carry), 5 upper face button (help).
- * Held buttons in `createXrInputFrame` are level signals; only `createXrControls` converts them to rising-edge requests.
+ * WebXR gamepad input -> `RuntimeInputFrame` (the XR input path for locomotion and actions), with hand roles (design 017 sections 7.2 and 7.3).
+ * The layout comes from the input sources that have a gamepad (`resolveXrHandRoles`): two controllers (a pointer hand and a belt hand) or one controller that does every verb. Frames are in the player-local frame (x right, y forward, z up; meters and radians); pitch is never driven from XR.
+ * Two controllers: pointer hand trigger Use, grip Menu, lower face Pick up, upper face What's this?, stick x turn; belt hand stick walk and turn, trigger next tool, grip Hand, lower face main menu.
+ * One controller: stick y walk and x turn, trigger Use, grip Menu, lower face Pick up, upper face tap What's this? and 1 s hold main menu, stick press next tool (only when the stick rests).
+ * Button layout follows the WebXR `xr-standard` gamepad mapping: 0 trigger, 1 grip (squeeze), 3 thumbstick press, 4 lower face button (A right, X left), 5 upper face button (B right, Y left).
+ * Held buttons in `createXrInputFrame` are level signals; only `createXrControls` converts them to requests (rising edges, a release for a tap, a hold time).
  */
 import { vec3 } from "../../math/vec3";
 import type { RuntimeInputFrame } from "../../interaction/inputFrame";
 import { computeContinuousTurn, computeJoystickLocomotion, type StickAxes } from "../../interaction/vrLocomotion";
+import { createTapOrHoldTracker, resolveXrHandRoles, type XrHandRoles } from "../../interaction/xrHandRoles";
+import { defaultXrHandOptions, type XrHandOptions, type XrLayout } from "../../glue/xrLayout";
 import { defaultVrComfortOptions, type VrComfortOptions } from "./vrComfort";
 
 /**
@@ -22,7 +24,7 @@ export interface GamepadLike {
 
 /**
  * Minimal structural subset of `XRInputSource` that input parsing needs.
- * Sources without a `gamepad` are ignored by `createXrInputFrame`; `handedness` and `targetRayMode` are not consulted here.
+ * Sources without a `gamepad` are ignored; `handedness` decides the roles, `targetRayMode` is not consulted here.
  */
 export interface XrInputSourceLike {
   readonly handedness?: XRHandedness | "none" | string;
@@ -31,60 +33,117 @@ export interface XrInputSourceLike {
 }
 
 /**
- * Stateful per-frame XR input reader that remembers button state to produce edge-triggered requests.
+ * Stateful per-frame XR input reader that remembers button state to produce requests.
  */
 export interface XrControls {
   /**
    * Converts the current XR input sources into one input frame, advancing the edge-detection state.
-   * `deltaSeconds` is the frame time in seconds (scales stick locomotion and turn). Call exactly once per rendered XR frame:
-   * every action `*Requested` flag (reset is never requested from VR) is true only on the frame where any source's button went from released to pressed.
-   * `carryActionRequested` follows button 4 (A on the right controller, X on the left) on any source.
+   * `deltaSeconds` is the frame time in seconds (scales stick locomotion, turn and the 1 s hold). Call exactly once per rendered XR frame:
+   * every `*Requested` flag (reset is never requested from VR) is true only on the frame where the button of its role went from released to pressed.
+   * With one controller the upper face button's tap (What's this?) fires on release and its hold (main menu) at 1 s.
+   * A change of layout between frames raises no request on that frame (a button that changed meaning is not a press).
    */
   consumeFrame(inputSources: Iterable<XrInputSourceLike>, deltaSeconds: number): RuntimeInputFrame;
+  /** Sets the two hand options ("Use one controller", "Left-handed"); they apply from the next `consumeFrame`. */
+  setHandOptions(options: XrHandOptions): void;
+  /** The layout the last `consumeFrame` read; undefined before the first frame and while no source has a gamepad. */
+  layout(): XrLayout | undefined;
 }
 
 // Button indices in the WebXR `xr-standard` gamepad mapping.
-const primaryTriggerButtonIndex = 0;
-const sideTriggerButtonIndex = 1;
-const carryFaceButtonIndex = 4;
-const helpFaceButtonIndex = 5;
+const triggerButtonIndex = 0;
+const gripButtonIndex = 1;
+const stickPressButtonIndex = 3;
+const lowerFaceButtonIndex = 4;
+const upperFaceButtonIndex = 5;
+
+/** What the roles are asking for, as held (level) signals. */
+interface VerbLevels {
+  readonly layout: XrLayout | undefined;
+  readonly primary: boolean;
+  readonly interact: boolean;
+  readonly carry: boolean;
+  /** Upper face button of the pointer hand. */
+  readonly upperFace: boolean;
+  /** Belt-hand trigger (two controllers), or the raw stick press (one controller). */
+  readonly nextTool: boolean;
+  readonly hand: boolean;
+  /** Belt-hand lower face button (two controllers). */
+  readonly mainMenu: boolean;
+  /** The pointer-hand stick rests inside the dead zone (only meaningful with one controller). */
+  readonly stickRests: boolean;
+}
+
+const noVerbs: VerbLevels = { layout: undefined, primary: false, interact: false, carry: false, upperFace: false, nextTool: false, hand: false, mainMenu: false, stickRests: true };
+
+function pressedAt(gamepad: GamepadLike | undefined, index: number): boolean {
+  return gamepad?.buttons?.[index]?.pressed === true;
+}
+
+function readVerbLevels(roles: XrHandRoles<XrInputSourceLike>, deadZone: number): VerbLevels {
+  const layout = roles.layout;
+  if (layout === undefined) return noVerbs;
+  const pointer = roles.pointer?.gamepad;
+  const belt = roles.belt?.gamepad;
+  const oneController = layout !== "two-controllers";
+  const stick = readPrimaryStickAxes(pointer);
+  return {
+    layout,
+    primary: pressedAt(pointer, triggerButtonIndex),
+    interact: pressedAt(pointer, gripButtonIndex),
+    carry: pressedAt(pointer, lowerFaceButtonIndex),
+    upperFace: pressedAt(pointer, upperFaceButtonIndex),
+    nextTool: oneController ? pressedAt(pointer, stickPressButtonIndex) : pressedAt(belt, triggerButtonIndex),
+    hand: !oneController && pressedAt(belt, gripButtonIndex),
+    mainMenu: !oneController && pressedAt(belt, lowerFaceButtonIndex),
+    stickRests: stick === undefined || (Math.abs(stick.x) <= deadZone && Math.abs(stick.y) <= deadZone),
+  };
+}
 
 /**
  * Creates the stateful XR input reader used once per XR frame by createThreeApp#shell (`xrControls.consumeFrame(session.inputSources, dt)`).
- * `options` overrides fields of `defaultVrComfortOptions` (speeds, dead zone); omitted fields keep defaults.
+ * `options` overrides fields of `defaultVrComfortOptions` (speeds, dead zone); omitted fields keep defaults. `initialHandOptions` default to both switches off.
  * Holds no resources, so there is nothing to dispose.
  */
-export function createXrControls(options: Partial<VrComfortOptions> = {}): XrControls {
+export function createXrControls(options: Partial<VrComfortOptions> = {}, initialHandOptions: XrHandOptions = defaultXrHandOptions): XrControls {
   const comfort = { ...defaultVrComfortOptions, ...options };
-  let previousPrimaryActionPressed = false;
-  let previousInteractPressed = false;
-  let previousCarryActionPressed = false;
-  let previousHelpPressed = false;
+  let handOptions = initialHandOptions;
+  let previous: VerbLevels | undefined;
+  let lastLayout: XrLayout | undefined;
+  const upperFaceTracker = createTapOrHoldTracker();
 
   return {
+    setHandOptions(next) {
+      handOptions = next;
+    },
+    layout() {
+      return lastLayout;
+    },
     consumeFrame(inputSources, deltaSeconds) {
-      // Edge detection: a request fires only when some source is pressed now and none was pressed on the previous call.
       const sources = [...inputSources];
-      const frame = createXrInputFrame(sources, deltaSeconds, comfort);
-      const primaryActionPressed = sources.some((source) => isPrimaryActionPressed(source.gamepad));
-      const primaryActionRequested = primaryActionPressed && !previousPrimaryActionPressed;
-      const interactPressed = sources.some((source) => isInteractPressed(source.gamepad));
-      const interactRequested = interactPressed && !previousInteractPressed;
-      const carryActionPressed = sources.some((source) => isCarryActionPressed(source));
-      const carryActionRequested = carryActionPressed && !previousCarryActionPressed;
-      const helpPressed = sources.some((source) => isHelpPressed(source.gamepad));
-      const helpRequested = helpPressed && !previousHelpPressed;
-      previousPrimaryActionPressed = primaryActionPressed;
-      previousInteractPressed = interactPressed;
-      previousCarryActionPressed = carryActionPressed;
-      previousHelpPressed = helpPressed;
+      const roles = resolveXrHandRoles(sources, handOptions);
+      const frame = createXrInputFrame(sources, deltaSeconds, comfort, handOptions);
+      const now = readVerbLevels(roles, comfort.joystickDeadZone);
+      const before = previous ?? noVerbs;
+      const layoutChanged = previous !== undefined && now.layout !== previous.layout;
+      if (layoutChanged) upperFaceTracker.reset();
+      previous = now;
+      lastLayout = now.layout;
+      const oneController = now.layout === "one-left" || now.layout === "one-right";
+      // A request fires when the verb's button is down now and was not on the previous call; a layout change raises nothing.
+      const rises = (current: boolean, earlier: boolean): boolean => !layoutChanged && current && !earlier;
+      const upper = layoutChanged ? { tap: false, hold: false } : upperFaceTracker.step(oneController && now.upperFace, deltaSeconds);
       return {
         ...frame,
         resetRequested: false,
-        primaryActionRequested,
-        interactRequested,
-        carryActionRequested,
-        helpRequested,
+        primaryActionRequested: rises(now.primary, before.primary),
+        interactRequested: rises(now.interact, before.interact),
+        carryActionRequested: rises(now.carry, before.carry),
+        helpRequested: oneController ? upper.tap : rises(now.upperFace, before.upperFace),
+        // With one controller the stick press counts only if the stick rested at the moment of the press.
+        nextToolRequested: rises(now.nextTool, before.nextTool) && (!oneController || now.stickRests),
+        handRequested: rises(now.hand, before.hand),
+        mainMenuRequested: oneController ? upper.hold : rises(now.mainMenu, before.mainMenu),
       };
     },
   };
@@ -92,23 +151,25 @@ export function createXrControls(options: Partial<VrComfortOptions> = {}): XrCon
 
 /**
  * Builds a stateless input frame from the given sources; all action flags reflect the instantaneous held state, not edges.
- * Stick axes from all gamepad-bearing sources are summed and clamped, then mapped to forward/back displacement
- * (`localDisplacement`, meters, player-local) and a yaw delta (radians); `pitchDeltaRadians` is always 0 and `source` is "xr".
- * `deltaSeconds` is in seconds; `options` overrides `defaultVrComfortOptions`.
+ * Walking is the belt hand's stick y (with one controller, that controller's); turning is the sum of the x axes of the sticks present (pointer hand and belt hand), clamped. `localDisplacement` is in meters, player-local; the yaw delta in radians; `pitchDeltaRadians` is always 0 and `source` is "xr".
+ * `deltaSeconds` is in seconds; `options` overrides `defaultVrComfortOptions`; `handOptions` choose the roles (default both off). `nextToolRequested` is the held belt-hand trigger, or the held stick press while the stick rests; `mainMenuRequested` is the held belt-hand lower face button (the one-controller hold needs time, so only `createXrControls` raises it).
  */
 export function createXrInputFrame(
   inputSources: Iterable<XrInputSourceLike>,
   deltaSeconds: number,
   options: Partial<VrComfortOptions> = {},
+  handOptions: XrHandOptions = defaultXrHandOptions,
 ): RuntimeInputFrame {
   const comfort = { ...defaultVrComfortOptions, ...options };
-  const sources = [...inputSources].filter((source) => source.gamepad);
-  const stickAxes = sources
-    .map((source) => readPrimaryStickAxes(source.gamepad))
-    .filter((axes): axes is StickAxes => axes !== undefined);
-  const combinedAxes = combineStickAxes(stickAxes);
-  const locomotion = computeJoystickLocomotion(combinedAxes, deltaSeconds, comfort);
-  const yawDeltaRadians = computeContinuousTurn(combinedAxes?.x, deltaSeconds, comfort);
+  const roles = resolveXrHandRoles([...inputSources], handOptions);
+  const levels = readVerbLevels(roles, comfort.joystickDeadZone);
+  const pointerStick = readPrimaryStickAxes(roles.pointer?.gamepad);
+  const beltStick = readPrimaryStickAxes(roles.belt?.gamepad);
+  const turnAxes = combineStickAxes([pointerStick, beltStick].filter((axes): axes is StickAxes => axes !== undefined));
+  // The belt hand walks; with one controller the only stick does.
+  const walkAxes = roles.belt !== undefined ? beltStick : pointerStick;
+  const locomotion = computeJoystickLocomotion(walkAxes, deltaSeconds, comfort);
+  const yawDeltaRadians = computeContinuousTurn(turnAxes?.x, deltaSeconds, comfort);
 
   return {
     localDisplacement: locomotion.localDisplacement,
@@ -116,10 +177,14 @@ export function createXrInputFrame(
     pitchDeltaRadians: 0,
     // The stick press no longer resets the world (design 017 section 8.8): a frame from VR never asks for it.
     resetRequested: false,
-    primaryActionRequested: sources.some((source) => isPrimaryActionPressed(source.gamepad)),
-    interactRequested: sources.some((source) => isInteractPressed(source.gamepad)),
-    carryActionRequested: sources.some((source) => isCarryActionPressed(source)),
-    helpRequested: sources.some((source) => isHelpPressed(source.gamepad)),
+    primaryActionRequested: levels.primary,
+    interactRequested: levels.interact,
+    carryActionRequested: levels.carry,
+    helpRequested: levels.upperFace,
+    nextToolRequested: levels.nextTool && levels.stickRests,
+    handRequested: levels.hand,
+    mainMenuRequested: levels.mainMenu,
+    ...(levels.layout !== undefined ? { xrLayout: levels.layout } : {}),
     source: "xr",
   };
 }
@@ -181,14 +246,14 @@ function clampStickAxis(value: number): number {
  * True while the primary trigger (button 0) is held.
  */
 export function isPrimaryActionPressed(gamepad: GamepadLike | undefined): boolean {
-  return gamepad?.buttons?.[primaryTriggerButtonIndex]?.pressed === true;
+  return pressedAt(gamepad, triggerButtonIndex);
 }
 
 /**
  * True while the side trigger / squeeze (button 1) is held.
  */
 export function isInteractPressed(gamepad: GamepadLike | undefined): boolean {
-  return gamepad?.buttons?.[sideTriggerButtonIndex]?.pressed === true;
+  return pressedAt(gamepad, gripButtonIndex);
 }
 
 /**
@@ -196,14 +261,14 @@ export function isInteractPressed(gamepad: GamepadLike | undefined): boolean {
  * This is the XR carry binding; false for a missing gamepad or button.
  */
 export function isCarryActionPressed(source: XrInputSourceLike): boolean {
-  return source.gamepad?.buttons?.[carryFaceButtonIndex]?.pressed === true;
+  return pressedAt(source.gamepad, lowerFaceButtonIndex);
 }
 
 /**
  * True while the help face button (button 5) is held.
  */
 export function isHelpPressed(gamepad: GamepadLike | undefined): boolean {
-  return gamepad?.buttons?.[helpFaceButtonIndex]?.pressed === true;
+  return pressedAt(gamepad, upperFaceButtonIndex);
 }
 
 /**
@@ -219,6 +284,9 @@ export function emptyXrInputFrame(): RuntimeInputFrame {
     interactRequested: false,
     carryActionRequested: false,
     helpRequested: false,
+    nextToolRequested: false,
+    handRequested: false,
+    mainMenuRequested: false,
     source: "xr",
   };
 }

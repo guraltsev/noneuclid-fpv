@@ -92,6 +92,23 @@ describe("xrControllerHandModels", () => {
     expect(hands.rightHand()).toBeUndefined();
     hands.dispose();
   });
+
+  it("reports either hand by its handedness", () => {
+    const hands = createXrControllerHandModels(new THREE.Scene());
+    const frame = {
+      xrFrame: createFakeXrFrame({ position: { x: 0, y: 1, z: 0 } }),
+      referenceSpace: {} as XRReferenceSpace,
+      referenceSpaceToWorldMatrix: new THREE.Matrix4(),
+      tool: undefined,
+    };
+
+    hands.update({ ...frame, inputSources: [createFakeXrInputSource({ handedness: "left" })], pointerHandedness: "left" });
+    expect(hands.hand("left")?.position.toArray()).toEqual([0, 1, 0]);
+    expect(hands.hand("right")).toBeUndefined();
+    hands.update({ ...frame, inputSources: [], pointerHandedness: "left" });
+    expect(hands.hand("left")).toBeUndefined();
+    hands.dispose();
+  });
 });
 
 function createNamedBox(name: string, x: number): THREE.Mesh {

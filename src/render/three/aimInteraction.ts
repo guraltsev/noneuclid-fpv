@@ -326,9 +326,10 @@ export function createAimInteraction(deps: AimInteractionDeps) {
       return undefined;
     }
 
-    // Prefer the right-hand tracked controller; hand-tracking sources are skipped.
+    // The pointer hand's controller (right by default, left for a left-handed player); with one controller, that one. Hand-tracking sources are skipped.
     const sources = [...session.inputSources].filter((source) => source.targetRaySpace && !source.hand);
-    const source = sources.find((candidate) => candidate.handedness === "right") ?? sources[0];
+    const pointerHandedness = deps.session.get().menuState.leftHandedEnabled === true ? "left" : "right";
+    const source = sources.find((candidate) => candidate.handedness === pointerHandedness) ?? sources[0];
     if (!source) {
       return undefined;
     }

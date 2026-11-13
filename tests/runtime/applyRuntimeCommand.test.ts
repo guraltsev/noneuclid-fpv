@@ -504,4 +504,11 @@ describe("applyRuntimeCommand: tool and player state", () => {
     expect(reduce({ kind: "set-pending-tool-request", request }, pending.state).state).toBe(pending.state);
     expect(reduce({ kind: "set-pending-tool-request", request: undefined }, pending.state).state.pendingToolRequest).toBeUndefined();
   });
+
+  it("sets the VR hand options one at a time", () => {
+    expect(reduce({ kind: "set-xr-hand-option", option: "useOneController", enabled: true }).state.menuState).toMatchObject({ useOneControllerEnabled: true });
+    expect(reduce({ kind: "set-xr-hand-option", option: "leftHanded", enabled: true }).state.menuState).toMatchObject({ leftHandedEnabled: true });
+    const menu = reduce({ kind: "set-xr-hand-option", option: "leftHanded", enabled: true }).state.menuState;
+    expect(menu.useOneControllerEnabled).toBeUndefined();
+  });
 });

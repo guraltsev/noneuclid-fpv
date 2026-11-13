@@ -9,16 +9,13 @@ import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
 import type { CommandResult, EngineCommandBase, ToolContext, ToolDescriptor } from "../../src/engine/moduleTypes";
 import { appConfigForWorld, defaultAppConfig, getEnabledMainTools, isRuntimeToolEnabled, normalizeAppConfig } from "../../src/glue/appConfig";
 import { worldMapClient, worldMapModule, worldMapToolId } from "../../src/modules/worldMap";
-import { createRuntimeMenuState } from "../../src/runtime/runtimeMenuState";
 import { createTestEngine } from "../support/engine";
-import { createTestPaletteDefinition } from "../support/tools";
+import { createToolBeltDefinition } from "../../src/ui/toolBeltDefinition";
 
 const tool = worldMapClient().tools[0] as ToolDescriptor;
 
 function toolIdsOnPalette(config: typeof defaultAppConfig): readonly string[] {
-  const definition = createTestPaletteDefinition(createRuntimeMenuState({ selectedWorldId: "test" }), config, "xr");
-  if (definition.content.kind !== "main") throw new Error("expected the main page");
-  return definition.content.toolOptions.map((option) => option.id);
+  return createToolBeltDefinition({ appConfig: config, worldHasMap: true, selectedTool: "none" }).slots.map((slot) => slot.toolId);
 }
 
 function requestTool(isToolEnabled: (toolId: string) => boolean): CommandResult {

@@ -73,7 +73,8 @@ function createControllerSources(
 
   for (const source of inputSources) {
     // Only left/right gamepad controllers are handled; tracked hands are ignored here.
-    const handedness = source.handedness === "left" || source.handedness === "right" ? source.handedness : undefined;
+    // A controller with handedness "none" (a single controller some runtimes cannot place) counts as the right one.
+    const handedness = source.handedness === "left" || source.handedness === "right" ? source.handedness : source.handedness === "none" ? "right" : undefined;
     if (!handedness || source.hand) {
       continue;
     }

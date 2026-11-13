@@ -19,6 +19,7 @@ import {
   setRuntimeMenuAimCollisionOutlinesEnabled,
   setRuntimeMenuAntiNauseaModeEnabled,
   setRuntimeMenuShowHintsEnabled,
+  setRuntimeMenuXrHandOption,
   setRuntimeMenuCollisionGeometryWireframesEnabled,
   setRuntimeMenuConsoleLogLevel,
   setRuntimeMenuDebugEnabled,
@@ -237,6 +238,8 @@ export function reduceRuntimeCommand(state: ClientSessionState, command: Runtime
       };
     case "set-show-hints":
       return { state: { ...state, menuState: setRuntimeMenuShowHintsEnabled(menu, command.enabled) }, effects: [] };
+    case "set-xr-hand-option":
+      return { state: { ...state, menuState: setRuntimeMenuXrHandOption(menu, command.option, command.enabled) }, effects: [] };
     case "set-show-cell-path-renders-instances":
       return { state: { ...state, showCellPathRendersInstances: command.enabled }, effects: [] };
     case "set-cannon-tool-state":

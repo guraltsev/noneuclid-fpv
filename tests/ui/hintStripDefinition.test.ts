@@ -90,4 +90,19 @@ describe("hint strip definition (desktop rows of the design table)", () => {
     const entries = createHintStripDefinition({ inputMode: "xr", selectedTool: "geodesicEmitters/emitter", carrying: false, menuOpen: false });
     expect(entries[0]).toEqual({ glyphLabel: "Trigger", text: "place a laser" });
   });
+
+  it("names the VR buttons of the layout in the strip: two controllers", () => {
+    const focus = focusOf({ kind: "geodesicEmitters/emitter" } as never, "none");
+    const line = strip({ inputMode: "xr", xrLayout: "two-controllers", focus });
+
+    expect(line).toBe("Trigger / Grip: Laser menu · A: pick up");
+  });
+
+  it("names the VR buttons of the layout in the strip: one left controller", () => {
+    const focus = focusOf({ kind: "geodesicEmitters/emitter" } as never, "none");
+
+    expect(strip({ inputMode: "xr", xrLayout: "one-left", focus })).toBe("Trigger / Grip: Laser menu · X: pick up");
+    expect(strip({ inputMode: "xr", xrLayout: "one-left" })).toBe("Stick press: tools · Y: what's this?");
+    expect(strip({ inputMode: "xr", xrLayout: "one-right", selectedTool: "geodesicMeasurements/length" })).toBe("Stick press: put the Ruler away · B: what's this?");
+  });
 });

@@ -211,6 +211,31 @@ export const toolBeltText = {
   ariaLabel: "Tool belt",
 } as const;
 
+/** The "Controllers" section of Settings (VR hand options, design 017 sections 7.2 and 7.3). */
+export const controllersSettingsText = {
+  section: "Controllers",
+  useOneController: "Use one controller",
+  leftHanded: "Left-handed",
+} as const;
+
+/** The words of the VR belt, its toasts and the VR start card (design 017 sections 7.3, 7.4 and 8.1). */
+export const vrBeltText = {
+  /** Toast when the layout becomes one controller. */
+  oneControllerToast: "One controller: your tools are on your belt, look down",
+  /** Toast when the layout becomes two controllers. */
+  twoControllersToast: "Two controllers: your tools are on your left wrist",
+  /** Same, for the left-handed layout. */
+  twoControllersLeftHandedToast: "Two controllers: your tools are on your right wrist",
+  /** The title of the VR start card. */
+  startCardTitle: "Your controllers",
+  /** The line under the start card's list. */
+  startCardDismiss: "Pull the trigger to start",
+  /** Heading of the controllers in the card (two controllers). */
+  pointerHandHeading: "Pointer hand",
+  beltHandHeading: "Belt hand",
+  oneControllerHeading: "Your controller",
+} as const;
+
 /** The words of the hint strip (design 017 section 8.2): what the listed input does right now, after the colon. Lowercase, since a glyph label comes first. */
 export const hintStripText = {
   /** The label of the "Show hints" switch in Settings. */

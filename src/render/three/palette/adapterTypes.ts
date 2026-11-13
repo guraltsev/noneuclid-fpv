@@ -30,6 +30,8 @@ export interface ScenePaletteAdapterOptions {
   readonly onAntiNauseaModeToggled: (enabled: boolean) => void;
   /** Settings: the "Show hints" switch. */
   readonly onShowHintsToggled?: (enabled: boolean) => void;
+  /** Settings: a "Controllers" switch (Use one controller, Left-handed). */
+  readonly onXrHandOptionToggled?: (option: "useOneController" | "leftHanded", enabled: boolean) => void;
   readonly onPortalPanelModeSelected: (mode: PortalPanelModeId) => void;
   readonly onPortalInspectionToggled: (enabled: boolean) => void;
   readonly onCollisionGeometryWireframesToggled: (enabled: boolean) => void;

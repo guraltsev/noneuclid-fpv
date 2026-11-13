@@ -1284,6 +1284,8 @@ The student vocabulary (design 017 section 6): every student-visible noun, verb 
 | const | `pauseCardText` | The words of the pause card, the desktop main menu (design 017 section 8.1). |
 | const | `mainMenuText` | The words of the main menu's buttons that are not named elsewhere. |
 | const | `toolBeltText` | The words of the tool belt (design 017 section 7.4) and of the right click that finds nothing to open. |
+| const | `controllersSettingsText` | The "Controllers" section of Settings (VR hand options, design 017 sections 7.2 and 7.3). |
+| const | `vrBeltText` | The words of the VR belt, its toasts and the VR start card (design 017 sections 7.3, 7.4 and 8.1). |
 | const | `hintStripText` | The words of the hint strip (design 017 section 8.2): what the listed input does right now, after the colon. |
 
 ### `world-objects/worldObjectOwner.ts`
@@ -1502,6 +1504,16 @@ Pure (Three-free) VR comfort settings: the `VrComfortOptions` record and its def
 | interface | `VrComfortOptions` | Tunable VR comfort and locomotion parameters (all fields required; pass `Partial` to factories). |
 | const | `defaultVrComfortOptions` | Default comfort settings; treat as immutable. |
 
+### `glue/xrLayout.ts`
+
+The VR controller layout and the two hand options that choose it (design 017 sections 7.2 and 7.3).
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| type | `XrLayout` | How many VR controllers the player holds: two, or one in the left or the right hand (a controller with handedness "none" counts as the right one). |
+| interface | `XrHandOptions` | The "Controllers" switches of Settings. |
+| const | `defaultXrHandOptions` | Both switches off: two controllers, pointer hand right, belt hand left. |
+
 ## `interaction`
 
 ### `interaction/aimTarget.ts`
@@ -1557,6 +1569,50 @@ Pure functions turning XR thumbstick and head-tracking input into player-local m
 | function | `computeJoystickLocomotion` | Converts a stick position into forward/back displacement for this frame: `moveSpeedMetersPerSecond * deltaSeconds` scaled by the clamped y axis, with the sign flipped (stick up moves along +y forward). |
 | function | `computeContinuousTurn` | Returns the yaw change in radians for this frame from the stick x axis (stick right gives negative, i.e. |
 | function | `computePhysicalRoomScaleDisplacement` | Computes the horizontal displacement (meters, z ignored) between two head positions in game-world axes. |
+
+### `interaction/xrBeltMath.ts`
+
+Placement maths of the VR tool belt (design 017 sections 7.3 and 7.4), renderer-free and in the Three.js frame (meters, y up, -z forward): the strap's slot layout, the waist anchor of the one-controller belt, the enlarge-when-looked-at rule of the wrist belt and the low anchor of the one-controller toast panel.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| const | `beltSlotPitchMeters` | The strap's slot pitch along its long axis, meters at scale 1. |
+| const | `beltSlotHeightMeters` | The strap's slot height across the long axis, meters at scale 1. |
+| const | `beltEnlargedScale` | Scale of the wrist belt while the head looks at it. |
+| const | `beltEnlargeAngleDegrees` | The wrist belt grows when the angle between the head forward vector and the direction to the strap is under this many degrees. |
+| const | `waistBeltDropMeters` | The waist belt hangs this far below the head, meters. |
+| const | `waistBeltMinimumHeightMeters` | ... |
+| const | `waistBeltForwardMeters` | The waist belt stands this far in front of the player, along the head yaw, meters. |
+| const | `waistBeltSmoothing` | Smoothing factor per call for the waist belt and the low toast panel (the palette uses 0.22). |
+| const | `lowToastForwardMeters` | How far ahead of the head the low toast panel stands with one controller, meters. |
+| const | `lowToastDropMeters` | How far below eye level the low toast panel stands, meters. |
+| function | `beltStrapLengthMeters` | Total length of a strap of `slotCount` slots, meters at scale 1. |
+| function | `beltSlotAtLocalPoint` | The slot under a point on the strap, given in the strap plane coordinates (meters at scale 1; x along the strap from its center, y across it from its center). |
+| function | `beltSlotCenterX` | The center of slot `index` along the strap, meters at scale 1 (x of the strap plane coordinates). |
+| function | `angleBetweenForwardAndTargetDegrees` | The angle in degrees between `forward` and the direction from `from` to `to`; 180 when the points coincide or `forward` has no length. |
+| function | `wristBeltScale` | The wrist belt scale: 1.8 while the head looks at the strap (the angle is under 25 degrees), else 1. |
+| function | `waistBeltHeight` | The height of the waist belt: the head height minus 0.55 m, at least 0.6 m above the floor. |
+| function | `yawOfForward` | The yaw (radians about +y, 0 facing -z) of the horizontal part of a forward vector; `fallback` when the vector is nearly vertical (looking straight down or up). |
+| function | `lerpAngle` | Moves the angle `from` toward `to` by the fraction `factor` of the shortest way around. |
+| interface | `YawFollowingPose` | A pose that follows the head yaw: its center and the yaw. |
+| function | `followHeadYaw` | The pose `forwardMeters` ahead of the head along its yaw (not its pitch) at height `y`, moved toward from `previous` by `smoothing` per call when there is one. |
+| function | `resolveWaistBeltPose` | Where the one-controller belt stands: 0.35 m in front of the head along the head yaw (not its pitch), at waist height. |
+| function | `resolveLowToastPose` | The low toast panel with one controller: 0.6 m ahead along the head yaw, 0.3 m below eye level. |
+
+### `interaction/xrHandRoles.ts`
+
+Hand roles for VR input (design 017 sections 7.2 and 7.3), renderer-free: from the input sources that have a gamepad (and the two hand options) it picks the layout and says which source is the pointer hand and which is the belt hand.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `XrRoleSourceLike` | What role detection reads of an input source. |
+| interface | `XrHandRoles` | The result: the layout (absent when no source has a gamepad) and the sources by role. |
+| function | `pointerHandedness` | The handedness of the pointer hand: right by default, left when the player is left-handed. |
+| function | `resolveXrHandRoles` | Picks the layout and the roles from `sources` (those without a gamepad are ignored). |
+| const | `mainMenuHoldMilliseconds` | The time the upper face button must be held, with one controller, to open the main menu (milliseconds). |
+| interface | `TapOrHoldResult` | What a tap-or-hold button reports on a frame. |
+| interface | `TapOrHoldTracker` | A button that means one thing when tapped and another when held (the upper face button with one controller). |
+| function | `createTapOrHoldTracker` | Creates a {@link TapOrHoldTracker}. |
 
 ### `interaction/xrSessionState.ts`
 
@@ -2162,6 +2218,7 @@ Renderer-neutral state machine for the in-game menu, shared by the desktop overl
 | function | `setRuntimeMenuAimCollisionOutlinesEnabled` | Enables or disables aim-collision outlines. |
 | function | `setRuntimeMenuAntiNauseaModeEnabled` | Enables or disables VR anti-nausea mode. |
 | function | `setRuntimeMenuShowHintsEnabled` | Shows or hides the hint strip. |
+| function | `setRuntimeMenuXrHandOption` | Sets one of the VR hand options ("Use one controller", "Left-handed"). |
 | function | `setRuntimeMenuSelectedTool` | Selects the active tool without changing the page. |
 | function | `setRuntimeMenuReloadConfirmUntilMs` | Sets or clears (undefined) the reload-confirmation deadline. |
 | function | `setRuntimeMenuPlaceFlagType` | Sets the flag type the place-flag tool will place. |
@@ -2379,6 +2436,18 @@ The tool belt (design 017 section 7.4) as renderer-neutral data: an ordered list
 The student vocabulary under the name design 017 section 6.5 gives it.
 
 _No exports._
+
+### `ui/vrStartCardDefinition.ts`
+
+The VR start card (design 017 section 8.1) as plain data: the controllers of the current layout with the verb on each button ("Trigger: Use").
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `VrStartCardRow` | One line of the card: the control, and the verb it performs. |
+| interface | `VrStartCardSection` | A group of rows under one heading (a hand, or the single controller). |
+| interface | `VrStartCardDefinition` | The card's content. |
+| function | `vrStartCardLines` | The text lines of the card, as shown: the title, then each heading and its rows ("Trigger: Use"), then the dismiss line. |
+| function | `createVrStartCardDefinition` | Builds the card for `layout`. |
 
 ### `ui/worldInteractionDefinition.ts`
 
@@ -3805,6 +3874,7 @@ Cosmetic low-poly hand models that follow XR controllers (or tracked hands), plu
 | Kind | Name | Summary |
 | --- | --- | --- |
 | interface | `XrControllerHandModelsUpdate` | Per-frame inputs for `XrControllerHandModels.update` (createThreeApp#shell fills these during the XR frame). |
+| type | `XrToastAnchor` | Where the VR toast panel stands. |
 | interface | `XrControllerHandModels` | Controller hand model manager returned by `createXrControllerHandModels`. |
 | function | `createXrControllerHandModels` | Creates hidden left/right hand anchors and the wrist indicator sprite in `scene` and starts loading the hand GLB. |
 | interface | `WristToolIndicatorVisual` | Icon description for the wrist tool indicator. |
@@ -3814,13 +3884,13 @@ Cosmetic low-poly hand models that follow XR controllers (or tracked hands), plu
 
 ### `render/three/xrControls.ts`
 
-WebXR gamepad input -> `RuntimeInputFrame` (the XR input path for locomotion and actions).
+WebXR gamepad input -> `RuntimeInputFrame` (the XR input path for locomotion and actions), with hand roles (design 017 sections 7.2 and 7.3).
 
 | Kind | Name | Summary |
 | --- | --- | --- |
 | interface | `GamepadLike` | Minimal structural subset of the DOM `Gamepad` used by XR input parsing (also lets tests pass plain objects). |
 | interface | `XrInputSourceLike` | Minimal structural subset of `XRInputSource` that input parsing needs. |
-| interface | `XrControls` | Stateful per-frame XR input reader that remembers button state to produce edge-triggered requests. |
+| interface | `XrControls` | Stateful per-frame XR input reader that remembers button state to produce requests. |
 | function | `createXrControls` | Creates the stateful XR input reader used once per XR frame by createThreeApp#shell (`xrControls.consumeFrame(session.inputSources, dt)`). |
 | function | `createXrInputFrame` | Builds a stateless input frame from the given sources; all action flags reflect the instantaneous held state, not edges. |
 | function | `combineStickAxes` | Sums stick vectors from several controllers and clamps each component to [-1, 1]. |
@@ -3862,6 +3932,18 @@ DOM overlay with the "Enter VR" button and a status message, driven by `XrSessio
 | interface | `XrEntryUi` | Handle to the entry overlay created by `createXrEntryUi`. |
 | function | `createXrEntryUi` | Builds the overlay inside `container` (needs a positioned container; uses `document` and `window`). |
 
+### `render/three/xrHandUi.ts`
+
+The VR hand-role interface of the shell (design 017 sections 7.2 to 7.4 and 8.1): owns the tool belt strap and the start card, decides from the input sources where the belt and the toasts stand, and answers "which belt slot is the pointer on".
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `XrHandUiSource` | The input source as far as the hand UI reads it: roles, plus the grip space the wrist belt lies on. |
+| interface | `XrHandUiUpdate` | What `update` needs from the XR frame. |
+| interface | `XrHandUiResult` | What `update` tells the shell. |
+| interface | `XrHandUi` | The hand UI handle. |
+| function | `createXrHandUi` | Creates the hand UI in `scene`; `handOptions` is read each call, so a Settings change applies at once. |
+
 ### `render/three/xrObjectTooltipController.ts`
 
 Owns the single floating XR object tooltip in the scene and positions it above an aimed object.
@@ -3873,13 +3955,14 @@ Owns the single floating XR object tooltip in the scene and positions it above a
 
 ### `render/three/xrObjectTooltipMesh.ts`
 
-Builds the billboard mesh for the XR object tooltip: a rounded dark panel with up to three centered text lines, drawn on a canvas texture.
+Builds the billboard mesh for the XR object tooltip: a rounded dark panel with up to four centered text lines (the name, then the hint strip), drawn on a canvas texture.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
+| const | `maxXrObjectTooltipLines` | The most text lines the tooltip draws: the object's name, then up to three hint entries (design 017 section 8.2). |
 | const | `xrObjectTooltipRenderOrder` | Three.js `renderOrder` of the tooltip mesh; high so it draws after scene geometry. |
 | const | `xrObjectTooltipYOffsetMeters` | Vertical offset in meters (cell-local +z) added above the object's anchor point before placing the tooltip. |
-| function | `createXrObjectTooltip` | Creates a hidden (`visible = false`) billboard mesh showing `text`; only the first three newline-separated lines are drawn. |
+| function | `createXrObjectTooltip` | Creates a hidden (`visible = false`) billboard mesh showing `text`; only the first four newline-separated lines are drawn. |
 
 ### `render/three/xrPlayerRig.ts`
 
@@ -3941,6 +4024,29 @@ Coordinates "end the immersive session, then run a restart action" so restarts (
 | interface | `RestartableXrSession` | Structural subset of `XRSession` needed to end a session and observe its `end` event. |
 | interface | `XrSessionRestartCoordinator` | Handle returned by `createXrSessionRestartCoordinator`. |
 | function | `createXrSessionRestartCoordinator` | Creates a coordinator with its own pending-restart state (createThreeApp#shell creates one and calls `cancel` on dispose). |
+
+### `render/three/xrStartCard.ts`
+
+The VR start card (design 017 section 8.1): a panel in front of the player at session start that shows the controllers of the current layout with the verb on each button (`vrStartCardDefinition`), until the trigger dismisses it.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `XrStartCardUpdate` | What the card is drawn from this frame. |
+| interface | `XrStartCard` | The start card handle. |
+| function | `createXrStartCard` | Creates the card (hidden) in `scene`. |
+
+### `render/three/xrToolBelt.ts`
+
+The VR tool belt (design 017 sections 7.3 and 7.4): one scene object drawing the `toolBeltDefinition` slots as a strap of small panels on a single canvas texture, with a caption strip above it (the name of the tool in hand, or the subtitle of the slot the pointer is on).
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `XrToolBeltUpdate` | What the belt is drawn from this frame. |
+| interface | `XrToolBeltPick` | A slot found by `pick`. |
+| interface | `XrToolBelt` | The VR belt handle. |
+| function | `beltCaptionText` | The text of the caption strip: the hovered slot's name and subtitle (or why it cannot be taken), else the name of the tool in hand. |
+| function | `beltDrawingSignature` | A string that changes exactly when the drawing would. |
+| function | `createXrToolBelt` | Creates the belt (hidden) in `scene`. |
 
 ## `root`
 

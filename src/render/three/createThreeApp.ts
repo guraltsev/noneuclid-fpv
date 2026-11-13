@@ -66,7 +66,7 @@
  */
 import type { EngineEventBase } from "../../engine/moduleTypes";
 import { createToolHost } from "./toolHost";
-import type { RootAimRay } from "./rootAimRay";
+import type { FocusedRuntimeObject, RootAimRay } from "./rootAimRay";
 import { createWorldClient } from "./worldClient";
 import { createDefaultClientModules, createDefaultWorldModules, defaultSimulationClockOptions } from "../../runtime/experience";
 import { createLocalPlayerParticipant, createSimulationClock, createWorldEngine, publishLocalPlayerPose, readLocalPlayerPose } from "../../engine/worldEngine";
@@ -161,7 +161,9 @@ import { createPauseCardDefinition } from "../../ui/pauseCardDefinition";
 import { restoreSavedSnapshot, savedKindsRemovedThisFrame, savedObjectKinds, takeSavedSnapshot, type SavedSnapshot } from "../../world-objects/savedSnapshot";
 import { objectNouns, toastMessages } from "../../ui/vocabulary";
 import { createToastQueue } from "../../ui/toastQueue";
-import { toolBeltText, toolNames } from "../../ui/vocabulary";
+import { toolBeltText, toolNames, vrBeltText } from "../../ui/vocabulary";
+import type { XrHandOptions, XrLayout } from "../../glue/xrLayout";
+import { createXrHandUi } from "./xrHandUi";
 import { createWorldMapPieceReader } from "./worldMapPieces";
 import { createWorldMapRenderer } from "./worldMapRenderer";
 import { worldMapToolId } from "../../modules/worldMap";
@@ -370,9 +372,21 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   } catch {
     persistedShowHints = true;
   }
+  // The VR hand options are remembered per browser too.
+  const xrHandOptionStorageKeys = { useOneController: "noneuclid.xrUseOneController", leftHanded: "noneuclid.xrLeftHanded" } as const;
+  let persistedXrHandOptions: XrHandOptions = { useOneController: false, leftHanded: false };
+  try {
+    persistedXrHandOptions = {
+      useOneController: window.localStorage.getItem(xrHandOptionStorageKeys.useOneController) === "true",
+      leftHanded: window.localStorage.getItem(xrHandOptionStorageKeys.leftHanded) === "true",
+    };
+  } catch {
+    // Storage is only a convenience.
+  }
   const session = createClientSession({
     menuState: createRuntimeMenuState({
       showHintsEnabled: persistedShowHints,
+      xrHandOptions: persistedXrHandOptions,
       selectedWorldId: options.selectedWorldId,
       selectedAppConfigName: options.appConfigName,
       debugSettings: {
@@ -428,6 +442,9 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   const resetHoldRing = createResetHoldRing(document.body);
   // The tool last announced by a toast. Declared here, before the first palette sync, which runs during construction.
   let announcedTool: string | undefined;
+  // VR: whether the last frame was in a session, and the layout the player was last told about (a toast on a change).
+  let wasXrActive = false;
+  let announcedXrLayout: XrLayout | undefined;
   // Undo (design 017 section 8.8): one level. A start over or a deletion keeps the saved objects as they were before it;
   // U (or the toast's button) within the window puts them back.
   const savedKinds = savedObjectKinds(worldModules);
@@ -515,7 +532,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   function selectBeltSlot(slot: ToolBeltSlot): void {
     if (slot.toolId === "main-menu") {
       dispatchRuntimeCommand({ kind: "open-menu" });
-      void controls.requestPointerLock();
+      if (!renderer.xr.isPresenting) void controls.requestPointerLock();
       return;
     }
     if (!slot.enabled) {
@@ -529,6 +546,54 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       return;
     }
     worldClient.requestTool(slot.toolId);
+  }
+  /** The VR hand options as the menu state holds them. */
+  function currentXrHandOptions(): XrHandOptions {
+    const menu = currentMenuState();
+    return { useOneController: menu.useOneControllerEnabled === true, leftHanded: menu.leftHandedEnabled === true };
+  }
+  /** Remembers a changed hand option in the browser (storage can throw; then the default holds). */
+  function rememberXrHandOptions(options: XrHandOptions): void {
+    if (options.useOneController === persistedXrHandOptions.useOneController && options.leftHanded === persistedXrHandOptions.leftHanded) return;
+    persistedXrHandOptions = options;
+    try {
+      window.localStorage.setItem(xrHandOptionStorageKeys.useOneController, String(options.useOneController));
+      window.localStorage.setItem(xrHandOptionStorageKeys.leftHanded, String(options.leftHanded));
+    } catch {
+      // Storage is only a convenience.
+    }
+  }
+  /** A layout change mid-session is announced (design 017 section 7.3); the first layout of a session is shown by the start card instead. */
+  function announceXrLayoutChange(layout: XrLayout | undefined): void {
+    if (layout === undefined) return;
+    const previous = announcedXrLayout;
+    announcedXrLayout = layout;
+    if (previous === undefined || previous === layout) return;
+    if (layout === "two-controllers") {
+      toastQueue.push(currentXrHandOptions().leftHanded ? vrBeltText.twoControllersLeftHandedToast : vrBeltText.twoControllersToast);
+    } else {
+      toastQueue.push(vrBeltText.oneControllerToast);
+    }
+  }
+  /** The hint strip (design 017 section 8.2) for the focused object; VR passes its layout so the glyphs name the controller's buttons. */
+  function hintStripEntriesFor(inputMode: "desktop" | "xr", focused: FocusedRuntimeObject | undefined, xrLayout: XrLayout | undefined) {
+    const focus: HintStripFocus | undefined = focused === undefined
+      ? undefined
+      : { objectKind: focused.object.kind, actions: getWorldFocusMessageDefinition(focused.object)?.actions ?? [] };
+    return createHintStripDefinition({
+      inputMode,
+      ...(xrLayout !== undefined ? { xrLayout } : {}),
+      selectedTool: currentMenuState().selectedTool,
+      focus,
+      carrying: currentMenuState().selectedTool === "geodesicEmitters/carry",
+      menuOpen: false,
+      extendLengthMeters: defaultTraceLengthMeters,
+    });
+  }
+  /** VR: the hint strip lines under the focus label's name; none while "Show hints" is off. */
+  function xrHintLinesFor(focused: FocusedRuntimeObject): readonly string[] {
+    if (currentMenuState().showHintsEnabled === false) return [];
+    return hintStripEntriesFor("xr", focused, announcedXrLayout).map((entry) => `${entry.glyphLabel}: ${entry.text}`);
   }
   function stepBeltTool(direction: 1 | -1): void {
     const slot = stepBeltSlot(currentBeltDefinition(), activeBeltToolId(currentMenuState().selectedTool), direction);
@@ -591,6 +656,8 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   const desktopScenePaletteInput = createDesktopScenePaletteInput();
   const xrScenePaletteInput = createXrScenePaletteInput();
   const xrControllerHandModels = createXrControllerHandModels(scene);
+  // The VR belt, the start card and the toast anchor follow the hand roles (design 017 sections 7.2 to 7.4); the options are read from the menu state each frame.
+  const xrHandUi = createXrHandUi(scene, currentXrHandOptions);
   const objectHost = createObjectHost();
   const aimCrossMarker = createAimCrossMarker(scene);
   const floatingObjectTooltip = createFloatingObjectTooltip(document.body);
@@ -612,6 +679,8 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       xrRig.reset();
       xrScenePaletteInput.reset();
       xrControllerHandModels.reset();
+      xrHandUi.endSession();
+      announcedXrLayout = undefined;
       scenePaletteController.setVisible(false);
     },
     disposeOnTeardown: [xrRig, xrControls],
@@ -879,6 +948,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
 
 
   const aimFeedback = createAimFeedback({
+    xrHintLines: xrHintLinesFor,
     toolsById: () => toolHost.toolsById,
     engine,
     scene,
@@ -1063,6 +1133,8 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     desktopScenePaletteInput,
     xrScenePaletteInput,
     xrControllerHandModels,
+    xrHandUi,
+    beltDefinition: currentBeltDefinition,
     visibleToasts: () => toastQueue.visible(),
     resolveActiveRootAimRay,
     cycleFocusedAimTarget,
@@ -1348,7 +1420,15 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       ? headYawRadiansFromViewerPose(xrViewerPose)
       : undefined;
     const frameBeforeInputMs = performance.now();
+    if (xrActive) {
+      const handOptions = currentXrHandOptions();
+      xrControls.setHandOptions(handOptions);
+      rememberXrHandOptions(handOptions);
+      if (!wasXrActive) xrHandUi.beginSession();
+    }
+    wasXrActive = xrActive;
     const frame = xrActive ? getXrInputFrame(deltaSeconds) : getDesktopInputFrame(deltaSeconds);
+    if (xrActive) announceXrLayoutChange(frame.xrLayout);
     vrComfortVignette.update({
       active: xrActive && isArtificialLocomotionActive(frame),
       deltaSeconds,
@@ -1440,6 +1520,25 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     const xrHeadWorldPose = xrActive ? xrSession.resolveXrHeadWorldPose(xrViewerPose) : undefined;
     const activeAimRay = resolveActiveRootAimRay(xrActive, xrFrame, xrReferenceSpace);
     updateCarriedGeodesicCannonPose(xrActive, activeAimRay);
+    // VR: the belt strap is pointable, Use on a slot takes it, and the start card goes with the trigger. Either consumes the press.
+    let vrBeltConsumedPress = false;
+    if (xrActive) {
+      const pick = xrHandUi.pickBeltSlot(currentMenuState().isOpen ? undefined : activeAimRay);
+      if (frame.primaryActionRequested) {
+        if (xrHandUi.startCardVisible()) {
+          xrHandUi.dismissStartCard();
+          vrBeltConsumedPress = true;
+        } else if (pick !== undefined && !currentMenuState().isOpen) {
+          selectBeltSlot(pick.slot);
+          vrBeltConsumedPress = true;
+        }
+      }
+      if (!xrHandUi.startCardVisible()) {
+        if (frame.nextToolRequested === true && !currentMenuState().isOpen) stepBeltTool(1);
+        // The main menu button toggles the main page in front of the player, wherever the aim is.
+        if (frame.mainMenuRequested === true) dispatchRuntimeCommand({ kind: currentMenuState().isOpen ? "close-menu" : "open-menu" });
+      }
+    }
     if (frame.helpRequested) {
       aimFeedback.requestHelpLensForFocusedObject(activeAimRay);
     }
@@ -1448,10 +1547,10 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     if (frame.handRequested === true && !currentMenuState().isOpen && !isEmitterMode(currentMenuState().selectedTool)) {
       if (currentMenuState().selectedTool !== "none") dispatchRuntimeCommand({ kind: "clear-selected-tool" });
     }
-    const worldPrimaryActionRequested = frame.primaryActionRequested && !currentMenuState().isOpen;
+    const worldPrimaryActionRequested = frame.primaryActionRequested && !currentMenuState().isOpen && !vrBeltConsumedPress;
     // Tool dispatch: the selected tool's descriptor takes the primary action (the emitter's modal tools every frame, the others when no
     // menu is open). primaryActionConsumed stops the generic focused-object interaction.
-    let primaryActionConsumed = false;
+    let primaryActionConsumed = vrBeltConsumedPress;
     if (frame.carryActionRequested && !currentMenuState().isOpen) {
       primaryActionConsumed = currentMenuState().selectedTool === "geodesicEmitters/carry"
         ? finishGeodesicCannonCarry()
@@ -1460,7 +1559,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
 
     toolFrameInput.ray = activeAimRay;
     toolFrameInput.yawDeltaRadians = frame.yawDeltaRadians;
-    toolFrameInput.primaryActionRequested = frame.primaryActionRequested;
+    toolFrameInput.primaryActionRequested = frame.primaryActionRequested && !vrBeltConsumedPress;
     toolHost.setFrame(toolFrameInput);
     primaryActionConsumed = toolHost.dispatchPrimaryAction(worldPrimaryActionRequested, primaryActionConsumed);
 
@@ -1470,8 +1569,8 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     }
 
     if (frame.interactRequested) {
-      // F: on desktop only an object's menu opens; VR keeps the main menu until job 77.
-      if (openContextMenuFromAim(activeAimRay, { objectOnly: !xrActive }) === "nothing") toastQueue.push(toolBeltText.aimToOpenMenu);
+      // The grip and F open only an object's menu (design 017 section 7.1); the main menu has its own button.
+      if (openContextMenuFromAim(activeAimRay, { objectOnly: true }) === "nothing") toastQueue.push(toolBeltText.aimToOpenMenu);
     }
     // The number keys take belt slots (design 017 section 7.1); like key 0, only with no menu open.
     if (frame.toolKeyRequested !== undefined && !currentMenuState().isOpen) {
@@ -1607,17 +1706,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       }
     }
     if (showHints && crosshairVisible) {
-      const focus: HintStripFocus | undefined = displayFocus === undefined
-        ? undefined
-        : { objectKind: displayFocus.object.kind, actions: getWorldFocusMessageDefinition(displayFocus.object)?.actions ?? [] };
-      hintStrip.update(createHintStripDefinition({
-        inputMode: "desktop",
-        selectedTool: currentMenuState().selectedTool,
-        focus,
-        carrying: currentMenuState().selectedTool === "geodesicEmitters/carry",
-        menuOpen: false,
-        extendLengthMeters: defaultTraceLengthMeters,
-      }));
+      hintStrip.update(hintStripEntriesFor("desktop", displayFocus, undefined));
     } else {
       hintStrip.update(undefined);
     }
@@ -1791,6 +1880,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       xrEntryUi.dispose();
       scenePaletteController.dispose();
       xrControllerHandModels.dispose();
+      xrHandUi.dispose();
       desktopScenePaletteInput.dispose();
       toolBelt.dispose();
       hintStrip.dispose();
@@ -2023,7 +2113,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       playerPose,
       viewerQuaternion: xrHeadWorldPose?.quaternion ?? camera.getWorldQuaternion(worldMapViewerQuaternion),
       viewerPosition: xrHeadWorldPose?.position ?? camera.getWorldPosition(worldMapViewerPosition),
-      hand: xrActive ? { tracked: xrControllerHandModels.rightHand() } : undefined,
+      hand: xrActive ? { tracked: xrControllerHandModels.hand(currentXrHandOptions().leftHanded ? "left" : "right") } : undefined,
       deltaSeconds,
     });
   }

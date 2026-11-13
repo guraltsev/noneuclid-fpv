@@ -194,16 +194,18 @@ describe("XR controls", () => {
     expect(controls.consumeFrame([released], 1).carryActionRequested).toBe(false);
   });
 
-  it("maps the help face button to help edges", () => {
+  it("maps the pointer hand's upper face button to help edges with two controllers", () => {
     const controls = createXrControls();
-    const released = { gamepad: { buttons: [{ pressed: false }, { pressed: false }, { pressed: false }, { pressed: false }, { pressed: false }, { pressed: false }] } };
-    const pressed = { gamepad: { buttons: [{ pressed: false }, { pressed: false }, { pressed: false }, { pressed: false }, { pressed: false }, { pressed: true }] } };
+    const buttons = (down: boolean) => [{ pressed: false }, { pressed: false }, { pressed: false }, { pressed: false }, { pressed: false }, { pressed: down }];
+    const left = { handedness: "left", gamepad: { buttons: buttons(false) } };
+    const released = { handedness: "right", gamepad: { buttons: buttons(false) } };
+    const pressed = { handedness: "right", gamepad: { buttons: buttons(true) } };
 
     expect(isHelpPressed(pressed.gamepad)).toBe(true);
-    expect(createXrInputFrame([pressed], 1).helpRequested).toBe(true);
-    expect(controls.consumeFrame([released], 1).helpRequested).toBe(false);
-    expect(controls.consumeFrame([pressed], 1).helpRequested).toBe(true);
-    expect(controls.consumeFrame([pressed], 1).helpRequested).toBe(false);
-    expect(controls.consumeFrame([released], 1).helpRequested).toBe(false);
+    expect(createXrInputFrame([left, pressed], 1).helpRequested).toBe(true);
+    expect(controls.consumeFrame([left, released], 1).helpRequested).toBe(false);
+    expect(controls.consumeFrame([left, pressed], 1).helpRequested).toBe(true);
+    expect(controls.consumeFrame([left, pressed], 1).helpRequested).toBe(false);
+    expect(controls.consumeFrame([left, released], 1).helpRequested).toBe(false);
   });
 });

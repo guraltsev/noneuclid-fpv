@@ -64,6 +64,8 @@ export interface ScenePaletteControllerOptions {
   readonly onAntiNauseaModeToggled: (enabled: boolean) => void;
   /** The "Show hints" switch of Settings toggled. */
   readonly onShowHintsToggled?: (enabled: boolean) => void;
+  /** A "Controllers" switch of Settings toggled (Use one controller, Left-handed). */
+  readonly onXrHandOptionToggled?: (option: "useOneController" | "leftHanded", enabled: boolean) => void;
   /** Portal panel rendering mode chosen. */
   readonly onPortalPanelModeSelected: (mode: PortalPanelModeId) => void;
   /** Portal inspection toggled. */
@@ -192,6 +194,7 @@ export function createScenePaletteController(options: ScenePaletteControllerOpti
     onDebugOverlayItemToggled: options.onDebugOverlayItemToggled,
     onAntiNauseaModeToggled: options.onAntiNauseaModeToggled,
     onShowHintsToggled: options.onShowHintsToggled,
+    onXrHandOptionToggled: options.onXrHandOptionToggled,
     onPortalPanelModeSelected: options.onPortalPanelModeSelected,
     onPortalInspectionToggled: options.onPortalInspectionToggled,
     onCollisionGeometryWireframesToggled: options.onCollisionGeometryWireframesToggled,

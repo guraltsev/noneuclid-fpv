@@ -71,6 +71,8 @@ export interface AimFeedbackDeps {
   findDisplayFocusedRuntimeObject(ray?: RootAimRay): FocusedRuntimeObject | undefined;
   /** Viewport pixel where the desktop tooltip is anchored. */
   resolveDesktopTooltipScreenPosition(): { readonly x: number; readonly y: number };
+  /** VR: the hint strip lines ("Trigger: open Help") for the focused object, drawn under its name in the focus label; absent or empty draws the legacy action rows. */
+  xrHintLines?(focused: FocusedRuntimeObject): readonly string[];
   /** Tooltip text of an object for the input mode, if it has one. */
   getRuntimeObjectTooltipText(object: RuntimeWorldObject, inputMode: "desktop" | "xr"): string | undefined;
   /** Focus message of an object, from which its help is built. */
@@ -182,10 +184,10 @@ export function createAimFeedback(deps: AimFeedbackDeps): AimFeedback {
     }
 
     const focused = deps.findDisplayFocusedRuntimeObject(activeAimRay);
-    // Desktop shows only the object's name: what its inputs do is on the hint strip. VR keeps the action rows until its hint strip arrives.
+    // Desktop shows only the object's name: what its inputs do is on the hint strip. VR shows the name and the same hint strip under it, with the VR glyphs.
     const text = focused
       ? xrActive
-        ? deps.getRuntimeObjectTooltipText(focused.object, "xr")
+        ? xrFocusLabel(focused)
         : deps.getWorldFocusMessageDefinition(focused.object)?.title
       : undefined;
     if (xrActive) {
@@ -207,6 +209,14 @@ export function createAimFeedback(deps: AimFeedbackDeps): AimFeedback {
       xPixels: screenPosition?.x,
       yPixels: screenPosition?.y,
     });
+  }
+
+  // The VR focus label: the object's name and the hint strip lines; the old action rows when the shell gives no hint strip.
+  function xrFocusLabel(focused: FocusedRuntimeObject): string | undefined {
+    const hintLines = deps.xrHintLines?.(focused);
+    const title = deps.getWorldFocusMessageDefinition(focused.object)?.title;
+    if (hintLines === undefined || title === undefined) return deps.getRuntimeObjectTooltipText(focused.object, "xr");
+    return [title, ...hintLines].join("\n");
   }
 
   function updateAimCrossMarker(xrActive: boolean, activeAimRay: RootAimRay | undefined): void {

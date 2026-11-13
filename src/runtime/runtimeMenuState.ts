@@ -11,6 +11,7 @@ import type { DebugSettings } from "../glue/debugSettings";
 import type { DebugLevelId } from "../diagnostics/debugLevels";
 import type { PortalPanelModeId } from "../glue/portalPanelMode";
 import type { VrComfortOptions } from "../glue/vrComfortOptions";
+import type { XrHandOptions } from "../glue/xrLayout";
 import type { PlacedFlagType } from "../world-objects/toolObjects";
 import type { TutorialPageSpec } from "../cell-complex/specs";
 import { defaultAppConfigName } from "../glue/appConfig";
@@ -87,6 +88,10 @@ export interface RuntimeMenuState {
   readonly antiNauseaModeEnabled: boolean;
   /** Whether the hint strip is shown (the "Show hints" switch of Settings); absent means on. */
   readonly showHintsEnabled?: boolean;
+  /** The "Use one controller" switch of Settings (VR); absent means off. */
+  readonly useOneControllerEnabled?: boolean;
+  /** The "Left-handed" switch of Settings (VR: pointer hand left, belt hand right); absent means off. */
+  readonly leftHandedEnabled?: boolean;
   /** Currently active tool. */
   readonly selectedTool: RuntimeToolId;
   /**
@@ -161,6 +166,8 @@ export interface CreateRuntimeMenuStateOptions {
   readonly vrComfortOptions?: Pick<VrComfortOptions, "antiNauseaModeEnabled">;
   /** The remembered "Show hints" switch; absent or true means on. */
   readonly showHintsEnabled?: boolean;
+  /** The remembered VR hand options; absent means both off. */
+  readonly xrHandOptions?: XrHandOptions;
 }
 
 /**
@@ -187,6 +194,8 @@ export function createRuntimeMenuState(options: CreateRuntimeMenuStateOptions): 
     aimCollisionOutlinesEnabled: hasAnyDebugOption(debugSettings?.debugOptions, aimCollisionDebugOptions),
     antiNauseaModeEnabled: options.vrComfortOptions?.antiNauseaModeEnabled ?? true,
     ...(options.showHintsEnabled === false ? { showHintsEnabled: false } : {}),
+    ...(options.xrHandOptions?.useOneController === true ? { useOneControllerEnabled: true } : {}),
+    ...(options.xrHandOptions?.leftHanded === true ? { leftHandedEnabled: true } : {}),
     selectedTool: "none",
     placeFlagOptions: {
       flagType: "WoodenSign1",
@@ -652,6 +661,15 @@ export function setRuntimeMenuShowHintsEnabled(
     ...state,
     showHintsEnabled: enabled,
   };
+}
+
+/** Sets one of the VR hand options ("Use one controller", "Left-handed"). */
+export function setRuntimeMenuXrHandOption(
+  state: RuntimeMenuState,
+  option: "useOneController" | "leftHanded",
+  enabled: boolean,
+): RuntimeMenuState {
+  return option === "useOneController" ? { ...state, useOneControllerEnabled: enabled } : { ...state, leftHandedEnabled: enabled };
 }
 
 /** Selects the active tool without changing the page. */

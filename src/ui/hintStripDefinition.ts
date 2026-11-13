@@ -5,7 +5,7 @@
  */
 import type { RuntimeToolId } from "../glue/toolIds";
 import type { RuntimeWorldObject } from "../world-objects/runtimeObjectRegistry";
-import { getInputHintGlyph, type InputIntent, type InputMode } from "./inputIntents";
+import { getInputHintGlyph, type InputIntent, type InputMode, type XrLayout } from "./inputIntents";
 import { hintStripText, toolNames } from "./vocabulary";
 import type { WorldInteractionAction } from "./worldInteractionDefinition";
 
@@ -29,6 +29,8 @@ export interface HintStripFocus {
 /** What the strip is built from. */
 export interface HintStripSource {
   readonly inputMode: InputMode;
+  /** The VR controller layout, which decides the glyph letters; absent on desktop. */
+  readonly xrLayout?: XrLayout;
   readonly selectedTool: RuntimeToolId;
   /** The usable focused object; undefined when the aim is on the floor, the sky or an object with no use. */
   readonly focus?: HintStripFocus;
@@ -42,7 +44,7 @@ export interface HintStripSource {
 
 /** Builds the strip: at most three entries, never empty. */
 export function createHintStripDefinition(source: HintStripSource): readonly HintStripEntry[] {
-  const label = (intent: InputIntent): string => getInputHintGlyph(source.inputMode, intent).label;
+  const label = (intent: InputIntent): string => getInputHintGlyph(source.inputMode, intent, source.xrLayout).label;
   const primary = label("primary");
   const menu = label("context-menu");
   const entries = collectEntries(source, label, primary, menu);

@@ -28,7 +28,6 @@ export function createTestPaletteDefinition(
   appConfig: AppConfig = defaultAppConfig,
   inputMode: InputMode = "desktop",
   nowMs: number = Date.now(),
-  toolsById: ToolsById = createTestToolsById(),
 ): PaletteDefinition {
-  return createPaletteDefinition(state, appConfig, inputMode, nowMs, toolsById);
+  return createPaletteDefinition(state, appConfig, inputMode, nowMs);
 }

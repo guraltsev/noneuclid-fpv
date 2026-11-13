@@ -31,9 +31,18 @@ export interface XrControllerHandModelsUpdate {
   readonly tool?: ToolDescriptor;
   /** Sign variant shown when the tool is "placedFlags/flag"; defaults to "WoodenSign1". */
   readonly placeFlagType?: PlacedFlagType;
-  /** Toasts to show in a panel above the right wrist (design 017 section 8.3); absent or empty hides the panel. */
+  /** Toasts to show in a panel (design 017 section 8.3); absent or empty hides the panel. */
   readonly toasts?: readonly Toast[];
+  /** Where the toast panel stands: above the wrist of a hand (two controllers: the belt hand), or at a world position (one controller: low in the field of view). Absent: above the right wrist. */
+  readonly toastAnchor?: XrToastAnchor;
+  /** The hand that holds the pointer (it carries the tool indicator); absent means right. */
+  readonly pointerHandedness?: "left" | "right";
 }
+
+/** Where the VR toast panel stands. */
+export type XrToastAnchor =
+  | { readonly kind: "wrist"; readonly handedness: "left" | "right" }
+  | { readonly kind: "world"; readonly position: THREE.Vector3 };
 
 /**
  * Controller hand model manager returned by `createXrControllerHandModels`.
@@ -43,6 +52,8 @@ export interface XrControllerHandModels {
   update(frame: XrControllerHandModelsUpdate): void;
   /** The right hand's pose in the scene as of the last `update`, or undefined while it is not tracked. The object is the hand's own: read it, do not keep or change it. */
   rightHand(): THREE.Object3D | undefined;
+  /** The pose of the hand with the given handedness, as `rightHand` gives the right one. */
+  hand(handedness: "left" | "right"): THREE.Object3D | undefined;
   /** Hides all hands and the wrist indicator without freeing anything; call when an XR session ends. */
   reset(): void;
   /** Removes hands and indicator from the scene and frees their geometry, materials, textures; any in-flight model load is discarded. The owner must call it. */
@@ -117,6 +128,14 @@ export function createXrControllerHandModels(scene: THREE.Scene): XrControllerHa
       const seenHands = new Set<"left" | "right">();
 
       const placeFlagType = frame.placeFlagType ?? "WoodenSign1";
+      const indicatorHand = frame.pointerHandedness ?? "right";
+      const toastAnchor = frame.toastAnchor ?? { kind: "wrist", handedness: "right" };
+      const toasts = frame.toasts ?? [];
+      if (toastPanel === undefined && toasts.length > 0) {
+        toastPanel = createToastPanel();
+        scene.add(toastPanel.root);
+      }
+      let toastHandModel: THREE.Object3D | undefined;
 
       for (const source of frame.inputSources) {
         const handedness = source.handedness === "left" || source.handedness === "right" ? source.handedness : undefined;
@@ -134,15 +153,15 @@ export function createXrControllerHandModels(scene: THREE.Scene): XrControllerHa
         seenHands.add(handedness);
         applyXrPoseToObject(model, pose.transform, frame.referenceSpaceToWorldMatrix, 1);
         model.visible = true;
-        if (handedness === "right") {
+        if (handedness === indicatorHand) {
           updateWristToolIndicator(rightToolIndicator, model, frame.tool, placeFlagType);
-          const toasts = frame.toasts ?? [];
-          if (toastPanel === undefined && toasts.length > 0) {
-            toastPanel = createToastPanel();
-            scene.add(toastPanel.root);
-          }
-          if (toastPanel) updateToastPanel(toastPanel, model, toasts);
         }
+        if (toastAnchor.kind === "wrist" && handedness === toastAnchor.handedness) toastHandModel = model;
+      }
+      if (toastPanel) {
+        if (toastAnchor.kind === "world") updateToastPanel(toastPanel, undefined, toasts, toastAnchor.position);
+        else if (toastHandModel) updateToastPanel(toastPanel, toastHandModel, toasts);
+        else toastPanel.root.visible = false;
       }
 
       for (const [handedness, model] of instances) {
@@ -150,13 +169,16 @@ export function createXrControllerHandModels(scene: THREE.Scene): XrControllerHa
           model.visible = false;
         }
       }
-      if (!seenHands.has("right")) {
+      if (!seenHands.has(indicatorHand)) {
         rightToolIndicator.root.visible = false;
-        if (toastPanel) toastPanel.root.visible = false;
       }
     },
     rightHand() {
       const hand = instances.get("right");
+      return hand?.visible ? hand : undefined;
+    },
+    hand(handedness) {
+      const hand = instances.get(handedness);
       return hand?.visible ? hand : undefined;
     },
     reset() {
@@ -416,8 +438,8 @@ function createToastPanel(): ToastPanel {
   return { root, material, canvas, texture, key: "" };
 }
 
-// Positions the panel above the wrist and redraws it when the toasts changed. An action shows its label only.
-function updateToastPanel(panel: ToastPanel, wrist: THREE.Object3D, toasts: readonly Toast[]): void {
+// Positions the panel above the wrist (or at `worldPosition`) and redraws it when the toasts changed. An action shows its label only.
+function updateToastPanel(panel: ToastPanel, wrist: THREE.Object3D | undefined, toasts: readonly Toast[], worldPosition?: THREE.Vector3): void {
   if (toasts.length === 0) {
     panel.root.visible = false;
     return;
@@ -446,8 +468,13 @@ function updateToastPanel(panel: ToastPanel, wrist: THREE.Object3D, toasts: read
       panel.texture.needsUpdate = true;
     }
   }
-  panel.root.position.copy(toastPanelLocalOffset).applyQuaternion(wrist.quaternion).add(wrist.position);
-  panel.root.visible = wrist.visible;
+  if (wrist !== undefined) {
+    panel.root.position.copy(toastPanelLocalOffset).applyQuaternion(wrist.quaternion).add(wrist.position);
+    panel.root.visible = wrist.visible;
+  } else if (worldPosition !== undefined) {
+    panel.root.position.copy(worldPosition);
+    panel.root.visible = true;
+  }
 }
 
 interface WristToolIndicator {

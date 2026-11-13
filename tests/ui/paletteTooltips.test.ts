@@ -31,4 +31,10 @@ describe("paletteTooltips", () => {
     expect(resolvePaletteTooltipLabel("tool-options:place-sign")).toBe("Sign options");
     expect(resolvePaletteTooltipLabel("sign-type:WoodenSign1")).toBe("Choose sign type");
   });
+
+  it("names the main menu buttons", () => {
+    expect(resolvePaletteTooltipLabel("main-menu:help")).toBe("Help");
+    expect(resolvePaletteTooltipLabel("main-menu:go-home")).toBe("Go home");
+    expect(resolvePaletteTooltipLabel("main-menu:nothing")).toBeUndefined();
+  });
 });

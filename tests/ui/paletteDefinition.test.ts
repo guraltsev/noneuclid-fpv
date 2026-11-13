@@ -28,7 +28,7 @@ import {
   type SettingsPaletteContent,
   type TutorialPaletteContent,
 } from "../../src/ui/paletteDefinition";
-import { createTestPaletteDefinition, createTestToolsById } from "../support/tools";
+import { createTestPaletteDefinition } from "../support/tools";
 
 describe("createPaletteDefinition", () => {
   it("makes the main page the main menu on desktop, with no tool tiles", () => {
@@ -39,32 +39,13 @@ describe("createPaletteDefinition", () => {
     expect(content.toolOptions).toEqual([]);
   });
 
-  it("lists only the app config's enabled main tools for VR, with no default tool", () => {
+  it("makes the main page the main menu in VR too, with no tool tiles (tools come from the belt)", () => {
     const definition = createTestPaletteDefinition(createRuntimeMenuState({ selectedWorldId: "cube" }), defaultAppConfig, "xr");
     const content = definition.content as MainPaletteContent;
 
     expect(content.kind).toBe("main");
-    const toolIds = content.toolOptions.map((tool) => tool.id);
-    expect(toolIds).toContain("placedFlags/flag");
-    expect(toolIds).toContain("geodesicEmitters/emitter");
-    expect(toolIds).toContain("geodesicMeasurements/length");
-    expect(toolIds).not.toContain("aim");
-  });
-
-  it("takes the main list from the tools whose entry says so, in the config's order", () => {
-    const tools = new Map(createTestToolsById());
-    const sign = tools.get("placedFlags/flag")!;
-    tools.set("placedFlags/flag", { ...sign, entry: { kind: "sub-mode" } });
-
-    const definition = createTestPaletteDefinition(createRuntimeMenuState({ selectedWorldId: "cube" }), defaultAppConfig, "xr", 0, tools);
-
-    expect((definition.content as MainPaletteContent).toolOptions).toEqual([
-      { id: "none", label: "Hand" },
-      { id: "geodesicEmitters/emitter", label: "Laser" },
-      { id: "geodesicMeasurements/length", label: "Ruler" },
-      { id: "geodesicMeasurements/protractor", label: "Protractor" },
-      { id: "worldMap/map", label: "Map" },
-    ]);
+    expect(content.menuActions.map((action) => action.label)).toEqual(["Help", "Settings", "Go home", "Start over"]);
+    expect(content.toolOptions).toEqual([]);
   });
 
   it("lists every placed-flag type as a place-flag option", () => {

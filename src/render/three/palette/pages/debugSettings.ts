@@ -6,7 +6,7 @@ import type { PortalPanelModeId } from "../../../../glue/portalPanelMode";
 import type { RuntimeMenuConsoleLogLevelId } from "../../../../runtime/runtimeMenuState";
 import type { PaletteDefinition } from "../../../../ui/paletteDefinition";
 import type { ScenePaletteAdapterOptions } from "../adapterTypes";
-import { hintStripText } from "../../../../ui/vocabulary";
+import { controllersSettingsText, hintStripText } from "../../../../ui/vocabulary";
 import { borderColor, scrollbarBorderColor, scrollbarColor, sectionColor } from "../tokens";
 import { createActionButton, createChoiceSection, createOptionGrid, createSectionLabel, createSettingsScrollContainer, createToggleButton, createToggleRow } from "../widgets";
 
@@ -237,6 +237,28 @@ export function buildSettingsContent(
       onShowHintsToggled(enabled);
     }, "show-hints-toggle"));
     settings.add(hintsSection);
+  }
+
+  const onXrHandOptionToggled = options.onXrHandOptionToggled;
+  if (onXrHandOptionToggled !== undefined) {
+    const controllersSection = new Container({
+      width: "100%",
+      flexDirection: "column",
+      gap: 8,
+      padding: 12,
+      borderRadius: 20,
+      backgroundColor: sectionColor,
+      borderColor,
+      borderWidth: 1,
+    });
+    controllersSection.add(createSectionLabel(controllersSettingsText.section));
+    controllersSection.add(createToggleRow(controllersSettingsText.useOneController, content.useOneControllerEnabled, (enabled) => {
+      onXrHandOptionToggled("useOneController", enabled);
+    }, "use-one-controller-toggle"));
+    controllersSection.add(createToggleRow(controllersSettingsText.leftHanded, content.leftHandedEnabled, (enabled) => {
+      onXrHandOptionToggled("leftHanded", enabled);
+    }, "left-handed-toggle"));
+    settings.add(controllersSection);
   }
 
   return settings;

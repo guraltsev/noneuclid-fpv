@@ -179,7 +179,7 @@ can run as written. Job 68 (split from job 30) waits for the maintainer.
 | [74](_done/74_pause_card_and_crosshair.md) | Pause card (the desktop main menu) and an always-on crosshair | done, needs review | - |  |
 | [75](_done/75_desktop_tool_belt_and_verbs.md) | The tool belt and the input verbs on desktop | done, needs review | - |  |
 | [76](_done/76_hint_strip_and_targeting.md) | Hint strip, focus outline, angular picking and sticky focus | done, needs review | - |  |
-| [77](77_vr_hand_roles_one_controller_and_belt.md) | VR: hand roles, one-controller layout, the belt on the wrist or the waist, the VR main menu | queued | - |  |
+| [77](_done/77_vr_hand_roles_one_controller_and_belt.md) | VR: hand roles, one-controller layout, the belt on the wrist or the waist, the VR main menu | done, needs review | - |  |
 | [78](78_self_explaining_menus.md) | Self-explaining menus: text labels, disabled reasons, readable beam rows, one way to delete | queued | - |  |
 | [79](79_help_that_teaches.md) | Help that teaches: three pages, generated How to, "Try it", first-use tips, Settings | queued | - |  |
 | [80](80_shape_machine_panel.md) | Shape machine panel: one picture, Shift and Height, direct entry, presets | queued | - |  |

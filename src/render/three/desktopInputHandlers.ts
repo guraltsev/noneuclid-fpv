@@ -24,6 +24,8 @@ import { toolBeltText } from "../../ui/vocabulary";
 import type { XrControllerHandModels } from "./xrControllerHandModels";
 import type { XrControls } from "./xrControls";
 import type { XrScenePaletteInput } from "./xrScenePaletteInput";
+import type { XrHandUi } from "./xrHandUi";
+import type { ToolBeltDefinition } from "../../ui/toolBeltDefinition";
 
 // One mouse wheel notch is 100 pixels; a step needs 40, and steps are at least this far apart so a trackpad's flick takes one tool.
 const wheelStepPixels = 40;
@@ -52,8 +54,12 @@ export interface DesktopInputHandlersDeps {
   readonly desktopScenePaletteInput: Pick<DesktopScenePaletteInput, "update">;
   readonly xrScenePaletteInput: Pick<XrScenePaletteInput, "update">;
   readonly xrControllerHandModels: Pick<XrControllerHandModels, "update">;
-  /** The toasts on screen now; the VR wrist panel draws them. */
+  /** The toasts on screen now; the VR panel draws them. */
   visibleToasts?(): readonly Toast[];
+  /** The VR hand UI: roles, the belt strap, the start card and where the toasts stand. */
+  readonly xrHandUi: Pick<XrHandUi, "update">;
+  /** The tool belt as it is now (for the VR strap). */
+  beltDefinition(): ToolBeltDefinition;
   /** The aim ray of the desktop crosshair. */
   resolveActiveRootAimRay(xrActive: boolean): RootAimRay | undefined;
   /** Moves the focus to the next aim target under the ray; true when it moved. */
@@ -118,7 +124,7 @@ export function createDesktopInputHandlers(deps: DesktopInputHandlersDeps): Desk
   let wheelAccumulator = 0;
   let lastWheelStepMs = Number.NEGATIVE_INFINITY;
   const currentMenuState = () => session.get().menuState;
-  const paletteDefinitionCache = createPaletteDefinitionCache(deps.appConfig, deps.toolsById);
+  const paletteDefinitionCache = createPaletteDefinitionCache(deps.appConfig);
   // Desktop fallbacks of updateScenePalette's head pose; overwritten before each use.
   const paletteHeadPositionScratch = new THREE.Vector3();
   const paletteHeadQuaternionScratch = new THREE.Quaternion();
@@ -138,9 +144,20 @@ export function createDesktopInputHandlers(deps: DesktopInputHandlersDeps): Desk
     frame: RuntimeInputFrame,
   ): void {
     if (xrActive && xrFrame && xrReferenceSpace) {
+      const poseFrame: XRFrame = xrFrame;
+      const poseSpace: XRReferenceSpace = xrReferenceSpace;
       const inputSources = [...(renderer.xr.getSession()?.inputSources ?? [])];
       const headPosition = xrHeadWorldPose?.position ?? camera.getWorldPosition(paletteHeadPositionScratch);
       const headQuaternion = xrHeadWorldPose?.quaternion ?? camera.getWorldQuaternion(paletteHeadQuaternionScratch);
+      // Hand roles: the belt, the start card and the toast panel follow the layout; only the pointer hand points at the palette.
+      const handUi = deps.xrHandUi.update({
+        inputSources,
+        getPose: (space) => poseFrame.getPose(space, poseSpace) ?? undefined,
+        referenceSpaceToWorldMatrix: xrRig.root.matrixWorld,
+        head: { position: headPosition, quaternion: headQuaternion },
+        definition: deps.beltDefinition(),
+        menuOpen: currentMenuState().isOpen,
+      });
 
       const placement = resolveVrPalettePlacement({
         head: {
@@ -154,7 +171,7 @@ export function createDesktopInputHandlers(deps: DesktopInputHandlersDeps): Desk
           xrFrame,
           referenceSpace: xrReferenceSpace,
           referenceSpaceToWorldMatrix: xrRig.root.matrixWorld,
-          inputSources,
+          inputSources: handUi.paletteSources as readonly XRInputSource[],
         }),
         ...paletteDefinitionFrame("xr"),
         placement,
@@ -167,6 +184,8 @@ export function createDesktopInputHandlers(deps: DesktopInputHandlersDeps): Desk
         tool: deps.toolsById.get(currentMenuState().selectedTool),
         placeFlagType: currentMenuState().placeFlagOptions.flagType,
         toasts: deps.visibleToasts?.(),
+        toastAnchor: handUi.toastAnchor,
+        pointerHandedness: handUi.pointerHandedness,
       });
       return;
     }

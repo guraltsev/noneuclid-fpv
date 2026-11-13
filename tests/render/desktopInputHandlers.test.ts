@@ -32,7 +32,7 @@ function emptyFrame(): Omit<RuntimeInputFrame, "source"> {
 }
 
 function createHarness(
-  options: { readonly menuOpen?: boolean; readonly presenting?: boolean; readonly pinnedHelp?: boolean; readonly menuResult?: "closed" | "opened" | "nothing" } = {},
+  options: { readonly menuOpen?: boolean; readonly presenting?: boolean; readonly pinnedHelp?: boolean; readonly menuResult?: "closed" | "opened" | "nothing"; readonly xrSources?: readonly object[] } = {},
 ) {
   const session = createTestClientSession(
     options.menuOpen ? { menuState: { ...createRuntimeMenuState({ selectedWorldId: "test" }), isOpen: true } } : {},
@@ -47,20 +47,30 @@ function createHarness(
     lookMode: vi.fn(),
     paletteUpdate: vi.fn(),
     desktopPaletteInput: vi.fn(() => ({})),
+    xrPaletteInput: vi.fn(() => ({})),
+    handModels: vi.fn(),
+    handUi: vi.fn((_frame: { readonly inputSources: readonly object[] }) => ({
+      layout: "two-controllers" as const,
+      paletteSources: [{ handedness: "right" }],
+      pointerHandedness: "right" as const,
+      toastAnchor: { kind: "wrist" as const, handedness: "left" as const },
+    })),
   };
   const handlers = createDesktopInputHandlers({
     session,
     appConfig: defaultAppConfig,
     toolsById: createTestToolsById(),
     camera: new THREE.PerspectiveCamera(),
-    renderer: { domElement: canvas, xr: { isPresenting: options.presenting ?? false, getSession: () => null } },
+    renderer: { domElement: canvas, xr: { isPresenting: options.presenting ?? false, getSession: () => (options.xrSources ? { inputSources: options.xrSources as never } : null) } },
     xrRig: { root: new THREE.Group() },
     controls: { setLookMode: calls.lookMode, consumeFrame: () => emptyFrame() as never, isPointerLocked: () => false },
     xrControls: { consumeFrame: () => emptyFrame() as never },
     scenePaletteController: { update: calls.paletteUpdate },
     desktopScenePaletteInput: { update: calls.desktopPaletteInput as never },
-    xrScenePaletteInput: { update: vi.fn() as never },
-    xrControllerHandModels: { update: vi.fn() },
+    xrScenePaletteInput: { update: calls.xrPaletteInput as never },
+    xrControllerHandModels: { update: calls.handModels },
+    xrHandUi: { update: calls.handUi as never },
+    beltDefinition: () => ({ slots: [] }),
     resolveActiveRootAimRay: () => undefined,
     cycleFocusedAimTarget: calls.cycle,
     openContextMenuFromAim: calls.openContextMenu,
@@ -180,4 +190,20 @@ describe("createDesktopInputHandlers", () => {
     expect(calls.desktopPaletteInput).toHaveBeenCalledTimes(1);
     expect(calls.paletteUpdate).toHaveBeenCalledTimes(1);
   });
+
+  it("feeds the XR palette the pointer hand only, and the hand models the toast anchor", () => {
+    const left = { handedness: "left" };
+    const right = { handedness: "right" };
+    const { handlers, calls } = createHarness({ presenting: true, xrSources: [left, right] });
+    const xrFrame = { getPose: () => undefined } as unknown as XRFrame;
+
+    handlers.updateScenePalette(true, xrFrame, {} as XRReferenceSpace, undefined, 0.016, { ...emptyFrame(), source: "xr" });
+
+    expect(calls.handUi).toHaveBeenCalledTimes(1);
+    expect(calls.handUi.mock.calls[0][0].inputSources).toEqual([left, right]);
+    expect(calls.xrPaletteInput).toHaveBeenCalledWith(expect.objectContaining({ inputSources: [{ handedness: "right" }] }));
+    expect(calls.handModels).toHaveBeenCalledWith(expect.objectContaining({ pointerHandedness: "right", toastAnchor: { kind: "wrist", handedness: "left" } }));
+    expect(calls.desktopPaletteInput).not.toHaveBeenCalled();
+  });
 });
+

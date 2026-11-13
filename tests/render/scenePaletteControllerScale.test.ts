@@ -29,7 +29,7 @@ afterEach(() => {
 
 describe("scenePaletteController placement scale", () => {
   it("draws the tooltip and the hover marker at the placement scale", () => {
-    const { tooltip, marker } = hoverToolButton(2);
+    const { tooltip, marker } = hoverMenuButton(2);
 
     expect(tooltip.visible).toBe(true);
     expect(tooltip.scale.toArray()).toEqual([2, 2, 2]);
@@ -38,7 +38,7 @@ describe("scenePaletteController placement scale", () => {
   });
 
   it("draws them at scale 1 when the placement has no scale", () => {
-    const { tooltip, marker } = hoverToolButton(undefined);
+    const { tooltip, marker } = hoverMenuButton(undefined);
 
     expect(tooltip.visible).toBe(true);
     expect(tooltip.scale.toArray()).toEqual([1, 1, 1]);
@@ -47,9 +47,9 @@ describe("scenePaletteController placement scale", () => {
   });
 });
 
-// Build the controller with the main page open, aim an XR pointer from the head at a tool button, and return the
+// Build the controller with the main page open, aim an XR pointer from the head at a main-menu button, and return the
 // tooltip root and hover marker after the frame.
-function hoverToolButton(scale: number | undefined): { tooltip: THREE.Object3D; marker: THREE.Object3D } {
+function hoverMenuButton(scale: number | undefined): { tooltip: THREE.Object3D; marker: THREE.Object3D } {
   installFakeCanvas2d();
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera();
@@ -82,7 +82,7 @@ function hoverToolButton(scale: number | undefined): { tooltip: THREE.Object3D; 
   };
 
   frame(undefined);
-  const toolButton = findToolButton(scene);
+  const toolButton = findMenuButton(scene);
   frame(new THREE.Box3().setFromObject(toolButton).getCenter(new THREE.Vector3()));
 
   const tooltip = scene.getObjectByName("scene-palette-hover-tooltip");
@@ -96,16 +96,16 @@ function hoverToolButton(scale: number | undefined): { tooltip: THREE.Object3D; 
   return result;
 }
 
-function findToolButton(scene: THREE.Scene): THREE.Object3D {
+function findMenuButton(scene: THREE.Scene): THREE.Object3D {
   let found: THREE.Object3D | undefined;
   scene.traverse((object) => {
     const itemId = object.userData.scenePaletteItemId;
-    if (!found && typeof itemId === "string" && itemId.startsWith("tool:")) {
+    if (!found && typeof itemId === "string" && itemId.startsWith("main-menu:")) {
       found = object;
     }
   });
   if (!found) {
-    throw new Error("no tool button in the palette");
+    throw new Error("no main-menu button in the palette");
   }
   return found;
 }

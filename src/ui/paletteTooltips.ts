@@ -2,7 +2,15 @@
  * Resolves the tooltip text for palette items from their string item ids.
  * Item ids are namespaced strings produced by the palette renderers (for example "tool:placedFlags/flag", "geodesic-cannon-action:rotate:<id>", "sign-key:A"); this module is the single place that turns them into human-readable labels, so desktop and VR show the same tooltips. It is a pure lookup with no state.
  */
-import { objectActions, toolNames } from "../world-objects/vocabulary";
+import { mainMenuText, objectActions, surfaceNames, toolNames } from "../world-objects/vocabulary";
+
+/** The tooltips of the main menu buttons (design 017 section 7.5), by the id after "main-menu:". */
+const mainMenuTooltips: Readonly<Record<string, string | undefined>> = {
+  help: surfaceNames.help,
+  settings: mainMenuText.settings,
+  "go-home": objectActions.goHome,
+  "start-over": objectActions.startOver,
+};
 
 /**
  * Returns the tooltip for a palette item id (prefix families like tool:, tutorial:, sign-key: are decoded, others looked up in a fixed table), or undefined for an undefined or unknown id.
@@ -14,6 +22,10 @@ export function resolvePaletteTooltipLabel(itemId: string | undefined): string |
 
   if (itemId.startsWith("tool:")) {
     return toolTooltip(itemId.slice("tool:".length));
+  }
+
+  if (itemId.startsWith("main-menu:")) {
+    return mainMenuTooltips[itemId.slice("main-menu:".length)];
   }
 
   if (itemId.startsWith("geodesic-cannon-action:delete:")) {

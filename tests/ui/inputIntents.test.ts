@@ -63,4 +63,33 @@ describe("inputIntents", () => {
     expect(glyph.label).toBe("Context fallback");
     expect(glyph).not.toHaveProperty("iconSrc");
   });
+
+  it("names the controls of two controllers: grip, A, B, left trigger, X", () => {
+    const label = (intent: Parameters<typeof getInputHintGlyph>[1]) => getInputHintGlyph("xr", intent, "two-controllers").label;
+
+    expect(label("primary")).toBe("Trigger");
+    expect(label("context-menu")).toBe("Grip");
+    expect(label("carry")).toBe("A");
+    expect(label("help")).toBe("B");
+    expect(label("switch-tool")).toBe("Left trigger");
+    expect(label("hand")).toBe("Left grip");
+    expect(label("main-menu")).toBe("X");
+  });
+
+  it("names one controller by its letters, with the stick press and the hold", () => {
+    const right = (intent: Parameters<typeof getInputHintGlyph>[1]) => getInputHintGlyph("xr", intent, "one-right").label;
+    const left = (intent: Parameters<typeof getInputHintGlyph>[1]) => getInputHintGlyph("xr", intent, "one-left").label;
+
+    expect([right("carry"), right("help"), right("main-menu")]).toEqual(["A", "B", "Hold B"]);
+    expect([left("carry"), left("help"), left("main-menu")]).toEqual(["X", "Y", "Hold Y"]);
+    expect(right("switch-tool")).toBe("Stick press");
+    expect(left("switch-tool")).toBe("Stick press");
+    expect(left("primary")).toBe("Trigger");
+    expect(left("context-menu")).toBe("Grip");
+  });
+
+  it("keeps desktop labels independent of the layout and the old XR labels without one", () => {
+    expect(getInputHintGlyph("desktop", "carry", "one-left").label).toBe("G");
+    expect(getInputHintGlyph("xr", "carry").label).toBe("A / X");
+  });
 });
