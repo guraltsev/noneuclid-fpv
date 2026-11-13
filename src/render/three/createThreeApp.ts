@@ -75,7 +75,7 @@ import { reversePainterSortStable } from "@pmndrs/uikit";
 import { type AppState } from "../../runtime/appState";
 import { type CellComplexSpec } from "../../cell-complex/specs";
 import { buildStaticallyCulledPortalPathTables } from "../../cell-complex/staticPortalPathCull";
-import { type AppConfig, appConfigForWorld, defaultAppConfig, isRuntimeToolEnabled } from "../../glue/appConfig";
+import { type AppConfig, appConfigCatalog, appConfigForWorld, defaultAppConfig, isRuntimeToolEnabled } from "../../glue/appConfig";
 import { type DebugLevelId } from "../../diagnostics/debugLevels";
 import { type DebugOptionId, hasActiveDebugOption } from "../../glue/debugOptions";
 import { type DebugSettings } from "../../glue/debugSettings";
@@ -150,6 +150,9 @@ import { createRuntimeObjectActions } from "./runtimeObjectActions";
 import { createHelpLensRenderer } from "./helpLensRenderer";
 import { createToastView } from "../dom/toastView";
 import { createResetHoldRing } from "../dom/resetHoldRing";
+import { createPauseCard } from "../dom/pauseCard";
+import { createCrosshair } from "../dom/crosshair";
+import { createPauseCardDefinition } from "../../ui/pauseCardDefinition";
 import { restoreSavedSnapshot, savedKindsRemovedThisFrame, savedObjectKinds, takeSavedSnapshot, type SavedSnapshot } from "../../world-objects/savedSnapshot";
 import { objectNouns, toastMessages } from "../../ui/vocabulary";
 import { createToastQueue } from "../../ui/toastQueue";
@@ -409,6 +412,8 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     if (actionId === "undo") performUndo();
   });
   const resetHoldRing = createResetHoldRing(document.body);
+  // The tool last announced by a toast. Declared here, before the first palette sync, which runs during construction.
+  let announcedTool: string | undefined;
   // Undo (design 017 section 8.8): one level. A start over or a deletion keeps the saved objects as they were before it;
   // U (or the toast's button) within the window puts them back.
   const savedKinds = savedObjectKinds(worldModules);
@@ -487,6 +492,53 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   let frameDrawn = false;
   const debugOverlay = createDebugOverlay(container);
   const desktopToolIndicator = createDesktopToolIndicator(document.body);
+  // The pause card is the desktop main menu (design 017 section 8.1): shown whenever the pointer is not locked.
+  const helpCubeSpec = options.worldSpec.cells.flatMap((cell) => cell.visuals?.objects ?? []).find((object) => object.id === "startingQuestionCube");
+  const configCatalogLabel = appConfigCatalog.find((entry) => entry.id === options.appConfigName)?.label;
+  const pauseCard = createPauseCard(
+    document.body,
+    createPauseCardDefinition({
+      // "001 Basic Cube" is the config's name; the number is the config's file name, not a title.
+      configDisplayName: configCatalogLabel !== undefined && /^\d+\s/.test(configCatalogLabel) ? configCatalogLabel.replace(/^\d+\s+/, "") : undefined,
+      worldName: options.selectedWorldId,
+      goalPages: helpCubeSpec?.kind === "asset" ? helpCubeSpec.goalPages : undefined,
+    }),
+    {
+      onPlay: () => void controls.requestPointerLock(),
+      onAction(action) {
+        if (action === "go-home") {
+          teleportPlayerHome();
+        } else {
+          // The palette is driven with the pointer locked, so the pointer is taken when the page opens.
+          dispatchRuntimeCommand({ kind: "open-menu" });
+          if (action === "settings") {
+            dispatchRuntimeCommand({ kind: "show-settings" });
+          } else {
+            const helpCubeObject = runtimeObjectRegistry.get("startingQuestionCube");
+            if (helpCubeObject?.kind === "asset") dispatchRuntimeCommand({
+              kind: "show-question-help",
+              objectId: helpCubeObject.id,
+              tutorialPages: helpCubeObject.tutorialPages ?? [],
+              goalPages: helpCubeObject.goalPages ?? [],
+            });
+          }
+        }
+        void controls.requestPointerLock();
+      },
+      onStartOver() {
+        startOverRequested = true;
+        void controls.requestPointerLock();
+      },
+    },
+  );
+  const crosshair = createCrosshair(document.body);
+  // Losing the pointer lock (Esc) closes any open menu and shows the card.
+  const onPointerLockChange = (): void => {
+    if (document.pointerLockElement !== renderer.domElement && currentMenuState().isOpen) {
+      dispatchRuntimeCommand({ kind: "close-menu" });
+    }
+  };
+  document.addEventListener("pointerlockchange", onPointerLockChange);
   const desktopScenePaletteInput = createDesktopScenePaletteInput();
   const xrScenePaletteInput = createXrScenePaletteInput();
   const xrControllerHandModels = createXrControllerHandModels(scene);
@@ -1474,6 +1526,15 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     toastQueue.tick(performance.now());
     toastView.render(toastQueue.visible());
     resetHoldRing.render(controls.resetHoldProgress);
+    // Read the lock each frame, never cached: a headless browser stubs `document.pointerLockElement`.
+    const pointerLocked = document.pointerLockElement === renderer.domElement;
+    pauseCard.setVisible(!xrActive && !pointerLocked);
+    const crosshairVisible = !xrActive && pointerLocked && !currentMenuState().isOpen;
+    crosshair.update({
+      visible: crosshairVisible,
+      usable: crosshairVisible && findFocusedRuntimeObject(activeAimRay) !== undefined,
+      color: toolHost.toolsById.get(currentMenuState().selectedTool)?.indicatorColor,
+    });
     const frameAfterUiMs = performance.now();
     // Phase 5: draw. In XR the renderer renders each eye from `camera` as updated by the WebXR manager.
     const frameBeforeRenderMs = performance.now();
@@ -1652,6 +1713,9 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       helpLensRenderer.dispose();
       toastView.dispose();
       resetHoldRing.dispose();
+      document.removeEventListener("pointerlockchange", onPointerLockChange);
+      pauseCard.dispose();
+      crosshair.dispose();
       worldMapRenderer.dispose();
       vrComfortVignette.dispose();
       clearXrObjectTooltip();
@@ -1819,7 +1883,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     visibleCellId = currentlyVisibleCellId;
   }
 
-  let announcedTool: string | undefined;
   function syncDesktopPalette(): void {
     controls.setLookMode(currentMenuState().isOpen ? "palette" : "camera");
     const selectedTool = currentMenuState().selectedTool;

@@ -77,6 +77,8 @@ export const toastMessages = {
 
 /** The input verbs (design 017 section 7): one meaning each, bound on desktop and in VR. */
 export const verbNames = {
+  look: "Look",
+  walk: "Walk",
   use: "Use",
   menu: "Menu",
   pickUp: "Pick up",
@@ -174,3 +176,17 @@ export const retiredTerms: readonly string[] = [
   "R",
   "Reload",
 ];
+
+/** The words of the pause card, the desktop main menu (design 017 section 8.1). */
+export const pauseCardText = {
+  clickToPlay: "Click to play",
+  /** The "Switch tool" control until the number keys exist (job 75 changes it to "1-5"). */
+  switchToolControl: "Right click on the floor",
+  help: surfaceNames.help,
+  settings: "Settings",
+  goHome: objectActions.goHome,
+  startOver: objectActions.startOver,
+  startOverQuestion: "Remove everything you placed?",
+  yes: "Yes",
+  no: "No",
+} as const;

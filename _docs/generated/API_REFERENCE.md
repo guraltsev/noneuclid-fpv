@@ -1281,6 +1281,7 @@ The student vocabulary (design 017 section 6): every student-visible noun, verb 
 | function | `laserLabel` | The tooltip of a laser: "Laser" with its short id when it has one, "Laser L1". |
 | const | `lostGuidance` | The sentence for a student who is lost. |
 | const | `retiredTerms` | The words that no student-visible string may use (the "Retire" columns of design 017 tables 6.2 and 6.3). |
+| const | `pauseCardText` | The words of the pause card, the desktop main menu (design 017 section 8.1). |
 
 ### `world-objects/worldObjectOwner.ts`
 
@@ -2309,6 +2310,21 @@ Resolves the tooltip text for palette items from their string item ids.
 | --- | --- | --- |
 | function | `resolvePaletteTooltipLabel` | Returns the tooltip for a palette item id (prefix families like tool:, tutorial:, sign-key: are decoded, others looked up in a fixed table), or undefined for an undefined or unknown id. |
 
+### `ui/pauseCardDefinition.ts`
+
+The pause card, the desktop main menu (design 017 sections 7.5 and 8.1), as plain data: the activity title, a one-line description, the controls table and the main-menu actions.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `PauseCardControl` | One row of the controls table: the verb and the name of the control that performs it. |
+| type | `PauseCardActionId` | The main-menu actions, in the order they show. |
+| interface | `PauseCardDefinition` | The card's content. |
+| interface | `PauseCardSource` | What the card is built from: the world's name, the config's display name when it has one, and the first goal text. |
+| function | `prettyWorldName` | "001-basic-cube" becomes "Basic cube": the leading number and the dashes and underscores go. |
+| function | `firstSentence` | The first sentence of a text, without its line breaks; empty when the text is blank. |
+| function | `createPauseCardControls` | The controls table: Look, Walk, Use, Menu, Switch tool, What's this?, from the intent table. |
+| function | `createPauseCardDefinition` | Builds the card for a world. |
+
 ### `ui/toastQueue.ts`
 
 The toast queue (design 017 section 8.3): short messages that appear for a moment, at most two at a time.
@@ -2343,6 +2359,16 @@ Renderer-neutral description of what the player can do with the world object the
 
 ## `render`
 
+### `render/dom/crosshair.ts`
+
+Desktop crosshair (design 017 section 8.2 item 1): a 6 px white dot with a 1 px dark outline at the screen center, shown while the pointer is locked.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `CrosshairState` | What the crosshair shows. |
+| interface | `Crosshair` | Handle to the crosshair created by {@link createCrosshair}. |
+| function | `createCrosshair` | Creates the hidden crosshair and appends it to `container`. |
+
 ### `render/dom/desktopToolIndicator.ts`
 
 Small DOM badge showing the currently selected desktop tool (icon, name, and a selection prompt) near the HUD.
@@ -2360,6 +2386,16 @@ Floating tooltip DOM element that follows a screen position, used for object foc
 | --- | --- | --- |
 | interface | `FloatingObjectTooltip` | Handle to the tooltip created by {@link createFloatingObjectTooltip}. |
 | function | `createFloatingObjectTooltip` | Creates a hidden tooltip element with class floating-object-tooltip and appends it to container. |
+
+### `render/dom/pauseCard.ts`
+
+The pause card, the desktop main menu (design 017 sections 7.5 and 8.1): a DOM overlay that dims the scene by 35 percent and shows the activity title, a one-line description, "Click to play", the controls table and the main-menu actions.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `PauseCardHandlers` | Callbacks of the card. |
+| interface | `PauseCard` | Handle to the card created by {@link createPauseCard}. |
+| function | `createPauseCard` | Creates the hidden card and appends it to `container`. |
 
 ### `render/dom/resetHoldRing.ts`
 
