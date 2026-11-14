@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NonEuclidean FPV</title>
+<meta name="description" content="Walk in first person on surfaces built from flat pieces glued edge to edge: the cube, the tetrahedron, the flat torus and more. A laboratory for geometry.">
+<style>
+  :root {
+    --bg: #f6f7f9;
+    --surface: #ffffff;
+    --text: #1b2330;
+    --muted: #5b6676;
+    --line: #dde2ea;
+    --accent: #1f6feb;
+    --accent-text: #ffffff;
+    --chip: #eef2f8;
+    --kbd-bg: #ffffff;
+    --kbd-line: #c4ccd8;
+    --shadow: 0 1px 2px rgba(16, 24, 40, .06), 0 4px 16px rgba(16, 24, 40, .06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #10141b;
+      --surface: #171c25;
+      --text: #e7ebf1;
+      --muted: #9aa5b5;
+      --line: #2a3240;
+      --accent: #5b9dff;
+      --accent-text: #0b1220;
+      --chip: #212937;
+      --kbd-bg: #222a37;
+      --kbd-line: #3a4456;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 4px 16px rgba(0, 0, 0, .25);
+    }
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  a { color: var(--accent); }
+  img { display: block; max-width: 100%; height: auto; }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 16px; }
+
+  header.hero { padding: 48px 0 28px; }
+  .hero h1 { margin: 0 0 8px; font-size: clamp(30px, 5vw, 44px); line-height: 1.1; letter-spacing: -.01em; }
+  .hero p { margin: 0; max-width: 62ch; color: var(--muted); font-size: 18px; }
+  .hero nav { margin-top: 18px; display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 15px; }
+
+  section { padding: 28px 0; }
+  h2 { margin: 0 0 6px; font-size: 26px; letter-spacing: -.005em; }
+  .lead { margin: 0 0 22px; color: var(--muted); max-width: 70ch; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
+  .card {
+    display: flex; flex-direction: column;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+    overflow: hidden; box-shadow: var(--shadow);
+    text-decoration: none; color: inherit;
+    transition: transform .15s ease, box-shadow .15s ease;
+  }
+  .card:hover, .card:focus-visible { transform: translateY(-2px); box-shadow: 0 2px 4px rgba(16,24,40,.08), 0 10px 28px rgba(16,24,40,.14); }
+  .card:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  .card img { aspect-ratio: 16 / 9; object-fit: cover; width: 100%; background: #9cc6ee; }
+  .card .body { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
+  .card h3 { margin: 0; font-size: 19px; }
+  .card p { margin: 0; color: var(--muted); font-size: 15px; }
+  .card .facts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
+  .card .facts span { background: var(--chip); border-radius: 999px; padding: 2px 10px; font-size: 13px; color: var(--text); }
+  .card .go { margin-top: auto; padding-top: 6px; font-weight: 600; color: var(--accent); }
+
+  .steps { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; }
+  .step {
+    display: flex; flex-direction: column; gap: 12px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px; box-shadow: var(--shadow);
+  }
+  .step p { margin: 0 0 4px; }
+  .step img { border-radius: 8px; border: 1px solid var(--line); width: 100%; }
+  .step h3 { margin: 0 0 6px; font-size: 19px; display: flex; gap: 10px; align-items: baseline; }
+  .step h3 .n {
+    flex: none; display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 50%;
+    background: var(--accent); color: var(--accent-text); font-size: 15px;
+  }
+  .step ul { margin: 0; padding-left: 20px; }
+  .step li { margin: 4px 0; }
+
+  kbd {
+    display: inline-block; min-width: 1.6em; padding: 0 .4em; text-align: center;
+    font: 600 13px/1.6 ui-monospace, SFMono-Regular, Consolas, monospace;
+    background: var(--kbd-bg); border: 1px solid var(--kbd-line); border-bottom-width: 2px; border-radius: 5px;
+  }
+  .keys { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .keys th, .keys td { text-align: left; padding: 9px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  .keys tr:last-child td { border-bottom: 0; }
+  .keys th { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); background: var(--chip); }
+  .table-scroll { overflow-x: auto; }
+
+  .tips { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+  .tip { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+  .tip h3 { margin: 0 0 4px; font-size: 16px; }
+  .tip p { margin: 0; color: var(--muted); font-size: 15px; }
+
+  footer { padding: 28px 0 48px; color: var(--muted); font-size: 14px; border-top: 1px solid var(--line); margin-top: 20px; }
+  footer p { margin: 6px 0; }
+</style>
+</head>
+<body>
+<header class="hero">
+  <div class="wrap">
+    <h1>NonEuclidean FPV</h1>
+    <p>Walk in first person on surfaces built from flat pieces glued edge to edge.
+      Glue the pieces one way and you are walking on a cube; glue them another and the ground wraps around forever.
+      Notice, measure, and explain what is strange.</p>
+    <nav>
+      <a href="#worlds">Worlds</a>
+      <a href="#how">How to play</a>
+      <a href="#keys">All controls</a>
+      <a href="https://github.com/guraltsev/noneuclid-fpv">Source on GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+<section id="worlds">
+  <div class="wrap">
+    <h2>Choose a world</h2>
+    <p class="lead">Every world opens with all tools available. Runs in a recent desktop browser; a VR headset works too when the browser offers WebXR.</p>
+    <div class="grid">
+      <a class="card" href="./main/?world=cube">
+        <img src="img/world-cube.jpg" width="1280" height="720" loading="lazy" alt="View inside the cube world">
+        <div class="body">
+          <h3>Cube</h3>
+          <p>Six squares glued like the faces of a cube. Three squares meet at each corner,
+             so the angles around a corner add up to only 270°.</p>
+          <div class="facts"><span>6 squares</span><span>8 corners</span><span>270° at a corner</span></div>
+          <span class="go">Open world →</span>
+        </div>
+      </a>
+      <a class="card" href="./main/?world=tetrahedron">
+        <img src="img/world-tetrahedron.jpg" width="1280" height="720" loading="lazy" alt="View inside the tetrahedron world">
+        <div class="body">
+          <h3>Tetrahedron</h3>
+          <p>Four triangles, each glued to the other three. 
+            At every corner the angles add up to just 180°, and you can see your own reflection in the sharpest corners of all.</p>
+          <div class="facts"><span>4 triangles</span><span>4 corners</span><span>180° at a corner</span></div>
+          <span class="go">Open world →</span>
+        </div>
+      </a>
+      <a class="card" href="./main/?world=octahedron">
+        <img src="img/world-octahedron.jpg" width="1280" height="720" loading="lazy" alt="View inside the octahedron world">
+        <div class="body">
+          <h3>Octahedron</h3>
+          <p>Eight triangles, four meeting at each corner for a total of 240°.</p>
+          <div class="facts"><span>8 triangles</span><span>6 corners</span><span>240° at a corner</span></div>
+          <span class="go">Open world →</span>
+        </div>
+      </a>
+      <a class="card" href="./main/?world=dodecahedron">
+        <img src="img/world-dodecahedron.jpg" width="1280" height="720" loading="lazy" alt="View inside the dodecahedron world">
+        <div class="body">
+          <h3>Dodecahedron</h3>
+          <p>Twelve pentagons, three at each corner. This is the "flattest" of all the platonic solids.</p>
+          <div class="facts"><span>12 pentagons</span><span>20 corners</span><span>324° at a corner</span></div>
+          <span class="go">Open world →</span>
+        </div>
+      </a>
+      <a class="card" href="./main/?world=icosahedron">
+        <img src="img/world-icosahedron.jpg" width="1280" height="720" loading="lazy" alt="View inside the icosahedron world">
+        <div class="body">
+          <h3>Icosahedron</h3>
+          <p>Twenty triangles, five at each corner, for a total of 300°.</p>
+          <div class="facts"><span>20 triangles</span><span>12 corners</span><span>300° at a corner</span></div>
+          <span class="go">Open world →</span>
+        </div>
+      </a>
+      <a class="card" href="./main/?world=torus">
+        <img src="img/world-torus.jpg" width="1280" height="720" loading="lazy" alt="View inside the flat torus world">
+        <div class="body">
+          <h3>Flat torus</h3>
+          <p>One square whose opposite edges are glued. Walk off one edge and you come back in from the opposite one. 
+            Look ahead: the same house repeats forever.
+            The world loops around, but is it curved?
+          </p>
+          <div class="facts"><span>1 square</span><span>flat everywhere</span></div>
+          <span class="go">Open world →</span>
+        </div>
+      </a>
+      <a class="card" href="./main/?world=torus-moduli">
+        <img src="img/world-torus-moduli.jpg" width="1280" height="720" loading="lazy" alt="The geometry computer reshaping the flat torus">
+        <div class="body">
+          <h3>Exploring moduli space of a flat torus</h3>
+          <p>The flat torus with a geometry computer that reshapes it, shearing the square into a parallelogram. 
+            Which shapes give the same world?</p>
+          <div class="facts"><span>1 parallelogram</span><span>adjustable shape</span></div>
+          <span class="go">Open world →</span>
+        </div>
+      </a>
+    </div>
+  </div>
+</section>
+
+<section id="how">
+  <div class="wrap">
+    <h2>How to play</h2>
+    <p class="lead">The interface in a few steps. You start next to a house and a yellow question cube; the cube holds a short tutorial and the goal of the world.</p>
+    <div class="steps">
+      <div class="step">
+        <img src="img/howto-start.jpg" width="1280" height="720" loading="lazy" alt="">
+        <div>
+          <h3><span class="n">1</span>Look and walk</h3>
+          <p>You start next to a house and a yellow question cube.</p>
+          <ul><li>Click the view once so the mouse turns your head. <kbd>Esc</kbd> gives the mouse back.</li><li>Walk with <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> or the arrow keys; turn with the mouse or <kbd>Q</kbd> / <kbd>E</kbd>.</li><li>Walk off the edge of a flat piece and you carry on onto the piece glued to it.</li></ul>
+        </div>
+      </div>
+      <div class="step">
+        <img src="img/howto-question-cube.jpg" width="1280" height="720" loading="lazy" alt="">
+        <div>
+          <h3><span class="n">2</span>Read the goal</h3>
+          <p>Aim at the yellow cube and right-click it.</p>
+          <ul><li><b>Tutorial</b> explains everything you can do, one topic at a time, with pictures and the buttons to press on your device; <b>Goal</b> says what to look for in this world.</li><li>Aim at anything and press <kbd>H</kbd> for help about it.</li></ul>
+        </div>
+      </div>
+      <div class="step">
+        <img src="img/howto-menu.jpg" width="1280" height="720" loading="lazy" alt="">
+        <div>
+          <h3><span class="n">3</span>Open the tool menu</h3>
+          <p>Right-click (or press <kbd>F</kbd>) while aiming at empty floor.</p>
+          <ul><li>Move the mouse to a tool and left-click to pick it. The chosen tool shows in the bottom-left corner.</li><li>Top-left buttons: settings (choose another world), <b>Home</b> (back to the start if you are lost), reload (press twice).</li></ul>
+        </div>
+      </div>
+      <div class="step">
+        <img src="img/howto-ray.jpg" width="1280" height="720" loading="lazy" alt="A yellow ray leaving a post and coming back to it around the cube">
+        <div>
+          <h3><span class="n">4</span>Draw a straight line</h3>
+          <p>Pick <b>Geodesic emitter</b>, aim at the floor, left-click.</p>
+          <ul><li>A post appears and fires a short, locally straight ray the way you are facing. Left-click the ray to make it 2 m longer.</li><li>A ray stops if it runs into a corner: each corner of the surface is surrounded by a thin column.</li><li>Here a ray went once around the cube and came back to its own post.</li></ul>
+        </div>
+      </div>
+      <div class="step">
+        <img src="img/howto-aim.jpg" width="1280" height="720" loading="lazy" alt="The post's menu: one locked ray and one free ray with an Aim button">
+        <div>
+          <h3><span class="n">5</span>Aim a ray</h3>
+          <p>Right-click a post to open its menu: it lists the post's rays.</p>
+          <ul><li>Press <b>Aim</b> next to a free ray: the ray now points wherever you look. Left-click to fix it.</li><li>If it ends on another post, or close to one, it locks there.</li><li><b>+</b> adds a ray in a random direction; the bin deletes a ray.</li></ul>
+        </div>
+      </div>
+      <div class="step">
+        <img src="img/howto-locked.jpg" width="1280" height="720" loading="lazy" alt="Two posts joined by amber locked rays">
+        <div>
+          <h3><span class="n">6</span>Locked and free rays</h3>
+          <p>A ray with a post at both ends is <b>locked</b>; it turns amber.</p>
+          <ul><li>A free ray (cyan) can be aimed and made longer; a locked one cannot, and shows a lock in the post's menu.</li><li>A ray locks when it reaches another post, or when you put a new post on a free ray: the post cuts it in two.</li></ul>
+        </div>
+      </div>
+      <div class="step">
+        <img src="img/howto-carry.jpg" width="1280" height="720" loading="lazy" alt="Carrying a post while its locked ray follows">
+        <div>
+          <h3><span class="n">7</span>Move a post</h3>
+          <p>Aim at a post and press <kbd>G</kbd> to pick it up; <kbd>G</kbd> or left-click puts it down.</p>
+          <ul><li>Locked rays stay attached: while you walk they are redrawn as straight rays between the posts, going the same way around the world.</li><li>Free rays are removed when you pick a post up. Putting a post down on a ray cuts that ray.</li></ul>
+        </div>
+      </div>
+      <div class="step">
+        <img src="img/howto-tie.jpg" width="1280" height="720" loading="lazy" alt="Before: two locked geodesic segments meet at a post. After: the curve has shortened to one geodesic between the other two posts">
+        <div>
+          <h3><span class="n">8</span>Unite two geodesic segments and shorten the curve</h3>
+          <p>The orange button in a post's menu unites two of the post's locked geodesic segments into one curve and detaches it from the post.</p>
+          <ul><li>Left-click the two segments near the post.</li><li>The curve-shortening flow then moves the corner where they meet so that the curve gets shorter, until it is a geodesic between the other two posts, or a closed geodesic.</li><li>A closed curve around a corner of the solid shrinks to nothing and disappears.</li></ul>
+        </div>
+      </div>
+      <div class="step">
+        <img src="img/howto-length.jpg" width="1280" height="720" loading="lazy" alt="A ray labelled G2 length = 60 m">
+        <div>
+          <h3><span class="n">9</span>Measure</h3>
+          <p>Pick <b>Length</b> and left-click a ray to see its whole length, wherever it goes.</p>
+          <ul><li>The loop around the cube is exactly 60 m: four faces of 15 m.</li><li><b>Protractor</b>: click a post or a crossing, then two rays leaving it. The angle goes counter-clockwise from the first ray to the second.</li><li>With no tool selected, click a measurement to remove it.</li></ul>
+        </div>
+      </div>
+      <div class="step">
+        <img src="img/howto-sign.jpg" width="1280" height="720" loading="lazy" alt="A wooden sign labelled A1">
+        <div>
+          <h3><span class="n">10</span>Mark places</h3>
+          <p>Pick <b>Sign</b> and left-click the floor.</p>
+          <ul><li>Signs are numbered A1, A2, … so you can tell places apart. Right-click a sign to type your own text or delete it.</li></ul>
+        </div>
+      </div>
+      <div class="step">
+        <img src="img/howto-map.jpg" width="1280" height="720" loading="lazy" alt="The cube world in miniature, floating in front of the player">
+        <div>
+          <h3><span class="n">11</span>See the whole world</h3>
+          <p>In the cube and the other solids, pick <b>Map</b>.</p>
+          <ul><li>The world appears as a small solid in front of you, with you and the objects on it. Left-click to close it.</li></ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="keys">
+  <div class="wrap">
+    <h2>All controls</h2>
+    <p class="lead">Keyboard and mouse on a computer; the right-hand column is for a VR headset.</p>
+    <div class="table-scroll">
+    <table class="keys">
+      <thead><tr><th>To</th><th>Computer</th><th>VR headset</th></tr></thead>
+      <tbody>
+        <tr><td>Capture the mouse to look around</td><td>Click the view</td><td>Turn your head</td></tr>
+        <tr><td>Walk</td><td><kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> or the arrow keys</td><td>Stick forward / back</td></tr>
+        <tr><td>Turn</td><td>Mouse, or <kbd>Q</kbd> / <kbd>E</kbd></td><td>Stick left / right, or turn your head</td></tr>
+        <tr><td>Use the selected tool</td><td>Left click</td><td>Trigger</td></tr>
+        <tr><td>Open the tool menu, or an object's menu</td><td>Right click or <kbd>F</kbd></td><td>Side trigger</td></tr>
+        <tr><td>Pick up or put down a post</td><td><kbd>G</kbd></td><td>Lower face button (<kbd>A</kbd> / <kbd>X</kbd>)</td></tr>
+        <tr><td>Help about what you aim at</td><td><kbd>H</kbd></td><td>Upper face button (<kbd>B</kbd> / <kbd>Y</kbd>)</td></tr>
+        <tr><td>Aim at the next object behind the first</td><td><kbd>Tab</kbd> or mouse wheel</td><td>Not available</td></tr>
+        <tr><td>Close the menu, release the mouse</td><td><kbd>Esc</kbd></td><td>Side trigger</td></tr>
+        <tr><td>Start over: back to the start, <b>removing everything you placed</b></td><td><kbd>R</kbd></td><td>Press the stick</td></tr>
+      </tbody>
+    </table>
+    </div>
+  </div>
+</section>
+
+<section id="investigate">
+  <div class="wrap">
+    <h2>A good way to investigate</h2>
+    <div class="tips">
+      <div class="tip"><h3>1. Predict</h3><p>“If I walk straight ahead, I will come back to where I started.”</p></div>
+      <div class="tip"><h3>2. Try it</h3><p>Walk, place a sign, fire a straight ray, measure a length or an angle.</p></div>
+      <div class="tip"><h3>3. Record</h3><p>Sketch the route, write the measurements, and note what you expected.</p></div>
+      <div class="tip"><h3>4. Explain</h3><p>Did it match? What rule about how the pieces are glued explains it?</p></div>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>Earlier version: <a href="./classic/">classic</a> · <a href="./versions/">all published versions</a> · <a href="https://github.com/guraltsev/noneuclid-fpv">source and issue tracker</a></p>
+  </div>
+</footer>
+</body>
+</html>

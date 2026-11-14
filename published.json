@@ -1,0 +1,44 @@
+{
+  "default": "main",
+  "entries": {
+    "main": {
+      "branch": "main",
+      "sha": "b054bab3820e40703addf36b301acd529734a806",
+      "publishedAt": "2026-11-12T12:06:36.126Z",
+      "bytes": 52983355
+    },
+    "classic": {
+      "branch": "classic",
+      "sha": "d9dc700bead18b8996aab79c6de6483ac0d1f173",
+      "publishedAt": "2026-11-07T13:33:08.520Z",
+      "bytes": 53385329
+    },
+    "dev": {
+      "branch": "dev",
+      "sha": "44eda22d39e3240f2818e5b17476b9f37db88b23",
+      "publishedAt": "2026-11-14T00:27:13.354Z",
+      "bytes": 53161282
+    }
+  },
+  "landing": [
+    "img/howto-aim.jpg",
+    "img/howto-carry.jpg",
+    "img/howto-length.jpg",
+    "img/howto-locked.jpg",
+    "img/howto-map.jpg",
+    "img/howto-menu.jpg",
+    "img/howto-question-cube.jpg",
+    "img/howto-ray.jpg",
+    "img/howto-sign.jpg",
+    "img/howto-start.jpg",
+    "img/howto-tie.jpg",
+    "img/world-cube.jpg",
+    "img/world-dodecahedron.jpg",
+    "img/world-icosahedron.jpg",
+    "img/world-octahedron.jpg",
+    "img/world-tetrahedron.jpg",
+    "img/world-torus-moduli.jpg",
+    "img/world-torus.jpg",
+    "index.html"
+  ]
+}

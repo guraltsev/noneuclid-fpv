@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 64 64">
+<!-- World map icon. Project-made, covered by the project MIT License. The top of the picture is the thing's forward. -->
+<polygon points="6.00,14.00 46.00,14.00 60.00,32.00 46.00,50.00 6.00,50.00" fill="#b17f4c" stroke="#111827" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke" />
+<path d="M8 26 L50 26 M8 38 L50 38" stroke="#8b5a2b" stroke-width="2"/>
+<path d="M14 20 L36 20 M14 32 L44 32 M14 44 L30 44" stroke="#4a2c12" stroke-width="2.5" stroke-linecap="round"/>
+</svg>

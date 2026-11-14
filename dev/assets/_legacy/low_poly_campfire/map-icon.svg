@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 64 64">
+<!-- World map icon. Project-made, covered by the project MIT License. The top of the picture is the thing's forward. -->
+<path d="M12 54 L52 42" fill="none" stroke="#111827" stroke-width="9.5" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M12 54 L52 42" fill="none" stroke="#8b5a2b" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M12 42 L52 54" fill="none" stroke="#111827" stroke-width="9.5" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M12 42 L52 54" fill="none" stroke="#a0682f" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M32 4 C40 16 50 22 46 36 C44 44 38 48 32 48 C24 48 18 43 18 35 C18 26 26 24 26 14 C30 18 31 22 32 26 C34 18 34 12 32 4 Z" fill="#f97316" stroke="#111827" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round" paint-order="stroke" />
+<path d="M32 24 C37 31 41 35 39 41 C38 44 35 46 32 46 C28 46 25 43 26 38 C27 34 31 32 32 24 Z" fill="#fde047" />
+</svg>

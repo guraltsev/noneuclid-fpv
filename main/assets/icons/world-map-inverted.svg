@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-label="World map">
+  <!-- Project-made: an icosahedron seen along a vertex axis, white for dark backgrounds. -->
+  <g fill="none" stroke="#ffffff" stroke-width="14" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M128 24 218 76v104l-90 52-90-52V76z"/>
+    <path d="M128 72 176 156H80z"/>
+    <path d="M128 24v48M218 76l-90-4M38 76l90-4M218 76l-42 80M38 76l42 80M218 180l-42-24M38 180l42-24M128 232l48-76M128 232 80 156"/>
+  </g>
+</svg>

@@ -1,0 +1,9 @@
+<svg width="96" height="96" viewBox="0 0 24 24" fill="none" stroke="#111827" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Move the mouse">
+  <!-- Project-made: a mouse with arrows for moving it. Covered by the project MIT License. -->
+  <rect x="8" y="5" width="8" height="13" rx="4"/>
+  <path d="M12 5v4"/>
+  <path d="M4.5 11.5l-2.5 0M3.5 10l-1.5 1.5 1.5 1.5"/>
+  <path d="M19.5 11.5l2.5 0M20.5 10l1.5 1.5-1.5 1.5"/>
+  <path d="M12 21.5v0M10.5 20.5l1.5 1.5 1.5-1.5"/>
+  <path d="M10.5 2.5L12 1l1.5 1.5"/>
+</svg>
