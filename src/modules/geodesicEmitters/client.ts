@@ -23,7 +23,9 @@ const moduleId = "geodesicEmitters";
 
 /** The client tool state: the emitter whose menu page shows the result of the command in flight. */
 interface EmitterToolState {
-  readonly pageEmitterId: string;
+  readonly pageEmitterId?: string;
+  /** The first beam of a laser just placed is in flight: when it is answered the tool ends and the Hand is in hand again. */
+  readonly endAfterFirstShot?: boolean;
 }
 
 function shootFrom(tool: ToolContext, emitterId: string, yawRadians: number): void {
@@ -54,8 +56,9 @@ function primaryAction(tool: ToolContext): boolean {
 }
 
 function onResult(tool: ToolContext, result: CommandResult): void {
-  const pageEmitterId = tool.getToolState<EmitterToolState>(moduleId)?.pageEmitterId;
-  if (pageEmitterId !== undefined) tool.setToolState(moduleId, undefined);
+  const toolState = tool.getToolState<EmitterToolState>(moduleId);
+  const pageEmitterId = toolState?.pageEmitterId;
+  if (toolState !== undefined) tool.setToolState(moduleId, undefined);
   if (!result.ok) {
     tool.showMessage(result.refusal.message);
     if (pageEmitterId !== undefined) tool.showObjectPage(pageEmitterId);
@@ -72,13 +75,17 @@ function onResult(tool: ToolContext, result: CommandResult): void {
       }
       // On the floor: the emitter fires its first geodesic the way it faces. The tool ends with that answer.
       const emitter = tool.read.objects.get(value.emitterId);
-      if (emitter?.kind === geodesicEmitterKind) shootFrom(tool, emitter.id, emitter.aimYawRadians);
+      if (emitter?.kind === geodesicEmitterKind) {
+        tool.setToolState(moduleId, { endAfterFirstShot: true } satisfies EmitterToolState);
+        shootFrom(tool, emitter.id, emitter.aimYawRadians);
+      }
       return;
     }
     case "shot":
       tool.selectObject(value.emitterId, value.arcId);
-      // The laser tool stays in hand (design 017 section 8.3); only the emitter's page returns to its menu.
-      if (pageEmitterId !== undefined) tool.showObjectPage(pageEmitterId);
+      // Placing a laser ends with its first beam: the Hand is in hand again. Otherwise the laser tool stays in hand (design 017 section 8.3) and only the emitter's page returns to its menu.
+      if (toolState?.endAfterFirstShot === true) tool.endTool();
+      else if (pageEmitterId !== undefined) tool.showObjectPage(pageEmitterId);
       return;
     case "extended":
       tool.selectObject(value.emitterId, value.arcId);

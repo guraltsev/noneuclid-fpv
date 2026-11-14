@@ -289,7 +289,7 @@ describe("a tool's answer arriving later", () => {
 
     expect(engine.registry.getObjectsOfKind("geodesicEmitters/emitter")).toHaveLength(1);
     expect(engine.registry.getObjectsOfKind("geodesicModel/arc")).toHaveLength(1);
-    expect(deps.session.get().menuState.selectedTool).toBe("geodesicEmitters/emitter");
+    expect(deps.session.get().menuState.selectedTool).toBe("none");
   });
 });
 
