@@ -41,15 +41,15 @@ describe("createLaserPreview", () => {
     const scene = new THREE.Scene();
     const preview = createLaserPreview(scene);
 
-    preview.update(floorTarget, Math.PI / 2, "#facc15");
+    preview.update(floorTarget, Math.PI / 2);
     expect(preview.root.visible).toBe(true);
     expect(preview.root.position.x).toBeCloseTo(2);
     expect(preview.root.position.z).toBeCloseTo(-3);
     expect(preview.root.rotation.y).toBeCloseTo(Math.PI / 2);
 
-    preview.update({ ...floorTarget, kind: "object" } as AimTarget, 0, "#facc15");
+    preview.update({ ...floorTarget, kind: "object" } as AimTarget, 0);
     expect(preview.root.visible).toBe(false);
-    preview.update(undefined, undefined, "#facc15");
+    preview.update(undefined, undefined);
     expect(preview.root.visible).toBe(false);
     preview.dispose();
   });

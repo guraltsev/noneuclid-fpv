@@ -1038,6 +1038,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
 
 
   const aimFeedback = createAimFeedback({
+    assets: options.assets,
     xrHintLines: xrHintLinesFor,
     toolsById: () => toolHost.toolsById,
     engine,

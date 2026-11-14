@@ -28,6 +28,7 @@ import { createLaserPreview } from "./laserPreview";
 import { createProtractorToolFeedback, protractorToolFeedbackSignature } from "./protractorToolFeedback";
 import type { XrHeadWorldPose } from "./carriedGeodesicCannon";
 import type { FocusedRuntimeObject, RootAimRay } from "./rootAimRay";
+import type { PreparedWorldAssets } from "./preparedWorldAssets";
 import { disposeObject3D } from "./runtimeSceneUtils";
 
 /** The protractor's state while it has no picks: one object, because this is read every frame. */
@@ -37,6 +38,8 @@ const noProtractorPicks: ProtractorToolState = {};
 export interface AimFeedbackDeps {
   /** Scene that receives the controller ray line. */
   readonly scene: THREE.Scene;
+  /** The loaded models; the Laser preview is a translucent copy of the laser model. */
+  readonly assets?: PreparedWorldAssets;
   /** Main camera; the help lens panel is placed from it. */
   readonly camera: THREE.Camera;
   /** The shell session; menu, tool and protractor state are read from it. */
@@ -110,7 +113,7 @@ export function createAimFeedback(deps: AimFeedbackDeps): AimFeedback {
     depthWrite: false,
   });
   const focusOutline = createFocusOutline(cellMeshes);
-  const laserPreview = createLaserPreview(scene);
+  const laserPreview = createLaserPreview(scene, deps.assets);
   const aimControllerRay = new THREE.Line(aimControllerRayGeometry, aimControllerRayMaterial);
   aimControllerRay.name = "aim-controller-ray";
   aimControllerRay.renderOrder = 49;
@@ -161,7 +164,7 @@ export function createAimFeedback(deps: AimFeedbackDeps): AimFeedback {
   function updateLaserPreview(activeAimRay: RootAimRay | undefined): void {
     const menuState = currentMenuState();
     if (menuState.selectedTool !== "geodesicEmitters/emitter" || menuState.isOpen || !activeAimRay) {
-      laserPreview.update(undefined, undefined, "#ffffff");
+      laserPreview.update(undefined, undefined);
       return;
     }
 
@@ -169,7 +172,7 @@ export function createAimFeedback(deps: AimFeedbackDeps): AimFeedback {
     const horizontal = Math.hypot(activeAimRay.direction.x, activeAimRay.direction.z);
     // Three's -z is the world's +y.
     const heading = horizontal > 1e-6 ? Math.atan2(-activeAimRay.direction.z, activeAimRay.direction.x) : undefined;
-    laserPreview.update(target, heading, deps.toolsById().get(menuState.selectedTool)?.indicatorColor ?? "#facc15");
+    laserPreview.update(target, heading);
   }
 
   function updateFloatingObjectTooltip(

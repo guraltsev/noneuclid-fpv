@@ -244,15 +244,8 @@ function createSegmentSource(options: {
   };
 }
 
-function createRayEmitterOnPostSources(
-  assets: PreparedWorldAssets | undefined,
-): readonly RuntimeObjectRenderSourceMesh[] {
-  const postRoot = new THREE.Group();
-  postRoot.name = "geodesic-ray-post-source";
-  const headRoot = new THREE.Group();
-  headRoot.name = "geodesic-ray-head-source";
-
-  // The loaded post model is lifted by the floor offset; the fallback post is already built with its base at y = 0.
+/** The cannon's post as drawn, base on the floor; the loaded model is lifted by the floor offset, the fallback is already built with its base at y = 0. */
+export function createCannonPostModel(assets: PreparedWorldAssets | undefined): THREE.Object3D {
   const preparedPost = assets?.instantiateGltf(geodesicRayAssetPaths.post)?.scene;
   const post = preparedPost ?? createFallbackPost();
   post.name = "asset:geodesic-ray-post";
@@ -260,18 +253,27 @@ function createRayEmitterOnPostSources(
   if (preparedPost) {
     post.position.y = geodesicRayPostAssetFloorOffsetMeters;
   }
-  postRoot.add(post);
+  return post;
+}
 
+/** The cannon's head (lightsaber) as drawn, at the beam's emission point and pointing along +x. */
+export function createCannonHeadModel(assets: PreparedWorldAssets | undefined): THREE.Object3D {
   const lightsaber = assets?.instantiateGltf(geodesicRayAssetPaths.lightsaber)?.scene ?? createFallbackLightsaber();
   lightsaber.name = "asset:geodesic-ray-lightsaber";
   lightsaber.scale.setScalar(geodesicRayAssetScale);
-  lightsaber.position.set(
-    geodesicRayEmitterPosition.x,
-    geodesicRayEmitterPosition.y,
-    geodesicRayEmitterPosition.z,
-  );
-  headRoot.add(lightsaber);
+  lightsaber.position.set(geodesicRayEmitterPosition.x, geodesicRayEmitterPosition.y, geodesicRayEmitterPosition.z);
+  return lightsaber;
+}
 
+function createRayEmitterOnPostSources(
+  assets: PreparedWorldAssets | undefined,
+): readonly RuntimeObjectRenderSourceMesh[] {
+  const postRoot = new THREE.Group();
+  postRoot.name = "geodesic-ray-post-source";
+  postRoot.add(createCannonPostModel(assets));
+  const headRoot = new THREE.Group();
+  headRoot.name = "geodesic-ray-head-source";
+  headRoot.add(createCannonHeadModel(assets));
   postRoot.updateMatrixWorld(true);
   headRoot.updateMatrixWorld(true);
 
