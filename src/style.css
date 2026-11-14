@@ -777,13 +777,13 @@ img.desktop-tool-tile-icon {
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
-  gap: 0.15rem;
-  min-width: 3.1rem;
-  padding: 0.2rem 0.3rem 0.25rem;
-  border: 1px solid transparent;
-  border-radius: 8px;
+  gap: 0.2rem;
+  min-width: 4.6rem;
+  padding: 0.3rem 0.4rem 0.4rem;
+  border: 2px solid transparent;
+  border-radius: 10px;
   background: transparent;
-  color: #f8fafc;
+  color: #cbd5e1;
   font: inherit;
   cursor: pointer;
   pointer-events: auto;
@@ -791,12 +791,13 @@ img.desktop-tool-tile-icon {
 
 .tool-belt-slot:hover {
   background: rgb(255 255 255 / 10%);
+  color: #f8fafc;
 }
 
 .tool-belt-slot-active {
-  transform: translateY(-0.35rem);
   border-color: #facc15;
-  background: rgb(250 204 21 / 16%);
+  background: rgb(250 204 21 / 18%);
+  color: #fde68a;
 }
 
 .tool-belt-slot-disabled {
@@ -806,50 +807,27 @@ img.desktop-tool-tile-icon {
 
 .tool-belt-key {
   font: 800 0.7rem/1 system-ui, sans-serif;
-  color: #cbd5e1;
+  color: inherit;
+  opacity: 0.75;
 }
 
 .tool-belt-icon {
   display: grid;
   place-items: center;
-  width: 2rem;
-  height: 2rem;
+  width: 3rem;
+  height: 3rem;
 }
 
-.tool-belt-icon img,
 .tool-belt-icon svg {
-  width: 2rem;
-  height: 2rem;
-  object-fit: contain;
-}
-
-.tool-belt-icon-invert {
-  filter: invert(1);
-}
-
-.tool-belt-icon-text {
-  font-size: 1.5rem;
-  line-height: 1;
+  width: 3rem;
+  height: 3rem;
 }
 
 .tool-belt-name {
-  /* Visually hidden but still in the belt's text; the slot in hand shows its name. */
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-  font: 800 0.7rem/1 system-ui, sans-serif;
+  font: 800 0.72rem/1 system-ui, sans-serif;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.tool-belt-slot-active .tool-belt-name {
-  position: static;
-  width: auto;
-  height: auto;
-  clip-path: none;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
 }
 
 .tool-belt-prompt {
@@ -868,7 +846,7 @@ img.desktop-tool-tile-icon {
 .hint-strip {
   position: fixed;
   left: 50%;
-  bottom: 6.6rem;
+  bottom: 8.4rem;
   z-index: 39;
   display: flex;
   align-items: center;
