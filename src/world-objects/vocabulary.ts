@@ -36,7 +36,6 @@ export const objectNouns = {
   string: { singular: "string", plural: "strings" },
   measurement: { singular: "measurement", plural: "measurements" },
   sign: { singular: "sign", plural: "signs" },
-  helpCube: { singular: "help cube", plural: "help cubes" },
   shapeMachine: { singular: "shape machine", plural: "shape machines" },
   face: { singular: "face", plural: "faces" },
   edge: { singular: "edge", plural: "edges" },
@@ -190,6 +189,8 @@ export const retiredTerms: readonly string[] = [
 /** The words of the pause card, the desktop main menu (design 017 section 8.1). */
 export const pauseCardText = {
   clickToPlay: "Click to play",
+  /** The card's title when the config names none; never the world's name, which would give the surface away. */
+  defaultTitle: "Explore",
   /** The "Switch tool" control on desktop: the number keys and the wheel. */
   switchToolControl: "1–5 · wheel",
   help: surfaceNames.help,

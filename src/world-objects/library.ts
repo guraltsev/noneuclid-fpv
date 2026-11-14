@@ -195,7 +195,7 @@ const staticLibraryDefinitions = {
     assetPath: "questionblock/questionBlock.glb",
     mapIconPath: "questionblock/map-icon.svg",
     class: "question-cube",
-    displayHelpMessage: "A help cube. Aim at it to see how things work.",
+    displayHelpMessage: "Help. Aim at it to see how things work.",
     visualScale: questionCubeAssetScale,
     modelOffset: (scale) => [0, scale * questionCubeAssetScale * 0.13, 0],
     collision: (scale) => ({

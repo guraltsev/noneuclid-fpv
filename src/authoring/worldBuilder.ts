@@ -39,7 +39,7 @@ export const defaultFaceTowardLeftOfCenterDegrees = 8;
  * Default help message shown on the starting question cube when the author supplies none.
  */
 export const defaultStartingQuestionCubeMessage =
-  "Open this help cube to see how things work.";
+  "Open this help to see how things work.";
 /**
  * Default tutorial pages of the starting question cube, the cards of How to: "Basics" (marked "Start here"), then one card per tool, each with a picture and its controls (shown with the icons of the current device).
  * How to opens on an index of these titles, Basics first and the tools in belt order. A page that names `requiresTools` is left out when the app config (as it applies to the world) enables none of them; a page with a `toolId` stays for a tool the world cannot support and says so.

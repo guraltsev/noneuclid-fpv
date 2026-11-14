@@ -220,7 +220,7 @@ describe("runtimeObjectRegistry", () => {
     const registry = createRuntimeObjectRegistry([questionCube]);
 
     expect(questionCube.tooltip).toEqual({
-      label: "Help cube",
+      label: "Help",
       rangeMeters: 2.5,
     });
     expect(questionCube.interactable).toEqual({

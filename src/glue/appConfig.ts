@@ -70,9 +70,9 @@ export interface AppConfigCatalogEntry {
 export const appConfigCatalog: readonly AppConfigCatalogEntry[] = [
   { id: "default", label: "Default" },
   { id: "full", label: "Full sandbox" },
-  { id: "001", label: "001 Basic Cube" },
-  { id: "002", label: "002 Basic Tetrahedron" },
-  { id: "003", label: "003 Flat Torus" },
+  { id: "001", label: "001 Activity 1" },
+  { id: "002", label: "002 Activity 2" },
+  { id: "003", label: "003 Activity 3" },
 ];
 
 const defaultDebugOverlayItems = ["fps", "location", "portal-quantities"] as const;

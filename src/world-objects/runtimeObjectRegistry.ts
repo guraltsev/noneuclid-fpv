@@ -404,7 +404,7 @@ export function createRuntimeObjectRegistry(
 
 /**
  * Builds the registry record for an authored static asset placed in `cellId`.
- * The pose is a yaw (`turnRadians`, falling back to `yawRadians`, else 0) at the spec's cell-local position. Assets of class "geometry-computer" get a fixed 3 m tooltip and the "open-geometry-computer" interaction; "question-cube" assets with tutorial or goal pages get a "Help cube" tooltip and the "open-tutorial" interaction (range from `autoDisplayHelpRangeMeters`, default 2.5 m). The record is portal-renderable: the renderer draws the asset model from it once a render root is registered for the id.
+ * The pose is a yaw (`turnRadians`, falling back to `yawRadians`, else 0) at the spec's cell-local position. Assets of class "geometry-computer" get a fixed 3 m tooltip and the "open-geometry-computer" interaction; "question-cube" assets with tutorial or goal pages get a "Help" tooltip and the "open-tutorial" interaction (range from `autoDisplayHelpRangeMeters`, default 2.5 m). The record is portal-renderable: the renderer draws the asset model from it once a render root is registered for the id.
  */
 export function createRuntimeStaticAssetObject(
   objectSpec: AssetObjectSpec,
@@ -419,7 +419,7 @@ export function createRuntimeStaticAssetObject(
   const standToolId = objectSpec.standsTool;
   const standToolName = standToolId !== undefined && standToolId in toolNames ? toolNames[standToolId as keyof typeof toolNames].name : undefined;
   const standRangeMeters = objectSpec.autoDisplayHelpRangeMeters ?? 3.5;
-  // Tooltip precedence: geometry computers use their own fixed tooltip below; help cubes with pages say "Help cube"; otherwise any help message yields a class-labelled tooltip.
+  // Tooltip precedence: geometry computers use their own fixed tooltip below; help cubes with pages say "Help"; otherwise any help message yields a class-labelled tooltip.
   const helpTooltip = !geometryComputer
     ? standToolName !== undefined
       ? { label: standToolName, rangeMeters: standRangeMeters }
@@ -427,12 +427,12 @@ export function createRuntimeStaticAssetObject(
       ? { label: toolStandText.tableName, rangeMeters: standRangeMeters }
       : questionCubeHasHelpMenu
       ? {
-          label: "Help cube",
+          label: "Help",
           rangeMeters: questionCubeRangeMeters,
         }
       : objectSpec.displayHelpMessage
       ? {
-        label: questionCube ? "Help cube" : objectSpec.class ?? objectSpec.id,
+        label: questionCube ? "Help" : objectSpec.class ?? objectSpec.id,
         rangeMeters: questionCube ? questionCubeRangeMeters : objectSpec.autoDisplayHelpRangeMeters ?? 2.5,
       }
       : undefined

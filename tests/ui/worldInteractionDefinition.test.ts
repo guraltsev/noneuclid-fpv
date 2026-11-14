@@ -43,7 +43,7 @@ describe("worldInteractionDefinition", () => {
   it("emits primary read action for help hubs", () => {
     const definition = createWorldFocusMessageDefinition({
       object: {
-        ...baseObjectFields("question-a", "asset", "Help cube"),
+        ...baseObjectFields("question-a", "asset", "Help"),
         assetPath: "questionblock/questionBlock.glb",
         interactable: { label: "Help", action: "open-tutorial" },
         tutorialPages: [{ title: "Move", body: "Use arrows." }],
@@ -52,7 +52,7 @@ describe("worldInteractionDefinition", () => {
     });
 
     expect(definition?.actions).toMatchObject([{ id: "open-tutorial", intent: "primary", label: "Help" }]);
-    expect(formatWorldFocusMessageTextForLegacyFallback(definition, "desktop")).toBe("Help cube\nLeft click - Help");
+    expect(formatWorldFocusMessageTextForLegacyFallback(definition, "desktop")).toBe("Help\nLeft click - Help");
   });
 
   it("emits primary extend for open geodesic segments only when available", () => {

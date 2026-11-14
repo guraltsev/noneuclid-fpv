@@ -681,7 +681,6 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     createPauseCardDefinition({
       // "001 Basic Cube" is the config's name; the number is the config's file name, not a title.
       configDisplayName: configCatalogLabel !== undefined && /^\d+\s/.test(configCatalogLabel) ? configCatalogLabel.replace(/^\d+\s+/, "") : undefined,
-      worldName: options.selectedWorldId,
       goalPages: helpCubeSpec?.kind === "asset" ? helpCubeSpec.goalPages : undefined,
     }),
     {

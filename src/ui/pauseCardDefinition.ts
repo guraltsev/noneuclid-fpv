@@ -23,21 +23,12 @@ export interface PauseCardDefinition {
   readonly actions: readonly PauseCardActionId[];
 }
 
-/** What the card is built from: the world's name, the config's display name when it has one, and the first goal text. */
+/** What the card is built from: the config's display name when it has one, and the first goal text. */
 export interface PauseCardSource {
-  /** The config's display name; wins over the world's name when present. */
+  /** The config's display name; without one the title is a neutral default, never the world's name. */
   readonly configDisplayName?: string;
-  /** The world's catalog id or name, for example "001-basic-cube". */
-  readonly worldName: string;
   /** The goal pages of the world's help cube, in order. */
   readonly goalPages?: readonly TutorialPageSpec[];
-}
-
-/** "001-basic-cube" becomes "Basic cube": the leading number and the dashes and underscores go. */
-export function prettyWorldName(worldName: string): string {
-  const words = worldName.replace(/^\d+[-_ ]*/, "").replace(/[-_]+/g, " ").trim();
-  if (words.length === 0) return worldName;
-  return `${words.charAt(0).toUpperCase()}${words.slice(1)}`;
 }
 
 /** The first sentence of a text, without its line breaks; empty when the text is blank. */
@@ -63,7 +54,7 @@ export function createPauseCardControls(): readonly PauseCardControl[] {
 /** Builds the card for a world. */
 export function createPauseCardDefinition(source: PauseCardSource): PauseCardDefinition {
   const configName = source.configDisplayName?.trim();
-  const title = configName !== undefined && configName.length > 0 ? configName : prettyWorldName(source.worldName);
+  const title = configName !== undefined && configName.length > 0 ? configName : pauseCardText.defaultTitle;
   const firstBody = source.goalPages?.[0]?.body;
   const description = firstBody === undefined ? "" : firstSentence(firstBody);
   return {
