@@ -408,7 +408,8 @@ export function updateRuntimeObjectRenderArchetypeInstances(
   const rootGroupByPathId = options.rootGroupByPathId;
   const composedMatrix = composedMatrixScratch;
   const composedPosition = composedPositionScratch;
-  const lowestDepthByPlacement = lowestDepthByPlacementScratch;
+  const rootPlacements = rootPlacementsScratch;
+  const rootPositionsByObjectId = rootPositionsByObjectIdScratch;
   const writtenPlacements = writtenPlacementsScratch;
 
   for (const archetype of archetypes) {
@@ -416,27 +417,39 @@ export function updateRuntimeObjectRenderArchetypeInstances(
     let requestedCount = 0;
     let count = 0;
 
-    // Pass 1: the lowest path depth per placement. A real object and a ghost that land on the same place in the
-    // root frame are drawn once, by the depth-0 copy (unclipped). Without one, all copies are drawn.
-    lowestDepthByPlacement.clear();
+    // Pass 1: the placements of the depth-0 copies. A copy that lands on the same place in the root frame as a depth-0
+    // copy is drawn once, by the depth-0 copy (unclipped); a placement with no depth-0 copy has all its copies drawn.
+    // Only depth-0 copies are keyed, and their root-frame positions are kept per object, so pass 2 builds a key only for
+    // a copy that lies on one of them. In a one-cell world (the torus family) every visible path ends in the cell of
+    // every record, and building a key for every (record, path) pair cost about 20 ms a frame there.
+    rootPlacements.clear();
     writtenPlacements.clear();
-    for (const record of records) {
-      const paths = visiblePathsByDestinationCell.get(record.cellId) ?? [];
-
-      for (const path of paths) {
-        if (record.omitRootVisiblePath && path.depth === 0) {
+    releaseRootPositions(rootPositionsByObjectId);
+    if (unclippedRoot) {
+      for (const record of records) {
+        if (record.omitRootVisiblePath) {
           continue;
         }
 
-        composedMatrix.multiplyMatrices(path.rootFromDestinationMatrix, record.localMatrix);
-        if (isRuntimeObjectRecordSuppressedNearCamera(record, composedMatrix, composedPosition, options.cameraPositions)) {
-          continue;
-        }
+        const paths = visiblePathsByDestinationCell.get(record.cellId) ?? [];
+        for (const path of paths) {
+          if (path.depth !== 0) {
+            continue;
+          }
 
-        const key = placementKeyForPath(record, path, composedMatrix, rootGroupByPathId);
-        const lowest = lowestDepthByPlacement.get(key);
-        if (lowest === undefined || path.depth < lowest) {
-          lowestDepthByPlacement.set(key, path.depth);
+          composedMatrix.multiplyMatrices(path.rootFromDestinationMatrix, record.localMatrix);
+          if (isRuntimeObjectRecordSuppressedNearCamera(record, composedMatrix, composedPosition, options.cameraPositions)) {
+            continue;
+          }
+
+          rootPlacements.add(placementKeyForPath(record, path, composedMatrix, rootGroupByPathId));
+          let positions = rootPositionsByObjectId.get(record.objectId);
+          if (!positions) {
+            positions = rootPositionsPool.pop() ?? [];
+            rootPositionsByObjectId.set(record.objectId, positions);
+          }
+          const e = composedMatrix.elements;
+          positions.push(e[12], e[13], e[14]);
         }
       }
     }
@@ -447,6 +460,7 @@ export function updateRuntimeObjectRenderArchetypeInstances(
 
     for (const record of records) {
       const paths = visiblePathsByDestinationCell.get(record.cellId) ?? [];
+      const rootPositions = rootPositionsByObjectId.get(record.objectId);
 
       for (const path of paths) {
         if (record.omitRootVisiblePath && path.depth === 0) {
@@ -460,13 +474,15 @@ export function updateRuntimeObjectRenderArchetypeInstances(
           continue;
         }
 
-        const key = placementKeyForPath(record, path, composedMatrix, rootGroupByPathId);
-        if (lowestDepthByPlacement.get(key) === 0 && unclippedRoot) {
-          if (path.depth !== 0 || writtenPlacements.has(key)) {
-            onDecision?.(decisionFor(record, path, "merged-into-root-copy", composedMatrix, options.cameraPositions));
-            continue;
+        if (rootPositions && (path.depth === 0 || liesOnRootPosition(composedMatrix, rootPositions))) {
+          const key = placementKeyForPath(record, path, composedMatrix, rootGroupByPathId);
+          if (rootPlacements.has(key)) {
+            if (path.depth !== 0 || writtenPlacements.has(key)) {
+              onDecision?.(decisionFor(record, path, "merged-into-root-copy", composedMatrix, options.cameraPositions));
+              continue;
+            }
+            writtenPlacements.add(key);
           }
-          writtenPlacements.add(key);
         }
 
         requestedCount += 1;
@@ -596,7 +612,36 @@ function flagUploadPrefix(attribute: THREE.BufferAttribute, elementCount: number
 // Scratch for updateRuntimeObjectRenderArchetypeInstances; cleared or fully overwritten before each use.
 const composedMatrixScratch = new THREE.Matrix4();
 const composedPositionScratch = new THREE.Vector3();
-const lowestDepthByPlacementScratch = new Map<string, number>();
+const rootPlacementsScratch = new Set<string>();
+const rootPositionsByObjectIdScratch = new Map<string, number[]>();
+const rootPositionsPool: number[][] = [];
+// Equal placement keys need each translation component within one key unit (1e-4 m) of the other; the margin covers the rounding.
+const rootPositionMatchMeters = 1.5e-4;
+
+// Returns the per-object position lists to the pool and empties the map.
+function releaseRootPositions(positionsByObjectId: Map<string, number[]>): void {
+  for (const positions of positionsByObjectId.values()) {
+    positions.length = 0;
+    rootPositionsPool.push(positions);
+  }
+  positionsByObjectId.clear();
+}
+
+// Whether the composed translation lies within key rounding of one of the flat (x, y, z) depth-0 positions: a copy's placement key can equal
+// a depth-0 key only then, so the key is built only when this holds.
+function liesOnRootPosition(matrix: THREE.Matrix4, rootPositions: readonly number[]): boolean {
+  const e = matrix.elements;
+  for (let index = 0; index < rootPositions.length; index += 3) {
+    if (
+      Math.abs(e[12] - rootPositions[index]) < rootPositionMatchMeters
+      && Math.abs(e[13] - rootPositions[index + 1]) < rootPositionMatchMeters
+      && Math.abs(e[14] - rootPositions[index + 2]) < rootPositionMatchMeters
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
 const writtenPlacementsScratch = new Set<string>();
 
 // Placement identity of an instance: object id, translation and first column of the composed matrix, rounded to 1e-4.

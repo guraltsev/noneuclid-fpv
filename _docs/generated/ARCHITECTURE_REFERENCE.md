@@ -5,7 +5,7 @@
 
 This reference is produced from the source code. For the *meaning* of the modules — the mathematical model they implement — read [../MATHEMATICAL_MODEL.md](../MATHEMATICAL_MODEL.md) and [../ARCHITECTURE.md](../ARCHITECTURE.md). For every exported symbol see [API_REFERENCE.md](API_REFERENCE.md).
 
-**356 modules, 71,201 lines** under `src/`.
+**356 modules, 71,246 lines** under `src/`.
 
 ## Layers
 
@@ -27,7 +27,7 @@ A module belongs to the layer named by its first path segment under `src/`. "May
 | `modules` | 35 | 3,103 | `math`, `cell-complex`, `diagnostics`, `movement`, `world-objects`, `glue`, `interaction`, `engine` | World modules (design 013): each owns a slice of world behaviour and exposes a typed api.ts to the others. |
 | `runtime` | 16 | 3,025 | `math`, `cell-complex`, `diagnostics`, `movement`, `world-objects`, `authoring`, `glue`, `engine`, `modules` | Application state, runtime menu state, command dispatch, geometry session/worker, server channel and public API. |
 | `ui` | 15 | 2,634 | `math`, `cell-complex`, `world-objects`, `authoring`, `glue`, `engine`, `modules`, `runtime` | Renderer-neutral palette, help, tooltip and input-intent definitions. |
-| `render` | 155 | 32,265 | every lower layer | Three.js / DOM / WebXR rendering and input adapters (the application shell). |
+| `render` | 155 | 32,310 | every lower layer | Three.js / DOM / WebXR rendering and input adapters (the application shell). |
 | `root` | 1 | 217 | every lower layer | Entry point. |
 
 ## Layer dependency graph
@@ -503,7 +503,7 @@ None: every import respects the intended layering.
 | `render/three/protractorToolFeedback.ts` | 251 | In-scene feedback shown while the protractor tool is half-way through a measurement. | `math/vec3`, `render/three/worldAxes`, `world-objects/protractorTool`, `world-objects/toolObjects` |
 | `render/three/renderCameraClip.ts` | 19 | Camera near clip distance in meters (0.03). | — |
 | `render/three/renderInspection.ts` | 547 | Read-only inspection of what the runtime-object render pipeline did with the last frame: which records exist and where they come from, what the portal-ghost rule decided for a drawn part, which instances were written fo… | `render/three/frameRenderSnapshot`, `render/three/renderPortalInstances`, `render/three/runtimeObjectGhostRecords`, `render/three/runtimeObjectRenderArchetypes`, `render/three/runtimeObjectRenderRecords`, `render/three/worldAxes`, `runtime/publicApi` |
-| `render/three/renderPortalInstances.ts` | 708 | Fills the per-frame instance buffers that draw each visible portal path as an instance of its destination cell. | `cell-complex/portalPaths`, `render/three/cellRenderArchetypes`, `render/three/runtimeObjectRenderArchetypes`, `render/three/runtimeObjectRenderRecords`, `render/three/visiblePortalPaths`, `visibility/portalFunnel`, `visibility/visiblePortalPaths` |
+| `render/three/renderPortalInstances.ts` | 753 | Fills the per-frame instance buffers that draw each visible portal path as an instance of its destination cell. | `cell-complex/portalPaths`, `render/three/cellRenderArchetypes`, `render/three/runtimeObjectRenderArchetypes`, `render/three/runtimeObjectRenderRecords`, `render/three/visiblePortalPaths`, `visibility/portalFunnel`, `visibility/visiblePortalPaths` |
 | `render/three/renderQuality.ts` | 118 | Render-resolution policy and the pixel sizes that portal clipping depends on. | — |
 | `render/three/renderState.ts` | 139 | Plain-data snapshots of runtime and render diagnostics, shared between the Three.js app, the debug overlay, the XR debug panel and the console debug helpers. | `interaction/inputFrame`, `math/vec3` |
 | `render/three/rootAimRay.ts` | 75 | Aim-ray value type and pure aim helpers shared by desktop and XR interaction code. | `interaction/aimTarget`, `math/vec3`, `render/three/worldAxes`, `world-objects/interactionRange`, `world-objects/runtimeObjectRegistry` |
