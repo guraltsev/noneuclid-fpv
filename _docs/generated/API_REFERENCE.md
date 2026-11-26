@@ -762,6 +762,7 @@ Face themes (design 018 section 9.1): what stands on a face.
 | function | `firTiers` | The stacked cone tiers of a fir from `top` (the top of the trunk) up. |
 | function | `flower` | A flower: a stem from `base` up `height` meters and a bloom of `petals` points; now and then it sinks into the ground (or its pot) and rises again (design 018 section 9.9). |
 | function | `tree` | A tree: a leaning trunk and a crown of one to three overlapping balls (round) or stacked cones (pointed). |
+| const | `stillBoulderRadiusMeters` | Radius from which a floating boulder usually hangs perfectly still: a large mass motionless in the air is the more striking. |
 | const | `faceThemes` | Every theme, in a fixed order; the assignment draws from it. |
 | function | `faceThemeById` | The theme with the given id. |
 
@@ -805,6 +806,20 @@ Per-cell ground tint image (design 018 section 4.1).
 | const | `groundShadowLengthPerHeight` | Length of a caster's shadow on the ground as a multiple of its height (a low sun). |
 | interface | `GroundTint` | A tint image and the cell-local rectangle it covers (x right, y forward, meters). |
 | function | `computeGroundTint` | Computes the tint image of a cell over its bounding box, seeded by the cell id so it is the same on every machine. |
+
+### `world-assets/landmarkJoints.ts`
+
+Near-miss check for generated models (design 018 section 9.11): a gap between two pieces must look intentional, never like a joint that barely failed to meet.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| const | `jointTouchMeters` | Two parts this close (vertex to face) touch, meters. |
+| const | `jointGroundMeters` | A part whose lowest point is at most this high stands on the ground, meters. |
+| const | `nearMissFraction` | A gap smaller than this fraction of the smaller piece's size is a near miss. |
+| const | `nearMissFloorMeters` | A gap smaller than this is always a near miss, meters. |
+| const | `nearMissCeilingMeters` | A gap larger than this is never a near miss, however large the pieces, meters. |
+| interface | `NearMiss` | A near miss between two pieces, or a piece and the ground (`other` undefined). |
+| function | `findNearMisses` | The near misses of a part list at rest (see the module header); empty when every gap looks intentional. |
 
 ### `world-assets/landmarkLayout.ts`
 

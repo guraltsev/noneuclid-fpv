@@ -192,7 +192,8 @@ function generator(name: string, emit: (kit: Kit) => void): LandmarkGenerator {
 // A stack of smooth stones, from radius `base` up, each a little smaller and a little off centre; returns the height reached.
 function stoneStack(kit: Kit, at: Vec3, count: number, base: number, roles: readonly Role[]): number {
   const { random } = kit;
-  let z = at[2];
+  // The bottom stone sinks a little into the ground, so its wobble never lifts it clear.
+  let z = at[2] - base * 0.08;
   let radius = base;
   let u = at[0];
   let v = at[1];
@@ -378,7 +379,7 @@ const cairns: FaceTheme = {
   ],
   minor: [
     generator("small cairn", (kit) => {
-      stoneStack(kit, [0, 0, 0], integer(kit.random, 3, 5), between(kit.random, 0.55, 0.75), ["primary", "dark", "light"]);
+      stoneStack(kit, [0, 0, 0], integer(kit.random, 3, 5), between(kit.random, 0.6, 0.78), ["primary", "dark", "light"]);
     }),
     generator("balanced rock", (kit) => {
       kit.ball([0, 0, 0.25], 0.3, 0.3, 0.25, "dark", { wobble: 0.1 });
@@ -419,7 +420,8 @@ const village: FaceTheme = {
         }
       }
 
-      kit.strut([0, 0, height + 0.3 + width * 1.1], [0, 0, height + 0.3 + width * 1.1 + 1.2], 0.04, "dark");
+      // The pole starts inside the roof's tip, not on its very point.
+      kit.strut([0, 0, height + 0.3 + width * 1.1 - 0.3], [0, 0, height + 0.3 + width * 1.1 + 1.2], 0.04, "dark");
       // The pennant flutters about its pole.
       kit.moving(sway(random, "turn", [0, 0, height], [0, 0, 1], 0.35, 2.5, 4.5), () => kit.box([0.35, 0, height + width * 1.1 + 1.0], 0.7, 0.04, 0.4, "accent"));
     }),
@@ -538,7 +540,8 @@ const clockwork: FaceTheme = {
       for (const yaw of [0, Math.PI / 2, Math.PI, -Math.PI / 2]) {
         const cos = Math.cos(yaw - Math.PI / 2);
         const sin = Math.sin(yaw - Math.PI / 2);
-        const face: Vec3 = [cos * 1.04, sin * 1.04, height - 1.0];
+        // The face is set into the wall (the tower is 2 m wide), not standing off it.
+        const face: Vec3 = [cos * 0.99, sin * 0.99, height - 1.0];
         kit.prism(face, 12, 0.8, 0.8, 0.06, "light", { yaw: yaw - Math.PI / 2, pitch: Math.PI / 2 });
         const hourAngle = random() * TAU;
         const minuteAngle = random() * TAU;
@@ -554,8 +557,9 @@ const clockwork: FaceTheme = {
         );
       }
 
-      gear(kit, [1.0 + 0.12, 0, height * 0.45], 0.9, 12, 0.2, Math.PI / 2, "accent", 0.35);
-      gear(kit, [1.0 + 0.12, 0.7, height * 0.45 - 1.25], 0.6, 9, 0.2, Math.PI / 2, "secondary", -0.35);
+      // The gears lie against the wall (their back face just inside it) and mesh.
+      gear(kit, [1.0 + 0.09, 0, height * 0.45], 0.9, 12, 0.2, Math.PI / 2, "accent", 0.35);
+      gear(kit, [1.0 + 0.09, 0.7, height * 0.45 - 1.25], 0.6, 9, 0.2, Math.PI / 2, "secondary", -0.35);
     }),
     generator("gear tree", (kit) => {
       const { random } = kit;
@@ -625,8 +629,10 @@ const lamplight: FaceTheme = {
       kit.moving(pulse(random, "turn", elbow, [-dir[1], dir[0], 0], -between(random, 0.35, 0.6), between(random, 0.3, 0.5), 12, 22), () => {
         kit.strut(elbow, wrist, 0.12, "primary");
         kit.ball(wrist, 0.25, 0.25, 0.25, "dark");
-        // The shade hangs off the wrist and points down and out.
-        kit.prism([wrist[0] - dir[0] * 0.3, wrist[1] - dir[1] * 0.3, wrist[2] - 0.2], 10, 0.35, 1.3, 1.6, "accent", { yaw: yaw + Math.PI, pitch: Math.PI * 0.8 });
+        // The shade hangs off the wrist on a short neck and points down and out.
+        const neck: Vec3 = [wrist[0] - dir[0] * 0.3, wrist[1] - dir[1] * 0.3, wrist[2] - 0.2];
+        kit.strut(wrist, neck, 0.1, "dark");
+        kit.prism(neck, 10, 0.35, 1.3, 1.6, "accent", { yaw: yaw + Math.PI, pitch: Math.PI * 0.8 });
         kit.ball([wrist[0] - dir[0] * 1.2, wrist[1] - dir[1] * 1.2, wrist[2] - 1.0], 0.45, 0.45, 0.45, "glow", { glow: true });
       });
     }),
@@ -764,7 +770,7 @@ const thresholds: FaceTheme = {
       kit.box([0, 0, 0.06], 0.9, 0.9, 0.02, "#050505", undefined, { collide: false });
       // The lid turns about its back edge (u through (0, 0.45, 0.1)): lifting its front is a turn by -open about +u. The handle sits on
       // its front edge. Now and then it lifts further and drops back.
-      const hinge: Vec3 = [0, 0.45, 0.1];
+      const hinge: Vec3 = [0, 0.45, 0.075];
       const onLid = (y: number, z: number): Vec3 => [0, hinge[1] + y * Math.cos(open) + z * Math.sin(open), hinge[2] - y * Math.sin(open) + z * Math.cos(open)];
       kit.moving(pulse(kit.random, "turn", hinge, [1, 0, 0], -between(kit.random, 0.4, 0.8), 0.6, 8, 16), () => {
         kit.box(onLid(-0.45, 0), 0.95, 0.9, 0.06, "primary", { roll: -open }, { collide: false });
@@ -831,7 +837,7 @@ const mobiles: FaceTheme = {
     }),
   ],
   prop: [
-    generator("blob", (kit) => kit.ball([0, 0, 0.4], 0.6, 0.45, 0.4, pick(kit.random, ["primary", "accent", "dark"] as const), { wobble: 0.25 })),
+    generator("blob", (kit) => kit.ball([0, 0, 0.32], 0.6, 0.45, 0.4, pick(kit.random, ["primary", "accent", "dark"] as const), { wobble: 0.25 })),
     generator("star stick", (kit) => {
       kit.strut([0, 0, 0], [0, 0, 1.12], 0.03, "dark");
       kit.moving(sway(kit.random, "turn", [0, 0, 1.2], [0, 0, 1], 0.4, 4, 7), () => kit.star([0, 0, 1.2], 5, 0.3, 0.13, 0.06, "accent"));
@@ -907,7 +913,8 @@ const parlour: FaceTheme = {
     }),
     generator("teacup", (kit) => {
       kit.prism([0, 0, 0], 10, 0.25, 0.4, 0.45, "light");
-      kit.ring([0.42, 0, 0.25], 0.13, 0.03, "light", undefined, { start: -Math.PI / 2, arc: Math.PI, segments: 6, tubeSides: 3 });
+      // The handle's ends sink into the cup's wall.
+      kit.ring([0.36, 0, 0.25], 0.13, 0.03, "light", undefined, { start: -Math.PI / 2, arc: Math.PI, segments: 6, tubeSides: 3 });
       kit.prism([0, 0, 0], 10, 0.55, 0.55, 0.03, "accent", undefined, { collide: false });
     }),
     generator("books", (kit) => {
@@ -1097,7 +1104,8 @@ const orbits: FaceTheme = {
 
       for (let index = 0; index < 3; index += 1) {
         const ring = () =>
-          kit.ring([0, 0, centre], radius * (1 - index * 0.08), 0.07, pick(random, ["primary", "secondary", "light"] as const), { yaw: random() * TAU, roll: Math.PI / 2 + (index - 1) * 0.6 + random() * 0.3 }, { segments: 18, tubeSides: 3 });
+          // All rings have one radius, so they cross each other: a cage, not three hoops that just miss.
+          kit.ring([0, 0, centre], radius, 0.07, pick(random, ["primary", "secondary", "light"] as const), { yaw: random() * TAU, roll: Math.PI / 2 + (index - 1) * 0.6 + random() * 0.3 }, { segments: 18, tubeSides: 3 });
         // The rings drift round the vertical at different speeds and directions.
         kit.moving(steadyTurn(random, [0, 0, centre], [0, 0, 1], (index % 2 === 0 ? 1 : -1) * between(random, 0.08, 0.2)), ring);
       }
@@ -1105,18 +1113,22 @@ const orbits: FaceTheme = {
     generator("planet stalks", (kit) => {
       const { random } = kit;
       const count = integer(random, 3, 4);
+      // The stalks stand far enough apart that no two planets nearly touch; the last planet rises well above the others and alone wears a
+      // ring, which so clears every other planet and stalk.
+      const lowHeights = Array.from({ length: count - 1 }, () => between(random, 4, 6));
+      const heights = [...lowHeights, Math.max(...lowHeights) + 2.2];
 
       for (let index = 0; index < count; index += 1) {
         const angle = (index / count) * TAU + random();
-        const base: Vec3 = [Math.cos(angle) * 1.5, Math.sin(angle) * 1.5, 0];
-        const height = between(random, 4, 8);
-        const size = between(random, 0.5, 1.1);
-        kit.strut(base, [base[0], base[1], height - size], 0.06, "dark");
+        const base: Vec3 = [Math.cos(angle) * 2.0, Math.sin(angle) * 2.0, 0];
+        const height = heights[index];
+        const size = between(random, 0.5, 0.9);
+        kit.strut(base, [base[0], base[1], height - size * 0.6], 0.06, "dark");
         kit.ball([base[0], base[1], height], size, size, size, pick(random, ["primary", "secondary", "accent", "light"] as const), { longitudes: 9, latitudes: 4 });
-        if (random() < 0.6) {
+        if (index === count - 1) {
           const centre: Vec3 = [base[0], base[1], height];
           kit.moving(sway(random, "turn", centre, horizontalAxis(random), 0.15, 5, 9), () =>
-            kit.ring(centre, size * 1.7, 0.05, "light", { roll: Math.PI / 2 + between(random, -0.4, 0.4) }, { segments: 14, tubeSides: 3 }),
+            kit.ring(centre, size * 2.1, 0.05, "light", { roll: Math.PI / 2 + between(random, -0.4, 0.4) }, { segments: 14, tubeSides: 3 }),
           );
         }
       }
@@ -1128,7 +1140,8 @@ const orbits: FaceTheme = {
       kit.strut([0, 0, 0], [0, 0, height - 0.6], 0.05, "dark");
       kit.ball([0, 0, height], 0.6, 0.6, 0.6, "primary", { longitudes: 9, latitudes: 4 });
       kit.moving(sway(kit.random, "turn", [0, 0, height], horizontalAxis(kit.random), 0.15, 5, 9), () =>
-        kit.ring([0, 0, height], 1.0, 0.05, "accent", { roll: Math.PI / 2 + 0.35 }, { segments: 14, tubeSides: 3 }),
+        // A ring well clear of the planet, so the gap reads as Saturn's, not as a near miss.
+        kit.ring([0, 0, height], 1.35, 0.05, "accent", { roll: Math.PI / 2 + 0.35 }, { segments: 16, tubeSides: 3 }),
       );
     }),
     generator("floating rings", (kit) => {
@@ -1330,31 +1343,45 @@ const grove: FaceTheme = {
 
 // A cloud resting on the ground: a cluster of flattened puffs in the palette's light colour, drifting slowly to and fro. It does not
 // block the player: one walks through it.
-function groundCloud(kit: Kit, at: Vec3, length: number, puffs: number): void {
+function groundCloud(kit: Kit, at: Vec3, length: number, puffs: number, direction?: Vec3): Vec3 {
   const { random } = kit;
-  const along = horizontalAxis(random);
+  const along = direction ?? horizontalAxis(random);
   kit.moving(sway(random, "slide", at, along, between(random, 0.25, 0.5), 10, 16), () => {
     for (let index = 0; index < puffs; index += 1) {
       const t = puffs === 1 ? 0 : index / (puffs - 1) - 0.5;
-      const radius = length * between(random, 0.18, 0.28);
-      const side = between(random, -0.3, 0.3) * length;
-      const centre: Vec3 = [at[0] + along[0] * t * length - along[1] * side, at[1] + along[1] * t * length + along[0] * side, at[2] + radius * between(random, 0.25, 0.55)];
-      kit.ball(centre, radius, radius * between(random, 0.7, 1), radius * between(random, 0.45, 0.65), "light", { longitudes: 8, latitudes: 4, wobble: 0.15, collide: false });
+      // Puffs are wide and close enough to overlap their neighbours: one cloud, not a row of puffs that nearly touch.
+      const radius = length * between(random, 0.2, 0.3);
+      const side = between(random, -0.12, 0.12) * length;
+      // A puff rests on the ground (or the layer below): its centre is lower than its height, so it sinks in and never hovers just above.
+      const height = radius * between(random, 0.45, 0.65);
+      const centre: Vec3 = [at[0] + along[0] * t * length - along[1] * side, at[1] + along[1] * t * length + along[0] * side, at[2] + height * 0.55];
+      kit.ball(centre, radius, radius * between(random, 0.7, 1), height, "light", { longitudes: 7, latitudes: 4, wobble: 0.15, collide: false });
     }
   });
+  return along;
 }
 
-// A boulder hovering with its centre at `at`, bobbing slowly up and down.
-function floatingBoulder(kit: Kit, at: Vec3, radius: number): void {
+/** Radius from which a floating boulder usually hangs perfectly still: a large mass motionless in the air is the more striking. */
+export const stillBoulderRadiusMeters = 1.2;
+
+// A boulder hovering with its centre at `at`. A small one bobs slowly up and down; a large one usually hangs perfectly still, and
+// `still` makes it so.
+function floatingBoulder(kit: Kit, at: Vec3, radius: number, still?: boolean): void {
   const { random } = kit;
-  kit.moving(sway(random, "slide", at, [0, 0, 1], between(random, 0.15, 0.35), 5, 9), () =>
+  const stone = () =>
     kit.ball(at, radius * between(random, 0.9, 1.15), radius * between(random, 0.8, 1.05), radius * between(random, 0.7, 0.9), pick(random, ["primary", "dark", "secondary"] as const), {
       longitudes: 9,
       latitudes: 5,
       wobble: 0.22,
       pose: { yaw: random() * TAU },
-    }),
-  );
+    });
+
+  if (still ?? (radius >= stillBoulderRadiusMeters && random() < 0.7)) {
+    stone();
+    return;
+  }
+
+  kit.moving(sway(random, "slide", at, [0, 0, 1], between(random, 0.15, 0.35), 5, 9), stone);
 }
 
 const drift: FaceTheme = {
@@ -1364,19 +1391,55 @@ const drift: FaceTheme = {
     generator("floating boulders", (kit) => {
       const { random } = kit;
       const count = integer(random, 3, 5);
+      const placed: { readonly at: Vec3; readonly radius: number }[] = [];
       for (let index = 0; index < count; index += 1) {
-        const angle = (index / count) * TAU + random();
-        const reach = between(random, 0.6, 2.4);
-        floatingBoulder(kit, [Math.cos(angle) * reach, Math.sin(angle) * reach, between(random, 2.2, 7)], between(random, 0.7, 1.4));
+        const radius = between(random, 0.7, 1.4);
+        // At least a meter of air under every boulder and between any two: clearly floating, never nearly touching.
+        for (let attempt = 0; attempt < 30; attempt += 1) {
+          const angle = random() * TAU;
+          const reach = between(random, 0.6, 2.4);
+          // The first boulder hangs high, so the group always rises well above the face.
+          const high = index === 0 ? between(random, 5.5, 7) : between(random, 2.2, 7);
+          const at: Vec3 = [Math.cos(angle) * reach, Math.sin(angle) * reach, Math.max(high, radius + 1.2)];
+          if (placed.every((other) => Math.hypot(at[0] - other.at[0], at[1] - other.at[1], at[2] - other.at[2]) > (radius + other.radius) * 1.2 + 1.0)) {
+            placed.push({ at, radius });
+            floatingBoulder(kit, at, radius);
+            break;
+          }
+        }
       }
       groundCloud(kit, [0, 0, 0], between(random, 4, 5.5), integer(random, 4, 6));
+    }),
+    generator("monolith", (kit) => {
+      const { random } = kit;
+      // A huge flattened boulder, perfectly still, high over a cloud; a few fragments hang still beneath it, each with clear air all round.
+      const height = between(random, 6.2, 7.4);
+      const radius = between(random, 2.4, 3.1);
+      const thickness = radius * between(random, 0.4, 0.55);
+      kit.ball([0, 0, height], radius, radius * between(random, 0.75, 0.95), thickness, pick(random, ["dark", "primary"] as const), {
+        longitudes: 12,
+        latitudes: 5,
+        wobble: 0.18,
+        pose: { yaw: random() * TAU },
+      });
+      const fragments = integer(random, 2, 4);
+      for (let index = 0; index < fragments; index += 1) {
+        const angle = (index / fragments) * TAU + random() * 0.6;
+        const size = between(random, 0.25, 0.45);
+        // Between the monolith's underside (at least 1.2 m above) and the cloud (at least 1.2 m below).
+        floatingBoulder(kit, [Math.cos(angle) * radius * 0.55, Math.sin(angle) * radius * 0.55, between(random, 2.6, height - thickness - 1.2 - size)], size, true);
+      }
+      groundCloud(kit, [0, 0, 0], between(random, 3.5, 4.5), integer(random, 4, 6));
     }),
     generator("cloud field", (kit) => {
       const { random } = kit;
       groundCloud(kit, [-1.4, 0.4, 0], between(random, 3, 4), integer(random, 3, 5));
       groundCloud(kit, [1.6, -0.6, 0], between(random, 3, 4), integer(random, 3, 5));
-      floatingBoulder(kit, [0, 0, between(random, 5, 7)], between(random, 1.2, 1.8));
-      floatingBoulder(kit, [between(random, -1, 1), between(random, -1, 1), between(random, 2.5, 3.5)], between(random, 0.5, 0.8));
+      // The big one hangs perfectly still over the drifting clouds.
+      floatingBoulder(kit, [0, 0, between(random, 5.5, 7)], between(random, 1.2, 1.8), true);
+      // The small one floats off to the side and low, well clear of the big one.
+      const side = random() * TAU;
+      floatingBoulder(kit, [Math.cos(side) * 2.6, Math.sin(side) * 2.6, between(random, 2.0, 2.6)], between(random, 0.5, 0.8));
     }),
   ],
   minor: [
@@ -1387,9 +1450,11 @@ const drift: FaceTheme = {
     }),
     generator("cloud bank", (kit) => {
       const { random } = kit;
-      groundCloud(kit, [0, 0, 0], between(random, 3, 4.2), integer(random, 4, 6));
-      // A second layer of puffs on top makes the bank tall enough to see across the face.
-      groundCloud(kit, [0, 0, 0.95], between(random, 1.8, 2.4), 2);
+      const length = between(random, 3, 4.2);
+      const along = groundCloud(kit, [0, 0, 0], length, integer(random, 4, 6));
+      // A second layer of puffs on top makes the bank taller. It runs along the lower one, shorter, and sinks into it, so no puff of
+      // it hovers.
+      groundCloud(kit, [0, 0, 0.3], length * 0.5, 3, along);
     }),
   ],
   prop: [

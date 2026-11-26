@@ -411,3 +411,22 @@ edge with the handle on its front; stacked stones overlap enough that their wobb
 A sixteenth theme, **drift**: boulders hovering two to seven meters up, bobbing, over clouds that lie on the ground in the palette's
 light colour and drift slowly to and fro (they do not block the player). Majors: floating boulders over a cloud bank, a cloud field
 with boulders above it; minors: a pair of boulders, a two-layer cloud bank; props: a small floater, a cloud puff.
+
+### 9.11 Intentional gaps, and stillness
+
+A gap between two pieces of a model must look intentional, never like a joint that barely failed to meet. A checker
+(`world-assets/landmarkJoints.ts`) groups the parts of a model at rest into pieces (parts join when they touch, cross or nest)
+and reports any two pieces, or a piece and the ground, that are apart by less than 15 percent of the smaller one's size
+(between 0.2 and 0.6 m). Two pieces that both stand on the ground may stand close. A test runs it over every generator and
+decoration for twelve seeds. What it found and how each was fixed: stones whose wobble lifted them a few centimetres off the
+ground now sink into it; clock faces and gears stood off the clock tower's wall; the flag pole met the roof's very tip; the desk
+lamp's shade hung off the wrist without a neck; the hatch lid sat 2 cm above its frame; the teacup's handle missed the cup; the
+stop sign's plate stood off its post; a planet's stalk ended on its surface; the armillary's rings were nested 5 cm apart (they
+now share a radius and cross); Saturn rings were close enough to look like a miss (now clearly wide, and only on the highest
+planet, which rises clear of the others); floating boulders could hang just off the ground or nearly touch each other (now at
+least a meter of air under and between them); cloud puffs could hover just above the ground or each other (now they rest on
+it and overlap).
+
+Stillness is as striking as motion: a large floating boulder (radius 1.2 m and more) usually hangs perfectly still, the cloud
+field's great boulder always does, and the drift theme gains a **monolith**: a huge flattened boulder motionless six to seven
+meters up over a cloud, with a few still fragments beneath it, each with clear air all round.
