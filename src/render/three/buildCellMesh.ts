@@ -21,6 +21,9 @@ import {
   type PortalPanelModeId,
 } from "../../glue/portalPanelMode";
 import { buildCellSceneryMesh } from "./buildCellScenery";
+import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex";
+import type { WorldDressing } from "../../world-assets/worldDressing";
+import { buildCellLandmarksMesh } from "./buildCellLandmarks";
 import { buildPortalMesh } from "./buildPortalMesh";
 import type { PreparedWorldAssets } from "./preparedWorldAssets";
 import { SCENE_BACKGROUND_COLOR } from "./sceneColors";
@@ -40,6 +43,10 @@ export interface BuildCellMeshOptions {
   readonly showForbiddenZoneWireframes?: boolean;
   /** Lattice frame for floor UVs (deformable families); when absent the floor uses metric UVs with the material's tile size. */
   readonly floorUvFrame?: FloorLatticeUvFrame;
+  /** The world this cell belongs to: the floor needs the neighbouring cells to blend into them, and the generated dressing is looked up by world. */
+  readonly world?: CompiledCellComplex;
+  /** Generated dressing of the world (light direction, landmarks); cells of worlds without it get no landmarks. */
+  readonly dressing?: WorldDressing;
 }
 
 /** Builds the full Three.js group for a cell, named `cell:<id>` and tagged with its portal sides in `userData`. */
@@ -62,6 +69,12 @@ export function buildCellMesh(cell: CompiledPrismCell, options: BuildCellMeshOpt
   const scenery = options.floorUvFrame ? undefined : buildCellSceneryMesh(cell);
   if (scenery) {
     group.add(scenery);
+  }
+  const landmarks = options.floorUvFrame
+    ? undefined
+    : buildCellLandmarksMesh(cell.id, options.dressing?.landmarksByCellId.get(cell.id) ?? [], options.dressing?.shadowAzimuthByCellId.get(cell.id) ?? 0);
+  if (landmarks) {
+    group.add(landmarks);
   }
   group.add(buildCeilingMesh(cell));
   group.add(buildSideWalls(cell, options.assets, options.debugLevel, options.portalPanelMode));

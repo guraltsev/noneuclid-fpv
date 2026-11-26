@@ -29,13 +29,31 @@ export interface GroundTintCell {
   readonly floorMaterial: FloorMaterialSpec;
 }
 
+/** Something tall that stands in a cell and throws a long shadow on its ground (a generated landmark, an authored object). */
+export interface GroundShadowCaster {
+  /** Cell-local position of the foot, meters. */
+  readonly x: number;
+  readonly y: number;
+  /** Radius of the footprint, meters. */
+  readonly radiusMeters: number;
+  /** Height, meters; the shadow is this long times {@link groundShadowLengthPerHeight}. */
+  readonly heightMeters: number;
+}
+
 /** Options of {@link computeGroundTint}. */
 export interface GroundTintOptions {
   /** Image width in texels (default 128). */
   readonly width?: number;
   /** Image height in texels (default 128). */
   readonly height?: number;
+  /** Direction in which shadows fall in this cell: radians from +x toward +y (see `cell-complex/cellSun.ts`). Without it shadows fall straight down. */
+  readonly shadowAzimuthRadians?: number;
+  /** Extra shadow casters besides the cell's authored static objects (generated landmarks). */
+  readonly casters?: readonly GroundShadowCaster[];
 }
+
+/** Length of a caster's shadow on the ground as a multiple of its height (a low sun). */
+export const groundShadowLengthPerHeight = 1.1;
 
 /** A tint image and the cell-local rectangle it covers (x right, y forward, meters). */
 export interface GroundTint {

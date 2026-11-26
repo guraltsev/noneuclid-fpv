@@ -149,3 +149,62 @@ matters, lower `sceneryMaxPathDepth` (cellRenderArchetypes.ts) or `maxSceneryTri
 - **Larger generated landmarks** (rock formations, groves). They would need collision and portal ghosts, that is,
   registry objects; the authored models already fill this role.
 - **A setting to turn scenery off.** Easy to add to the Settings page if wanted.
+
+## 8. Second pass: the surreal direction (2026-11-26)
+
+The first pass was judged too timid: nicer, not striking. This section replaces principle 4 ("quiet"), the sky of
+section 3 and the "larger generated landmarks" entry of section 7, and refines principle 1.
+
+### 8.1 Art direction
+
+Low-poly surrealism: de Chirico (arcades, towers, empty squares, long shadows, a green-to-gold dusk sky), Dali
+(stilt-legged forms, crutches, drooping slabs, a vast plain), Magritte (things that float: boulders, a lone door
+frame), Tanguy (smooth biomorphic stones stacked and propped on a grey shore), Miro (thin black stalks carrying red,
+yellow and blue discs, crescents and stars). Flat-shaded, few triangles, strong silhouettes, saturated but limited
+palettes. What is large is far apart; what a tool draws stays the brightest thing nearby.
+
+Each floor texture is a biome with its own school, so a face is recognised from far away by silhouette and colour:
+
+| Floor | Biome | Landmarks (one major, a few minor) |
+| --- | --- | --- |
+| `gravelly_sand` | de Chirico piazza, ochre and terracotta | an arcade of 3 to 5 round arches, a tall tower with a pennant, plinths |
+| `red_mud_stones` | Dali desert, burnt red and bone | a stilt-legged form 8 m tall, crutch-propped drooping slabs, thin obelisks |
+| `grass1` | Magritte meadow, green and slate | boulders floating 2 to 5 m up, a lone door frame, a great pale sphere |
+| `river_pebbles` | Tanguy shore, grey-blue and bone | stacks of smooth pebbles, bone-like forms on thin props, a leaning needle |
+| `forest_leaves` | Miro garden, black with primaries | wire stalks with coloured discs, a crescent on a pole, biomorphic blobs |
+| `snow` | white ruins, marble and ice blue | a colonnade of broken columns with a lintel, a free-standing arch, ice spires |
+
+### 8.2 Light without a sun (refines principle 1)
+
+There is still no light with a horizontal direction in the scene. Instead **every cell has its own baked light
+direction** (`cell-complex/cellSun.ts`), used for the long ground shadows in the tint image and for the shading
+baked into the vertex colours of generated landmarks. The direction is carried from cell to cell across portals
+along a breadth-first tree, so it is continuous across most sides and jumps across the rest. The jump cannot be
+removed: it is the holonomy of the surface. The shadows are part of the place, the same in every copy of a cell.
+
+The sky stays symmetric about the vertical: a dusk gradient from deep teal at the zenith through green to a
+glowing gold horizon, with a pale moon and its halo exactly at the zenith (a disc at the zenith has no horizontal
+direction). Fog is the warm horizon colour.
+
+### 8.3 Faces blend into each other
+
+The floor of a metric cell is an inner polygon in its own texture plus one strip along every side. In a strip the
+shader mixes the cell's own ground (texture times tint) with the neighbour's, carried across the portal so its
+pattern continues exactly. The neighbour's share is `1 - smoothstep(-w, w, s + n)`, with `s` the distance from the
+side into the cell, `w` the half-width of the transition and `n` a noise in the side's own frame with opposite sign
+on the two sides: at the side itself the two cells show the same mixture, so the border is continuous and wanders.
+Strips are opaque (no transparency, no overdraw) and meet at corners along the bisector. Scenery near a side is drawn
+from both biomes in the same proportion. The torus family keeps its own floor.
+
+### 8.4 Landmarks
+
+`world-assets/landmarkLayout.ts` lays out, per cell and seeded, one major landmark (6 to 11 m) and two to four minor
+ones (1.5 to 4 m), away from sides (cell geometry has no portal ghosts), corners, authored objects and the start.
+`render/three/buildCellLandmarks.ts` builds one merged vertex-coloured mesh per cell, a cell archetype of kind
+`landmark`, drawn up to path depth 6. Pillars and feet are colliders for the player. Budget: 900 triangles per cell.
+
+### 8.5 Generated creatures
+
+Creatures that walk straight lines are part of the mathematics, so some are generated too: a stilt-walker (a small
+body on four very long thin legs) and a drifting mobile (discs and a crescent on a wire), built in code and moved by
+the existing geodesic creature behaviour.

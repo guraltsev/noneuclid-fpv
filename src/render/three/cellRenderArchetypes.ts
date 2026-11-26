@@ -21,6 +21,8 @@ import type { DebugLevelId } from "../../diagnostics/debugLevels";
 import type { PortalPanelModeId } from "../../glue/portalPanelMode";
 import { buildCellMesh } from "./buildCellMesh";
 import { computeGroundTint, type GroundTint } from "../../world-assets/groundTint";
+import { landmarkShadowCasters } from "../../world-assets/landmarkLayout";
+import { computeWorldDressing, type WorldDressing } from "../../world-assets/worldDressing";
 import { patchFloorPatchMaterial } from "./floorPatchMaterial";
 import { createGroundTintTexture, patchGroundTintMaterial } from "./groundTintMaterial";
 import { patchPortalClipMaterial, type PortalClipMaterialState } from "./portalClipMaterial";
@@ -31,6 +33,7 @@ import { disposeMaterial, disposeObject3D } from "./runtimeSceneUtils";
 export type CellRenderArchetypeKind =
   | "floor"
   | "scenery"
+  | "landmark"
   | "solid-wall"
   | "portal-frame"
   | "debug-wireframe";
@@ -65,6 +68,8 @@ export interface CellRenderArchetype {
 
 /** Scenery is drawn only on portal paths of at most this depth (about 45 m; farther away a tuft is a few pixels and fogged). */
 export const sceneryMaxPathDepth = 3;
+/** Deepest portal path on which the generated landmarks of a cell are drawn: beyond it (about 90 m on the cube) the fog has taken them. */
+export const landmarkMaxPathDepth = 6;
 
 /** Options controlling how cell meshes are built and instanced. */
 export interface BuildCellRenderArchetypesOptions {
@@ -79,6 +84,8 @@ export interface BuildCellRenderArchetypesOptions {
   readonly showForbiddenZoneWireframes?: boolean;
   /** Per cell id, the lattice frame for floor UVs; cells not in the map use metric UVs. */
   readonly floorUvFramesByCellId?: ReadonlyMap<string, FloorLatticeUvFrame>;
+  /** Generated dressing of the world (light direction, landmarks). Computed from the world when absent, except for worlds with lattice floors, which get none. */
+  readonly dressing?: WorldDressing;
 }
 
 /** Description of an archetype that would be built, for diagnostics and tests, without creating GPU resources. */
@@ -98,7 +105,7 @@ export function buildCellRenderArchetypes(
   const archetypes: CellRenderArchetype[] = [];
 
   for (const cell of world.cells) {
-    const sources = collectCellArchetypeSources(cell, options);
+    const sources = collectCellArchetypeSources(world, cell, options);
 
     for (const source of sources) {
       const mesh = new THREE.InstancedMesh(source.geometry, source.material, source.capacity);
@@ -136,7 +143,7 @@ export function buildCellRenderArchetypes(
         capacity: source.capacity,
         sourceObjectName: source.sourceObjectName,
         ownedTextures: source.ownedTextures,
-        maxPathDepth: source.kind === "scenery" ? sceneryMaxPathDepth : undefined,
+        maxPathDepth: source.kind === "scenery" ? sceneryMaxPathDepth : source.kind === "landmark" ? landmarkMaxPathDepth : undefined,
       });
     }
   }
@@ -150,7 +157,7 @@ export function planCellRenderArchetypes(
   options: BuildCellRenderArchetypesOptions,
 ): readonly CellRenderArchetypePlanEntry[] {
   return world.cells.flatMap((cell) =>
-    collectCellArchetypeSources(cell, options).map((source) => ({
+    collectCellArchetypeSources(world, cell, options).map((source) => ({
       cellId: source.cellId,
       archetypeId: source.archetypeId,
       kind: source.kind,
@@ -229,11 +236,22 @@ interface CellArchetypeSource {
   readonly ownedTextures?: readonly THREE.Texture[];
 }
 
+// Worlds with lattice floors (the torus family) are continuous by design and get no generated dressing.
+function worldDressingFor(world: CompiledCellComplex, options: BuildCellRenderArchetypesOptions): WorldDressing | undefined {
+  if (options.dressing) {
+    return options.dressing;
+  }
+
+  return options.floorUvFramesByCellId && options.floorUvFramesByCellId.size > 0 ? undefined : computeWorldDressing(world);
+}
+
 // Bakes each mesh's world matrix (relative to the cell mesh root) into its geometry so instance matrices only need rootFromDestination.
 function collectCellArchetypeSources(
+  world: CompiledCellComplex,
   cell: CompiledPrismCell,
   options: BuildCellRenderArchetypesOptions,
 ): readonly CellArchetypeSource[] {
+  const dressing = worldDressingFor(world, options);
   const sourceRoot = buildCellMesh(cell, {
     debugLevel: options.debugLevel,
     portalPanelMode: options.portalPanelMode,
@@ -241,6 +259,8 @@ function collectCellArchetypeSources(
     assets: options.assets,
     showForbiddenZoneWireframes: options.showForbiddenZoneWireframes,
     floorUvFrame: options.floorUvFramesByCellId?.get(cell.id),
+    world,
+    dressing,
   });
   sourceRoot.updateMatrixWorld(true);
 
@@ -265,7 +285,10 @@ function collectCellArchetypeSources(
     geometry.applyMatrix4(object.matrixWorld);
     const wantsGroundTint = kind === "floor" && cell.floorMaterial.kind === "floor-texture" && !floorUvFrame;
     if (wantsGroundTint && !groundTint) {
-      const tint = computeGroundTint(cell);
+      const tint = computeGroundTint(cell, {
+        shadowAzimuthRadians: dressing?.shadowAzimuthByCellId.get(cell.id),
+        casters: landmarkShadowCasters(dressing?.landmarksByCellId.get(cell.id) ?? []),
+      });
       groundTint = { tint, texture: createGroundTintTexture(tint) };
     }
     const tintOptions = wantsGroundTint ? groundTint : undefined;
@@ -292,6 +315,10 @@ function collectCellArchetypeSources(
 function classifyObjectKind(object: THREE.Mesh): CellRenderArchetypeKind | undefined {
   if (object.name.startsWith("floor:")) {
     return "floor";
+  }
+
+  if (object.userData.kind === "landmark") {
+    return "landmark";
   }
 
   if (object.userData.kind === "scenery") {
