@@ -327,6 +327,12 @@ export const hintStripText = {
   pickUp: "pick up",
   putDown: "put down",
   placeLaser: "place a laser",
+  /** The Laser aimed at a beam or a meeting point: the click places a laser that cuts the beam there. */
+  placeLaserHere: "place a laser here",
+  /** The Laser aimed at a laser: the click adds a beam to it. */
+  addBeam: "add a beam",
+  /** The laser's Aim and Turn modes: the click accepts the direction. */
+  setDirection: "set direction",
   placeSign: "place a sign",
   openHelp: "open Help",
   measureBeam: "measure this beam",
