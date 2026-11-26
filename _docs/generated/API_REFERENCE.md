@@ -3367,6 +3367,7 @@ Distance limits for what is drawn far away, without popping (design 018 section 
 | const | `sceneryFadeStartMeters` | Scenery (grass tufts, pebbles) starts to thin out at this distance from the eye, meters. |
 | const | `sceneryFadeEndMeters` | Scenery is gone at this distance from the eye, meters, and not instanced beyond it. |
 | const | `landmarkMaxDrawDistanceMeters` | Landmarks are not instanced beyond this distance from the eye, meters (where the radial fog has fully covered them). |
+| const | `runtimeObjectMaxDrawDistanceMeters` | Runtime objects (creatures, decorations, tools, flags) are not instanced beyond this distance from the eye, meters. |
 | function | `installRadialFog` | Makes three.js fog use the distance from the eye instead of the view depth (see the module header). |
 | function | `createSceneFog` | The scene fog, linear from `sceneFogNearMeters` to `sceneFogFarMeters`. |
 | interface | `DistanceFadeOptions` | Distance band of a dithered fade. |

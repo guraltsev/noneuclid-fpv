@@ -468,6 +468,33 @@ describe("updateRuntimeObjectRenderArchetypeInstances", () => {
       "room-b",
     ]);
   });
+
+  it("skips copies beyond the draw distance from every eye, without counting overflow", () => {
+    // Bounds: radius 1 at the origin, scaled by 2 by the record, so a copy is kept while its centre is within 100 + 2 m of an eye.
+    const archetype = { ...createArchetype("bench", 3), maxDrawDistanceMeters: 100, bounds: new THREE.Sphere(new THREE.Vector3(), 1) };
+    const diagnostics = createRuntimeObjectRenderArchetypeDiagnostics();
+    const records: RuntimeObjectRenderRecord[] = [
+      { objectId: "bench", cellId: "room-a", archetypeKey: "bench", localMatrix: new THREE.Matrix4().makeScale(2, 2, 2) },
+    ];
+    const copyAt = (x: number, pathId: number) => ({
+      ...createRootVisiblePortalPath("room-a"),
+      depth: 1,
+      pathId,
+      rootFromDestinationMatrix: new THREE.Matrix4().makeTranslation(x, 0, 0),
+    });
+    const paths = new Map([["room-a", [createRootVisiblePortalPath("room-a"), copyAt(50, 2), copyAt(101.5, 3), copyAt(103, 4), copyAt(-300, 5)]]]);
+    const write = (cameraPositions: readonly THREE.Vector3[]): readonly number[] => {
+      updateRuntimeObjectRenderArchetypeInstances([archetype], groupRuntimeObjectRenderRecordsByArchetype(records), paths, diagnostics, new Map(), { cameraPositions });
+      return Array.from({ length: archetype.mesh.count }, (_, index) => archetype.portalPathIdAttribute.getX(index));
+    };
+
+    expect(write([new THREE.Vector3()])).toEqual([0, 2, 3]);
+    expect(diagnostics.capacityOverflowCount).toBe(0);
+    // A second eye near the far copy keeps it: a copy is skipped only when it is beyond the distance from every eye.
+    diagnostics.reset();
+    expect(write([new THREE.Vector3(), new THREE.Vector3(-250, 0, 0)])).toEqual([0, 2, 3]);
+    expect(diagnostics.capacityOverflowCount).toBe(1);
+  });
 });
 
 function createArchetype(archetypeKey: string, capacity: number): RuntimeObjectRenderArchetype {
