@@ -65,7 +65,7 @@ describe("helpLensDefinition", () => {
       },
     });
 
-    expect(help.body).toBe("Move with Arrow keys. Look at nearby objects for prompts. Left click uses the selected/default action. Right click opens tools and object menus. Press H while aiming at an object for its help.");
+    expect(help.body).toBe("Move with W A S D or the arrow keys. Look at nearby objects for prompts. Left click uses the selected/default action. Right click opens tools and object menus. Press H while aiming at an object for its help.");
     expect(help.rows).toEqual([]);
   });
 
@@ -96,7 +96,7 @@ describe("helpLensDefinition", () => {
       hint: {
         intent: "move",
         mode: "desktop",
-        label: "Arrow keys",
+        label: "W A S D / arrow keys",
         iconSrc: publicAssetUrl("icons/arrowkeys.svg"),
       },
       label: "move",

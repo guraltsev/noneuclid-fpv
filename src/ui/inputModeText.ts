@@ -14,7 +14,7 @@ interface InputModeSentenceRewrite {
 const sentenceRewrites: readonly InputModeSentenceRewrite[] = [
   {
     neutral: "Move with Arrow keys or the left stick.",
-    desktop: "Move with Arrow keys.",
+    desktop: "Move with W A S D or the arrow keys.",
     xr: "Move with the left stick.",
   },
   {

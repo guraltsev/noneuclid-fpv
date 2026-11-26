@@ -686,6 +686,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       // "001 Basic Cube" is the config's name; the number is the config's file name, not a title.
       configDisplayName: configCatalogLabel !== undefined && /^\d+\s/.test(configCatalogLabel) ? configCatalogLabel.replace(/^\d+\s+/, "") : undefined,
       goalPages: helpCubeSpec?.kind === "asset" ? helpCubeSpec.goalPages : undefined,
+      laserToolAvailable: appConfig.tools.geodesicEmitters,
     }),
     {
       onPlay: () => void controls.requestPointerLock(),

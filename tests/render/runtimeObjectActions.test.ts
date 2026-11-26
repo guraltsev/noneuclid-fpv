@@ -165,7 +165,7 @@ describe("createRuntimeObjectActions", () => {
     expect(readLocalPlayerPose(engine).position).toEqual({ x: 1, y: 2, z: 0 });
   });
 
-  it("sends right click or F on an open menu to the right action, which keeps the tool on an object's page", () => {
+  it("sends right click or F on an open menu to the right action", () => {
     const menuState = { ...createRuntimeMenuState({ selectedWorldId: "test" }), isOpen: true, page: "geodesic-cannon-actions" as const };
     const { actions, commands } = createHarness(undefined, { menuState });
 

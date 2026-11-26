@@ -126,7 +126,7 @@ describe("applyRuntimeCommand: navigation", () => {
     expect(result.effects[0]).toEqual({ kind: "end-tool-session" });
   });
 
-  it("closes an object's menu on the right action and keeps the tool (reverses the earlier cancel, design 018 section 5 item 5)", () => {
+  it("closes an object's menu on right action and Close, keeping the tool (design 018)", () => {
     for (const page of ["edit-sign", "measurement-actions", "geodesic-cannon-actions", "geometry-computer-actions"] as const) {
       const state = stateWith({ isOpen: true, page, selectedTool: "geodesicMeasurements/protractor" });
       for (const command of [{ kind: "menu-right-action" }, { kind: "close-menu-button" }] as const) {
