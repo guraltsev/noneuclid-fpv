@@ -222,7 +222,8 @@ import {
   disposeObject3D,
   isGeodesicRuntimeRenderObject,
 } from "./runtimeSceneUtils";
-import { SCENE_BACKGROUND_COLOR } from "./sceneColors";
+import { SKY_HORIZON_COLOR } from "./sceneColors";
+import { createSkyBackgroundTexture } from "./skyBackground";
 import {
   createStylizedSceneLighting,
   disposeStylizedSceneLighting,
@@ -329,9 +330,10 @@ const MAX_CONSECUTIVE_FAILED_FRAMES = 30;
 export function createThreeApp(container: HTMLElement, appState: AppState, options: ThreeAppOptions): ThreeApp {
   const appConfig = appConfigForWorld(options.appConfig ?? defaultAppConfig, appState.world);
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(SCENE_BACKGROUND_COLOR);
+  const skyBackgroundTexture = createSkyBackgroundTexture();
+  scene.background = skyBackgroundTexture;
   scene.environment = null;
-  scene.fog = new THREE.Fog(SCENE_BACKGROUND_COLOR, 12, 85);
+  scene.fog = new THREE.Fog(SKY_HORIZON_COLOR, 16, 90);
   const underCellInfinityFloor = createUnderCellInfinityFloor();
   scene.add(underCellInfinityFloor);
 
@@ -2088,6 +2090,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       }
       scene.remove(underCellInfinityFloor);
       disposeObject3D(underCellInfinityFloor);
+      skyBackgroundTexture.dispose();
       portalFrame.dispose();
       portalClipData.dispose();
       for (const archetype of runtimeObjectRenderArchetypesByKey.values()) {
