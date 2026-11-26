@@ -82,11 +82,7 @@ import { type DebugSettings } from "../../glue/debugSettings";
 import { type PortalPanelModeId } from "../../glue/portalPanelMode";
 import { type LaunchOptions } from "../../glue/readLaunchOptions";
 import { buildStaticAssetRenderRoot } from "./staticAssetRenderRoot";
-import { type DynamicObjectState, simpleCollisionCylinder } from "../../movement/dynamicObject";
-import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex";
-import { yawRigidTransform3 } from "../../math/rigidTransform3";
-import { vec3 } from "../../math/vec3";
-import { computeWorldDressing } from "../../world-assets/worldDressing";
+import { simpleCollisionCylinder } from "../../movement/dynamicObject";
 import { movePlayer } from "../../movement/movePlayer";
 import { DEFAULT_PLAYER_EYE_HEIGHT_METERS } from "../../movement/playerBody";
 import { type PlayerPose, playerPoseToDynamicObject } from "../../movement/playerPose";
@@ -238,6 +234,7 @@ import {
 import { createScenePaletteController } from "./scenePaletteController";
 import { createScenePaletteCommands } from "./scenePaletteCommands";
 import { createToolObjectRuntimes } from "./toolObjectRuntimes";
+import { createLandmarkBodyLookup } from "./landmarkBodies";
 import { createUnderCellInfinityFloor } from "./underCellFloor";
 import { VisiblePortalPathOptions, defaultMinPortalScreenAreaPixels } from "../../visibility/visiblePortalPaths";
 import {
@@ -334,6 +331,7 @@ const MAX_CONSECUTIVE_FAILED_FRAMES = 30;
  * detected asynchronously. The caller owns the returned handle and must call `dispose()` once.
  */
 export function createThreeApp(container: HTMLElement, appState: AppState, options: ThreeAppOptions): ThreeApp {
+  const landmarkBodyLookup = createLandmarkBodyLookup();
   const appConfig = appConfigForWorld(options.appConfig ?? defaultAppConfig, appState.world);
   const scene = new THREE.Scene();
   const skyBackgroundTexture = createSkyBackgroundTexture();
@@ -2277,37 +2275,9 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     toolBelt.update(currentBeltDefinition(), toolHost.promptOf(selectedTool), beltToolColor);
   }
 
-  // Generated landmark colliders (piers, columns, stones) block the player like objects but are not registry objects, so they are no aim targets.
-  // Built once per cell and world, so the per-frame hook allocates only for the registry objects.
-  let landmarkBodiesWorld: CompiledCellComplex | undefined;
-  const landmarkBodiesByCellId = new Map<string, readonly (DynamicObjectState & { readonly id: string })[]>();
-
-  function landmarkBodiesInCell(cellId: string): readonly (DynamicObjectState & { readonly id: string })[] {
-    const world = activeWorld();
-
-    if (landmarkBodiesWorld !== world) {
-      landmarkBodiesWorld = world;
-      landmarkBodiesByCellId.clear();
-    }
-
-    let bodies = landmarkBodiesByCellId.get(cellId);
-
-    if (!bodies) {
-      const colliders = computeWorldDressing(world).landmarksByCellId.get(cellId)?.flatMap((placement) => placement.colliders) ?? [];
-      bodies = colliders.map((collider, index) => ({
-        id: `landmark:${cellId}:${index}`,
-        cellId,
-        localPose: yawRigidTransform3(0, vec3(collider.x, collider.y, 0)),
-        collision: simpleCollisionCylinder(collider.radiusMeters, collider.heightMeters, vec3(0, 0, collider.heightMeters / 2)),
-      }));
-      landmarkBodiesByCellId.set(cellId, bodies);
-    }
-
-    return bodies;
-  }
-
   function playerBlockingBodiesInCell(cellId: string) {
-    const landmarkBodies = landmarkBodiesInCell(cellId);
+    // A function declaration is hoisted above the return of createThreeApp, a `let` below it is never initialised: the lookup keeps its state in its own closure.
+    const landmarkBodies = landmarkBodyLookup(activeWorld(), cellId);
     const registered = runtimeObjectRegistry.getPlayerBlockingObjectsInCell(cellId).map((object) => ({ ...runtimeObjectToDynamicObjectState(object), id: object.id }));
     return landmarkBodies.length === 0 ? registered : [...registered, ...landmarkBodies];
   }
