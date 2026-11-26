@@ -5,9 +5,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sh",
+            "command": "know",
             "args": [
-              "${CLAUDE_PROJECT_DIR}/_scripts/know_hook",
+              "hook",
               "UserPromptSubmit",
               "--runtime",
               "claude-code"
@@ -22,9 +22,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sh",
+            "command": "know",
             "args": [
-              "${CLAUDE_PROJECT_DIR}/_scripts/know_hook",
+              "hook",
               "PreCompact",
               "--runtime",
               "claude-code"
@@ -39,9 +39,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sh",
+            "command": "know",
             "args": [
-              "${CLAUDE_PROJECT_DIR}/_scripts/know_hook",
+              "hook",
               "SessionEnd",
               "--runtime",
               "claude-code"

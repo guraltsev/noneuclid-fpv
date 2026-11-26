@@ -1,0 +1,66 @@
+[project]
+id = "11616cb0-ad3b-48fd-a177-e23a2450fe5d"
+
+[knowledge.storage]
+lock_timeout_seconds = 10.0
+auto_push = false
+auto_commit = true
+branch = "knowledge"
+backend = "git-branch"
+
+[knowledge.brief]
+enabled = true
+trigger = "first_prompt"
+after_compaction = true
+max_items = 5
+token_budget = 350
+max_summary_tokens = 80
+
+[knowledge.retrieval]
+keyword = "bm25"
+embedding_model = "BAAI/bge-small-en-v1.5"
+embedding_enabled = true
+fusion = "rrf"
+min_quality = "auto"
+small_model_select = false
+
+[knowledge.capture]
+agent_write = true
+session_extract = true
+extract_status = "candidate"
+
+[knowledge.session_job]
+triggers = ["SessionEnd", "PreCompact"]
+chunk_bytes = 33554432
+digest_max_tokens = 40000
+grade_only_if_reads_or_signals = true
+
+[knowledge.grader]
+runtime = "auto"
+model = "small"
+timeout_seconds = 300
+
+[knowledge.maintenance]
+auto_add_tags = false
+auto_rewrite_summary = false
+auto_link_related = false
+auto_mark_stale = false
+auto_archive = false
+auto_promote_candidates = false
+minimum_independent_sessions = 5
+weak_summary_max_read_rate = 0.2
+useful_min_share = 0.6
+repeated_min_sessions = 2
+overbroad_max_useful_share = 0.3
+archive_min_false_positive_share = 0.8
+candidate_idle_days = 60
+max_notes_per_run = 5
+
+[knowledge.experiment]
+holdout_fraction = 0.0
+
+[knowledge.privacy]
+store_prompt_excerpt = false
+redact_secrets = true
+
+[knowledge.pricing]
