@@ -225,6 +225,7 @@ import {
   isGeodesicRuntimeRenderObject,
 } from "./runtimeSceneUtils";
 import { SCENE_FOG_COLOR } from "./sceneColors";
+import { createSceneFog } from "./distanceFade";
 import { createSkyBackgroundTexture } from "./skyBackground";
 import {
   createStylizedSceneLighting,
@@ -337,7 +338,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   const skyBackgroundTexture = createSkyBackgroundTexture();
   scene.background = skyBackgroundTexture;
   scene.environment = null;
-  scene.fog = new THREE.Fog(SCENE_FOG_COLOR, 18, 95);
+  scene.fog = createSceneFog(SCENE_FOG_COLOR);
   const underCellInfinityFloor = createUnderCellInfinityFloor();
   scene.add(underCellInfinityFloor);
 

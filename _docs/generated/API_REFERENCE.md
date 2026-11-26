@@ -3060,8 +3060,7 @@ Builds the instanced-mesh archetypes for the static geometry of every cell, one 
 | --- | --- | --- |
 | type | `CellRenderArchetypeKind` | Category of a cell mesh part; "ceiling" and floor-outline meshes have no kind and are not instanced. |
 | interface | `CellRenderArchetype` | An instanced mesh of one cell part with its per-instance portal attributes. |
-| const | `sceneryMaxPathDepth` | Scenery is drawn only on portal paths of at most this depth (about 45 m; farther away a tuft is a few pixels and fogged). |
-| const | `landmarkMaxPathDepth` | Deepest portal path on which the generated landmarks of a cell are drawn: beyond it (about 90 m on the cube) the fog has taken them. |
+| function | `maxDrawDistanceMetersFor` | Farthest distance from the eye at which an archetype of this kind is drawn, meters; undefined for every distance. |
 | interface | `BuildCellRenderArchetypesOptions` | Options controlling how cell meshes are built and instanced. |
 | interface | `CellRenderArchetypePlanEntry` | Description of an archetype that would be built, for diagnostics and tests, without creating GPU resources. |
 | function | `buildCellRenderArchetypes` | Builds every cell's archetypes, with `count = 0` and frustum culling disabled (instance bounds are not tracked). |
@@ -3252,6 +3251,22 @@ The shell's side of the discoveries (design 017 section 9.4): it owns the world'
 | interface | `DiscoveryObservation` | What the player and the world did in one frame. |
 | interface | `DiscoveryController` | Handle to the controller. |
 | function | `createDiscoveryController` | Creates the controller for a world. |
+
+### `render/three/distanceFade.ts`
+
+Distance limits for what is drawn far away, without popping (design 018 section 8).
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| const | `sceneFogFarMeters` | Far distance of the scene fog, meters: beyond it everything is the fog colour. |
+| const | `sceneFogNearMeters` | Near distance of the scene fog, meters. |
+| const | `sceneryFadeStartMeters` | Scenery (grass tufts, pebbles) starts to thin out at this distance from the eye, meters. |
+| const | `sceneryFadeEndMeters` | Scenery is gone at this distance from the eye, meters, and not instanced beyond it. |
+| const | `landmarkMaxDrawDistanceMeters` | Landmarks are not instanced beyond this distance from the eye, meters (where the radial fog has fully covered them). |
+| function | `installRadialFog` | Makes three.js fog use the distance from the eye instead of the view depth (see the module header). |
+| function | `createSceneFog` | The scene fog, linear from `sceneFogNearMeters` to `sceneFogFarMeters`. |
+| interface | `DistanceFadeOptions` | Distance band of a dithered fade. |
+| function | `patchDistanceFadeMaterial` | Makes the material dissolve between `startMeters` and `endMeters` from the eye (see the module header). |
 
 ### `render/three/edgeLines.ts`
 
@@ -3463,12 +3478,14 @@ Geometry of a metric floor split into an inner polygon and one blend strip per s
 | const | `blendStripSegmentMeters` | Longest segment along a side of a strip, meters. |
 | const | `blendStripInradiusFraction` | The strip width is at most this fraction of the cell's inradius, so the inner polygon never collapses. |
 | const | `blendNoiseWidthFraction` | The noise amplitude is at most this fraction of the strip width, so the transition ends inside the strip. |
+| const | `blendCornerSlopeFraction` | Fraction of `tan(corner angle / 2)` used as the slope that limits the transition near a corner, so it ends just inside the bisector. |
 | interface | `FloorStrip` | One blend strip of a cell and what its material needs to know about the glued side. |
 | interface | `FloorBlendGeometry` | The inner polygon and strips of a cell's floor. |
 | function | `cellInradiusMeters` | Radius of the largest circle around the vertex centroid that fits in the cell (the inradius for a regular polygon, a lower bound otherwise), meters. |
 | function | `blendStripWidthMeters` | Strip width `w = min(blendHalfWidthMeters, 0.42 * inradius)` of a cell, meters. |
 | function | `groundBlendTransition` | The transition between two cells whose strips are `widthA` and `widthB` wide: the narrower strip decides, the noise amplitude is limited to a fraction of it, and the half-width `h` is what is left, so the neighbour's sh… |
 | function | `buildFloorBlendGeometry` | Builds the inner polygon and the strips of `cell`. |
+| function | `cornerHalfAngleTangent` | `tan(angle / 2)` of the interior angle of `cell` at its vertex `vertexIndex`, clamped away from 0 and infinity. |
 
 ### `render/three/groundBlendMaterial.ts`
 
@@ -3479,7 +3496,6 @@ Ground blending along the sides of a metric floor (design 018 section 8.3).
 | const | `blendHalfWidthMeters` | Largest half-width of the strip (its width) in meters, before it is limited by the size of the cell. |
 | const | `blendNoiseAmplitudeMeters` | Largest sideways wander of the border in meters (the noise `n` goes from minus to plus this). |
 | const | `blendNoiseFeatureMeters` | Size of the features of the border noise along the side, meters. |
-| const | `blendNoiseTaperMeters` | Distance from either end of a side over which the noise fades to zero, meters. |
 | interface | `GroundBlendTintSource` | A tint image together with the texture that holds it, as the shader needs them. |
 | interface | `GroundBlendOptions` | Everything `patchGroundBlendMaterial` needs to mix a cell's ground with its neighbour's. |
 | function | `patchGroundBlendMaterial` | Makes the material mix its own ground with the neighbour's as described in the module header. |
@@ -3963,6 +3979,7 @@ Fills the per-frame instance buffers that draw each visible portal path as an in
 | function | `buildVisiblePathsByDestinationCell` | Joins the statically kept path lists per destination cell with the currently visible paths. |
 | function | `flattenVisiblePortalPathGroups` | Merges grouped visible paths back into one list, de-duplicated by `pathId` and sorted ascending by id. |
 | function | `omitPathsWithoutClipSlot` | Removes depth > 0 paths that have no clip slot, so they get no instance at all instead of being drawn fully clipped. |
+| function | `isBeyondDrawDistance` | True when the archetype has a draw distance and its copy on `path` lies entirely beyond it from every eye. |
 | function | `updateCellRenderArchetypeInstances` | Writes instance matrices and clip attributes for every cell archetype from the visible paths of its cell. |
 | interface | `RuntimeObjectInstanceDecision` | What the instance writer did with one record on one visible path of the record's cell (see `onDecision` of {@link updateRuntimeObjectRenderArchetypeInstances}). |
 | function | `updateRuntimeObjectRenderArchetypeInstances` | Writes instances for runtime objects (flags, markers, creatures...) once per visible path of the cell containing each record. |

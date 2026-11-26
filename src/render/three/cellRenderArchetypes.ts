@@ -21,6 +21,7 @@ import type { DebugLevelId } from "../../diagnostics/debugLevels";
 import type { PortalPanelModeId } from "../../glue/portalPanelMode";
 import { buildCellMesh, type FloorStripBlend } from "./buildCellMesh";
 import { computeGroundTint, type GroundTint } from "../../world-assets/groundTint";
+import { landmarkMaxDrawDistanceMeters, patchDistanceFadeMaterial, sceneryFadeEndMeters, sceneryFadeStartMeters } from "./distanceFade";
 import { landmarkShadowCasters } from "../../world-assets/landmarkLayout";
 import { computeWorldDressing, type WorldDressing } from "../../world-assets/worldDressing";
 import { patchFloorPatchMaterial } from "./floorPatchMaterial";
@@ -63,14 +64,19 @@ export interface CellRenderArchetype {
   readonly sourceObjectName?: string;
   /** Textures created for this archetype's materials (the ground tint); `disposeCellRenderArchetypes` disposes them. */
   readonly ownedTextures?: readonly THREE.Texture[];
-  /** Deepest portal path (number of portals crossed) this archetype is drawn on; undefined means every depth. */
-  readonly maxPathDepth?: number;
+  /**
+   * Farthest distance from the eye, meters, at which this archetype is drawn (see `distanceFade.ts`): a path whose copy of `bounds` is
+   * entirely farther from every eye is skipped. Undefined means it is drawn at every distance.
+   */
+  readonly maxDrawDistanceMeters?: number;
+  /** Bounding sphere of the geometry in the cell's frame; set together with `maxDrawDistanceMeters`. */
+  readonly bounds?: THREE.Sphere;
 }
 
-/** Scenery is drawn only on portal paths of at most this depth (about 45 m; farther away a tuft is a few pixels and fogged). */
-export const sceneryMaxPathDepth = 3;
-/** Deepest portal path on which the generated landmarks of a cell are drawn: beyond it (about 90 m on the cube) the fog has taken them. */
-export const landmarkMaxPathDepth = 6;
+/** Farthest distance from the eye at which an archetype of this kind is drawn, meters; undefined for every distance. */
+export function maxDrawDistanceMetersFor(kind: CellRenderArchetypeKind): number | undefined {
+  return kind === "scenery" ? sceneryFadeEndMeters : kind === "landmark" ? landmarkMaxDrawDistanceMeters : undefined;
+}
 
 /** Options controlling how cell meshes are built and instanced. */
 export interface BuildCellRenderArchetypesOptions {
@@ -145,12 +151,23 @@ export function buildCellRenderArchetypes(
         capacity: source.capacity,
         sourceObjectName: source.sourceObjectName,
         ownedTextures: source.ownedTextures,
-        maxPathDepth: source.kind === "scenery" ? sceneryMaxPathDepth : source.kind === "landmark" ? landmarkMaxPathDepth : undefined,
+        ...distanceLimitFor(source),
       });
     }
   }
 
   return archetypes;
+}
+
+function distanceLimitFor(source: CellArchetypeSource): { maxDrawDistanceMeters?: number; bounds?: THREE.Sphere } {
+  const maxDrawDistanceMeters = maxDrawDistanceMetersFor(source.kind);
+
+  if (maxDrawDistanceMeters === undefined) {
+    return {};
+  }
+
+  source.geometry.computeBoundingSphere();
+  return { maxDrawDistanceMeters, bounds: source.geometry.boundingSphere!.clone() };
 }
 
 /** Lists the archetypes `buildCellRenderArchetypes` would create (ids, kinds, capacities). Note that it constructs (and discards) full cell meshes, so it is not free. */
@@ -326,8 +343,9 @@ function collectCellArchetypeSources(
     const geometry = object.geometry.clone();
     geometry.applyMatrix4(object.matrixWorld);
     const floorPatches: FloorMaterialPatches | undefined = kind === "floor" && ownTint ? floorPatchesFor(object, ownTint, context.groundTints) : undefined;
-    const material = cloneMaterial(object.material, options.portalClipMaterialState, floorPatches);
-    const rootMaterial = cloneMaterial(object.material, undefined, floorPatches);
+    const fade = kind === "scenery";
+    const material = cloneMaterial(object.material, options.portalClipMaterialState, floorPatches, fade);
+    const rootMaterial = cloneMaterial(object.material, undefined, floorPatches, fade);
     const archetypeIndex = sources.length;
     const ownsTint = floorPatches !== undefined && !tintOwned;
     tintOwned ||= ownsTint;
@@ -366,6 +384,7 @@ function floorPatchesFor(object: THREE.Mesh, ownTint: CellGroundTint, groundTint
       neighbourTint: neighbourTint ?? ownTint,
       halfWidthMeters: strip.halfWidthMeters,
       noiseAmplitudeMeters: strip.noiseAmplitudeMeters,
+      cornerSlopes: strip.cornerSlopes,
       seed: strip.seed,
       enabled: strip.enabled && neighbourTint !== undefined,
     },
@@ -425,9 +444,13 @@ function cloneMaterial(
   material: THREE.Material | THREE.Material[],
   portalClipMaterialState: PortalClipMaterialState | undefined,
   floorPatches: FloorMaterialPatches | undefined,
+  distanceFade = false,
 ): THREE.Material | THREE.Material[] {
   const prepare = (entry: THREE.Material): THREE.Material => {
-    const patched = patchFloorPatchMaterial(entry.clone());
+    const floorPatched = patchFloorPatchMaterial(entry.clone());
+    const patched = distanceFade
+      ? patchDistanceFadeMaterial(floorPatched, { startMeters: sceneryFadeStartMeters, endMeters: sceneryFadeEndMeters })
+      : floorPatched;
 
     if (!floorPatches) {
       return patched;

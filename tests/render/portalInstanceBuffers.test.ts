@@ -11,7 +11,7 @@
  */
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
-import { sceneryMaxPathDepth, type CellRenderArchetype } from "../../src/render/three/cellRenderArchetypes";
+import { type CellRenderArchetype } from "../../src/render/three/cellRenderArchetypes";
 import { createPortalInstanceDebugRenderer } from "../../src/render/three/portalInstanceDebug";
 import {
   buildVisiblePathsByDestinationCell,
@@ -140,21 +140,48 @@ describe("updateCellRenderArchetypeInstances", () => {
   });
 });
 
-describe("updateCellRenderArchetypeInstances depth limit", () => {
-  const pathsAtDepths = (depths: readonly number[]) =>
-    groupVisiblePortalPathsByDestinationCell(depths.map((depth) => ({ ...createRootVisiblePortalPath("room-b"), depth, pathId: depth + 1 })));
+describe("updateCellRenderArchetypeInstances distance limit", () => {
+  const pathsAtDistances = (distances: readonly number[]) =>
+    groupVisiblePortalPathsByDestinationCell(
+      distances.map((distance, index) => ({
+        ...createRootVisiblePortalPath("room-b"),
+        depth: index + 1,
+        pathId: index + 1,
+        rootFromDestinationMatrix: new THREE.Matrix4().makeTranslation(distance, 0, 0),
+      })),
+    );
 
-  it("skips too-deep paths for scenery without overflow, but not for floors", () => {
+  it("skips copies beyond the draw distance from every eye, without overflow, but not floors", () => {
     const floor = createArchetype("room-b", "room-b:floor:0", 8);
-    const scenery = { ...createArchetype("room-b", "room-b:scenery:1", 2), kind: "scenery" as const, maxPathDepth: sceneryMaxPathDepth };
+    const scenery = {
+      ...createArchetype("room-b", "room-b:scenery:1", 4),
+      kind: "scenery" as const,
+      maxDrawDistanceMeters: 50,
+      bounds: new THREE.Sphere(new THREE.Vector3(0, 0, 0), 3),
+    };
     const diagnostics = createPortalInstanceDiagnostics();
+    const paths = pathsAtDistances([10, 52, 54, 80]);
 
-    updateCellRenderArchetypeInstances([floor, scenery], pathsAtDepths([1, 3, 4, 5]), diagnostics);
+    updateCellRenderArchetypeInstances([floor, scenery], paths, diagnostics, new Map(), {
+      separateRoot: false,
+      cameraPositions: [new THREE.Vector3(0, 0, 0)],
+    });
 
     expect(floor.mesh.count).toBe(4);
     expect(scenery.mesh.count).toBe(2);
     expect(diagnostics.capacityOverflowCount).toBe(0);
-    expect([0, 1].map((index) => readAttribute(scenery.portalPathIdAttribute, index))).toEqual([2, 4]);
+    expect([0, 1].map((index) => readAttribute(scenery.portalPathIdAttribute, index))).toEqual([1, 2]);
+
+    // A second eye near the far copies keeps them.
+    updateCellRenderArchetypeInstances([floor, scenery], paths, diagnostics, new Map(), {
+      separateRoot: false,
+      cameraPositions: [new THREE.Vector3(0, 0, 0), new THREE.Vector3(60, 0, 0)],
+    });
+    expect(scenery.mesh.count).toBe(4);
+
+    // Without eye positions nothing is culled by distance.
+    updateCellRenderArchetypeInstances([floor, scenery], paths, diagnostics);
+    expect(scenery.mesh.count).toBe(4);
   });
 });
 

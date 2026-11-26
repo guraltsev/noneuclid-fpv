@@ -253,6 +253,26 @@ export function omitPathsWithoutClipSlot(
   return filtered;
 }
 
+const boundsCentreScratch = new THREE.Vector3();
+
+/** True when the archetype has a draw distance and its copy on `path` lies entirely beyond it from every eye. */
+export function isBeyondDrawDistance(
+  archetype: Pick<CellRenderArchetype, "maxDrawDistanceMeters" | "bounds">,
+  path: Pick<VisiblePortalPath, "rootFromDestinationMatrix">,
+  cameraPositions: readonly THREE.Vector3[] | undefined,
+): boolean {
+  const limit = archetype.maxDrawDistanceMeters;
+  const bounds = archetype.bounds;
+
+  if (limit === undefined || !bounds || !cameraPositions || cameraPositions.length === 0) {
+    return false;
+  }
+
+  const centre = boundsCentreScratch.copy(bounds.center).applyMatrix4(path.rootFromDestinationMatrix);
+  const reach = limit + bounds.radius;
+  return cameraPositions.every((eye) => eye.distanceToSquared(centre) > reach * reach);
+}
+
 /**
  * Writes instance matrices and clip attributes for every cell archetype from the visible paths of its cell.
  *
@@ -269,7 +289,12 @@ export function updateCellRenderArchetypeInstances(
   visiblePathsByDestinationCell: ReadonlyMap<string, readonly VisiblePortalPath[]>,
   diagnostics: PortalInstanceDiagnostics,
   clipIndexByPathId: ReadonlyMap<number, number> = new Map(),
-  options: { readonly separateRoot: boolean; readonly unclippedRoot?: boolean } = { separateRoot: false },
+  options: {
+    readonly separateRoot: boolean;
+    readonly unclippedRoot?: boolean;
+    /** Eye positions in the frame of the paths' matrices; without them nothing is culled by distance. */
+    readonly cameraPositions?: readonly THREE.Vector3[];
+  } = { separateRoot: false },
 ): void {
   const unclippedRoot = options.unclippedRoot ?? true;
 
@@ -289,8 +314,8 @@ export function updateCellRenderArchetypeInstances(
         continue;
       }
 
-      // Too deep for this archetype (distant scenery): neither drawn nor counted as overflow.
-      if (archetype.maxPathDepth !== undefined && path.depth > archetype.maxPathDepth) {
+      // Too far for this archetype (distant scenery, landmarks in the fog): neither drawn nor counted as overflow.
+      if (isBeyondDrawDistance(archetype, path, options.cameraPositions)) {
         continue;
       }
 

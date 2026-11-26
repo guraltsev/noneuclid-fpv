@@ -20,8 +20,7 @@ import {
   disposeCellRenderArchetypes,
   deriveCellRenderArchetypeCapacities,
   planCellRenderArchetypes,
-  landmarkMaxPathDepth,
-  sceneryMaxPathDepth,
+  maxDrawDistanceMetersFor,
 } from "../../src/render/three/cellRenderArchetypes";
 import { createFakePreparedAssets } from "../support/preparedAssets";
 
@@ -67,7 +66,8 @@ describe("planCellRenderArchetypes", () => {
 
     const archetypes = buildCellRenderArchetypes(world, options);
     for (const archetype of archetypes) {
-      expect(archetype.maxPathDepth).toBe(archetype.kind === "scenery" ? sceneryMaxPathDepth : archetype.kind === "landmark" ? landmarkMaxPathDepth : undefined);
+      expect(archetype.maxDrawDistanceMeters).toBe(maxDrawDistanceMetersFor(archetype.kind));
+      expect(archetype.bounds !== undefined).toBe(archetype.maxDrawDistanceMeters !== undefined);
     }
     disposeCellRenderArchetypes(archetypes);
   });
@@ -297,11 +297,11 @@ describe("buildCellRenderArchetypes root mesh", () => {
       expect(rootMaterial).not.toBe(patchedMaterial);
       expect(patchedMaterial.customProgramCacheKey()).toContain("portal-clip-planes");
       expect(rootMaterial.customProgramCacheKey()).not.toContain("portal-clip-planes");
-      // The root material has no clip patch; a metric textured floor still carries the ground tint or blend (and nothing else).
+      // The root material has no clip patch; a metric textured floor still carries the ground tint or blend, scenery its distance fade (and nothing else).
       const isStrip = archetype.sourceObjectName?.includes(":side-") === true;
       const isInner = archetype.kind === "floor" && !isStrip;
       expect(rootMaterial.customProgramCacheKey()).toBe(
-        isStrip ? "ground-blend:" : isInner ? "ground-tint:" : new (rootMaterial.constructor as new () => THREE.Material)().customProgramCacheKey(),
+        isStrip ? "ground-blend:" : isInner ? "ground-tint:" : archetype.kind === "scenery" ? "distance-fade:" : new (rootMaterial.constructor as new () => THREE.Material)().customProgramCacheKey(),
       );
     }
 

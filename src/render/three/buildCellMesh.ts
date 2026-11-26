@@ -145,6 +145,8 @@ export interface FloorStripBlend {
   readonly halfWidthMeters: number;
   /** Amplitude of the border noise, meters. */
   readonly noiseAmplitudeMeters: number;
+  /** Reach of the transition per meter along the side at its canonical start and end (narrows it towards the corners). */
+  readonly cornerSlopes: readonly [number, number];
   /** False on a side that does not blend (solid wall): the neighbour's share is forced to 0. */
   readonly enabled: boolean;
 }
@@ -236,6 +238,7 @@ function buildFloorMeshes(cell: CompiledPrismCell, options: BuildCellMeshOptions
       seed: strip.seed,
       halfWidthMeters: strip.halfWidthMeters,
       noiseAmplitudeMeters: strip.noiseAmplitudeMeters,
+      cornerSlopes: strip.cornerSlopes,
       enabled: blends,
     };
     mesh.userData = { kind: "floor-strip", cellId: cell.id, sideIndex: strip.sideIndex, groundBlend: blend };

@@ -96,8 +96,8 @@ seams where the surface has none.
 - The renderer turns the list into one merged mesh per cell with vertex colours (`buildCellScenery.ts`), a new cell
   archetype kind `scenery`. It is instanced over portal copies and clipped like the floor. It is not in the object
   registry: no collision, no aim target, no tooltip, not on the map.
-- Budget: at most 1500 triangles per cell, and a `scenery` archetype is drawn only on paths of depth 3 or less
-  (about 45 m; at that distance a tuft is a few pixels and half faded by fog).
+- Budget: at most 1500 triangles per cell, and a `scenery` archetype is drawn only within 50 m of the eye
+  (it fades out from 38 m; section 8.7).
 
 ## 5. Desktop tools
 
@@ -127,7 +127,7 @@ Counted on the cube (`001-basic-cube`) at four fixed poses, 1920 x 1000:
 
 Frame times were not measured: the only display available while this was built was a software renderer. Check the
 frame rate on a real GPU with the debug overlay (`debugOverlay=1&debugOverlayItems=fps`) before merging. If it
-matters, lower `sceneryMaxPathDepth` (cellRenderArchetypes.ts) or `maxSceneryTrianglesPerCell` (sceneryLayout.ts).
+matters, lower `sceneryFadeEndMeters` (distanceFade.ts) or `maxSceneryTrianglesPerCell` (sceneryLayout.ts).
 
 ## 6a. Where the implementation differs from sections 3 to 5
 
@@ -201,7 +201,7 @@ from both biomes in the same proportion. The torus family keeps its own floor.
 `world-assets/landmarkLayout.ts` lays out, per cell and seeded, one major landmark (6 to 11 m) and one or two minor
 ones (1.5 to 4 m), away from sides (cell geometry has no portal ghosts), corners, authored objects and the start.
 `render/three/buildCellLandmarks.ts` builds one merged vertex-coloured mesh per cell, a cell archetype of kind
-`landmark`, drawn up to path depth 6. Pillars and feet are colliders for the player. Budget: 900 triangles per cell.
+`landmark`, drawn up to 95 m from the eye (section 8.7). Pillars and feet are colliders for the player. Budget: 900 triangles per cell.
 
 ### 8.5 Generated creatures
 
@@ -233,3 +233,22 @@ Cost on the cube (`001-basic-cube`), one pose with 286 visible cell copies:
 
 Seen only on a software renderer; frame rate on a real GPU and in VR is not measured. A thin dark line can show along a
 border on light floors where the plane under the cells shows through the hairline gap between two cells' floors.
+
+### 8.7 Corners and distance (third pass)
+
+Two artefacts of the second pass, and what replaced the rules that caused them:
+
+- **A diagonal seam at every corner.** The strip of each side shows the neighbour across that side, and the strips of two
+  sides meet on the corner bisector, so with a constant transition width the two strips showed two different neighbours
+  along it. The transition (half-width plus noise) now narrows linearly towards both ends of a side, with slope
+  `0.85 * tan(angle / 2)` for the smaller of the two cells' corner angles there (`groundBlendGeometry.ts`). On the
+  bisector the neighbour's share is then 0 in both strips; the borders form a fan that closes at the vertex. Beyond a
+  cone point the view is still split, because the two continuations of space there are different places.
+- **Distant things popping.** Scenery (depth 3) and landmarks (depth 6) were cut by portal depth, which is not distance:
+  a copy changes depth when the player crosses a portal or the path set changes. They are now cut by distance from the
+  eye (`distanceFade.ts`): landmarks beyond the fog's far distance (95 m), scenery beyond 50 m, after a dithered fade from
+  38 m. The fog itself now uses the distance from the eye instead of the view depth, so whatever is past 95 m is exactly
+  the fog colour in every direction and the cut is invisible; turning the head no longer changes the fog either.
+
+Cost: landmarks on the cube are now drawn up to 95 m instead of depth 6 (about 90 m there), so about as many copies;
+on worlds with small faces, more. Scenery up to 50 m instead of depth 3 (about 45 m on the cube). Not measured on a GPU.

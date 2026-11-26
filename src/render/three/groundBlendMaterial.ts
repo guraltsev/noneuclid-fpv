@@ -7,7 +7,9 @@
  * `1 - smoothstep(-h, h, s + n)`, where `s` is the distance from the side into the cell and `n` a value noise in a frame both
  * cells of a portal agree on (canonical distance along the side and canonical signed distance, see `groundBlendGeometry.ts`).
  * At the side itself both cells compute the same noise and complementary shares, so they show the same mixture: the border
- * is continuous and wanders. The noise tapers to zero near both ends of the side so the corners agree too.
+ * is continuous and wanders. Towards both ends of the side the transition (half-width and noise together) shrinks in proportion to the
+ * distance from the corner, with the slopes `groundBlendGeometry.ts` derives from the corner angles, so the share is 0 on the corner bisector
+ * where the strips of two sides meet: the corners agree and the border between three or more grounds closes at the vertex.
  *
  * The patch chains any earlier `onBeforeCompile` and program cache key and must run before the portal clip patch. It replaces the
  * `map_fragment` chunk (the own texel is applied inside the block, not twice) and needs the vertex attributes
@@ -24,8 +26,6 @@ export const blendHalfWidthMeters = 2.6;
 export const blendNoiseAmplitudeMeters = 1.1;
 /** Size of the features of the border noise along the side, meters. */
 export const blendNoiseFeatureMeters = 2.5;
-/** Distance from either end of a side over which the noise fades to zero, meters. */
-export const blendNoiseTaperMeters = 1.0;
 
 /** A tint image together with the texture that holds it, as the shader needs them. */
 export interface GroundBlendTintSource {
@@ -47,6 +47,8 @@ export interface GroundBlendOptions {
   readonly halfWidthMeters: number;
   /** Amplitude of the border noise, meters. */
   readonly noiseAmplitudeMeters: number;
+  /** Largest reach (half-width plus noise) per meter along the side, at the canonical start and end of the side; equal for both cells. */
+  readonly cornerSlopes: readonly [number, number];
   /** Seed of the noise; equal for both cells of a portal. */
   readonly seed: number;
   /** False on a side with no neighbour to blend with (a solid wall): the share is forced to 0. */
@@ -98,6 +100,7 @@ const fragmentDeclarations = [
   "uniform float blendHalfWidth;",
   "uniform float blendNoiseAmplitude;",
   "uniform float blendSeed;",
+  "uniform vec2 blendCornerSlopes;",
   "uniform float blendStrength;",
   "float blendHash(vec2 lattice, float seed) {",
   "  vec3 p3 = fract(vec3(lattice.x, lattice.y, seed) * vec3(0.1031, 0.1030, 0.0973));",
@@ -125,10 +128,12 @@ const fragmentColor = [
   "  vec3 ownGround = diffuse * texture2D(map, vMapUv).rgb * texture2D(groundTintMap, (vGroundTintPoint - groundTintOrigin) / groundTintSize).rgb;",
   "  vec2 neighbourTintUv = clamp((vNeighbourPoint - neighbourTintOrigin) / neighbourTintSize, 0.0, 1.0);",
   "  vec3 neighbourGround = neighbourColor * texture2D(neighbourMap, vNeighbourUv).rgb * texture2D(neighbourTintMap, neighbourTintUv).rgb;",
-  `  float taper = smoothstep(0.0, ${blendNoiseTaperMeters.toFixed(1)}, vBlendCoord.x) * smoothstep(0.0, ${blendNoiseTaperMeters.toFixed(1)}, vBlendLength - vBlendCoord.x);`,
-  "  float wander = (blendNoise(vBlendCoord, blendSeed) - 0.5) * 2.0 * blendNoiseAmplitude * taper;",
+  "  float cornerReach = max(0.0, min(blendCornerSlopes.x * vBlendCoord.x, blendCornerSlopes.y * (vBlendLength - vBlendCoord.x)));",
+  "  float shrink = clamp(cornerReach / max(blendHalfWidth + blendNoiseAmplitude, 1e-4), 0.0, 1.0);",
+  "  float halfWidth = max(blendHalfWidth * shrink, 1e-4);",
+  "  float wander = (blendNoise(vBlendCoord, blendSeed) - 0.5) * 2.0 * blendNoiseAmplitude * shrink;",
   "  float distanceIntoCell = vBlendSign * (vBlendCoord.y + wander);",
-  "  float neighbourShare = blendStrength * (1.0 - smoothstep(-blendHalfWidth, blendHalfWidth, distanceIntoCell));",
+  "  float neighbourShare = blendStrength * (1.0 - smoothstep(-halfWidth, halfWidth, distanceIntoCell));",
   "  diffuseColor.rgb = mix(ownGround, neighbourGround, neighbourShare) * 2.0 * groundTintGain;",
   "}",
 ].join("\n");
@@ -157,6 +162,7 @@ export function patchGroundBlendMaterial<TMaterial extends THREE.Material>(mater
     shader.uniforms.blendHalfWidth = { value: options.halfWidthMeters };
     shader.uniforms.blendNoiseAmplitude = { value: options.noiseAmplitudeMeters };
     shader.uniforms.blendSeed = { value: options.seed };
+    shader.uniforms.blendCornerSlopes = { value: new THREE.Vector2(options.cornerSlopes[0], options.cornerSlopes[1]) };
     shader.uniforms.blendStrength = { value: options.enabled ? 1 : 0 };
     shader.vertexShader = shader.vertexShader
       .replace("#include <common>", `#include <common>\n${vertexDeclarations}`)
