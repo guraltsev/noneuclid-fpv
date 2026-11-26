@@ -52,6 +52,8 @@ export interface SceneryLayoutOptions {
   readonly spacingMeters?: number;
   /** Multiplies every biome density. */
   readonly densityScale?: number;
+  /** Discs (cell-local meters) no prop may touch, such as the feet of generated landmarks. */
+  readonly keepOutDiscs?: readonly { readonly x: number; readonly y: number; readonly radius: number }[];
 }
 
 /** Triangles each prop kind adds to the cell mesh; `buildCellScenery.ts` emits exactly this many for the kind. */
@@ -174,7 +176,9 @@ export function computeSceneryLayout(cell: CompiledPrismCell, options: SceneryLa
   const seed = hashStringToSeed(cell.id);
   const random = createSeededRandom((seed ^ 0x5ce4e5) >>> 0);
   const table = sceneryBiomeTable[biome];
-  const allowed = (x: number, y: number, scale: number): boolean => isClear(cell, x, y, sceneryPropRadiusMeters * scale);
+  const keepOut = options.keepOutDiscs ?? [];
+  const allowed = (x: number, y: number, scale: number): boolean =>
+    isClear(cell, x, y, sceneryPropRadiusMeters * scale) && keepOut.every((disc) => Math.hypot(x - disc.x, y - disc.y) >= disc.radius + sceneryPropRadiusMeters * scale);
 
   const features = placeFeatures(biome, allowed, cell, random);
   const ordinary: SceneryProp[] = [];
