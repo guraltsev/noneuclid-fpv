@@ -13,6 +13,7 @@ import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
 import type { CompiledPrismCell } from "../../src/cell-complex/prismCells";
 import { transformPoint3 } from "../../src/math/rigidTransform3";
 import {
+  blendCornerSlopeFraction,
   blendStripSegmentMeters,
   blendStripWidthMeters,
   buildFloorBlendGeometry,
@@ -135,6 +136,28 @@ function polygonSides(corners: readonly { readonly x: number; readonly y: number
   });
 }
 
+describe("floor blend narrowing at the corners", () => {
+  it.each([
+    ["cube", cube, Math.PI / 2],
+    ["tetrahedron", tetrahedron, Math.PI / 3],
+  ] as const)("on the %s, ends the transition inside the corner bisector of both cells", (_name, world, cornerAngle) => {
+    for (const cell of world.cells) {
+      const strips = buildFloorBlendGeometry(cell, neighboursOf(world, cell)).strips;
+      for (const strip of strips) {
+        for (const slope of strip.cornerSlopes) {
+          expect(slope).toBeCloseTo(blendCornerSlopeFraction * Math.tan(cornerAngle / 2), 9);
+        }
+        // A point on the bisector at distance t along the side is t tan(angle / 2) into the cell; the reach (half-width plus noise) there
+        // is at most slope * t, so even with the noise at its worst the neighbour's share is 0 where the strips of two sides meet.
+        for (const t of [0.05, 0.5, 1, 2, 4]) {
+          const reach = Math.min(strip.halfWidthMeters + strip.noiseAmplitudeMeters, strip.cornerSlopes[0] * t);
+          expect(t * Math.tan(cornerAngle / 2)).toBeGreaterThan(reach);
+        }
+      }
+    }
+  });
+});
+
 describe("floor blend geometry across the portals of the basic cube", () => {
   const stripOf = (cell: CompiledPrismCell, sideIndex: number) => buildFloorBlendGeometry(cell, neighboursOf(cube, cell)).strips[sideIndex];
 
@@ -148,6 +171,7 @@ describe("floor blend geometry across the portals of the basic cube", () => {
         const theirs = stripOf(other, otherSide);
         expect(mine.seed).toBe(theirs.seed);
         expect(mine.halfWidthMeters).toBe(theirs.halfWidthMeters);
+        expect(mine.cornerSlopes).toEqual(theirs.cornerSlopes);
         expect(mine.neighbourCellId).toBe(other.id);
 
         const position = mine.geometry.getAttribute("position");

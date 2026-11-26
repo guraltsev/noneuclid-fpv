@@ -15,6 +15,11 @@
  *   so the same physical point gets the same (t, s) from both cells;
  * - `blendLength`: the side's length, for the noise taper;
  * - `blendSign`: +1 or -1, the factor that turns canonical `s` into the distance into the cell's own interior.
+ * Strips of neighbouring sides meet on the corner bisector, where each would otherwise show a different neighbour. The transition therefore
+ * narrows towards both ends of the side: its full reach (half-width plus noise) is at most `slope * t` from the canonical start and
+ * `slope * (L - t)` from the end, where the slope at a corner is `blendCornerSlopeFraction * tan(angle / 2)` for the smaller of the two cells'
+ * corner angles there. A point on the bisector at distance `t` along the side is `t * tan(angle / 2)` from it, so the neighbour's share is 0
+ * there in both strips: the floor is continuous around the corner and the transition is a fan that closes at the vertex (the cone point).
  * A side without a blend partner (a solid wall, or a neighbour with no floor texture) has itself as neighbour; its material forces the share to 0.
  */
 import * as THREE from "three";
@@ -30,6 +35,8 @@ export const blendStripSegmentMeters = 1.5;
 export const blendStripInradiusFraction = 0.42;
 /** The noise amplitude is at most this fraction of the strip width, so the transition ends inside the strip. */
 export const blendNoiseWidthFraction = 0.4;
+/** Fraction of `tan(corner angle / 2)` used as the slope that limits the transition near a corner, so it ends just inside the bisector. */
+export const blendCornerSlopeFraction = 0.85;
 
 /** One blend strip of a cell and what its material needs to know about the glued side. */
 export interface FloorStrip {
@@ -43,6 +50,11 @@ export interface FloorStrip {
   readonly halfWidthMeters: number;
   /** Amplitude of the noise, meters, equal for both cells of a portal. */
   readonly noiseAmplitudeMeters: number;
+  /**
+   * Largest reach of the transition per meter along the side, at the canonical start and end of the side (see the module header); equal for
+   * both cells of a portal.
+   */
+  readonly cornerSlopes: readonly [number, number];
 }
 
 /** The inner polygon and strips of a cell's floor. */
@@ -222,6 +234,13 @@ function buildStrip(
   geometry.setIndex(indices);
 
   const transition = blends ? groundBlendTransition(width, blendStripWidthMeters(neighbour)) : groundBlendTransition(width, width);
+  const ownStart = cornerHalfAngleTangent(cell, side.sideIndex);
+  const ownEnd = cornerHalfAngleTangent(cell, (side.sideIndex + 1) % cell.baseVertices.length);
+  const [neighbourAtOwnStart, neighbourAtOwnEnd] = blends
+    ? neighbourCornerTangents(neighbour, neighbourSide, mapThroughPortal(portal.transformToTarget, side.start))
+    : [ownStart, ownEnd];
+  const slopeAtOwnStart = blendCornerSlopeFraction * Math.min(ownStart, neighbourAtOwnStart);
+  const slopeAtOwnEnd = blendCornerSlopeFraction * Math.min(ownEnd, neighbourAtOwnEnd);
   return {
     sideIndex: side.sideIndex,
     geometry,
@@ -229,7 +248,38 @@ function buildStrip(
     seed: (hashStringToSeed(ownKey <= otherKey ? `${ownKey}|${otherKey}` : `${otherKey}|${ownKey}`) % 4096) / 64,
     halfWidthMeters: transition.halfWidthMeters,
     noiseAmplitudeMeters: transition.noiseAmplitudeMeters,
+    cornerSlopes: isCanonical ? [slopeAtOwnStart, slopeAtOwnEnd] : [slopeAtOwnEnd, slopeAtOwnStart],
   };
+}
+
+/** `tan(angle / 2)` of the interior angle of `cell` at its vertex `vertexIndex`, clamped away from 0 and infinity. */
+export function cornerHalfAngleTangent(cell: Pick<CompiledPrismCell, "baseVertices">, vertexIndex: number): number {
+  const count = cell.baseVertices.length;
+  const vertex = cell.baseVertices[vertexIndex];
+  const previous = cell.baseVertices[(vertexIndex + count - 1) % count];
+  const next = cell.baseVertices[(vertexIndex + 1) % count];
+  const angle = Math.abs(
+    Math.atan2(
+      (previous.x - vertex.x) * (next.y - vertex.y) - (previous.y - vertex.y) * (next.x - vertex.x),
+      (previous.x - vertex.x) * (next.x - vertex.x) + (previous.y - vertex.y) * (next.y - vertex.y),
+    ),
+  );
+  return Math.tan(Math.min(Math.max(angle, 0.05), Math.PI - 0.05) / 2);
+}
+
+// The neighbour's corner tangents at the two ends of its glued side, ordered as [at the own side's start, at the own side's end]:
+// the end of the neighbour's side nearer to the own start (carried through the portal) is the same vertex.
+function neighbourCornerTangents(neighbour: CompiledPrismCell, sideIndex: number, ownStartInNeighbour: Point): [number, number] {
+  const count = neighbour.baseVertices.length;
+  const startIndex = sideIndex;
+  const endIndex = (sideIndex + 1) % count;
+  const start = neighbour.baseVertices[startIndex];
+  const end = neighbour.baseVertices[endIndex];
+  const startIsOwnStart =
+    Math.hypot(start.x - ownStartInNeighbour.x, start.y - ownStartInNeighbour.y) <= Math.hypot(end.x - ownStartInNeighbour.x, end.y - ownStartInNeighbour.y);
+  const atStart = cornerHalfAngleTangent(neighbour, startIndex);
+  const atEnd = cornerHalfAngleTangent(neighbour, endIndex);
+  return startIsOwnStart ? [atStart, atEnd] : [atEnd, atStart];
 }
 
 function mapThroughPortal(transform: Parameters<typeof transformPoint3>[0], point: Point): Point {

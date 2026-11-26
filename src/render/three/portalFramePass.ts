@@ -243,13 +243,14 @@ export function createPortalFramePass(deps: PortalFramePassDeps): PortalFramePas
       buildVisiblePathsByDestinationCell(table.pathsByDestinationCellId, latestVisibleResult.visiblePathById),
       portalClipData.clipIndexByPathId,
     );
-    updatePortalVisiblePathInstances(visiblePathsByDestinationCell, true);
+    const cameraPositions = monoCameraPositions(renderRoot);
+    updatePortalVisiblePathInstances(visiblePathsByDestinationCell, true, cameraPositions);
     latestFrameSnapshot = createFrameRenderSnapshot({
       serial,
       rootCellId: renderRoot.rootCellId,
       visiblePathsByDestinationCell,
       clipIndexByPathId: portalClipData.clipIndexByPathId,
-      cameraPositions: monoCameraPositions(renderRoot),
+      cameraPositions,
     });
     portalInstanceRenderState = createPortalInstanceRenderStateFromVisibleResult(
       latestFrameSnapshot.visiblePathsByDestinationCell,
@@ -296,7 +297,7 @@ export function createPortalFramePass(deps: PortalFramePassDeps): PortalFramePas
         groupVisiblePortalPathsByDestinationCell(portalClipData.rankedAcceptedPaths),
         portalClipData.clipIndexByPathId,
       );
-      updatePortalVisiblePathInstances(visiblePathsByDestinationCell, portalRootsUnclipped);
+      updatePortalVisiblePathInstances(visiblePathsByDestinationCell, portalRootsUnclipped, cameraPositions);
       latestFrameSnapshot = createFrameRenderSnapshot({
         serial,
         rootCellId: portalEyeRenderStates[0]?.rootCellId ?? readLocalPlayerPose(engine).cellId,
@@ -327,6 +328,7 @@ export function createPortalFramePass(deps: PortalFramePassDeps): PortalFramePas
   function updatePortalVisiblePathInstances(
     visiblePathsByDestinationCell: ReadonlyMap<string, readonly VisiblePortalPath[]>,
     separateRoot: boolean,
+    cameraPositions: readonly THREE.Vector3[],
   ): void {
     if (portalClipData.visiblePathOverflowCount > 0 && !portalClipOverflowWarned) {
       portalClipOverflowWarned = true;
@@ -340,7 +342,7 @@ export function createPortalFramePass(deps: PortalFramePassDeps): PortalFramePas
       visiblePathsByDestinationCell,
       portalInstanceDiagnostics,
       portalClipData.clipIndexByPathId,
-      { separateRoot, unclippedRoot: separateRoot },
+      { separateRoot, unclippedRoot: separateRoot, cameraPositions },
     );
   }
 

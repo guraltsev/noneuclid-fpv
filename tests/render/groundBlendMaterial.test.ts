@@ -24,6 +24,7 @@ function options(texture: THREE.Texture, enabled = true): GroundBlendOptions {
     neighbourColor: new THREE.Color("#ffffff"),
     halfWidthMeters: 1.5,
     noiseAmplitudeMeters: 1.1,
+    cornerSlopes: [0.85, 0.85],
     seed: 3,
     enabled,
   };
