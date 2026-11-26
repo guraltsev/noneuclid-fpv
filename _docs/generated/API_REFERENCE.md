@@ -1256,6 +1256,21 @@ Static asset authoring helper: converts author-facing parameters for a glTF deco
 | function | `createStaticAssetObject` | Builds an AssetObjectSpec from authoring parameters. |
 | function | `degreesToRadians` | Converts degrees to radians. |
 
+### `world-objects/toolClickRules.ts`
+
+What a primary click accepts, per tool, as pure predicates of the aim: the kind of what the aim rests on ("floor" or an object kind) and whether it is within interaction range.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| const | `floorPickKind` | The kind of the floor in an aim pick. |
+| const | `segmentPickKind` | The kind of a beam segment in an aim pick. |
+| const | `crossingPickKind` | The kind of a meeting point (a crossing of two beams) in an aim pick. |
+| const | `laserPickKind` | The kind of a laser in an aim pick. |
+| function | `laserToolAcceptsClick` | What the Laser does with a click: on a laser (in range) it adds a beam; on the floor, a beam or a meeting point it places a laser, at any distance. |
+| function | `signToolAcceptsClick` | The Sign accepts a click on the floor only. |
+| function | `rulerAcceptsClick` | The Ruler accepts a click on a beam within range. |
+| function | `protractorAcceptsCenterClick` | The Protractor's first pick is a laser or a meeting point within range. |
+
 ### `world-objects/toolObjects.ts`
 
 Registry record types of the results of the player's tools: placed flags (signs), geodesic length labels and protractor angles.
@@ -1315,6 +1330,7 @@ The student vocabulary (design 017 section 6): every student-visible noun, verb 
 | const | `controllersSettingsText` | The "Controllers" section of Settings (VR hand options, design 017 sections 7.2 and 7.3). |
 | const | `vrBeltText` | The words of the VR belt, its toasts and the VR start card (design 017 sections 7.3, 7.4 and 8.1). |
 | const | `hintStripText` | The words of the hint strip (design 017 section 8.2): what the listed input does right now, after the colon. |
+| const | `crosshairReasons` | The reasons the crosshair gives when a click would be ignored (design 018 section 5), two to four words each; also shown as a toast when the player clicks anyway. |
 | const | `toolStandText` | The words of the tool stand (design 017 section 9.2) and of the help cube's invitation (section 9.1). |
 | const | `helpText` | The words of Help beyond the page names (design 017 section 8.6): the cards of How to, the Try it button and the first-use tips. |
 | const | `firstUseTipText` | The tool steps of the first-use tips (design 017 section 8.6). |
@@ -2419,6 +2435,21 @@ Abstracts where world-geometry snapshots are built: a dedicated module Web Worke
 
 ## `ui`
 
+### `ui/crosshairDefinition.ts`
+
+The crosshair's state (design 018 section 5 item 1) as renderer-neutral data: "idle" (nothing to do here), "ready" (a left click does something now) or "refused" (something relevant is under the aim but the click would be ignored, with the reason in a few words).
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| type | `CrosshairVisualState` | How the crosshair looks. |
+| interface | `CrosshairDefinition` | The crosshair's state and, when refused, why. |
+| interface | `CrosshairAim` | What the aim rests on, as the tools see it (the current aim pick). |
+| interface | `CrosshairSource` | What the crosshair is built from. |
+| function | `createCrosshairDefinition` | Builds the crosshair's state from the tool in hand and the aim. |
+| const | `refusalToastIntervalMs` | Minimum time between two toasts of the same refusal reason, milliseconds. |
+| interface | `RefusalToastGate` | Decides whether a click on a refused crosshair shows its reason as a toast: at most once per {@link refusalToastIntervalMs} for the same reason. |
+| function | `createRefusalToastGate` | Creates a gate with no history. |
+
 ### `ui/firstUseTips.ts`
 
 First-use tips (design 017 section 8.6): the first time a tool is taken in a session, a small tip shows the first step of how to use it, and moves on to the next step when the student does what the step describes.
@@ -2546,10 +2577,9 @@ The pause card, the desktop main menu (design 017 sections 7.5 and 8.1), as plai
 | interface | `PauseCardControl` | One row of the controls table: the verb and the name of the control that performs it. |
 | type | `PauseCardActionId` | The main-menu actions, in the order they show. |
 | interface | `PauseCardDefinition` | The card's content. |
-| interface | `PauseCardSource` | What the card is built from: the world's name, the config's display name when it has one, and the first goal text. |
-| function | `prettyWorldName` | "001-basic-cube" becomes "Basic cube": the leading number and the dashes and underscores go. |
+| interface | `PauseCardSource` | What the card is built from: the config's display name when it has one, and the first goal text. |
 | function | `firstSentence` | The first sentence of a text, without its line breaks; empty when the text is blank. |
-| function | `createPauseCardControls` | The controls table: Look, Walk, Use, Menu, Switch tool, What's this?, from the intent table. |
+| function | `createPauseCardControls` | The controls table, from the intent table: Look, Walk, Use, Menu, Switch tool, Put tool away, Pick up / put down (with the Laser only), Next target, What's this?, Start over, Undo. |
 | function | `createPauseCardDefinition` | Builds the card for a world. |
 
 ### `ui/toastQueue.ts`
@@ -2693,7 +2723,7 @@ The desktop tool belt (design 017 section 7.4): a row of slots at the bottom cen
 
 ### `render/three/aimCrossMarker.ts`
 
-Red cross decal drawn on the surface point that the aim ray currently hits.
+Cross decal (red by default, the selected tool's color on the desktop) drawn on the surface point that the aim ray currently hits.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
@@ -2894,6 +2924,15 @@ Three.js view of a simple geodesic creature (the mouse or the butterfly): the gl
 | interface | `SimpleGeoCreatureRuntime` | Per-creature runtime handle owned by the renderer. |
 | function | `placeSimpleGeoCreatureModel` | Puts a creature's glTF scene in the creature's own frame: the spec's scale, tilts, the half turn that makes the model face forward and the model offset (world axes to Three.js axes). |
 | function | `createSimpleGeoCreatureRuntime` | Creates the runtime (three.js model instance, behavior, registry entry) for a creature starting in `startCellId`. |
+
+### `render/three/crosshairAim.ts`
+
+Builds the crosshair definition's input (`src/ui/crosshairDefinition.ts`) from the current aim pick: which object the aim rests on, whether it is in range, whether the Hand could use it, and the Protractor's step.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `CrosshairAimDeps` | What the adapter reads: the tool context of the selected tool, the object reader, and whether the Hand has an action on an object. |
+| function | `readCrosshairAim` | The aim as the crosshair needs it; undefined when nothing is hit. |
 
 ### `render/three/curiosityMarkers.ts`
 
@@ -3136,6 +3175,8 @@ Render sources and per-frame render records for geodesic cannons, geodesic segme
 | function | `collectGeodesicRuntimeRenderRecords` | Produces the render records of one geodesic object in its own cell, one per matching archetype mesh (no portal ghosts; the instance sync adds them for the body parts, see {@link collectGeodesicBodyPlacements}). |
 | function | `emitterHeadsKey` | A string that changes whenever the heads drawn at a cannon change: the attached geodesics and their launch yaws. |
 | function | `composeSegmentMatrix` | Returns the Three.js model matrix mapping the unit ribbon (x from 0 to 1) onto `segment`. |
+| function | `createCannonPostModel` | The cannon's post as drawn, base on the floor; the loaded model is lifted by the floor offset, the fallback is already built with its base at y = 0. |
+| function | `createCannonHeadModel` | The cannon's head (lightsaber) as drawn, at the beam's emission point and pointing along +x. |
 
 ### `render/three/geodesicCannonTools.ts`
 
@@ -3256,15 +3297,14 @@ Help panel ("help lens") renderer: shows the current contextual help definition 
 
 ### `render/three/laserPreview.ts`
 
-The Laser's placement preview (design 017 section 8.3): with the Laser in hand and the aim on the floor, a translucent ghost of a laser stands at the aim point, with an arrow along the direction a placed laser would fire.
+The Laser's placement preview (design 017 section 8.3): with the Laser in hand and the aim on the floor, a translucent copy of the real laser (its post and its head) stands at the aim point, the head turned the way a placed laser would fire.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
-| const | `laserPreviewPostRadiusMeters` | Radius of the ghost's post, meters. |
-| const | `laserPreviewPostHeightMeters` | Height of the ghost's post, meters. |
-| const | `laserPreviewArrowLengthMeters` | Length of the direction arrow from the post, meters. |
+| const | `laserPreviewOpacity` | How opaque the copy is, 0 to 1. |
+| const | `laserPreviewHaloOpacity` | How opaque the faint yellow halo around the copy is, 0 to 1. |
 | interface | `LaserPreview` | Handle to the preview created by {@link createLaserPreview}. |
-| function | `createLaserPreview` | Creates the preview, adds it (hidden) to `scene`, and returns its handle. |
+| function | `createLaserPreview` | Creates the preview from the loaded models (procedural stand-ins when `assets` is omitted), adds it (hidden) to `scene`, and returns its handle. |
 
 ### `render/three/measureLengthRenderer.ts`
 
