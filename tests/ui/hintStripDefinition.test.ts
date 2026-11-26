@@ -49,6 +49,11 @@ describe("hint strip definition (desktop rows of the design table)", () => {
     expect(strip({ selectedTool: "none", focus, extendLengthMeters: 2 })).toBe("Left click: extend 2 m");
   });
 
+  it("does not offer extending a free beam with the Sign in hand", () => {
+    const focus = focusOf({ kind: "geodesicModel/segment" } as never, "placedFlags/flag", true);
+    expect(strip({ selectedTool: "placedFlags/flag", focus, extendLengthMeters: 2 })).not.toContain("extend");
+  });
+
   it("offers placing a laser on a beam or a meeting point with the Laser in hand", () => {
     const beam = focusOf({ kind: "geodesicModel/segment" } as never, "geodesicEmitters/emitter", true);
     const crossing = focusOf({ kind: "geodesicModel/crossing" } as never, "geodesicEmitters/emitter");

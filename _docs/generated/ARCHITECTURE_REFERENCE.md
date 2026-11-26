@@ -5,7 +5,7 @@
 
 This reference is produced from the source code. For the *meaning* of the modules — the mathematical model they implement — read [../MATHEMATICAL_MODEL.md](../MATHEMATICAL_MODEL.md) and [../ARCHITECTURE.md](../ARCHITECTURE.md). For every exported symbol see [API_REFERENCE.md](API_REFERENCE.md).
 
-**338 modules, 65,875 lines** under `src/`.
+**338 modules, 65,876 lines** under `src/`.
 
 ## Layers
 
@@ -26,7 +26,7 @@ A module belongs to the layer named by its first path segment under `src/`. "May
 | `engine` | 10 | 1,673 | `math`, `cell-complex`, `diagnostics`, `movement`, `world-objects`, `glue`, `interaction` | The world engine core (design 013): step order, command queue, participants, module composition and ticks. Imports no module. |
 | `modules` | 35 | 3,103 | `math`, `cell-complex`, `diagnostics`, `movement`, `world-objects`, `glue`, `interaction`, `engine` | World modules (design 013): each owns a slice of world behaviour and exposes a typed api.ts to the others. |
 | `runtime` | 16 | 3,025 | `math`, `cell-complex`, `diagnostics`, `movement`, `world-objects`, `authoring`, `glue`, `engine`, `modules` | Application state, runtime menu state, command dispatch, geometry session/worker, server channel and public API. |
-| `ui` | 15 | 2,628 | `math`, `cell-complex`, `world-objects`, `authoring`, `glue`, `engine`, `modules`, `runtime` | Renderer-neutral palette, help, tooltip and input-intent definitions. |
+| `ui` | 15 | 2,629 | `math`, `cell-complex`, `world-objects`, `authoring`, `glue`, `engine`, `modules`, `runtime` | Renderer-neutral palette, help, tooltip and input-intent definitions. |
 | `render` | 146 | 30,286 | every lower layer | Three.js / DOM / WebXR rendering and input adapters (the application shell). |
 | `root` | 1 | 214 | every lower layer | Entry point. |
 
@@ -373,7 +373,7 @@ None: every import respects the intended layering.
 | `ui/crosshairDefinition.ts` | 131 | The crosshair's state (design 018 section 5 item 1) as renderer-neutral data: "idle" (nothing to do here), "ready" (a left click does something now) or "refused" (something relevant is under the aim but the click would … | `glue/toolIds`, `world-objects/toolClickRules`, `world-objects/vocabulary` |
 | `ui/firstUseTips.ts` | 127 | First-use tips (design 017 section 8.6): the first time a tool is taken in a session, a small tip shows the first step of how to use it, and moves on to the next step when the student does what the step describes. | `ui/vocabulary` |
 | `ui/helpLensDefinition.ts` | 132 | Renderer-neutral definition of the contextual "help lens" panel shown on desktop and in VR: a title, a body sentence and rows pairing an input glyph with an action label. | `glue/toolIds`, `runtime/toolRegistry`, `ui/inputIntents`, `ui/inputModeText`, `ui/worldInteractionDefinition`, `world-objects/vocabulary` |
-| `ui/hintStripDefinition.ts` | 154 | The hint strip (design 017 section 8.2 item 3) as renderer-neutral data: up to three inputs that do something right now, each a glyph label and a short text ("Left click", "open Help"). | `glue/toolIds`, `ui/inputIntents`, `ui/vocabulary`, `ui/worldInteractionDefinition`, `world-objects/runtimeObjectRegistry` |
+| `ui/hintStripDefinition.ts` | 155 | The hint strip (design 017 section 8.2 item 3) as renderer-neutral data: up to three inputs that do something right now, each a glyph label and a short text ("Left click", "open Help"). | `glue/toolIds`, `ui/inputIntents`, `ui/vocabulary`, `ui/worldInteractionDefinition`, `world-objects/runtimeObjectRegistry` |
 | `ui/howToCards.ts` | 51 | The cards of How to (design 017 section 8.6), generated against the world. | `cell-complex/specs`, `glue/appConfig`, `ui/inputIntents`, `ui/toolBeltDefinition`, `ui/vocabulary` |
 | `ui/inputIntents.ts` | 188 | Maps abstract input intents (move, primary action, context menu, help, ...) to the label and optional icon that show the player which physical control performs them in desktop or XR mode. | `cell-complex/specs`, `glue/assetUrls`, `glue/xrLayout` |
 | `ui/inputModeText.ts` | 49 | Shared text rewriter that turns device-neutral help sentences into desktop or XR wording. | `ui/inputIntents` |

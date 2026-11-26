@@ -82,7 +82,8 @@ function collectEntries(
   const laserText = laserToolPrimaryText(source.selectedTool, focus.objectKind);
   if (laserText !== undefined) {
     entries.push({ glyphLabel: primary, text: laserText });
-  } else if (primaryAction !== undefined) {
+  } else if (primaryAction !== undefined && !(inHand && primaryAction.id === "extend-geodesic")) {
+    // Only the Hand makes a free beam longer; with another tool in hand the click does not, so the strip does not say it does.
     entries.push({ glyphLabel: primary, text: primaryActionText(primaryAction, source.extendLengthMeters) });
   }
   if (menuAction !== undefined) {

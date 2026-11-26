@@ -1,7 +1,7 @@
 # 018 - Look of the polyhedral worlds and feel of the desktop tools
 
-Status: proposal (2026-11-25), implemented on branch `look-and-feel`. Sections 3 to 5 are the specification the
-implementation follows; section 7 lists what was left out.
+Status: implemented on branch `look-and-feel` (2026-11-25), not yet checked on a real GPU or in VR. Sections 3 to 5 are
+the specification; section 6a lists where the implementation differs and section 7 what was left out.
 
 ## 1. What a walk through the cube showed
 
@@ -116,10 +116,29 @@ seams where the surface has none.
 
 ## 6. Performance
 
-Measured on the cube at the standard poses (see the branch description for numbers): draw calls rise by at most 12
-(six cells, instanced and root mesh), triangles by at most 1500 per drawn copy of a cell within depth 3, floor
-fragments pay one more texture fetch. Nothing is added to the per-frame CPU path except one comparison per path in
-the cell instance writer.
+Counted on the cube (`001-basic-cube`) at four fixed poses, 1920 x 1000:
+
+- Visible cell copies per frame: 213 to 275, of which 15 to 18 are at depth 3 or less. Only those draw scenery.
+- Scenery per face: 125 to 250 props, 600 to 1300 triangles. Added per frame: at most 18 x 1500 = 27 000 triangles,
+  in practice 15 000 to 20 000.
+- Draw calls: at most 12 more (six cells, the instanced mesh and the root mesh of each).
+- Floor fragments pay one more texture fetch (a 128 x 128 texture per cell).
+- Per-frame CPU: one comparison per path in the cell instance writer; nothing else.
+
+Frame times were not measured: the only display available while this was built was a software renderer. Check the
+frame rate on a real GPU with the debug overlay (`debugOverlay=1&debugOverlayItems=fps`) before merging. If it
+matters, lower `sceneryMaxPathDepth` (cellRenderArchetypes.ts) or `maxSceneryTrianglesPerCell` (sceneryLayout.ts).
+
+## 6a. Where the implementation differs from sections 3 to 5
+
+- Values tuned by eye after the first build: floor gain 1.75, large ground variation 0.3, shadow strength 0.5; the
+  plane under the cells is dark earth (`UNDER_FLOOR_COLOR`), not the haze colour, because it shows through hairline
+  gaps between floors.
+- An object with no use (the house, the tool stand) never makes the crosshair say "refused" for the Ruler and the
+  Protractor: only objects the tool could act on do. The Sign and the Laser say "Aim at the floor" on any object.
+- Escape on an object's menu still puts the tool away; right click, F and Close keep it.
+- The hint and crosshair wording is shared with VR, so VR also reads "place a laser here" and "add a beam", and the
+  palette Close button keeps the tool in VR too. The red cross is unchanged in VR.
 
 ## 7. Left out
 
