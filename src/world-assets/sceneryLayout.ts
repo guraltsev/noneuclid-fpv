@@ -60,6 +60,8 @@ export interface SceneryLayoutOptions {
   readonly neighbourBiomeBySideIndex?: ReadonlyMap<number, SceneryBiome | undefined>;
   /** Half-width `h` of the biome transition at a side, meters (default {@link defaultNeighbourBlendHalfWidthMeters}). */
   readonly neighbourBlendHalfWidthMeters?: number;
+  /** Discs (cell-local meters) no prop may touch, such as the feet of generated landmarks. */
+  readonly keepOutDiscs?: readonly { readonly x: number; readonly y: number; readonly radius: number }[];
 }
 
 /** Half-width of the biome transition at a side when the caller gives none, meters. */
@@ -185,7 +187,9 @@ export function computeSceneryLayout(cell: CompiledPrismCell, options: SceneryLa
   const seed = hashStringToSeed(cell.id);
   const random = createSeededRandom((seed ^ 0x5ce4e5) >>> 0);
   const table = sceneryBiomeTable[biome];
-  const allowed = (x: number, y: number, scale: number): boolean => isClear(cell, x, y, sceneryPropRadiusMeters * scale);
+  const keepOut = options.keepOutDiscs ?? [];
+  const allowed = (x: number, y: number, scale: number): boolean =>
+    isClear(cell, x, y, sceneryPropRadiusMeters * scale) && keepOut.every((disc) => Math.hypot(x - disc.x, y - disc.y) >= disc.radius + sceneryPropRadiusMeters * scale);
   const kindsAt = neighbourKindsPicker(cell, table.kinds, options);
 
   const features = placeFeatures(biome, allowed, cell, random);
