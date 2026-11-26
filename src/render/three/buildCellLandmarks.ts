@@ -9,7 +9,7 @@
  */
 import * as THREE from "three";
 import type { LandmarkPlacement } from "../../world-assets/landmarkLayout";
-import { tessellateParts } from "../../world-assets/landmarkParts";
+import { motionHoldOf, motionKinds, motionScheduleOf, motionSchedules, tessellateParts } from "../../world-assets/landmarkParts";
 import { createSeededRandom } from "../../world-assets/seededNoise";
 import { motionAttributeNames, patchLandmarkMotionMaterial } from "./landmarkMotion";
 
@@ -90,6 +90,7 @@ export function buildCellLandmarksMesh(
   const motionPivots = new Float32Array(total * 9);
   const motionAxes = new Float32Array(total * 9);
   const motionTimings = new Float32Array(total * 12);
+  const motionModes = new Float32Array(total * 6);
   let anyMotion = false;
   const motionPoint = new THREE.Vector3();
   const motionDirection = new THREE.Vector3();
@@ -158,6 +159,10 @@ export function buildCellLandmarksMesh(
           motionPivots.set([motionPoint.x, motionPoint.z, -motionPoint.y], offset);
           motionAxes.set([motionDirection.x, motionDirection.z, -motionDirection.y], offset);
           motionTimings.set([motion.step, motion.period, motion.move, motion.phase], ((cursor / 9) * 3 + vertex) * 4);
+          motionModes.set(
+            [motionKinds.indexOf(motion.kind ?? "turn") + 3 * motionSchedules.indexOf(motionScheduleOf(motion)), motionHoldOf(motion)],
+            ((cursor / 9) * 3 + vertex) * 2,
+          );
         }
 
         // Cell-local (x, y, height) to Three (x, height, -y).
@@ -186,6 +191,7 @@ export function buildCellLandmarksMesh(
     geometry.setAttribute(motionAttributeNames.pivot, new THREE.BufferAttribute(motionPivots, 3));
     geometry.setAttribute(motionAttributeNames.axis, new THREE.BufferAttribute(motionAxes, 3));
     geometry.setAttribute(motionAttributeNames.timing, new THREE.BufferAttribute(motionTimings, 4));
+    geometry.setAttribute(motionAttributeNames.mode, new THREE.BufferAttribute(motionModes, 2));
     material.userData.landmarkMotion = true;
     patchLandmarkMotionMaterial(material);
   }

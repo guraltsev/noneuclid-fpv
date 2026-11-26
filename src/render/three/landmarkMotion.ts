@@ -3,13 +3,11 @@
  *
  * A landmark mesh is one merged geometry drawn once per portal copy, so its parts cannot be moved on the CPU. Instead every vertex of a
  * moving part carries its motion (`world-assets/landmarkParts.ts`, `PartMotion`) as attributes in the mesh's own frame:
- * `motionPivot` and `motionAxis`, and `motionTiming` = (step, period, move, phase). The patched vertex shader turns the vertex and its
- * normal about the axis through the pivot by the angle the schedule gives at the shared clock {@link landmarkMotionTime}; a vertex with a
- * zero step stands still. Every copy through every portal moves in step, at no CPU cost.
- *
- * The schedule: at clock `t`, with `u = (t + phase) / period`, the part has made `floor(u)` steps and is `smoothstep(0, move, fract(u) *
- * period)` of the way through the next one; with `move >= period` it turns steadily instead. The baked shade of a turning face does not
- * change: the turns are slow and the light is soft, so it does not show.
+ * `motionPivot` and `motionAxis`, `motionTiming` = (step, period, move, phase) and `motionMode` = (kind + 3 * schedule, hold). The
+ * patched vertex shader computes the amount the schedule gives at the shared clock {@link landmarkMotionTime} (`motionValueAt`) and turns
+ * the vertex and its normal about the axis through the pivot, slides it along the axis, or scales it about the pivot; a vertex with a zero
+ * step stands still. Every copy through every portal moves in step, at no CPU cost. The baked shade of a moving face does not change: the
+ * motions are slow or small and the light is soft, so it does not show.
  *
  * Materials lose shader hooks when cloned, so a moving mesh's material is marked in `userData.landmarkMotion` and {@link applyLandmarkMotion}
  * installs the hook on the clone that is drawn. A geometry whose positions are transformed must have its motion attributes transformed
@@ -26,41 +24,31 @@ export function setLandmarkMotionTime(seconds: number): void {
 }
 
 /** Names of the motion attributes. */
-export const motionAttributeNames = { pivot: "motionPivot", axis: "motionAxis", timing: "motionTiming" } as const;
-
-/** The angle (radians) the schedule `(step, period, move, phase)` gives at clock `t`, as the shader computes it (without its wrap to a turn). */
-export function motionAngleAt(timing: readonly [number, number, number, number], t: number): number {
-  const [step, period, move, phase] = timing;
-
-  if (step === 0) {
-    return 0;
-  }
-
-  const u = (t + phase) / period;
-  const steps = Math.floor(u);
-  const fraction = u - steps;
-  const x = Math.min(1, Math.max(0, (fraction * period) / move));
-  const progress = move >= period ? fraction : x * x * (3 - 2 * x);
-  return step * (steps + progress);
-}
+export const motionAttributeNames = { pivot: "motionPivot", axis: "motionAxis", timing: "motionTiming", mode: "motionMode" } as const;
 
 const vertexDeclarations = [
   "attribute vec3 motionPivot;",
   "attribute vec3 motionAxis;",
   "attribute vec4 motionTiming;",
+  "attribute vec2 motionMode;",
   "uniform float landmarkMotionTime;",
   "vec3 landmarkMotionRotate(vec3 v, vec3 axis, float angle) {",
   "  float c = cos(angle);",
   "  float s = sin(angle);",
   "  return v * c + cross(axis, v) * s + axis * dot(axis, v) * (1.0 - c);",
   "}",
-  "float landmarkMotionAngle() {",
+  // The amount the schedule gives now (see `motionValueAt`); turns in steps or steady are wrapped to within a full turn.
+  "float landmarkMotionValue() {",
   "  if (motionTiming.x == 0.0) return 0.0;",
+  "  float schedule = floor(motionMode.x / 3.0 + 0.01);",
   "  float u = (landmarkMotionTime + motionTiming.w) / motionTiming.y;",
   "  float steps = floor(u);",
   "  float fraction = u - steps;",
-  "  float progress = motionTiming.z >= motionTiming.y ? fraction : smoothstep(0.0, motionTiming.z, fraction * motionTiming.y);",
-  "  return mod(motionTiming.x * steps, 6.28318530718) + motionTiming.x * progress;",
+  "  float time = fraction * motionTiming.y;",
+  "  if (schedule < 0.5) return mod(motionTiming.x * steps, 6.28318530718) + motionTiming.x * smoothstep(0.0, motionTiming.z, time);",
+  "  if (schedule < 1.5) return mod(motionTiming.x * steps, 6.28318530718) + motionTiming.x * fraction;",
+  "  if (schedule < 2.5) return motionTiming.x * sin(6.28318530718 * u);",
+  "  return motionTiming.x * smoothstep(0.0, motionTiming.z, time) * (1.0 - smoothstep(motionTiming.z + motionMode.y, 2.0 * motionTiming.z + motionMode.y, time));",
   "}",
 ].join("\n");
 
@@ -76,11 +64,21 @@ export function patchLandmarkMotionMaterial<TMaterial extends THREE.Material>(ma
       .replace("#include <common>", `#include <common>\n${vertexDeclarations}`)
       .replace(
         "#include <beginnormal_vertex>",
-        "#include <beginnormal_vertex>\nfloat landmarkMotionAngleValue = landmarkMotionAngle();\nobjectNormal = landmarkMotionRotate(objectNormal, motionAxis, landmarkMotionAngleValue);",
+        [
+          "#include <beginnormal_vertex>",
+          "float landmarkMotionAmount = landmarkMotionValue();",
+          "float landmarkMotionKind = motionMode.x - 3.0 * floor(motionMode.x / 3.0 + 0.01);",
+          "if (landmarkMotionKind < 0.5) objectNormal = landmarkMotionRotate(objectNormal, motionAxis, landmarkMotionAmount);",
+        ].join("\n"),
       )
       .replace(
         "#include <begin_vertex>",
-        "#include <begin_vertex>\ntransformed = motionPivot + landmarkMotionRotate(transformed - motionPivot, motionAxis, landmarkMotionAngleValue);",
+        [
+          "#include <begin_vertex>",
+          "if (landmarkMotionKind < 0.5) transformed = motionPivot + landmarkMotionRotate(transformed - motionPivot, motionAxis, landmarkMotionAmount);",
+          "else if (landmarkMotionKind < 1.5) transformed += motionAxis * landmarkMotionAmount;",
+          "else transformed = motionPivot + (transformed - motionPivot) * max(0.0, 1.0 + landmarkMotionAmount);",
+        ].join("\n"),
       );
   };
   material.customProgramCacheKey = () => `${previousProgramKey}landmark-motion:`;

@@ -16,8 +16,8 @@
  *
  * Every triangle carries a reference point inside its solid; the mesh builder turns the normal away from it before it bakes the light.
  *
- * A part may move ({@link PartMotion}): it turns about an axis through a pivot, in steps that each take a moment and then rest, or
- * continuously. The motion is data that rides on the triangles to the mesh, and the vertex shader turns the part (design 018
+ * A part may move ({@link PartMotion}): it turns about an axis through a pivot, slides along it or grows about the pivot, in steps, steadily,
+ * swaying, or in pulses that go out and come back. The motion is data that rides on the triangles to the mesh, and the vertex shader turns the part (design 018
  * section 9.9); nothing here moves, and colliders, shadows and the footprint are those of the part at rest.
  * Layer rule: imports only sibling modules.
  */
@@ -33,12 +33,31 @@ export interface PartPose {
   readonly roll?: number;
 }
 
+/** What a motion does to its part: turn it about the axis, slide it along the axis, or grow it about the pivot. */
+export type MotionKind = "turn" | "slide" | "grow";
+
 /**
- * How a part moves, in the landmark frame: it turns about `axis` through `pivot` by `step` radians every `period` seconds; each turn
- * takes `move` seconds, eased in and out, and the part rests in between. With `move` at least `period` it turns at a steady
- * `step / period` radians per second. `phase` (seconds) shifts the schedule, so neighbours do not move together.
+ * How a motion's amount `step` plays out in time (`u = (t + phase) / period`):
+ * - `steps`: rest, then add `step` over `move` seconds, eased; again every `period` (a turn that never comes back);
+ * - `steady`: `step` per `period`, without stopping;
+ * - `sway`: `step * sin(2 pi u)`, a constant gentle oscillation;
+ * - `pulse`: out to `step` over `move` seconds, hold for `hold` seconds, back over `move`, then rest until the next period.
+ */
+export type MotionSchedule = "steps" | "steady" | "sway" | "pulse";
+
+/** Every motion kind and schedule, in the order the shader numbers them. */
+export const motionKinds: readonly MotionKind[] = ["turn", "slide", "grow"];
+/** Every motion schedule, in the order the shader numbers them. */
+export const motionSchedules: readonly MotionSchedule[] = ["steps", "steady", "sway", "pulse"];
+
+/**
+ * How a part moves, in the landmark frame. `step` is radians for a turn, meters for a slide and a change of scale (1 + value) for a
+ * grow. Without `kind` it turns; without `schedule` it goes in `steps`, or `steady` when `move` is at least `period`. `phase` (seconds)
+ * shifts the schedule, so neighbours do not move together.
  */
 export interface PartMotion {
+  readonly kind?: MotionKind;
+  readonly schedule?: MotionSchedule;
   readonly pivot: Vec3;
   /** Unit vector. */
   readonly axis: Vec3;
@@ -46,6 +65,47 @@ export interface PartMotion {
   readonly period: number;
   readonly move: number;
   readonly phase: number;
+  /** `pulse` only: seconds held at the full amount (default: half of what the period leaves after the two moves). */
+  readonly hold?: number;
+}
+
+/** The schedule a motion follows, with the defaults filled in. */
+export function motionScheduleOf(motion: PartMotion): MotionSchedule {
+  return motion.schedule ?? (motion.move >= motion.period ? "steady" : "steps");
+}
+
+/** The hold of a pulse, with the default filled in. */
+export function motionHoldOf(motion: PartMotion): number {
+  return motion.hold ?? Math.max(0, (motion.period - 2 * motion.move) / 2);
+}
+
+/**
+ * The amount (radians, meters or change of scale) `motion` gives at clock `t`, seconds. The shader computes the same, except that it wraps
+ * turns made in steps or steadily to within a full turn.
+ */
+export function motionValueAt(motion: PartMotion, t: number): number {
+  const { step, period, move, phase } = motion;
+  const u = (t + phase) / period;
+  const steps = Math.floor(u);
+  const fraction = u - steps;
+  const smooth = (from: number, to: number, x: number) => {
+    const y = Math.min(1, Math.max(0, (x - from) / (to - from)));
+    return y * y * (3 - 2 * y);
+  };
+
+  switch (motionScheduleOf(motion)) {
+    case "steps":
+      return step * (steps + smooth(0, move, fraction * period));
+    case "steady":
+      return step * u;
+    case "sway":
+      return step * Math.sin(2 * Math.PI * u);
+    case "pulse": {
+      const hold = motionHoldOf(motion);
+      const time = fraction * period;
+      return step * smooth(0, move, time) * (1 - smooth(move + hold, 2 * move + hold, time));
+    }
+  }
 }
 
 /** What every part has besides its shape. */

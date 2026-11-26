@@ -9,7 +9,7 @@
  * the player starts. Pure; layer rule: imports only sibling modules.
  */
 import type { FacePalette } from "./facePalettes";
-import { bench, between, bicycle, build, firTiers, house, integer, pick, polyline, TAU, tree } from "./faceThemes";
+import { bench, between, bicycle, build, firTiers, flower, house, integer, pick, polyline, TAU, tree } from "./faceThemes";
 import type { LandmarkPart, Vec3 } from "./landmarkParts";
 import { createSeededRandom, hashStringToSeed } from "./seededNoise";
 
@@ -88,12 +88,11 @@ const builders: Record<GeneratedDecorationKind, (kit: Parameters<Parameters<type
     const { random } = kit;
     kit.prism([0, 0, 0], 8, 0.17, 0.24, 0.34, pick(random, ["secondary", "dark"] as const));
     kit.prism([0, 0, 0.3], 8, 0.25, 0.25, 0.05, "dark", undefined, { collide: false });
+    // The flowers stand in the pot and now and then sink into it and rise again.
     const flowers = integer(random, 3, 5);
     for (let index = 0; index < flowers; index += 1) {
       const angle = (index / flowers) * TAU + random();
-      const top: Vec3 = [Math.cos(angle) * 0.1, Math.sin(angle) * 0.1, between(random, 0.55, 0.75)];
-      kit.strut([0, 0, 0.33], top, 0.012, "dark", { collide: false });
-      kit.star(top, 5, 0.09, 0.04, 0.03, pick(random, ["accent", "light", "primary"] as const), { roll: Math.PI / 2 });
+      flower(kit, [Math.cos(angle) * 0.1, Math.sin(angle) * 0.1, 0.33], between(random, 0.22, 0.42), 5, 0.09);
     }
   },
   flower_group: (kit) => {
@@ -102,10 +101,7 @@ const builders: Record<GeneratedDecorationKind, (kit: Parameters<Parameters<type
     for (let index = 0; index < flowers; index += 1) {
       const angle = random() * TAU;
       const reach = between(random, 0, 0.5);
-      const height = between(random, 0.3, 0.6);
-      const base: Vec3 = [Math.cos(angle) * reach, Math.sin(angle) * reach, 0];
-      kit.strut(base, [base[0], base[1], height], 0.012, "dark", { collide: false });
-      kit.star([base[0], base[1], height], 5, 0.1, 0.045, 0.03, pick(random, ["accent", "light", "secondary"] as const), { roll: Math.PI / 2 });
+      flower(kit, [Math.cos(angle) * reach, Math.sin(angle) * reach, 0], between(random, 0.3, 0.6), 5, 0.1);
     }
   },
   stop_sign: (kit) => {

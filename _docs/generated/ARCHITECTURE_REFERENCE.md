@@ -5,7 +5,7 @@
 
 This reference is produced from the source code. For the *meaning* of the modules — the mathematical model they implement — read [../MATHEMATICAL_MODEL.md](../MATHEMATICAL_MODEL.md) and [../ARCHITECTURE.md](../ARCHITECTURE.md). For every exported symbol see [API_REFERENCE.md](API_REFERENCE.md).
 
-**355 modules, 70,635 lines** under `src/`.
+**355 modules, 70,905 lines** under `src/`.
 
 ## Layers
 
@@ -18,7 +18,7 @@ A module belongs to the layer named by its first path segment under `src/`. "May
 | `diagnostics` | 2 | 474 | `math`, `cell-complex` | Debug levels and the runtime diagnostics recorder that every layer above may report to. |
 | `visibility` | 2 | 1,036 | `math`, `cell-complex` | Per-frame portal visibility: funnel clipping of portal-path tables against a camera. Pure; no renderer. |
 | `movement` | 13 | 2,929 | `math`, `cell-complex` | Player body, collision, movement and portal crossing in compiled cell complexes. |
-| `world-assets` | 11 | 3,347 | `cell-complex` | Floor-texture and asset descriptors. |
+| `world-assets` | 11 | 3,613 | `cell-complex` | Floor-texture and asset descriptors. |
 | `world-objects` | 41 | 10,505 | `math`, `cell-complex`, `diagnostics`, `movement`, `world-assets` | Placeable runtime objects: registry, geodesic emitters, measurement tools, flags, creature behaviors. |
 | `authoring` | 5 | 967 | `math`, `cell-complex`, `examples`, `world-assets`, `world-objects` | World builder DSL, world-script compiler, validation and world catalog. |
 | `glue` | 12 | 1,092 | `math`, `cell-complex`, `diagnostics`, `authoring` | Launch options, debug settings, tool ids, asset URLs, app configuration. |
@@ -27,7 +27,7 @@ A module belongs to the layer named by its first path segment under `src/`. "May
 | `modules` | 35 | 3,103 | `math`, `cell-complex`, `diagnostics`, `movement`, `world-objects`, `glue`, `interaction`, `engine` | World modules (design 013): each owns a slice of world behaviour and exposes a typed api.ts to the others. |
 | `runtime` | 16 | 3,025 | `math`, `cell-complex`, `diagnostics`, `movement`, `world-objects`, `authoring`, `glue`, `engine`, `modules` | Application state, runtime menu state, command dispatch, geometry session/worker, server channel and public API. |
 | `ui` | 15 | 2,634 | `math`, `cell-complex`, `world-objects`, `authoring`, `glue`, `engine`, `modules`, `runtime` | Renderer-neutral palette, help, tooltip and input-intent definitions. |
-| `render` | 155 | 32,261 | every lower layer | Three.js / DOM / WebXR rendering and input adapters (the application shell). |
+| `render` | 155 | 32,265 | every lower layer | Three.js / DOM / WebXR rendering and input adapters (the application shell). |
 | `root` | 1 | 217 | every lower layer | Entry point. |
 
 ## Layer dependency graph
@@ -202,14 +202,14 @@ None: every import respects the intended layering.
 
 | Module | Lines | Summary | Imports |
 | --- | ---: | --- | --- |
-| `world-assets/decorationModels.ts` | 134 | Decorations generated in code (design 018 section 9.8): the bench, bicycle, trees, flowers, sign, cone and house that world files place by hand are built from the landmark part kit instead of loaded from glTF files. | `world-assets/facePalettes`, `world-assets/faceThemes`, `world-assets/landmarkParts`, `world-assets/seededNoise` |
+| `world-assets/decorationModels.ts` | 130 | Decorations generated in code (design 018 section 9.8): the bench, bicycle, trees, flowers, sign, cone and house that world files place by hand are built from the landmark part kit instead of loaded from glTF files. | `world-assets/facePalettes`, `world-assets/faceThemes`, `world-assets/landmarkParts`, `world-assets/seededNoise` |
 | `world-assets/facePalettes.ts` | 111 | Colour palettes of faces (design 018 section 9.2): every face gets a key hue and a colour scheme, and every colour on it (its landmarks and a tint of its ground) comes from the palette built from them, so a face is reco… | — |
 | `world-assets/faceThemeAssignment.ts` | 173 | Which face gets which theme and palette (design 018 section 9.3). | `cell-complex/compileCellComplex`, `cell-complex/prismCells`, `world-assets/decorationModels`, `world-assets/facePalettes`, `world-assets/faceThemes`, `world-assets/seededNoise` |
-| `world-assets/faceThemes.ts` | 1204 | Face themes (design 018 section 9.1): what stands on a face. | `world-assets/facePalettes`, `world-assets/landmarkParts` |
+| `world-assets/faceThemes.ts` | 1414 | Face themes (design 018 section 9.1): what stands on a face. | `world-assets/facePalettes`, `world-assets/landmarkParts` |
 | `world-assets/floorTextures.ts` | 201 | Floor texture library: the named floor appearances world scripts can use, via the `floorTexture` helper. | `cell-complex/specs` |
 | `world-assets/groundTint.ts` | 207 | Per-cell ground tint image (design 018 section 4.1). | `cell-complex/specs`, `world-assets/seededNoise` |
 | `world-assets/landmarkLayout.ts` | 325 | Seeded layout of the generated landmarks of a cell (design 018 sections 8.4 and 9): one major landmark (6 to 11 m), a few minor ones (1.5 to 4 m) and some small props, all from the generators of the face's theme and in … | `cell-complex/prismCells`, `world-assets/faceThemeAssignment`, `world-assets/faceThemes`, `world-assets/groundTint`, `world-assets/landmarkParts`, `world-assets/seededNoise` |
-| `world-assets/landmarkParts.ts` | 434 | The primitive kit of generated landmarks (design 018 section 9): a landmark is a list of parts, each a simple solid in the landmark's own frame (`u` right, `v` forward, `w` up, meters, origin on the ground), with a colo… | `world-assets/seededNoise` |
+| `world-assets/landmarkParts.ts` | 494 | The primitive kit of generated landmarks (design 018 section 9): a landmark is a list of parts, each a simple solid in the landmark's own frame (`u` right, `v` forward, `w` up, meters, origin on the ground), with a colo… | `world-assets/seededNoise` |
 | `world-assets/sceneryLayout.ts` | 410 | Seeded layout of the small decorative props (grass, flowers, stones, mushrooms...) that grow on the floor of a cell. | `cell-complex/prismCells`, `world-assets/seededNoise` |
 | `world-assets/seededNoise.ts` | 74 | Deterministic seeded random numbers and value noise. | — |
 | `world-assets/worldDressing.ts` | 74 | Everything generated that dresses a world and that more than one consumer needs (design 018): the baked light direction of each cell, the look of each face (theme and palette) and its landmarks. | `cell-complex/cellSun`, `cell-complex/compileCellComplex`, `world-assets/faceThemeAssignment`, `world-assets/landmarkLayout` |
@@ -413,7 +413,7 @@ None: every import respects the intended layering.
 | `render/three/aimTarget.ts` | 34 | Three.js adapter of the renderer-free aim picking (`interaction/aimTarget`): reads the aim ray from a camera's world position and forward (-z) axis, in the root Three.js frame, and hands it over in world axes. | `interaction/aimTarget`, `render/three/worldAxes` |
 | `render/three/appDebugHelpers.ts` | 644 | Browser-console debug surface for the app: window-level helper installation, the shapes of the JSON dumps they return, and small number/portal-word formatters. | `cell-complex/portalPathDebug`, `cell-complex/portalPaths`, `cell-complex/staticPortalPathCull`, `glue/toolIds`, `math/vec3`, `movement/playerBody`, `movement/playerPose`, `render/three/geodesicCreatureDebug`, `render/three/renderPortalInstances`, `render/three/renderQuality`, `render/three/renderState`, `render/three/visiblePortalPaths`, `render/three/worldAxes`, `runtime/publicApi`, `runtime/worldGeometrySession`, `visibility/visiblePortalPaths`, `world-objects/derived`, `world-objects/geodesic/lifecycle`, `world-objects/geodesic/objects`, `world-objects/runtimeObjectRegistry` |
 | `render/three/appDebugLogging.ts` | 112 | Console guides printed when debug options are enabled. | `cell-complex/portalPaths`, `cell-complex/staticPortalPathCull`, `diagnostics/debugLevels`, `glue/debugOptions` |
-| `render/three/buildCellLandmarks.ts` | 200 | Mesh of the generated landmarks of one cell (design 018 sections 8 and 9), in the cell mesh's Three.js axes (cell-local (x, y, height) is Three (x, height, -y)). | `render/three/landmarkMotion`, `world-assets/landmarkLayout`, `world-assets/landmarkParts`, `world-assets/seededNoise` |
+| `render/three/buildCellLandmarks.ts` | 206 | Mesh of the generated landmarks of one cell (design 018 sections 8 and 9), in the cell mesh's Three.js axes (cell-local (x, y, height) is Three (x, height, -y)). | `render/three/landmarkMotion`, `world-assets/landmarkLayout`, `world-assets/landmarkParts`, `world-assets/seededNoise` |
 | `render/three/buildCellMesh.ts` | 478 | Builds the Three.js geometry of one prism cell in the cell's own local frame (which the portal pipeline later places). | `cell-complex/compileCellComplex`, `cell-complex/floorUv`, `cell-complex/prismCells`, `diagnostics/debugLevels`, `glue/portalPanelMode`, `render/three/buildCellLandmarks`, `render/three/buildCellScenery`, `render/three/buildPortalMesh`, `render/three/debugCollisionWireframes`, `render/three/groundBlendGeometry`, `render/three/preparedWorldAssets`, `render/three/sceneColors`, `world-assets/landmarkLayout`, `world-assets/sceneryLayout`, `world-assets/worldDressing` |
 | `render/three/buildCellScenery.ts` | 522 | Builds the merged scenery mesh of one cell: every prop of `computeSceneryLayout` as a few flat-shaded, vertex-coloured triangles. | `cell-complex/prismCells`, `world-assets/sceneryLayout`, `world-assets/seededNoise` |
 | `render/three/buildDecorationMesh.ts` | 218 | Builds the Three.js node for a static decoration (asset object) declared in a cell spec. | `cell-complex/specs`, `diagnostics/runtimeDiagnostics`, `render/three/buildCellLandmarks`, `render/three/preparedWorldAssets`, `render/three/runtimeSceneUtils`, `render/three/worldAxes`, `world-assets/decorationModels`, `world-assets/facePalettes`, `world-assets/landmarkLayout`, `world-assets/landmarkParts` |
@@ -464,7 +464,7 @@ None: every import respects the intended layering.
 | `render/three/helpLensRenderer.ts` | 301 | Help panel ("help lens") renderer: shows the current contextual help definition either as a DOM panel (desktop) or as a floating textured plane in front of the camera (XR). | `glue/assetUrls`, `render/three/canvasDrawing`, `ui/helpLensDefinition` |
 | `render/three/landmarkBodies.ts` | 43 | Player-blocking bodies of the generated landmarks (design 018 section 8.4). | `cell-complex/compileCellComplex`, `math/rigidTransform3`, `math/vec3`, `movement/dynamicObject`, `world-assets/worldDressing` |
 | `render/three/landmarkMapIcon.ts` | 145 | Map icon of a generated landmark (design 018 section 9.7): the landmark itself, drawn from its parts as seen from the front, in its own colours, on a light disc with a dark rim so it reads on any floor. | `world-assets/facePalettes`, `world-assets/landmarkLayout`, `world-assets/landmarkParts` |
-| `render/three/landmarkMotion.ts` | 122 | Moving parts of generated landmarks and decorations, turned in the vertex shader (design 018 section 9.9). | — |
+| `render/three/landmarkMotion.ts` | 120 | Moving parts of generated landmarks and decorations, turned in the vertex shader (design 018 section 9.9). | — |
 | `render/three/laserPreview.ts` | 85 | The Laser's placement preview (design 017 section 8.3): with the Laser in hand and the aim on the floor, a translucent copy of the real laser (its post and its head) stands at the aim point, the head turned the way a pl… | `interaction/aimTarget`, `render/three/geodesicCannonRenderer`, `render/three/preparedWorldAssets`, `render/three/worldAxes` |
 | `render/three/measureLengthRenderer.ts` | 104 | Renderer for measured-geodesic-length labels placed in the world. | `render/three/runtimeSceneUtils`, `render/three/worldAxes`, `render/three/worldResultBadge`, `world-objects/measureLengthTool`, `world-objects/toolObjects` |
 | `render/three/palette/adapterTypes.ts` | 111 | Option and handle types of the in-scene palette panel adapter (the contract between the scene palette controller and the panel builders). | `glue/portalPanelMode`, `glue/toolIds`, `runtime/runtimeCommands`, `runtime/runtimeMenuState`, `ui/paletteDefinition`, `world-objects/toolObjects` |
