@@ -3,10 +3,11 @@
  * Contains the authoring helper that builds a SimpleGeoCreatureObjectSpec with library defaults (speeds, visual scale, collision cylinder derived from the measured model bounds), and the registry record. The motion is in `creatures/simpleGeoCreatureBehavior` and the glTF view in `render/three/creatures/simpleGeoCreatureView`.
  * Units are meters, seconds and radians; positions and displacements are in the current cell's local frame (x right, y forward, z up). Each frame the creature moves forward along its body +y axis at constant speed, plus an optional sinusoidal sideways wobble (faded out near forbidden zones around portal junction vertices) and, for butterflies, a bounded vertical bob; each creature owns an invisible leader that walks the geodesic exactly, and the creature steers toward the leader's position (plus the wobble and bob) with swept collision against walls, forbidden zones and other bodies, so it detours around an obstacle and then rejoins the same geodesic; a detour around a forbidden zone keeps the zone's vertex on the side the geodesic passes it.
  */
-import type { CellObjectSpec, SimpleCollisionCylinderSpec, SimpleGeoCreatureObjectSpec } from "../cell-complex/specs";
+import type { CellObjectSpec, GeneratedCreatureKind, SimpleCollisionCylinderSpec, SimpleGeoCreatureObjectSpec } from "../cell-complex/specs";
 import { yawRigidTransform3 } from "../math/rigidTransform3";
 import { vec3 } from "../math/vec3";
 import { degreesToRadians } from "./staticAssets";
+import { userObjectClass } from "./objectMetadata";
 import type { RuntimeCreatureObject } from "./runtimeObjectBase";
 
 /**
@@ -105,6 +106,73 @@ export function createSimpleGeoCreature(
 }
 
 /**
+ * What differs between the generated creature kinds: the motion family (`kind` of the spec), the speed, the lift of the model, the collision and the words shown to the student.
+ * The stilt-walker's body and the mobile are overhead, so neither blocks the player (it walks between the walker's legs and under the mobile); the eye blocks like the mouse.
+ */
+const generatedCreatureDefinitions: Readonly<Record<GeneratedCreatureKind, {
+  readonly motion: SimpleGeoCreatureObjectSpec["kind"];
+  readonly speed: number;
+  readonly label: string;
+  readonly help: string;
+  readonly collision: SimpleCollisionCylinderSpec;
+  readonly blocksPlayer: boolean;
+}>> = {
+  "stilt-walker": {
+    motion: "geo-mouse",
+    speed: 0.9,
+    label: "stilt walker",
+    help: "A tall creature on thin legs. It walks in a straight line, and so does its shadow on the ground.",
+    // Only the feet are low; the cylinder covers the splayed legs near the ground.
+    collision: { radius: 0.55, height: 0.3, offset: { x: 0, y: 0, z: 0.15 } },
+    blocksPlayer: false,
+  },
+  "drifting-mobile": {
+    motion: "geo-butterfly",
+    speed: 0.6,
+    label: "drifting mobile",
+    help: "Coloured discs on a wire that drift along a straight line.",
+    collision: { radius: 0.35, height: 1.6, offset: { x: 0, y: 0, z: 0 } },
+    blocksPlayer: false,
+  },
+  "rolling-eye": {
+    motion: "geo-mouse",
+    speed: 1.0,
+    label: "rolling eye",
+    help: "A big eye that rolls along a straight line over the ground.",
+    collision: { radius: 0.3, height: 0.6, offset: { x: 0, y: 0, z: 0.3 } },
+    blocksPlayer: true,
+  },
+};
+
+/**
+ * Creates the authored spec of a creature whose body is generated in code (no glTF is named or loaded, and there is no map icon).
+ * The motion family, default speed, collision and student-visible words come from the kind; `params` overrides them as for the mouse and the butterfly. The spec's scale is the author scale, since the generated body is already in meters.
+ */
+export function createGeneratedGeoCreature(
+  id: string,
+  model: { readonly kind: GeneratedCreatureKind; readonly seed: number },
+  params: SimpleGeoCreatureAuthoringParams,
+): SimpleGeoCreatureObjectSpec {
+  const definition = generatedCreatureDefinitions[model.kind];
+  const authorScale = params.scale ?? defaultScale;
+  const collision = definition.collision;
+  const spec = createSimpleGeoCreature(definition.motion, id, "", {
+    ...params,
+    collision: params.collision ?? {
+      radius: collision.radius * authorScale,
+      height: collision.height * authorScale,
+      offset: { x: 0, y: 0, z: (collision.offset?.z ?? 0) * authorScale },
+    },
+    speed: params.speed ?? definition.speed,
+    displayHelpMessage: params.displayHelpMessage ?? definition.help,
+    do_not_collide_with: params.do_not_collide_with ?? params.doNotCollideWith ?? (definition.blocksPlayer ? undefined : [userObjectClass]),
+  });
+  const { assetPath: _noAsset, ...withoutAsset } = spec;
+
+  return { ...withoutAsset, generatedModel: model, scale: authorScale, modelOffset: { x: 0, y: 0, z: 0 } };
+}
+
+/**
  * Type guard: true for geo-mouse and geo-butterfly specs.
  */
 export function isSimpleGeoCreatureObjectSpec(objectSpec: CellObjectSpec): objectSpec is SimpleGeoCreatureObjectSpec {
@@ -137,7 +205,9 @@ function createRuntimeCreatureObject(objectSpec: SimpleGeoCreatureObjectSpec, ce
     portalRenderable: true,
     displayHelpMessage: objectSpec.displayHelpMessage ?? "A moving creature that follows the geometry of this world.",
     tooltip: {
-      label: objectSpec.kind === "geo-mouse" ? "geodesic mouse" : "geodesic butterfly",
+      label: objectSpec.generatedModel !== undefined
+        ? generatedCreatureDefinitions[objectSpec.generatedModel.kind].label
+        : objectSpec.kind === "geo-mouse" ? "geodesic mouse" : "geodesic butterfly",
       rangeMeters: 2.25,
     },
   };

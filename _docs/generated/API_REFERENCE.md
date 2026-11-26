@@ -135,6 +135,15 @@ Immutable 3D vector type and the small set of free functions used throughout the
 
 ## `cell-complex`
 
+### `cell-complex/cellSun.ts`
+
+The baked light direction of every cell (design 018 section 3).
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| const | `firstCellShadowAzimuthRadians` | Direction the shadows of the first cell point to, as an angle in radians from the cell's +x axis toward +y. |
+| function | `computeCellShadowAzimuths` | Computes, per cell id, the azimuth (radians from +x toward +y, cell-local) of the direction in which shadows fall in that cell. |
+
 ### `cell-complex/compileCellComplex.ts`
 
 Top-level compiler from an authored cell-complex spec to the runtime geometry used by movement and rendering.
@@ -360,7 +369,9 @@ Authoring-level data model for a cell complex: the plain-data spec that world fi
 | interface | `TutorialControlSpec` | One row of a tutorial page's control list: the input, and what it does here. |
 | interface | `SimpleCollisionCylinderSpec` | Vertical collision cylinder: radius and height in meters, with an optional offset from the object's anchor. |
 | interface | `GeodesicMarmotObjectSpec` | Autonomous marmot that moves along locally straight paths with a given velocity. |
-| interface | `SimpleGeoCreatureObjectSpec` | Autonomous creature (mouse or butterfly) moving at constant speed with an oscillation added. |
+| type | `GeneratedCreatureKind` | The bodies the renderer can generate in code instead of loading a glTF (design 018 section 8.5). |
+| interface | `GeneratedModelSpec` | A creature body generated in code: the kind picks the shape, the seed its small variations. |
+| interface | `SimpleGeoCreatureObjectSpec` | Autonomous creature moving at constant speed with an oscillation added. |
 | type | `CellObjectSpec` | Union of all object kinds that may appear in a cell's `visuals.objects`, discriminated by `kind`. |
 
 ### `cell-complex/staticLineCone.ts`
@@ -704,11 +715,79 @@ Per-cell ground tint image (design 018 section 4.1).
 | const | `groundTintWarmCoolStrength` | Largest warm/cool shift of the red and blue channels, as a fraction. |
 | const | `groundContactShadowStrength` | Darkest the contact shadow gets, as a fraction removed at the object (0.38 means 62 percent of the colour is left). |
 | const | `groundContactShadowDefaultRadiusMeters` | Radius in meters used for a static object with no collision cylinder. |
+| const | `groundLongShadowStrength` | Darkest a long shadow gets, at its foot, as a fraction removed (0.42 leaves 58 percent of the colour). |
+| const | `groundLongShadowTipStrengthFraction` | Fraction of the foot darkness left at the tip of a long shadow. |
+| const | `groundLongShadowTipWidthFraction` | Width of a long shadow at its tip as a fraction of its width at the foot. |
+| const | `groundLongShadowEdgeMeters` | Width of the soft edge of a long shadow, meters. |
+| const | `groundShadowDefaultHeightPerRadius` | Height assumed for an authored object with no collision height, as a multiple of its radius. |
+| const | `groundTintImageSize` | Default width and height of the tint image, texels. |
 | const | `groundTintNeutralTexel` | Texel value that means "multiply by 1.0". |
 | interface | `GroundTintCell` | The structural part of a compiled prism cell that the tint needs. |
+| interface | `GroundShadowCaster` | Something tall that stands in a cell and throws a long shadow on its ground (a generated landmark, an authored object). |
 | interface | `GroundTintOptions` | Options of {@link computeGroundTint}. |
+| const | `groundShadowLengthPerHeight` | Length of a caster's shadow on the ground as a multiple of its height (a low sun). |
 | interface | `GroundTint` | A tint image and the cell-local rectangle it covers (x right, y forward, meters). |
 | function | `computeGroundTint` | Computes the tint image of a cell over its bounding box, seeded by the cell id so it is the same on every machine. |
+
+### `world-assets/landmarkLayout.ts`
+
+Seeded layout of the large generated landmarks of a cell (design 018 sections 8.1 and 8.4): arcades, towers, floating boulders, stilt forms and the like.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `LandmarkPlacement` | One generated landmark, in cell-local meters (x right, y forward). |
+| interface | `LandmarkCollider` | A vertical cylinder the player cannot walk into. |
+| interface | `LandmarkLayoutContext` | What the layout needs to know besides the cell. |
+| const | `maxLandmarkTrianglesPerCell` | The most triangles of landmarks one cell may carry; minor landmarks are dropped first. |
+| const | `landmarkClearances` | Clearance rules in meters: the disc of a landmark must stay this far (beyond its radius) from sides, and its centre this far from vertices. |
+| const | `landmarkDefaultObjectRadiusMeters` | Collision radius assumed for an authored object without one, meters. |
+| const | `landmarkBiomeByKind` | The biome a landmark kind belongs to; the mesh builder picks its palette from it. |
+| function | `computeLandmarkLayout` | Lays out the landmarks of a cell; an empty list for a cell that gets none. |
+| interface | `FloatingLandmarkPart` | A landmark part that hovers: its centre column on the ground is at (`x`, `y`), its radius and its top height are given. |
+| function | `landmarkFloatingParts` | The hovering boulders of a placement in cell-local meters (empty for every kind but floating boulders and small floaters). |
+| function | `landmarkShadowCasters` | The long shadows the landmarks throw on the ground of their cell: one per ground-touching part, and for every hovering boulder one at the point below it with its radius and its top height (a floating thing still throws … |
+| interface | `LandmarkKeepOutDisc` | A disc on the ground that small props must keep out of. |
+| function | `landmarkKeepOutDiscs` | Discs around the ground-touching parts of the landmarks (collider radius plus 0.4 m) so scenery does not grow inside piers. |
+
+### `world-assets/landmarkShapes.ts`
+
+What each generated landmark kind is, in numbers (design 018 sections 8.1 and 8.4): nominal footprint, height, ground colliders and the triangle count of its mesh.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| type | `LandmarkKind` | What a landmark is; the mesh builder has one shape generator per kind. |
+| interface | `LocalLandmarkCollider` | A vertical cylinder of a landmark in its own frame at scale 1. |
+| interface | `LandmarkShape` | The nominal numbers of one landmark (scale 1). |
+| interface | `FloatingBoulder` | One hovering boulder, in the landmark frame: centre height `zCenter`, outer radius `radius` (the mesh never exceeds it). |
+| interface | `StackStone` | One stone of a pebble stack: an ellipsoid with radii `rx`, `ry`, `rz` centred at (`u`, `v`, `zCenter`). |
+| const | `thinColliderRadiusMeters` | Collider radius of a thin stalk, strut or leg, meters. |
+| const | `arcadeClearWidthMeters` | Clear width between the piers of an arcade, meters. |
+| const | `arcadePierMeters` | Width (and depth) of an arcade pier, meters. |
+| const | `arcadePierHeightMeters` | Height of the piers of an arcade (the arches spring 1.35 m below their top), meters. |
+| const | `arcadeHeightMeters` | Height of an arcade including its entablature, meters. |
+| const | `arcadeArchSegments` | Segments of one semicircular arch of an arcade. |
+| const | `colonnadePitchMeters` | Column pitch of a colonnade, meters. |
+| const | `colonnadeShaftHeightMeters` | Height of a standing colonnade shaft, meters. |
+| const | `ruinArchSegments` | Number of arch pieces of a ruin arch. |
+| const | `mobileItemTriangles` | Triangles of the five items a wire mobile carries, in turn: red disc, blue disc, black crescent, yellow star, yellow disc. |
+| const | `flatDiscSegments` | Segments of the disc fan of a flat disc. |
+| const | `stoneLongitudes` | Longitude and latitude bands of the smooth stones (pebble stacks and pairs). |
+| const | `stoneLatitudes` | Latitude bands of a smooth stone. |
+| function | `latLongTriangles` | Triangles of a lat-long ellipsoid with `longitudes` and `latitudes` bands. |
+| function | `icoTriangles` | Triangles of an icosphere at subdivision level 0 (20) or 1 (80). |
+| function | `wireMobileTriangles` | Triangles of a wire mobile with `branches` branches: a kinked stalk, then per branch a strut and its item. |
+| function | `colonnadeColumnCount` | Number of columns of a colonnade variant. |
+| function | `colonnadeColumnBroken` | Whether column `index` of a colonnade variant is broken short. |
+| function | `colonnadeStumpHeightMeters` | Height of a broken colonnade stump, meters; depends on its index only. |
+| function | `colonnadeColumnU` | Position of column `index` along a colonnade of `count` columns, meters from its centre. |
+| function | `arcadePierU` | Pier centres of an arcade of `arches` arches, meters from its centre. |
+| function | `arcadeLengthMeters` | Length of an arcade of `arches` arches, meters. |
+| function | `colonnadeLengthMeters` | Length of a colonnade of `count` columns, meters. |
+| function | `colonnadeVariantFor` | Draws a colonnade variant (column count and the set of broken columns) from a seed: one to half the columns are broken, and at least two neighbouring columns stay standing so that a lintel joins them. |
+| function | `floatingBoulders` | The boulders of a `floating-boulders` cluster (variant = count, 3 to 5) or of a `small-floater` (one boulder), drawn from the seed. |
+| function | `pebbleStackStones` | The stones of a pebble stack of `count` stones (5 to 8): decreasing in size, slightly off the axis, stacked to 6 to 8 m. |
+| function | `landmarkTriangleCount` | The triangle count of a landmark of the given kind and variant, which `buildCellLandmarks.ts` emits exactly. |
+| function | `landmarkShape` | The nominal shape of a landmark: footprint, height, colliders and triangles, at scale 1. |
 
 ### `world-assets/sceneryLayout.ts`
 
@@ -720,6 +799,7 @@ Seeded layout of the small decorative props (grass, flowers, stones, mushrooms..
 | type | `SceneryBiome` | A ground type that decides which props grow; derived from the floor texture name. |
 | interface | `SceneryProp` | One prop of a cell: where it stands, how it is turned and sized, and which colour variant it has. |
 | interface | `SceneryLayoutOptions` | Options of {@link computeSceneryLayout}; the defaults are the shipped look, tests and tuning override them. |
+| const | `defaultNeighbourBlendHalfWidthMeters` | Half-width of the biome transition at a side when the caller gives none, meters. |
 | const | `sceneryTrianglesByKind` | Triangles each prop kind adds to the cell mesh; `buildCellScenery.ts` emits exactly this many for the kind. |
 | const | `maxSceneryTrianglesPerCell` | The most triangles of scenery one cell may carry. |
 | const | `scenerySpacingMeters` | Spacing of the jittered placement grid, meters. |
@@ -743,6 +823,15 @@ Deterministic seeded random numbers and value noise.
 | function | `createSeededRandom` | Creates a mulberry32 generator returning numbers in [0, 1) from a 32-bit seed. |
 | function | `valueNoise2` | Lattice value noise at (x, y) in [0, 1]: smoothstep interpolation of hashed values at the integer corners. |
 | function | `fractalNoise2` | Sum of `octaves` layers of value noise (each twice the frequency and half the weight), normalised to [0, 1]. |
+
+### `world-assets/worldDressing.ts`
+
+Everything generated that dresses a world and that more than one consumer needs (design 018): the baked light direction of each cell and its landmarks.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `WorldDressing` | The generated dressing of a world. |
+| function | `computeWorldDressing` | Computes (once per world object) the dressing of a compiled world. |
 
 ## `world-objects`
 
@@ -1294,6 +1383,7 @@ Simple geodesic creatures: the mouse and the butterfly, autonomous walkers that 
 | --- | --- | --- |
 | interface | `SimpleGeoCreatureAuthoringParams` | Author-facing parameters for the mouse and butterfly library entries. |
 | function | `createSimpleGeoCreature` | Creates the authored spec for a mouse or butterfly. |
+| function | `createGeneratedGeoCreature` | Creates the authored spec of a creature whose body is generated in code (no glTF is named or loaded, and there is no map icon). |
 | function | `isSimpleGeoCreatureObjectSpec` | Type guard: true for geo-mouse and geo-butterfly specs. |
 | function | `createSimpleGeoCreatureRuntimeObject` | Builds the registry record for a creature spec in the given cell without creating any three.js objects. |
 
@@ -2868,6 +2958,25 @@ Console guides printed when debug options are enabled.
 | function | `logDebugStartupGuide` | Prints the debugging quick start: the current debug level, the enabled options and the available console commands. |
 | function | `logPortalDebugInstall` | Prints how to use the portal path debug helpers and a table of per-root-cell path counts (generated, kept, rejected, budget-rejected). |
 
+### `render/three/buildCellLandmarks.ts`
+
+Mesh of the generated landmarks of one cell (design 018 sections 8.1 to 8.4), in the cell mesh's Three.js axes (cell-local (x, y, height) is Three (x, height, -y)).
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| const | `landmarkLightElevationRadians` | Elevation of the baked light above the horizon, radians (40 degrees). |
+| const | `landmarkShadeFloor` | Brightness of a face turned away from the light. |
+| const | `landmarkShadeRange` | Brightness added to the floor by a face turned straight to the light. |
+| const | `landmarkShadeRed` | Red multiplier of a face turned away from the light (shade reads cool). |
+| const | `landmarkShadeBlue` | Blue multiplier of a face turned away from the light. |
+| const | `landmarkUndersideFactor` | Brightness multiplier of an underside (normal pointing down). |
+| const | `landmarkUndersideNormalZ` | A face whose normal height component is below this counts as an underside. |
+| const | `landmarkFacetJitter` | Per-triangle brightness jitter, as a total fraction (plus or minus half of it), so flat facets do not look uniform. |
+| const | `landmarkPalette` | Palettes (sRGB hex) per biome; edit here to tune the look. |
+| function | `landmarkToLight` | Unit vector from a surface toward the light, in cell-local axes: horizontally opposite to the shadow direction, raised by the light elevation. |
+| function | `bakeLandmarkLight` | Multiplies `color` by the baked light of a face with the unit normal `normal` (cell-local axes): `0.62 + 0.38 * max(0, n . |
+| function | `buildCellLandmarksMesh` | Builds the landmark mesh of a cell (`name = "landmarks:<cellId>"`, `userData.kind = "landmark"`), or undefined when the cell has no landmarks. |
+
 ### `render/three/buildCellMesh.ts`
 
 Builds the Three.js geometry of one prism cell in the cell's own local frame (which the portal pipeline later places).
@@ -2877,6 +2986,7 @@ Builds the Three.js geometry of one prism cell in the cell's own local frame (wh
 | interface | `BuildCellMeshOptions` | Options controlling which debug and decoration content a cell mesh includes. |
 | function | `buildCellMesh` | Builds the full Three.js group for a cell, named `cell:<id>` and tagged with its portal sides in `userData`. |
 | function | `floorColorTexture` | The tiling color texture of a cell's floor, or undefined if it has none or it failed to load. |
+| interface | `FloorStripBlend` | What a floor strip's material needs to blend into the neighbour; stored in the strip mesh's `userData.groundBlend`, never in a material (clones JSON-copy `userData`). |
 
 ### `render/three/buildCellScenery.ts`
 
@@ -2951,6 +3061,7 @@ Builds the instanced-mesh archetypes for the static geometry of every cell, one 
 | type | `CellRenderArchetypeKind` | Category of a cell mesh part; "ceiling" and floor-outline meshes have no kind and are not instanced. |
 | interface | `CellRenderArchetype` | An instanced mesh of one cell part with its per-instance portal attributes. |
 | const | `sceneryMaxPathDepth` | Scenery is drawn only on portal paths of at most this depth (about 45 m; farther away a tuft is a few pixels and fogged). |
+| const | `landmarkMaxPathDepth` | Deepest portal path on which the generated landmarks of a cell are drawn: beyond it (about 90 m on the cube) the fog has taken them. |
 | interface | `BuildCellRenderArchetypesOptions` | Options controlling how cell meshes are built and instanced. |
 | interface | `CellRenderArchetypePlanEntry` | Description of an archetype that would be built, for diagnostics and tests, without creating GPU resources. |
 | function | `buildCellRenderArchetypes` | Builds every cell's archetypes, with `count = 0` and frustum culling disabled (instance bounds are not tracked). |
@@ -2967,6 +3078,15 @@ Application shell: builds the Three.js scene, owns the shared mutable state (pla
 | interface | `ThreeApp` | Handle returned by {@link createThreeApp} for the running application shell. |
 | interface | `ThreeAppOptions` | Inputs for {@link createThreeApp}: the selected world, launch/debug settings and host callbacks. |
 | function | `createThreeApp` | Creates the Three.js application shell inside `container` and starts its animation loop. |
+
+### `render/three/creatures/generatedCreatureMesh.ts`
+
+Creature bodies generated in code, in the low-poly surrealist style of design 018 section 8.1: a stilt-walker (Dali), a drifting mobile (Miro) and a rolling eye (Magritte, Tanguy).
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| const | `generatedCreatureTriangleBudget` | The most triangles each generated body may use (design 018 section 8.5). |
+| function | `buildGeneratedCreatureRoot` | Builds the body of a generated creature: a group holding one merged vertex-coloured mesh (`MeshLambertMaterial` with `vertexColors` and `DoubleSide`). |
 
 ### `render/three/creatures/geodesicMarmotView.ts`
 
@@ -3333,6 +3453,36 @@ The `window.noneuclidGeometry` helpers and the `geometry` API namespace that dri
 | interface | `GeometryDebugHelpersDeps` | Dependencies of {@link createGeometryDebugHelpers}. |
 | interface | `GeometryDebugHelpersHandle` | Handle to the geometry helpers created by {@link createGeometryDebugHelpers}. |
 | function | `createGeometryDebugHelpers` | Creates the installer of the geometry debug helpers. |
+
+### `render/three/groundBlendGeometry.ts`
+
+Geometry of a metric floor split into an inner polygon and one blend strip per side (design 018 section 8.3).
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| const | `blendStripSegmentMeters` | Longest segment along a side of a strip, meters. |
+| const | `blendStripInradiusFraction` | The strip width is at most this fraction of the cell's inradius, so the inner polygon never collapses. |
+| const | `blendNoiseWidthFraction` | The noise amplitude is at most this fraction of the strip width, so the transition ends inside the strip. |
+| interface | `FloorStrip` | One blend strip of a cell and what its material needs to know about the glued side. |
+| interface | `FloorBlendGeometry` | The inner polygon and strips of a cell's floor. |
+| function | `cellInradiusMeters` | Radius of the largest circle around the vertex centroid that fits in the cell (the inradius for a regular polygon, a lower bound otherwise), meters. |
+| function | `blendStripWidthMeters` | Strip width `w = min(blendHalfWidthMeters, 0.42 * inradius)` of a cell, meters. |
+| function | `groundBlendTransition` | The transition between two cells whose strips are `widthA` and `widthB` wide: the narrower strip decides, the noise amplitude is limited to a fraction of it, and the half-width `h` is what is left, so the neighbour's sh… |
+| function | `buildFloorBlendGeometry` | Builds the inner polygon and the strips of `cell`. |
+
+### `render/three/groundBlendMaterial.ts`
+
+Ground blending along the sides of a metric floor (design 018 section 8.3).
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| const | `blendHalfWidthMeters` | Largest half-width of the strip (its width) in meters, before it is limited by the size of the cell. |
+| const | `blendNoiseAmplitudeMeters` | Largest sideways wander of the border in meters (the noise `n` goes from minus to plus this). |
+| const | `blendNoiseFeatureMeters` | Size of the features of the border noise along the side, meters. |
+| const | `blendNoiseTaperMeters` | Distance from either end of a side over which the noise fades to zero, meters. |
+| interface | `GroundBlendTintSource` | A tint image together with the texture that holds it, as the shader needs them. |
+| interface | `GroundBlendOptions` | Everything `patchGroundBlendMaterial` needs to mix a cell's ground with its neighbour's. |
+| function | `patchGroundBlendMaterial` | Makes the material mix its own ground with the neighbour's as described in the module header. |
 
 ### `render/three/groundTintMaterial.ts`
 
@@ -3967,10 +4117,15 @@ Shared scene colour constants for the Three.js renderer.
 | Kind | Name | Summary |
 | --- | --- | --- |
 | const | `SCENE_BACKGROUND_COLOR` | Sky-blue colour (0x78b9eb) used for ceiling caps and as the legacy flat background tone. |
-| const | `SKY_ZENITH_COLOR` | Deep sky blue straight overhead (elevation 70 degrees and above). |
-| const | `SKY_MID_COLOR` | Mid sky blue at 25 degrees of elevation. |
-| const | `SKY_HORIZON_COLOR` | Pale haze at the horizon; also the fog colour, so distant geometry dissolves into the horizon. |
-| const | `GROUND_HAZE_COLOR` | Muted grey-green seen below the horizon and used for the plane under the cells. |
+| const | `SKY_ZENITH_COLOR` | Deep teal-blue overhead (elevation 70 degrees and above, outside the moon and its halo). |
+| const | `SKY_TEAL_COLOR` | Teal at 45 degrees of elevation. |
+| const | `SKY_GREEN_COLOR` | Green at 20 degrees of elevation. |
+| const | `SKY_LOW_GOLD_COLOR` | Pale gold at 6 degrees of elevation, just above the glowing horizon. |
+| const | `SKY_HORIZON_COLOR` | Glowing gold at the horizon (design 018 section 8.2). |
+| const | `SKY_MOON_COLOR` | Pale moon disc and halo, exactly at the zenith (a disc there has no horizontal direction). |
+| const | `SCENE_FOG_COLOR` | Fog colour: the horizon gold, slightly desaturated, so distant geometry dissolves into the horizon. |
+| const | `HEMISPHERE_SKY_COLOR` | Sky colour of the hemisphere light, a touch warmer than white. |
+| const | `GROUND_HAZE_COLOR` | Dark warm haze seen below the horizon. |
 | const | `UNDER_FLOOR_COLOR` | Dark earth colour (0x2c3128) of the plane under the cells. |
 
 ### `render/three/sceneLighting.ts`
@@ -4075,13 +4230,19 @@ Vertical sky gradient used as `scene.background`.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
-| const | `skyTextureHeightPixels` | Number of rows (elevation samples) of the sky texture. |
-| const | `skyMidElevationDegrees` | Elevation at which the sky reaches SKY_MID_COLOR, degrees. |
-| const | `skyZenithElevationDegrees` | Elevation from which the sky is SKY_ZENITH_COLOR, degrees. |
+| const | `skyTextureHeightPixels` | Number of rows (elevation samples) of the sky texture; enough for a clean moon edge (0.18 degrees per row). |
+| const | `skyLowGoldElevationDegrees` | Elevation of the low gold band, degrees. |
+| const | `skyGreenElevationDegrees` | Elevation at which the sky is green, degrees. |
+| const | `skyTealElevationDegrees` | Elevation at which the sky is teal, degrees. |
+| const | `skyZenithElevationDegrees` | Elevation from which the sky is deep teal-blue, degrees. |
 | const | `skyGroundBlendFraction` | Fraction of the span under the horizon, counted up from the horizon, over which the ground haze blends into the horizon colour. |
+| const | `skyMoonRadiusDegrees` | Angular radius of the moon disc around the zenith, degrees. |
+| const | `skyMoonEdgeDegrees` | Width of the moon's soft edge, degrees (centred on the radius). |
+| const | `skyMoonHaloRadiusDegrees` | Angular radius out to which the moon's faint halo reaches, degrees. |
+| const | `skyMoonHaloStrength` | Share of the moon colour in the halo right at the disc's edge. |
 | interface | `SkyRgb` | An sRGB colour with channels in 0..1. |
 | function | `skyColorAtElevation` | Returns the sky colour (sRGB, 0..1) at an elevation in radians, from -pi/2 (nadir) to pi/2 (zenith). |
-| function | `createSkyBackgroundTexture` | Creates the 1 x 256 sky texture. |
+| function | `createSkyBackgroundTexture` | Creates the 1 x 1024 sky texture. |
 
 ### `render/three/staticAssetRenderRoot.ts`
 

@@ -14,7 +14,7 @@
 import * as THREE from "three";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
-import { dodecahedron } from "../../src/authoring/exampleWorlds";
+import { basicCube, dodecahedron } from "../../src/authoring/exampleWorlds";
 import { twoPrismLoop } from "../fixtures/cell-complex/twoPrismLoop";
 import { floorLatticeUv, type FloorLatticeUvFrame } from "../../src/cell-complex/floorUv";
 import type { CellComplexSpec } from "../../src/cell-complex/specs";
@@ -332,6 +332,49 @@ describe("buildCellMesh floor UVs", () => {
       expect(uv.getX(i)).toBeCloseTo(s, 5);
       expect(uv.getY(i)).toBeCloseTo(t, 5);
     }
+  });
+});
+
+describe("buildCellMesh floor strips", () => {
+  const meshesOf = (root: THREE.Object3D): THREE.Mesh[] => {
+    const found: THREE.Mesh[] = [];
+    root.traverse((object) => {
+      if (object instanceof THREE.Mesh && object.name.startsWith("floor:")) {
+        found.push(object);
+      }
+    });
+    return found;
+  };
+  const build = (cell: Parameters<typeof buildCellMesh>[0], extra: Partial<Parameters<typeof buildCellMesh>[1]>) =>
+    buildCellMesh(cell, { debugLevel: "off", portalPanelMode: "none", eyeHeightMeters: 1.6, assets: createFakePreparedAssets(), ...extra });
+
+  it("splits a metric textured floor in a world into an inner polygon and one strip per side", () => {
+    const world = compileCellComplex(basicCube);
+    const cell = world.cells[0];
+    const floors = meshesOf(build(cell, { world }));
+    expect(floors.map((mesh) => mesh.name)).toEqual([
+      `floor:${cell.id}`,
+      ...cell.sides.map((side) => `floor:${cell.id}:side-${side.sideIndex}`),
+    ]);
+    const strip = floors[1];
+    expect(strip.userData.groundBlend.neighbourCellId).toBe(cell.portalBySideIndex.get(0)?.targetCellId);
+    expect(strip.userData.groundBlend.enabled).toBe(true);
+    expect((strip.material as THREE.MeshStandardMaterial).map).not.toBeNull();
+  });
+
+  it("keeps one floor mesh without a world or with a lattice frame", () => {
+    const world = compileCellComplex(basicCube);
+    const cell = world.cells[0];
+    expect(meshesOf(build(cell, {}))).toHaveLength(1);
+    const frame = { origin: { x: 0, y: 0 }, u: { x: 15, y: 0 }, v: { x: 0, y: 15 }, tilesAlongU: 2, tilesAlongV: 2, restU: { x: 15, y: 0 }, restV: { x: 0, y: 15 } };
+    expect(meshesOf(build(cell, { world, floorUvFrame: frame }))).toHaveLength(1);
+  });
+
+  it("makes a wall side a strip that does not blend", () => {
+    const world = compileCellComplex(createFloorRoomSpec(5));
+    const floors = meshesOf(build(world.cells[0], { world }));
+    expect(floors).toHaveLength(5);
+    expect(floors.slice(1).every((mesh) => mesh.userData.groundBlend.enabled === false)).toBe(true);
   });
 });
 

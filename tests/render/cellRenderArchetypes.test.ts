@@ -20,6 +20,7 @@ import {
   disposeCellRenderArchetypes,
   deriveCellRenderArchetypeCapacities,
   planCellRenderArchetypes,
+  landmarkMaxPathDepth,
   sceneryMaxPathDepth,
 } from "../../src/render/three/cellRenderArchetypes";
 import { createFakePreparedAssets } from "../support/preparedAssets";
@@ -66,7 +67,7 @@ describe("planCellRenderArchetypes", () => {
 
     const archetypes = buildCellRenderArchetypes(world, options);
     for (const archetype of archetypes) {
-      expect(archetype.maxPathDepth).toBe(archetype.kind === "scenery" ? sceneryMaxPathDepth : undefined);
+      expect(archetype.maxPathDepth).toBe(archetype.kind === "scenery" ? sceneryMaxPathDepth : archetype.kind === "landmark" ? landmarkMaxPathDepth : undefined);
     }
     disposeCellRenderArchetypes(archetypes);
   });
@@ -241,6 +242,36 @@ describe("buildCellRenderArchetypes ground tint", () => {
   });
 });
 
+describe("buildCellRenderArchetypes floor strips", () => {
+  const keyOf = (material: THREE.Material | THREE.Material[]) => (Array.isArray(material) ? material[0] : material).customProgramCacheKey();
+
+  it("gives a cube face an inner floor and four strips, and one tint texture owned once", () => {
+    const world = compileCellComplex(basicCube);
+    const archetypes = buildCellRenderArchetypes(world, {
+      debugLevel: "off",
+      portalPanelMode: "none",
+      eyeHeightMeters: 1.6,
+      assets: createPreparedAssets(),
+      capacitiesByCellId: new Map(),
+      portalClipMaterialState: createPortalClipMaterialState(createPortalClipData({ maxVisiblePaths: 8 })),
+    });
+
+    for (const cell of world.cells) {
+      const floors = archetypes.filter((archetype) => archetype.cellId === cell.id && archetype.kind === "floor");
+      expect(floors).toHaveLength(5);
+      expect(floors.flatMap((archetype) => archetype.ownedTextures ?? [])).toHaveLength(1);
+      expect(floors[0].ownedTextures).toHaveLength(1);
+      expect(keyOf(floors[0].mesh.material)).toContain("ground-tint");
+      for (const strip of floors.slice(1)) {
+        // Blend first, clip patch last.
+        expect(keyOf(strip.mesh.material)).toMatch(/ground-blend:.*portal-clip-planes/);
+        expect(keyOf(strip.rootMesh.material)).toBe("ground-blend:");
+      }
+    }
+    disposeCellRenderArchetypes(archetypes);
+  });
+});
+
 describe("buildCellRenderArchetypes root mesh", () => {
   it("gives every archetype a hidden root mesh sharing geometry with an unpatched material", () => {
     const world = compileCellComplex(cube);
@@ -266,9 +297,11 @@ describe("buildCellRenderArchetypes root mesh", () => {
       expect(rootMaterial).not.toBe(patchedMaterial);
       expect(patchedMaterial.customProgramCacheKey()).toContain("portal-clip-planes");
       expect(rootMaterial.customProgramCacheKey()).not.toContain("portal-clip-planes");
-      // The root material has no clip patch; a metric textured floor still carries the ground tint (and nothing else).
+      // The root material has no clip patch; a metric textured floor still carries the ground tint or blend (and nothing else).
+      const isStrip = archetype.sourceObjectName?.includes(":side-") === true;
+      const isInner = archetype.kind === "floor" && !isStrip;
       expect(rootMaterial.customProgramCacheKey()).toBe(
-        archetype.ownedTextures ? "ground-tint:" : new (rootMaterial.constructor as new () => THREE.Material)().customProgramCacheKey(),
+        isStrip ? "ground-blend:" : isInner ? "ground-tint:" : new (rootMaterial.constructor as new () => THREE.Material)().customProgramCacheKey(),
       );
     }
 

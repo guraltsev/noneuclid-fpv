@@ -6,7 +6,7 @@
  */
 import { describe, expect, it } from "vitest";
 import type { CellObjectSpec } from "../../src/cell-complex/specs";
-import { computeGroundTint, groundTintNeutralTexel, type GroundTintCell } from "../../src/world-assets/groundTint";
+import { computeGroundTint, groundTintNeutralTexel, groundShadowLengthPerHeight, type GroundTintCell } from "../../src/world-assets/groundTint";
 
 function cell(objects: readonly CellObjectSpec[]): GroundTintCell {
   return {
@@ -49,14 +49,14 @@ function texelAt(tint: ReturnType<typeof computeGroundTint>, x: number, y: numbe
 describe("computeGroundTint", () => {
   it("covers the bounding box at the requested size, near neutral", () => {
     const tint = computeGroundTint(cell([]));
-    expect([tint.width, tint.height, tint.data.length]).toEqual([128, 128, 128 * 128 * 4]);
+    expect([tint.width, tint.height, tint.data.length]).toEqual([192, 192, 192 * 192 * 4]);
     expect([tint.originX, tint.originY, tint.sizeX, tint.sizeY]).toEqual([-5, -4, 10, 8]);
     expect(computeGroundTint(cell([]), { width: 16, height: 8 }).data.length).toBe(16 * 8 * 4);
     let sum = 0;
     for (let index = 1; index < tint.data.length; index += 4) {
       sum += tint.data[index];
     }
-    const mean = sum / (128 * 128);
+    const mean = sum / (192 * 192);
     expect(mean).toBeGreaterThan(groundTintNeutralTexel * 0.85);
     expect(mean).toBeLessThan(groundTintNeutralTexel * 1.15);
     expect(tint.data[3]).toBe(255);
@@ -73,5 +73,41 @@ describe("computeGroundTint", () => {
     expect(texelAt(withRock, 0, 0)).toBeLessThan(texelAt(empty, 0, 0) * 0.75);
     expect(texelAt(withRock, 4.5, 3.5)).toBe(texelAt(empty, 4.5, 3.5));
     expect(withMouse.data).toEqual(empty.data);
+  });
+});
+
+describe("long baked shadows", () => {
+  const tall: CellObjectSpec = { ...rock, id: "tall", collision: { radius: 0.5, height: 2 } };
+  const azimuth = 0; // shadows fall toward +x
+
+  it("darkens the ground along the azimuth and not against it", () => {
+    const plain = computeGroundTint(cell([tall]));
+    const long = computeGroundTint(cell([tall]), { shadowAzimuthRadians: azimuth });
+    const length = 2 * groundShadowLengthPerHeight;
+    expect(texelAt(long, length * 0.5, 0)).toBeLessThan(texelAt(plain, length * 0.5, 0) * 0.8);
+    expect(texelAt(long, -3, 0)).toBe(texelAt(plain, -3, 0));
+    expect(texelAt(long, length * 0.5, 3)).toBe(texelAt(plain, length * 0.5, 3));
+    expect(texelAt(long, length + 1.5, 0)).toBe(texelAt(plain, length + 1.5, 0));
+  });
+
+  it("is darker at the foot than at the tip and uses the casters passed in", () => {
+    const empty = cell([]);
+    const caster = { x: -4, y: 0, radiusMeters: 0.4, heightMeters: 3 };
+    const plain = computeGroundTint(empty);
+    const long = computeGroundTint(empty, { shadowAzimuthRadians: azimuth, casters: [caster] });
+    const foot = texelAt(long, -3.7, 0) / texelAt(plain, -3.7, 0);
+    const tip = texelAt(long, -4 + 3 * groundShadowLengthPerHeight - 0.3, 0) / texelAt(plain, -4 + 3 * groundShadowLengthPerHeight - 0.3, 0);
+    expect(foot).toBeLessThan(tip);
+    expect(tip).toBeLessThan(0.9);
+    expect(computeGroundTint(empty, { casters: [caster] }).data).toEqual(plain.data);
+  });
+
+  it("gives an authored object without a collision height a height of 2.5 radii", () => {
+    const bare: CellObjectSpec = { id: "bare", kind: "asset", assetPath: "x.gltf", position: { x: -4, y: 0, z: 0 } };
+    const plain = computeGroundTint(cell([bare]));
+    const long = computeGroundTint(cell([bare]), { shadowAzimuthRadians: azimuth });
+    // radius 0.35, height 0.875, shadow 0.96 m long: dark just past the contact disc, nothing 3 m away.
+    expect(texelAt(long, -3.3, 0)).toBeLessThan(texelAt(plain, -3.3, 0));
+    expect(texelAt(long, -1, 0)).toBe(texelAt(plain, -1, 0));
   });
 });

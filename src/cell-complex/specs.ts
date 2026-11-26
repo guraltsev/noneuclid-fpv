@@ -312,12 +312,25 @@ export interface GeodesicMarmotObjectSpec extends PositionedCellObjectSpec {
   readonly animationClipName?: string;
 }
 
+/** The bodies the renderer can generate in code instead of loading a glTF (design 018 section 8.5). */
+export type GeneratedCreatureKind = "stilt-walker" | "drifting-mobile" | "rolling-eye";
+
+/** A creature body generated in code: the kind picks the shape, the seed its small variations. Plain data, so the spec stays free of render code. */
+export interface GeneratedModelSpec {
+  readonly kind: GeneratedCreatureKind;
+  readonly seed: number;
+}
+
 /**
- * Autonomous creature (mouse or butterfly) moving at constant speed with an oscillation added.
+ * Autonomous creature moving at constant speed with an oscillation added. `kind` picks the motion family: "geo-mouse" walks on the floor, "geo-butterfly" flies with a small vertical bob.
+ * The body is the glTF at `assetPath`, or, when `generatedModel` is set, a mesh built in code and no asset is loaded.
  */
 export interface SimpleGeoCreatureObjectSpec extends PositionedCellObjectSpec {
   readonly kind: "geo-mouse" | "geo-butterfly";
-  readonly assetPath: string;
+  /** The glTF of the body; absent exactly when `generatedModel` is set. */
+  readonly assetPath?: string;
+  /** Set for a body generated in code; then there is no `assetPath`. */
+  readonly generatedModel?: GeneratedModelSpec;
   readonly speedMetersPerSecond: number;
   readonly oscillationRateHz: number;
   /**
