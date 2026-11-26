@@ -5,8 +5,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "know",
+            "command": "agenttools",
             "args": [
+              "know",
               "hook",
               "UserPromptSubmit",
               "--runtime",
@@ -22,8 +23,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "know",
+            "command": "agenttools",
             "args": [
+              "know",
               "hook",
               "PreCompact",
               "--runtime",
@@ -39,8 +41,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "know",
+            "command": "agenttools",
             "args": [
+              "know",
               "hook",
               "SessionEnd",
               "--runtime",
@@ -56,8 +59,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "know",
+            "command": "agenttools",
             "args": [
+              "know",
               "hook",
               "SessionStart",
               "--runtime",
