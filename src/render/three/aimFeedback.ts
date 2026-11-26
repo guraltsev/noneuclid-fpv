@@ -223,16 +223,20 @@ export function createAimFeedback(deps: AimFeedbackDeps): AimFeedback {
   }
 
   function updateAimCrossMarker(xrActive: boolean, activeAimRay: RootAimRay | undefined): void {
-    // "none" and "aim" have no descriptor and show the cross.
-    const selectedTool = deps.toolsById().get(currentMenuState().selectedTool);
-    if ((selectedTool !== undefined && !selectedTool.showsAimCross) || currentMenuState().isOpen) {
+    // Design 018 section 5: on the desktop the cross is drawn only where it adds something (the Sign and the aim modes), in the tool's color; the Hand ("none") has none. "aim" has no descriptor and shows it. VR keeps its cross and controller ray as before.
+    const selectedId = currentMenuState().selectedTool;
+    const selectedTool = deps.toolsById().get(selectedId);
+    const shown = selectedTool === undefined
+      ? xrActive || selectedId !== "none"
+      : xrActive ? selectedTool.showsXrAimCross ?? selectedTool.showsAimCross : selectedTool.showsAimCross;
+    if (!shown || currentMenuState().isOpen) {
       aimCrossMarker.update(undefined);
       updateAimControllerRay(false);
       return;
     }
 
     const target = activeAimRay ? deps.resolveCurrentAimTarget(activeAimRay) : undefined;
-    aimCrossMarker.update(target, activeAimRay);
+    aimCrossMarker.update(target, activeAimRay, xrActive ? undefined : selectedTool?.indicatorColor);
     updateAimControllerRay(xrActive && Boolean(target), activeAimRay, aimCrossMarker.root.position);
   }
 

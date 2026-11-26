@@ -22,10 +22,10 @@ export interface StylizedSceneLighting {
  * The caller owns the returned handle and should release it with {@link disposeStylizedSceneLighting}.
  */
 export function createStylizedSceneLighting(scene: THREE.Scene): StylizedSceneLighting {
-  const hemisphereLight = new THREE.HemisphereLight(0xf6f8ff, 0x304050, 1.85);
+  const hemisphereLight = new THREE.HemisphereLight(0xfff6e8, 0x55604f, 1.9);
   hemisphereLight.castShadow = false;
 
-  const ambientLight = new THREE.AmbientLight(0xffffff, 0.28);
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
   ambientLight.castShadow = false;
 
   scene.add(hemisphereLight);

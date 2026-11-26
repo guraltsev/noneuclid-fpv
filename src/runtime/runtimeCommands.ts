@@ -61,6 +61,8 @@ export type RuntimeCommand =
   | { readonly kind: "close-menu" }
   /** Closes the menu, ends the tool in progress and selects no tool. */
   | { readonly kind: "cancel-menu-and-tool" }
+  /** The palette's Close button: closes the menu of an object (laser, sign, measurement, shape machine) and keeps the tool in hand; from any other page it cancels the menu and the tool like `cancel-menu-and-tool`. Design 018 section 5 item 5. */
+  | { readonly kind: "close-menu-button" }
   /** The header's right action: leave the page one level up, or cancel from a top-level page. */
   | { readonly kind: "menu-right-action" }
   | { readonly kind: "show-settings" }

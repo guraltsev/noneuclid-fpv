@@ -61,7 +61,12 @@ function collectEntries(
     return [{ glyphLabel: primary, text: hintStripText.choose }, { glyphLabel: menu, text: hintStripText.close }];
   }
   if (source.carrying) {
-    return [{ glyphLabel: label("carry"), text: hintStripText.putDown }];
+    // On desktop a left click puts the laser down (the G key does too); the VR strip keeps naming its carry button.
+    return [{ glyphLabel: source.inputMode === "desktop" ? primary : label("carry"), text: hintStripText.putDown }];
+  }
+  if (source.inputMode === "desktop" && (source.selectedTool === "geodesicEmitters/rotate" || source.selectedTool === "geodesicEmitters/aim" || source.selectedTool === "aim")) {
+    // The laser's turn and aim modes ignore 0: the click is the way out.
+    return [{ glyphLabel: primary, text: hintStripText.setDirection }];
   }
 
   const whatsThis: HintStripEntry = { glyphLabel: label("help"), text: hintStripText.whatsThis };
@@ -74,17 +79,30 @@ function collectEntries(
   const entries: HintStripEntry[] = [];
   const primaryAction = focus.actions.find((action) => action.available && action.intent === "primary");
   const menuAction = focus.actions.find((action) => action.available && action.intent === "context-menu");
-  if (primaryAction !== undefined) {
+  const laserText = laserToolPrimaryText(source.selectedTool, focus.objectKind);
+  if (laserText !== undefined) {
+    entries.push({ glyphLabel: primary, text: laserText });
+  } else if (primaryAction !== undefined && !(inHand && primaryAction.id === "extend-geodesic")) {
+    // Only the Hand makes a free beam longer; with another tool in hand the click does not, so the strip does not say it does.
     entries.push({ glyphLabel: primary, text: primaryActionText(primaryAction, source.extendLengthMeters) });
   }
   if (menuAction !== undefined) {
     // With the Hand, Use opens the menu too (design 017 section 7.1), so both controls are named in one entry.
     entries.push({ glyphLabel: inHand || primaryAction !== undefined ? menu : `${primary} / ${menu}`, text: menuAction.label });
   }
-  if (focus.objectKind === "geodesicEmitters/emitter" || focus.objectKind === "placedFlags/flag") {
+  // Only lasers can be picked up; a sign cannot.
+  if (focus.objectKind === "geodesicEmitters/emitter") {
     entries.push({ glyphLabel: label("carry"), text: hintStripText.pickUp });
   }
   return entries.length > 0 ? entries : [whatsThis];
+}
+
+// What a click does with the Laser in hand: it places a laser on a beam or a meeting point, and adds a beam to a laser (the client's primary handler).
+function laserToolPrimaryText(tool: RuntimeToolId, kind: RuntimeWorldObject["kind"]): string | undefined {
+  if (tool !== "geodesicEmitters/emitter") return undefined;
+  if (kind === "geodesicModel/segment" || kind === "geodesicModel/crossing") return hintStripText.placeLaserHere;
+  if (kind === "geodesicEmitters/emitter") return hintStripText.addBeam;
+  return undefined;
 }
 
 // The aim is on the floor: the tool in hand says what a click does there, and how to put the tool away.

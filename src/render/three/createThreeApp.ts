@@ -163,6 +163,8 @@ import { getInputHintGlyph } from "../../ui/inputIntents";
 import { createResetHoldRing } from "../dom/resetHoldRing";
 import { createPauseCard } from "../dom/pauseCard";
 import { createCrosshair } from "../dom/crosshair";
+import { createCrosshairDefinition, createRefusalToastGate, type CrosshairDefinition } from "../../ui/crosshairDefinition";
+import { readCrosshairAim } from "./crosshairAim";
 import { createPauseCardDefinition } from "../../ui/pauseCardDefinition";
 import { restoreSavedSnapshot, savedKindsRemovedThisFrame, savedObjectKinds, takeSavedSnapshot, type SavedSnapshot } from "../../world-objects/savedSnapshot";
 import { objectNouns, toastMessages } from "../../ui/vocabulary";
@@ -222,7 +224,8 @@ import {
   disposeObject3D,
   isGeodesicRuntimeRenderObject,
 } from "./runtimeSceneUtils";
-import { SCENE_BACKGROUND_COLOR } from "./sceneColors";
+import { SKY_HORIZON_COLOR } from "./sceneColors";
+import { createSkyBackgroundTexture } from "./skyBackground";
 import {
   createStylizedSceneLighting,
   disposeStylizedSceneLighting,
@@ -329,9 +332,10 @@ const MAX_CONSECUTIVE_FAILED_FRAMES = 30;
 export function createThreeApp(container: HTMLElement, appState: AppState, options: ThreeAppOptions): ThreeApp {
   const appConfig = appConfigForWorld(options.appConfig ?? defaultAppConfig, appState.world);
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(SCENE_BACKGROUND_COLOR);
+  const skyBackgroundTexture = createSkyBackgroundTexture();
+  scene.background = skyBackgroundTexture;
   scene.environment = null;
-  scene.fog = new THREE.Fog(SCENE_BACKGROUND_COLOR, 12, 85);
+  scene.fog = new THREE.Fog(SKY_HORIZON_COLOR, 16, 90);
   const underCellInfinityFloor = createUnderCellInfinityFloor();
   scene.add(underCellInfinityFloor);
 
@@ -458,6 +462,8 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   // The world's and the tools' sentences (a refused action, a notice) show briefly in front of the player, and also go
   // to the console and the diagnostics, always (not only in debug mode).
   const toastQueue = createToastQueue({ durationMs: 2500, maxVisible: 2 });
+  const refusalToastGate = createRefusalToastGate();
+  let lastCrosshairLook: CrosshairDefinition = { state: "idle" };
   // The undo toast stays this long (design 017 section 8.8); every other toast stays for the queue's duration.
   const undoWindowMs = 10_000;
   const toastView = createToastView(document.body, (actionId) => {
@@ -682,6 +688,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       // "001 Basic Cube" is the config's name; the number is the config's file name, not a title.
       configDisplayName: configCatalogLabel !== undefined && /^\d+\s/.test(configCatalogLabel) ? configCatalogLabel.replace(/^\d+\s+/, "") : undefined,
       goalPages: helpCubeSpec?.kind === "asset" ? helpCubeSpec.goalPages : undefined,
+      laserToolAvailable: appConfig.tools.geodesicEmitters,
     }),
     {
       onPlay: () => void controls.requestPointerLock(),
@@ -1823,11 +1830,32 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
     toolBelt.root.hidden = xrActive;
     const crosshairVisible = !xrActive && pointerLocked && !currentMenuState().isOpen;
     const displayFocus = crosshairVisible ? findDisplayFocusedRuntimeObject(activeAimRay) : undefined;
+    const crosshairSelectedTool = currentMenuState().selectedTool;
+    const crosshairLook = crosshairVisible
+      ? createCrosshairDefinition({
+        selectedTool: crosshairSelectedTool,
+        menuOpen: false,
+        aim: readCrosshairAim({
+          tool: toolHost.contextOf(crosshairSelectedTool),
+          objects: engine.read.objects,
+          selectedTool: crosshairSelectedTool,
+          handCanUse: (object) => getWorldFocusMessageDefinition(object)?.actions.some((action) => action.available) === true,
+        }),
+      })
+      : { state: "idle" } as const;
     crosshair.update({
       visible: crosshairVisible,
-      usable: displayFocus !== undefined,
-      color: toolHost.toolsById.get(currentMenuState().selectedTool)?.indicatorColor,
+      state: crosshairLook.state,
+      reason: crosshairLook.reason,
+      color: toolHost.toolsById.get(crosshairSelectedTool)?.indicatorColor,
     });
+    // A click on a refused crosshair is not silent: the reason shows as a toast, at most once per 1.5 s. The look of the frame before the click decides, because the click itself may change it (a protractor's first pick moves it to its next step).
+    const refusedBeforeClick = lastCrosshairLook;
+    lastCrosshairLook = crosshairLook;
+    if (refusedBeforeClick.state === "refused" && refusedBeforeClick.reason !== undefined && frame.primaryActionRequested
+      && crosshairVisible && refusalToastGate.shouldShow(refusedBeforeClick.reason, performance.now())) {
+      toastQueue.push(refusedBeforeClick.reason);
+    }
     // The hint strip names what the inputs do now; it follows the "Show hints" switch, and shows only while the player is playing on desktop.
     const showHints = currentMenuState().showHintsEnabled !== false;
     if (showHints !== persistedShowHints) {
@@ -2088,6 +2116,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       }
       scene.remove(underCellInfinityFloor);
       disposeObject3D(underCellInfinityFloor);
+      skyBackgroundTexture.dispose();
       portalFrame.dispose();
       portalClipData.dispose();
       for (const archetype of runtimeObjectRenderArchetypesByKey.values()) {
@@ -2239,7 +2268,9 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       toastQueue.push(descriptor === undefined ? toolNames.none.name : known?.name ?? descriptor.label);
     }
     announcedTool = selectedTool;
-    toolBelt.update(currentBeltDefinition(), toolHost.promptOf(selectedTool));
+    const beltTool = activeBeltToolId(selectedTool);
+    const beltToolColor = beltTool === "hand" || beltTool === "main-menu" ? undefined : toolHost.toolsById.get(beltTool)?.indicatorColor;
+    toolBelt.update(currentBeltDefinition(), toolHost.promptOf(selectedTool), beltToolColor);
   }
 
   function playerBlockingBodiesInCell(cellId: string) {

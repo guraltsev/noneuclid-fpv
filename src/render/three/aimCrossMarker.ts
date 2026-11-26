@@ -1,5 +1,5 @@
 /**
- * Red cross decal drawn on the surface point that the aim ray currently hits.
+ * Cross decal (red by default, the selected tool's color on the desktop) drawn on the surface point that the aim ray currently hits.
  * The marker is a single Three.js group added to the scene root; it is positioned in root (Three.js) coordinates converted from the target's world-frame rootPoint/rootNormal via worldAxes. Lengths are meters. It is hidden whenever there is no aim target.
  * The cross is oriented so its plane is tangent to the surface and its right axis follows the camera/controller right axis projected onto that plane.
  */
@@ -16,9 +16,9 @@ export interface AimCrossMarker {
   readonly root: THREE.Group;
   /**
    * Shows the cross at the target hit (lifted slightly off the surface) or hides it when target is undefined.
-   * orientation, when given, supplies a quaternion in Three.js frame whose right/up axes define the cross roll.
+   * orientation, when given, supplies a quaternion in Three.js frame whose right/up axes define the cross roll. color, a CSS color, is the selected tool's color on the desktop; absent draws the default red.
    */
-  update(target: AimTarget | undefined, orientation?: AimCrossMarkerOrientation): void;
+  update(target: AimTarget | undefined, orientation?: AimCrossMarkerOrientation, color?: string): void;
   /** Detaches the group from its parent and frees the geometry and material. */
   dispose(): void;
 }
@@ -33,6 +33,7 @@ export interface AimCrossMarkerOrientation {
 const crossRadiusMeters = 0.16;
 // Offset along the surface normal, meters, so the decal does not z-fight the surface.
 const surfaceLiftMeters = 0.01;
+const defaultCrossColor = 0xef1b1b;
 const fallbackMarkerRight = new THREE.Vector3(1, 0, 0);
 const fallbackMarkerUp = new THREE.Vector3(0, 1, 0);
 
@@ -58,7 +59,7 @@ export function createAimCrossMarker(scene: THREE.Scene): AimCrossMarker {
     ]), 3),
   );
   const material = new THREE.LineBasicMaterial({
-    color: 0xef1b1b,
+    color: defaultCrossColor,
     depthTest: true,
     depthWrite: false,
     transparent: true,
@@ -71,7 +72,8 @@ export function createAimCrossMarker(scene: THREE.Scene): AimCrossMarker {
 
   return {
     root,
-    update(target, orientation) {
+    update(target, orientation, color) {
+      material.color.set(color ?? defaultCrossColor);
       if (!target) {
         root.visible = false;
         return;

@@ -1,11 +1,12 @@
 /**
  * Large plane drawn below the cells so the void reads as ground.
  *
- * A single flat, unlit, double-sided black square (1000 m on a side) at world z = -1 m, i.e. one metre below the cell floors
+ * A single flat, unlit, double-sided dark-earth square (1000 m on a side) at world z = -1 m, i.e. one metre below the cell floors
  * (cell-local z = 0). It is expressed directly in the Three.js frame (y up) at the scene root, is not tied to any cell
  * or portal path, and is never frustum-culled so it stays visible whichever cell the camera is in.
  */
 import * as THREE from "three";
+import { UNDER_FLOOR_COLOR } from "./sceneColors";
 
 /** Side length of the square floor plane, meters; large enough to read as infinite from inside the cells. */
 export const underCellInfinityFloorSizeMeters = 1_000;
@@ -13,10 +14,10 @@ export const underCellInfinityFloorSizeMeters = 1_000;
 export const underCellInfinityFloorWorldZMeters = -1;
 
 /**
- * Creates the large black plane drawn below the cells so that the void reads as ground.
+ * Creates the large dark-earth plane drawn below the cells so that the void reads as ground.
  *
  * The plane lies horizontally at height -1 m (rotated -90 degrees about x so its face normal is +y, Three.js up),
- * centred on the origin of the Three.js frame, double sided, unlit and not frustum-culled. The caller owns the
+ * centred on the origin of the Three.js frame, double sided, unlit and not frustum-culled. Its colour is a dark earth tone, so the hairline gaps between floors do not show as bright lines; fog turns it into haze far away. The caller owns the
  * geometry and material.
  */
 export function createUnderCellInfinityFloor(): THREE.Mesh {
@@ -25,7 +26,7 @@ export function createUnderCellInfinityFloor(): THREE.Mesh {
     underCellInfinityFloorSizeMeters,
   );
   const material = new THREE.MeshBasicMaterial({
-    color: 0x000000,
+    color: UNDER_FLOOR_COLOR,
     side: THREE.DoubleSide,
   });
   const mesh = new THREE.Mesh(geometry, material);

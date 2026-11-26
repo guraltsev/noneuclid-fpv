@@ -44,7 +44,7 @@ export function createScenePaletteCommands(deps: ScenePaletteCommandsDeps): Scen
       dispatch({ kind: "open-menu" });
     },
     onCloseRequested() {
-      dispatch({ kind: "cancel-menu-and-tool" });
+      dispatch({ kind: "close-menu-button" });
     },
     onShowSettingsRequested() {
       dispatch({ kind: "show-settings" });

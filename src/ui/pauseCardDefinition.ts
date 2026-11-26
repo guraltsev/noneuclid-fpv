@@ -29,6 +29,8 @@ export interface PauseCardSource {
   readonly configDisplayName?: string;
   /** The goal pages of the world's help cube, in order. */
   readonly goalPages?: readonly TutorialPageSpec[];
+  /** Whether the Laser tool is available in the config; the pick up and put down key is listed only then, because only lasers can be picked up. */
+  readonly laserToolAvailable?: boolean;
 }
 
 /** The first sentence of a text, without its line breaks; empty when the text is blank. */
@@ -38,8 +40,8 @@ export function firstSentence(text: string): string {
   return match === null ? flat : match[0];
 }
 
-/** The controls table: Look, Walk, Use, Menu, Switch tool, What's this?, from the intent table. */
-export function createPauseCardControls(): readonly PauseCardControl[] {
+/** The controls table, from the intent table: Look, Walk, Use, Menu, Switch tool, Put tool away, Pick up / put down (with the Laser only), Next target, What's this?, Start over, Undo. */
+export function createPauseCardControls(laserToolAvailable = true): readonly PauseCardControl[] {
   const label = (intent: Parameters<typeof getInputHintGlyph>[1]): string => getInputHintGlyph("desktop", intent).label;
   return [
     { verb: verbNames.look, glyphLabel: label("look") },
@@ -47,7 +49,12 @@ export function createPauseCardControls(): readonly PauseCardControl[] {
     { verb: verbNames.use, glyphLabel: label("primary") },
     { verb: verbNames.menu, glyphLabel: label("context-menu") },
     { verb: verbNames.switchTool, glyphLabel: pauseCardText.switchToolControl },
+    { verb: verbNames.putToolAway, glyphLabel: label("hand") },
+    ...(laserToolAvailable ? [{ verb: verbNames.pickUpPutDown, glyphLabel: label("carry") }] : []),
+    { verb: verbNames.nextTarget, glyphLabel: label("next-focus-target") },
     { verb: verbNames.whatsThis, glyphLabel: label("help") },
+    { verb: verbNames.startOver, glyphLabel: label("reset") },
+    { verb: verbNames.undo, glyphLabel: label("undo") },
   ];
 }
 
@@ -60,7 +67,7 @@ export function createPauseCardDefinition(source: PauseCardSource): PauseCardDef
   return {
     title,
     ...(description.length > 0 ? { description } : {}),
-    controls: createPauseCardControls(),
+    controls: createPauseCardControls(source.laserToolAvailable ?? true),
     actions: ["help", "settings", "go-home", "start-over"],
   };
 }

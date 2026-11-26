@@ -14,7 +14,7 @@ describe("formatBodyForInputMode", () => {
 
   it("rewrites known sentences for desktop", () => {
     expect(formatBodyForInputMode(body, "desktop")).toBe(
-      "Move with Arrow keys. Press H while aiming at an object for its help. Other text.",
+      "Move with W A S D or the arrow keys. Press H while aiming at an object for its help. Other text.",
     );
   });
 

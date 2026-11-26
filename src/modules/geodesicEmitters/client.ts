@@ -6,6 +6,7 @@
  */
 import type { CommandResult, ToolContext, ToolDescriptor, ModuleClient } from "../../engine/moduleTypes";
 import { defaultTraceLengthMeters } from "../../world-objects/geodesic/objects";
+import { laserToolAcceptsClick } from "../../world-objects/toolClickRules";
 import { toolNames } from "../../world-objects/vocabulary";
 import { geodesicModelToken } from "../geodesicModel/api";
 import {
@@ -43,10 +44,10 @@ function primaryAction(tool: ToolContext): boolean {
   const pick = tool.currentPick();
   if (pick === undefined) return true;
   if (pick.objectKind === geodesicEmitterKind) {
-    if (pick.withinRange && pick.objectId !== undefined) shootFrom(tool, pick.objectId, randomYawRadians());
+    if (laserToolAcceptsClick(pick.objectKind, pick.withinRange) && pick.objectId !== undefined) shootFrom(tool, pick.objectId, randomYawRadians());
     return true;
   }
-  if (pick.objectKind !== "floor" && pick.objectKind !== "geodesicModel/crossing" && pick.objectKind !== "geodesicModel/segment") return true;
+  if (!laserToolAcceptsClick(pick.objectKind, pick.withinRange)) return true;
   // A (near-)vertical aim has no horizontal direction: the click does nothing.
   const yawRadians = tool.aimYawRadians();
   if (yawRadians === undefined) return true;
@@ -140,11 +141,12 @@ function createEmitterToolDescriptor(): ToolDescriptor {
     label: toolNames[geodesicEmitterToolId].name,
     badgeLabel: toolNames[geodesicEmitterToolId].name,
     helpTitle: toolNames[geodesicEmitterToolId].name,
-    helpBody: `${toolNames[geodesicEmitterToolId].subtitle}. Aim at the floor and Use to place a laser; Use on a laser fires a new beam, and Use on a free beam makes it longer.`,
-    helpRows: [{ input: "primary", label: "place a laser or make a beam longer" }, { input: "context-menu", label: "open the menu of what you aim at" }],
+    helpBody: `${toolNames[geodesicEmitterToolId].subtitle}. Aim at the floor, a beam or a meeting point and Use to place a laser; Use on a laser adds a beam.`,
+    helpRows: [{ input: "primary", label: "place a laser or add a beam to one" }, { input: "context-menu", label: "open the menu of what you aim at" }],
     indicatorColor: "#facc15",
     iconId: "ray",
-    showsAimCross: true,
+    showsAimCross: false,
+    showsXrAimCross: true,
     entry: { kind: "main-tool" },
     onPrimaryAction: primaryAction,
     onResult,
