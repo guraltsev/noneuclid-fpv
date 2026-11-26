@@ -30,7 +30,7 @@ const desktopHints: Readonly<Record<InputIntent, Omit<InputHintGlyph, "intent" |
     iconSrc: publicAssetUrl("icons/mouse-move.svg"),
   },
   move: {
-    label: "Arrow keys",
+    label: "W A S D / arrow keys",
     iconSrc: publicAssetUrl("icons/arrowkeys.svg"),
   },
   primary: {

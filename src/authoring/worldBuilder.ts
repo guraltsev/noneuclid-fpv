@@ -64,11 +64,11 @@ export const defaultStartingQuestionCubeTutorialPages: readonly TutorialPageSpec
   {
     title: toolNames["geodesicEmitters/emitter"].name,
     toolId: "geodesicEmitters/emitter",
-    body: `Pick the ${toolNames["geodesicEmitters/emitter"].name} and select a spot on the floor: a laser appears and fires a short beam the way you face. ${objectSubtitles.beam}. Select the beam to make it 2 m longer. A beam stops at a corner of the world. In a laser's menu, Aim points a free beam wherever you look (select to fix it), Add beam fires another and Delete removes one. A beam with a laser at both ends is a linked beam: ${objectSubtitles.linkedBeam}; it cannot be aimed. Pick a laser up to move it: its linked beams follow and its free beams go. Join turns two linked beams at a laser into one string. ${objectSubtitles.string}.`,
+    body: `Pick the ${toolNames["geodesicEmitters/emitter"].name} and select a spot on the floor: a laser appears and fires a short beam the way you face. ${objectSubtitles.beam}. Select a beam or a meeting point to place a laser there, which cuts the beam; with the Hand, select a free beam to make it 2 m longer. Select a laser to add a beam. A beam stops at a corner of the world. In a laser's menu, Aim points a free beam wherever you look (select to fix it), Add beam fires another and Delete removes one. A beam with a laser at both ends is a linked beam: ${objectSubtitles.linkedBeam}; it cannot be aimed. Pick a laser up to move it: its linked beams follow and its free beams go. Join turns two linked beams at a laser into one string. ${objectSubtitles.string}.`,
     imagePath: "tutorial/rays.jpg",
     requiresTools: ["geodesicEmitters/emitter"],
     controls: [
-      { intent: "primary", label: "place a laser, or make a beam longer" },
+      { intent: "primary", label: "place a laser, or add a beam to one" },
       { intent: "context-menu", label: "on a laser: its menu (Aim, Add beam, Join, Delete)" },
       { intent: "carry", label: "pick up or put down a laser" },
     ],

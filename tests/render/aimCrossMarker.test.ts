@@ -5,7 +5,7 @@
  */
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
-import { resolveAimCrossMarkerQuaternion } from "../../src/render/three/aimCrossMarker";
+import { createAimCrossMarker, resolveAimCrossMarkerQuaternion } from "../../src/render/three/aimCrossMarker";
 
 describe("aimCrossMarker", () => {
   it("keeps the cross bars aligned to the desktop camera axes on the target surface", () => {
@@ -42,5 +42,18 @@ describe("aimCrossMarker", () => {
     expect(right.y).toBeCloseTo(1);
     expect(up.x).toBeCloseTo(-1);
     expect(up.y).toBeCloseTo(0);
+  });
+
+  it("draws in the given color and returns to red without one", () => {
+    const marker = createAimCrossMarker(new THREE.Scene());
+    const lines = marker.root.getObjectByName("aim-cross-marker-lines") as THREE.LineSegments;
+    const material = lines.material as THREE.LineBasicMaterial;
+    const target = { rootPoint: { x: 0, y: 0, z: 0 }, rootNormal: { x: 0, y: 0, z: 1 } } as never;
+
+    marker.update(target, undefined, "#fb923c");
+    expect(material.color.getHexString()).toBe("fb923c");
+    marker.update(target);
+    expect(material.color.getHexString()).toBe("ef1b1b");
+    marker.dispose();
   });
 });

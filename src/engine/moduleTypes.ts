@@ -369,8 +369,10 @@ export interface ToolDescriptor {
   readonly indicatorColor: string;
   /** Key into the icon tables of the desktop indicator, the wrist indicator and the palette. */
   readonly iconId: string;
-  /** The aim cross is drawn while this tool is active. */
+  /** The aim cross is drawn on the desktop while this tool is active, in the tool's `indicatorColor`. False where another cue already shows the target: the Laser's ghost, a beam or laser outline under the Ruler, Protractor and Join. */
   readonly showsAimCross: boolean;
+  /** In VR the cross, and the controller ray that ends on it, stay for this tool even when the desktop drops the cross; defaults to `showsAimCross`. */
+  readonly showsXrAimCross?: boolean;
   /** `onPrimaryAction` runs every frame, not only on a primary action while no menu is open (the tools that update from the input each frame). */
   readonly runsEveryFrame?: boolean;
   /** Where the tool is started from: the main tool list, an action on an object's menu page, or (`sub-mode`) the shell, from a button of its own. */

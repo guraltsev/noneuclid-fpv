@@ -85,7 +85,7 @@ function createToolHelpLens(selectedTool: RuntimeToolId, inputMode: InputMode, t
   return {
     title: toolNames.none.name,
     body: inputMode === "desktop"
-      ? `Move with Arrow keys. ${toolNames.none.subtitle}: look at things to see what you can do, or open the menu.`
+      ? `Move with W A S D or the arrow keys. ${toolNames.none.subtitle}: look at things to see what you can do, or open the menu.`
       : `Move with the left stick. ${toolNames.none.subtitle}: look at things to see what you can do, or open the menu.`,
     rows: [row(moveHint, "move"), row(primaryHint, "use what you aim at"), row(contextHint, "open the menu of what you aim at")],
   };

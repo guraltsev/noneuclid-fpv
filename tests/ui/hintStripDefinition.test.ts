@@ -44,9 +44,32 @@ describe("hint strip definition (desktop rows of the design table)", () => {
     expect(strip({ selectedTool: "geodesicEmitters/emitter" })).toBe("Left click: place a laser · 0: put the Laser away");
   });
 
-  it("offers extending a free beam with the Laser in hand", () => {
-    const focus = focusOf({ kind: "geodesicModel/segment" } as never, "geodesicEmitters/emitter", true);
-    expect(strip({ selectedTool: "geodesicEmitters/emitter", focus, extendLengthMeters: 2 })).toBe("Left click: extend 2 m");
+  it("offers extending a free beam with the Hand, which is true for the Hand", () => {
+    const focus = focusOf({ kind: "geodesicModel/segment" } as never, "none", true);
+    expect(strip({ selectedTool: "none", focus, extendLengthMeters: 2 })).toBe("Left click: extend 2 m");
+  });
+
+  it("offers placing a laser on a beam or a meeting point with the Laser in hand", () => {
+    const beam = focusOf({ kind: "geodesicModel/segment" } as never, "geodesicEmitters/emitter", true);
+    const crossing = focusOf({ kind: "geodesicModel/crossing" } as never, "geodesicEmitters/emitter");
+    expect(strip({ selectedTool: "geodesicEmitters/emitter", focus: beam, extendLengthMeters: 2 })).toBe("Left click: place a laser here");
+    expect(strip({ selectedTool: "geodesicEmitters/emitter", focus: crossing })).toBe("Left click: place a laser here");
+  });
+
+  it("offers adding a beam with the Laser aimed at a laser", () => {
+    const focus = focusOf({ kind: "geodesicEmitters/emitter" } as never, "geodesicEmitters/emitter");
+    expect(strip({ selectedTool: "geodesicEmitters/emitter", focus })).toBe("Left click: add a beam · Right click / F: Laser menu · G: pick up");
+  });
+
+  it("does not offer picking up a sign", () => {
+    const focus = focusOf({ kind: "placedFlags/flag" } as never, "none");
+    expect(strip({ focus })).not.toContain("pick up");
+  });
+
+  it("names the action of the laser modes and no put-away entry", () => {
+    expect(strip({ carrying: true, selectedTool: "geodesicEmitters/carry" })).toBe("Left click: put down");
+    expect(strip({ selectedTool: "geodesicEmitters/rotate" })).toBe("Left click: set direction");
+    expect(strip({ selectedTool: "geodesicEmitters/aim" })).toBe("Left click: set direction");
   });
 
   it("offers measuring a beam with the Ruler", () => {
@@ -62,7 +85,8 @@ describe("hint strip definition (desktop rows of the design table)", () => {
   });
 
   it("offers only putting down while carrying", () => {
-    expect(strip({ carrying: true, selectedTool: "geodesicEmitters/carry" })).toBe("G: put down");
+    expect(strip({ carrying: true, selectedTool: "geodesicEmitters/carry" })).toBe("Left click: put down");
+    expect(strip({ carrying: true, selectedTool: "geodesicEmitters/carry", inputMode: "xr", xrLayout: "two-controllers" })).toBe("A: put down");
   });
 
   it("offers choosing and closing while a menu is open", () => {

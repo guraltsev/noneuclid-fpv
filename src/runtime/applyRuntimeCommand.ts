@@ -102,17 +102,12 @@ export function reduceRuntimeCommand(state: ClientSessionState, command: Runtime
       return withMenu(closeRuntimeMenu(menu), syncPalette);
     case "cancel-menu-and-tool":
       return cancelMenuAndTool(menu, withMenu);
+    case "close-menu-button":
+      return isObjectMenuPage(menu.page) ? withMenu(closeRuntimeMenu(menu), syncPalette) : cancelMenuAndTool(menu, withMenu);
     case "menu-right-action":
-      if (
-        menu.page === "main" ||
-        menu.page === "edit-sign" ||
-        menu.page === "measurement-actions" ||
-        menu.page === "geodesic-cannon-actions" ||
-        menu.page === "geometry-computer-actions" ||
-        menu.page === "question-help"
-      ) {
-        return cancelMenuAndTool(menu, withMenu);
-      }
+      // The menu of an object closes and the tool stays in hand (design 018 section 5 item 5); the main menu and Help cancel the tool as before.
+      if (isObjectMenuPage(menu.page)) return withMenu(closeRuntimeMenu(menu), syncPalette);
+      if (menu.page === "main" || menu.page === "question-help") return cancelMenuAndTool(menu, withMenu);
       return withMenu(menuOneLevelUp(menu), syncPalette);
     case "show-settings":
       return withMenu(showRuntimeMenuSettings(menu), syncPalette);
@@ -348,6 +343,11 @@ function withDebugSettings(state: ClientSessionState, debugSettings: DebugSettin
       "portal-path-overlay-instances",
     ),
   };
+}
+
+/** True for the pages that open on an object: a sign, a measurement, a laser, a shape machine. */
+function isObjectMenuPage(page: RuntimeMenuState["page"]): boolean {
+  return page === "edit-sign" || page === "measurement-actions" || page === "geodesic-cannon-actions" || page === "geometry-computer-actions";
 }
 
 /** Closes the menu and selects no tool; the host drops every tool's pending selection first. */

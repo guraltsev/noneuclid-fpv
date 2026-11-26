@@ -25,7 +25,7 @@ describe("inputIntents", () => {
       iconSrc: publicAssetUrl("icons/h-alphabet.svg"),
     });
     expect(getInputHintGlyph("desktop", "move")).toMatchObject({
-      label: "Arrow keys",
+      label: "W A S D / arrow keys",
       iconSrc: publicAssetUrl("icons/arrowkeys.svg"),
     });
   });

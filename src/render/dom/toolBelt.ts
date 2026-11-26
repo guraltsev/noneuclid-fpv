@@ -14,11 +14,14 @@ export interface ToolBeltHandlers {
 /** Handle to the belt created by {@link createToolBelt}. */
 export interface ToolBelt {
   readonly root: HTMLDivElement;
-  /** Shows `definition`; `promptText` is the tool's prompt while it asks the player to select something. */
-  update(definition: ToolBeltDefinition, promptText: string | undefined): void;
+  /** Shows `definition`; `promptText` is the tool's prompt while it asks the player to select something; `activeColor` (a CSS color) is the color of the tool in hand, used for the active slot. */
+  update(definition: ToolBeltDefinition, promptText: string | undefined, activeColor?: string): void;
   /** Removes the belt from the DOM. */
   dispose(): void;
 }
+
+// The Hand has no color of its own: a light neutral, not one of the tool colors.
+const neutralActiveColor = "#e2e8f0";
 
 /** Creates the belt and appends it to `container`. */
 export function createToolBelt(container: HTMLElement, handlers: ToolBeltHandlers, ariaLabel: string): ToolBelt {
@@ -88,7 +91,9 @@ export function createToolBelt(container: HTMLElement, handlers: ToolBeltHandler
 
   return {
     root,
-    update(definition, promptText) {
+    update(definition, promptText, activeColor) {
+      // The active slot's border, tint and text follow the tool in hand (design 018 section 5 item 4).
+      root.style.setProperty("--belt-active-color", activeColor ?? neutralActiveColor);
       const signature = JSON.stringify([definition.slots.map((slot) => [slot.toolId, slot.enabled, slot.active]), promptText ?? ""]);
       if (signature === lastSignature) return;
       lastSignature = signature;

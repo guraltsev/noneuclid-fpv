@@ -81,6 +81,11 @@ export const verbNames = {
   use: "Use",
   menu: "Menu",
   pickUp: "Pick up",
+  pickUpPutDown: "Pick up / put down",
+  putToolAway: "Put tool away",
+  nextTarget: "Next target",
+  startOver: "Start over",
+  undo: "Undo",
   whatsThis: "What's this?",
   switchTool: "Switch tool",
   mainMenu: "Main menu",
@@ -327,6 +332,12 @@ export const hintStripText = {
   pickUp: "pick up",
   putDown: "put down",
   placeLaser: "place a laser",
+  /** The Laser aimed at a beam or a meeting point: the click places a laser that cuts the beam there. */
+  placeLaserHere: "place a laser here",
+  /** The Laser aimed at a laser: the click adds a beam to it. */
+  addBeam: "add a beam",
+  /** The laser's Aim and Turn modes: the click accepts the direction. */
+  setDirection: "set direction",
   placeSign: "place a sign",
   openHelp: "open Help",
   measureBeam: "measure this beam",
@@ -336,6 +347,14 @@ export const hintStripText = {
   extend: (lengthMeters?: number): string => lengthMeters === undefined ? "extend" : `extend ${lengthMeters} m`,
   /** "put the Laser away": what key 0 does with a tool in hand. */
   putAway: (toolName: string): string => `put the ${toolName} away`,
+} as const;
+
+/** The reasons the crosshair gives when a click would be ignored (design 018 section 5), two to four words each; also shown as a toast when the player clicks anyway. */
+export const crosshairReasons = {
+  tooFar: "Too far",
+  aimAtBeam: "Aim at a beam",
+  aimAtLaserOrMeetingPoint: "Aim at a laser or a meeting point",
+  aimAtFloor: "Aim at the floor",
 } as const;
 
 /** The words of the tool stand (design 017 section 9.2) and of the help cube's invitation (section 9.1). */
