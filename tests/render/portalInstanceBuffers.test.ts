@@ -11,7 +11,7 @@
  */
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
-import type { CellRenderArchetype } from "../../src/render/three/cellRenderArchetypes";
+import { sceneryMaxPathDepth, type CellRenderArchetype } from "../../src/render/three/cellRenderArchetypes";
 import { createPortalInstanceDebugRenderer } from "../../src/render/three/portalInstanceDebug";
 import {
   buildVisiblePathsByDestinationCell,
@@ -137,6 +137,24 @@ describe("updateCellRenderArchetypeInstances", () => {
     expect(readAttribute(roomB.portalPathIdAttribute, 1)).toBe(9);
     expect(readAttribute(roomB.portalClipIndexAttribute, 0)).toBe(0);
     expect(readAttribute(roomB.portalClipIndexAttribute, 1)).toBe(1);
+  });
+});
+
+describe("updateCellRenderArchetypeInstances depth limit", () => {
+  const pathsAtDepths = (depths: readonly number[]) =>
+    groupVisiblePortalPathsByDestinationCell(depths.map((depth) => ({ ...createRootVisiblePortalPath("room-b"), depth, pathId: depth + 1 })));
+
+  it("skips too-deep paths for scenery without overflow, but not for floors", () => {
+    const floor = createArchetype("room-b", "room-b:floor:0", 8);
+    const scenery = { ...createArchetype("room-b", "room-b:scenery:1", 2), kind: "scenery" as const, maxPathDepth: sceneryMaxPathDepth };
+    const diagnostics = createPortalInstanceDiagnostics();
+
+    updateCellRenderArchetypeInstances([floor, scenery], pathsAtDepths([1, 3, 4, 5]), diagnostics);
+
+    expect(floor.mesh.count).toBe(4);
+    expect(scenery.mesh.count).toBe(2);
+    expect(diagnostics.capacityOverflowCount).toBe(0);
+    expect([0, 1].map((index) => readAttribute(scenery.portalPathIdAttribute, index))).toEqual([2, 4]);
   });
 });
 

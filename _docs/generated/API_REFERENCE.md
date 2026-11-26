@@ -693,6 +693,40 @@ Floor texture library: the named floor appearances world scripts can use, via th
 | const | `worldFloorTextureLibrary` | Implementation of the floor helpers injected into world scripts; throws on an unknown texture name. |
 | function | `normalizeFloorMaterial` | Converts a floor argument into a plain FloorMaterialSpec: a string becomes a flat-color floor, a library material is shallow-copied (dropping the brand). |
 
+### `world-assets/sceneryLayout.ts`
+
+Seeded layout of the small decorative props (grass, flowers, stones, mushrooms...) that grow on the floor of a cell.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| type | `SceneryPropKind` | The kinds of prop the layout can place. |
+| type | `SceneryBiome` | A ground type that decides which props grow; derived from the floor texture name. |
+| interface | `SceneryProp` | One prop of a cell: where it stands, how it is turned and sized, and which colour variant it has. |
+| interface | `SceneryLayoutOptions` | Options of {@link computeSceneryLayout}; the defaults are the shipped look, tests and tuning override them. |
+| const | `sceneryTrianglesByKind` | Triangles each prop kind adds to the cell mesh; `buildCellScenery.ts` emits exactly this many for the kind. |
+| const | `maxSceneryTrianglesPerCell` | The most triangles of scenery one cell may carry. |
+| const | `scenerySpacingMeters` | Spacing of the jittered placement grid, meters. |
+| const | `sceneryPropRadiusMeters` | Radius of a prop of scale 1 for keep-out purposes, meters: every shape fits in a disc of this radius. |
+| const | `scenerySideClearanceMeters` | Clearance from every side of the cell, meters (a prop's own radius counts). |
+| const | `sceneryVertexClearanceMeters` | Clearance from every vertex of the cell, meters. |
+| const | `sceneryDefaultObjectRadiusMeters` | Collision radius assumed for an authored object without one, meters. |
+| const | `sceneryObjectClearanceMeters` | Extra clearance around an authored object's collision radius, meters. |
+| const | `sceneryFeatureClearRadiusMeters` | Radius of the cleared disc around the centre of a feature, in which no ordinary prop grows, meters. |
+| const | `sceneryBiomeTable` | Per biome: probability scale of keeping a grid candidate on the lushest ground, and the weighted prop kinds. |
+| function | `sceneryBiomeForFloor` | What grows on a floor texture (design 018 section 4.2); undefined for any other texture or none. |
+| function | `computeSceneryLayout` | Lays out the props of a cell: a jittered grid thinned by the same noise field as the ground tint (clumps on lush patches, clearings elsewhere), then one or two features (a ring of stones or mushrooms, a flower patch), w… |
+
+### `world-assets/seededNoise.ts`
+
+Seeded, platform-independent pseudo-randomness and smooth noise for generated world detail.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| function | `hashStringToSeed` | Hashes text to a 32-bit unsigned seed with FNV-1a. |
+| function | `createSeededRandom` | Creates a mulberry32 generator: each call returns the next number in [0, 1) of the sequence of `seed`. |
+| function | `valueNoise2` | Value noise in [0, 1]: random values on the integer lattice, interpolated with a smoothstep; features are about 1 unit wide. |
+| function | `fractalNoise2` | Sum of `octaves` value-noise layers, each twice as fine and half as strong as the one before, normalized to [0, 1]. |
+
 ## `world-objects`
 
 ### `world-objects/carry.ts`
@@ -2546,8 +2580,7 @@ The pause card, the desktop main menu (design 017 sections 7.5 and 8.1), as plai
 | interface | `PauseCardControl` | One row of the controls table: the verb and the name of the control that performs it. |
 | type | `PauseCardActionId` | The main-menu actions, in the order they show. |
 | interface | `PauseCardDefinition` | The card's content. |
-| interface | `PauseCardSource` | What the card is built from: the world's name, the config's display name when it has one, and the first goal text. |
-| function | `prettyWorldName` | "001-basic-cube" becomes "Basic cube": the leading number and the dashes and underscores go. |
+| interface | `PauseCardSource` | What the card is built from: the config's display name when it has one, and the first goal text. |
 | function | `firstSentence` | The first sentence of a text, without its line breaks; empty when the text is blank. |
 | function | `createPauseCardControls` | The controls table: Look, Walk, Use, Menu, Switch tool, What's this?, from the intent table. |
 | function | `createPauseCardDefinition` | Builds the card for a world. |
@@ -2797,6 +2830,16 @@ Builds the Three.js geometry of one prism cell in the cell's own local frame (wh
 | function | `buildCellMesh` | Builds the full Three.js group for a cell, named `cell:<id>` and tagged with its portal sides in `userData`. |
 | function | `floorColorTexture` | The tiling color texture of a cell's floor, or undefined if it has none or it failed to load. |
 
+### `render/three/buildCellScenery.ts`
+
+Builds the merged scenery mesh of one cell: every prop of `computeSceneryLayout` as a few flat-shaded, vertex-coloured triangles.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `SceneryColors` | Colours of one prop kind as sRGB hex pairs; `tone` 0 gives the first of each pair and `tone` 1 the second. |
+| const | `sceneryPalette` | The scenery palette: one entry per prop kind. |
+| function | `buildCellSceneryMesh` | Builds the scenery mesh of `cell`, or undefined when the cell grows nothing (no biome, a flat-colour floor). |
+
 ### `render/three/buildDecorationMesh.ts`
 
 Builds the Three.js node for a static decoration (asset object) declared in a cell spec.
@@ -2859,6 +2902,7 @@ Builds the instanced-mesh archetypes for the static geometry of every cell, one 
 | --- | --- | --- |
 | type | `CellRenderArchetypeKind` | Category of a cell mesh part; "ceiling" and floor-outline meshes have no kind and are not instanced. |
 | interface | `CellRenderArchetype` | An instanced mesh of one cell part with its per-instance portal attributes. |
+| const | `sceneryMaxPathDepth` | Scenery is drawn only on portal paths of at most this depth (about 45 m; farther away a tuft is a few pixels and fogged). |
 | interface | `BuildCellRenderArchetypesOptions` | Options controlling how cell meshes are built and instanced. |
 | interface | `CellRenderArchetypePlanEntry` | Description of an archetype that would be built, for diagnostics and tests, without creating GPU resources. |
 | function | `buildCellRenderArchetypes` | Builds every cell's archetypes, with `count = 0` and frustum culling disabled (instance bounds are not tracked). |
@@ -3136,6 +3180,8 @@ Render sources and per-frame render records for geodesic cannons, geodesic segme
 | function | `collectGeodesicRuntimeRenderRecords` | Produces the render records of one geodesic object in its own cell, one per matching archetype mesh (no portal ghosts; the instance sync adds them for the body parts, see {@link collectGeodesicBodyPlacements}). |
 | function | `emitterHeadsKey` | A string that changes whenever the heads drawn at a cannon change: the attached geodesics and their launch yaws. |
 | function | `composeSegmentMatrix` | Returns the Three.js model matrix mapping the unit ribbon (x from 0 to 1) onto `segment`. |
+| function | `createCannonPostModel` | The cannon's post as drawn, base on the floor; the loaded model is lifted by the floor offset, the fallback is already built with its base at y = 0. |
+| function | `createCannonHeadModel` | The cannon's head (lightsaber) as drawn, at the beam's emission point and pointing along +x. |
 
 ### `render/three/geodesicCannonTools.ts`
 
@@ -3256,15 +3302,14 @@ Help panel ("help lens") renderer: shows the current contextual help definition 
 
 ### `render/three/laserPreview.ts`
 
-The Laser's placement preview (design 017 section 8.3): with the Laser in hand and the aim on the floor, a translucent ghost of a laser stands at the aim point, with an arrow along the direction a placed laser would fire.
+The Laser's placement preview (design 017 section 8.3): with the Laser in hand and the aim on the floor, a translucent copy of the real laser (its post and its head) stands at the aim point, the head turned the way a placed laser would fire.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
-| const | `laserPreviewPostRadiusMeters` | Radius of the ghost's post, meters. |
-| const | `laserPreviewPostHeightMeters` | Height of the ghost's post, meters. |
-| const | `laserPreviewArrowLengthMeters` | Length of the direction arrow from the post, meters. |
+| const | `laserPreviewOpacity` | How opaque the copy is, 0 to 1. |
+| const | `laserPreviewHaloOpacity` | How opaque the faint yellow halo around the copy is, 0 to 1. |
 | interface | `LaserPreview` | Handle to the preview created by {@link createLaserPreview}. |
-| function | `createLaserPreview` | Creates the preview, adds it (hidden) to `scene`, and returns its handle. |
+| function | `createLaserPreview` | Creates the preview from the loaded models (procedural stand-ins when `assets` is omitted), adds it (hidden) to `scene`, and returns its handle. |
 
 ### `render/three/measureLengthRenderer.ts`
 

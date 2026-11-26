@@ -1,6 +1,6 @@
 /**
  * Cell render archetypes (src/render/three/cellRenderArchetypes.ts): one instanced-mesh archetype per drawable
- * mesh part of every cell (floor, solid wall, portal frame, static object, debug wireframe; ceilings and floor
+ * mesh part of every cell (floor, scenery, solid wall, portal frame, static object, debug wireframe; ceilings and floor
  * outlines are intentionally skipped). Instance capacity per cell is the largest number of statically kept paths
  * ending at that cell over all roots, optionally capped by a visible-path budget (at least 1) or summed across
  * several eyes. Each archetype also owns a hidden, unpatched-material `rootMesh` sharing the same geometry, used
@@ -8,7 +8,7 @@
  */
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
-import { cube } from "../../src/authoring/exampleWorlds";
+import { basicCube, cube } from "../../src/authoring/exampleWorlds";
 import { createPortalClipData } from "../../src/render/three/portalClipData";
 import { createPortalClipMaterialState } from "../../src/render/three/portalClipMaterial";
 import { compileCellComplex } from "../../src/cell-complex/compileCellComplex";
@@ -20,6 +20,7 @@ import {
   disposeCellRenderArchetypes,
   deriveCellRenderArchetypeCapacities,
   planCellRenderArchetypes,
+  sceneryMaxPathDepth,
 } from "../../src/render/three/cellRenderArchetypes";
 import { createFakePreparedAssets } from "../support/preparedAssets";
 
@@ -46,6 +47,28 @@ describe("planCellRenderArchetypes", () => {
     expect(planned.some((entry) => (entry.kind as string) === "static-object")).toBe(false);
     expect(planned.some((entry) => entry.kind === "debug-wireframe")).toBe(false);
     expect(planned.some((entry) => entry.sourceObjectName?.includes("marmot"))).toBe(false);
+  });
+
+  it("gives each basic cube face a scenery archetype limited to near paths", () => {
+    const world = compileCellComplex(basicCube);
+    const options = {
+      debugLevel: "off" as const,
+      portalPanelMode: "none" as const,
+      eyeHeightMeters: 1.6,
+      assets: createPreparedAssets(),
+      capacitiesByCellId: new Map(world.cells.map((cell) => [cell.id, 2])),
+    };
+    const planned = planCellRenderArchetypes(world, options);
+
+    for (const cell of world.cells) {
+      expect(planned.filter((entry) => entry.cellId === cell.id && entry.kind === "scenery")).toHaveLength(1);
+    }
+
+    const archetypes = buildCellRenderArchetypes(world, options);
+    for (const archetype of archetypes) {
+      expect(archetype.maxPathDepth).toBe(archetype.kind === "scenery" ? sceneryMaxPathDepth : undefined);
+    }
+    disposeCellRenderArchetypes(archetypes);
   });
 
   it("keeps forbidden-zone line wireframes out of instanced archetypes", () => {
