@@ -794,10 +794,11 @@ img.desktop-tool-tile-icon {
   color: #f8fafc;
 }
 
+/* The active slot takes the color of the tool in hand (set by toolBelt.ts); the Hand is a neutral light grey. */
 .tool-belt-slot-active {
-  border-color: #facc15;
-  background: rgb(250 204 21 / 18%);
-  color: #fde68a;
+  border-color: var(--belt-active-color, #e2e8f0);
+  background: color-mix(in srgb, var(--belt-active-color, #e2e8f0) 18%, transparent);
+  color: color-mix(in srgb, var(--belt-active-color, #e2e8f0) 55%, white);
 }
 
 .tool-belt-slot-disabled {

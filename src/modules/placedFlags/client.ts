@@ -46,7 +46,7 @@ function createSignToolDescriptor(): ToolDescriptor {
     helpTitle: toolNames[placedFlagToolId].name,
     helpBody: `${toolNames[placedFlagToolId].subtitle}: it stands on the floor where you aim.`,
     helpRows: [{ input: "primary", label: "place a sign" }, { input: "context-menu", label: "open the menu of what you aim at" }],
-    indicatorColor: "#22c55e",
+    indicatorColor: "#fb923c",
     iconId: "sign",
     showsAimCross: true,
     entry: { kind: "main-tool" },

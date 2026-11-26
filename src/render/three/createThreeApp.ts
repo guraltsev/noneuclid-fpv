@@ -2264,7 +2264,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       toastQueue.push(descriptor === undefined ? toolNames.none.name : known?.name ?? descriptor.label);
     }
     announcedTool = selectedTool;
-    toolBelt.update(currentBeltDefinition(), toolHost.promptOf(selectedTool));
+    toolBelt.update(currentBeltDefinition(), toolHost.promptOf(selectedTool), toolHost.toolsById.get(activeBeltToolId(selectedTool) as RuntimeToolId)?.indicatorColor);
   }
 
   function playerBlockingBodiesInCell(cellId: string) {
