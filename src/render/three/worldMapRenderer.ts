@@ -15,6 +15,7 @@ import { vec3, type Vec3 } from "../../math/vec3";
 import type { PlayerPose } from "../../movement/playerPose";
 import { floorColorTexture } from "./buildCellMesh";
 import type { PreparedWorldAssets } from "./preparedWorldAssets";
+import { drawLandmarkMapIcon } from "./landmarkMapIcon";
 import { threeToWorldBasis } from "./worldAxes";
 import { worldMapPieceHeightMeters, type WorldMapIconPiece, type WorldMapPiece } from "./worldMapPieces";
 
@@ -115,6 +116,17 @@ export function createWorldMapRenderer(scene: THREE.Scene, renderer: Pick<THREE.
   const stripGeometry = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2).translate(0.5, 0, 0);
   // One material per icon image, made when first shown; undefined for an image that was not loaded.
   const iconMaterials = new Map<string, THREE.Material | undefined>();
+  // Textures drawn for generated landmarks; the renderer made them, so it disposes them (asset textures are shared and are not).
+  const drawnIconTextures: THREE.Texture[] = [];
+
+  function landmarkIconTexture(landmark: NonNullable<WorldMapIconPiece["landmark"]>): THREE.Texture | undefined {
+    const canvas = drawLandmarkMapIcon(landmark.placement, landmark.palette);
+    if (!canvas) return undefined;
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    drawnIconTextures.push(texture);
+    return texture;
+  }
   const drawnPieces = new Map<string, THREE.Mesh<THREE.BufferGeometry, THREE.Material>>();
   const seenPieceIds = new Set<string>();
   const solidFromCell = new THREE.Matrix4();
@@ -150,17 +162,17 @@ export function createWorldMapRenderer(scene: THREE.Scene, renderer: Pick<THREE.
     return mesh;
   }
 
-  function iconMaterial(iconPath: string): THREE.Material | undefined {
+  function iconMaterial(piece: WorldMapIconPiece): THREE.Material | undefined {
+    const iconPath = piece.iconPath;
     if (!iconMaterials.has(iconPath)) {
-      const map = assets.getConfiguredTexture({ assetPath: iconPath, colorSpace: THREE.SRGBColorSpace, repeatX: 1, repeatY: 1 });
-      // It writes no depth, so that things flat on one face do not fight; the render order stacks them.
+      const map = piece.landmark ? landmarkIconTexture(piece.landmark) : assets.getConfiguredTexture({ assetPath: iconPath, colorSpace: THREE.SRGBColorSpace, repeatX: 1, repeatY: 1 });
       iconMaterials.set(iconPath, map && new THREE.MeshBasicMaterial({ map, transparent: true, depthWrite: false, fog: false }));
     }
     return iconMaterials.get(iconPath);
   }
 
   function placeIcon(mesh: THREE.Mesh<THREE.BufferGeometry, THREE.Material>, piece: WorldMapIconPiece, circumradiusMeters: number): void {
-    const material = iconMaterial(piece.iconPath);
+    const material = iconMaterial(piece);
     mesh.visible = material !== undefined;
     if (material === undefined) return;
     const sizeMeters = circumradiusMeters * (piece.onTop ? avatarIconSizeOfCircumradius : iconSizeOfCircumradius);
@@ -300,6 +312,7 @@ export function createWorldMapRenderer(scene: THREE.Scene, renderer: Pick<THREE.
       clearSurface();
       for (const mesh of drawnPieces.values()) root.remove(mesh);
       for (const material of iconMaterials.values()) material?.dispose();
+      for (const texture of drawnIconTextures) texture.dispose();
       iconGeometry.dispose();
       stripGeometry.dispose();
       matcap.dispose();

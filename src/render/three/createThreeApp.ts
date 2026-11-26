@@ -871,6 +871,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
   const readWorldMapPieces = createWorldMapPieceReader({
     registry: runtimeObjectRegistry,
     geodesicRenderSources: geodesicRuntimeRenderSources,
+    landmarks: true,
   });
   const portalClipData = createPortalClipData({ maxVisiblePaths });
   // Hardware clip distances (WEBGL_clip_cull_distance) when available, otherwise a fragment compare and discard.

@@ -6,7 +6,7 @@
  * its palette's colours. Theme ids are unique.
  */
 import { describe, expect, it } from "vitest";
-import { buildFacePalette, groundPaletteMultiplier, hslToHex } from "../../src/world-assets/facePalettes";
+import { buildFacePalette, groundPaletteMultiplier, hslToHex, paletteSchemes } from "../../src/world-assets/facePalettes";
 import { faceThemes, type LandmarkRole } from "../../src/world-assets/faceThemes";
 import { measureParts, partTriangleCount, tessellatePart, type LandmarkPart } from "../../src/world-assets/landmarkParts";
 import { createSeededRandom } from "../../src/world-assets/seededNoise";
@@ -60,7 +60,7 @@ describe("face themes", () => {
 
   it.each(faceThemes.map((theme) => theme.id))("%s: every generator stays in its size range and budget, in its palette, deterministically", (id) => {
     const theme = faceThemes.find((entry) => entry.id === id)!;
-    const palette = buildFacePalette(140, "split");
+    const palette = buildFacePalette(140, "analogous");
     const allowed = new Set([palette.primary, palette.secondary, palette.accent, palette.dark, palette.light, palette.glow, "#050505"]);
 
     for (const role of ["major", "minor", "prop"] as const) {
@@ -81,7 +81,38 @@ describe("face themes", () => {
   });
 });
 
+// HSL saturation of an sRGB hex colour.
+function saturationOf(hex: string): number {
+  const value = Number.parseInt(hex.slice(1), 16);
+  const [r, g, b] = [(value >> 16) & 255, (value >> 8) & 255, value & 255].map((channel) => channel / 255);
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const lightness = (max + min) / 2;
+  return max === min ? 0 : (max - min) / (1 - Math.abs(2 * lightness - 1));
+}
+
+function hueOf(hex: string): number {
+  const value = Number.parseInt(hex.slice(1), 16);
+  const [r, g, b] = [(value >> 16) & 255, (value >> 8) & 255, value & 255];
+  return ((Math.atan2(Math.sqrt(3) * (g - b), 2 * r - g - b) * 180) / Math.PI + 360) % 360;
+}
+
 describe("face palettes", () => {
+  it("stay muted and in one region of the colour wheel", () => {
+    for (const scheme of paletteSchemes) {
+      for (let hue = 0; hue < 360; hue += 20) {
+        for (const roll of [0, 0.5, 1]) {
+          const palette = buildFacePalette(hue, scheme, () => roll);
+          for (const color of [palette.primary, palette.secondary, palette.accent, palette.ground]) {
+            expect(saturationOf(color), `${scheme} ${hue} ${color}`).toBeLessThanOrEqual(0.66);
+            const distance = Math.abs(((hueOf(color) - hue + 540) % 360) - 180);
+            expect(distance, `${scheme} ${hue} ${color}`).toBeLessThanOrEqual(45);
+          }
+        }
+      }
+    }
+  });
+
   it("converts HSL to hex", () => {
     expect(hslToHex(0, 1, 0.5)).toBe("#ff0000");
     expect(hslToHex(120, 1, 0.5)).toBe("#00ff00");
@@ -96,7 +127,7 @@ describe("face palettes", () => {
     expect(r).toBeGreaterThan(g);
     expect(r).toBeGreaterThan(b);
     for (let hue = 0; hue < 360; hue += 30) {
-      expect(Math.max(...groundPaletteMultiplier(buildFacePalette(hue, "triadic")))).toBeLessThanOrEqual(1.9 + 1e-9);
+      expect(Math.max(...groundPaletteMultiplier(buildFacePalette(hue, "tonal")))).toBeLessThanOrEqual(1.9 + 1e-9);
     }
   });
 });
