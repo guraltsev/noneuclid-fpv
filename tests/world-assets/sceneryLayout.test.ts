@@ -103,3 +103,33 @@ describe("computeSceneryLayout on the basic cube", () => {
     expect(computeSceneryLayout({ ...world.cells[0], floorMaterial: { kind: "floor-color", floorColor: "#446688" } })).toEqual([]);
   });
 });
+
+describe("computeSceneryLayout next to a neighbouring biome", () => {
+  const grass = withFloor(world.cells[0], "grass1");
+  const dense = { densityScale: 4, spacingMeters: 0.5, neighbourBiomeBySideIndex: new Map([[0, "snow" as const]]), neighbourBlendHalfWidthMeters: 2 };
+  const snowKinds = new Set(["snow-mound", "ice-crystal", "twig"]);
+  const distanceToSide0 = (prop: { readonly x: number; readonly y: number }) => {
+    const side = grass.sides[0];
+    return (prop.x - side.start.x) * side.inwardNormal.x + (prop.y - side.start.y) * side.inwardNormal.y;
+  };
+
+  it("draws near the side from the neighbour's list and far from it only from its own", () => {
+    const props = computeSceneryLayout(grass, dense);
+    const near = props.filter((prop) => distanceToSide0(prop) < 1);
+    const far = props.filter((prop) => distanceToSide0(prop) >= 2);
+
+    expect(near.length).toBeGreaterThan(5);
+    expect(near.some((prop) => snowKinds.has(prop.kind))).toBe(true);
+    expect(near.some((prop) => !snowKinds.has(prop.kind))).toBe(true);
+    expect(far.length).toBeGreaterThan(5);
+    expect(far.every((prop) => !snowKinds.has(prop.kind))).toBe(true);
+  });
+
+  it("is deterministic and leaves the layout alone without neighbours", () => {
+    expect(computeSceneryLayout(grass, dense)).toEqual(computeSceneryLayout(grass, dense));
+    expect(computeSceneryLayout(grass, { ...dense, neighbourBiomeBySideIndex: new Map() })).toEqual(computeSceneryLayout(grass, { ...dense, neighbourBiomeBySideIndex: undefined }));
+    // The same positions either way (below the triangle budget): only the kinds change.
+    const sparse = { neighbourBiomeBySideIndex: dense.neighbourBiomeBySideIndex };
+    expect(computeSceneryLayout(grass, sparse).map((prop) => [prop.x, prop.y])).toEqual(computeSceneryLayout(grass).map((prop) => [prop.x, prop.y]));
+  });
+});

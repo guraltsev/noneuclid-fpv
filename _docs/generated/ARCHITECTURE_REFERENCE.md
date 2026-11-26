@@ -5,7 +5,7 @@
 
 This reference is produced from the source code. For the *meaning* of the modules — the mathematical model they implement — read [../MATHEMATICAL_MODEL.md](../MATHEMATICAL_MODEL.md) and [../ARCHITECTURE.md](../ARCHITECTURE.md). For every exported symbol see [API_REFERENCE.md](API_REFERENCE.md).
 
-**338 modules, 65,876 lines** under `src/`.
+**344 modules, 66,856 lines** under `src/`.
 
 ## Layers
 
@@ -14,11 +14,11 @@ A module belongs to the layer named by its first path segment under `src/`. "May
 | Layer | Modules | Lines | May import | Purpose |
 | --- | ---: | ---: | --- | --- |
 | `math` | 8 | 746 | nothing | Vectors, rigid transforms, planes, polygons, tolerances. Pure; imports nothing. |
-| `cell-complex` | 21 | 4,576 | `math` | Prism-cell specs, compilation, portal transforms, portal-path tables, static visibility culling, deformation families. |
+| `cell-complex` | 22 | 4,634 | `math` | Prism-cell specs, compilation, portal transforms, portal-path tables, static visibility culling, deformation families. |
 | `diagnostics` | 2 | 474 | `math`, `cell-complex` | Debug levels and the runtime diagnostics recorder that every layer above may report to. |
 | `visibility` | 2 | 1,036 | `math`, `cell-complex` | Per-frame portal visibility: funnel clipping of portal-path tables against a camera. Pure; no renderer. |
 | `movement` | 13 | 2,929 | `math`, `cell-complex` | Player body, collision, movement and portal crossing in compiled cell complexes. |
-| `world-assets` | 4 | 739 | `cell-complex` | Floor-texture and asset descriptors. |
+| `world-assets` | 6 | 974 | `cell-complex` | Floor-texture and asset descriptors. |
 | `world-objects` | 41 | 10,440 | `math`, `cell-complex`, `diagnostics`, `movement`, `world-assets` | Placeable runtime objects: registry, geodesic emitters, measurement tools, flags, creature behaviors. |
 | `authoring` | 5 | 967 | `math`, `cell-complex`, `examples`, `world-assets`, `world-objects` | World builder DSL, world-script compiler, validation and world catalog. |
 | `glue` | 12 | 1,060 | `math`, `cell-complex`, `diagnostics`, `authoring` | Launch options, debug settings, tool ids, asset URLs, app configuration. |
@@ -27,7 +27,7 @@ A module belongs to the layer named by its first path segment under `src/`. "May
 | `modules` | 35 | 3,103 | `math`, `cell-complex`, `diagnostics`, `movement`, `world-objects`, `glue`, `interaction`, `engine` | World modules (design 013): each owns a slice of world behaviour and exposes a typed api.ts to the others. |
 | `runtime` | 16 | 3,025 | `math`, `cell-complex`, `diagnostics`, `movement`, `world-objects`, `authoring`, `glue`, `engine`, `modules` | Application state, runtime menu state, command dispatch, geometry session/worker, server channel and public API. |
 | `ui` | 15 | 2,629 | `math`, `cell-complex`, `world-objects`, `authoring`, `glue`, `engine`, `modules`, `runtime` | Renderer-neutral palette, help, tooltip and input-intent definitions. |
-| `render` | 146 | 30,286 | every lower layer | Three.js / DOM / WebXR rendering and input adapters (the application shell). |
+| `render` | 149 | 30,973 | every lower layer | Three.js / DOM / WebXR rendering and input adapters (the application shell). |
 | `root` | 1 | 214 | every lower layer | Entry point. |
 
 ## Layer dependency graph
@@ -55,7 +55,7 @@ flowchart LR
   authoring -->|6| cell_complex
   authoring -->|2| world_assets
   authoring -->|5| world_objects
-  cell_complex -->|27| math
+  cell_complex -->|29| math
   diagnostics -->|1| cell_complex
   engine -->|3| cell_complex
   engine -->|5| glue
@@ -77,18 +77,18 @@ flowchart LR
   modules -->|45| world_objects
   movement -->|15| cell_complex
   movement -->|24| math
-  render -->|69| cell_complex
+  render -->|72| cell_complex
   render -->|11| diagnostics
   render -->|23| engine
   render -->|38| glue
   render -->|30| interaction
-  render -->|38| math
+  render -->|39| math
   render -->|19| modules
   render -->|36| movement
   render -->|60| runtime
   render -->|48| ui
   render -->|8| visibility
-  render -->|4| world_assets
+  render -->|11| world_assets
   render -->|105| world_objects
   root -->|1| authoring
   root -->|2| cell_complex
@@ -111,7 +111,7 @@ flowchart LR
   ui -->|12| world_objects
   visibility -->|4| cell_complex
   visibility -->|4| math
-  world_assets -->|3| cell_complex
+  world_assets -->|6| cell_complex
   world_objects -->|34| cell_complex
   world_objects -->|41| math
   world_objects -->|15| movement
@@ -142,6 +142,7 @@ None: every import respects the intended layering.
 
 | Module | Lines | Summary | Imports |
 | --- | ---: | --- | --- |
+| `cell-complex/cellSun.ts` | 58 | The baked light direction of every cell (design 018 section 3). | `cell-complex/prismCells`, `math/rigidTransform3`, `math/vec3` |
 | `cell-complex/compileCellComplex.ts` | 65 | Top-level compiler from an authored cell-complex spec to the runtime geometry used by movement and rendering. | `cell-complex/compilePortalTransforms`, `cell-complex/prismCells`, `cell-complex/specs`, `cell-complex/validateCellComplexSpec` |
 | `cell-complex/compilePortalTransforms.ts` | 91 | Derives the rigid gluing map of every portal from the geometry of the two sides it joins. | `cell-complex/prismCells`, `cell-complex/specs`, `math/rigidTransform3`, `math/vec3` |
 | `cell-complex/deformations/torusModuli.ts` | 95 | The modulus of a flat torus, for the geometry computer's readout. | `math/latticeReduction` |
@@ -201,9 +202,11 @@ None: every import respects the intended layering.
 | Module | Lines | Summary | Imports |
 | --- | ---: | --- | --- |
 | `world-assets/floorTextures.ts` | 201 | Floor texture library: the named floor appearances world scripts can use, via the `floorTexture` helper. | `cell-complex/specs` |
-| `world-assets/groundTint.ts` | 107 | Per-cell ground tint image (design 018 section 4.1). | `cell-complex/specs`, `world-assets/seededNoise` |
-| `world-assets/sceneryLayout.ts` | 357 | Seeded layout of the small decorative props (grass, flowers, stones, mushrooms...) that grow on the floor of a cell. | `cell-complex/prismCells`, `world-assets/seededNoise` |
+| `world-assets/groundTint.ts` | 197 | Per-cell ground tint image (design 018 section 4.1). | `cell-complex/specs`, `world-assets/seededNoise` |
+| `world-assets/landmarkLayout.ts` | 55 | Seeded layout of the large generated landmarks of a cell (design 018 section 4.3): arches, arcades, towers, pillars and the like. | `cell-complex/prismCells`, `world-assets/groundTint` |
+| `world-assets/sceneryLayout.ts` | 406 | Seeded layout of the small decorative props (grass, flowers, stones, mushrooms...) that grow on the floor of a cell. | `cell-complex/prismCells`, `world-assets/seededNoise` |
 | `world-assets/seededNoise.ts` | 74 | Deterministic seeded random numbers and value noise. | — |
+| `world-assets/worldDressing.ts` | 41 | Everything generated that dresses a world and that more than one consumer needs (design 018): the baked light direction of each cell and its landmarks. | `cell-complex/cellSun`, `cell-complex/compileCellComplex`, `world-assets/landmarkLayout` |
 
 ### `world-objects`
 
@@ -404,14 +407,15 @@ None: every import respects the intended layering.
 | `render/three/aimTarget.ts` | 34 | Three.js adapter of the renderer-free aim picking (`interaction/aimTarget`): reads the aim ray from a camera's world position and forward (-z) axis, in the root Three.js frame, and hands it over in world axes. | `interaction/aimTarget`, `render/three/worldAxes` |
 | `render/three/appDebugHelpers.ts` | 644 | Browser-console debug surface for the app: window-level helper installation, the shapes of the JSON dumps they return, and small number/portal-word formatters. | `cell-complex/portalPathDebug`, `cell-complex/portalPaths`, `cell-complex/staticPortalPathCull`, `glue/toolIds`, `math/vec3`, `movement/playerBody`, `movement/playerPose`, `render/three/geodesicCreatureDebug`, `render/three/renderPortalInstances`, `render/three/renderQuality`, `render/three/renderState`, `render/three/visiblePortalPaths`, `render/three/worldAxes`, `runtime/publicApi`, `runtime/worldGeometrySession`, `visibility/visiblePortalPaths`, `world-objects/derived`, `world-objects/geodesic/lifecycle`, `world-objects/geodesic/objects`, `world-objects/runtimeObjectRegistry` |
 | `render/three/appDebugLogging.ts` | 112 | Console guides printed when debug options are enabled. | `cell-complex/portalPaths`, `cell-complex/staticPortalPathCull`, `diagnostics/debugLevels`, `glue/debugOptions` |
-| `render/three/buildCellMesh.ts` | 365 | Builds the Three.js geometry of one prism cell in the cell's own local frame (which the portal pipeline later places). | `cell-complex/floorUv`, `cell-complex/prismCells`, `diagnostics/debugLevels`, `glue/portalPanelMode`, `render/three/buildCellScenery`, `render/three/buildPortalMesh`, `render/three/debugCollisionWireframes`, `render/three/preparedWorldAssets`, `render/three/sceneColors` |
-| `render/three/buildCellScenery.ts` | 516 | Builds the merged scenery mesh of one cell: every prop of `computeSceneryLayout` as a few flat-shaded, vertex-coloured triangles. | `cell-complex/prismCells`, `world-assets/sceneryLayout`, `world-assets/seededNoise` |
+| `render/three/buildCellLandmarks.ts` | 17 | Mesh of the generated landmarks of one cell (design 018 section 4.3), in the cell mesh's Three.js axes (cell-local (x, y, height) is Three (x, height, -y)). | `world-assets/landmarkLayout` |
+| `render/three/buildCellMesh.ts` | 471 | Builds the Three.js geometry of one prism cell in the cell's own local frame (which the portal pipeline later places). | `cell-complex/compileCellComplex`, `cell-complex/floorUv`, `cell-complex/prismCells`, `diagnostics/debugLevels`, `glue/portalPanelMode`, `render/three/buildCellLandmarks`, `render/three/buildCellScenery`, `render/three/buildPortalMesh`, `render/three/debugCollisionWireframes`, `render/three/groundBlendGeometry`, `render/three/preparedWorldAssets`, `render/three/sceneColors`, `world-assets/sceneryLayout`, `world-assets/worldDressing` |
+| `render/three/buildCellScenery.ts` | 522 | Builds the merged scenery mesh of one cell: every prop of `computeSceneryLayout` as a few flat-shaded, vertex-coloured triangles. | `cell-complex/prismCells`, `world-assets/sceneryLayout`, `world-assets/seededNoise` |
 | `render/three/buildDecorationMesh.ts` | 163 | Builds the Three.js node for a static decoration (asset object) declared in a cell spec. | `cell-complex/specs`, `diagnostics/runtimeDiagnostics`, `render/three/preparedWorldAssets`, `render/three/runtimeSceneUtils`, `render/three/worldAxes` |
 | `render/three/buildPortalMesh.ts` | 75 | Builds the visible wall panel of a portal side (the textured "doorway" surface) in a cell's local frame. | `render/three/portalWallTexture`, `render/three/preparedWorldAssets` |
 | `render/three/canvasDrawing.ts` | 28 | Canvas 2D drawing helpers used to build text-label textures. | — |
 | `render/three/carriedGeodesicCannon.ts` | 143 | Pure placement and naming helpers for carrying and aiming geodesic emitters. | `math/vec3`, `render/three/rootAimRay`, `render/three/worldAxes`, `world-objects/geodesic/endpoints`, `world-objects/geodesic/objects`, `world-objects/runtimeObjectRegistry` |
 | `render/three/carryHighlight.ts` | 87 | The translucent shape drawn around an object that is being carried. | `cell-complex/compileCellComplex`, `movement/dynamicObject`, `render/three/runtimeObjectGhostRecords`, `render/three/runtimeObjectRenderRecords`, `render/three/worldAxes`, `world-objects/carryHighlightShape` |
-| `render/three/cellRenderArchetypes.ts` | 349 | Builds the instanced-mesh archetypes for the static geometry of every cell, one archetype per drawable mesh part. | `cell-complex/compileCellComplex`, `cell-complex/floorUv`, `cell-complex/prismCells`, `cell-complex/staticPortalPathCull`, `diagnostics/debugLevels`, `glue/portalPanelMode`, `render/three/buildCellMesh`, `render/three/floorPatchMaterial`, `render/three/groundTintMaterial`, `render/three/portalClipMaterial`, `render/three/preparedWorldAssets`, `render/three/runtimeSceneUtils`, `world-assets/groundTint` |
+| `render/three/cellRenderArchetypes.ts` | 449 | Builds the instanced-mesh archetypes for the static geometry of every cell, one archetype per drawable mesh part. | `cell-complex/compileCellComplex`, `cell-complex/floorUv`, `cell-complex/prismCells`, `cell-complex/staticPortalPathCull`, `diagnostics/debugLevels`, `glue/portalPanelMode`, `render/three/buildCellMesh`, `render/three/floorPatchMaterial`, `render/three/groundBlendMaterial`, `render/three/groundTintMaterial`, `render/three/portalClipMaterial`, `render/three/preparedWorldAssets`, `render/three/runtimeSceneUtils`, `world-assets/groundTint`, `world-assets/landmarkLayout`, `world-assets/worldDressing` |
 | `render/three/createThreeApp.ts` | 2358 | Application shell: builds the Three.js scene, owns the shared mutable state (player pose, menu state, visible-portal results, tool state) and runs the frame loop. | `cell-complex/platonicSolid`, `cell-complex/specs`, `cell-complex/staticPortalPathCull`, `diagnostics/debugLevels`, `diagnostics/runtimeDiagnostics`, `engine/moduleTypes`, `engine/worldEngine`, `glue/appConfig`, `glue/debugOptions`, `glue/debugSettings`, `glue/portalPanelMode`, `glue/readLaunchOptions`, `glue/toolIds`, `glue/xrLayout`, `interaction/inputFrame`, `modules/discoveries/index`, `modules/geodesicEmitters/api`, `modules/geodesicEmitters/client`, `modules/geodesicMeasurements/api`, `modules/geodesicMeasurements/client`, `modules/placedFlags/api`, `modules/placedFlags/client`, `modules/worldMap/index`, `movement/dynamicObject`, `movement/movePlayer`, `movement/playerBody`, `movement/playerPose`, `render/dom/crosshair`, `render/dom/floatingObjectTooltip`, `render/dom/hintStrip`, `render/dom/pauseCard`, `render/dom/resetHoldRing`, `render/dom/toastView`, `render/dom/toolBelt`, `render/three/aimCrossMarker`, `render/three/aimFeedback`, `render/three/aimInteraction`, `render/three/appDebugHelpers`, `render/three/appDebugLogging`, `render/three/carriedGeodesicCannon`, `render/three/creatures/geodesicMarmotView`, `render/three/creatures/simpleGeoCreatureView`, `render/three/crosshairAim`, `render/three/curiosityMarkers`, `render/three/debugOverlay`, `render/three/debugVisualization`, `render/three/desktopControls`, `render/three/desktopInputHandlers`, `render/three/desktopScenePaletteInput`, `render/three/discoveryController`, `render/three/edgeLines`, `render/three/firstUseTipController`, `render/three/frameDiagnostics`, `render/three/frameErrorGuard`, `render/three/frameRenderSnapshot`, `render/three/geodesicCannonRenderer`, `render/three/geodesicCannonTools`, `render/three/geodesicDebugDumps`, `render/three/geodesicEmitterLabelController`, `render/three/geometryCommit`, `render/three/geometryComputerMenu`, `render/three/geometryDebugHelpers`, `render/three/helpCubeInvite`, `render/three/helpLensRenderer`, `render/three/measureLengthRenderer`, `render/three/palette/tokens`, `render/three/placedFlagRenderer`, `render/three/playerRoverModel`, `render/three/portalClipData`, `render/three/portalClipMaterial`, `render/three/portalClipPolygonOverlay`, `render/three/portalDebugRuntime`, `render/three/portalFramePass`, `render/three/preparedWorldAssets`, `render/three/prerenderCells`, `render/three/protractorAngleRenderer`, `render/three/renderCameraClip`, `render/three/renderInspection`, `render/three/renderQuality`, `render/three/renderState`, `render/three/rootAimRay`, `render/three/runtimeEffects`, `render/three/runtimeObjectActions`, `render/three/runtimeObjectInstanceSync`, `render/three/runtimeObjectRenderArchetypes`, `render/three/runtimeObjectRenderRecords`, `render/three/runtimeSceneUtils`, `render/three/sceneColors`, `render/three/sceneLighting`, `render/three/scenePaletteCommands`, `render/three/scenePaletteController`, `render/three/scriptedPlayerMotion`, `render/three/settingsStorage`, `render/three/skyBackground`, `render/three/staticAssetRenderRoot`, `render/three/toolHost`, `render/three/toolObjectRuntimes`, `render/three/underCellFloor`, `render/three/vrComfort`, `render/three/worldClient`, `render/three/worldDemo`, `render/three/worldMapPieces`, `render/three/worldMapRenderer`, `render/three/xrControllerHandModels`, `render/three/xrControls`, `render/three/xrDebugPanel`, `render/three/xrEntryUi`, `render/three/xrHandUi`, `render/three/xrObjectTooltipController`, `render/three/xrPlayerRig`, `render/three/xrScenePaletteInput`, `render/three/xrSessionController`, `runtime/appState`, `runtime/applyRuntimeCommand`, `runtime/clientSession`, `runtime/experience`, `runtime/publicApi`, `runtime/runtimeCommands`, `runtime/runtimeMenuState`, `runtime/worldGeometryDeformationFamilies`, `runtime/worldGeometrySession`, `ui/crosshairDefinition`, `ui/hintStripDefinition`, `ui/howToCards`, `ui/inputIntents`, `ui/pauseCardDefinition`, `ui/toastQueue`, `ui/toolBeltDefinition`, `ui/vocabulary`, `visibility/visiblePortalPaths`, `world-objects/derived`, `world-objects/geodesic/beamRows`, `world-objects/geodesic/endpoints`, `world-objects/geodesic/objects`, `world-objects/geodesicMarmot`, `world-objects/objectMetadata`, `world-objects/runtimeObjectBase`, `world-objects/runtimeObjectRegistry`, `world-objects/savedSnapshot`, `world-objects/simpleGeoCreature`, `world-objects/worldObjectOwner` |
 | `render/three/creatures/geodesicMarmotView.ts` | 116 | Three.js view of the geodesic marmot: its static proxy mesh, the debug collision cylinder and the attachment to the current cell's scene node. | `cell-complex/compileCellComplex`, `cell-complex/specs`, `cell-complex/worldGeometryDeformations`, `diagnostics/runtimeDiagnostics`, `render/three/buildDecorationMesh`, `render/three/debugCollisionWireframes`, `render/three/preparedWorldAssets`, `render/three/worldAxes`, `world-objects/creatures/geodesicMarmotBehavior`, `world-objects/runtimeObjectRegistry`, `world-objects/worldObjectOwner` |
 | `render/three/creatures/simpleGeoCreatureView.ts` | 138 | Three.js view of a simple geodesic creature (the mouse or the butterfly): the glTF instance, the debug collision cylinder and the attachment to the current cell's scene node. | `cell-complex/compileCellComplex`, `cell-complex/specs`, `cell-complex/worldGeometryDeformations`, `diagnostics/runtimeDiagnostics`, `math/rigidTransform3`, `movement/dynamicObject`, `render/three/debugCollisionWireframes`, `render/three/preparedWorldAssets`, `render/three/worldAxes`, `world-objects/creatures/simpleGeoCreatureBehavior`, `world-objects/runtimeObjectRegistry`, `world-objects/worldObjectOwner` |
@@ -444,6 +448,8 @@ None: every import respects the intended layering.
 | `render/three/geometryCommitTransforms.ts` | 94 | Pure transforms that carry live state across a geometry commit: the player pose, a placed sign and a geodesic emitter are sent through the per-cell deformation maps of the previous to the new world. | `cell-complex/compileCellComplex`, `cell-complex/worldGeometryDeformations`, `math/rigidTransform3`, `movement/depenetrateDynamicObject`, `movement/dynamicObject`, `movement/playerPose`, `render/three/runtimeSceneUtils`, `world-objects/runtimeObjectBase`, `world-objects/runtimeObjectRegistry`, `world-objects/toolObjects` |
 | `render/three/geometryComputerMenu.ts` | 218 | Menu logic for the in-world geometry computer, which edits the torus-skew parameters of the world and starts the deformation. | `render/three/runtimeSceneUtils`, `runtime/clientSession`, `runtime/runtimeCommands`, `runtime/worldGeometrySession` |
 | `render/three/geometryDebugHelpers.ts` | 85 | The `window.noneuclidGeometry` helpers and the `geometry` API namespace that drive the torus-skew deformation by hand. | `render/three/appDebugHelpers`, `runtime/clientSession`, `runtime/publicApi`, `runtime/worldGeometrySession` |
+| `render/three/groundBlendGeometry.ts` | 239 | Geometry of a metric floor split into an inner polygon and one blend strip per side (design 018 section 8.3). | `cell-complex/floorUv`, `cell-complex/prismCells`, `math/rigidTransform3`, `render/three/groundBlendMaterial`, `world-assets/seededNoise` |
+| `render/three/groundBlendMaterial.ts` | 172 | Ground blending along the sides of a metric floor (design 018 section 8.3). | `render/three/groundTintMaterial`, `world-assets/groundTint` |
 | `render/three/groundTintMaterial.ts` | 76 | Ground tint for a textured floor material (design 018 section 4.1). | `world-assets/groundTint` |
 | `render/three/helpCubeInvite.ts` | 147 | The help cube's invitation (design 017 section 9.1): a floating "? | `cell-complex/compileCellComplex`, `cell-complex/portalRoute`, `engine/worldEngine`, `math/rigidTransform3`, `render/three/geodesicEmitterLabels`, `render/three/runtimeSceneUtils`, `render/three/worldAxes`, `ui/vocabulary`, `world-objects/runtimeObjectRegistry`, `world-objects/worldObjectOwner` |
 | `render/three/helpLensRenderer.ts` | 301 | Help panel ("help lens") renderer: shows the current contextual help definition either as a DOM panel (desktop) or as a floating textured plane in front of the camera (XR). | `glue/assetUrls`, `render/three/canvasDrawing`, `ui/helpLensDefinition` |
@@ -495,8 +501,8 @@ None: every import respects the intended layering.
 | `render/three/runtimeObjectRenderArchetypes.ts` | 157 | Instanced-mesh archetypes for runtime objects: one `THREE.InstancedMesh` per source mesh, drawn once per visible portal path. | `render/three/portalClipMaterial`, `render/three/runtimeObjectRenderRecords`, `render/three/runtimeSceneUtils` |
 | `render/three/runtimeObjectRenderRecords.ts` | 186 | Data records describing where runtime (non-static) objects should be drawn, and the source meshes they instance. | — |
 | `render/three/runtimeSceneUtils.ts` | 192 | Small scene-graph, geometry, and pose helpers shared by the app shell. | `cell-complex/prismCells`, `cell-complex/worldGeometryDeformations`, `math/vec3`, `movement/playerBody`, `render/three/debugCollisionWireframes`, `runtime/appState`, `world-objects/runtimeObjectRegistry` |
-| `render/three/sceneColors.ts` | 22 | Shared scene colour constants for the Three.js renderer. | — |
-| `render/three/sceneLighting.ts` | 70 | Lighting rig for the stylized (non-physical) look of the scene. | — |
+| `render/three/sceneColors.ts` | 32 | Shared scene colour constants for the Three.js renderer. | — |
+| `render/three/sceneLighting.ts` | 71 | Lighting rig for the stylized (non-physical) look of the scene. | `render/three/sceneColors` |
 | `render/three/scenePaletteCommands.ts` | 213 | What the scene palette's buttons do: one callback per palette action, each dispatching the command that action stands for (selecting a tool is a request to the world instead). | `glue/toolIds`, `render/three/scenePaletteController`, `runtime/runtimeCommands` |
 | `render/three/scenePaletteController.ts` | 718 | Controller that owns the in-scene palette's scene graph and routes pointer input to palette actions, for both desktop and XR. | `glue/portalPanelMode`, `glue/toolIds`, `render/three/canvasDrawing`, `render/three/palette/scenePaletteAdapter`, `render/three/runtimeSceneUtils`, `render/three/scenePaletteInput`, `render/three/scenePaletteLayout`, `render/three/scenePointers`, `runtime/clientSession`, `runtime/runtimeCommands`, `runtime/runtimeMenuState`, `ui/paletteDefinition`, `ui/paletteTooltips`, `world-objects/toolObjects` |
 | `render/three/scenePaletteInput.ts` | 70 | Renderer-side input contract for the in-scene palette, shared by the desktop and XR input paths. | — |
@@ -504,7 +510,7 @@ None: every import respects the intended layering.
 | `render/three/scenePointers.ts` | 148 | Per-source ray pointers that drive hover and select events on the XR scene palette (and desktop pointer sources). | `render/three/scenePaletteInput` |
 | `render/three/scriptedPlayerMotion.ts` | 266 | Scripted motion of the local player: runs a motion script (src/movement/motionScript.ts) through the frame loop and serves it as the public API namespace `motion` (`window.noneuclid.api.motion`). | `cell-complex/compileCellComplex`, `movement/developedObstacles`, `movement/motionRunner`, `movement/motionScript`, `movement/movePlayer`, `movement/playerBody`, `movement/playerPose`, `runtime/apiCall`, `world-objects/runtimeObjectBase` |
 | `render/three/settingsStorage.ts` | 103 | What Settings and Help remember between visits (design 017 sections 8.6 and 8.7): the text size, the mouse sensitivity, the turn speed, Invert Y and the How to cards that were opened. | `runtime/runtimeMenuState` |
-| `render/three/skyBackground.ts` | 87 | Vertical sky gradient used as `scene.background`. | `render/three/sceneColors` |
+| `render/three/skyBackground.ts` | 123 | Vertical sky gradient used as `scene.background`. | `render/three/sceneColors` |
 | `render/three/staticAssetRenderRoot.ts` | 38 | Render root of a static asset: the template that the runtime-object render path turns into instanced meshes drawn at the asset's registry pose. | `cell-complex/specs`, `math/rigidTransform3`, `render/three/buildDecorationMesh`, `render/three/preparedWorldAssets`, `render/three/worldAxes` |
 | `render/three/staticObjectCollisionWireframes.ts` | 37 | Debug overlay builder for the collision shapes of static asset objects in one cell. | `render/three/debugCollisionWireframes`, `world-objects/runtimeObjectBase`, `world-objects/runtimeObjectRegistry` |
 | `render/three/stereoPortalFrame.ts` | 125 | Builds the per-eye visibility states of one stereo (XR) frame, as a pure function of the world, the static path tables, the eyes' render roots and the viewport, so the contract tests run the same code as the app. | `cell-complex/compileCellComplex`, `cell-complex/staticPortalPathCull`, `render/three/appDebugHelpers`, `render/three/portalEyeFrameTransforms`, `render/three/visiblePortalPaths`, `render/three/xrPortalEye`, `visibility/visiblePortalPaths` |
