@@ -360,9 +360,10 @@ export interface RuntimeObjectInstanceDecision {
   /**
    * "written": an instance was written (`instanceIndex`); "omitted-root-path": the record skips the depth-0 path; "suppressed-near-camera":
    * the instance would lie within the record's suppression distance of a camera (`cameraDistanceMeters`); "merged-into-root-copy": the
-   * placement is also drawn by the unclipped depth-0 copy, so this one is not written; "over-capacity": the archetype is full.
+   * placement is also drawn by the unclipped depth-0 copy, so this one is not written; "beyond-draw-distance": the copy lies beyond the
+   * archetype's draw distance from every eye (in the fog); "over-capacity": the archetype is full.
    */
-  readonly outcome: "written" | "omitted-root-path" | "suppressed-near-camera" | "merged-into-root-copy" | "over-capacity";
+  readonly outcome: "written" | "omitted-root-path" | "suppressed-near-camera" | "merged-into-root-copy" | "beyond-draw-distance" | "over-capacity";
   readonly instanceIndex?: number;
   /** Root-frame (Three axes) distance from the instance to the nearest camera, when the record has a suppression distance. */
   readonly cameraDistanceMeters?: number;
@@ -380,7 +381,8 @@ export interface RuntimeObjectInstanceDecision {
  * Instances of one object that land on the same place in the root frame (same translation and first column, rounded
  * to 1e-4) are written once, from the unclipped depth-0 path, when there is one, so a real object and its ghost do
  * not z-fight. Otherwise every copy is written: each clipped path shows the object only inside its own funnel, so
- * keeping one would make the object pop as the winner changes with the view. With `rootGroupByPathId` only instances
+ * keeping one would make the object pop as the winner changes with the view. A copy (not at depth 0) whose archetype `bounds` lie entirely farther than
+ * the archetype's `maxDrawDistanceMeters` from every camera position is not written, like a far landmark (`isBeyondDrawDistance`). With `rootGroupByPathId` only instances
  * of one root group merge. `unclippedRoot` as in
  * `resolvePortalInstanceClipIndex`. Overflow is counted by requested (not stored) instances.
  */
@@ -405,6 +407,7 @@ export function updateRuntimeObjectRenderArchetypeInstances(
 ): void {
   const onDecision = options.onDecision;
   const unclippedRoot = options.unclippedRoot ?? true;
+  const cameraPositions = options.cameraPositions;
   const rootGroupByPathId = options.rootGroupByPathId;
   const composedMatrix = composedMatrixScratch;
   const composedPosition = composedPositionScratch;
@@ -414,6 +417,7 @@ export function updateRuntimeObjectRenderArchetypeInstances(
 
   for (const archetype of archetypes) {
     const records = recordsByArchetypeKey.get(archetype.archetypeKey) ?? [];
+    const drawDistance = archetype.bounds && cameraPositions && cameraPositions.length > 0 ? archetype.maxDrawDistanceMeters : undefined;
     let requestedCount = 0;
     let count = 0;
 
@@ -461,11 +465,30 @@ export function updateRuntimeObjectRenderArchetypeInstances(
     for (const record of records) {
       const paths = visiblePathsByDestinationCell.get(record.cellId) ?? [];
       const rootPositions = rootPositionsByObjectId.get(record.objectId);
+      // The record's bounding sphere in its cell's frame, for the draw-distance test (portal transforms are rigid, so the radius carries over).
+      let reachSquared = 0;
+      if (drawDistance !== undefined) {
+        recordBoundsCentre.copy(archetype.bounds!.center).applyMatrix4(record.localMatrix);
+        const reach = drawDistance + archetype.bounds!.radius * record.localMatrix.getMaxScaleOnAxis();
+        reachSquared = reach * reach;
+      }
 
       for (const path of paths) {
         if (record.omitRootVisiblePath && path.depth === 0) {
           onDecision?.(decisionFor(record, path, "omitted-root-path", undefined, options.cameraPositions));
           continue;
+        }
+
+        // Too far: the copy's bounding sphere lies beyond the draw distance from every eye, where the fog has covered it. Tested before the
+        // matrix product, so a far copy costs one point transform; neither drawn nor counted as overflow. Depth-0 copies are always kept.
+        if (drawDistance !== undefined && path.depth !== 0) {
+          if (isPointBeyondFromEveryEye(path.rootFromDestinationMatrix, recordBoundsCentre, cameraPositions!, reachSquared)) {
+            if (onDecision) {
+              composedMatrix.multiplyMatrices(path.rootFromDestinationMatrix, record.localMatrix);
+              onDecision(decisionFor(record, path, "beyond-draw-distance", composedMatrix, options.cameraPositions));
+            }
+            continue;
+          }
         }
 
         composedMatrix.multiplyMatrices(path.rootFromDestinationMatrix, record.localMatrix);
@@ -612,6 +635,31 @@ function flagUploadPrefix(attribute: THREE.BufferAttribute, elementCount: number
 // Scratch for updateRuntimeObjectRenderArchetypeInstances; cleared or fully overwritten before each use.
 const composedMatrixScratch = new THREE.Matrix4();
 const composedPositionScratch = new THREE.Vector3();
+const recordBoundsCentre = new THREE.Vector3();
+
+// Whether `matrix * point` (a rigid transform, no perspective divide) is farther than sqrt(reachSquared) from every eye. Runs once per (record,
+// path) pair, so it is written out without closures or temporaries.
+function isPointBeyondFromEveryEye(
+  matrix: THREE.Matrix4,
+  point: THREE.Vector3,
+  eyes: readonly THREE.Vector3[],
+  reachSquared: number,
+): boolean {
+  const e = matrix.elements;
+  const x = e[0] * point.x + e[4] * point.y + e[8] * point.z + e[12];
+  const y = e[1] * point.x + e[5] * point.y + e[9] * point.z + e[13];
+  const z = e[2] * point.x + e[6] * point.y + e[10] * point.z + e[14];
+  for (let index = 0; index < eyes.length; index += 1) {
+    const eye = eyes[index];
+    const dx = x - eye.x;
+    const dy = y - eye.y;
+    const dz = z - eye.z;
+    if (dx * dx + dy * dy + dz * dz <= reachSquared) {
+      return false;
+    }
+  }
+  return true;
+}
 const rootPlacementsScratch = new Set<string>();
 const rootPositionsByObjectIdScratch = new Map<string, number[]>();
 const rootPositionsPool: number[][] = [];

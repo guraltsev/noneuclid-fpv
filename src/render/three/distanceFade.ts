@@ -26,6 +26,11 @@ export const sceneryFadeStartMeters = 38;
 export const sceneryFadeEndMeters = 50;
 /** Landmarks are not instanced beyond this distance from the eye, meters (where the radial fog has fully covered them). */
 export const landmarkMaxDrawDistanceMeters = sceneFogFarMeters;
+/**
+ * Runtime objects (creatures, decorations, tools, flags) are not instanced beyond this distance from the eye, meters. The margin past the fog's far
+ * distance covers parts that move outside the rest-pose bounding sphere (landmark motion: sway, slide, grow).
+ */
+export const runtimeObjectMaxDrawDistanceMeters = sceneFogFarMeters + 5;
 
 const radialFogVertex = "#ifdef USE_FOG\n\tvFogDepth = length( mvPosition.xyz );\n#endif\n";
 

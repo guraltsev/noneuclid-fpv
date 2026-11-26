@@ -6,7 +6,8 @@
  * material, optionally patches it with `patchPortalClipMaterial`, and carries the two per-instance attributes
  * `portalPathId` and `portalClipIndex` used by the clip shader. Capacity is fixed at creation
  * (`recordCount * maxVisiblePaths`, at least 1); instances beyond it are dropped and reported through
- * `RuntimeObjectRenderArchetypeDiagnostics`. Frustum culling is off because instance bounds are not tracked.
+ * `RuntimeObjectRenderArchetypeDiagnostics`. Frustum culling is off because instance bounds are not tracked; the archetype's bounding sphere
+ * (object-root frame) lets the instance writer skip copies beyond `runtimeObjectMaxDrawDistanceMeters` (see `distanceFade.ts`).
  * Placed flags of one type share the archetypes of their glTF model meshes (keys under
  * `placedFlagModelArchetypeKeyPrefix`, see `runtimeObjectRenderRecords`), so N flags cost one draw call per model mesh;
  * only each flag's text planes keep archetypes of their own.
@@ -14,6 +15,7 @@
 
 import * as THREE from "three";
 import { applyDecorationRecolor } from "./decorationPalette";
+import { runtimeObjectMaxDrawDistanceMeters } from "./distanceFade";
 import { applyLandmarkMotion, transformMotionAttributes } from "./landmarkMotion";
 import { patchPortalClipMaterial, type PortalClipMaterialState } from "./portalClipMaterial";
 import type { RuntimeObjectRenderRecord, RuntimeObjectRenderSourceMesh } from "./runtimeObjectRenderRecords";
@@ -32,6 +34,13 @@ export interface RuntimeObjectRenderArchetype {
   readonly capacity: number;
   /** Id of the runtime object the source mesh came from. */
   readonly sourceObjectId: string;
+  /**
+   * Farthest distance from the eye, meters, at which a copy is drawn: a copy whose `bounds` lie entirely farther from every eye is not instanced.
+   * Undefined (with `bounds`) means every distance.
+   */
+  readonly maxDrawDistanceMeters?: number;
+  /** Bounding sphere of the geometry in the object-root frame (the frame of a record's `localMatrix`). */
+  readonly bounds?: THREE.Sphere;
 }
 
 /** Per-frame collector of runtime-object archetypes whose capacity was exceeded. */
@@ -98,6 +107,8 @@ export function buildRuntimeObjectRenderArchetype(
   portalClipIndexAttribute.setUsage(THREE.DynamicDrawUsage);
   geometry.setAttribute("portalPathId", portalPathIdAttribute);
   geometry.setAttribute("portalClipIndex", portalClipIndexAttribute);
+  geometry.computeBoundingSphere();
+  const bounds = geometry.boundingSphere && Number.isFinite(geometry.boundingSphere.radius) ? geometry.boundingSphere.clone() : undefined;
   mesh.userData = {
     kind: "runtime-object-render-archetype",
     objectId: source.objectId,
@@ -111,6 +122,7 @@ export function buildRuntimeObjectRenderArchetype(
     portalClipIndexAttribute,
     capacity,
     sourceObjectId: source.objectId,
+    ...(bounds ? { maxDrawDistanceMeters: runtimeObjectMaxDrawDistanceMeters, bounds } : {}),
   };
 }
 
