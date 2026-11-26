@@ -82,6 +82,9 @@ import { type DebugSettings } from "../../glue/debugSettings";
 import { type PortalPanelModeId } from "../../glue/portalPanelMode";
 import { type LaunchOptions } from "../../glue/readLaunchOptions";
 import { buildStaticAssetRenderRoot } from "./staticAssetRenderRoot";
+import { recolorDecoration } from "./decorationPalette";
+import { decorationThemeIdsFor } from "../../world-assets/faceThemeAssignment";
+import { computeWorldDressing, setActiveLookSeed } from "../../world-assets/worldDressing";
 import { simpleCollisionCylinder } from "../../movement/dynamicObject";
 import { movePlayer } from "../../movement/movePlayer";
 import { DEFAULT_PLAYER_EYE_HEIGHT_METERS } from "../../movement/playerBody";
@@ -300,6 +303,8 @@ export interface ThreeAppOptions {
   /** When true the renderer uses the quality-limited device pixel ratio and smooths portal clip edges. */
   readonly renderQualityEnabled: boolean;
   readonly vrComfortOptions: VrComfortOptions;
+  /** Seed of the world's look (face themes, palettes, generated landmarks); undefined draws it from the world's cell ids. */
+  readonly lookSeed?: number;
   readonly appConfigName: string;
   /** Feature toggles for menu sections and tools; defaults to `defaultAppConfig`. */
   readonly appConfig?: AppConfig;
@@ -332,6 +337,8 @@ const MAX_CONSECUTIVE_FAILED_FRAMES = 30;
  * detected asynchronously. The caller owns the returned handle and must call `dispose()` once.
  */
 export function createThreeApp(container: HTMLElement, appState: AppState, options: ThreeAppOptions): ThreeApp {
+  // Every consumer of the world dressing (cell meshes, tint, landmark bodies, decoration colours) uses this run's look seed.
+  setActiveLookSeed(options.lookSeed);
   const landmarkBodyLookup = createLandmarkBodyLookup();
   const appConfig = appConfigForWorld(options.appConfig ?? defaultAppConfig, appState.world);
   const scene = new THREE.Scene();
@@ -692,6 +699,7 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       configDisplayName: configCatalogLabel !== undefined && /^\d+\s/.test(configCatalogLabel) ? configCatalogLabel.replace(/^\d+\s+/, "") : undefined,
       goalPages: helpCubeSpec?.kind === "asset" ? helpCubeSpec.goalPages : undefined,
       laserToolAvailable: appConfig.tools.geodesicEmitters,
+      lookSeed: options.lookSeed,
     }),
     {
       onPlay: () => void controls.requestPointerLock(),
@@ -1403,10 +1411,13 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
         // The model is drawn from the registry record through this root; it is a template and stays out of the scene.
         const record = runtimeObjectRegistry.get(objectSpec.id);
         if (record) {
-          runtimeObjectRootsById.set(
-            objectSpec.id,
-            buildStaticAssetRenderRoot(cell.id, objectSpec, record.localPose, options.assets),
-          );
+          const assetRoot = buildStaticAssetRenderRoot(cell.id, objectSpec, record.localPose, options.assets);
+          // A decoration takes its face's palette (design 018 section 9.6); the face's theme was chosen to match it.
+          const look = decorationThemeIdsFor(objectSpec.assetPath) === undefined ? undefined : computeWorldDressing(activeWorld()).lookByCellId.get(cell.id);
+          if (look) {
+            recolorDecoration(assetRoot, look.palette);
+          }
+          runtimeObjectRootsById.set(objectSpec.id, assetRoot);
         }
       }
     }

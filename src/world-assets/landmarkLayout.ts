@@ -66,6 +66,8 @@ export interface LandmarkLayoutContext {
   readonly startPosition?: { readonly x: number; readonly y: number };
   /** Theme and palette of the face; without one the cell gets no landmarks. */
   readonly look?: FaceLook;
+  /** The world's look seed: a different seed builds different landmarks (default: from the cell id and theme only). */
+  readonly seed?: number;
 }
 
 /** The most triangles of landmarks one cell may carry; props are dropped first, then minors. */
@@ -179,7 +181,7 @@ export function computeLandmarkLayout(cell: CompiledPrismCell, context: Landmark
     return [];
   }
 
-  const random = createSeededRandom((hashStringToSeed(cell.id) ^ hashStringToSeed(look.theme.id) ^ 0x1a4d3a2c) >>> 0);
+  const random = createSeededRandom((hashStringToSeed(`${cell.id}|${context.seed ?? ""}`) ^ hashStringToSeed(look.theme.id) ^ 0x1a4d3a2c) >>> 0);
   const xs = cell.baseVertices.map((vertex) => vertex.x);
   const ys = cell.baseVertices.map((vertex) => vertex.y);
   const bounds = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)] as const;

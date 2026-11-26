@@ -19,18 +19,41 @@ export interface WorldDressing {
   readonly landmarksByCellId: ReadonlyMap<string, readonly LandmarkPlacement[]>;
 }
 
-const dressingByWorld = new WeakMap<CompiledCellComplex, WorldDressing>();
+const dressingByWorld = new WeakMap<CompiledCellComplex, Map<string, WorldDressing>>();
+let activeLookSeed: number | undefined;
 
-/** Computes (once per world object) the dressing of a compiled world. */
-export function computeWorldDressing(world: CompiledCellComplex): WorldDressing {
-  const known = dressingByWorld.get(world);
+/**
+ * Sets the look seed (the `lookSeed` launch option) that {@link computeWorldDressing} uses when it is given none, so every consumer of the
+ * dressing (cell meshes, ground tint, landmark collisions, the recolouring of authored objects) sees the same look. `undefined` returns to
+ * the seed drawn from the world's cell ids.
+ */
+export function setActiveLookSeed(seed: number | undefined): void {
+  activeLookSeed = seed;
+}
+
+/** The look seed set by {@link setActiveLookSeed}, if any. */
+export function getActiveLookSeed(): number | undefined {
+  return activeLookSeed;
+}
+
+/** Computes (once per world object and look seed) the dressing of a compiled world. */
+export function computeWorldDressing(world: CompiledCellComplex, lookSeed: number | undefined = activeLookSeed): WorldDressing {
+  const key = lookSeed === undefined ? "world" : String(lookSeed);
+  let bySeed = dressingByWorld.get(world);
+
+  if (!bySeed) {
+    bySeed = new Map();
+    dressingByWorld.set(world, bySeed);
+  }
+
+  const known = bySeed.get(key);
 
   if (known) {
     return known;
   }
 
   const start = world.startingPosition;
-  const lookByCellId = assignFaceLooks(world);
+  const lookByCellId = assignFaceLooks(world, lookSeed);
   const dressing: WorldDressing = {
     shadowAzimuthByCellId: computeCellShadowAzimuths(world),
     lookByCellId,
@@ -40,10 +63,11 @@ export function computeWorldDressing(world: CompiledCellComplex): WorldDressing 
         computeLandmarkLayout(cell, {
           startPosition: start && start.cellId === cell.id ? { x: start.position.x, y: start.position.y } : undefined,
           look: lookByCellId.get(cell.id),
+          seed: lookSeed,
         }),
       ]),
     ),
   };
-  dressingByWorld.set(world, dressing);
+  bySeed.set(key, dressing);
   return dressing;
 }

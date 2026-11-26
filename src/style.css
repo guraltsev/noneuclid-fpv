@@ -1121,6 +1121,14 @@ img.desktop-tool-tile-icon {
   cursor: pointer;
 }
 
+.pause-card-look-seed {
+  margin: 10px 0 0;
+  font-size: 12px;
+  opacity: 0.65;
+  user-select: text;
+  cursor: text;
+}
+
 .pause-card-actions [hidden] {
   display: none;
 }

@@ -711,6 +711,8 @@ Which face gets which theme and palette (design 018 section 9.3).
 | Kind | Name | Summary |
 | --- | --- | --- |
 | interface | `FaceLook` | What a face looks like. |
+| const | `decorationThemeIdsByAssetFolder` | The themes an authored decoration fits, by the folder of its model (`library.ts`), best first. |
+| function | `decorationThemeIdsFor` | The theme ids the decoration with model `assetPath` fits, best first, or undefined when it is not a decoration. |
 | const | `maxKeyHues` | Most key hues the wheel is cut into. |
 | function | `isThemedCell` | Whether a cell is themed (gets landmarks and a palette). |
 | function | `assignFaceLooks` | Assigns a theme and a palette to every themed cell of the world (see the module header). |
@@ -855,7 +857,9 @@ Everything generated that dresses a world and that more than one consumer needs 
 | Kind | Name | Summary |
 | --- | --- | --- |
 | interface | `WorldDressing` | The generated dressing of a world. |
-| function | `computeWorldDressing` | Computes (once per world object) the dressing of a compiled world. |
+| function | `setActiveLookSeed` | Sets the look seed (the `lookSeed` launch option) that {@link computeWorldDressing} uses when it is given none, so every consumer of the dressing (cell meshes, ground tint, landmark collisions, the recolouring of author… |
+| function | `getActiveLookSeed` | The look seed set by {@link setActiveLookSeed}, if any. |
+| function | `computeWorldDressing` | Computes (once per world object and look seed) the dressing of a compiled world. |
 
 ## `world-objects`
 
@@ -1654,7 +1658,7 @@ Converts between launch options and URL query parameters: strips them from the v
 | Kind | Name | Summary |
 | --- | --- | --- |
 | function | `removeLaunchOptionsFromUrl` | Returns the URL with all launch-option query parameters (but not config) removed. |
-| function | `replaceVisibleUrlWithoutLaunchOptions` | Rewrites the browser address bar via history.replaceState without launch-option parameters; does nothing when none are present. |
+| function | `replaceVisibleUrlWithoutLaunchOptions` | Rewrites the browser address bar via history.replaceState without launch-option parameters, except the look seed, which it sets to `lookSeed` when given (so a reload keeps the look and the address can be shared); does n… |
 | function | `buildUrlWithLaunchOptions` | Returns the URL with the given options encoded as query parameters (config only when non-default, debugOptions only when non-empty), replacing any previous launch parameters; reading it back with readLaunchOptions repro… |
 
 ### `glue/loadingStatus.ts`
@@ -1687,6 +1691,9 @@ Parses the page URL's query string into a LaunchOptions record, with precedence:
 | Kind | Name | Summary |
 | --- | --- | --- |
 | interface | `LaunchOptions` | Resolved settings for one run of the app: world, UI toggles, debug settings, comfort options and the app config they came from. |
+| const | `maxLookSeed` | Largest look seed; seeds are kept to six digits so they are easy to read out and type. |
+| function | `parseLookSeed` | The look seed in `rawValue`, or undefined when it is missing or not a whole number from 0 to {@link maxLookSeed}. |
+| function | `randomLookSeed` | A random look seed from 0 to {@link maxLookSeed}. |
 | function | `readLaunchOptions` | Builds LaunchOptions from a location's query string, the loaded app config and its name, applying URL > config > default precedence for each field. |
 
 ### `glue/toolIds.ts`
@@ -3218,6 +3225,16 @@ Debug visuals attached to cell roots: object collision wireframes, selectable-hi
 | --- | --- | --- |
 | interface | `DebugVisualizationDeps` | Dependencies for {@link createDebugVisualization}; createThreeApp#shell passes the shared maps by reference (this module mutates the group maps) and the changing state as getters. |
 | function | `createDebugVisualization` | Creates the debug-visual sync functions. |
+
+### `render/three/decorationPalette.ts`
+
+Recolours an authored decoration (a bicycle, a bench, a tree, ...) in the palette of the face it stands on (design 018 section 9.6), so hand-placed models belong to their face like the generated landmarks do.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| const | `decorationRecolorStrength` | How far a material's colour moves to its palette role (0 keeps it, 1 replaces its hue entirely). |
+| function | `recoloredDecorationColor` | The colour `original` takes for the palette colour `target` (both linear): `target` at `original`'s luminance, mixed in by the strength. |
+| function | `recolorDecoration` | Recolours every material under `root` in `palette` (see the module header). |
 
 ### `render/three/desktopControls.ts`
 

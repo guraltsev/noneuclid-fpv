@@ -1,6 +1,6 @@
 /**
  * Converts between launch options and URL query parameters: strips them from the visible address after startup (so reloads and shared links are clean) and builds a shareable URL that reproduces the current options.
- * The stripped parameter set covers world, ui, debug flags, overlay, render quality and anti-nausea options but not config; the shareable URL additionally rewrites config/configName. Only the query string is modified; the path and hash are preserved.
+ * The stripped parameter set covers world, ui, debug flags, overlay, render quality and anti-nausea options but not config or the look seed, which stays visible; the shareable URL additionally rewrites config/configName and the look seed. Only the query string is modified; the path and hash are preserved.
  */
 import type { LaunchOptions } from "./readLaunchOptions";
 import { serializeDebugOptions } from "./debugOptions";
@@ -26,6 +26,7 @@ const launchOptionSearchParams = [
 const copiedUrlLaunchOptionSearchParams = [
   "config",
   "configName",
+  "lookSeed",
   ...launchOptionSearchParams,
 ] as const;
 
@@ -49,10 +50,15 @@ function removeSearchParamsFromUrl(href: string, paramsToRemove: readonly string
 }
 
 /**
- * Rewrites the browser address bar via history.replaceState without launch-option parameters; does nothing when none are present.
+ * Rewrites the browser address bar via history.replaceState without launch-option parameters, except the look seed, which it sets to
+ * `lookSeed` when given (so a reload keeps the look and the address can be shared); does nothing when nothing changes.
  */
-export function replaceVisibleUrlWithoutLaunchOptions(window: Window): void {
-  const cleanUrl = removeLaunchOptionsFromUrl(window.location.href);
+export function replaceVisibleUrlWithoutLaunchOptions(window: Window, lookSeed?: number): void {
+  const url = new URL(removeLaunchOptionsFromUrl(window.location.href));
+  if (lookSeed !== undefined) {
+    url.searchParams.set("lookSeed", String(lookSeed));
+  }
+  const cleanUrl = url.toString();
 
   if (cleanUrl !== window.location.href) {
     window.history.replaceState({}, "", cleanUrl);
@@ -70,6 +76,7 @@ export function buildUrlWithLaunchOptions(href: string, options: LaunchOptions):
   }
 
   url.searchParams.set("world", options.selectedWorldId);
+  url.searchParams.set("lookSeed", String(options.lookSeed));
   url.searchParams.set("ui", serializeUiOptions(options.uiOptions));
   url.searchParams.set("debugLevel", options.debugLevel);
   url.searchParams.set("portalPanels", options.portalPanelMode);

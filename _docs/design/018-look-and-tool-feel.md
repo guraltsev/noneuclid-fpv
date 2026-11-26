@@ -282,6 +282,7 @@ the same, but every landmark of a theme belongs to the same family:
 | totems | totem pole of stacked shapes | small totem | cube pairs, cones |
 | orbits | armillary sphere, planets on stalks | ringed planet, floating rings | globe, meteorite |
 | kites | mast with flags and bunting, kites in flight | flag pole, windsock | pennant stakes |
+| grove | a great tree, a copse | small tree, topiary | flower beds, shrubs |
 
 Landmarks are lists of parts from a small kit (`world-assets/landmarkParts.ts`): box, prism or cone, lat-long ball, ring or
 arc, star or gear, strut. The kit both draws the parts and measures them, so colliders (a part standing on the ground blocks
@@ -300,13 +301,20 @@ recolour both cells' grounds correctly.
 
 `world-assets/faceThemeAssignment.ts` visits the faces breadth-first with a random source seeded from the world's cell ids:
 
-- a face takes a theme no glued neighbour has, among the least used so far; with 14 themes, the cube and the dodecahedron
+- a face takes a theme no glued neighbour has, among the least used so far; with 15 themes, the cube and the dodecahedron
   give every face its own;
 - the colour wheel is cut into min(faces, 12) evenly spaced key hues with a random offset; a face takes, among the least
   used hues, the one farthest from its neighbours' hues;
 - schemes differ from the neighbours' where they can.
 
-The draw is the same for a world every time, so a student can learn it; `assignFaceLooks(world, seed)` takes another seed.
+The draw is seeded by the **look seed** (section 9.6).
+
+A face that holds an authored decoration takes one of the themes that decoration fits (`decorationThemeIdsByAssetFolder`):
+a bicycle fits clockwork, village or lamplight; a bench village, lamplight, grove or ruins; a tree grove, village, ruins or
+fungi; flowers grove, parlour, village or fungi; a stop sign or traffic cone lamplight, village, kites or totems. Faces with
+decorations choose first, by the same rules (differ from the neighbours, least used first), so a world whose faces are full
+of trees still gets different themes side by side. Grass and objects with a job (question cube, starting house, tool stand,
+creatures) constrain nothing.
 
 ### 9.4 Borders
 
@@ -317,3 +325,16 @@ corners (section 8.7).
 ### 9.5 Cost
 
 A face carries 250 to 2000 triangles of landmarks (budget 2400, was 900), drawn as one mesh per cell. Not measured on a GPU.
+
+### 9.6 The look seed and authored decorations
+
+The look (themes, palettes, generated landmarks) comes from one number, the **look seed**: `?lookSeed=N` (0 to 999999) in the
+address. Without one, a seed is drawn at random on every load, written into the address bar (so a reload keeps the look) and
+shown at the bottom of the pause card ("World look N"), so a look someone likes can be shared or reproduced; the copied link
+with options carries it too. Every consumer of the dressing (cell meshes, ground tint, landmark collisions, decoration colours)
+reads the same seed (`setActiveLookSeed`, `computeWorldDressing(world, seed)`).
+
+Authored decorations stay where the world file puts them, on a face whose theme they fit (section 9.3), and are recoloured in
+that face's palette (`render/three/decorationPalette.ts`): each distinct material is cloned and moved 80 percent towards a
+palette role (`primary`, `secondary`, `accent`, `light` in turn) at its own brightness, so a bench on a lime-and-purple village
+face is lime and purple like the generated benches around it.

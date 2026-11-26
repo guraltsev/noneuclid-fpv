@@ -40,15 +40,39 @@ export interface LaunchOptions {
   readonly appConfig: AppConfig;
   /** Name of the config the appConfig was loaded from. */
   readonly appConfigName: string;
+  /**
+   * Seed of the world's look (face themes, palettes, generated landmarks; design 018 section 9.3): `?lookSeed=` when it is a whole number
+   * from 0 to {@link maxLookSeed}, otherwise drawn at random, so every visit without one looks different and the pause card shows it to share.
+   */
+  readonly lookSeed: number;
+}
+
+/** Largest look seed; seeds are kept to six digits so they are easy to read out and type. */
+export const maxLookSeed = 999_999;
+
+/** The look seed in `rawValue`, or undefined when it is missing or not a whole number from 0 to {@link maxLookSeed}. */
+export function parseLookSeed(rawValue: string | null): number | undefined {
+  if (rawValue === null || !/^\d{1,6}$/.test(rawValue.trim())) {
+    return undefined;
+  }
+
+  return Number.parseInt(rawValue.trim(), 10);
+}
+
+/** A random look seed from 0 to {@link maxLookSeed}. */
+export function randomLookSeed(random: () => number = Math.random): number {
+  return Math.min(maxLookSeed, Math.floor(random() * (maxLookSeed + 1)));
 }
 
 /**
  * Builds LaunchOptions from a location's query string, the loaded app config and its name, applying URL > config > default precedence for each field.
+ * `random` draws the look seed when the URL gives none.
  */
 export function readLaunchOptions(
   location: Location,
   appConfig: AppConfig = defaultAppConfig,
   appConfigName = defaultAppConfigName,
+  random: () => number = Math.random,
 ): LaunchOptions {
   const params = new URLSearchParams(location.search);
   const requestedWorldId = normalizeWorldId(params.get("world")) ?? appConfig.startingWorldId ?? defaultWorldId;
@@ -100,6 +124,7 @@ export function readLaunchOptions(
     vrComfortOptions: readVrComfortOptions(params),
     appConfig,
     appConfigName,
+    lookSeed: parseLookSeed(params.get("lookSeed")) ?? randomLookSeed(random),
   };
 }
 
