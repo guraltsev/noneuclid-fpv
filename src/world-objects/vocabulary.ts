@@ -194,6 +194,8 @@ export const retiredTerms: readonly string[] = [
 /** The words of the pause card, the desktop main menu (design 017 section 8.1). */
 export const pauseCardText = {
   clickToPlay: "Click to play",
+  /** Label before the world's look seed at the bottom of the card; the same number in `?lookSeed=` reproduces the look. */
+  lookSeed: "World look",
   /** The card's title when the config names none; never the world's name, which would give the surface away. */
   defaultTitle: "Explore",
   /** The "Switch tool" control on desktop: the number keys and the wheel. */

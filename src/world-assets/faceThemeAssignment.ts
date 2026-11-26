@@ -24,6 +24,41 @@ export interface FaceLook {
   readonly palette: FacePalette;
 }
 
+/**
+ * The themes an authored decoration fits, by the folder of its model (`library.ts`), best first. Objects with a job (the question cube, the
+ * starting house, the tool stand, creatures) are not decorations and constrain nothing; nor is grass, which belongs anywhere.
+ */
+export const decorationThemeIdsByAssetFolder: Readonly<Record<string, readonly string[]>> = {
+  bicycle: ["clockwork", "village", "lamplight"],
+  "_legacy/clock_low_poly": ["clockwork", "parlour"],
+  Bench: ["village", "lamplight", "grove", "ruins"],
+  Tree1: ["grove", "village", "ruins", "fungi"],
+  TreeSwirl: ["grove", "fungi", "mobiles", "ruins"],
+  FloweGroup: ["grove", "village", "parlour", "fungi"],
+  flowerPot: ["grove", "parlour", "village", "thresholds"],
+  stopsign: ["lamplight", "village", "kites"],
+  trafficCone: ["lamplight", "kites", "village", "totems"],
+  "_legacy/low_poly_campfire": ["lamplight", "cairns"],
+  "_legacy/low_poly_rocks": ["cairns", "crystals", "ruins"],
+};
+
+/** The theme ids the decoration with model `assetPath` fits, best first, or undefined when it is not a decoration. */
+export function decorationThemeIdsFor(assetPath: string): readonly string[] | undefined {
+  return decorationThemeIdsByAssetFolder[assetPath.slice(0, assetPath.lastIndexOf("/"))];
+}
+
+// The themes a cell may take: those every decoration on it fits (or, when they agree on none, those its first decoration fits).
+function allowedThemesOf(cell: CompiledPrismCell): readonly FaceTheme[] | undefined {
+  const lists = cell.objects.flatMap((object) => (object.kind === "asset" ? [decorationThemeIdsFor(object.assetPath)] : [])).filter((list): list is readonly string[] => list !== undefined);
+
+  if (lists.length === 0) {
+    return undefined;
+  }
+
+  const common = lists[0].filter((id) => lists.every((list) => list.includes(id)));
+  return (common.length > 0 ? common : lists[0]).map((id) => faceThemes.find((theme) => theme.id === id)).filter((theme): theme is FaceTheme => theme !== undefined);
+}
+
 /** Most key hues the wheel is cut into. */
 export const maxKeyHues = 12;
 
@@ -72,6 +107,8 @@ export function assignFaceLooks(world: Pick<CompiledCellComplex, "cells" | "cell
     }
   }
 
+  // Faces with decorations choose their themes first (among those their decorations fit), then the free faces.
+  const allowed = new Map(cells.map((cell) => [cell.id, allowedThemesOf(cell)] as const));
   const hueCount = Math.max(3, Math.min(cells.length, maxKeyHues));
   const hueOffset = random() * 360;
   const hues = Array.from({ length: hueCount }, (_, index) => (hueOffset + (index * 360) / hueCount) % 360);
@@ -81,14 +118,27 @@ export function assignFaceLooks(world: Pick<CompiledCellComplex, "cells" | "cell
   const hueIndexByCell = new Map<string, number>();
   const schemeByCell = new Map<string, PaletteScheme>();
 
-  for (const cell of order) {
+  const themeByCell = new Map<string, FaceTheme>();
+  const chooseTheme = (cell: CompiledPrismCell): FaceTheme => {
     const around = neighbours.get(cell.id) ?? [];
-    const takenThemes = new Set(around.map((id) => looks.get(id)?.theme.id).filter((id): id is string => id !== undefined));
-    const themeChoices = faceThemes.filter((theme) => !takenThemes.has(theme.id));
-    const themePool = themeChoices.length > 0 ? themeChoices : faceThemes;
-    const fewestThemeUses = Math.min(...themePool.map((theme) => themeUses.get(theme.id) ?? 0));
+    const pool = allowed.get(cell.id) ?? faceThemes;
+    const takenThemes = new Set(around.map((id) => themeByCell.get(id)?.id).filter((id): id is string => id !== undefined));
+    const themeChoices = pool.filter((entry) => !takenThemes.has(entry.id));
+    const themePool = themeChoices.length > 0 ? themeChoices : pool;
+    const fewestThemeUses = Math.min(...themePool.map((entry) => themeUses.get(entry.id) ?? 0));
     const theme = pickRandom(random, themePool.filter((entry) => (themeUses.get(entry.id) ?? 0) === fewestThemeUses));
     themeUses.set(theme.id, (themeUses.get(theme.id) ?? 0) + 1);
+    themeByCell.set(cell.id, theme);
+    return theme;
+  };
+
+  for (const cell of order.filter((entry) => allowed.get(entry.id) !== undefined)) {
+    chooseTheme(cell);
+  }
+
+  for (const cell of order) {
+    const around = neighbours.get(cell.id) ?? [];
+    const theme = themeByCell.get(cell.id) ?? chooseTheme(cell);
 
     const neighbourHues = around.map((id) => hueIndexByCell.get(id)).filter((index): index is number => index !== undefined);
     const fewestHueUses = Math.min(...hueUses);

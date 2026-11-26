@@ -17,7 +17,28 @@ import {
   readAppConfigForwardName,
   readAppConfigName,
 } from "../../src/glue/appConfig";
-import { readLaunchOptions } from "../../src/glue/readLaunchOptions";
+import { maxLookSeed, parseLookSeed, readLaunchOptions } from "../../src/glue/readLaunchOptions";
+
+describe("readLaunchOptions look seed", () => {
+  const at = (search: string) => new URL(`https://example.test/${search}`) as unknown as Location;
+
+  it("reads a whole-number seed from the URL", () => {
+    expect(readLaunchOptions(at("?lookSeed=42")).lookSeed).toBe(42);
+    expect(readLaunchOptions(at("?lookSeed=000007")).lookSeed).toBe(7);
+  });
+
+  it("draws a random seed when the URL has none or a bad one", () => {
+    expect(readLaunchOptions(at(""), undefined, undefined, () => 0.5).lookSeed).toBe(500_000);
+    expect(readLaunchOptions(at("?lookSeed=abc"), undefined, undefined, () => 0).lookSeed).toBe(0);
+    expect(readLaunchOptions(at(""), undefined, undefined, () => 0.9999999).lookSeed).toBe(maxLookSeed);
+  });
+
+  it("rejects negative, fractional and too long seeds", () => {
+    for (const raw of ["-1", "1.5", "1234567", "", "1e3"]) {
+      expect(parseLookSeed(raw)).toBeUndefined();
+    }
+  });
+});
 
 describe("readLaunchOptions", () => {
   it("reads debug launcher visibility and named debug options from URL params", () => {

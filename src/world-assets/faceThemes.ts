@@ -1046,8 +1046,74 @@ const kites: FaceTheme = {
   ],
 };
 
+
+// A tree: a leaning trunk and a crown of one to three overlapping balls (round) or stacked cones (pointed).
+function tree(kit: Kit, at: Vec3, height: number, pointed: boolean): void {
+  const { random } = kit;
+  const lean: Vec3 = [between(random, -0.3, 0.3), between(random, -0.3, 0.3), 0];
+  const top: Vec3 = [at[0] + lean[0], at[1] + lean[1], at[2] + height * 0.45];
+  kit.strut(at, top, Math.max(0.1, height * 0.035), "dark");
+
+  if (pointed) {
+    const layers = integer(random, 2, 4);
+    for (let index = 0; index < layers; index += 1) {
+      const radius = height * (0.28 - index * 0.05);
+      kit.prism([top[0], top[1], top[2] + index * height * 0.15], 7, radius, 0, height * 0.32, index % 2 === 0 ? "primary" : "secondary");
+    }
+    return;
+  }
+
+  const blobs = integer(random, 1, 3);
+  for (let index = 0; index < blobs; index += 1) {
+    const radius = height * between(random, 0.22, 0.3);
+    kit.ball([top[0] + between(random, -0.3, 0.3) * radius, top[1] + between(random, -0.3, 0.3) * radius, top[2] + radius * (0.8 + index * 0.5)], radius, radius, radius * 0.85, index % 2 === 0 ? "primary" : "secondary", {
+      longitudes: 8,
+      latitudes: 4,
+      wobble: 0.12,
+    });
+  }
+}
+
+const grove: FaceTheme = {
+  id: "grove",
+  title: "Groves, topiary and flowers",
+  major: [
+    generator("great tree", (kit) => tree(kit, [0, 0, 0], between(kit.random, 7.5, 9.5), kit.random() < 0.5)),
+    generator("copse", (kit) => {
+      const count = integer(kit.random, 3, 4);
+      for (let index = 0; index < count; index += 1) {
+        const angle = (index / count) * TAU + kit.random();
+        tree(kit, [Math.cos(angle) * 1.8, Math.sin(angle) * 1.8, 0], between(kit.random, 5.5, 8), kit.random() < 0.5);
+      }
+    }),
+  ],
+  minor: [
+    generator("small tree", (kit) => tree(kit, [0, 0, 0], between(kit.random, 2.6, 4.2), kit.random() < 0.5)),
+    generator("topiary", (kit) => {
+      kit.prism([0, 0, 0], 8, 0.55, 0.65, 0.7, "secondary");
+      kit.strut([0, 0, 0.7], [0, 0, 1.4], 0.06, "dark");
+      kit.ball([0, 0, 1.9], 0.6, 0.6, 0.6, "primary", { longitudes: 9, latitudes: 4 });
+      kit.ball([0, 0, 2.85], 0.4, 0.4, 0.4, "primary", { longitudes: 8, latitudes: 4 });
+    }),
+  ],
+  prop: [
+    generator("flower bed", (kit) => {
+      const count = integer(kit.random, 4, 6);
+      for (let index = 0; index < count; index += 1) {
+        const angle = kit.random() * TAU;
+        const reach = between(kit.random, 0, 0.45);
+        const height = between(kit.random, 0.35, 0.7);
+        const base: Vec3 = [Math.cos(angle) * reach, Math.sin(angle) * reach, 0];
+        kit.strut(base, [base[0], base[1], height], 0.015, "dark", { collide: false });
+        kit.star([base[0], base[1], height], 4, 0.12, 0.05, 0.03, pick(kit.random, ["accent", "light", "secondary"] as const), { roll: Math.PI / 2 });
+      }
+    }),
+    generator("shrub", (kit) => kit.ball([0, 0, 0.35], 0.5, 0.45, 0.4, "primary", { wobble: 0.2 })),
+  ],
+};
+
 /** Every theme, in a fixed order; the assignment draws from it. */
-export const faceThemes: readonly FaceTheme[] = [cairns, village, striders, clockwork, lamplight, thresholds, mobiles, parlour, crystals, ruins, fungi, totems, orbits, kites];
+export const faceThemes: readonly FaceTheme[] = [cairns, village, striders, clockwork, lamplight, thresholds, mobiles, parlour, crystals, ruins, fungi, totems, orbits, kites, grove];
 
 /** The theme with the given id. */
 export function faceThemeById(id: string): FaceTheme {

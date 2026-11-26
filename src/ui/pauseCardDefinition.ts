@@ -21,6 +21,8 @@ export interface PauseCardDefinition {
   readonly description?: string;
   readonly controls: readonly PauseCardControl[];
   readonly actions: readonly PauseCardActionId[];
+  /** A small line at the bottom: the world's look seed, to share or reproduce this look. Absent when there is no seed. */
+  readonly lookSeedLine?: string;
 }
 
 /** What the card is built from: the config's display name when it has one, and the first goal text. */
@@ -31,6 +33,8 @@ export interface PauseCardSource {
   readonly goalPages?: readonly TutorialPageSpec[];
   /** Whether the Laser tool is available in the config; the pick up and put down key is listed only then, because only lasers can be picked up. */
   readonly laserToolAvailable?: boolean;
+  /** The world's look seed (the `lookSeed` launch option). */
+  readonly lookSeed?: number;
 }
 
 /** The first sentence of a text, without its line breaks; empty when the text is blank. */
@@ -69,5 +73,6 @@ export function createPauseCardDefinition(source: PauseCardSource): PauseCardDef
     ...(description.length > 0 ? { description } : {}),
     controls: createPauseCardControls(source.laserToolAvailable ?? true),
     actions: ["help", "settings", "go-home", "start-over"],
+    ...(source.lookSeed !== undefined ? { lookSeedLine: `${pauseCardText.lookSeed} ${source.lookSeed}` } : {}),
   };
 }

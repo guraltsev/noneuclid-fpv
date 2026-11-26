@@ -27,8 +27,13 @@ describe("launchOptionsUrl", () => {
   it("builds an explicit URL containing the current launch options", () => {
     expect(buildUrlWithLaunchOptions("https://example.test/play?keep=1", exampleLaunchOptions()))
       .toBe(
-        "https://example.test/play?keep=1&world=cube&ui=DebugButton&debugLevel=verbose&portalPanels=panel-with-text&debugOptions=runtime-diagnostics%2Cportal-path-debug&debugOverlay=false&debugOverlayItems=location&renderQuality=true&antiNausea=true&antiNauseaFovScale=0.5",
+        "https://example.test/play?keep=1&world=cube&lookSeed=4321&ui=DebugButton&debugLevel=verbose&portalPanels=panel-with-text&debugOptions=runtime-diagnostics%2Cportal-path-debug&debugOverlay=false&debugOverlayItems=location&renderQuality=true&antiNausea=true&antiNauseaFovScale=0.5",
       );
+  });
+
+  it("keeps the look seed visible and replaces it with the current one", () => {
+    expect(removeLaunchOptionsFromUrl("https://example.test/play?world=cube&lookSeed=12")).toBe("https://example.test/play?lookSeed=12");
+    expect(buildUrlWithLaunchOptions("https://example.test/play?lookSeed=12", exampleLaunchOptions())).not.toContain("lookSeed=12&");
   });
 
   it("does not keep stale config names in copied launch URLs", () => {
@@ -59,5 +64,6 @@ function exampleLaunchOptions(): LaunchOptions {
     vrComfortOptions: defaultVrComfortOptions,
     appConfig: defaultAppConfig,
     appConfigName: defaultAppConfigName,
+    lookSeed: 4321,
   };
 }

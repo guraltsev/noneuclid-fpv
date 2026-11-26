@@ -34,7 +34,7 @@ if (!appElement) {
 const initialLaunchLocation = new URL(window.location.href) as unknown as Location;
 const initialAppConfigName = readAppConfigName(initialLaunchLocation);
 let launchOptions = readLaunchOptions(initialLaunchLocation, undefined, initialAppConfigName);
-replaceVisibleUrlWithoutLaunchOptions(window);
+replaceVisibleUrlWithoutLaunchOptions(window, launchOptions.lookSeed);
 let activeApp: ThreeApp | undefined;
 // Preloaded assets of the active app; owned here and disposed after the app on every restart.
 let activeAssets: OwnedPreparedWorldAssets | undefined;
@@ -72,7 +72,8 @@ async function startApp(container: HTMLDivElement, initialLocation: Location): P
     loadingStatus.setPhase("Loading app config");
     const appConfig = await loadAppConfig(initialAppConfigName);
     loadingStatus.dispose();
-    void restartApp(container, readLaunchOptions(initialLocation, appConfig, initialAppConfigName));
+    // The look seed was drawn (or read) once, before the config loaded, and is already in the address bar: keep it.
+    void restartApp(container, { ...readLaunchOptions(initialLocation, appConfig, initialAppConfigName), lookSeed: launchOptions.lookSeed });
   } catch (error) {
     console.error(error);
     loadingStatus.showError(error instanceof Error ? error.message : "Unable to load app config.");
@@ -125,6 +126,7 @@ async function restartApp(container: HTMLDivElement, nextLaunchOptions: LaunchOp
         vrComfortOptions: launchOptions.vrComfortOptions,
         appConfigName: launchOptions.appConfigName,
         appConfig: launchOptions.appConfig,
+        lookSeed: launchOptions.lookSeed,
         assets: loadedAssets,
         onWorldChangeRequested(worldId) {
           void restartApp(container, {
@@ -183,6 +185,7 @@ async function restartAppWithConfig(container: HTMLDivElement, configName: strin
   if (appConfig.menu.worldSelectionSectionEnabled) {
     params.set("world", launchOptions.selectedWorldId);
   }
+  params.set("lookSeed", String(launchOptions.lookSeed));
   configLocation.search = params.toString();
   void restartApp(container, readLaunchOptions(configLocation, appConfig, configName));
 }

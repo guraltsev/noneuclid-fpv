@@ -112,6 +112,13 @@ export function createPauseCard(container: HTMLElement, definition: PauseCardDef
   });
   no.addEventListener("click", () => setAsking(false));
   actions.append(actionButtons, question);
+  if (definition.lookSeedLine !== undefined) {
+    // Inside the actions block, so selecting the text to copy it does not start play.
+    const seed = document.createElement("p");
+    seed.className = "pause-card-look-seed";
+    seed.textContent = definition.lookSeedLine;
+    actions.append(seed);
+  }
   card.append(actions);
 
   root.append(card);
