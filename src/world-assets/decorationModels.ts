@@ -108,8 +108,9 @@ const builders: Record<GeneratedDecorationKind, (kit: Parameters<Parameters<type
     const height = between(kit.random, 2.0, 2.2);
     kit.prism([0, 0, 0], 6, 0.05, 0.04, height, "dark");
     // The plate faces forward (+v); an octagon in the accent colour with a light rim.
-    kit.prism([0, 0.06, height], 8, 0.36, 0.36, 0.04, "light", { roll: -Math.PI / 2 }, { phase: Math.PI / 8 });
-    kit.prism([0, 0.1, height], 8, 0.31, 0.31, 0.03, "accent", { roll: -Math.PI / 2 }, { phase: Math.PI / 8 });
+    // The plate is fixed on the post's front face (the post is 4 to 5 cm thick).
+    kit.prism([0, 0.03, height], 8, 0.36, 0.36, 0.04, "light", { roll: -Math.PI / 2 }, { phase: Math.PI / 8 });
+    kit.prism([0, 0.07, height], 8, 0.31, 0.31, 0.03, "accent", { roll: -Math.PI / 2 }, { phase: Math.PI / 8 });
   },
   traffic_cone: (kit) => {
     const height = between(kit.random, 0.68, 0.76);

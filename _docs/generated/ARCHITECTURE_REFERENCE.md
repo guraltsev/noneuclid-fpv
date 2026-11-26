@@ -5,7 +5,7 @@
 
 This reference is produced from the source code. For the *meaning* of the modules — the mathematical model they implement — read [../MATHEMATICAL_MODEL.md](../MATHEMATICAL_MODEL.md) and [../ARCHITECTURE.md](../ARCHITECTURE.md). For every exported symbol see [API_REFERENCE.md](API_REFERENCE.md).
 
-**355 modules, 70,905 lines** under `src/`.
+**356 modules, 71,201 lines** under `src/`.
 
 ## Layers
 
@@ -18,7 +18,7 @@ A module belongs to the layer named by its first path segment under `src/`. "May
 | `diagnostics` | 2 | 474 | `math`, `cell-complex` | Debug levels and the runtime diagnostics recorder that every layer above may report to. |
 | `visibility` | 2 | 1,036 | `math`, `cell-complex` | Per-frame portal visibility: funnel clipping of portal-path tables against a camera. Pure; no renderer. |
 | `movement` | 13 | 2,929 | `math`, `cell-complex` | Player body, collision, movement and portal crossing in compiled cell complexes. |
-| `world-assets` | 11 | 3,613 | `cell-complex` | Floor-texture and asset descriptors. |
+| `world-assets` | 12 | 3,909 | `cell-complex` | Floor-texture and asset descriptors. |
 | `world-objects` | 41 | 10,505 | `math`, `cell-complex`, `diagnostics`, `movement`, `world-assets` | Placeable runtime objects: registry, geodesic emitters, measurement tools, flags, creature behaviors. |
 | `authoring` | 5 | 967 | `math`, `cell-complex`, `examples`, `world-assets`, `world-objects` | World builder DSL, world-script compiler, validation and world catalog. |
 | `glue` | 12 | 1,092 | `math`, `cell-complex`, `diagnostics`, `authoring` | Launch options, debug settings, tool ids, asset URLs, app configuration. |
@@ -202,12 +202,13 @@ None: every import respects the intended layering.
 
 | Module | Lines | Summary | Imports |
 | --- | ---: | --- | --- |
-| `world-assets/decorationModels.ts` | 130 | Decorations generated in code (design 018 section 9.8): the bench, bicycle, trees, flowers, sign, cone and house that world files place by hand are built from the landmark part kit instead of loaded from glTF files. | `world-assets/facePalettes`, `world-assets/faceThemes`, `world-assets/landmarkParts`, `world-assets/seededNoise` |
+| `world-assets/decorationModels.ts` | 131 | Decorations generated in code (design 018 section 9.8): the bench, bicycle, trees, flowers, sign, cone and house that world files place by hand are built from the landmark part kit instead of loaded from glTF files. | `world-assets/facePalettes`, `world-assets/faceThemes`, `world-assets/landmarkParts`, `world-assets/seededNoise` |
 | `world-assets/facePalettes.ts` | 111 | Colour palettes of faces (design 018 section 9.2): every face gets a key hue and a colour scheme, and every colour on it (its landmarks and a tint of its ground) comes from the palette built from them, so a face is reco… | — |
 | `world-assets/faceThemeAssignment.ts` | 173 | Which face gets which theme and palette (design 018 section 9.3). | `cell-complex/compileCellComplex`, `cell-complex/prismCells`, `world-assets/decorationModels`, `world-assets/facePalettes`, `world-assets/faceThemes`, `world-assets/seededNoise` |
-| `world-assets/faceThemes.ts` | 1414 | Face themes (design 018 section 9.1): what stands on a face. | `world-assets/facePalettes`, `world-assets/landmarkParts` |
+| `world-assets/faceThemes.ts` | 1479 | Face themes (design 018 section 9.1): what stands on a face. | `world-assets/facePalettes`, `world-assets/landmarkParts` |
 | `world-assets/floorTextures.ts` | 201 | Floor texture library: the named floor appearances world scripts can use, via the `floorTexture` helper. | `cell-complex/specs` |
 | `world-assets/groundTint.ts` | 207 | Per-cell ground tint image (design 018 section 4.1). | `cell-complex/specs`, `world-assets/seededNoise` |
+| `world-assets/landmarkJoints.ts` | 230 | Near-miss check for generated models (design 018 section 9.11): a gap between two pieces must look intentional, never like a joint that barely failed to meet. | `world-assets/landmarkParts` |
 | `world-assets/landmarkLayout.ts` | 325 | Seeded layout of the generated landmarks of a cell (design 018 sections 8.4 and 9): one major landmark (6 to 11 m), a few minor ones (1.5 to 4 m) and some small props, all from the generators of the face's theme and in … | `cell-complex/prismCells`, `world-assets/faceThemeAssignment`, `world-assets/faceThemes`, `world-assets/groundTint`, `world-assets/landmarkParts`, `world-assets/seededNoise` |
 | `world-assets/landmarkParts.ts` | 494 | The primitive kit of generated landmarks (design 018 section 9): a landmark is a list of parts, each a simple solid in the landmark's own frame (`u` right, `v` forward, `w` up, meters, origin on the ground), with a colo… | `world-assets/seededNoise` |
 | `world-assets/sceneryLayout.ts` | 410 | Seeded layout of the small decorative props (grass, flowers, stones, mushrooms...) that grow on the floor of a cell. | `cell-complex/prismCells`, `world-assets/seededNoise` |
@@ -570,3 +571,4 @@ Modules not reachable from `src/main.ts`. They are exercised only by tests; revi
 - `math/planes.ts`
 - `movement/dynamicObjectMotion.ts`
 - `render/three/worldMessageDisplay.ts`
+- `world-assets/landmarkJoints.ts`
