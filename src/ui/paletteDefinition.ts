@@ -128,6 +128,8 @@ export interface SettingsPaletteContent {
   readonly turnSpeed: RuntimeTurnSpeed;
   /** Text size step (Display). */
   readonly textSize: RuntimeTextSize;
+  /** The device the page is drawn for: the mouse settings belong to the desktop, the controller settings to VR. */
+  readonly inputMode: "desktop" | "xr";
   /** The controls reference (Controls): one row per verb, with the name of the control of the current device. */
   readonly controlsReference: readonly { readonly verb: string; readonly glyph: InputHintGlyph }[];
   /** True while a reload awaits its confirming second press. */
@@ -487,6 +489,7 @@ export function createPaletteDefinition(
         invertYEnabled: state.invertYEnabled === true,
         turnSpeed: state.turnSpeed ?? "medium",
         textSize: state.textSize ?? "medium",
+        inputMode,
         controlsReference: controlsReferenceIntents.map(({ verb, intent }) => ({ verb, glyph: getInputHintGlyph(inputMode, intent, xrLayout) })),
         reloadConfirmationActive,
       },
@@ -638,7 +641,8 @@ export function createPaletteDefinition(
     return {
       pageId: "question-help",
       leftAction: createHeaderAction("none"),
-      rightAction: createHeaderAction("close"),
+      // Back goes to the main menu, Help's place in it (the in-scene panel adds the close button).
+      rightAction: createHeaderAction("back"),
       reloadConfirmationActive,
       content: {
         kind: "question-help",

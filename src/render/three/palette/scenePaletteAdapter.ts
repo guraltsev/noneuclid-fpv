@@ -11,7 +11,7 @@ import { Container } from "@pmndrs/uikit";
 import type { PaletteDefinition } from "../../../ui/paletteDefinition";
 import { scenePalettePanelHeightPixels, scenePalettePanelPixelSize, scenePalettePanelWidthPixels } from "../scenePaletteLayout";
 import type { ScenePaletteAdapter, ScenePaletteAdapterOptions } from "./adapterTypes";
-import { borderColor, surfaceColor, textColor } from "./tokens";
+import { borderColor, panelPadding, surfaceColor, textColor, toPanelText } from "./tokens";
 import { disposeRenderedChildren } from "./widgets";
 import { buildHeader } from "./header";
 import { buildMainContent } from "./pages/main";
@@ -21,7 +21,7 @@ import { buildDiscoveriesContent } from "./pages/discoveries";
 import { buildPagedHelpContent, buildQuestionHelpContent } from "./pages/help";
 import { buildEditSignContent, buildPlaceSignOptionsContent } from "./pages/signs";
 import { buildMeasurementActionsContent } from "./pages/measurements";
-import { buildDebugSettingsContent, buildSettingsContent } from "./pages/debugSettings";
+import { buildDebugSettingsContent, buildSettingsContent, type SettingsCategoryId } from "./pages/debugSettings";
 
 /**
  * Creates the in-scene palette panel: an empty, hidden uikit root at the standard palette size, ready for setDefinition.
@@ -31,23 +31,27 @@ import { buildDebugSettingsContent, buildSettingsContent } from "./pages/debugSe
 export function createScenePaletteAdapter(options: ScenePaletteAdapterOptions): ScenePaletteAdapter {
   // Header and body currently attached to root; tracked so they can be disposed on the next setDefinition.
   let renderedChildren: Container[] = [];
+  // The Settings category shown in its sidebar: view state of this panel, kept while the panel lives so Settings reopens where it was left.
+  let settingsCategory: SettingsCategoryId | undefined;
+  let currentDefinition: PaletteDefinition | undefined;
+  // Set when a sidebar category was chosen; the page is rebuilt on the next update, outside the pointer dispatch that chose it.
+  let rebuildRequested = false;
   const root = new Container({
     width: scenePalettePanelWidthPixels,
     height: scenePalettePanelHeightPixels,
     pixelSize: scenePalettePanelPixelSize,
     flexDirection: "column",
     borderRadius: 28,
-    padding: 20,
-    gap: 12,
+    padding: panelPadding,
+    gap: 18,
     backgroundColor: surfaceColor,
     color: textColor,
     fill: textColor,
     opacity: 1,
-    overflow: "visible",
+    overflow: "hidden",
     pointerEvents: "auto",
-    scrollbarColor: "#64748b",
     borderColor,
-    borderWidth: 3,
+    borderWidth: 2,
     renderOrder: 999,
     depthTest: false,
     depthWrite: false,
@@ -56,20 +60,41 @@ export function createScenePaletteAdapter(options: ScenePaletteAdapterOptions): 
   root.visible = false;
   root.pointerEventsType = { allow: ["ray"] };
 
+  const settingsView = {
+    get category() {
+      return settingsCategory;
+    },
+    select(category: SettingsCategoryId) {
+      if (category === settingsCategory) return;
+      settingsCategory = category;
+      rebuildRequested = true;
+    },
+  };
+
+  const render = (definition: PaletteDefinition) => {
+    currentDefinition = definition;
+    const nextDefinition = withPanelText(definition);
+    rebuildRequested = false;
+    disposeRenderedChildren(renderedChildren);
+    renderedChildren = [
+      buildHeader(nextDefinition, options),
+      buildContent(nextDefinition, options, settingsView),
+    ];
+    root.add(...renderedChildren);
+  };
+
   return {
     root,
     setDefinition(nextDefinition) {
-      disposeRenderedChildren(renderedChildren);
-      renderedChildren = [
-        buildHeader(nextDefinition, options),
-        buildContent(nextDefinition, options),
-      ];
-      root.add(...renderedChildren);
+      render(nextDefinition);
     },
     setVisible(visible) {
       root.visible = visible;
     },
     update(deltaMs) {
+      if (rebuildRequested && currentDefinition !== undefined) {
+        render(currentDefinition);
+      }
       root.update(deltaMs);
     },
     dispose() {
@@ -81,10 +106,29 @@ export function createScenePaletteAdapter(options: ScenePaletteAdapterOptions): 
   };
 }
 
+// The definition with every string made drawable by the panel's font (see toPanelText); ids are plain ASCII and pass unchanged.
+function withPanelText<T>(value: T): T {
+  if (typeof value === "string") {
+    return toPanelText(value) as T;
+  }
+  if (Array.isArray(value)) {
+    return value.map((entry) => withPanelText(entry)) as T;
+  }
+  if (value !== null && typeof value === "object") {
+    const mapped: Record<string, unknown> = {};
+    for (const [key, entry] of Object.entries(value)) {
+      mapped[key] = withPanelText(entry);
+    }
+    return mapped as T;
+  }
+  return value;
+}
+
 // Select the page body by content.kind; the final fallthrough builds the settings page (world, config, debug and comfort sections).
 function buildContent(
   definition: PaletteDefinition,
   options: ScenePaletteAdapterOptions,
+  settingsView: { readonly category: SettingsCategoryId | undefined; select(category: SettingsCategoryId): void },
 ): Container {
   if (definition.content.kind === "main") {
     return buildMainContent(definition.content, options, definition.reloadConfirmationActive);
@@ -130,5 +174,5 @@ function buildContent(
     return buildDebugSettingsContent(definition.content, options);
   }
 
-  return buildSettingsContent(definition.content, options);
+  return buildSettingsContent(definition.content, options, settingsView);
 }

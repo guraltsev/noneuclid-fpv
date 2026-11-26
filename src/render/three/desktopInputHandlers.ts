@@ -124,6 +124,8 @@ export function createDesktopInputHandlers(deps: DesktopInputHandlersDeps): Desk
   // The wheel: pixels accumulated toward the next step, and when the last step happened (a trackpad sends many small events).
   let wheelAccumulator = 0;
   let lastWheelStepMs = Number.NEGATIVE_INFINITY;
+  // Wheel pixels turned while the menu is open, handed to the palette pointer on the next frame (it scrolls the page under the cursor).
+  let pendingPaletteWheelPixels = 0;
   const currentMenuState = () => session.get().menuState;
   const paletteDefinitionCache = createPaletteDefinitionCache(deps.appConfig);
   // Desktop fallbacks of updateScenePalette's head pose; overwritten before each use.
@@ -204,6 +206,7 @@ export function createDesktopInputHandlers(deps: DesktopInputHandlersDeps): Desk
           paletteSelectPressed: frame.paletteSelectPressed ?? false,
           paletteSelectRequested: frame.paletteSelectRequested ?? false,
         },
+        wheelDeltaPixels: takePaletteWheelPixels(),
         deltaSeconds,
         camera,
         isOpen: currentMenuState().isOpen,
@@ -256,8 +259,23 @@ export function createDesktopInputHandlers(deps: DesktopInputHandlersDeps): Desk
     }
   }
 
+  function takePaletteWheelPixels(): number {
+    const pixels = pendingPaletteWheelPixels;
+    pendingPaletteWheelPixels = 0;
+    return pixels;
+  }
+
   function onDesktopWheel(event: WheelEvent): void {
-    if (renderer.xr.isPresenting || currentMenuState().isOpen) {
+    if (renderer.xr.isPresenting) {
+      return;
+    }
+
+    // While the menu is open the wheel scrolls the page under the menu cursor, like a mouse wheel over any scrolling list.
+    if (currentMenuState().isOpen) {
+      if (event.target === renderer.domElement || controls.isPointerLocked()) {
+        event.preventDefault();
+        pendingPaletteWheelPixels += event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? 400 : 1);
+      }
       return;
     }
 

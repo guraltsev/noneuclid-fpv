@@ -5,10 +5,13 @@ import { Container } from "@pmndrs/uikit";
 import { Trash2 } from "@pmndrs/uikit-lucide";
 import type { PaletteDefinition } from "../../../../ui/paletteDefinition";
 import type { ScenePaletteAdapterOptions } from "../adapterTypes";
-import { actionColor, borderColor, inactiveColor, scrollbarBorderColor, scrollbarColor, sectionColor, textColor } from "../tokens";
+import { actionColor, borderColor, dangerColor, inactiveColor, sectionColor, textColor, typeScale } from "../tokens";
 import { createGeodesicCannonActionIcon, createConnectedGeodesicSegmentStatus } from "../icons";
-import { createButtonText, createInteractiveSurface, createSectionLabel, withDisabledReason } from "../widgets";
-import { objectActions, toolNames } from "../../../../world-objects/vocabulary";
+import { createButtonText, createInteractiveSurface, createOverline, createPageBody, createScrollArea, withDisabledReason } from "../widgets";
+import { objectActions } from "../../../../world-objects/vocabulary";
+
+// The heading over the list of a laser's beams.
+const geodesicListHeading = "Beams";
 
 /**
  * Geodesic cannon page: a scrollable list with one row per geodesic (label, connected-status icon or Aim button, delete button).
@@ -17,66 +20,42 @@ export function buildGeodesicCannonActionsContent(
   content: Extract<PaletteDefinition["content"], { readonly kind: "geodesic-cannon-actions" }>,
   options: ScenePaletteAdapterOptions,
 ): Container {
-  const panel = new Container({
-    width: "100%",
-    minHeight: 522,
-    flexDirection: "column",
-    gap: 10,
-    padding: 16,
-    borderRadius: 24,
-    backgroundColor: sectionColor,
-    borderColor,
-    borderWidth: 2,
-  });
-  panel.add(createSectionLabel(toolNames["geodesicEmitters/emitter"].name));
+  // The page title names the laser; its own actions are in the header toolbar.
+  const panel = createPageBody({ gap: 10 });
+  panel.add(createOverline(geodesicListHeading));
 
-  const list = new Container({
-    width: "100%",
-    height: 316,
-    flexDirection: "column",
-    gap: 8,
-    overflow: "scroll",
-    paddingRight: 18,
-    scrollbarWidth: 12,
-    scrollbarColor,
-    scrollbarBorderColor,
-    scrollbarBorderWidth: 2,
-    scrollbarBorderRadius: 6,
-    scrollbarZIndex: 1004,
-  });
+  const list = createScrollArea({ gap: 8 });
 
   for (const geodesic of content.geodesics) {
     const row = new Container({
       width: "100%",
-      minHeight: 58,
+      minHeight: 64,
+      flexShrink: 0,
       flexDirection: "row",
       alignItems: "center",
-      justifyContent: "space-between",
-      gap: 8,
-      padding: 8,
-      borderRadius: 14,
-      backgroundColor: inactiveColor,
+      gap: 10,
+      paddingX: 18,
+      paddingY: 10,
+      borderRadius: 12,
+      backgroundColor: sectionColor,
       borderColor,
       borderWidth: 1,
     });
-    row.add(createButtonText(geodesic.label, 18));
+    const label = createButtonText(geodesic.label, typeScale.body, "medium");
+    row.add(label);
+    row.add(new Container({ flexGrow: 1 }));
 
     const deleteButton = createInteractiveSurface({
       width: 112,
       height: 42,
       label: objectActions.delete,
-      labelFontSize: 16,
+      labelFontSize: typeScale.button - 1,
       disabled: geodesic.deleteDisabled,
-      backgroundColor: geodesic.deleteDisabled ? "#334155" : "#7f1d1d",
+      backgroundColor: dangerColor,
       onClick: () => options.onGeodesicCannonDeleteRequested?.(content.cannonId, geodesic.id),
     });
     deleteButton.userData.scenePaletteItemId = `geodesic-cannon-action:delete:${geodesic.id}`;
-    deleteButton.add(new Trash2({
-      width: 22,
-      height: 22,
-      color: textColor,
-      fill: textColor,
-    }));
+    deleteButton.add(new Trash2({ width: 20, height: 20, color: textColor }));
 
     if (geodesic.connected) {
       const status = createInteractiveSurface({
@@ -85,7 +64,7 @@ export function buildGeodesicCannonActionsContent(
         label: "",
         labelFontSize: 15,
         disabled: true,
-        backgroundColor: "#334155",
+        backgroundColor: inactiveColor,
         onClick: () => {},
       });
       status.name = geodesic.connectionSymbolLabel ?? "Linked beam: a beam from one laser to another";
@@ -98,7 +77,7 @@ export function buildGeodesicCannonActionsContent(
       width: 112,
       height: 42,
       label: objectActions.aim,
-      labelFontSize: 16,
+      labelFontSize: typeScale.button - 1,
       disabled: geodesic.aimDisabled,
       backgroundColor: actionColor,
       onClick: () => options.onGeodesicCannonAimRequested?.(content.cannonId, geodesic.id),

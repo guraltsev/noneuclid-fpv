@@ -34,6 +34,8 @@ export interface DesktopScenePaletteInput {
     readonly camera: THREE.PerspectiveCamera | THREE.OrthographicCamera;
     readonly isOpen: boolean;
     readonly placement: ScenePalettePlacement;
+    /** Mouse wheel pixels turned since the last frame (positive scrolls down); absent means none. */
+    readonly wheelDeltaPixels?: number;
   }): ScenePaletteInputFrame;
   /** Detaches the internal pointer object from any parent; the object owns no GPU resources. */
   dispose(): void;
@@ -67,7 +69,7 @@ export function createDesktopScenePaletteInput(): DesktopScenePaletteInput {
   let previousMenuTogglePressed = false;
 
   return {
-    update({ desktopFrame, deltaSeconds, camera, isOpen, placement }) {
+    update({ desktopFrame, deltaSeconds, camera, isOpen, placement, wheelDeltaPixels }) {
       // Recenter the cursor whenever the palette is closed so it reopens at the middle.
       if (!isOpen) {
         cursorLocalX = 0;
@@ -111,6 +113,7 @@ export function createDesktopScenePaletteInput(): DesktopScenePaletteInput {
         selectPressed: desktopFrame.paletteSelectPressed,
         dominant: true,
         visibleRay: false,
+        ...(wheelDeltaPixels ? { wheelDeltaPixels } : {}),
       }] : [];
       previousMenuTogglePressed = rawMenuTogglePressed;
 

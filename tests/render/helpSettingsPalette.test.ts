@@ -1,13 +1,13 @@
 /**
  * `tests/render/helpSettingsPalette.test.ts` - unit tier.
  *
- * The palette pages of the help that teaches and of the new Settings, built by the scene palette adapter: the How to index shows "Start here" and a tick on an opened card, a tool card has a "Try it" button that names its tool (and is inert, with its reason, for a tool the world cannot support), the Settings page lists the controls reference and the display and control steps and calls back with the step chosen, and the palette font tokens follow the text size.
+ * The palette pages of the help that teaches and of the new Settings, built by the scene palette adapter: the How to index shows "Start here" and a tick on an opened card, a tool card has a "Try it" button that names its tool (and is inert, with its reason, for a tool the world cannot support), the Settings page shows one sidebar category at a time (Controls first) and calls back with the step chosen in each, the palette font tokens follow the text size, and the panel text avoids glyphs its font lacks.
  */
 import { afterEach, describe, expect, it } from "vitest";
 import { defaultStartingQuestionCubeGoalPages, defaultStartingQuestionCubeTutorialPages } from "../../src/authoring/worldBuilder";
 import { defaultAppConfig } from "../../src/glue/appConfig";
 import { createScenePaletteAdapter } from "../../src/render/three/palette/scenePaletteAdapter";
-import { fontPx, paletteTextScales, setPaletteTextScale } from "../../src/render/three/palette/tokens";
+import { fontPx, paletteTextScales, setPaletteTextScale, toPanelText } from "../../src/render/three/palette/tokens";
 import {
   createRuntimeMenuState,
   markRuntimeMenuHelpCardRead,
@@ -117,6 +117,12 @@ describe("How to on the palette", () => {
     adapter.dispose();
   });
 
+  it("replaces the punctuation the panel's font cannot draw with ASCII", () => {
+    expect(toPanelText("Beam 2 \u00b7 L1\u2013L3 \u00b7 linked")).toBe("Beam 2 | L1-L3 | linked");
+    expect(toPanelText("Pick up \u00b7 G")).toBe("Pick up | G");
+    expect(toPanelText("90\u00b0 angle")).toBe("90\u00b0 angle");
+  });
+
   it("scales the panel's font sizes with the text size", () => {
     expect(fontPx(20)).toBe(20);
     setPaletteTextScale(paletteTextScales.large);
@@ -142,12 +148,25 @@ describe("Settings on the palette", () => {
     adapter.setDefinition(createPaletteDefinition(showRuntimeMenuSettings(createRuntimeMenuState({ selectedWorldId: "cube" })), defaultAppConfig, "desktop", 0));
 
     const root = adapter.root as unknown as Node;
+    // Settings opens on Controls; the sidebar shows one category at a time.
     actionOf(root, "mouse-sensitivity:high")?.();
     actionOf(root, "turn-speed:slow")?.();
     actionOf(root, "invert-y-toggle")?.();
+    // The VR controller options are not offered on the desktop.
+    expect(actionOf(root, "left-handed-toggle")).toBeUndefined();
+    expect(actionOf(root, "text-size:large")).toBeUndefined();
+    actionOf(root, "settings-category:display")?.();
+    adapter.update(16);
     actionOf(root, "text-size:large")?.();
     actionOf(root, "show-hints-toggle")?.();
     actionOf(root, "reset-tips")?.();
+
+    adapter.setDefinition(createPaletteDefinition(showRuntimeMenuSettings(createRuntimeMenuState({ selectedWorldId: "cube" })), defaultAppConfig, "xr", 0, "one-right"));
+    adapter.update(16);
+    // In VR the panel reopens on the category last shown; Controls has the controller options and no mouse settings.
+    actionOf(root, "settings-category:controls")?.();
+    adapter.update(16);
+    expect(actionOf(root, "mouse-sensitivity:high")).toBeUndefined();
     actionOf(root, "left-handed-toggle")?.();
 
     expect(calls).toEqual(["mouse:high", "turn:slow", "invert:true", "text:large", "hints:false", "reset-tips", "leftHanded:true"]);

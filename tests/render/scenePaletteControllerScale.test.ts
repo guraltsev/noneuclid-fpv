@@ -83,7 +83,7 @@ function hoverMenuButton(scale: number | undefined): { tooltip: THREE.Object3D; 
 
   frame(undefined);
   const toolButton = findMenuButton(scene);
-  frame(new THREE.Box3().setFromObject(toolButton).getCenter(new THREE.Vector3()));
+  frame(toolButton.getWorldPosition(new THREE.Vector3()));
 
   const tooltip = scene.getObjectByName("scene-palette-hover-tooltip");
   const marker = scene.getObjectByName("scene-palette-hit-marker");

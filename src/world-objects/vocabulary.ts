@@ -211,9 +211,17 @@ export const pauseCardText = {
 
 /** The words of the main menu's buttons that are not named elsewhere. */
 export const mainMenuText = {
+  /** The title of the main menu page. */
+  title: "Menu",
   settings: "Settings",
   /** The start-over button while it waits for a second press. */
   startOverConfirm: "Click again to confirm",
+  /** The line under each main-menu button that says what it does. */
+  helpDescription: "How to use the tools, things to try, your discoveries",
+  settingsDescription: "Controls, display, comfort",
+  goHomeDescription: "Go back to where you started",
+  startOverDescription: "Remove everything you placed",
+  startOverConfirmDescription: "Everything you placed will be removed",
 } as const;
 
 /**
@@ -459,6 +467,23 @@ export const settingsText = {
   small: "Small",
   large: "Large",
   antiNausea: "Anti-nausea vignette",
+  /** The categories of the Settings sidebar not named above. */
+  inputGuide: "Input guide",
+  world: "World",
+  config: "Config",
+  developer: "Developer",
+  /** The lines under some settings that say what they do. */
+  antiNauseaDescription: "Darkens the edges of the view while you move",
+  invertYDescription: "Moving the mouse up looks down",
+  resetTipsDescription: "Show the first-use tips again",
+  debugToolsLabel: "Debug tools",
+  debugToolsDescription: "Overlays and inspection tools for developers",
+  debugSettingsButton: "Open",
+  /** The title of the debug settings page. */
+  debugSettingsTitle: "Developer settings",
+  /** The title of the place-sign options page and of the sign editor. */
+  signType: "Sign type",
+  editSign: "Edit sign",
 } as const;
 
 /**

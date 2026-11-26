@@ -4,34 +4,19 @@
 import { Container, Text } from "@pmndrs/uikit";
 import type { DiscoveryPaletteEntry, PaletteDefinition } from "../../../../ui/paletteDefinition";
 import type { ScenePaletteAdapterOptions } from "../adapterTypes";
-import { activeColor, borderColor, inactiveColor, mutedTextColor, sectionColor, textColor, fontPx } from "../tokens";
-import { createInteractiveSurface, createSettingsScrollContainer } from "../widgets";
+import { activeColor, borderColor, inactiveColor, mutedTextColor, raisedColor, sectionColor, textColor, fontPx, typeScale } from "../tokens";
+import { createCaption, createInteractiveSurface, createPageBody, createScrollArea } from "../widgets";
 
 /** The page: title and count, a line of text and the entries. */
 export function buildDiscoveriesContent(
   content: Extract<PaletteDefinition["content"], { readonly kind: "discoveries" }>,
   options: ScenePaletteAdapterOptions,
 ): Container {
-  const panel = new Container({
-    width: "100%",
-    minHeight: 382,
-    flexDirection: "column",
-    gap: 14,
-    padding: 16,
-    borderRadius: 24,
-    backgroundColor: sectionColor,
-    borderColor,
-    borderWidth: 2,
-  });
-  const titleRow = new Container({ width: "100%", flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 14, flexShrink: 0 });
-  titleRow.add(new Text({ text: content.title, fontSize: fontPx(34), fontWeight: "bold", color: textColor, fill: textColor, flexShrink: 0 }));
-  if (content.countLabel !== "") {
-    titleRow.add(new Text({ text: content.countLabel, fontSize: fontPx(18), fontWeight: "bold", color: mutedTextColor, fill: mutedTextColor, flexShrink: 0 }));
-  }
-  panel.add(titleRow);
-  panel.add(new Text({ text: content.body, fontSize: fontPx(20), fontWeight: "medium", color: mutedTextColor, fill: mutedTextColor, flexShrink: 0, wordBreak: "break-word" }));
+  // The title and the count are in the header.
+  const panel = createPageBody({ gap: 14 });
+  panel.add(createCaption(content.body, { fontSize: typeScale.body }));
 
-  const list = createSettingsScrollContainer();
+  const list = createScrollArea({ gap: 10 });
   for (const entry of content.entries) {
     list.add(buildEntry(entry, options));
   }
@@ -45,17 +30,18 @@ function buildEntry(entry: DiscoveryPaletteEntry, options: ScenePaletteAdapterOp
     width: "100%",
     flexDirection: "column",
     gap: 8,
-    padding: 12,
+    paddingX: 18,
+    paddingY: 14,
     borderRadius: 14,
-    backgroundColor: entry.found ? "#1e293b" : "#0b1220",
-    borderColor: entry.found ? "#38bdf8" : borderColor,
+    backgroundColor: entry.found ? raisedColor : sectionColor,
+    borderColor: entry.found ? activeColor : borderColor,
     borderWidth: 1,
     flexShrink: 0,
   });
   card.userData.scenePaletteItemId = `discovery:${entry.id}`;
   card.add(new Text({
     text: entry.title,
-    fontSize: fontPx(entry.found ? 22 : 18),
+    fontSize: fontPx(entry.found ? 21 : 18),
     fontWeight: entry.found ? "bold" : "medium",
     color: entry.found ? textColor : mutedTextColor,
     fill: entry.found ? textColor : mutedTextColor,
@@ -69,10 +55,11 @@ function buildEntry(entry: DiscoveryPaletteEntry, options: ScenePaletteAdapterOp
     const { invitation, action, shown } = entry.showEdges;
     card.add(new Text({ text: invitation, fontSize: fontPx(18), fontWeight: "medium", color: mutedTextColor, fill: mutedTextColor, flexShrink: 0, wordBreak: "break-word" }));
     const button = createInteractiveSurface({
-      width: 200,
+      width: "auto",
+      paddingX: 20,
       height: 44,
       label: action.label,
-      labelFontSize: 18,
+      labelFontSize: typeScale.button,
       disabled: action.disabled,
       backgroundColor: shown ? inactiveColor : activeColor,
       onClick: () => options.onShowEdgesToggled?.(!shown),
