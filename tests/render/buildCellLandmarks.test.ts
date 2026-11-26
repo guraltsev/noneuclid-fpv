@@ -88,7 +88,7 @@ describe("buildCellLandmarksMesh", () => {
       // Moving parts add their motion attributes (`landmarkMotion.ts`).
       const moving = placements.some((placement) => placement.parts.some((part) => part.motion));
       expect(Object.keys(mesh.geometry.attributes).sort()).toEqual(
-        moving ? ["color", "motionAxis", "motionPivot", "motionTiming", "normal", "position"] : ["color", "normal", "position"],
+        moving ? ["color", "motionAxis", "motionMode", "motionPivot", "motionTiming", "normal", "position"] : ["color", "normal", "position"],
       );
       expect(position.count).toBe(placements.reduce((sum, placement) => sum + placement.triangles, 0) * 3);
       expect(mesh.material).toBeInstanceOf(THREE.MeshLambertMaterial);

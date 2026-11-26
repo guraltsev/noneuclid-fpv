@@ -382,3 +382,32 @@ pivot, axis and timing as attributes, and the vertex shader turns position and n
 clock (`render/three/landmarkMotion.ts`). Every copy through every portal moves in step at no CPU cost. The baked shade of a
 turning face does not change (the turns are slow and the light is soft). Colliders, shadows and the footprint are those of the
 parts at rest; every motion turns a part about an axis through itself or the landmark's centre, so it stays inside its footprint.
+
+### 9.10 More kinds of motion, joints and the drift theme
+
+Motion now has a kind and a schedule (`PartMotion.kind`, `PartMotion.schedule`): a part **turns** about its axis, **slides** along
+it or **grows** about its pivot (scale `1 + value`), and the amount follows **steps** (rest, then an eased step), **steady**
+turning, a constant gentle **sway** (`step * sin`), or a **pulse** (out over `move`, hold, back, rest). The shader reads the kind and
+schedule from a `motionMode` attribute. What uses what:
+
+| Motion | Where |
+| --- | --- |
+| sway (turn) | flags and pennants, windsocks, kites with their strings, the town tower's pennant, rocking top stones and the balanced rock, a swaying floor-lamp shade, planet rings, the disc stalk, the moon on its pole, the star stick, wavering doors |
+| sway (slide) | floating boulders bob, floating rings bob, ground clouds drift |
+| sway (grow) | flames of lanterns and candles flicker; eggs and puffballs breathe |
+| pulse (slide) | drawers slide out and back (their bodies come out of the chest); flowers sink into the ground or their pot and rise again |
+| pulse (grow) | a round tree's small leaf balls shrink to nothing and grow back |
+| pulse (turn) | doors swing wide and back; the hatch lid lifts; the giant desk lamp bows suddenly about its elbow and straightens |
+| steps (turn) | fir tiers, mobile branches, totem pieces, street lamps and the lamp grove's crooked posts (some with a sudden jerk), clock minute hands, the pocket watch's hand |
+| steady (turn) | gears, armillary rings, hour hands, the globe |
+
+Joints were checked on a contact sheet of every generator from the front and the side, and fixed where a part did not meet the
+mass it belongs to: the round tree's crown now sits on its trunk (the first ball centred over it, the trunk running into it);
+a mushroom's cap sits on the true top of its leaning stalk and its spots on the cap's surface; the great mobile's branches start
+on its kinked stalk; the moon rests on its pole and the star on its stick; the bench's back stands on its back legs; the bicycle
+has a stem; the standing gear's frame meets its axle; the watch's face and rim lean alike; the hatch lid turns about its back
+edge with the handle on its front; stacked stones overlap enough that their wobble opens no gap.
+
+A sixteenth theme, **drift**: boulders hovering two to seven meters up, bobbing, over clouds that lie on the ground in the palette's
+light colour and drift slowly to and fro (they do not block the player). Majors: floating boulders over a cloud bank, a cloud field
+with boulders above it; minors: a pair of boulders, a two-layer cloud bank; props: a small floater, a cloud puff.

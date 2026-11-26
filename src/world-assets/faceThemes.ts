@@ -6,7 +6,7 @@
  * Pure and deterministic. Layer rule: imports only sibling modules.
  */
 import type { FacePalette } from "./facePalettes";
-import type { LandmarkPart, PartMotion, PartPose, Vec3 } from "./landmarkParts";
+import type { LandmarkPart, MotionKind, PartMotion, PartPose, Vec3 } from "./landmarkParts";
 
 /** Size class of a generated landmark. */
 export type LandmarkRole = "major" | "minor" | "prop";
@@ -95,7 +95,7 @@ export class Kit {
     return this;
   }
 
-  ball(at: Vec3, rx: number, ry: number, rz: number, role: Role | string, extra: { longitudes?: number; latitudes?: number; wobble?: number; glow?: boolean; pose?: PartPose } = {}): this {
+  ball(at: Vec3, rx: number, ry: number, rz: number, role: Role | string, extra: { longitudes?: number; latitudes?: number; wobble?: number; glow?: boolean; collide?: boolean; pose?: PartPose } = {}): this {
     const { pose, ...rest } = extra;
     this.add({ shape: "ball", at, rx, ry, rz, color: this.color(role), pose, wobbleSeed: Math.floor(this.random() * 1e9), ...rest });
     return this;
@@ -153,6 +153,31 @@ export function steadyTurn(random: () => number, pivot: Vec3, axis: Vec3, radian
   return { pivot, axis, step: radiansPerSecond * period, period, move: period, phase: random() * period };
 }
 
+/**
+ * A constant gentle oscillation (design 018 section 9.9): `kind` by up to `amplitude` (radians, meters or change of scale) either way,
+ * about or along `axis` through `pivot`, once every `periodLow` to `periodHigh` seconds, at a random phase.
+ */
+export function sway(random: () => number, kind: MotionKind, pivot: Vec3, axis: Vec3, amplitude: number, periodLow = 3, periodHigh = 6): PartMotion {
+  const period = between(random, periodLow, periodHigh);
+  return { kind, schedule: "sway", pivot, axis, step: amplitude, period, move: period, phase: random() * period };
+}
+
+/**
+ * A pulse: now and then `kind` goes out to `amount` over `move` seconds, holds 1.5 to 4 seconds and comes back, then rests; once every
+ * `periodLow` to `periodHigh` seconds, at a random phase (drawers, flowers, doors, a lamp's sudden bow).
+ */
+export function pulse(random: () => number, kind: MotionKind, pivot: Vec3, axis: Vec3, amount: number, move: number, periodLow = 9, periodHigh = 18): PartMotion {
+  const period = between(random, periodLow, periodHigh);
+  const hold = Math.min(between(random, 1.5, 4), Math.max(0, period - 2 * move - 1));
+  return { kind, schedule: "pulse", pivot, axis, step: amount, period, move, hold, phase: random() * period };
+}
+
+/** A random horizontal unit vector. */
+export function horizontalAxis(random: () => number): Vec3 {
+  const angle = random() * TAU;
+  return [Math.cos(angle), Math.sin(angle), 0];
+}
+
 /** Runs `emit` on a fresh kit and returns the parts it made. */
 export function build(random: () => number, palette: FacePalette, emit: (kit: Kit) => void): readonly LandmarkPart[] {
   const kit = new Kit(random, palette);
@@ -174,13 +199,21 @@ function stoneStack(kit: Kit, at: Vec3, count: number, base: number, roles: read
 
   for (let index = 0; index < count; index += 1) {
     const rz = radius * between(random, 0.42, 0.62);
-    kit.ball([u, v, z + rz], radius * between(random, 0.9, 1.15), radius * between(random, 0.8, 1.05), rz, pick(random, roles), {
-      longitudes: 8,
-      latitudes: 4,
-      wobble: 0.08,
-      pose: { yaw: random() * TAU },
-    });
-    z += rz * 1.85;
+    const stone = () =>
+      kit.ball([u, v, z + rz], radius * between(random, 0.9, 1.15), radius * between(random, 0.8, 1.05), rz, pick(random, roles), {
+        longitudes: 8,
+        latitudes: 4,
+        wobble: 0.08,
+        pose: { yaw: random() * TAU },
+      });
+    // The top stone rocks a little on the one below; the others sit still.
+    if (index === count - 1) {
+      kit.moving(sway(random, "turn", [u, v, z], horizontalAxis(random), 0.05, 4, 7), stone);
+    } else {
+      stone();
+    }
+    // Stones overlap a little, so the wobble never opens a gap between them.
+    z += rz * 1.7;
     u += between(random, -0.18, 0.18) * radius;
     v += between(random, -0.18, 0.18) * radius;
     radius *= between(random, 0.72, 0.95);
@@ -213,12 +246,12 @@ export function bench(kit: Kit, at: Vec3, length: number, yaw: number): void {
   const sin = Math.sin(yaw);
   const local = (u: number, v: number, w: number): Vec3 => [at[0] + u * cos - v * sin, at[1] + u * sin + v * cos, at[2] + w];
   kit.box(local(0, 0, 0.42), length, 0.45, 0.08, "primary", { yaw });
-  kit.box(local(0, 0.22, 0.55), length, 0.07, 0.4, "primary", { yaw });
+  // The backrest stands on the seat's back edge and is held by the back legs, which run up through the seat.
+  kit.box(local(0, 0.19, 0.6), length, 0.07, 0.36, "primary", { yaw });
 
   for (const u of [-0.42, 0.42]) {
-    for (const v of [-0.17, 0.17]) {
-      kit.strut(local(u * length, v, 0), local(u * length, v, 0.42), 0.04, "dark");
-    }
+    kit.strut(local(u * length, -0.17, 0), local(u * length, -0.17, 0.42), 0.04, "dark");
+    kit.strut(local(u * length, 0.17, 0), local(u * length, 0.19, 0.96), 0.04, "dark");
   }
 }
 
@@ -249,6 +282,8 @@ export function bicycle(kit: Kit, r: number): void {
   polyline(kit, [crank, head, [gap / 2, 0, r]], tube, "primary");
   kit.strut(seat, head, tube, "primary");
   kit.box([seat[0], 0, seat[2] + tube], r * 0.55, r * 0.25, r * 0.11, "dark");
+  // The stem carries the handlebar up from the head of the frame.
+  kit.strut(head, [head[0] - tube, 0, head[2] + r * 0.28], tube * 0.8, "dark");
   kit.strut([head[0] - tube, -r * 0.5, head[2] + r * 0.28], [head[0] - tube, r * 0.5, head[2] + r * 0.28], tube * 0.8, "dark");
 }
 
@@ -298,16 +333,20 @@ function column(kit: Kit, at: Vec3, radius: number, height: number, role: Role, 
 // A mushroom: stalk, cap and spots.
 function mushroom(kit: Kit, at: Vec3, height: number, capRadius: number, lean: number): void {
   const { random } = kit;
-  const top: Vec3 = [at[0] + lean * height * 0.3, at[1], at[2] + height];
-  kit.prism(at, 7, capRadius * 0.24, capRadius * 0.17, height, "light", { pitch: lean * 0.3 });
-  kit.ball(top, capRadius, capRadius, capRadius * between(random, 0.35, 0.55), "primary", { longitudes: 10, latitudes: 4 });
+  // The stalk leans by turning about v; its top, where the cap sits, is where the turn carries it.
+  const tilt = lean * 0.3;
+  const top: Vec3 = [at[0] + Math.sin(tilt) * height, at[1], at[2] + Math.cos(tilt) * height];
+  const capHeight = capRadius * between(random, 0.35, 0.55);
+  kit.prism(at, 7, capRadius * 0.24, capRadius * 0.17, height, "light", { pitch: tilt });
+  kit.ball(top, capRadius, capRadius, capHeight, "primary", { longitudes: 10, latitudes: 4 });
   kit.ring([top[0], top[1], top[2] - capRadius * 0.05], capRadius * 0.7, capRadius * 0.12, "dark", { roll: Math.PI / 2 }, { segments: 10, tubeSides: 3 });
   const spots = integer(random, 3, 6);
 
   for (let index = 0; index < spots; index += 1) {
     const angle = random() * TAU;
     const reach = between(random, 0.3, 0.75) * capRadius;
-    kit.ball([top[0] + Math.cos(angle) * reach, top[1] + Math.sin(angle) * reach, top[2] + capRadius * 0.38 * (1 - (reach / capRadius) ** 2) ** 0.5], capRadius * 0.13, capRadius * 0.13, capRadius * 0.07, "light", {
+    // On the cap's surface, sunk a little into it.
+    kit.ball([top[0] + Math.cos(angle) * reach, top[1] + Math.sin(angle) * reach, top[2] + capHeight * (1 - (reach / capRadius) ** 2) ** 0.5 - capRadius * 0.02], capRadius * 0.13, capRadius * 0.13, capRadius * 0.07, "light", {
       longitudes: 5,
       latitudes: 3,
     });
@@ -343,13 +382,16 @@ const cairns: FaceTheme = {
     }),
     generator("balanced rock", (kit) => {
       kit.ball([0, 0, 0.25], 0.3, 0.3, 0.25, "dark", { wobble: 0.1 });
-      kit.ball([0, 0, 0.5 + 0.9], 1.3, 1.0, 0.9, "primary", { wobble: 0.12, longitudes: 10 });
+      // The big stone sinks onto the small one (its wobble may shrink it by 12 percent) and rocks on it.
+      kit.moving(sway(kit.random, "turn", [0, 0, 0.45], horizontalAxis(kit.random), 0.04, 4, 7), () =>
+        kit.ball([0, 0, 0.45 + 0.9 * 0.82], 1.3, 1.0, 0.9, "primary", { wobble: 0.12, longitudes: 10 }),
+      );
     }),
   ],
   prop: [
     generator("pebble pair", (kit) => {
       kit.ball([0, 0, 0.25], 0.5, 0.4, 0.25, "light", { wobble: 0.1 });
-      kit.ball([0.1, 0, 0.68], 0.3, 0.26, 0.18, "primary", { wobble: 0.1 });
+      kit.ball([0.1, 0, 0.6], 0.3, 0.26, 0.18, "primary", { wobble: 0.1 });
     }),
     generator("flat stone", (kit) => {
       kit.ball([0, 0, 0.12], 0.7, 0.5, 0.12, pick(kit.random, ["dark", "secondary"] as const), { wobble: 0.15 });
@@ -378,7 +420,8 @@ const village: FaceTheme = {
       }
 
       kit.strut([0, 0, height + 0.3 + width * 1.1], [0, 0, height + 0.3 + width * 1.1 + 1.2], 0.04, "dark");
-      kit.box([0.35, 0, height + width * 1.1 + 1.0], 0.7, 0.04, 0.4, "accent");
+      // The pennant flutters about its pole.
+      kit.moving(sway(random, "turn", [0, 0, height], [0, 0, 1], 0.35, 2.5, 4.5), () => kit.box([0.35, 0, height + width * 1.1 + 1.0], 0.7, 0.04, 0.4, "accent"));
     }),
     generator("hamlet", (kit) => {
       const { random } = kit;
@@ -474,7 +517,9 @@ const striders: FaceTheme = {
 
       for (let index = 0; index < count; index += 1) {
         const angle = (index / count) * TAU;
-        kit.ball([Math.cos(angle) * 0.35, Math.sin(angle) * 0.35, 0.32], 0.22, 0.22, 0.32, "light");
+        const base: Vec3 = [Math.cos(angle) * 0.35, Math.sin(angle) * 0.35, 0];
+        // Something inside breathes.
+        kit.moving(sway(kit.random, "grow", base, [0, 0, 1], 0.05, 2.5, 4.5), () => kit.ball([base[0], base[1], 0.32], 0.22, 0.22, 0.32, "light"));
       }
     }),
   ],
@@ -535,8 +580,9 @@ const clockwork: FaceTheme = {
     generator("standing gear", (kit) => {
       const radius = between(kit.random, 1.2, 1.7);
       gear(kit, [0, 0, radius + 0.3], radius, integer(kit.random, 10, 16), 0.3, 0, "primary", kit.random() < 0.5 ? 0.25 : -0.25);
-      kit.strut([-0.8, 0.3, 0], [0, 0.3, radius + 0.3], 0.07, "dark");
-      kit.strut([0.8, 0.3, 0], [0, 0.3, radius + 0.3], 0.07, "dark");
+      // The A-frame meets the end of the axle, which runs from the gear towards -v.
+      kit.strut([-0.8, -0.4, 0], [0, -0.4, radius + 0.3], 0.07, "dark");
+      kit.strut([0.8, -0.4, 0], [0, -0.4, radius + 0.3], 0.07, "dark");
     }),
     generator("bicycle", (kit) => bicycle(kit, between(kit.random, 0.6, 0.72))),
   ],
@@ -547,8 +593,15 @@ const clockwork: FaceTheme = {
       kit.prism([0, 0, 0], 8, radius * 0.22, radius * 0.22, 0.24, "dark");
     }),
     generator("pocket watch", (kit) => {
-      kit.prism([0, 0, 0.55], 12, 0.5, 0.5, 0.1, "light", { pitch: Math.PI / 2 - 0.3 });
+      // Face and rim lean back alike: the face's axis and the rim's normal are both (0, cos 0.3, sin 0.3).
+      const normal: Vec3 = [0, Math.cos(0.3), Math.sin(0.3)];
+      const up: Vec3 = [0, -Math.sin(0.3), Math.cos(0.3)];
+      kit.prism([0, -normal[1] * 0.05, 0.55 - normal[2] * 0.05], 12, 0.5, 0.5, 0.1, "light", { roll: 0.3 - Math.PI / 2 });
       kit.ring([0, 0, 0.55], 0.5, 0.05, "accent", { roll: 0.3 }, { segments: 12, tubeSides: 3 });
+      const centre: Vec3 = [0, normal[1] * 0.07, 0.55 + normal[2] * 0.07];
+      kit.moving({ pivot: centre, axis: normal, step: -TAU / 60, period: 1.5, move: 0.15, phase: kit.random() * 1.5 }, () =>
+        kit.strut(centre, [0, centre[1] + up[1] * 0.38, centre[2] + up[2] * 0.38], 0.02, "dark", { collide: false }),
+      );
     }),
   ],
 };
@@ -567,11 +620,15 @@ const lamplight: FaceTheme = {
       kit.strut([0, 0, 0.35], elbow, 0.12, "primary");
       kit.strut([dir[1] * 0.25, -dir[0] * 0.25, 0.35], [elbow[0] + dir[1] * 0.25, elbow[1] - dir[0] * 0.25, elbow[2]], 0.05, "primary");
       kit.ball(elbow, 0.25, 0.25, 0.25, "dark");
-      kit.strut(elbow, wrist, 0.12, "primary");
-      kit.ball(wrist, 0.25, 0.25, 0.25, "dark");
-      // The shade hangs off the wrist and points down and out.
-      kit.prism([wrist[0] - dir[0] * 0.3, wrist[1] - dir[1] * 0.3, wrist[2] - 0.2], 10, 0.35, 1.3, 1.6, "accent", { yaw: yaw + Math.PI, pitch: Math.PI * 0.8 });
-      kit.ball([wrist[0] - dir[0] * 1.2, wrist[1] - dir[1] * 1.2, wrist[2] - 1.0], 0.45, 0.45, 0.45, "glow", { glow: true });
+      // Now and then the upper arm, the shade and the bulb bow suddenly about the elbow, hold, and straighten again. The elbow's axis is
+      // the horizontal one across the arm; a negative turn about it carries the wrist down and outwards.
+      kit.moving(pulse(random, "turn", elbow, [-dir[1], dir[0], 0], -between(random, 0.35, 0.6), between(random, 0.3, 0.5), 12, 22), () => {
+        kit.strut(elbow, wrist, 0.12, "primary");
+        kit.ball(wrist, 0.25, 0.25, 0.25, "dark");
+        // The shade hangs off the wrist and points down and out.
+        kit.prism([wrist[0] - dir[0] * 0.3, wrist[1] - dir[1] * 0.3, wrist[2] - 0.2], 10, 0.35, 1.3, 1.6, "accent", { yaw: yaw + Math.PI, pitch: Math.PI * 0.8 });
+        kit.ball([wrist[0] - dir[0] * 1.2, wrist[1] - dir[1] * 1.2, wrist[2] - 1.0], 0.45, 0.45, 0.45, "glow", { glow: true });
+      });
     }),
     generator("lamp grove", (kit) => {
       const { random } = kit;
@@ -583,8 +640,12 @@ const lamplight: FaceTheme = {
         const height = between(random, 5, 8);
         const bend = random() * TAU;
         const top: Vec3 = [base[0] + Math.cos(bend) * 0.8, base[1] + Math.sin(bend) * 0.8, height];
-        polyline(kit, [base, [base[0], base[1], height * 0.7], top], 0.09, "dark");
-        lampHead(kit, [top[0], top[1], top[2] - 0.2], 0.55, pick(random, ["primary", "accent"] as const));
+        // Each crooked post turns about its foot now and then to look elsewhere: some slowly, some with a sudden jerk.
+        const quick = random() < 0.4;
+        kit.moving({ ...occasionalTurn(random, base, [0, 0, 1], index % 2 === 0 ? 1 : -1, 0.6, 1.4), move: quick ? 0.4 : between(random, 1.2, 2.2) }, () => {
+          polyline(kit, [base, [base[0], base[1], height * 0.7], top], 0.09, "dark");
+          lampHead(kit, [top[0], top[1], top[2] - 0.2], 0.55, pick(random, ["primary", "accent"] as const));
+        });
       }
     }),
   ],
@@ -592,21 +653,30 @@ const lamplight: FaceTheme = {
     generator("street lamp", (kit) => {
       const height = between(kit.random, 3.0, 3.9);
       kit.prism([0, 0, 0], 6, 0.18, 0.08, height, "dark");
-      kit.strut([0, 0, height], [0.7, 0, height + 0.15], 0.05, "dark");
-      lampHead(kit, [0.7, 0, height], 0.35, "primary");
+      // The arm and its lamp turn round the post now and then.
+      kit.moving(occasionalTurn(kit.random, [0, 0, height], [0, 0, 1], kit.random() < 0.5 ? 1 : -1, 0.8, 1.6), () => {
+        kit.strut([0, 0, height], [0.7, 0, height + 0.15], 0.05, "dark");
+        lampHead(kit, [0.7, 0, height], 0.35, "primary");
+      });
     }),
     generator("floor lamp", (kit) => {
       const height = between(kit.random, 2.2, 3.0);
       kit.prism([0, 0, 0], 8, 0.45, 0.4, 0.1, "dark");
       kit.strut([0, 0, 0.1], [0, 0, height], 0.05, "dark");
-      kit.prism([0, 0, height - 0.3], 8, 0.6, 0.35, 0.6, "secondary");
-      kit.ball([0, 0, height - 0.1], 0.18, 0.18, 0.18, "glow", { glow: true, longitudes: 6, latitudes: 3 });
+      // The shade and bulb rock gently on the top of the post.
+      kit.moving(sway(kit.random, "turn", [0, 0, height - 0.3], horizontalAxis(kit.random), 0.07, 4, 7), () => {
+        kit.prism([0, 0, height - 0.3], 8, 0.6, 0.35, 0.6, "secondary");
+        kit.ball([0, 0, height - 0.1], 0.18, 0.18, 0.18, "glow", { glow: true, longitudes: 6, latitudes: 3 });
+      });
     }),
   ],
   prop: [
     generator("lantern", (kit) => {
       kit.box([0, 0, 0], 0.35, 0.35, 0.08, "dark");
-      kit.ball([0, 0, 0.3], 0.14, 0.14, 0.2, "glow", { glow: true, longitudes: 6, latitudes: 3 });
+      // The flame flickers.
+      kit.moving(sway(kit.random, "grow", [0, 0, 0.12], [0, 0, 1], 0.12, 0.9, 1.5), () =>
+        kit.ball([0, 0, 0.3], 0.14, 0.14, 0.2, "glow", { glow: true, longitudes: 6, latitudes: 3 }),
+      );
       kit.prism([0, 0, 0.52], 4, 0.3, 0, 0.25, "dark", undefined, { phase: Math.PI / 4 });
       for (const [u, v] of [[-0.15, -0.15], [0.15, -0.15], [0.15, 0.15], [-0.15, 0.15]]) {
         kit.strut([u, v, 0.08], [u, v, 0.52], 0.015, "dark", { collide: false });
@@ -619,7 +689,8 @@ const lamplight: FaceTheme = {
         const angle = (index / count) * TAU;
         const height = between(kit.random, 0.3, 0.7);
         kit.prism([Math.cos(angle) * 0.18, Math.sin(angle) * 0.18, 0], 6, 0.07, 0.07, height, "light");
-        kit.prism([Math.cos(angle) * 0.18, Math.sin(angle) * 0.18, height], 4, 0.04, 0, 0.1, "glow", undefined, { glow: true });
+        const wick: Vec3 = [Math.cos(angle) * 0.18, Math.sin(angle) * 0.18, height];
+        kit.moving(sway(kit.random, "grow", wick, [0, 0, 1], 0.2, 0.6, 1.2), () => kit.prism(wick, 4, 0.04, 0, 0.1, "glow", undefined, { glow: true }));
       }
     }),
   ],
@@ -644,11 +715,15 @@ function doorFrame(kit: Kit, at: Vec3, width: number, height: number, yaw: numbe
   kit.box(local(-width / 2 - 0.1, 0, 0), 0.2, 0.25, height + 0.2, "light", { yaw });
   kit.box(local(width / 2 + 0.1, 0, 0), 0.2, 0.25, height + 0.2, "light", { yaw });
   kit.box(local(0, 0, height), width + 0.4, 0.25, 0.2, "light", { yaw });
-  // The door turns about its hinge on the left post.
+  // The door turns about its hinge on the left post. It wavers in a draught, or now and then swings wide open and back.
   const doorYaw = yaw - ajar;
   const hinge = local(-width / 2, 0, 0);
-  kit.box([hinge[0] + (Math.cos(doorYaw) * width) / 2, hinge[1] + (Math.sin(doorYaw) * width) / 2, 0], width, 0.08, height, "primary", { yaw: doorYaw });
-  kit.ball([hinge[0] + Math.cos(doorYaw) * width * 0.85 - Math.sin(doorYaw) * 0.08, hinge[1] + Math.sin(doorYaw) * width * 0.85 + Math.cos(doorYaw) * 0.08, height * 0.48], 0.06, 0.06, 0.06, "accent", { longitudes: 5, latitudes: 3 });
+  const { random } = kit;
+  const motion = random() < 0.5 ? sway(random, "turn", hinge, [0, 0, 1], between(random, 0.08, 0.15), 4, 7) : pulse(random, "turn", hinge, [0, 0, 1], -between(random, 0.5, 0.9), 1.2, 12, 20);
+  kit.moving(motion, () => {
+    kit.box([hinge[0] + (Math.cos(doorYaw) * width) / 2, hinge[1] + (Math.sin(doorYaw) * width) / 2, 0], width, 0.08, height, "primary", { yaw: doorYaw });
+    kit.ball([hinge[0] + Math.cos(doorYaw) * width * 0.85 - Math.sin(doorYaw) * 0.08, hinge[1] + Math.sin(doorYaw) * width * 0.85 + Math.cos(doorYaw) * 0.08, height * 0.48], 0.06, 0.06, 0.06, "accent", { longitudes: 5, latitudes: 3 });
+  });
 }
 
 const thresholds: FaceTheme = {
@@ -687,9 +762,14 @@ const thresholds: FaceTheme = {
       const open = between(kit.random, 0.4, 1.3);
       kit.box([0, 0, 0], 1.1, 1.1, 0.08, "dark", undefined, { collide: false });
       kit.box([0, 0, 0.06], 0.9, 0.9, 0.02, "#050505", undefined, { collide: false });
-      // The lid turns about its back edge.
-      kit.box([0, 0.5 - Math.cos(open) * 0.45, 0.1 + Math.sin(open) * 0.45], 0.95, 0.9, 0.06, "primary", { roll: open }, { collide: false });
-      kit.ring([0, 0.5 - Math.cos(open) * 0.75, 0.1 + Math.sin(open) * 0.78], 0.1, 0.02, "accent", { roll: open }, { segments: 8, tubeSides: 3 });
+      // The lid turns about its back edge (u through (0, 0.45, 0.1)): lifting its front is a turn by -open about +u. The handle sits on
+      // its front edge. Now and then it lifts further and drops back.
+      const hinge: Vec3 = [0, 0.45, 0.1];
+      const onLid = (y: number, z: number): Vec3 => [0, hinge[1] + y * Math.cos(open) + z * Math.sin(open), hinge[2] - y * Math.sin(open) + z * Math.cos(open)];
+      kit.moving(pulse(kit.random, "turn", hinge, [1, 0, 0], -between(kit.random, 0.4, 0.8), 0.6, 8, 16), () => {
+        kit.box(onLid(-0.45, 0), 0.95, 0.9, 0.06, "primary", { roll: -open }, { collide: false });
+        kit.ring(onLid(-0.8, 0.08), 0.1, 0.02, "accent", { roll: Math.PI / 2 - open }, { segments: 8, tubeSides: 3 });
+      });
     }),
     generator("step", (kit) => {
       kit.box([0, 0, 0], 1.0, 0.6, 0.25, "secondary");
@@ -711,7 +791,9 @@ const mobiles: FaceTheme = {
 
       for (let index = 0; index < branches; index += 1) {
         const angle = (index / branches) * TAU + random();
-        const from: Vec3 = [0, 0, height - index * 0.9];
+        // The branch starts on the stalk, which runs from the ground to the kink and on to the top.
+        const z = height - index * 0.9;
+        const from: Vec3 = z >= kink[2] ? [kink[0] * ((height - z) / (height - kink[2])), kink[1] * ((height - z) / (height - kink[2])), z] : [kink[0] * (z / kink[2]), kink[1] * (z / kink[2]), z];
         const length = between(random, 1.6, 2.6);
         const end: Vec3 = [Math.cos(angle) * length, Math.sin(angle) * length, from[2] - between(random, 0.3, 1.2)];
         const role = pick(random, ["primary", "secondary", "accent", "light"] as const);
@@ -735,19 +817,24 @@ const mobiles: FaceTheme = {
     generator("disc stalk", (kit) => {
       const height = between(kit.random, 2.4, 3.6);
       kit.strut([0, 0, 0], [0.3, 0, height], 0.05, "dark");
-      kit.prism([0.3, 0, height], 10, 0.55, 0.55, 0.08, pick(kit.random, ["primary", "accent"] as const), { pitch: Math.PI / 2 });
+      kit.moving(sway(kit.random, "turn", [0.3, 0, height], [0, 0, 1], 0.5, 5, 9), () =>
+        kit.prism([0.3, 0, height], 10, 0.55, 0.55, 0.08, pick(kit.random, ["primary", "accent"] as const), { pitch: Math.PI / 2 }),
+      );
     }),
     generator("moon pole", (kit) => {
       const height = between(kit.random, 2.4, 3.4);
       kit.strut([0, 0, 0], [0, 0, height], 0.05, "dark");
-      kit.ring([0, 0, height + 0.4], 0.45, 0.14, "secondary", undefined, { start: -0.3, arc: Math.PI * 1.2, segments: 9, tubeSides: 3 });
+      // The crescent's arc runs through its lowest point, which rests on the pole; it turns to and fro about the pole.
+      kit.moving(sway(kit.random, "turn", [0, 0, height], [0, 0, 1], 0.5, 6, 9), () =>
+        kit.ring([0, 0, height + 0.4], 0.45, 0.14, "secondary", undefined, { start: Math.PI / 2 + 0.4, arc: Math.PI * 1.2, segments: 9, tubeSides: 3 }),
+      );
     }),
   ],
   prop: [
     generator("blob", (kit) => kit.ball([0, 0, 0.4], 0.6, 0.45, 0.4, pick(kit.random, ["primary", "accent", "dark"] as const), { wobble: 0.25 })),
     generator("star stick", (kit) => {
-      kit.strut([0, 0, 0], [0, 0, 1.0], 0.03, "dark");
-      kit.star([0, 0, 1.2], 5, 0.3, 0.13, 0.06, "accent");
+      kit.strut([0, 0, 0], [0, 0, 1.12], 0.03, "dark");
+      kit.moving(sway(kit.random, "turn", [0, 0, 1.2], [0, 0, 1], 0.4, 4, 7), () => kit.star([0, 0, 1.2], 5, 0.3, 0.13, 0.06, "accent"));
     }),
   ],
 };
@@ -799,8 +886,14 @@ const parlour: FaceTheme = {
       kit.box([0, 0, 0], 1.8, 0.9, height, "secondary");
       const drawers = 3;
       for (let index = 0; index < drawers; index += 1) {
-        kit.box([0, -0.46, 0.15 + (index + 0.15) * (height - 0.2) / drawers], 1.6, 0.04, (height - 0.4) / drawers, "primary");
-        kit.ball([0, -0.5, 0.15 + (index + 0.6) * (height - 0.2) / drawers], 0.07, 0.07, 0.07, "accent", { longitudes: 5, latitudes: 3 });
+        const bottom = 0.15 + (index + 0.15) * (height - 0.2) / drawers;
+        const tall = (height - 0.4) / drawers;
+        // Each drawer now and then slides part way out and back; its body, hidden in the chest at rest, comes out with it.
+        kit.moving(pulse(kit.random, "slide", [0, 0, 0], [0, -1, 0], between(kit.random, 0.25, 0.45), between(kit.random, 0.6, 1.0), 8, 18), () => {
+          kit.box([0, -0.15, bottom + 0.03], 1.5, 0.6, tall - 0.06, "dark", undefined, { collide: false });
+          kit.box([0, -0.46, bottom], 1.6, 0.04, tall, "primary", undefined, { collide: false });
+          kit.ball([0, -0.5, 0.15 + (index + 0.6) * (height - 0.2) / drawers], 0.07, 0.07, 0.07, "accent", { longitudes: 5, latitudes: 3 });
+        });
       }
     }),
   ],
@@ -933,8 +1026,9 @@ const fungi: FaceTheme = {
   minor: [
     generator("mushroom", (kit) => mushroom(kit, [0, 0, 0], between(kit.random, 1.6, 3.2), between(kit.random, 0.8, 1.4), between(kit.random, -0.6, 0.6))),
     generator("puffballs", (kit) => {
-      kit.ball([0, 0, 0.8], 0.9, 0.9, 0.8, "light", { longitudes: 9, latitudes: 4 });
-      kit.ball([1.1, 0.2, 0.5], 0.55, 0.55, 0.5, "secondary", { longitudes: 8, latitudes: 4 });
+      // Both puffballs breathe, out of step.
+      kit.moving(sway(kit.random, "grow", [0, 0, 0], [0, 0, 1], 0.05, 3, 5), () => kit.ball([0, 0, 0.8], 0.9, 0.9, 0.8, "light", { longitudes: 9, latitudes: 4 }));
+      kit.moving(sway(kit.random, "grow", [1.1, 0.2, 0], [0, 0, 1], 0.06, 3, 5), () => kit.ball([1.1, 0.2, 0.5], 0.55, 0.55, 0.5, "secondary", { longitudes: 8, latitudes: 4 }));
     }),
   ],
   prop: [
@@ -951,21 +1045,21 @@ function totemPole(kit: Kit, height: number, width: number): void {
     const role = (["primary", "secondary", "accent", "dark", "light"] as const)[index % 5];
     const size = width * between(random, 0.8, 1.15);
     const kind = integer(random, 0, 3);
-
-    if (kind === 0) {
-      kit.box([0, 0, z], size, size, size, role, { yaw: random() * 0.5 });
-      z += size;
-    } else if (kind === 1) {
-      kit.ball([0, 0, z + size * 0.5], size * 0.6, size * 0.6, size * 0.5, role, { longitudes: 8, latitudes: 4 });
-      z += size;
-    } else if (kind === 2) {
-      kit.prism([0, 0, z], 6, size * 0.6, size * 0.35, size, role);
-      z += size;
-    } else {
-      kit.prism([0, 0, z], 4, size * 0.75, size * 0.75, size * 0.5, role, undefined, { phase: Math.PI / 4 });
-      kit.box([0, 0, z + size * 0.1], size * 2.4, size * 0.2, size * 0.3, role);
-      z += size * 0.5;
-    }
+    const bottom = z;
+    // Each piece turns about the pole now and then, its own way.
+    kit.moving(occasionalTurn(random, [0, 0, bottom], [0, 0, 1], index % 2 === 0 ? 1 : -1, 0.4, 1.2), () => {
+      if (kind === 0) {
+        kit.box([0, 0, bottom], size, size, size, role, { yaw: random() * 0.5 });
+      } else if (kind === 1) {
+        kit.ball([0, 0, bottom + size * 0.5], size * 0.6, size * 0.6, size * 0.5, role, { longitudes: 8, latitudes: 4 });
+      } else if (kind === 2) {
+        kit.prism([0, 0, bottom], 6, size * 0.6, size * 0.35, size, role);
+      } else {
+        kit.prism([0, 0, bottom], 4, size * 0.75, size * 0.75, size * 0.5, role, undefined, { phase: Math.PI / 4 });
+        kit.box([0, 0, bottom + size * 0.1], size * 2.4, size * 0.2, size * 0.3, role);
+      }
+    });
+    z += kind === 3 ? size * 0.5 : size;
 
     index += 1;
   }
@@ -1020,7 +1114,10 @@ const orbits: FaceTheme = {
         kit.strut(base, [base[0], base[1], height - size], 0.06, "dark");
         kit.ball([base[0], base[1], height], size, size, size, pick(random, ["primary", "secondary", "accent", "light"] as const), { longitudes: 9, latitudes: 4 });
         if (random() < 0.6) {
-          kit.ring([base[0], base[1], height], size * 1.7, 0.05, "light", { roll: Math.PI / 2 + between(random, -0.4, 0.4) }, { segments: 14, tubeSides: 3 });
+          const centre: Vec3 = [base[0], base[1], height];
+          kit.moving(sway(random, "turn", centre, horizontalAxis(random), 0.15, 5, 9), () =>
+            kit.ring(centre, size * 1.7, 0.05, "light", { roll: Math.PI / 2 + between(random, -0.4, 0.4) }, { segments: 14, tubeSides: 3 }),
+          );
         }
       }
     }),
@@ -1030,25 +1127,33 @@ const orbits: FaceTheme = {
       const height = between(kit.random, 2.2, 3.4);
       kit.strut([0, 0, 0], [0, 0, height - 0.6], 0.05, "dark");
       kit.ball([0, 0, height], 0.6, 0.6, 0.6, "primary", { longitudes: 9, latitudes: 4 });
-      kit.ring([0, 0, height], 1.0, 0.05, "accent", { roll: Math.PI / 2 + 0.35 }, { segments: 14, tubeSides: 3 });
+      kit.moving(sway(kit.random, "turn", [0, 0, height], horizontalAxis(kit.random), 0.15, 5, 9), () =>
+        kit.ring([0, 0, height], 1.0, 0.05, "accent", { roll: Math.PI / 2 + 0.35 }, { segments: 14, tubeSides: 3 }),
+      );
     }),
     generator("floating rings", (kit) => {
       for (let index = 0; index < 3; index += 1) {
-        kit.ring([0, 0, 1.4 + index * 0.9], 0.9 - index * 0.2, 0.08, pick(kit.random, ["primary", "secondary", "accent"] as const), { roll: Math.PI / 2 + between(kit.random, -0.3, 0.3) }, { segments: 14, tubeSides: 3 });
+        // Each ring bobs up and down, out of step with the others.
+        kit.moving(sway(kit.random, "slide", [0, 0, 0], [0, 0, 1], between(kit.random, 0.1, 0.2), 4, 7), () =>
+          kit.ring([0, 0, 1.4 + index * 0.9], 0.9 - index * 0.2, 0.08, pick(kit.random, ["primary", "secondary", "accent"] as const), { roll: Math.PI / 2 + between(kit.random, -0.3, 0.3) }, { segments: 14, tubeSides: 3 }),
+        );
       }
     }),
   ],
   prop: [
     generator("globe", (kit) => {
       kit.prism([0, 0, 0], 6, 0.25, 0.1, 0.5, "dark");
-      kit.ball([0, 0, 0.8], 0.32, 0.32, 0.32, "secondary", { longitudes: 8, latitudes: 4 });
+      kit.moving(steadyTurn(kit.random, [0, 0, 0.8], [0, 0, 1], 0.4), () => kit.ball([0, 0, 0.8], 0.32, 0.32, 0.32, "secondary", { longitudes: 8, latitudes: 4 }));
     }),
     generator("meteorite", (kit) => kit.ball([0, 0, 0.3], 0.5, 0.4, 0.35, "dark", { wobble: 0.3 })),
   ],
 };
 
+// A flag hanging from `top` on a pole, `yaw` away from it; it flutters to and fro about the pole.
 function flag(kit: Kit, top: Vec3, length: number, height: number, yaw: number, role: Role): void {
-  kit.box([top[0] + (Math.cos(yaw) * length) / 2, top[1] + (Math.sin(yaw) * length) / 2, top[2] - height], length, 0.04, height, role, { yaw });
+  kit.moving(sway(kit.random, "turn", top, [0, 0, 1], between(kit.random, 0.25, 0.45), 2.5, 4.5), () =>
+    kit.box([top[0] + (Math.cos(yaw) * length) / 2, top[1] + (Math.sin(yaw) * length) / 2, top[2] - height], length, 0.04, height, role, { yaw }),
+  );
 }
 
 const kites: FaceTheme = {
@@ -1086,9 +1191,12 @@ const kites: FaceTheme = {
       for (let index = 0; index < count; index += 1) {
         const angle = random() * TAU;
         const at: Vec3 = [Math.cos(angle) * 1.8, Math.sin(angle) * 1.8, between(random, 6, 9)];
-        kit.prism(at, 4, 1.1, 1.1, 0.05, pick(random, ["primary", "secondary", "accent"] as const), { yaw: angle, pitch: Math.PI / 2 - 0.4 });
-        kit.strut([0, 0, 0.6], at, 0.015, "light", { collide: false });
-        polyline(kit, [at, [at[0], at[1], at[2] - 1.2], [at[0] + 0.3, at[1], at[2] - 2.0]], 0.02, "accent");
+        // Kite, string and tail sway together about the anchor, across the wind.
+        kit.moving(sway(random, "turn", [0, 0, 0.6], [-Math.sin(angle), Math.cos(angle), 0], between(random, 0.05, 0.09), 5, 9), () => {
+          kit.prism(at, 4, 1.1, 1.1, 0.05, pick(random, ["primary", "secondary", "accent"] as const), { yaw: angle, pitch: Math.PI / 2 - 0.4 });
+          kit.strut([0, 0, 0.6], at, 0.015, "light", { collide: false });
+          polyline(kit, [at, [at[0], at[1], at[2] - 1.2], [at[0] + 0.3, at[1], at[2] - 2.0]], 0.02, "accent");
+        });
       }
     }),
   ],
@@ -1101,13 +1209,15 @@ const kites: FaceTheme = {
     generator("windsock", (kit) => {
       const height = between(kit.random, 2.6, 3.4);
       kit.strut([0, 0, 0], [0, 0, height], 0.05, "dark");
-      kit.prism([0, 0, height - 0.2], 8, 0.3, 0.15, 1.4, "accent", { yaw: kit.random() * TAU, pitch: Math.PI / 2 + 0.25 });
+      kit.moving(sway(kit.random, "turn", [0, 0, height - 0.2], [0, 0, 1], 0.5, 4, 7), () =>
+        kit.prism([0, 0, height - 0.2], 8, 0.3, 0.15, 1.4, "accent", { yaw: kit.random() * TAU, pitch: Math.PI / 2 + 0.25 }),
+      );
     }),
   ],
   prop: [
     generator("pennant stake", (kit) => {
       kit.strut([0, 0, 0], [0, 0, 1.1], 0.025, "dark");
-      kit.prism([0, 0, 0.7], 3, 0.25, 0, 0.4, "accent", { pitch: Math.PI / 2 });
+      kit.moving(sway(kit.random, "turn", [0, 0, 0.7], [0, 0, 1], 0.4, 2.5, 4.5), () => kit.prism([0, 0, 0.7], 3, 0.25, 0, 0.4, "accent", { pitch: Math.PI / 2 }));
     }),
   ],
 };
@@ -1127,8 +1237,20 @@ export function firTiers(kit: Kit, top: Vec3, height: number, layers: number, tw
   }
 }
 
+/**
+ * A flower: a stem from `base` up `height` meters and a bloom of `petals` points; now and then it sinks into the ground (or its pot) and rises
+ * again (design 018 section 9.9).
+ */
+export function flower(kit: Kit, base: Vec3, height: number, petals: number, size: number): void {
+  const { random } = kit;
+  kit.moving(pulse(random, "slide", base, [0, 0, 1], -(height + size + 0.05), between(random, 0.8, 1.5), 10, 24), () => {
+    kit.strut(base, [base[0], base[1], base[2] + height], 0.015, "dark", { collide: false });
+    kit.star([base[0], base[1], base[2] + height], petals, size, size * 0.42, 0.03, pick(random, ["accent", "light", "secondary"] as const), { roll: Math.PI / 2 });
+  });
+}
+
 /** A tree: a leaning trunk and a crown of one to three overlapping balls (round) or stacked cones (pointed). */
-export function tree(kit: Kit, at: Vec3, height: number, pointed: boolean): void {
+export function tree(kit: Kit, at: Vec3, height: number, pointed: boolean, leafBalls?: number): void {
   const { random } = kit;
   const lean: Vec3 = [between(random, -0.3, 0.3), between(random, -0.3, 0.3), 0];
   const top: Vec3 = [at[0] + lean[0], at[1] + lean[1], at[2] + height * 0.45];
@@ -1139,14 +1261,32 @@ export function tree(kit: Kit, at: Vec3, height: number, pointed: boolean): void
     return;
   }
 
+  // The first ball of the crown sits on the trunk, which runs up into it; the others overlap it, a little off to the side.
+  const crown = height * between(random, 0.22, 0.3);
+  const centre: Vec3 = [top[0], top[1], top[2] + crown * 0.55];
+  kit.strut(top, [centre[0], centre[1], centre[2]], Math.max(0.08, height * 0.028), "dark");
   const blobs = integer(random, 1, 3);
   for (let index = 0; index < blobs; index += 1) {
-    const radius = height * between(random, 0.22, 0.3);
-    kit.ball([top[0] + between(random, -0.3, 0.3) * radius, top[1] + between(random, -0.3, 0.3) * radius, top[2] + radius * (0.8 + index * 0.5)], radius, radius, radius * 0.85, index % 2 === 0 ? "primary" : "secondary", {
+    const radius = index === 0 ? crown : crown * between(random, 0.7, 0.9);
+    const angle = random() * TAU;
+    const off = index === 0 ? 0 : crown * between(random, 0.25, 0.45);
+    kit.ball([centre[0] + Math.cos(angle) * off, centre[1] + Math.sin(angle) * off, centre[2] + index * crown * 0.45], radius, radius, radius * 0.85, index % 2 === 0 ? "primary" : "secondary", {
       longitudes: 8,
       latitudes: 4,
       wobble: 0.12,
     });
+  }
+
+  // Small leaf balls on the crown's surface now and then shrink away to nothing and grow back (design 018 section 9.9).
+  const leaves = leafBalls ?? integer(random, 2, 4);
+  for (let index = 0; index < leaves; index += 1) {
+    const angle = random() * TAU;
+    const rise = between(random, -0.2, 0.8);
+    const radius = crown * between(random, 0.3, 0.45);
+    const at: Vec3 = [centre[0] + Math.cos(angle) * crown * 0.85, centre[1] + Math.sin(angle) * crown * 0.85, centre[2] + rise * crown * 0.6];
+    kit.moving(pulse(random, "grow", at, [0, 0, 1], -1, between(random, 1.4, 2.4), 9, 20), () =>
+      kit.ball(at, radius, radius, radius * 0.85, pick(random, ["primary", "secondary"] as const), { longitudes: 6, latitudes: 4, wobble: 0.15 }),
+    );
   }
 }
 
@@ -1159,7 +1299,8 @@ const grove: FaceTheme = {
       const count = integer(kit.random, 3, 4);
       for (let index = 0; index < count; index += 1) {
         const angle = (index / count) * TAU + kit.random();
-        tree(kit, [Math.cos(angle) * 1.8, Math.sin(angle) * 1.8, 0], between(kit.random, 5.5, 8), kit.random() < 0.5);
+        // A copse keeps one leaf ball per tree, to stay inside its triangle budget.
+        tree(kit, [Math.cos(angle) * 1.8, Math.sin(angle) * 1.8, 0], between(kit.random, 5.5, 8), kit.random() < 0.5, 1);
       }
     }),
   ],
@@ -1180,16 +1321,85 @@ const grove: FaceTheme = {
         const reach = between(kit.random, 0, 0.45);
         const height = between(kit.random, 0.35, 0.7);
         const base: Vec3 = [Math.cos(angle) * reach, Math.sin(angle) * reach, 0];
-        kit.strut(base, [base[0], base[1], height], 0.015, "dark", { collide: false });
-        kit.star([base[0], base[1], height], 4, 0.12, 0.05, 0.03, pick(kit.random, ["accent", "light", "secondary"] as const), { roll: Math.PI / 2 });
+        flower(kit, base, height, 4, 0.12);
       }
     }),
     generator("shrub", (kit) => kit.ball([0, 0, 0.35], 0.5, 0.45, 0.4, "primary", { wobble: 0.2 })),
   ],
 };
 
+// A cloud resting on the ground: a cluster of flattened puffs in the palette's light colour, drifting slowly to and fro. It does not
+// block the player: one walks through it.
+function groundCloud(kit: Kit, at: Vec3, length: number, puffs: number): void {
+  const { random } = kit;
+  const along = horizontalAxis(random);
+  kit.moving(sway(random, "slide", at, along, between(random, 0.25, 0.5), 10, 16), () => {
+    for (let index = 0; index < puffs; index += 1) {
+      const t = puffs === 1 ? 0 : index / (puffs - 1) - 0.5;
+      const radius = length * between(random, 0.18, 0.28);
+      const side = between(random, -0.3, 0.3) * length;
+      const centre: Vec3 = [at[0] + along[0] * t * length - along[1] * side, at[1] + along[1] * t * length + along[0] * side, at[2] + radius * between(random, 0.25, 0.55)];
+      kit.ball(centre, radius, radius * between(random, 0.7, 1), radius * between(random, 0.45, 0.65), "light", { longitudes: 8, latitudes: 4, wobble: 0.15, collide: false });
+    }
+  });
+}
+
+// A boulder hovering with its centre at `at`, bobbing slowly up and down.
+function floatingBoulder(kit: Kit, at: Vec3, radius: number): void {
+  const { random } = kit;
+  kit.moving(sway(random, "slide", at, [0, 0, 1], between(random, 0.15, 0.35), 5, 9), () =>
+    kit.ball(at, radius * between(random, 0.9, 1.15), radius * between(random, 0.8, 1.05), radius * between(random, 0.7, 0.9), pick(random, ["primary", "dark", "secondary"] as const), {
+      longitudes: 9,
+      latitudes: 5,
+      wobble: 0.22,
+      pose: { yaw: random() * TAU },
+    }),
+  );
+}
+
+const drift: FaceTheme = {
+  id: "drift",
+  title: "Floating boulders over clouds on the ground",
+  major: [
+    generator("floating boulders", (kit) => {
+      const { random } = kit;
+      const count = integer(random, 3, 5);
+      for (let index = 0; index < count; index += 1) {
+        const angle = (index / count) * TAU + random();
+        const reach = between(random, 0.6, 2.4);
+        floatingBoulder(kit, [Math.cos(angle) * reach, Math.sin(angle) * reach, between(random, 2.2, 7)], between(random, 0.7, 1.4));
+      }
+      groundCloud(kit, [0, 0, 0], between(random, 4, 5.5), integer(random, 4, 6));
+    }),
+    generator("cloud field", (kit) => {
+      const { random } = kit;
+      groundCloud(kit, [-1.4, 0.4, 0], between(random, 3, 4), integer(random, 3, 5));
+      groundCloud(kit, [1.6, -0.6, 0], between(random, 3, 4), integer(random, 3, 5));
+      floatingBoulder(kit, [0, 0, between(random, 5, 7)], between(random, 1.2, 1.8));
+      floatingBoulder(kit, [between(random, -1, 1), between(random, -1, 1), between(random, 2.5, 3.5)], between(random, 0.5, 0.8));
+    }),
+  ],
+  minor: [
+    generator("boulder pair", (kit) => {
+      const { random } = kit;
+      floatingBoulder(kit, [0, 0, between(random, 1.6, 2.6)], between(random, 0.5, 0.8));
+      floatingBoulder(kit, [between(random, 0.6, 1.0), between(random, -0.5, 0.5), between(random, 2.8, 3.6)], between(random, 0.3, 0.5));
+    }),
+    generator("cloud bank", (kit) => {
+      const { random } = kit;
+      groundCloud(kit, [0, 0, 0], between(random, 3, 4.2), integer(random, 4, 6));
+      // A second layer of puffs on top makes the bank tall enough to see across the face.
+      groundCloud(kit, [0, 0, 0.95], between(random, 1.8, 2.4), 2);
+    }),
+  ],
+  prop: [
+    generator("small floater", (kit) => floatingBoulder(kit, [0, 0, between(kit.random, 0.9, 1.2)], between(kit.random, 0.18, 0.3))),
+    generator("cloud puff", (kit) => groundCloud(kit, [0, 0, 0], between(kit.random, 1.0, 1.6), integer(kit.random, 2, 3))),
+  ],
+};
+
 /** Every theme, in a fixed order; the assignment draws from it. */
-export const faceThemes: readonly FaceTheme[] = [cairns, village, striders, clockwork, lamplight, thresholds, mobiles, parlour, crystals, ruins, fungi, totems, orbits, kites, grove];
+export const faceThemes: readonly FaceTheme[] = [cairns, village, striders, clockwork, lamplight, thresholds, mobiles, parlour, crystals, ruins, fungi, totems, orbits, kites, grove, drift];
 
 /** The theme with the given id. */
 export function faceThemeById(id: string): FaceTheme {
