@@ -693,6 +693,34 @@ Floor texture library: the named floor appearances world scripts can use, via th
 | const | `worldFloorTextureLibrary` | Implementation of the floor helpers injected into world scripts; throws on an unknown texture name. |
 | function | `normalizeFloorMaterial` | Converts a floor argument into a plain FloorMaterialSpec: a string becomes a flat-color floor, a library material is shallow-copied (dropping the brand). |
 
+### `world-assets/groundTint.ts`
+
+Per-cell ground tint image (design 018 section 4.1).
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| const | `groundTintLargeStrength` | Strength of the large (about 8 m) brightness patches: the tint varies by plus or minus this fraction. |
+| const | `groundTintSmallStrength` | Strength of the small (about 2 m) brightness patches. |
+| const | `groundTintWarmCoolStrength` | Largest warm/cool shift of the red and blue channels, as a fraction. |
+| const | `groundContactShadowStrength` | Darkest the contact shadow gets, as a fraction removed at the object (0.38 means 62 percent of the colour is left). |
+| const | `groundContactShadowDefaultRadiusMeters` | Radius in meters used for a static object with no collision cylinder. |
+| const | `groundTintNeutralTexel` | Texel value that means "multiply by 1.0". |
+| interface | `GroundTintCell` | The structural part of a compiled prism cell that the tint needs. |
+| interface | `GroundTintOptions` | Options of {@link computeGroundTint}. |
+| interface | `GroundTint` | A tint image and the cell-local rectangle it covers (x right, y forward, meters). |
+| function | `computeGroundTint` | Computes the tint image of a cell over its bounding box, seeded by the cell id so it is the same on every machine. |
+
+### `world-assets/seededNoise.ts`
+
+Deterministic seeded random numbers and value noise.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| function | `hashStringToSeed` | Hashes a string to an unsigned 32-bit seed (FNV-1a). |
+| function | `createSeededRandom` | Creates a mulberry32 generator returning numbers in [0, 1) from a 32-bit seed. |
+| function | `valueNoise2` | Lattice value noise at (x, y) in [0, 1]: smoothstep interpolation of hashed values at the integer corners. |
+| function | `fractalNoise2` | Sum of `octaves` layers of value noise (each twice the frequency and half the weight), normalised to [0, 1]. |
+
 ## `world-objects`
 
 ### `world-objects/carry.ts`
@@ -2546,8 +2574,7 @@ The pause card, the desktop main menu (design 017 sections 7.5 and 8.1), as plai
 | interface | `PauseCardControl` | One row of the controls table: the verb and the name of the control that performs it. |
 | type | `PauseCardActionId` | The main-menu actions, in the order they show. |
 | interface | `PauseCardDefinition` | The card's content. |
-| interface | `PauseCardSource` | What the card is built from: the world's name, the config's display name when it has one, and the first goal text. |
-| function | `prettyWorldName` | "001-basic-cube" becomes "Basic cube": the leading number and the dashes and underscores go. |
+| interface | `PauseCardSource` | What the card is built from: the config's display name when it has one, and the first goal text. |
 | function | `firstSentence` | The first sentence of a text, without its line breaks; empty when the text is blank. |
 | function | `createPauseCardControls` | The controls table: Look, Walk, Use, Menu, Switch tool, What's this?, from the intent table. |
 | function | `createPauseCardDefinition` | Builds the card for a world. |
@@ -3136,6 +3163,8 @@ Render sources and per-frame render records for geodesic cannons, geodesic segme
 | function | `collectGeodesicRuntimeRenderRecords` | Produces the render records of one geodesic object in its own cell, one per matching archetype mesh (no portal ghosts; the instance sync adds them for the body parts, see {@link collectGeodesicBodyPlacements}). |
 | function | `emitterHeadsKey` | A string that changes whenever the heads drawn at a cannon change: the attached geodesics and their launch yaws. |
 | function | `composeSegmentMatrix` | Returns the Three.js model matrix mapping the unit ribbon (x from 0 to 1) onto `segment`. |
+| function | `createCannonPostModel` | The cannon's post as drawn, base on the floor; the loaded model is lifted by the floor offset, the fallback is already built with its base at y = 0. |
+| function | `createCannonHeadModel` | The cannon's head (lightsaber) as drawn, at the beam's emission point and pointing along +x. |
 
 ### `render/three/geodesicCannonTools.ts`
 
@@ -3231,6 +3260,16 @@ The `window.noneuclidGeometry` helpers and the `geometry` API namespace that dri
 | interface | `GeometryDebugHelpersHandle` | Handle to the geometry helpers created by {@link createGeometryDebugHelpers}. |
 | function | `createGeometryDebugHelpers` | Creates the installer of the geometry debug helpers. |
 
+### `render/three/groundTintMaterial.ts`
+
+Ground tint for a textured floor material (design 018 section 4.1).
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| const | `groundTintGain` | Multiplier applied to the floor colour together with the tint image (the image is 0..2 around 1.0). |
+| function | `createGroundTintTexture` | Uploads the tint image as a linear-filtered, edge-clamped, non-colour-managed texture. |
+| function | `patchGroundTintMaterial` | Multiplies the material's diffuse colour by `texture` (mapped over the tint's rectangle) and by `gain`. |
+
 ### `render/three/helpCubeInvite.ts`
 
 The help cube's invitation (design 017 section 9.1): a floating "?
@@ -3256,15 +3295,14 @@ Help panel ("help lens") renderer: shows the current contextual help definition 
 
 ### `render/three/laserPreview.ts`
 
-The Laser's placement preview (design 017 section 8.3): with the Laser in hand and the aim on the floor, a translucent ghost of a laser stands at the aim point, with an arrow along the direction a placed laser would fire.
+The Laser's placement preview (design 017 section 8.3): with the Laser in hand and the aim on the floor, a translucent copy of the real laser (its post and its head) stands at the aim point, the head turned the way a placed laser would fire.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
-| const | `laserPreviewPostRadiusMeters` | Radius of the ghost's post, meters. |
-| const | `laserPreviewPostHeightMeters` | Height of the ghost's post, meters. |
-| const | `laserPreviewArrowLengthMeters` | Length of the direction arrow from the post, meters. |
+| const | `laserPreviewOpacity` | How opaque the copy is, 0 to 1. |
+| const | `laserPreviewHaloOpacity` | How opaque the faint yellow halo around the copy is, 0 to 1. |
 | interface | `LaserPreview` | Handle to the preview created by {@link createLaserPreview}. |
-| function | `createLaserPreview` | Creates the preview, adds it (hidden) to `scene`, and returns its handle. |
+| function | `createLaserPreview` | Creates the preview from the loaded models (procedural stand-ins when `assets` is omitted), adds it (hidden) to `scene`, and returns its handle. |
 
 ### `render/three/measureLengthRenderer.ts`
 
@@ -3854,7 +3892,11 @@ Shared scene colour constants for the Three.js renderer.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
-| const | `SCENE_BACKGROUND_COLOR` | Sky-blue clear/background colour (0x78b9eb) shown wherever no cell geometry or floor is drawn. |
+| const | `SCENE_BACKGROUND_COLOR` | Sky-blue colour (0x78b9eb) used for ceiling caps and as the legacy flat background tone. |
+| const | `SKY_ZENITH_COLOR` | Deep sky blue straight overhead (elevation 70 degrees and above). |
+| const | `SKY_MID_COLOR` | Mid sky blue at 25 degrees of elevation. |
+| const | `SKY_HORIZON_COLOR` | Pale haze at the horizon; also the fog colour, so distant geometry dissolves into the horizon. |
+| const | `GROUND_HAZE_COLOR` | Muted grey-green seen below the horizon and used for the plane under the cells. |
 
 ### `render/three/sceneLighting.ts`
 
@@ -3952,6 +3994,20 @@ What Settings and Help remember between visits (design 017 sections 8.6 and 8.7)
 | const | `turnSpeedFactors` | The factor each turn speed step gives the keyboard turn rate. |
 | const | `textSizeRootFactors` | The factor of the root font size of the page (the heads-up display is sized in rem) for each text size. |
 
+### `render/three/skyBackground.ts`
+
+Vertical sky gradient used as `scene.background`.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| const | `skyTextureHeightPixels` | Number of rows (elevation samples) of the sky texture. |
+| const | `skyMidElevationDegrees` | Elevation at which the sky reaches SKY_MID_COLOR, degrees. |
+| const | `skyZenithElevationDegrees` | Elevation from which the sky is SKY_ZENITH_COLOR, degrees. |
+| const | `skyGroundBlendFraction` | Fraction of the span under the horizon, counted up from the horizon, over which the ground haze blends into the horizon colour. |
+| interface | `SkyRgb` | An sRGB colour with channels in 0..1. |
+| function | `skyColorAtElevation` | Returns the sky colour (sRGB, 0..1) at an elevation in radians, from -pi/2 (nadir) to pi/2 (zenith). |
+| function | `createSkyBackgroundTexture` | Creates the 1 x 256 sky texture. |
+
 ### `render/three/staticAssetRenderRoot.ts`
 
 Render root of a static asset: the template that the runtime-object render path turns into instanced meshes drawn at the asset's registry pose.
@@ -4007,7 +4063,7 @@ Large plane drawn below the cells so the void reads as ground.
 | --- | --- | --- |
 | const | `underCellInfinityFloorSizeMeters` | Side length of the square floor plane, meters; large enough to read as infinite from inside the cells. |
 | const | `underCellInfinityFloorWorldZMeters` | Height of the plane as a world-frame z coordinate, meters (-1 m); it is applied as the Three.js y position. |
-| function | `createUnderCellInfinityFloor` | Creates the large black plane drawn below the cells so that the void reads as ground. |
+| function | `createUnderCellInfinityFloor` | Creates the large ground-haze plane drawn below the cells so that the void reads as ground. |
 
 ### `render/three/visiblePortalPaths.ts`
 
