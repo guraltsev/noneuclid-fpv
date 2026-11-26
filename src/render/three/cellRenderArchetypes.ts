@@ -20,7 +20,9 @@ import type { StaticPortalPathCullResult } from "../../cell-complex/staticPortal
 import type { DebugLevelId } from "../../diagnostics/debugLevels";
 import type { PortalPanelModeId } from "../../glue/portalPanelMode";
 import { buildCellMesh } from "./buildCellMesh";
+import { computeGroundTint, type GroundTint } from "../../world-assets/groundTint";
 import { patchFloorPatchMaterial } from "./floorPatchMaterial";
+import { createGroundTintTexture, patchGroundTintMaterial } from "./groundTintMaterial";
 import { patchPortalClipMaterial, type PortalClipMaterialState } from "./portalClipMaterial";
 import type { PreparedWorldAssets } from "./preparedWorldAssets";
 import { disposeMaterial, disposeObject3D } from "./runtimeSceneUtils";
@@ -54,6 +56,8 @@ export interface CellRenderArchetype {
   readonly capacity: number;
   /** Name of the source Three.js mesh, if it had one. */
   readonly sourceObjectName?: string;
+  /** Textures created for this archetype's materials (the ground tint); `disposeCellRenderArchetypes` disposes them. */
+  readonly ownedTextures?: readonly THREE.Texture[];
 }
 
 /** Options controlling how cell meshes are built and instanced. */
@@ -125,6 +129,7 @@ export function buildCellRenderArchetypes(
         portalClipIndexAttribute,
         capacity: source.capacity,
         sourceObjectName: source.sourceObjectName,
+        ownedTextures: source.ownedTextures,
       });
     }
   }
@@ -198,6 +203,9 @@ export function disposeCellRenderArchetypes(archetypes: readonly CellRenderArche
     archetype.mesh.geometry.dispose();
     disposeMaterial(archetype.mesh.material);
     disposeMaterial(archetype.rootMesh.material);
+    for (const texture of archetype.ownedTextures ?? []) {
+      texture.dispose();
+    }
   }
 }
 
@@ -211,6 +219,7 @@ interface CellArchetypeSource {
   readonly rootMaterial: THREE.Material | THREE.Material[];
   readonly capacity: number;
   readonly sourceObjectName?: string;
+  readonly ownedTextures?: readonly THREE.Texture[];
 }
 
 // Bakes each mesh's world matrix (relative to the cell mesh root) into its geometry so instance matrices only need rootFromDestination.
@@ -230,6 +239,9 @@ function collectCellArchetypeSources(
 
   const capacity = options.capacitiesByCellId.get(cell.id) ?? 1;
   const sources: CellArchetypeSource[] = [];
+  const floorUvFrame = options.floorUvFramesByCellId?.get(cell.id);
+  // The ground tint is made once per cell, only for metric textured floors (lattice floors are continuous across cells).
+  let groundTint: { readonly tint: GroundTint; readonly texture: THREE.DataTexture } | undefined;
 
   sourceRoot.traverse((object) => {
     if (!(object instanceof THREE.Mesh)) {
@@ -244,8 +256,14 @@ function collectCellArchetypeSources(
 
     const geometry = object.geometry.clone();
     geometry.applyMatrix4(object.matrixWorld);
-    const material = cloneMaterial(object.material, options.portalClipMaterialState);
-    const rootMaterial = cloneMaterial(object.material, undefined);
+    const wantsGroundTint = kind === "floor" && cell.floorMaterial.kind === "floor-texture" && !floorUvFrame;
+    if (wantsGroundTint && !groundTint) {
+      const tint = computeGroundTint(cell);
+      groundTint = { tint, texture: createGroundTintTexture(tint) };
+    }
+    const tintOptions = wantsGroundTint ? groundTint : undefined;
+    const material = cloneMaterial(object.material, options.portalClipMaterialState, tintOptions);
+    const rootMaterial = cloneMaterial(object.material, undefined, tintOptions);
     const archetypeIndex = sources.length;
     sources.push({
       cellId: cell.id,
@@ -256,6 +274,7 @@ function collectCellArchetypeSources(
       rootMaterial,
       capacity,
       sourceObjectName: object.name || undefined,
+      ownedTextures: tintOptions ? [tintOptions.texture] : undefined,
     });
   });
 
@@ -297,15 +316,22 @@ function classifyObjectKind(object: THREE.Mesh): CellRenderArchetypeKind | undef
   return undefined;
 }
 
+// Clone -> floor patch -> ground tint -> portal clip: the clip patch chains the earlier hooks and must stay last.
 function cloneMaterial(
   material: THREE.Material | THREE.Material[],
   portalClipMaterialState: PortalClipMaterialState | undefined,
+  groundTint: { readonly tint: GroundTint; readonly texture: THREE.Texture } | undefined,
 ): THREE.Material | THREE.Material[] {
+  const prepare = (entry: THREE.Material): THREE.Material => {
+    const patched = patchFloorPatchMaterial(entry.clone());
+    return groundTint ? patchGroundTintMaterial(patched, groundTint.texture, groundTint.tint) : patched;
+  };
+
   if (Array.isArray(material)) {
-    const cloned = material.map((entry) => patchFloorPatchMaterial(entry.clone()));
+    const cloned = material.map(prepare);
     return portalClipMaterialState ? patchPortalClipMaterial(cloned, portalClipMaterialState) : cloned;
   }
 
-  const cloned = patchFloorPatchMaterial(material.clone());
+  const cloned = prepare(material);
   return portalClipMaterialState ? patchPortalClipMaterial(cloned, portalClipMaterialState) : cloned;
 }

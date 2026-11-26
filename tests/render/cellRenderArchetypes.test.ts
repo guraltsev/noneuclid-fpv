@@ -161,6 +161,63 @@ describe("buildCellRenderArchetypes floor UV frames", () => {
   });
 });
 
+describe("buildCellRenderArchetypes ground tint", () => {
+  const world = (): CellComplexSpec =>
+    ({
+      cells: [
+        {
+          id: "tint-room",
+          heightMeters: 4,
+          baseVertices: [
+            { x: -5, y: -5 },
+            { x: 5, y: -5 },
+            { x: 5, y: 5 },
+            { x: -5, y: 5 },
+          ],
+          portals: [],
+          visuals: {
+            floorMaterial: { kind: "floor-texture", name: "test", floorColor: "#5b8f48", tileSizeMeters: 4, colorTexturePath: "textures/test.ktx2" },
+          },
+        },
+      ],
+    }) as unknown as CellComplexSpec;
+  const keyOf = (material: THREE.Material | THREE.Material[]) => (Array.isArray(material) ? material[0] : material).customProgramCacheKey();
+  const build = (frames?: ReadonlyMap<string, never>) => {
+    const compiled = compileCellComplex(world());
+    return buildCellRenderArchetypes(compiled, {
+      debugLevel: "off",
+      portalPanelMode: "none",
+      eyeHeightMeters: 1.6,
+      assets: createPreparedAssets(),
+      capacitiesByCellId: new Map([["tint-room", 1]]),
+      floorUvFramesByCellId: frames,
+      portalClipMaterialState: createPortalClipMaterialState(createPortalClipData({ maxVisiblePaths: 8 })),
+    });
+  };
+
+  it("tints a metric textured floor, keeps the clip patch, and owns one texture", () => {
+    const archetypes = build();
+    const floor = archetypes.find((archetype) => archetype.kind === "floor")!;
+    expect(keyOf(floor.mesh.material)).toContain("ground-tint");
+    expect(keyOf(floor.mesh.material)).toContain("portal-clip-planes");
+    expect(keyOf(floor.rootMesh.material)).toContain("ground-tint");
+    expect(floor.ownedTextures).toHaveLength(1);
+    for (const other of archetypes.filter((archetype) => archetype !== floor)) {
+      expect(keyOf(other.mesh.material)).not.toContain("ground-tint");
+    }
+    disposeCellRenderArchetypes(archetypes);
+  });
+
+  it("leaves a lattice floor untouched", () => {
+    const frame = { origin: { x: -5, y: -5 }, u: { x: 10, y: 0 }, v: { x: 2, y: 10 }, tilesAlongU: 3, tilesAlongV: 2, restU: { x: 10, y: 0 }, restV: { x: 2, y: 10 } };
+    const archetypes = build(new Map([["tint-room", frame]]) as never);
+    const floor = archetypes.find((archetype) => archetype.kind === "floor")!;
+    expect(keyOf(floor.mesh.material)).not.toContain("ground-tint");
+    expect(floor.ownedTextures).toBeUndefined();
+    disposeCellRenderArchetypes(archetypes);
+  });
+});
+
 describe("buildCellRenderArchetypes root mesh", () => {
   it("gives every archetype a hidden root mesh sharing geometry with an unpatched material", () => {
     const world = compileCellComplex(cube);
@@ -186,7 +243,10 @@ describe("buildCellRenderArchetypes root mesh", () => {
       expect(rootMaterial).not.toBe(patchedMaterial);
       expect(patchedMaterial.customProgramCacheKey()).toContain("portal-clip-planes");
       expect(rootMaterial.customProgramCacheKey()).not.toContain("portal-clip-planes");
-      expect(rootMaterial.customProgramCacheKey()).toBe(new (rootMaterial.constructor as new () => THREE.Material)().customProgramCacheKey());
+      // The root material has no clip patch; a metric textured floor still carries the ground tint (and nothing else).
+      expect(rootMaterial.customProgramCacheKey()).toBe(
+        archetype.ownedTextures ? "ground-tint:" : new (rootMaterial.constructor as new () => THREE.Material)().customProgramCacheKey(),
+      );
     }
 
     disposeCellRenderArchetypes(archetypes);
