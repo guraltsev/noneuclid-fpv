@@ -50,6 +50,23 @@
           }
         ]
       }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "know",
+            "args": [
+              "hook",
+              "SessionStart",
+              "--runtime",
+              "claude-code"
+            ],
+            "timeout": 30
+          }
+        ]
+      }
     ]
   }
 }
