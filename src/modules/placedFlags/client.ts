@@ -4,13 +4,14 @@
  * Typing is not a press: the page holds the text, each key sends the whole message, and the world takes them in order, so no key waits for the one before it.
  */
 import type { CommandResult, ModuleClient, ToolContext, ToolDescriptor } from "../../engine/moduleTypes";
+import { signToolAcceptsClick } from "../../world-objects/toolClickRules";
 import { toolNames } from "../../world-objects/vocabulary";
 import { placedFlagToolId, type PlacedFlagsPlaceCommand, type PlacedFlagsRemoveCommand, type PlacedFlagsSetMessageCommand } from "./api";
 
 function primaryAction(tool: ToolContext): boolean {
   if (tool.commandInFlight()) return true;
   const pick = tool.currentPick();
-  if (pick?.objectKind !== "floor") return true;
+  if (pick === undefined || !signToolAcceptsClick(pick.objectKind)) return true;
   const place: PlacedFlagsPlaceCommand = { kind: "placedFlags/place", cellId: pick.cellId, point: pick.point, eyePoint: pick.eyePoint, flagType: tool.chosenFlagType() };
   tool.submit(place);
   return true;

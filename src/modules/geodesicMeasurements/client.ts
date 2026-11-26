@@ -4,6 +4,7 @@
  * While a command of a tool is in flight, a press does nothing, so a double click measures once. An accepted measurement ends the tool; a refusal is shown, the tool stays, and the protractor starts its picks again.
  */
 import type { CommandResult, ModuleClient, ToolContext, ToolDescriptor } from "../../engine/moduleTypes";
+import { protractorAcceptsCenterClick, rulerAcceptsClick } from "../../world-objects/toolClickRules";
 import { toolNames } from "../../world-objects/vocabulary";
 import { protractorSelectionsUseDifferentGeodesics, resolveProtractorCenterSelection, resolveProtractorSideAt, type ProtractorToolState } from "../../world-objects/protractorTool";
 import {
@@ -20,7 +21,7 @@ import {
 function measureLength(tool: ToolContext): boolean {
   if (tool.commandInFlight()) return true;
   const pick = tool.currentPick();
-  if (pick === undefined || !pick.withinRange || pick.objectId === undefined) return true;
+  if (pick === undefined || !rulerAcceptsClick(pick.objectKind, pick.withinRange) || pick.objectId === undefined) return true;
   const segment = tool.read.objects.get(pick.objectId);
   if (segment?.kind !== "geodesicModel/segment") return true;
   const command: GeodesicMeasurementsCreateLengthCommand = { kind: "geodesicMeasurements/createLength", arcId: segment.geodesicId };
@@ -36,7 +37,7 @@ function pickWithProtractor(tool: ToolContext): boolean {
   const { center, first } = tool.getToolState<ProtractorToolState>(geodesicMeasurementsModuleId) ?? {};
   if (center === undefined) {
     const object = pick.objectId === undefined ? undefined : tool.read.objects.get(pick.objectId);
-    if (object?.kind === "geodesicEmitters/emitter" || object?.kind === "geodesicModel/crossing") {
+    if (protractorAcceptsCenterClick(pick.objectKind, pick.withinRange) && (object?.kind === "geodesicEmitters/emitter" || object?.kind === "geodesicModel/crossing")) {
       tool.setToolState(geodesicMeasurementsModuleId, { center: resolveProtractorCenterSelection(tool.read.objects, object) } satisfies ProtractorToolState);
     }
     return true;

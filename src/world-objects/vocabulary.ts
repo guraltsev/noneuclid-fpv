@@ -344,6 +344,14 @@ export const hintStripText = {
   putAway: (toolName: string): string => `put the ${toolName} away`,
 } as const;
 
+/** The reasons the crosshair gives when a click would be ignored (design 018 section 5), two to four words each; also shown as a toast when the player clicks anyway. */
+export const crosshairReasons = {
+  tooFar: "Too far",
+  aimAtBeam: "Aim at a beam",
+  aimAtLaserOrMeetingPoint: "Aim at a laser or a meeting point",
+  aimAtFloor: "Aim at the floor",
+} as const;
+
 /** The words of the tool stand (design 017 section 9.2) and of the help cube's invitation (section 9.1). */
 export const toolStandText = {
   /** The name of the stand's table. */

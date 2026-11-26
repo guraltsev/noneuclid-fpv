@@ -1152,6 +1152,45 @@ img.desktop-tool-tile-icon {
   box-shadow: 0 0 0 1px rgb(0 0 0 / 70%), inset 0 0 0 1px rgb(0 0 0 / 70%);
 }
 
+/* Refused: something is aimed at but the click would be ignored. A hollow ring at 55% opacity with a short diagonal bar, and the reason beneath. */
+.crosshair.crosshair-refused {
+  width: 16px;
+  height: 16px;
+  border: 2px solid color-mix(in srgb, var(--crosshair-color) 55%, transparent);
+  background: transparent;
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 40%);
+}
+
+.crosshair.crosshair-refused::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 2px;
+  height: 14px;
+  border-radius: 1px;
+  background: color-mix(in srgb, var(--crosshair-color) 55%, transparent);
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.crosshair-reason {
+  display: none;
+}
+
+.crosshair.crosshair-refused .crosshair-reason {
+  position: absolute;
+  left: 50%;
+  top: calc(50% + 22px);
+  display: block;
+  padding: 0.3rem 0.8rem;
+  border-radius: 999px;
+  background: rgb(10 17 20 / 72%);
+  color: #f1f5f9;
+  font: 600 0.78rem/1.2 system-ui, sans-serif;
+  white-space: nowrap;
+  transform: translateX(-50%);
+}
+
 /* The first-use tip: pinned beside the tool belt (above it on a narrow screen). */
 .tip-card {
   position: fixed;
