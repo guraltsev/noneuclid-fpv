@@ -7,6 +7,7 @@
  * Lights are added directly to the scene root (Three.js frame, y up).
  */
 import * as THREE from "three";
+import { HEMISPHERE_SKY_COLOR } from "./sceneColors";
 
 /** Handle to the lights created by {@link createStylizedSceneLighting}. */
 export interface StylizedSceneLighting {
@@ -22,7 +23,7 @@ export interface StylizedSceneLighting {
  * The caller owns the returned handle and should release it with {@link disposeStylizedSceneLighting}.
  */
 export function createStylizedSceneLighting(scene: THREE.Scene): StylizedSceneLighting {
-  const hemisphereLight = new THREE.HemisphereLight(0xfff6e8, 0x55604f, 1.9);
+  const hemisphereLight = new THREE.HemisphereLight(HEMISPHERE_SKY_COLOR, 0x55604f, 1.9);
   hemisphereLight.castShadow = false;
 
   const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
