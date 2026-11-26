@@ -5,14 +5,20 @@ import { Container, Text } from "@pmndrs/uikit";
 import type { PaletteDefinition } from "../../../../ui/paletteDefinition";
 import type { PlacedFlagType } from "../../../../world-objects/toolObjects";
 import type { ScenePaletteAdapterOptions } from "../adapterTypes";
-import { actionColor, activeColor, borderColor, inactiveColor, sectionColor, textColor, fontPx } from "../tokens";
+import { actionColor, activeColor, borderColor, inactiveColor, raisedColor, surfaceColor, textColor, fontPx } from "../tokens";
 import { createSignImage } from "../icons";
-import { createButtonText, createInteractiveSurface, createSectionLabel } from "../widgets";
+import { createButtonText, createCaption, createInteractiveSurface, createPageBody } from "../widgets";
 
 const signTypeLabels: Record<PlacedFlagType, string> = {
   WoodenSign1: "Wooden Sign 1",
   WoodenSign2: "Wooden Sign 2",
 };
+
+// Size of a key of the sign editor's keyboard and the gap between keys: ten keys and their gaps fill the panel's width.
+const keyWidth = 82;
+const keyHeight = 54;
+const keyGap = 8;
+const keyboardWidth = 10 * keyWidth + 9 * keyGap;
 
 // Key layout of the on-panel sign editor keyboard; Enter, Space and Backspace are added separately.
 const signKeyboardRows = [
@@ -29,18 +35,8 @@ export function buildPlaceSignOptionsContent(
   content: Extract<PaletteDefinition["content"], { readonly kind: "place-flag-options" }>,
   options: ScenePaletteAdapterOptions,
 ): Container {
-  const panel = new Container({
-    width: "100%",
-    minHeight: 300,
-    flexDirection: "column",
-    gap: 12,
-    padding: 16,
-    borderRadius: 24,
-    backgroundColor: sectionColor,
-    borderColor,
-    borderWidth: 2,
-  });
-  panel.add(createSectionLabel("Sign type"));
+  // The page title says "Sign type".
+  const panel = createPageBody({ gap: 12 });
 
   const grid = new Container({
     width: "100%",
@@ -49,12 +45,12 @@ export function buildPlaceSignOptionsContent(
   });
   for (const option of content.flagTypeOptions) {
     const tile = createInteractiveSurface({
-      width: "49%",
-      height: 150,
+      width: "49.4%",
+      height: 200,
       label: "",
       labelFontSize: 17,
       flexDirection: "column",
-      backgroundColor: option.id === content.selectedFlagType ? activeColor : inactiveColor,
+      backgroundColor: option.id === content.selectedFlagType ? activeColor : raisedColor,
       onClick: () => options.onPlaceFlagTypeSelected?.(option.id as PlacedFlagType),
     });
     const signType = option.id as PlacedFlagType;
@@ -74,76 +70,75 @@ export function buildEditSignContent(
   content: Extract<PaletteDefinition["content"], { readonly kind: "edit-sign" }>,
   options: ScenePaletteAdapterOptions,
 ): Container {
-  const panel = new Container({
-    width: "100%",
-    minHeight: 382,
-    flexDirection: "column",
-    gap: 10,
-    padding: 14,
-    borderRadius: 24,
-    backgroundColor: sectionColor,
-    borderColor,
-    borderWidth: 2,
-  });
+  const panel = createPageBody({ gap: 18 });
 
   const preview = new Container({
     width: "100%",
-    height: 96,
     flexDirection: "column",
-    justifyContent: "center",
-    gap: 4,
-    padding: 10,
+    gap: 6,
+    paddingX: 18,
+    paddingY: 12,
     borderRadius: 14,
-    backgroundColor: "#020617",
+    backgroundColor: surfaceColor,
     borderColor,
     borderWidth: 1,
+    flexShrink: 0,
   });
   preview.add(
-    createSectionLabel(`Sign text ${content.message.length}/${content.maxLength}`),
+    createCaption(`Sign text ${content.message.length}/${content.maxLength}`),
     createSignPreviewLines(content.message),
   );
   panel.add(preview);
 
+  // The keyboard: a block as wide as its number row, centered in the space under the preview.
+  const keyboard = new Container({
+    width: keyboardWidth,
+    alignSelf: "center",
+    flexDirection: "column",
+    gap: keyGap,
+    flexShrink: 0,
+  });
   for (const row of signKeyboardRows) {
-    panel.add(createKeyboardRow(row, options));
+    keyboard.add(createKeyboardRow(row, options));
   }
 
-  const backspaceRow = new Container({
+  const bottomRow = new Container({
     width: "100%",
-    height: 42,
+    height: keyHeight,
     flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 8,
+    gap: keyGap,
+    flexShrink: 0,
   });
   const enter = createInteractiveSurface({
-    width: 132,
-    height: 42,
+    width: 2 * keyWidth + keyGap,
+    height: keyHeight,
     label: "Enter",
-    labelFontSize: 15,
+    labelFontSize: 17,
     backgroundColor: actionColor,
     onClick: () => options.onSignKeyboardCharacter?.("\n"),
   });
   enter.userData.scenePaletteItemId = "sign-key:Enter";
   const space = createInteractiveSurface({
-    width: 156,
-    height: 42,
+    width: 6 * keyWidth + 5 * keyGap,
+    height: keyHeight,
     label: "Space",
-    labelFontSize: 15,
+    labelFontSize: 17,
     backgroundColor: inactiveColor,
     onClick: () => options.onSignKeyboardCharacter?.(" "),
   });
   space.userData.scenePaletteItemId = "sign-key:Space";
   const backspace = createInteractiveSurface({
-    width: 156,
-    height: 42,
+    width: 2 * keyWidth + keyGap,
+    height: keyHeight,
     label: "Backspace",
-    labelFontSize: 15,
-    backgroundColor: "#991b1b",
+    labelFontSize: 17,
+    backgroundColor: inactiveColor,
     onClick: () => options.onSignKeyboardBackspace?.(),
   });
   backspace.userData.scenePaletteItemId = "sign-key:Backspace";
-  backspaceRow.add(enter, space, backspace);
-  panel.add(backspaceRow);
+  bottomRow.add(enter, space, backspace);
+  keyboard.add(bottomRow);
+  panel.add(keyboard);
 
   return panel;
 }
@@ -160,10 +155,9 @@ function createSignPreviewLines(message: string): Container {
 
   const block = new Container({
     width: "100%",
-    height: 62,
     flexDirection: "column",
     justifyContent: "center",
-    gap: 2,
+    gap: 4,
   });
 
   for (let index = 0; index < 3; index += 1) {
@@ -172,7 +166,7 @@ function createSignPreviewLines(message: string): Container {
     const displayLine = sourceLineIndex === cursorLineIndex ? `${line}|` : line;
     const text = new Text({
       text: displayLine || " ",
-      fontSize: fontPx(18),
+      fontSize: fontPx(20),
       fontWeight: "bold",
       color: textColor,
       fill: textColor,
@@ -192,7 +186,7 @@ function createKeyboardRow(
   keys: readonly string[],
   options: ScenePaletteAdapterOptions,
 ): Container {
-  return createKeypadRow(keys, (key) => options.onSignKeyboardCharacter?.(key), "sign-key:");
+  return createKeypadRow(keys, (key) => options.onSignKeyboardCharacter?.(key), "sign-key:", keyWidth, keyHeight);
 }
 
 /**
@@ -204,22 +198,23 @@ export function createKeypadRow(
   onKey: (key: string) => void,
   itemIdPrefix: string,
   keyWidth = 48,
+  keyHeight = 38,
 ): Container {
   const row = new Container({
     width: "100%",
-    height: 38,
+    height: keyHeight,
     flexDirection: "row",
     justifyContent: "center",
-    gap: 6,
+    gap: keyHeight > 40 ? keyGap : 6,
     flexShrink: 0,
   });
 
   for (const key of keys) {
     const button = createInteractiveSurface({
       width: keyWidth,
-      height: 38,
+      height: keyHeight,
       label: key,
-      labelFontSize: 16,
+      labelFontSize: keyHeight > 40 ? 19 : 16,
       backgroundColor: inactiveColor,
       onClick: () => onKey(key),
     });

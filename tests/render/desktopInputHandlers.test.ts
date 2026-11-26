@@ -4,8 +4,8 @@
  * `createDesktopInputHandlers` turns DOM events and controller input into shell actions. These tests drive the handle with a
  * shell session and recording stand-ins: Escape toggles the menu through the palette toggle (and dismisses a pinned help when
  * there is nothing to toggle), a right click on the canvas opens the menu of the aimed object only and says so when nothing is aimed,
- * Tab cycles the focused target and the wheel steps the tool, both only while no menu is open, the input frames carry their source,
- * and the palette is fed from the desktop pointer.
+ * Tab cycles the focused target and the wheel steps the tool, both only while no menu is open (with the menu open the wheel goes to
+ * the menu pointer, once), the input frames carry their source, and the palette is fed from the desktop pointer.
  */
 import * as THREE from "three";
 import { describe, expect, it, vi } from "vitest";
@@ -162,6 +162,20 @@ describe("createDesktopInputHandlers", () => {
     expect(closed.calls.stepTool.mock.calls).toEqual([[1], [-1]]);
     expect(closed.calls.cycle).not.toHaveBeenCalled();
     expect(open.calls.stepTool).not.toHaveBeenCalled();
+  });
+
+  it("hands the wheel to the menu pointer while the menu is open, once", () => {
+    const { handlers, calls } = createHarness({ menuOpen: true });
+    const event = wheel(120, 1000);
+    handlers.onDesktopWheel(event);
+    const frame = { ...emptyFrame(), source: "desktop" as const };
+    handlers.updateScenePalette(false, undefined, null, undefined, 0.016, frame);
+    handlers.updateScenePalette(false, undefined, null, undefined, 0.016, frame);
+
+    const fed = calls.desktopPaletteInput.mock.calls as unknown as [{ readonly wheelDeltaPixels: number }][];
+    expect(event.preventDefault).toHaveBeenCalled();
+    expect(fed.map(([options]) => options.wheelDeltaPixels)).toEqual([120, 0]);
+    expect(calls.stepTool).not.toHaveBeenCalled();
   });
 
   it("takes one tool from a flick of small wheel events", () => {

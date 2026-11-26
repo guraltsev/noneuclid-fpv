@@ -41,13 +41,16 @@ export function createScenePointers(
         seenIds.add(source.id);
         const entry = getOrCreatePointerEntry(entries, source, getCamera);
         source.object.updateMatrixWorld(true);
-        entry.pointer.move(scene, createPointerEvent(source.id));
+        entry.pointer.move(scene, createPointerEvent(source));
+        if (source.wheelDeltaPixels) {
+          entry.pointer.wheel(scene, { ...createPointerEvent(source), deltaX: 0, deltaY: source.wheelDeltaPixels, deltaZ: 0 });
+        }
 
         const previousPressed = entry.selectPressed;
         if (!previousPressed && source.selectPressed) {
-          entry.pointer.down(createPointerButtonEvent(source.id));
+          entry.pointer.down(createPointerButtonEvent(source));
         } else if (previousPressed && !source.selectPressed) {
-          entry.pointer.up(createPointerButtonEvent(source.id));
+          entry.pointer.up(createPointerButtonEvent(source));
         }
         entry.selectPressed = source.selectPressed;
 
@@ -68,7 +71,7 @@ export function createScenePointers(
           continue;
         }
 
-        entry.pointer.exit(createPointerEvent(id));
+        entry.pointer.exit(createPointerEvent({ id, kind: entry.kind }));
         entries.delete(id);
       }
 
@@ -76,7 +79,7 @@ export function createScenePointers(
     },
     dispose() {
       for (const [id, entry] of entries) {
-        entry.pointer.exit(createPointerEvent(id));
+        entry.pointer.exit(createPointerEvent({ id, kind: entry.kind }));
       }
       entries.clear();
     },
@@ -99,6 +102,7 @@ export function chooseActiveScenePointer(
 
 interface PointerEntry {
   readonly pointer: Pointer;
+  readonly kind: ScenePalettePointerSource["kind"];
   selectPressed: boolean;
 }
 
@@ -115,6 +119,7 @@ function getOrCreatePointerEntry(
   const pointer = createRayPointer(getCamera, { current: source.object }, { sourceId: source.id }, undefined, "ray");
   const created: PointerEntry = {
     pointer,
+    kind: source.kind,
     selectPressed: false,
   };
   entries.set(source.id, created);
@@ -122,18 +127,21 @@ function getOrCreatePointerEntry(
 }
 
 // The library only reads a few fields of the event, so a minimal fake is used; every source shares pointerId 1 and is distinguished by sourceId.
-function createPointerEvent(sourceId: string): PointerEvent {
+// The desktop aimer is a mouse: uikit then drags a scrollbar thumb the way it is dragged (down moves the page down) and does not scroll a page that is
+// merely clicked. An XR ray stays a "ray", which uikit scrolls by dragging the page itself, as on a touch screen.
+function createPointerEvent(source: Pick<ScenePalettePointerSource, "id" | "kind">): PointerEvent & { readonly timeStamp: number } {
   return {
     pointerId: 1,
-    pointerType: "ray",
+    pointerType: source.kind === "desktop-aimer" ? "mouse" : "ray",
     buttons: 0,
-    sourceId,
-  } as unknown as PointerEvent;
+    sourceId: source.id,
+    timeStamp: performance.now(),
+  } as unknown as PointerEvent & { readonly timeStamp: number };
 }
 
-function createPointerButtonEvent(sourceId: string): PointerEvent & { readonly button: number } {
+function createPointerButtonEvent(source: Pick<ScenePalettePointerSource, "id" | "kind">): PointerEvent & { readonly button: number } {
   return {
-    ...createPointerEvent(sourceId),
+    ...createPointerEvent(source),
     button: 0,
     buttons: 1,
   } as unknown as PointerEvent & { readonly button: number };

@@ -264,10 +264,9 @@ export function createHeaderIcon(
   actionId: PaletteDefinition["leftAction"]["id"],
 ): InstanceType<typeof Settings> | InstanceType<typeof X> | InstanceType<typeof ArrowLeft> | undefined {
   const iconProperties = {
-    width: 28,
-    height: 28,
+    width: 26,
+    height: 26,
     color: textColor,
-    fill: textColor,
   };
 
   switch (actionId) {

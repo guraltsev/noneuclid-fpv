@@ -3337,11 +3337,11 @@ Desktop input path for the in-scene palette: turns mouse motion and button state
 
 ### `render/three/desktopScenePalettePlacement.ts`
 
-Desktop placement of the in-scene palette: a panel floating 1.05 m in front of the camera, facing it.
+Desktop placement of the in-scene palette: a panel floating in front of the camera, facing it, at the distance that makes it fill the same share of the window whatever its size and shape, and raised a little so its bottom edge clears the tool belt at the bottom of the window.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
-| function | `resolveDesktopScenePalettePlacement` | Computes the palette pose for the desktop (non-XR) camera: 1.05 m along the camera's view direction, oriented to look back at the camera with the camera's up vector. |
+| function | `resolveDesktopScenePalettePlacement` | Computes the palette pose for the desktop (non-XR) camera: along the camera's view direction at the distance where the panel fills 78% of the window height (or 90% of its width, if the window is narrow), raised by 5% of… |
 
 ### `render/three/discoveryController.ts`
 
@@ -3702,11 +3702,12 @@ Option and handle types of the in-scene palette panel adapter (the contract betw
 
 ### `render/three/palette/header.ts`
 
-The palette panel header row: left action (plus home and reload on the main page), contextual actions and the right action.
+The palette panel header: a title bar (back or settings on the left, the page title and an optional subtitle, close on the right), a toolbar row under it with the page's own actions (Add beam, Pick up, Delete, ...) when the page has any, and a hairline that separates it from the page body.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
-| function | `buildHeader` | Header row: left (action, plus home/reload on the main page and a confirm tooltip), center contextual actions, right action. |
+| function | `paletteTitle` | The title the header shows for a page, and the subtitle under it (empty when there is none). |
+| function | `buildHeader` | Header: the title bar, then the toolbar of the page's actions when it has any, then a hairline. |
 
 ### `render/three/palette/icons.ts`
 
@@ -3731,12 +3732,14 @@ The shape machine's picture: the current (white) and target (green) parallelogra
 
 ### `render/three/palette/pages/debugSettings.ts`
 
-Settings palette pages: the world, config, debug and comfort settings page and the debug settings page.
+Settings palette pages: the Settings page (a sidebar of categories on the left, the chosen category's cards on the right) and the debug settings page.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
+| type | `SettingsCategoryId` | The categories of the Settings sidebar. |
+| interface | `SettingsCategoryView` | Which Settings category is shown, and how to choose another; held by the adapter for as long as the panel lives. |
 | function | `buildDebugSettingsContent` | Debug settings page: log level, overlay toggles (items only when the overlay is on), portal options, wireframes, aim outlines and an optional copy-URL button. |
-| function | `buildSettingsContent` | Settings page: Controls (a reference of what each control does, mouse sensitivity, Invert Y, turn speed, the VR hand options), Display (text size, Show hints, Reset tips), Comfort, then the world, config and debug secti… |
+| function | `buildSettingsContent` | Settings page: the category sidebar and the chosen category. |
 
 ### `render/three/palette/pages/discoveries.ts`
 
@@ -3764,28 +3767,28 @@ Shape machine palette page (design 017 section 8.9): one picture of the target t
 
 ### `render/three/palette/pages/help.ts`
 
-Help palette pages: the question-mark hub, the tutorial's index of pages, and the paged tutorial and goal pages (title, optional picture, body, and control rows that show the input icon of the current device).
+Help palette pages: the Help hub (one row per part of Help), the tutorial's index of cards, and the paged tutorial and goal pages (the card's title, an optional picture, the text, control rows that show the input icon of the current device, and a pager at the bottom).
 
 | Kind | Name | Summary |
 | --- | --- | --- |
-| function | `buildQuestionHelpContent` | Help hub page: title, body text and one button per option, dispatching to the tutorial or goal callback. |
-| function | `buildPagedHelpContent` | Tutorial or goal page: title, body, and previous / page label / next controls; disabled arrows are inert. |
+| function | `buildQuestionHelpContent` | Help hub page: a line of text and one row per part of Help, dispatching to the tutorial, goal or discoveries callback. |
+| function | `buildPagedHelpContent` | Tutorial or goal page: the card's title, the text (with its picture), and a pager (previous, page label, next) pinned to the bottom; disabled arrows are inert. |
 
 ### `render/three/palette/pages/main.ts`
 
-Main palette page, the main menu: Help, Settings, Go home and Start over as text buttons (Start over asks for a second press).
+Main palette page, the main menu: Help, Settings, Go home and Start over as full-width rows, each with an icon and a line that says what it does.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
-| function | `buildMainContent` | Main page: the main-menu buttons. |
+| function | `buildMainContent` | Main page: the main-menu rows. |
 
 ### `render/three/palette/pages/measurements.ts`
 
-Measurement menu page: the title and one sentence about a length or an angle.
+Measurement menu page: one sentence about a length or an angle.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
-| function | `buildMeasurementActionsContent` | Measurement menu page body: a section label with the menu's title, then the sentence that says what Delete does. |
+| function | `buildMeasurementActionsContent` | Measurement menu page body: the sentence that says what Delete does. |
 
 ### `render/three/palette/pages/signs.ts`
 
@@ -3807,46 +3810,77 @@ Builds the in-scene tool palette panel as a @pmndrs/uikit component tree from a 
 
 ### `render/three/palette/tokens.ts`
 
-Color tokens (CSS hex strings) shared by every part of the in-scene palette panel.
+Design tokens of the in-scene palette panel: colors (CSS hex strings), the spacing and size scale, and the text size steps.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
 | const | `surfaceColor` | Panel background. |
-| const | `sectionColor` | Background of a section or page card on the panel. |
-| const | `borderColor` | Outline of the panel, cards and option buttons. |
-| const | `actionColor` | Background of an enabled action button. |
-| const | `activeColor` | Background of a selected tile, option or toggle. |
-| const | `inactiveColor` | Background of an unselected tile, option or toggle. |
+| const | `sectionColor` | Background of a card (a group of rows) and of the settings sidebar. |
+| const | `raisedColor` | Background of a row or tile inside a card, a step above the card. |
+| const | `raisedHoverColor` | Hover tint of a neutral control. |
+| const | `borderColor` | Outline of the panel and of cards; also the hairline between rows and under the header. |
+| const | `dividerColor` | Hairline between the rows of a card. |
+| const | `actionColor` | Background of a primary action button. |
+| const | `actionHoverColor` | Hover tint of a primary action button. |
+| const | `activeColor` | Background of a selected tile, option, segment or a switch that is on. |
+| const | `activeHoverColor` | Hover tint of a selected control. |
+| const | `inactiveColor` | Background of an unselected option, segment or a switch that is off. |
+| const | `disabledColor` | Background of a disabled control. |
+| const | `dangerColor` | Background of a destructive action (Delete, Start over) and of a pending confirmation. |
+| const | `dangerHoverColor` | Hover tint of a destructive action. |
+| const | `contributedActionColor` | Background of an action that a tool contributed to an object's page. |
 | const | `textColor` | Main text and icon color. |
-| const | `mutedTextColor` | Text color of secondary lines. |
+| const | `mutedTextColor` | Text color of secondary lines: descriptions, section headings, counters. |
+| const | `headingTextColor` | Text color of the small uppercase section headings. |
+| const | `chipColor` | Background of a key or button name chip (light, so it reads as a keycap). |
+| const | `chipTextColor` | Text color of a key or button name chip. |
 | const | `scrollbarColor` | Scrollbar thumb color of the scrolling pages. |
+| const | `scrollbarBorderColor` | Scrollbar border color of the scrolling pages. |
+| const | `scrollbarWidth` | Width of a scrollbar, in panel pixels: wide enough to grab with the menu cursor. |
+| const | `rowHeight` | Minimum height of a settings row. |
+| const | `buttonHeight` | Height of a standard button. |
+| const | `controlRadius` | Corner radius of buttons and rows. |
+| const | `cardRadius` | Corner radius of cards. |
+| const | `panelPadding` | Padding of the panel, and the gap between the header and the body. |
 | const | `paletteTextScales` | The text size steps of the display setting and the factor each gives the font sizes of the panel. |
 | function | `setPaletteTextScale` | Sets the factor that `fontPx` applies; the panel is rebuilt afterwards (a new palette definition does that). |
 | function | `fontPx` | A font size of the panel, in pixels, at the chosen text size: the design size times the scale, rounded. |
-| const | `scrollbarBorderColor` | Scrollbar border color of the scrolling pages. |
+| const | `typeScale` | The type scale of the panel, in design pixels (pass through `fontPx`). |
+| function | `toPanelText` | Text the panel's font can draw: the vocabulary's typographic punctuation replaced by its ASCII look-alike. |
 
 ### `render/three/palette/widgets.ts`
 
-Generic uikit widgets of the in-scene palette panel (buttons, toggles, option grids, section labels, the interactive surface) and disposal of rendered trees.
+Generic uikit widgets of the in-scene palette panel and disposal of rendered trees.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
-| function | `createSettingsScrollContainer` | Fixed 400 pixel tall scrolling column with a styled scrollbar. |
-| function | `createSectionLabel` | Muted section heading text that shrinks and wraps within its row. |
-| function | `createChoiceSection` | Labelled single-choice option grid. |
-| function | `createOptionGrid` | Two-column grid of option buttons; the selected one is highlighted. |
-| function | `createToggleRow` | Label plus On/Off toggle. |
-| function | `createToggleButton` | On/Off button; clicking calls onToggled with the inverted value of the state captured at build time (state is not read back). |
-| function | `createStepRow` | Label plus a row of exclusive steps (Low, Medium, High); the selected one is highlighted. |
+| function | `createScrollArea` | A scrolling column that takes all the height left in its parent column (the page body under the header), with a scrollbar wide enough to grab. |
+| const | `createSettingsScrollContainer` | The scroll area under the old name, for pages that list cards. |
+| function | `createPageBody` | A page body that does not scroll: a column that fills the height under the header. |
+| function | `createOverline` | Small uppercase heading over a card (a group of settings). |
+| function | `createSectionLabel` | Row label text: the name of a setting or of a list item. |
+| function | `createCaption` | Secondary text: a description under a label, a line of explanation on a page. |
+| function | `createBodyText` | Body text of a page: a paragraph in the main text color. |
+| function | `createHeadingText` | A heading inside a page body (a help card's title). |
+| function | `createCard` | A group of settings: an optional overline heading, then a card whose rows are separated by hairlines. |
+| function | `addCardRow` | Adds a row to a card made by `createCard`, with a hairline above it when it is not the first. |
+| function | `createSettingRow` | A setting row: the label (and an optional description under it) on the left, the control on the right, vertically centered. |
+| function | `createChoiceSection` | Labelled single-choice list (a card of rows, the chosen one ticked). |
+| function | `createOptionGrid` | Single-choice option grid: two columns of rows, the chosen one highlighted with a tick. |
+| function | `createToggleRow` | A setting with a switch: label (and description) on the left, the switch on the right. |
+| function | `createToggleButton` | A switch: a pill track with a knob at the right when on, at the left when off. |
+| function | `createSegmentedControl` | A segmented control: the steps side by side in one rounded track, the chosen one filled. |
+| function | `createStepRow` | A setting with exclusive steps (Low, Medium, High): label on the left, a segmented control on the right. |
+| function | `createNavigationRow` | A list row that opens something: an optional icon, the label and a description, and a chevron at the right edge. |
 | function | `createActionButton` | Generic labelled action button with an optional home/reload icon. |
 | const | `disabledReasonColor` | Color of the reason text under a disabled control: warm, so that it reads as "why", not as a label. |
 | function | `createDisabledReasonText` | The small text that says why a control is disabled (design 017 section 8.5). |
 | function | `withDisabledReason` | A control with its reason under it while it is disabled; the control itself when it is not (or has no reason). |
 | type | `HeaderActionIcon` | The icons a contextual header action can show. |
 | function | `headerActionIcon` | The header icon for an icon id a tool contributed; throws on an id the palette has no icon for. |
-| function | `createHeaderActionButton` | Icon-and-text button for contextual header actions ("+ Add beam", "Pick up · G", "Join", "Delete"); disabled ones are dimmed and inert, with their reason drawn under them. |
+| function | `createHeaderActionButton` | Icon-and-text button of a page's toolbar ("+ Add beam", "Pick up · G", "Join", "Delete"); disabled ones are dimmed and inert, with their reason drawn under them. |
 | function | `createInteractiveSurface` | Base clickable Container. |
-| function | `createButtonText` | Bold label text that wraps and may shrink. |
+| function | `createButtonText` | Button label text: bold by default, wraps and may shrink. |
 | function | `disposeRenderedChildren` | Dispose each top-level child tree. |
 
 ### `render/three/pathTraceOverlay.ts`

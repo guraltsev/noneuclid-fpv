@@ -26,6 +26,8 @@ export interface ScenePalettePointerSource {
   readonly dominant?: boolean;
   /** Whether the controller should draw a visible ray line for this pointer; absent means true. The desktop aimer sets false. */
   readonly visibleRay?: boolean;
+  /** Mouse wheel pixels turned this frame (positive scrolls down); only the desktop aimer has a wheel. Absent means none. */
+  readonly wheelDeltaPixels?: number;
 }
 
 /**

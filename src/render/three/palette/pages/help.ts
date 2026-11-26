@@ -1,66 +1,48 @@
 /**
- * Help palette pages: the question-mark hub, the tutorial's index of pages, and the paged tutorial and goal pages (title, optional picture, body, and control rows that show the input icon of the current device).
+ * Help palette pages: the Help hub (one row per part of Help), the tutorial's index of cards, and the paged tutorial and goal pages
+ * (the card's title, an optional picture, the text, control rows that show the input icon of the current device, and a pager at the bottom).
+ * The header names the part of Help and the page number; the page body fills the rest of the panel.
  */
 import { Container, Image, Text } from "@pmndrs/uikit";
-import { Check, ChevronLeft, ChevronRight } from "@pmndrs/uikit-lucide";
+import { BookOpen, Check, ChevronLeft, ChevronRight, Lightbulb, Sparkles } from "@pmndrs/uikit-lucide";
 import type { PagedHelpControl, PaletteDefinition } from "../../../../ui/paletteDefinition";
 import type { RuntimeToolId } from "../../../../glue/toolIds";
 import type { ScenePaletteAdapterOptions } from "../adapterTypes";
-import { actionColor, activeColor, borderColor, mutedTextColor, scrollbarBorderColor, scrollbarColor, sectionColor, textColor, fontPx } from "../tokens";
-import { createButtonText, createInteractiveSurface, disabledReasonColor, withDisabledReason } from "../widgets";
-import { helpText, surfaceNames } from "../../../../world-objects/vocabulary";
+import { actionColor, activeColor, borderColor, buttonHeight, chipColor, chipTextColor, fontPx, inactiveColor, raisedColor, textColor, typeScale } from "../tokens";
+import {
+  createBodyText,
+  createButtonText,
+  createCaption,
+  createHeadingText,
+  createInteractiveSurface,
+  createNavigationRow,
+  createPageBody,
+  createScrollArea,
+  disabledReasonColor,
+  withDisabledReason,
+} from "../widgets";
+import { helpText } from "../../../../world-objects/vocabulary";
 
 /**
- * Help hub page: title, body text and one button per option, dispatching to the tutorial or goal callback.
+ * Help hub page: a line of text and one row per part of Help, dispatching to the tutorial, goal or discoveries callback.
  */
 export function buildQuestionHelpContent(
   content: Extract<PaletteDefinition["content"], { readonly kind: "question-help" }>,
   options: ScenePaletteAdapterOptions,
 ): Container {
-  const panel = new Container({
-    width: "100%",
-    minHeight: 300,
-    flexDirection: "column",
-    gap: 16,
-    padding: 16,
-    borderRadius: 24,
-    backgroundColor: sectionColor,
-    borderColor,
-    borderWidth: 2,
-  });
-  panel.add(new Text({
-    text: surfaceNames.help,
-    fontSize: fontPx(34),
-    fontWeight: "bold",
-    color: textColor,
-    fill: textColor,
-    flexShrink: 0,
-    wordBreak: "break-word",
-  }));
-  panel.add(new Text({
-    text: content.body,
-    fontSize: fontPx(20),
-    fontWeight: "medium",
-    lineHeight: "140%",
-    color: textColor,
-    fill: textColor,
-    flexShrink: 0,
-    wordBreak: "break-word",
-  }));
+  const page = createPageBody({ gap: 12 });
+  page.add(createCaption(content.body, { fontSize: typeScale.body }));
+  page.add(new Container({ height: 4, flexShrink: 0 }));
 
-  const optionRows = new Container({
-    width: "100%",
-    flexDirection: "column",
-    gap: 10,
-  });
   for (const entry of content.options) {
-    const button = createInteractiveSurface({
-      width: "100%",
-      height: 58,
+    const iconProperties = { width: 26, height: 26, color: textColor };
+    const row = createNavigationRow({
+      itemId: `question-help:${entry.id}`,
       label: entry.label,
-      labelFontSize: 20,
+      icon: entry.id === "tutorial" ? new BookOpen(iconProperties)
+        : entry.id === "goal" ? new Lightbulb(iconProperties)
+          : new Sparkles(iconProperties),
       disabled: entry.disabled,
-      backgroundColor: entry.disabled ? "#334155" : actionColor,
       onClick: () => {
         if (entry.id === "tutorial") {
           options.onQuestionHelpTutorialRequested?.();
@@ -71,17 +53,14 @@ export function buildQuestionHelpContent(
         }
       },
     });
-    button.userData.scenePaletteItemId = `question-help:${entry.id}`;
-    optionRows.add(withDisabledReason(button, entry.disabled ? entry.disabledReason : undefined, "100%"));
+    page.add(withDisabledReason(row, entry.disabled ? entry.disabledReason : undefined, "100%"));
   }
-
-  panel.add(optionRows);
-  return panel;
+  return page;
 }
 
 /**
- * Tutorial or goal page: title, body, and previous / page label / next controls; disabled arrows are inert.
- * A page with a picture shows it to the left of the text; control rows follow the body. The tutorial's index view lists its pages as buttons instead.
+ * Tutorial or goal page: the card's title, the text (with its picture), and a pager (previous, page label, next) pinned to the bottom; disabled arrows are inert.
+ * A How to card scrolls as one column with its picture above the text; a Things to try page keeps its picture beside the text. The tutorial's index view lists its cards instead.
  */
 export function buildPagedHelpContent(
   content: Extract<PaletteDefinition["content"], { readonly kind: "tutorial" | "goal" }>,
@@ -91,38 +70,20 @@ export function buildPagedHelpContent(
     return buildTutorialIndex(content, options);
   }
 
-  // A fixed height keeps the paging arrows in the same place on every page.
   const isCard = content.kind === "tutorial";
-  const panel = new Container({
-    width: "100%",
-    height: isCard ? 600 : 560,
-    flexDirection: "column",
-    gap: 14,
-    padding: 16,
-    borderRadius: 24,
-    backgroundColor: sectionColor,
-    borderColor,
-    borderWidth: 2,
-  });
+  const page = createPageBody({ gap: 16 });
+
   const titleRow = new Container({ width: "100%", flexDirection: "row", alignItems: "center", gap: 14, flexShrink: 0 });
-  titleRow.add(new Text({
-    text: content.title,
-    fontSize: fontPx(34),
-    fontWeight: "bold",
-    color: textColor,
-    fill: textColor,
-    flexShrink: 0,
-    wordBreak: "break-word",
-  }));
+  titleRow.add(createHeadingText(content.title));
   if (content.kind === "tutorial" && content.startHere === true) {
     titleRow.add(createStartHereChip());
   }
-  panel.add(titleRow);
+  page.add(titleRow);
   // A card of a tool the world cannot support says so at the top.
   if (content.kind === "tutorial" && content.disabledReason !== undefined) {
     const reason = new Text({
       text: content.disabledReason,
-      fontSize: fontPx(20),
+      fontSize: fontPx(typeScale.body),
       fontWeight: "bold",
       color: disabledReasonColor,
       fill: disabledReasonColor,
@@ -130,37 +91,25 @@ export function buildPagedHelpContent(
       wordBreak: "break-word",
     });
     reason.userData.scenePaletteDisabledReason = content.disabledReason;
-    panel.add(reason);
+    page.add(reason);
   }
-  // A How to card scrolls as one column with its picture above the text at full panel width; a Things to try page keeps its picture beside the text.
+
   const main = isCard
-    ? new Container({
-        width: "100%",
-        flexGrow: 1,
-        flexShrink: 1,
-        flexDirection: "column",
-        gap: 12,
-        overflow: "scroll",
-        paddingRight: 24,
-        scrollbarWidth: 14,
-        scrollbarColor,
-        scrollbarBorderColor,
-        scrollbarBorderWidth: 2,
-        scrollbarBorderRadius: 7,
-        scrollbarZIndex: 1004,
-      })
+    ? createScrollArea({ gap: 14 })
     : new Container({
         width: "100%",
         flexGrow: 1,
         flexShrink: 1,
+        flexBasis: 0,
+        minHeight: 0,
         flexDirection: "row",
-        gap: 20,
+        gap: 24,
       });
   if (content.imageSrc) {
     const picture = new Image({
       src: content.imageSrc,
-      width: isCard ? "100%" : 420,
-      height: isCard ? 150 : 236,
+      width: isCard ? "100%" : 400,
+      height: isCard ? 180 : 236,
       keepAspectRatio: false,
       flexShrink: 0,
       objectFit: "cover",
@@ -175,55 +124,33 @@ export function buildPagedHelpContent(
   const text = new Container({
     ...(isCard ? { width: "100%" as const, flexShrink: 0 } : { flexGrow: 1, flexShrink: 1 }),
     flexDirection: "column",
-    gap: 10,
+    gap: 12,
   });
-  text.add(new Text({
-    text: content.body,
-    fontSize: fontPx(content.imageSrc && !isCard ? 19 : 20),
-    fontWeight: "medium",
-    lineHeight: "140%",
-    color: textColor,
-    fill: textColor,
-    flexShrink: 0,
-    wordBreak: "break-word",
-  }));
+  text.add(createBodyText(content.body));
   for (const control of content.controls) {
     text.add(createControlRow(control));
   }
   main.add(text);
-  panel.add(main);
+  page.add(main);
 
-  // "Try it": takes the card's tool, closes Help and shows the first step of the tool's tip.
-  if (content.kind === "tutorial" && content.toolId !== undefined && content.tryItAction !== undefined) {
-    const toolId = content.toolId;
-    const tryIt = content.tryItAction;
-    const tryItButton = createInteractiveSurface({
-      width: 220,
-      height: 46,
-      label: tryIt.label,
-      labelFontSize: 20,
-      disabled: tryIt.disabled,
-      backgroundColor: tryIt.disabled ? "#334155" : activeColor,
-      onClick: () => options.onTutorialTryItRequested?.(toolId as RuntimeToolId),
-    });
-    tryItButton.userData.scenePaletteItemId = "tutorial-try-it";
-    panel.add(withDisabledReason(tryItButton, tryIt.disabled ? tryIt.disabledReason : undefined, 220));
-  }
-
-  const controls = new Container({
+  const footer = new Container({
     width: "100%",
-    minHeight: 54,
     flexDirection: "row",
     alignItems: "flex-start",
     justifyContent: "space-between",
     gap: 12,
+    flexShrink: 0,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderColor,
   });
+
   const previousButton = createInteractiveSurface({
-    width: 140,
-    height: 46,
+    width: 150,
+    height: buttonHeight,
     label: "",
     disabled: content.previousAction.disabled,
-    backgroundColor: content.previousAction.disabled ? "#334155" : actionColor,
+    backgroundColor: inactiveColor,
     onClick: () => {
       if (content.kind === "tutorial") {
         options.onTutorialPreviousRequested?.();
@@ -233,28 +160,35 @@ export function buildPagedHelpContent(
     },
   });
   previousButton.userData.scenePaletteItemId = `${content.kind}:previous`;
-  previousButton.add(new ChevronLeft({
-    width: 28,
-    height: 28,
-    color: textColor,
-    fill: textColor,
-  }), createButtonText(content.previousAction.label, 18));
+  previousButton.add(new ChevronLeft({ width: 24, height: 24, color: textColor }), createButtonText(content.previousAction.label, typeScale.button));
 
-  const pageLabel = new Text({
-    text: content.pageLabel,
-    fontSize: fontPx(18),
-    fontWeight: "bold",
-    color: mutedTextColor,
-    fill: mutedTextColor,
-    flexShrink: 0,
-  });
+  const middle = new Container({ flexDirection: "row", alignItems: "center", gap: 12, flexGrow: 1, justifyContent: "center", minHeight: buttonHeight });
+  // "Try it": takes the card's tool, closes Help and shows the first step of the tool's tip.
+  const hasTryIt = content.kind === "tutorial" && content.toolId !== undefined && content.tryItAction !== undefined;
+  if (content.kind === "tutorial" && content.toolId !== undefined && content.tryItAction !== undefined) {
+    const toolId = content.toolId;
+    const tryIt = content.tryItAction;
+    const tryItButton = createInteractiveSurface({
+      width: "auto",
+      height: buttonHeight,
+      paddingX: 22,
+      label: tryIt.label,
+      labelFontSize: typeScale.button,
+      disabled: tryIt.disabled,
+      backgroundColor: activeColor,
+      onClick: () => options.onTutorialTryItRequested?.(toolId as RuntimeToolId),
+    });
+    tryItButton.userData.scenePaletteItemId = "tutorial-try-it";
+    middle.add(withDisabledReason(tryItButton, tryIt.disabled ? tryIt.disabledReason : undefined, 240));
+  }
+  // The page number is in the header, next to the title.
 
   const nextButton = createInteractiveSurface({
-    width: 140,
-    height: 46,
+    width: 150,
+    height: buttonHeight,
     label: "",
     disabled: content.nextAction.disabled,
-    backgroundColor: content.nextAction.disabled ? "#334155" : actionColor,
+    backgroundColor: actionColor,
     onClick: () => {
       if (content.kind === "tutorial") {
         options.onTutorialNextRequested?.();
@@ -264,20 +198,19 @@ export function buildPagedHelpContent(
     },
   });
   nextButton.userData.scenePaletteItemId = `${content.kind}:next`;
-  nextButton.add(createButtonText(content.nextAction.label, 18), new ChevronRight({
-    width: 28,
-    height: 28,
-    color: textColor,
-    fill: textColor,
-  }));
+  nextButton.add(createButtonText(content.nextAction.label, typeScale.button), new ChevronRight({ width: 24, height: 24, color: textColor }));
 
-  controls.add(
-    withDisabledReason(previousButton, content.previousAction.disabled ? content.previousAction.disabledReason : undefined, 140),
-    pageLabel,
-    withDisabledReason(nextButton, content.nextAction.disabled ? content.nextAction.disabledReason : undefined, 140),
+  footer.add(
+    withDisabledReason(previousButton, content.previousAction.disabled ? content.previousAction.disabledReason : undefined, 150),
+    middle,
+    withDisabledReason(nextButton, content.nextAction.disabled ? content.nextAction.disabledReason : undefined, 150),
   );
-  panel.add(controls);
-  return panel;
+  // A single page has nowhere to go: no pager, unless it has a Try it button.
+  const singlePage = content.previousAction.disabled && content.nextAction.disabled;
+  if (!singlePage || hasTryIt) {
+    page.add(footer);
+  }
+  return page;
 }
 
 // One control row: the input on a light chip (its icon, or its name when it has none) and what it does.
@@ -286,15 +219,15 @@ function createControlRow(control: PagedHelpControl): Container {
     width: "100%",
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: 14,
     flexShrink: 0,
   });
   const chip = new Container({
     minWidth: 44,
     height: 44,
-    paddingX: control.hint.iconSrc ? 4 : 10,
+    paddingX: control.hint.iconSrc ? 4 : 12,
     borderRadius: 10,
-    backgroundColor: "#f1f5f9",
+    backgroundColor: chipColor,
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
@@ -313,12 +246,12 @@ function createControlRow(control: PagedHelpControl): Container {
     icon.userData.scenePaletteIconSrc = control.hint.iconSrc;
     chip.add(icon);
   } else {
-    chip.add(new Text({ text: control.hint.label, fontSize: fontPx(18), fontWeight: "bold", color: "#0f172a", fill: "#0f172a" }));
+    chip.add(new Text({ text: control.hint.label, fontSize: fontPx(typeScale.caption + 1), fontWeight: "bold", color: chipTextColor, fill: chipTextColor }));
   }
   row.add(chip);
   row.add(new Text({
     text: control.hint.iconSrc ? `${control.hint.label}: ${control.label}` : control.label,
-    fontSize: fontPx(18),
+    fontSize: fontPx(typeScale.body - 1),
     fontWeight: "medium",
     color: textColor,
     fill: textColor,
@@ -334,60 +267,65 @@ function createStartHereChip(): Container {
     paddingX: 10,
     paddingY: 3,
     borderRadius: 999,
-    backgroundColor: "#f1f5f9",
+    backgroundColor: chipColor,
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
+    pointerEvents: "none",
   });
-  chip.add(new Text({ text: helpText.startHere, fontSize: fontPx(16), fontWeight: "bold", color: "#0f172a", fill: "#0f172a" }));
+  chip.add(new Text({ text: helpText.startHere, fontSize: fontPx(typeScale.caption - 1), fontWeight: "bold", color: chipTextColor, fill: chipTextColor }));
   return chip;
 }
 
-// The tutorial's index: its title, a line of text and one button per page, two to a row.
+// Two index buttons and their gap fill the scroll area's width (the panel's inner width less the scrollbar lane).
+const indexButtonWidth = 440;
+
+// The tutorial's index: a line of text and one button per card, two to a row, in a scroll area.
 function buildTutorialIndex(
   content: Extract<PaletteDefinition["content"], { readonly kind: "tutorial" }>,
   options: ScenePaletteAdapterOptions,
 ): Container {
-  const panel = new Container({
-    width: "100%",
-    minHeight: 382,
-    flexDirection: "column",
-    gap: 14,
-    padding: 16,
-    borderRadius: 24,
-    backgroundColor: sectionColor,
-    borderColor,
-    borderWidth: 2,
-  });
-  panel.add(new Text({ text: content.title, fontSize: fontPx(34), fontWeight: "bold", color: textColor, fill: textColor, flexShrink: 0 }));
-  panel.add(new Text({ text: content.body, fontSize: fontPx(20), fontWeight: "medium", color: mutedTextColor, fill: mutedTextColor, flexShrink: 0 }));
+  const page = createPageBody({ gap: 14 });
+  page.add(createCaption(content.body, { fontSize: typeScale.body }));
+  const list = createScrollArea({ gap: 10 });
   const grid = new Container({
     width: "100%",
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 12,
+    gap: 10,
+    flexShrink: 0,
   });
   for (const topic of content.topics) {
     const button = createInteractiveSurface({
-      width: 436,
-      height: 58,
+      width: indexButtonWidth,
+      height: 60,
       label: "",
       justifyContent: "flex-start",
-      paddingLeft: 18,
-      backgroundColor: topic.startHere ? activeColor : actionColor,
+      paddingX: 18,
+      backgroundColor: raisedColor,
       onClick: () => options.onTutorialPageRequested?.(topic.pageIndex),
     });
     button.userData.scenePaletteItemId = `tutorial-topic:${topic.pageIndex}`;
-    button.add(createButtonText(topic.title, 20));
+    button.add(new Text({
+      text: topic.title,
+      fontSize: fontPx(typeScale.body),
+      fontWeight: "bold",
+      color: textColor,
+      fill: textColor,
+      flexGrow: 1,
+      flexShrink: 1,
+      pointerEvents: "none",
+    }));
     if (topic.startHere) button.add(createStartHereChip());
     if (topic.read) {
       // The tick of a card that was opened.
-      const tick = new Check({ width: 26, height: 26, color: textColor, fill: textColor });
+      const tick = new Check({ width: 24, height: 24, color: activeColor, flexShrink: 0 });
       tick.userData.scenePaletteReadTick = true;
       button.add(tick);
     }
-    grid.add(topic.disabledReason !== undefined ? withDisabledReason(button, topic.disabledReason, 436) : button);
+    grid.add(topic.disabledReason !== undefined ? withDisabledReason(button, topic.disabledReason, indexButtonWidth) : button);
   }
-  panel.add(grid);
-  return panel;
+  list.add(grid);
+  page.add(list);
+  return page;
 }

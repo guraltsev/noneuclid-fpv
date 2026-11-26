@@ -5,8 +5,8 @@ import { Container, Text } from "@pmndrs/uikit";
 import type { PaletteDefinition } from "../../../../ui/paletteDefinition";
 import { shapeMachineText } from "../../../../ui/vocabulary";
 import type { ScenePaletteAdapterOptions } from "../adapterTypes";
-import { actionColor, activeColor, borderColor, inactiveColor, sectionColor, textColor, fontPx } from "../tokens";
-import { createDisabledReasonText, createInteractiveSurface, createSectionLabel, withDisabledReason } from "../widgets";
+import { actionColor, activeColor, borderColor, inactiveColor, textColor, fontPx } from "../tokens";
+import { createDisabledReasonText, createInteractiveSurface, createScrollArea, createSectionLabel, withDisabledReason } from "../widgets";
 import { createWorldDeformationDiagram } from "../latticeDiagram";
 import { createKeypadRow } from "./signs";
 
@@ -19,21 +19,11 @@ export function buildGeometryComputerActionsContent(
   content: GeometryComputerContent,
   options: ScenePaletteAdapterOptions,
 ): Container {
-  const panel = new Container({
-    width: "100%",
-    minHeight: 600,
-    flexDirection: "column",
-    gap: 8,
-    padding: 14,
-    borderRadius: 24,
-    backgroundColor: sectionColor,
-    borderColor,
-    borderWidth: 2,
-  });
+  // A scroll area: the picture, rows, number pad and presets can be taller than the panel at a large text size.
+  const panel = createScrollArea({ gap: 10 });
   const edit = (change: Parameters<NonNullable<ScenePaletteAdapterOptions["onGeometryComputerEditRequested"]>>[1]): void =>
     options.onGeometryComputerEditRequested?.(content.computerId, change);
 
-  panel.add(createSectionLabel("Shape machine"));
   // The picture and the rows say the numbers; the status line is only for a world that is not the torus.
   if (!content.available) {
     panel.add(new Text({
