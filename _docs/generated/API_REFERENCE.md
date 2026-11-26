@@ -696,6 +696,8 @@ Colour palettes of faces (design 018 section 9.2): every face gets a key hue and
 | --- | --- | --- |
 | type | `PaletteScheme` | How the second and accent hues relate to the key hue. |
 | const | `paletteSchemes` | Every scheme, in a fixed order. |
+| const | `paletteSaturationLow` | Saturation of the key colour, from this to {@link paletteSaturationHigh} (muted, not neon). |
+| const | `paletteSaturationHigh` | Upper end of the key colour's saturation. |
 | interface | `FacePalette` | The colours of one face. |
 | function | `hslToHex` | sRGB hex of an HSL colour (hue in degrees, saturation and lightness 0 to 1). |
 | function | `hexToLinearRgb` | Linear-light RGB (0 to 1) of an sRGB hex colour. |
@@ -3582,6 +3584,17 @@ Player-blocking bodies of the generated landmarks (design 018 section 8.4).
 | type | `LandmarkBody` | A landmark collider in the form the movement code takes, with an id of the form `landmark:<cellId>:<n>`. |
 | function | `createLandmarkBodyLookup` | Returns the lookup `(world, cellId) -> bodies`; it remembers the bodies of the last world it was asked about. |
 
+### `render/three/landmarkMapIcon.ts`
+
+Map icon of a generated landmark (design 018 section 9.7): the landmark itself, drawn from its parts as seen from the front, in its own colours, on a light disc with a dark rim so it reads on any floor.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| const | `landmarkMapIconPixels` | Side of the icon image, pixels. |
+| interface | `IconTriangle` | One triangle of the icon in image space with its fill colour, painted in array order. |
+| function | `landmarkIconTriangles` | The triangles of the icon of `placement` in image pixels (y down), far to near, fitted into a disc of radius 0.38 of the image. |
+| function | `drawLandmarkMapIcon` | Draws the icon of `placement` in `palette` onto a new canvas, or returns undefined where there is no DOM. |
+
 ### `render/three/laserPreview.ts`
 
 The Laser's placement preview (design 017 section 8.3): with the Laser in hand and the aim on the floor, a translucent copy of the real laser (its post and its head) stands at the aim point, the head turned the way a placed laser would fire.
@@ -4464,6 +4477,7 @@ What the world map shows, all of it flat on the solid: nothing on the map has he
 | const | `worldMapPieceHeightMeters` | Height over the face of everything on it, in meters: only enough not to fight the face for depth. |
 | function | `worldMapIconPathOf` | The icon of `object`, as declared with it, or undefined for a thing the map does not show. |
 | function | `createWorldMapPieceReader` | Returns a function listing the pieces of the moment. |
+| function | `landmarkPieces` | The major landmark of every themed face, as an icon drawn from its own parts: the one thing that tells the face apart from far away. |
 
 ### `render/three/worldMapRenderer.ts`
 

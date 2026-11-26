@@ -17,6 +17,9 @@ import type { RuntimeObjectReader, RuntimeWorldObject } from "../../world-object
 import { collectGeodesicRuntimeRenderRecords, composeSegmentMatrix, geodesicMapIconPaths } from "./geodesicCannonRenderer";
 import type { RuntimeObjectRenderSourceMesh } from "./runtimeObjectRenderRecords";
 import { rigidTransformToThreeMatrix } from "./worldAxes";
+import type { FacePalette } from "../../world-assets/facePalettes";
+import type { LandmarkPlacement } from "../../world-assets/landmarkLayout";
+import { computeWorldDressing, getActiveLookSeed } from "../../world-assets/worldDressing";
 
 /** A thing on the map, as its icon. */
 export interface WorldMapIconPiece {
@@ -24,8 +27,10 @@ export interface WorldMapIconPiece {
   /** Stable while the thing exists. */
   readonly id: string;
   readonly cellId: string;
-  /** The icon's image, relative to the assets directory; preloaded with the world. */
+  /** The icon's image, relative to the assets directory; preloaded with the world. For a generated landmark, a key naming its drawn icon. */
   readonly iconPath: string;
+  /** A generated landmark whose icon is drawn from its own parts (`landmarkMapIcon.ts`), with its face's palette; absent for every other thing. */
+  readonly landmark?: { readonly placement: LandmarkPlacement; readonly palette: FacePalette };
   /** Where the thing stands in the cell, on the floor and turned with it, in Three axes: the icon's top points along -z. */
   readonly cellFromIcon: THREE.Matrix4;
   /** Drawn larger and over the other icons: the player must not get lost under a tree. */
@@ -49,6 +54,8 @@ export type WorldMapPiece = WorldMapIconPiece | WorldMapStripPiece;
 export interface WorldMapPieceSources {
   readonly registry: RuntimeObjectReader;
   readonly geodesicRenderSources: readonly RuntimeObjectRenderSourceMesh[];
+  /** Whether each themed face's major landmark is on the map (the app's map; off where only registry things matter). */
+  readonly landmarks?: boolean;
 }
 
 /** Height over the face of everything on it, in meters: only enough not to fight the face for depth. */
@@ -108,10 +115,30 @@ export function createWorldMapPieceReader(from: WorldMapPieceSources): (playerPo
   return (playerPose, world) => {
     const solid = solidOf(world);
     if (solid === undefined) return [];
-    const pieces = from.registry.getAll().flatMap((object) => objectPieces(object, world, solid));
+    const pieces = [...(from.landmarks ? landmarkPieces(world) : []), ...from.registry.getAll().flatMap((object) => objectPieces(object, world, solid))];
     const avatar = iconAt(standardUserRobotObject.id, playerPose.cellId, standardUserRobotObject.mapIconPath, yawRigidTransform3(playerPose.yawRadians, playerPose.position), true);
     return [...pieces, avatar];
   };
+}
+
+/**
+ * The major landmark of every themed face, as an icon drawn from its own parts: the one thing that tells the face apart from far away.
+ * Minor landmarks and props stay off the map, which would be a jumble with them.
+ */
+export function landmarkPieces(world: CompiledCellComplex): readonly WorldMapIconPiece[] {
+  const dressing = computeWorldDressing(world);
+  const seed = getActiveLookSeed() ?? "world";
+  return [...dressing.landmarksByCellId].flatMap(([cellId, placements]) => {
+    const look = dressing.lookByCellId.get(cellId);
+    const major = placements.find((placement) => placement.role === "major");
+
+    if (!look || !major) {
+      return [];
+    }
+
+    const id = `landmark:${seed}:${cellId}`;
+    return [{ ...iconAt(id, cellId, `generated/${id}`, yawRigidTransform3(major.yawRadians, vec3(major.x, major.y, 0)), false), landmark: { placement: major, palette: look.palette } }];
+  });
 }
 
 function iconAt(id: string, cellId: string, iconPath: string, localPose: RigidTransform3, onTop: boolean): WorldMapIconPiece {

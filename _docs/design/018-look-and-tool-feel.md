@@ -291,8 +291,8 @@ numbers as the mesh. Glowing parts (bulbs, eyes, lit windows) skip the baked lig
 
 ### 9.2 Palettes
 
-A palette is built from a key hue and a scheme (analogous, complementary, split or triadic): `primary`, `secondary` and
-`accent` from the scheme, `dark` and `light` from the key hue, a `glow`, and a `ground` colour (`world-assets/facePalettes.ts`).
+A palette is built from a key hue and a scheme, analogous (second and accent hues a little to either side) or tonal (one hue,
+lighter and stronger variants), with muted saturation (0.36 to 0.5 for the key colour): `primary`, `secondary` and `accent` from the scheme, `dark` and `light` from the key hue, a `glow`, and a `ground` colour (`world-assets/facePalettes.ts`).
 Every part takes a palette role. The floor keeps its texture's detail and brightness but loses 80 percent of its own colour
 and takes the palette's ground hue; this rides in the tint image (alpha = how much colour is removed), so the blend strips
 recolour both cells' grounds correctly.
@@ -306,6 +306,9 @@ recolour both cells' grounds correctly.
 - the colour wheel is cut into min(faces, 12) evenly spaced key hues with a random offset; a face takes, among the least
   used hues, the one farthest from its neighbours' hues;
 - schemes differ from the neighbours' where they can.
+
+Contrasting schemes (complementary, split, triadic) and saturated colours were tried first and dropped: two-hue faces looked
+cartoonish next to one-hue faces. Faces stay apart through their key hues, which neighbours never share.
 
 The draw is seeded by the **look seed** (section 9.6).
 
@@ -338,3 +341,10 @@ Authored decorations stay where the world file puts them, on a face whose theme 
 that face's palette (`render/three/decorationPalette.ts`): each distinct material is cloned and moved 80 percent towards a
 palette role (`primary`, `secondary`, `accent`, `light` in turn) at its own brightness, so a bench on a lime-and-purple village
 face is lime and purple like the generated benches around it.
+
+### 9.7 Landmarks on the map
+
+The world map shows each themed face's major landmark as an icon (`render/three/landmarkMapIcon.ts`, `landmarkPieces` in
+`worldMapPieces.ts`). The icon is drawn from the landmark's own parts, seen from its front, in its own colours, on a disc in the
+palette's light colour with a dark rim: the map shows the very cairn, tower or spider of this look, not a symbol for its kind.
+Minor landmarks and props stay off the map, which would be a jumble with them.

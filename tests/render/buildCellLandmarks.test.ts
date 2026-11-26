@@ -27,7 +27,7 @@ import { createFakePreparedAssets } from "../support/preparedAssets";
 
 const world = compileCellComplex(basicCube);
 const azimuth = 2.2;
-const palette = buildFacePalette(30, "complementary");
+const palette = buildFacePalette(30, "tonal");
 
 function placementOf(parts: readonly LandmarkPart[], kind = "test", yawRadians = 0.3): LandmarkPlacement {
   const measure = measureParts(parts);

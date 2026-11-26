@@ -7,11 +7,21 @@
  * (multiplied into the floor). Pure; colours are sRGB hex. Layer rule: imports only sibling modules.
  */
 
-/** How the second and accent hues relate to the key hue. */
-export type PaletteScheme = "analogous" | "complementary" | "split" | "triadic";
+/**
+ * How the second and accent hues relate to the key hue. Both keep a face to one region of the colour wheel: contrasting schemes
+ * (complementary, triadic) made faces look cartoonish, and faces are told apart by their key hues, which neighbours never share.
+ * - `analogous`: second and accent hues a little to either side of the key;
+ * - `tonal`: one hue, the second colour lighter and the accent a touch warmer and stronger.
+ */
+export type PaletteScheme = "analogous" | "tonal";
 
 /** Every scheme, in a fixed order. */
-export const paletteSchemes: readonly PaletteScheme[] = ["analogous", "complementary", "split", "triadic"];
+export const paletteSchemes: readonly PaletteScheme[] = ["analogous", "tonal"];
+
+/** Saturation of the key colour, from this to {@link paletteSaturationHigh} (muted, not neon). */
+export const paletteSaturationLow = 0.36;
+/** Upper end of the key colour's saturation. */
+export const paletteSaturationHigh = 0.5;
 
 /** The colours of one face. */
 export interface FacePalette {
@@ -29,10 +39,8 @@ export interface FacePalette {
 
 /** Hue offsets (degrees) of the secondary and accent colours per scheme. */
 const schemeOffsets: Record<PaletteScheme, readonly [number, number]> = {
-  analogous: [32, -38],
-  complementary: [180, 15],
-  split: [150, 210],
-  triadic: [120, 240],
+  analogous: [28, -24],
+  tonal: [0, 10],
 };
 
 /** sRGB hex of an HSL colour (hue in degrees, saturation and lightness 0 to 1). */
@@ -64,22 +72,23 @@ export function hexToLinearRgb(hex: string): readonly [number, number, number] {
 
 /**
  * Builds a palette from a key hue, a scheme and a random source (for small variations of saturation and lightness, so two faces of close
- * hue still differ). The key colour is saturated and mid-light; dark and light keep a trace of the key hue.
+ * hue still differ). The key colour is muted and mid-light; dark and light keep a trace of the key hue.
  */
 export function buildFacePalette(hue: number, scheme: PaletteScheme, random: () => number = () => 0.5): FacePalette {
   const [secondOffset, accentOffset] = schemeOffsets[scheme];
-  const saturation = 0.58 + 0.2 * random();
+  const saturation = paletteSaturationLow + (paletteSaturationHigh - paletteSaturationLow) * random();
   const lightness = 0.46 + 0.1 * random();
+  const secondLightness = scheme === "tonal" ? Math.min(0.78, lightness + 0.2) : Math.min(0.7, lightness + 0.1);
   return {
     hue,
     scheme,
     primary: hslToHex(hue, saturation, lightness),
-    secondary: hslToHex(hue + secondOffset, saturation * 0.85, Math.min(0.72, lightness + 0.12)),
-    accent: hslToHex(hue + accentOffset, 0.85, 0.55),
-    dark: hslToHex(hue, 0.35, 0.16 + 0.06 * random()),
-    light: hslToHex(hue, 0.4, 0.86),
-    glow: hslToHex(hue + 30, 1, 0.8),
-    ground: hslToHex(hue, 0.45, 0.55),
+    secondary: hslToHex(hue + secondOffset, saturation * 0.85, secondLightness),
+    accent: hslToHex(hue + accentOffset, Math.min(0.62, saturation + 0.14), 0.5),
+    dark: hslToHex(hue, 0.25, 0.16 + 0.06 * random()),
+    light: hslToHex(hue, 0.25, 0.85),
+    glow: hslToHex(hue + 30, 0.85, 0.8),
+    ground: hslToHex(hue, 0.35, 0.55),
   };
 }
 

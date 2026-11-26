@@ -18,7 +18,7 @@ describe("recolorDecoration", () => {
     const root = new THREE.Group();
     root.add(new THREE.Mesh(new THREE.BoxGeometry(), shared), new THREE.Mesh(new THREE.BoxGeometry(), shared), new THREE.Mesh(new THREE.BoxGeometry(), [other, shared]));
 
-    expect(recolorDecoration(root, buildFacePalette(0, "triadic"))).toBe(2);
+    expect(recolorDecoration(root, buildFacePalette(0, "analogous"))).toBe(2);
     expect(shared.color.getHex()).toBe(0x808080);
     const [first, second, third] = root.children as THREE.Mesh[];
     expect(first.material).toBe(second.material);

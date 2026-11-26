@@ -166,7 +166,7 @@ describe("computeLandmarkLayout on other cells", () => {
   it.each(faceThemes.map((theme) => theme.id))("places a major landmark of %s on an empty cube face", (id) => {
     const [cell] = cube.cells;
     const theme = faceThemes.find((entry) => entry.id === id)!;
-    const placements = computeLandmarkLayout({ ...cell, objects: [] }, { look: { theme, palette: buildFacePalette(200, "triadic") } });
+    const placements = computeLandmarkLayout({ ...cell, objects: [] }, { look: { theme, palette: buildFacePalette(200, "tonal") } });
     expect(placements.filter((placement) => placement.role === "major")).toHaveLength(1);
   });
 });
