@@ -18,15 +18,15 @@ findings, and save what it reports.
 When a task is finished, for each note you opened call `mcp__know__know_assess` once with an outcome (`used`,
 `helpful`, `not_needed`, `irrelevant`, `misleading`, `stale`) and a one-line reason. Report the negative outcomes as
 readily as the positive ones: an honest `not_needed` is more useful than silence.
-When you finish a substantial piece of work in which you found things you did not save, run `_scripts/know_session_job`
+When you finish a substantial piece of work in which you found things you did not save, run `agenttools know session-job`
 once (no arguments). It has a small model review the unread part of this session and save what you missed as candidate
 notes. It costs a model call, so use it after real discoveries, not after every task; `know_write` is still the way to
 save a fact you already know.
 Current source code and tests outrank notes.
 If no <project-knowledge> block arrived at the start of the session (hooks may not be active), call `know_search` before
 you start a task.
-If the MCP tools are unavailable, the same operations are `_scripts/know_search "<query>"`, `_scripts/know_read <id>`,
-`_scripts/know_write` (note as JSON on standard input) and `_scripts/know_assess <id> <outcome> <reason>`.
+If the MCP tools are unavailable, the same operations are `agenttools know search "<query>"`, `agenttools know read <id>`,
+`agenttools know write` (note as JSON on standard input) and `agenttools know assess <id> <outcome> <reason>`.
 A note passed to `know_write` needs `title`, `summary`, `body`, `type` (`discovery`, `procedure`, `decision`,
 `constraint`, `antipattern`, `environment` or `open_question`) and `confidence` (`low`, `medium`, `high` or `unknown`);
 `evidence_level` (`observed`, `reproduced`, `tested`, `source_verified` or `hypothesis`) is optional. Leave out `status`.

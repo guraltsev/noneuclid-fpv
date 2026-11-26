@@ -1,8 +1,9 @@
 {
   "mcpServers": {
     "know": {
-      "command": "know",
+      "command": "agenttools",
       "args": [
+        "know",
         "mcp",
         "--runtime",
         "claude-code"
