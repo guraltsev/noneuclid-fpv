@@ -21,6 +21,7 @@ import {
   type PortalPanelModeId,
 } from "../../glue/portalPanelMode";
 import { buildCellSceneryMesh } from "./buildCellScenery";
+import { landmarkKeepOutDiscs } from "../../world-assets/landmarkLayout";
 import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex";
 import type { WorldDressing } from "../../world-assets/worldDressing";
 import { buildCellLandmarksMesh } from "./buildCellLandmarks";
@@ -66,13 +67,14 @@ export function buildCellMesh(cell: CompiledPrismCell, options: BuildCellMeshOpt
 
   group.add(buildFloorMesh(cell, options.assets, options.floorUvFrame));
   // Lattice floors (the torus family) are continuous across cells by design, so they get no per-cell scenery.
-  const scenery = options.floorUvFrame ? undefined : buildCellSceneryMesh(cell);
+  const landmarkPlacements = options.dressing?.landmarksByCellId.get(cell.id) ?? [];
+  const scenery = options.floorUvFrame ? undefined : buildCellSceneryMesh(cell, landmarkKeepOutDiscs(landmarkPlacements));
   if (scenery) {
     group.add(scenery);
   }
   const landmarks = options.floorUvFrame
     ? undefined
-    : buildCellLandmarksMesh(cell.id, options.dressing?.landmarksByCellId.get(cell.id) ?? [], options.dressing?.shadowAzimuthByCellId.get(cell.id) ?? 0);
+    : buildCellLandmarksMesh(cell.id, landmarkPlacements, options.dressing?.shadowAzimuthByCellId.get(cell.id) ?? 0);
   if (landmarks) {
     group.add(landmarks);
   }

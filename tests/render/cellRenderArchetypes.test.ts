@@ -20,6 +20,7 @@ import {
   disposeCellRenderArchetypes,
   deriveCellRenderArchetypeCapacities,
   planCellRenderArchetypes,
+  landmarkMaxPathDepth,
   sceneryMaxPathDepth,
 } from "../../src/render/three/cellRenderArchetypes";
 import { createFakePreparedAssets } from "../support/preparedAssets";
@@ -66,7 +67,7 @@ describe("planCellRenderArchetypes", () => {
 
     const archetypes = buildCellRenderArchetypes(world, options);
     for (const archetype of archetypes) {
-      expect(archetype.maxPathDepth).toBe(archetype.kind === "scenery" ? sceneryMaxPathDepth : undefined);
+      expect(archetype.maxPathDepth).toBe(archetype.kind === "scenery" ? sceneryMaxPathDepth : archetype.kind === "landmark" ? landmarkMaxPathDepth : undefined);
     }
     disposeCellRenderArchetypes(archetypes);
   });
