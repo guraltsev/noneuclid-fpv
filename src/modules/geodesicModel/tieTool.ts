@@ -91,7 +91,8 @@ export function createTieToolDescriptor(): ToolDescriptor {
     helpRows: [{ input: "primary", label: "select a linked beam near the laser" }],
     indicatorColor: "#f59e0b",
     iconId: "ray",
-    showsAimCross: true,
+    showsAimCross: false,
+    showsXrAimCross: true,
     entry: {
       kind: "object-action",
       objectKind: "geodesicEmitters/emitter",

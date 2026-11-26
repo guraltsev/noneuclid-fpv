@@ -199,6 +199,23 @@ describe("createAimFeedback", () => {
     expect(menu.crossUpdates).toEqual([undefined]);
   });
 
+  it("draws the desktop cross only for the Sign and the aim modes, and keeps it in VR", () => {
+    const stateFor = (selectedTool: never) => ({ menuState: { ...createRuntimeMenuState({ selectedWorldId: "test" }), selectedTool } });
+    for (const tool of ["none", "geodesicEmitters/emitter", "geodesicMeasurements/length", "geodesicMeasurements/protractor", "geodesicModel/tie"]) {
+      const harness = createHarness(stateFor(tool as never));
+      harness.feedback.updateAim(false, aimRay);
+      expect(harness.crossUpdates, tool).toEqual([undefined]);
+    }
+    for (const tool of ["placedFlags/flag", "geodesicEmitters/aim"]) {
+      const harness = createHarness(stateFor(tool as never));
+      harness.feedback.updateAim(false, aimRay);
+      expect(harness.crossUpdates, tool).toEqual([floorTarget]);
+    }
+    const vr = createHarness(stateFor("geodesicEmitters/emitter" as never));
+    vr.feedback.updateAim(true, aimRay);
+    expect(vr.crossUpdates).toEqual([floorTarget]);
+  });
+
   it("draws the controller ray only in XR and removes it on dispose", () => {
     const { feedback, scene } = createHarness();
     const ray = scene.getObjectByName("aim-controller-ray");
