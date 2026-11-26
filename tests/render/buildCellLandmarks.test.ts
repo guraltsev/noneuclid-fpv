@@ -85,7 +85,11 @@ describe("buildCellLandmarksMesh", () => {
       expect(mesh.name).toBe(`landmarks:${cell.id}`);
       expect(mesh.userData).toEqual({ kind: "landmark", cellId: cell.id });
       expect(mesh.geometry.index).toBeNull();
-      expect(Object.keys(mesh.geometry.attributes).sort()).toEqual(["color", "normal", "position"]);
+      // Moving parts add their motion attributes (`landmarkMotion.ts`).
+      const moving = placements.some((placement) => placement.parts.some((part) => part.motion));
+      expect(Object.keys(mesh.geometry.attributes).sort()).toEqual(
+        moving ? ["color", "motionAxis", "motionPivot", "motionTiming", "normal", "position"] : ["color", "normal", "position"],
+      );
       expect(position.count).toBe(placements.reduce((sum, placement) => sum + placement.triangles, 0) * 3);
       expect(mesh.material).toBeInstanceOf(THREE.MeshLambertMaterial);
       expect((mesh.material as THREE.MeshLambertMaterial).vertexColors).toBe(true);

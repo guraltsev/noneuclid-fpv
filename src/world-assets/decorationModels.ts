@@ -9,7 +9,7 @@
  * the player starts. Pure; layer rule: imports only sibling modules.
  */
 import type { FacePalette } from "./facePalettes";
-import { bench, between, bicycle, build, house, integer, pick, polyline, TAU, tree } from "./faceThemes";
+import { bench, between, bicycle, build, firTiers, house, integer, pick, polyline, TAU, tree } from "./faceThemes";
 import type { LandmarkPart, Vec3 } from "./landmarkParts";
 import { createSeededRandom, hashStringToSeed } from "./seededNoise";
 
@@ -82,12 +82,7 @@ const builders: Record<GeneratedDecorationKind, (kit: Parameters<Parameters<type
       return [Math.cos(angle) * 0.22 * t, Math.sin(angle) * 0.22 * t, t * height * 0.45];
     });
     polyline(kit, points, 0.11, "dark");
-    const top = points[points.length - 1];
-    const layers = integer(random, 3, 4);
-    for (let index = 0; index < layers; index += 1) {
-      const radius = height * (0.27 - index * 0.05);
-      kit.prism([top[0], top[1], top[2] + index * height * 0.14], 7, radius, 0, height * 0.3, index % 2 === 0 ? "primary" : "secondary", { yaw: index * 0.4 });
-    }
+    firTiers(kit, points[points.length - 1], height, integer(random, 3, 4), 0.4);
   },
   flower_pot: (kit) => {
     const { random } = kit;

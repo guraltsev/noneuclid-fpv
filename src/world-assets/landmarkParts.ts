@@ -15,6 +15,10 @@
  * - `strut`: a square rod of radius `radius` from `from` to `to` (both in the part frame).
  *
  * Every triangle carries a reference point inside its solid; the mesh builder turns the normal away from it before it bakes the light.
+ *
+ * A part may move ({@link PartMotion}): it turns about an axis through a pivot, in steps that each take a moment and then rest, or
+ * continuously. The motion is data that rides on the triangles to the mesh, and the vertex shader turns the part (design 018
+ * section 9.9); nothing here moves, and colliders, shadows and the footprint are those of the part at rest.
  * Layer rule: imports only sibling modules.
  */
 import { createSeededRandom } from "./seededNoise";
@@ -29,6 +33,21 @@ export interface PartPose {
   readonly roll?: number;
 }
 
+/**
+ * How a part moves, in the landmark frame: it turns about `axis` through `pivot` by `step` radians every `period` seconds; each turn
+ * takes `move` seconds, eased in and out, and the part rests in between. With `move` at least `period` it turns at a steady
+ * `step / period` radians per second. `phase` (seconds) shifts the schedule, so neighbours do not move together.
+ */
+export interface PartMotion {
+  readonly pivot: Vec3;
+  /** Unit vector. */
+  readonly axis: Vec3;
+  readonly step: number;
+  readonly period: number;
+  readonly move: number;
+  readonly phase: number;
+}
+
 /** What every part has besides its shape. */
 interface PartBase {
   /** Where the part's origin is, in the landmark frame. */
@@ -40,6 +59,8 @@ interface PartBase {
   readonly glow?: boolean;
   /** False keeps a part that touches the ground from blocking the player (a hatch lid, a rug). */
   readonly collide?: boolean;
+  /** How the part moves; absent for a part that stands still. */
+  readonly motion?: PartMotion;
 }
 
 /** One part of a landmark. */
@@ -77,6 +98,8 @@ export interface LandmarkTriangle {
   readonly inside: Vec3;
   readonly color: string;
   readonly glow: boolean;
+  /** The part's motion, if it moves. */
+  readonly motion?: PartMotion;
 }
 
 /** A vertical cylinder of a landmark the player cannot walk into, in the landmark frame. */
@@ -174,7 +197,9 @@ export function tessellatePart(part: LandmarkPart): readonly LandmarkTriangle[] 
   const place = placer(part);
   const glow = part.glow === true;
   const out: LandmarkTriangle[] = [];
-  const tri = (a: Vec3, b: Vec3, c: Vec3, inside: Vec3) => out.push({ a: place(a), b: place(b), c: place(c), inside: place(inside), color: part.color, glow });
+  const motion = part.motion;
+  const tri = (a: Vec3, b: Vec3, c: Vec3, inside: Vec3) =>
+    out.push({ a: place(a), b: place(b), c: place(c), inside: place(inside), color: part.color, glow, ...(motion ? { motion } : {}) });
   const quad = (a: Vec3, b: Vec3, c: Vec3, d: Vec3, inside: Vec3) => {
     tri(a, b, c, inside);
     tri(a, c, d, inside);

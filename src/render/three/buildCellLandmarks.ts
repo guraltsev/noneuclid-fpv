@@ -4,12 +4,14 @@
  * One merged non-indexed mesh with vertex colours and a stock `MeshLambertMaterial`, so the portal clip patch applies and the cell archetype pipeline can
  * instance it over portal copies. It draws exactly the triangles `world-assets/landmarkParts.ts` makes of each placement's parts, placed by the
  * placement's position, turn and scale. The scene has no directional light, so the light of the cell (`shadowAzimuthRadians`) is baked into the
- * colours: every triangle is darkened by how far its normal turns from the light; glowing parts keep their full colour.
+ * colours: every triangle is darkened by how far its normal turns from the light; glowing parts keep their full colour. Moving parts carry
+ * their motion as vertex attributes and the material turns them (`landmarkMotion.ts`).
  */
 import * as THREE from "three";
 import type { LandmarkPlacement } from "../../world-assets/landmarkLayout";
 import { tessellateParts } from "../../world-assets/landmarkParts";
 import { createSeededRandom } from "../../world-assets/seededNoise";
+import { motionAttributeNames, patchLandmarkMotionMaterial } from "./landmarkMotion";
 
 /** Elevation of the baked light above the horizon, radians (40 degrees). */
 export const landmarkLightElevationRadians = (40 * Math.PI) / 180;
@@ -84,6 +86,13 @@ export function buildCellLandmarksMesh(
   const positions = new Float32Array(total * 9);
   const normals = new Float32Array(total * 9);
   const colors = new Float32Array(total * 9);
+  // Moving parts carry their motion per vertex (`landmarkMotion.ts`); the arrays are dropped again when nothing moves.
+  const motionPivots = new Float32Array(total * 9);
+  const motionAxes = new Float32Array(total * 9);
+  const motionTimings = new Float32Array(total * 12);
+  let anyMotion = false;
+  const motionPoint = new THREE.Vector3();
+  const motionDirection = new THREE.Vector3();
   const toLight = landmarkToLight(shadowAzimuthRadians);
   const corners = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
   const inside = new THREE.Vector3();
@@ -101,6 +110,7 @@ export function buildCellLandmarksMesh(
       .multiply(new THREE.Matrix4().makeScale(placement.scale, placement.scale, placement.scale));
     const random = createSeededRandom((placement.seed ^ 0x1a2b3c4d) >>> 0);
     const triangles = tessellateParts(placement.parts);
+    const rotation = new THREE.Matrix3().setFromMatrix4(matrix);
 
     if (triangles.length !== placement.triangles) {
       throw new Error(`landmark ${placement.kind} made ${triangles.length} triangles, its placement says ${placement.triangles}`);
@@ -132,8 +142,24 @@ export function buildCellLandmarksMesh(
         shaded.multiplyScalar(1 + (random() - 0.5) * landmarkFacetJitter);
       }
 
+      const motion = triangle.motion;
+
+      if (motion) {
+        anyMotion = true;
+        motionPoint.set(...motion.pivot).applyMatrix4(matrix);
+        motionDirection.set(...motion.axis).applyMatrix3(rotation).normalize();
+      }
+
       for (let vertex = 0; vertex < 3; vertex += 1) {
         const offset = cursor + vertex * 3;
+
+        if (motion) {
+          // Cell-local (x, y, height) to Three (x, height, -y), like the positions.
+          motionPivots.set([motionPoint.x, motionPoint.z, -motionPoint.y], offset);
+          motionAxes.set([motionDirection.x, motionDirection.z, -motionDirection.y], offset);
+          motionTimings.set([motion.step, motion.period, motion.move, motion.phase], ((cursor / 9) * 3 + vertex) * 4);
+        }
+
         // Cell-local (x, y, height) to Three (x, height, -y).
         positions[offset] = corners[vertex].x;
         positions[offset + 1] = corners[vertex].z;
@@ -154,9 +180,19 @@ export function buildCellLandmarksMesh(
   geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
   geometry.setAttribute("normal", new THREE.BufferAttribute(normals, 3));
   geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+  const material = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
+
+  if (anyMotion) {
+    geometry.setAttribute(motionAttributeNames.pivot, new THREE.BufferAttribute(motionPivots, 3));
+    geometry.setAttribute(motionAttributeNames.axis, new THREE.BufferAttribute(motionAxes, 3));
+    geometry.setAttribute(motionAttributeNames.timing, new THREE.BufferAttribute(motionTimings, 4));
+    material.userData.landmarkMotion = true;
+    patchLandmarkMotionMaterial(material);
+  }
+
   geometry.computeBoundingSphere();
 
-  const mesh = new THREE.Mesh(geometry, new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }));
+  const mesh = new THREE.Mesh(geometry, material);
   mesh.name = `landmarks:${cellId}`;
   mesh.userData = { kind: "landmark", cellId };
   return mesh;

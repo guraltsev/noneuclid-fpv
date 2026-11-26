@@ -364,3 +364,21 @@ family) they take a muted wood palette.
 - The models left loaded from files (grass, the question cube, legacy props) are recoloured in the shader where they fit a
   theme (`render/three/decorationPalette.ts`): desaturated, then tinted, so a texture changes as much as a plain colour.
 - The removed models and their licences are gone from `public/assets`; their map icons, which were project-made, stay.
+
+### 9.9 Parts that move now and then
+
+A static place in which, now and then, something turns. A part may carry a motion (`PartMotion` in
+`world-assets/landmarkParts.ts`): it turns about an axis through a pivot, either in steps (it rests, then turns by a step over
+a moment, eased in and out) or steadily. The kit gives every part made under `kit.moving(motion, ...)` the same motion, so a
+branch and the disc it carries move together.
+
+- Fir tiers (grove trees, swirl trees) turn about the trunk now and then, each at its own pace and against the tier below.
+- The clock tower's minute hands tick every two to four seconds; the hour hands creep round once in twelve minutes; its gears and
+  those of the gear tree and the standing gear turn steadily, slower with more teeth, neighbours in opposite directions.
+- The armillary's rings drift round the vertical; the great mobile's branches swing round the stalk now and then.
+
+A face's landmarks are one merged mesh drawn once per portal copy, so nothing moves on the CPU: each moving vertex carries its
+pivot, axis and timing as attributes, and the vertex shader turns position and normal by the angle the schedule gives at a shared
+clock (`render/three/landmarkMotion.ts`). Every copy through every portal moves in step at no CPU cost. The baked shade of a
+turning face does not change (the turns are slow and the light is soft). Colliders, shadows and the footprint are those of the
+parts at rest; every motion turns a part about an axis through itself or the landmark's centre, so it stays inside its footprint.
