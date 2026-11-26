@@ -52,7 +52,18 @@ export interface SceneryLayoutOptions {
   readonly spacingMeters?: number;
   /** Multiplies every biome density. */
   readonly densityScale?: number;
+  /**
+   * Per side index, the biome of the cell glued to that side (undefined for a wall or a neighbour that grows nothing). A prop
+   * near such a side takes its kind from the neighbour's list with probability `1 - smoothstep(-h, h, d)`, `d` being its distance
+   * into this cell from the side and `h` {@link neighbourBlendHalfWidthMeters}, so both faces carry both biomes in the same proportion at the border.
+   */
+  readonly neighbourBiomeBySideIndex?: ReadonlyMap<number, SceneryBiome | undefined>;
+  /** Half-width `h` of the biome transition at a side, meters (default {@link defaultNeighbourBlendHalfWidthMeters}). */
+  readonly neighbourBlendHalfWidthMeters?: number;
 }
+
+/** Half-width of the biome transition at a side when the caller gives none, meters. */
+export const defaultNeighbourBlendHalfWidthMeters = 1.5;
 
 /** Triangles each prop kind adds to the cell mesh; `buildCellScenery.ts` emits exactly this many for the kind. */
 export const sceneryTrianglesByKind: Record<SceneryPropKind, number> = {
@@ -175,6 +186,7 @@ export function computeSceneryLayout(cell: CompiledPrismCell, options: SceneryLa
   const random = createSeededRandom((seed ^ 0x5ce4e5) >>> 0);
   const table = sceneryBiomeTable[biome];
   const allowed = (x: number, y: number, scale: number): boolean => isClear(cell, x, y, sceneryPropRadiusMeters * scale);
+  const kindsAt = neighbourKindsPicker(cell, table.kinds, options);
 
   const features = placeFeatures(biome, allowed, cell, random);
   const ordinary: SceneryProp[] = [];
@@ -210,12 +222,49 @@ export function computeSceneryLayout(cell: CompiledPrismCell, options: SceneryLa
         continue;
       }
 
-      ordinary.push({ kind: pickKind(table.kinds, kindRoll), x, y, yawRadians, scale, tone });
+      ordinary.push({ kind: pickKind(kindsAt(x, y, kindRoll), kindRoll), x, y, yawRadians, scale, tone });
     }
   }
 
   const featureProps = features.flatMap((feature) => feature.props);
   return trimToBudget(ordinary, featureProps);
+}
+
+// The kind list for a candidate: the nearest side with a neighbour biome lends its list with probability 1 - smoothstep(-h, h, d).
+// The decision reuses the fine digits of the kind roll, so no extra random number is drawn and layouts without neighbours do not change.
+function neighbourKindsPicker(
+  cell: CompiledPrismCell,
+  ownKinds: readonly (readonly [SceneryPropKind, number])[],
+  options: SceneryLayoutOptions,
+): (x: number, y: number, kindRoll: number) => readonly (readonly [SceneryPropKind, number])[] {
+  const neighbours = options.neighbourBiomeBySideIndex;
+  const halfWidth = options.neighbourBlendHalfWidthMeters ?? defaultNeighbourBlendHalfWidthMeters;
+
+  if (!neighbours || neighbours.size === 0) {
+    return () => ownKinds;
+  }
+
+  return (x, y, kindRoll) => {
+    let nearest: SceneryBiome | undefined;
+    let nearestDistance = Infinity;
+
+    for (const side of cell.sides) {
+      const biome = neighbours.get(side.sideIndex);
+      const distance = (x - side.start.x) * side.inwardNormal.x + (y - side.start.y) * side.inwardNormal.y;
+
+      if (biome && distance < nearestDistance) {
+        nearest = biome;
+        nearestDistance = distance;
+      }
+    }
+
+    if (!nearest) {
+      return ownKinds;
+    }
+
+    const biomeRoll = (kindRoll * 997) % 1;
+    return biomeRoll < 1 - smoothstep(-halfWidth, halfWidth, nearestDistance) ? sceneryBiomeTable[nearest].kinds : ownKinds;
+  };
 }
 
 interface PlacedFeature {

@@ -715,6 +715,12 @@ Per-cell ground tint image (design 018 section 4.1).
 | const | `groundTintWarmCoolStrength` | Largest warm/cool shift of the red and blue channels, as a fraction. |
 | const | `groundContactShadowStrength` | Darkest the contact shadow gets, as a fraction removed at the object (0.38 means 62 percent of the colour is left). |
 | const | `groundContactShadowDefaultRadiusMeters` | Radius in meters used for a static object with no collision cylinder. |
+| const | `groundLongShadowStrength` | Darkest a long shadow gets, at its foot, as a fraction removed (0.42 leaves 58 percent of the colour). |
+| const | `groundLongShadowTipStrengthFraction` | Fraction of the foot darkness left at the tip of a long shadow. |
+| const | `groundLongShadowTipWidthFraction` | Width of a long shadow at its tip as a fraction of its width at the foot. |
+| const | `groundLongShadowEdgeMeters` | Width of the soft edge of a long shadow, meters. |
+| const | `groundShadowDefaultHeightPerRadius` | Height assumed for an authored object with no collision height, as a multiple of its radius. |
+| const | `groundTintImageSize` | Default width and height of the tint image, texels. |
 | const | `groundTintNeutralTexel` | Texel value that means "multiply by 1.0". |
 | interface | `GroundTintCell` | The structural part of a compiled prism cell that the tint needs. |
 | interface | `GroundShadowCaster` | Something tall that stands in a cell and throws a long shadow on its ground (a generated landmark, an authored object). |
@@ -746,6 +752,7 @@ Seeded layout of the small decorative props (grass, flowers, stones, mushrooms..
 | type | `SceneryBiome` | A ground type that decides which props grow; derived from the floor texture name. |
 | interface | `SceneryProp` | One prop of a cell: where it stands, how it is turned and sized, and which colour variant it has. |
 | interface | `SceneryLayoutOptions` | Options of {@link computeSceneryLayout}; the defaults are the shipped look, tests and tuning override them. |
+| const | `defaultNeighbourBlendHalfWidthMeters` | Half-width of the biome transition at a side when the caller gives none, meters. |
 | const | `sceneryTrianglesByKind` | Triangles each prop kind adds to the cell mesh; `buildCellScenery.ts` emits exactly this many for the kind. |
 | const | `maxSceneryTrianglesPerCell` | The most triangles of scenery one cell may carry. |
 | const | `scenerySpacingMeters` | Spacing of the jittered placement grid, meters. |
@@ -2921,6 +2928,7 @@ Builds the Three.js geometry of one prism cell in the cell's own local frame (wh
 | interface | `BuildCellMeshOptions` | Options controlling which debug and decoration content a cell mesh includes. |
 | function | `buildCellMesh` | Builds the full Three.js group for a cell, named `cell:<id>` and tagged with its portal sides in `userData`. |
 | function | `floorColorTexture` | The tiling color texture of a cell's floor, or undefined if it has none or it failed to load. |
+| interface | `FloorStripBlend` | What a floor strip's material needs to blend into the neighbour; stored in the strip mesh's `userData.groundBlend`, never in a material (clones JSON-copy `userData`). |
 
 ### `render/three/buildCellScenery.ts`
 
@@ -3387,6 +3395,36 @@ The `window.noneuclidGeometry` helpers and the `geometry` API namespace that dri
 | interface | `GeometryDebugHelpersDeps` | Dependencies of {@link createGeometryDebugHelpers}. |
 | interface | `GeometryDebugHelpersHandle` | Handle to the geometry helpers created by {@link createGeometryDebugHelpers}. |
 | function | `createGeometryDebugHelpers` | Creates the installer of the geometry debug helpers. |
+
+### `render/three/groundBlendGeometry.ts`
+
+Geometry of a metric floor split into an inner polygon and one blend strip per side (design 018 section 8.3).
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| const | `blendStripSegmentMeters` | Longest segment along a side of a strip, meters. |
+| const | `blendStripInradiusFraction` | The strip width is at most this fraction of the cell's inradius, so the inner polygon never collapses. |
+| const | `blendNoiseWidthFraction` | The noise amplitude is at most this fraction of the strip width, so the transition ends inside the strip. |
+| interface | `FloorStrip` | One blend strip of a cell and what its material needs to know about the glued side. |
+| interface | `FloorBlendGeometry` | The inner polygon and strips of a cell's floor. |
+| function | `cellInradiusMeters` | Radius of the largest circle around the vertex centroid that fits in the cell (the inradius for a regular polygon, a lower bound otherwise), meters. |
+| function | `blendStripWidthMeters` | Strip width `w = min(blendHalfWidthMeters, 0.42 * inradius)` of a cell, meters. |
+| function | `groundBlendTransition` | The transition between two cells whose strips are `widthA` and `widthB` wide: the narrower strip decides, the noise amplitude is limited to a fraction of it, and the half-width `h` is what is left, so the neighbour's sh… |
+| function | `buildFloorBlendGeometry` | Builds the inner polygon and the strips of `cell`. |
+
+### `render/three/groundBlendMaterial.ts`
+
+Ground blending along the sides of a metric floor (design 018 section 8.3).
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| const | `blendHalfWidthMeters` | Largest half-width of the strip (its width) in meters, before it is limited by the size of the cell. |
+| const | `blendNoiseAmplitudeMeters` | Largest sideways wander of the border in meters (the noise `n` goes from minus to plus this). |
+| const | `blendNoiseFeatureMeters` | Size of the features of the border noise along the side, meters. |
+| const | `blendNoiseTaperMeters` | Distance from either end of a side over which the noise fades to zero, meters. |
+| interface | `GroundBlendTintSource` | A tint image together with the texture that holds it, as the shader needs them. |
+| interface | `GroundBlendOptions` | Everything `patchGroundBlendMaterial` needs to mix a cell's ground with its neighbour's. |
+| function | `patchGroundBlendMaterial` | Makes the material mix its own ground with the neighbour's as described in the module header. |
 
 ### `render/three/groundTintMaterial.ts`
 
@@ -4021,10 +4059,15 @@ Shared scene colour constants for the Three.js renderer.
 | Kind | Name | Summary |
 | --- | --- | --- |
 | const | `SCENE_BACKGROUND_COLOR` | Sky-blue colour (0x78b9eb) used for ceiling caps and as the legacy flat background tone. |
-| const | `SKY_ZENITH_COLOR` | Deep sky blue straight overhead (elevation 70 degrees and above). |
-| const | `SKY_MID_COLOR` | Mid sky blue at 25 degrees of elevation. |
-| const | `SKY_HORIZON_COLOR` | Pale haze at the horizon; also the fog colour, so distant geometry dissolves into the horizon. |
-| const | `GROUND_HAZE_COLOR` | Muted grey-green seen below the horizon and used for the plane under the cells. |
+| const | `SKY_ZENITH_COLOR` | Deep teal-blue overhead (elevation 70 degrees and above, outside the moon and its halo). |
+| const | `SKY_TEAL_COLOR` | Teal at 45 degrees of elevation. |
+| const | `SKY_GREEN_COLOR` | Green at 20 degrees of elevation. |
+| const | `SKY_LOW_GOLD_COLOR` | Pale gold at 6 degrees of elevation, just above the glowing horizon. |
+| const | `SKY_HORIZON_COLOR` | Glowing gold at the horizon (design 018 section 8.2). |
+| const | `SKY_MOON_COLOR` | Pale moon disc and halo, exactly at the zenith (a disc there has no horizontal direction). |
+| const | `SCENE_FOG_COLOR` | Fog colour: the horizon gold, slightly desaturated, so distant geometry dissolves into the horizon. |
+| const | `HEMISPHERE_SKY_COLOR` | Sky colour of the hemisphere light, a touch warmer than white. |
+| const | `GROUND_HAZE_COLOR` | Dark warm haze seen below the horizon. |
 | const | `UNDER_FLOOR_COLOR` | Dark earth colour (0x2c3128) of the plane under the cells. |
 
 ### `render/three/sceneLighting.ts`
@@ -4129,13 +4172,19 @@ Vertical sky gradient used as `scene.background`.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
-| const | `skyTextureHeightPixels` | Number of rows (elevation samples) of the sky texture. |
-| const | `skyMidElevationDegrees` | Elevation at which the sky reaches SKY_MID_COLOR, degrees. |
-| const | `skyZenithElevationDegrees` | Elevation from which the sky is SKY_ZENITH_COLOR, degrees. |
+| const | `skyTextureHeightPixels` | Number of rows (elevation samples) of the sky texture; enough for a clean moon edge (0.18 degrees per row). |
+| const | `skyLowGoldElevationDegrees` | Elevation of the low gold band, degrees. |
+| const | `skyGreenElevationDegrees` | Elevation at which the sky is green, degrees. |
+| const | `skyTealElevationDegrees` | Elevation at which the sky is teal, degrees. |
+| const | `skyZenithElevationDegrees` | Elevation from which the sky is deep teal-blue, degrees. |
 | const | `skyGroundBlendFraction` | Fraction of the span under the horizon, counted up from the horizon, over which the ground haze blends into the horizon colour. |
+| const | `skyMoonRadiusDegrees` | Angular radius of the moon disc around the zenith, degrees. |
+| const | `skyMoonEdgeDegrees` | Width of the moon's soft edge, degrees (centred on the radius). |
+| const | `skyMoonHaloRadiusDegrees` | Angular radius out to which the moon's faint halo reaches, degrees. |
+| const | `skyMoonHaloStrength` | Share of the moon colour in the halo right at the disc's edge. |
 | interface | `SkyRgb` | An sRGB colour with channels in 0..1. |
 | function | `skyColorAtElevation` | Returns the sky colour (sRGB, 0..1) at an elevation in radians, from -pi/2 (nadir) to pi/2 (zenith). |
-| function | `createSkyBackgroundTexture` | Creates the 1 x 256 sky texture. |
+| function | `createSkyBackgroundTexture` | Creates the 1 x 1024 sky texture. |
 
 ### `render/three/staticAssetRenderRoot.ts`
 

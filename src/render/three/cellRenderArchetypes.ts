@@ -19,11 +19,12 @@ import type { CompiledPrismCell } from "../../cell-complex/prismCells";
 import type { StaticPortalPathCullResult } from "../../cell-complex/staticPortalPathCull";
 import type { DebugLevelId } from "../../diagnostics/debugLevels";
 import type { PortalPanelModeId } from "../../glue/portalPanelMode";
-import { buildCellMesh } from "./buildCellMesh";
+import { buildCellMesh, type FloorStripBlend } from "./buildCellMesh";
 import { computeGroundTint, type GroundTint } from "../../world-assets/groundTint";
 import { landmarkShadowCasters } from "../../world-assets/landmarkLayout";
 import { computeWorldDressing, type WorldDressing } from "../../world-assets/worldDressing";
 import { patchFloorPatchMaterial } from "./floorPatchMaterial";
+import { patchGroundBlendMaterial, type GroundBlendOptions } from "./groundBlendMaterial";
 import { createGroundTintTexture, patchGroundTintMaterial } from "./groundTintMaterial";
 import { patchPortalClipMaterial, type PortalClipMaterialState } from "./portalClipMaterial";
 import type { PreparedWorldAssets } from "./preparedWorldAssets";
@@ -103,9 +104,10 @@ export function buildCellRenderArchetypes(
   options: BuildCellRenderArchetypesOptions,
 ): readonly CellRenderArchetype[] {
   const archetypes: CellRenderArchetype[] = [];
+  const context = createWorldContext(world, options);
 
   for (const cell of world.cells) {
-    const sources = collectCellArchetypeSources(world, cell, options);
+    const sources = collectCellArchetypeSources(world, cell, options, context);
 
     for (const source of sources) {
       const mesh = new THREE.InstancedMesh(source.geometry, source.material, source.capacity);
@@ -156,8 +158,9 @@ export function planCellRenderArchetypes(
   world: CompiledCellComplex,
   options: BuildCellRenderArchetypesOptions,
 ): readonly CellRenderArchetypePlanEntry[] {
-  return world.cells.flatMap((cell) =>
-    collectCellArchetypeSources(world, cell, options).map((source) => ({
+  const context = createWorldContext(world, options);
+  const entries = world.cells.flatMap((cell) =>
+    collectCellArchetypeSources(world, cell, options, context).map((source) => ({
       cellId: source.cellId,
       archetypeId: source.archetypeId,
       kind: source.kind,
@@ -165,6 +168,13 @@ export function planCellRenderArchetypes(
       sourceObjectName: source.sourceObjectName,
     })),
   );
+
+  // A plan keeps nothing: release the tint textures the sources would have handed to archetypes.
+  for (const { texture } of context.groundTints.values()) {
+    texture.dispose();
+  }
+
+  return entries;
 }
 
 /**
@@ -245,13 +255,45 @@ function worldDressingFor(world: CompiledCellComplex, options: BuildCellRenderAr
   return options.floorUvFramesByCellId && options.floorUvFramesByCellId.size > 0 ? undefined : computeWorldDressing(world);
 }
 
+/** A cell's ground tint image and the texture made from it. */
+interface CellGroundTint {
+  readonly tint: GroundTint;
+  readonly texture: THREE.DataTexture;
+}
+
+// What every cell of one build shares: the dressing, and the tint of every metric textured cell (a strip samples its neighbour's tint).
+interface WorldBuildContext {
+  readonly dressing: WorldDressing | undefined;
+  readonly groundTints: ReadonlyMap<string, CellGroundTint>;
+}
+
+// Only metric textured floors are tinted and blended; lattice floors are continuous across cells by design.
+function createWorldContext(world: CompiledCellComplex, options: BuildCellRenderArchetypesOptions): WorldBuildContext {
+  const dressing = worldDressingFor(world, options);
+  const groundTints = new Map<string, CellGroundTint>();
+
+  for (const cell of world.cells) {
+    if (cell.floorMaterial.kind !== "floor-texture" || options.floorUvFramesByCellId?.get(cell.id)) {
+      continue;
+    }
+
+    const tint = computeGroundTint(cell, {
+      shadowAzimuthRadians: dressing?.shadowAzimuthByCellId.get(cell.id),
+      casters: landmarkShadowCasters(dressing?.landmarksByCellId.get(cell.id) ?? []),
+    });
+    groundTints.set(cell.id, { tint, texture: createGroundTintTexture(tint) });
+  }
+
+  return { dressing, groundTints };
+}
+
 // Bakes each mesh's world matrix (relative to the cell mesh root) into its geometry so instance matrices only need rootFromDestination.
 function collectCellArchetypeSources(
   world: CompiledCellComplex,
   cell: CompiledPrismCell,
   options: BuildCellRenderArchetypesOptions,
+  context: WorldBuildContext,
 ): readonly CellArchetypeSource[] {
-  const dressing = worldDressingFor(world, options);
   const sourceRoot = buildCellMesh(cell, {
     debugLevel: options.debugLevel,
     portalPanelMode: options.portalPanelMode,
@@ -260,15 +302,15 @@ function collectCellArchetypeSources(
     showForbiddenZoneWireframes: options.showForbiddenZoneWireframes,
     floorUvFrame: options.floorUvFramesByCellId?.get(cell.id),
     world,
-    dressing,
+    dressing: context.dressing,
   });
   sourceRoot.updateMatrixWorld(true);
 
   const capacity = options.capacitiesByCellId.get(cell.id) ?? 1;
   const sources: CellArchetypeSource[] = [];
-  const floorUvFrame = options.floorUvFramesByCellId?.get(cell.id);
-  // The ground tint is made once per cell, only for metric textured floors (lattice floors are continuous across cells).
-  let groundTint: { readonly tint: GroundTint; readonly texture: THREE.DataTexture } | undefined;
+  const ownTint = context.groundTints.get(cell.id);
+  // The cell's own tint texture is disposed once, with the first floor archetype of the cell; strips of other cells only read it.
+  let tintOwned = false;
 
   sourceRoot.traverse((object) => {
     if (!(object instanceof THREE.Mesh)) {
@@ -283,18 +325,12 @@ function collectCellArchetypeSources(
 
     const geometry = object.geometry.clone();
     geometry.applyMatrix4(object.matrixWorld);
-    const wantsGroundTint = kind === "floor" && cell.floorMaterial.kind === "floor-texture" && !floorUvFrame;
-    if (wantsGroundTint && !groundTint) {
-      const tint = computeGroundTint(cell, {
-        shadowAzimuthRadians: dressing?.shadowAzimuthByCellId.get(cell.id),
-        casters: landmarkShadowCasters(dressing?.landmarksByCellId.get(cell.id) ?? []),
-      });
-      groundTint = { tint, texture: createGroundTintTexture(tint) };
-    }
-    const tintOptions = wantsGroundTint ? groundTint : undefined;
-    const material = cloneMaterial(object.material, options.portalClipMaterialState, tintOptions);
-    const rootMaterial = cloneMaterial(object.material, undefined, tintOptions);
+    const floorPatches: FloorMaterialPatches | undefined = kind === "floor" && ownTint ? floorPatchesFor(object, ownTint, context.groundTints) : undefined;
+    const material = cloneMaterial(object.material, options.portalClipMaterialState, floorPatches);
+    const rootMaterial = cloneMaterial(object.material, undefined, floorPatches);
     const archetypeIndex = sources.length;
+    const ownsTint = floorPatches !== undefined && !tintOwned;
+    tintOwned ||= ownsTint;
     sources.push({
       cellId: cell.id,
       archetypeId: `${cell.id}:${kind}:${archetypeIndex}`,
@@ -304,12 +340,36 @@ function collectCellArchetypeSources(
       rootMaterial,
       capacity,
       sourceObjectName: object.name || undefined,
-      ownedTextures: tintOptions ? [tintOptions.texture] : undefined,
+      ownedTextures: ownsTint ? [ownTint!.texture] : undefined,
     });
   });
 
   disposeObject3D(sourceRoot);
   return sources;
+}
+
+// The ground patches of one floor mesh: a strip blends with its neighbour's ground, the inner polygon only tints. A neighbour without a tint image does not blend.
+function floorPatchesFor(object: THREE.Mesh, ownTint: CellGroundTint, groundTints: ReadonlyMap<string, CellGroundTint>): FloorMaterialPatches {
+  const strip = object.userData.groundBlend as FloorStripBlend | undefined;
+
+  if (!strip) {
+    return { tint: ownTint };
+  }
+
+  const neighbourTint = groundTints.get(strip.neighbourCellId);
+  return {
+    tint: ownTint,
+    blend: {
+      ownTint,
+      neighbourMap: strip.neighbourMap,
+      neighbourColor: strip.neighbourColor,
+      neighbourTint: neighbourTint ?? ownTint,
+      halfWidthMeters: strip.halfWidthMeters,
+      noiseAmplitudeMeters: strip.noiseAmplitudeMeters,
+      seed: strip.seed,
+      enabled: strip.enabled && neighbourTint !== undefined,
+    },
+  };
 }
 
 function classifyObjectKind(object: THREE.Mesh): CellRenderArchetypeKind | undefined {
@@ -354,15 +414,28 @@ function classifyObjectKind(object: THREE.Mesh): CellRenderArchetypeKind | undef
   return undefined;
 }
 
-// Clone -> floor patch -> ground tint -> portal clip: the clip patch chains the earlier hooks and must stay last.
+/** The ground patches a floor mesh's material gets: the tint, or the blend with the neighbour (which includes the tint). */
+interface FloorMaterialPatches {
+  readonly tint: CellGroundTint;
+  readonly blend?: GroundBlendOptions;
+}
+
+// Clone -> floor patch -> ground tint or ground blend -> portal clip: the clip patch chains the earlier hooks and must stay last.
 function cloneMaterial(
   material: THREE.Material | THREE.Material[],
   portalClipMaterialState: PortalClipMaterialState | undefined,
-  groundTint: { readonly tint: GroundTint; readonly texture: THREE.Texture } | undefined,
+  floorPatches: FloorMaterialPatches | undefined,
 ): THREE.Material | THREE.Material[] {
   const prepare = (entry: THREE.Material): THREE.Material => {
     const patched = patchFloorPatchMaterial(entry.clone());
-    return groundTint ? patchGroundTintMaterial(patched, groundTint.texture, groundTint.tint) : patched;
+
+    if (!floorPatches) {
+      return patched;
+    }
+
+    return floorPatches.blend
+      ? patchGroundBlendMaterial(patched, floorPatches.blend)
+      : patchGroundTintMaterial(patched, floorPatches.tint.texture, floorPatches.tint.tint);
   };
 
   if (Array.isArray(material)) {

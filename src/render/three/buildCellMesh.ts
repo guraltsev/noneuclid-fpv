@@ -20,7 +20,9 @@ import {
   shouldRenderPortalWall,
   type PortalPanelModeId,
 } from "../../glue/portalPanelMode";
+import { sceneryBiomeForFloor, type SceneryLayoutOptions } from "../../world-assets/sceneryLayout";
 import { buildCellSceneryMesh } from "./buildCellScenery";
+import { blendStripWidthMeters, buildFloorBlendGeometry, groundBlendTransition } from "./groundBlendGeometry";
 import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex";
 import type { WorldDressing } from "../../world-assets/worldDressing";
 import { buildCellLandmarksMesh } from "./buildCellLandmarks";
@@ -64,9 +66,11 @@ export function buildCellMesh(cell: CompiledPrismCell, options: BuildCellMeshOpt
     })),
   };
 
-  group.add(buildFloorMesh(cell, options.assets, options.floorUvFrame));
+  for (const floorMesh of buildFloorMeshes(cell, options)) {
+    group.add(floorMesh);
+  }
   // Lattice floors (the torus family) are continuous across cells by design, so they get no per-cell scenery.
-  const scenery = options.floorUvFrame ? undefined : buildCellSceneryMesh(cell);
+  const scenery = options.floorUvFrame ? undefined : buildCellSceneryMesh(cell, sceneryNeighbourOptions(cell, options.world));
   if (scenery) {
     group.add(scenery);
   }
@@ -123,7 +127,121 @@ export function floorColorTexture(cell: CompiledPrismCell, assets: Pick<Prepared
   });
 }
 
-function buildFloorMesh(cell: CompiledPrismCell, assets: PreparedWorldAssets, floorUvFrame?: FloorLatticeUvFrame): THREE.Object3D {
+/** What a floor strip's material needs to blend into the neighbour; stored in the strip mesh's `userData.groundBlend`, never in a material (clones JSON-copy `userData`). */
+export interface FloorStripBlend {
+  /** The cell whose ground the strip blends into (the cell itself on a side that does not blend). */
+  readonly neighbourCellId: string;
+  /** Colour texture of the neighbour's floor; shared, never disposed by the strip. */
+  readonly neighbourMap: THREE.Texture;
+  /** The neighbour's `floorColor`. */
+  readonly neighbourColor: THREE.Color;
+  /** Noise seed, equal for both cells of the portal. */
+  readonly seed: number;
+  /** Half-width of the transition, meters. */
+  readonly halfWidthMeters: number;
+  /** Amplitude of the border noise, meters. */
+  readonly noiseAmplitudeMeters: number;
+  /** False on a side that does not blend (solid wall): the neighbour's share is forced to 0. */
+  readonly enabled: boolean;
+}
+
+// The cells a biome can blend with: the glued neighbour of each side, when it exists and is a textured floor.
+function sceneryNeighbourOptions(cell: CompiledPrismCell, world: CompiledCellComplex | undefined): SceneryLayoutOptions {
+  if (!world) {
+    return {};
+  }
+
+  const biomes = new Map<number, ReturnType<typeof sceneryBiomeForFloor>>();
+  let width = blendStripWidthMeters(cell);
+
+  for (const portal of cell.portals) {
+    const neighbour = world.cellsById.get(portal.targetCellId);
+
+    if (neighbour?.floorMaterial.kind === "floor-texture") {
+      biomes.set(portal.sideIndex, sceneryBiomeForFloor(neighbour.floorMaterial.name));
+      width = Math.min(width, blendStripWidthMeters(neighbour));
+    }
+  }
+
+  return { neighbourBiomeBySideIndex: biomes, neighbourBlendHalfWidthMeters: groundBlendTransition(width, width).halfWidthMeters };
+}
+
+function createFloorMaterial(cell: CompiledPrismCell, assets: PreparedWorldAssets, floorUvFrame?: FloorLatticeUvFrame): THREE.MeshStandardMaterial {
+  const material = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(cell.floorColor),
+    roughness: 0.85,
+    metalness: 0,
+    side: THREE.DoubleSide,
+  });
+  material.userData.floorMaterialKind = cell.floorMaterial.kind;
+  material.normalScale = new THREE.Vector2(0.8, 0.8);
+
+  if (cell.floorMaterial.kind === "floor-texture" && cell.floorMaterial.colorTexturePath) {
+    const texture = floorColorTexture(cell, assets);
+
+    if (texture) {
+      material.map = texture;
+      if (floorUvFrame) {
+        material.userData.floorPatchField = floorPatchField(floorUvFrame);
+      }
+      material.userData.textureUrl = cell.floorMaterial.colorTexturePath;
+    } else {
+      material.userData.missingTextureUrl = cell.floorMaterial.colorTexturePath;
+    }
+  }
+
+  material.needsUpdate = true;
+  return material;
+}
+
+// A metric textured floor in a world is an inner polygon plus one blend strip per side (design 018 section 8.3); every other floor is one mesh.
+function buildFloorMeshes(cell: CompiledPrismCell, options: BuildCellMeshOptions): readonly THREE.Mesh[] {
+  const ownTexture = !options.floorUvFrame && options.world ? floorColorTexture(cell, options.assets) : undefined;
+
+  if (!options.world || !ownTexture) {
+    return [buildFloorMesh(cell, options.assets, options.floorUvFrame)];
+  }
+
+  const neighbours = new Map<number, CompiledPrismCell>();
+  const neighbourTextures = new Map<number, THREE.Texture>();
+
+  for (const portal of cell.portals) {
+    const neighbour = options.world.cellsById.get(portal.targetCellId);
+    const texture = neighbour ? floorColorTexture(neighbour, options.assets) : undefined;
+
+    if (neighbour && texture) {
+      neighbours.set(portal.sideIndex, neighbour);
+      neighbourTextures.set(portal.sideIndex, texture);
+    }
+  }
+
+  const geometry = buildFloorBlendGeometry(cell, neighbours);
+  const inner = new THREE.Mesh(geometry.inner, createFloorMaterial(cell, options.assets));
+  inner.name = `floor:${cell.id}`;
+  const meshes: THREE.Mesh[] = [inner];
+
+  for (const strip of geometry.strips) {
+    const mesh = new THREE.Mesh(strip.geometry, createFloorMaterial(cell, options.assets));
+    mesh.name = `floor:${cell.id}:side-${strip.sideIndex}`;
+    const blends = strip.neighbourCellId !== undefined;
+    const neighbour = blends ? neighbours.get(strip.sideIndex) : undefined;
+    const blend: FloorStripBlend = {
+      neighbourCellId: strip.neighbourCellId ?? cell.id,
+      neighbourMap: (blends ? neighbourTextures.get(strip.sideIndex) : undefined) ?? ownTexture,
+      neighbourColor: new THREE.Color((neighbour ?? cell).floorColor),
+      seed: strip.seed,
+      halfWidthMeters: strip.halfWidthMeters,
+      noiseAmplitudeMeters: strip.noiseAmplitudeMeters,
+      enabled: blends,
+    };
+    mesh.userData = { kind: "floor-strip", cellId: cell.id, sideIndex: strip.sideIndex, groundBlend: blend };
+    meshes.push(mesh);
+  }
+
+  return meshes;
+}
+
+function buildFloorMesh(cell: CompiledPrismCell, assets: PreparedWorldAssets, floorUvFrame?: FloorLatticeUvFrame): THREE.Mesh {
   const shape = new THREE.Shape();
   const first = cell.baseVertices[0];
 
@@ -149,32 +267,7 @@ function buildFloorMesh(cell: CompiledPrismCell, assets: PreparedWorldAssets, fl
   geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
   geometry.rotateX(-Math.PI / 2);
 
-  const material = new THREE.MeshStandardMaterial({
-    color: new THREE.Color(cell.floorColor),
-    roughness: 0.85,
-    metalness: 0,
-    side: THREE.DoubleSide,
-  });
-  material.userData.floorMaterialKind = cell.floorMaterial.kind;
-  material.normalScale = new THREE.Vector2(0.8, 0.8);
-
-  if (cell.floorMaterial.kind === "floor-texture" && cell.floorMaterial.colorTexturePath) {
-    const texture = floorColorTexture(cell, assets);
-
-    if (texture) {
-      material.map = texture;
-      if (floorUvFrame) {
-        material.userData.floorPatchField = floorPatchField(floorUvFrame);
-      }
-      material.userData.textureUrl = cell.floorMaterial.colorTexturePath;
-    } else {
-      material.userData.missingTextureUrl = cell.floorMaterial.colorTexturePath;
-    }
-  }
-
-  material.needsUpdate = true;
-
-  const floor = new THREE.Mesh(geometry, material);
+  const floor = new THREE.Mesh(geometry, createFloorMaterial(cell, assets, floorUvFrame));
   floor.name = `floor:${cell.id}`;
   return floor;
 }

@@ -10,7 +10,13 @@
 
 import * as THREE from "three";
 import type { CompiledPrismCell } from "../../cell-complex/prismCells";
-import { computeSceneryLayout, sceneryTrianglesByKind, type SceneryProp, type SceneryPropKind } from "../../world-assets/sceneryLayout";
+import {
+  computeSceneryLayout,
+  sceneryTrianglesByKind,
+  type SceneryLayoutOptions,
+  type SceneryProp,
+  type SceneryPropKind,
+} from "../../world-assets/sceneryLayout";
 import { createSeededRandom, hashStringToSeed } from "../../world-assets/seededNoise";
 
 /**
@@ -146,10 +152,10 @@ class SceneryWriter {
 
 /**
  * Builds the scenery mesh of `cell`, or undefined when the cell grows nothing (no biome, a flat-colour floor).
- * The geometry belongs to the caller (disposed with the cell mesh); the material is new per mesh.
+ * `layoutOptions` carries the neighbouring biomes of the cell's sides (see `SceneryLayoutOptions`). The geometry belongs to the caller (disposed with the cell mesh); the material is new per mesh.
  */
-export function buildCellSceneryMesh(cell: CompiledPrismCell): THREE.Mesh | undefined {
-  const props = computeSceneryLayout(cell);
+export function buildCellSceneryMesh(cell: CompiledPrismCell, layoutOptions: SceneryLayoutOptions = {}): THREE.Mesh | undefined {
+  const props = computeSceneryLayout(cell, layoutOptions);
 
   if (props.length === 0) {
     return undefined;
