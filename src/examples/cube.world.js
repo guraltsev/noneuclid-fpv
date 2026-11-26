@@ -86,18 +86,11 @@ top_grass = grass("top-grass", {
   turn: -9,
 });
 
-bottom_bicycle = bicycle("bottom-bicycle", {
-  position: [-0.5, 0, -0.8],
-  scale: 0.85,
-  turn: 29,
-});
-
 OnFace("front", [front_mouse]);
 OnFace("right", [right_tree]);
 OnFace("back", [back_butterfly]);
 OnFace("left", [left_bench]);
 OnFace("top", [top_grass]);
-OnFace("bottom", [bottom_bicycle]);
 
 // What this world can show the student: there is no shape machine here, so that discovery is left out (design 017 section 9.4).
 discoveries({ disable: ["new-shape"] });

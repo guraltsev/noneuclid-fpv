@@ -35,24 +35,29 @@ export interface FaceTheme {
 
 // --- small helpers -----------------------------------------------------------------------------------------------------------------------
 
-type Role = keyof Pick<FacePalette, "primary" | "secondary" | "accent" | "dark" | "light" | "glow">;
+/** A palette role a part can take. */
+export type Role = keyof Pick<FacePalette, "primary" | "secondary" | "accent" | "dark" | "light" | "glow">;
 
-const TAU = Math.PI * 2;
+/** A full turn, radians. */
+export const TAU = Math.PI * 2;
 
-function between(random: () => number, low: number, high: number): number {
+/** A random number from `low` to `high`. */
+export function between(random: () => number, low: number, high: number): number {
   return low + (high - low) * random();
 }
 
-function integer(random: () => number, low: number, high: number): number {
+/** A random whole number from `low` to `high`, both included. */
+export function integer(random: () => number, low: number, high: number): number {
   return low + Math.floor(random() * (high - low + 1));
 }
 
-function pick<T>(random: () => number, items: readonly T[]): T {
+/** A random item of `items`. */
+export function pick<T>(random: () => number, items: readonly T[]): T {
   return items[Math.floor(random() * items.length) % items.length];
 }
 
 /** A part list under construction, with one helper per shape; colours are palette roles or hex strings. */
-class Kit {
+export class Kit {
   readonly parts: LandmarkPart[] = [];
 
   constructor(
@@ -117,7 +122,8 @@ class Kit {
   }
 }
 
-function build(random: () => number, palette: FacePalette, emit: (kit: Kit) => void): readonly LandmarkPart[] {
+/** Runs `emit` on a fresh kit and returns the parts it made. */
+export function build(random: () => number, palette: FacePalette, emit: (kit: Kit) => void): readonly LandmarkPart[] {
   const kit = new Kit(random, palette);
   emit(kit);
   return kit.parts;
@@ -152,8 +158,8 @@ function stoneStack(kit: Kit, at: Vec3, count: number, base: number, roles: read
   return z;
 }
 
-// A house: walls, gable roof, a door and a few windows. `yaw` turns it; returns nothing.
-function house(kit: Kit, at: Vec3, width: number, depth: number, wall: number, yaw: number): void {
+/** A house: walls, gable roof, a door on its -v side and a few windows; `yaw` turns it. */
+export function house(kit: Kit, at: Vec3, width: number, depth: number, wall: number, yaw: number): void {
   const { random } = kit;
   const cos = Math.cos(yaw);
   const sin = Math.sin(yaw);
@@ -170,8 +176,8 @@ function house(kit: Kit, at: Vec3, width: number, depth: number, wall: number, y
   }
 }
 
-// A bench: seat, back and four legs, `length` long, facing -v after `yaw`.
-function bench(kit: Kit, at: Vec3, length: number, yaw: number): void {
+/** A bench: seat, back and four legs, `length` long, facing -v after `yaw`. */
+export function bench(kit: Kit, at: Vec3, length: number, yaw: number): void {
   const cos = Math.cos(yaw);
   const sin = Math.sin(yaw);
   const local = (u: number, v: number, w: number): Vec3 => [at[0] + u * cos - v * sin, at[1] + u * sin + v * cos, at[2] + w];
@@ -199,6 +205,22 @@ function wheel(kit: Kit, at: Vec3, radius: number, spokes: number, yaw: number, 
   }
 }
 
+/** A bicycle along `u` with wheels of radius `r`: frame, saddle and handlebar, its parts sized with the wheels. */
+export function bicycle(kit: Kit, r: number): void {
+  const gap = r * 2.3;
+  const tube = Math.max(0.02, r * 0.07);
+  wheel(kit, [-gap / 2, 0, r], r, 8, 0, "dark", "light");
+  wheel(kit, [gap / 2, 0, r], r, 8, 0, "dark", "light");
+  const crank: Vec3 = [0, 0, r];
+  const seat: Vec3 = [-r * 0.35, 0, r * 2.0];
+  const head: Vec3 = [gap / 2 - r * 0.35, 0, r * 2.05];
+  polyline(kit, [[-gap / 2, 0, r], crank, seat, [-gap / 2, 0, r]], tube, "primary");
+  polyline(kit, [crank, head, [gap / 2, 0, r]], tube, "primary");
+  kit.strut(seat, head, tube, "primary");
+  kit.box([seat[0], 0, seat[2] + tube], r * 0.55, r * 0.25, r * 0.11, "dark");
+  kit.strut([head[0] - tube, -r * 0.5, head[2] + r * 0.28], [head[0] - tube, r * 0.5, head[2] + r * 0.28], tube * 0.8, "dark");
+}
+
 // A gear standing in the u-w plane turned by `yaw`: a toothed disc with a hub.
 function gear(kit: Kit, at: Vec3, radius: number, teeth: number, thickness: number, yaw: number, role: Role): void {
   kit.star(at, teeth, radius, radius * 0.86, thickness, role, { yaw });
@@ -217,8 +239,8 @@ function lampHead(kit: Kit, at: Vec3, shadeRadius: number, role: Role): void {
   kit.ball([at[0], at[1], at[2]], shadeRadius * 0.38, shadeRadius * 0.38, shadeRadius * 0.38, "glow", { glow: true, longitudes: 6, latitudes: 3 });
 }
 
-// A polyline of struts through `points`.
-function polyline(kit: Kit, points: readonly Vec3[], radius: number, role: Role): void {
+/** A polyline of struts through `points`. */
+export function polyline(kit: Kit, points: readonly Vec3[], radius: number, role: Role): void {
   for (let index = 0; index + 1 < points.length; index += 1) {
     kit.strut(points[index], points[index + 1], radius, role);
   }
@@ -465,20 +487,7 @@ const clockwork: FaceTheme = {
       kit.strut([-0.8, 0.3, 0], [0, 0.3, radius + 0.3], 0.07, "dark");
       kit.strut([0.8, 0.3, 0], [0, 0.3, radius + 0.3], 0.07, "dark");
     }),
-    generator("big bicycle", (kit) => {
-      const r = between(kit.random, 0.9, 1.2);
-      const gap = r * 2.3;
-      wheel(kit, [-gap / 2, 0, r], r, 8, 0, "dark", "light");
-      wheel(kit, [gap / 2, 0, r], r, 8, 0, "dark", "light");
-      const crank: Vec3 = [0, 0, r];
-      const seat: Vec3 = [-r * 0.35, 0, r * 2.0];
-      const head: Vec3 = [gap / 2 - r * 0.35, 0, r * 2.05];
-      polyline(kit, [[-gap / 2, 0, r], crank, seat, [-gap / 2, 0, r]], 0.05, "primary");
-      polyline(kit, [crank, head, [gap / 2, 0, r]], 0.05, "primary");
-      kit.strut(seat, head, 0.05, "primary");
-      kit.box([seat[0], 0, seat[2] + 0.05], 0.4, 0.18, 0.08, "dark");
-      kit.strut([head[0] - 0.05, -0.35, head[2] + 0.2], [head[0] - 0.05, 0.35, head[2] + 0.2], 0.04, "dark");
-    }),
+    generator("bicycle", (kit) => bicycle(kit, between(kit.random, 0.6, 0.72))),
   ],
   prop: [
     generator("fallen gear", (kit) => {
@@ -1047,8 +1056,8 @@ const kites: FaceTheme = {
 };
 
 
-// A tree: a leaning trunk and a crown of one to three overlapping balls (round) or stacked cones (pointed).
-function tree(kit: Kit, at: Vec3, height: number, pointed: boolean): void {
+/** A tree: a leaning trunk and a crown of one to three overlapping balls (round) or stacked cones (pointed). */
+export function tree(kit: Kit, at: Vec3, height: number, pointed: boolean): void {
   const { random } = kit;
   const lean: Vec3 = [between(random, -0.3, 0.3), between(random, -0.3, 0.3), 0];
   const top: Vec3 = [at[0] + lean[0], at[1] + lean[1], at[2] + height * 0.45];

@@ -688,6 +688,20 @@ Swept collision of a moving disc against discs and capsules in one flat plane, a
 
 ## `world-assets`
 
+### `world-assets/decorationModels.ts`
+
+Decorations generated in code (design 018 section 9.8): the bench, bicycle, trees, flowers, sign, cone and house that world files place by hand are built from the landmark part kit instead of loaded from glTF files.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| type | `GeneratedDecorationKind` | The decorations built in code. |
+| const | `generatedDecorationKinds` | Every generated decoration kind. |
+| const | `generatedDecorationPathPrefix` | Prefix of the asset path of a generated decoration. |
+| function | `generatedDecorationPath` | The asset path that names a generated decoration. |
+| function | `generatedDecorationKindOf` | The kind named by `assetPath`, or undefined when it is not a generated decoration. |
+| function | `decorationSeed` | The seed of an object's model: its id and the world's look seed, so every look varies it. |
+| function | `buildDecorationParts` | The parts of a generated decoration of `kind` from `seed`, in `palette`. |
+
 ### `world-assets/facePalettes.ts`
 
 Colour palettes of faces (design 018 section 9.2): every face gets a key hue and a colour scheme, and every colour on it (its landmarks and a tint of its ground) comes from the palette built from them, so a face is recognised by colour from far away.
@@ -713,7 +727,7 @@ Which face gets which theme and palette (design 018 section 9.3).
 | Kind | Name | Summary |
 | --- | --- | --- |
 | interface | `FaceLook` | What a face looks like. |
-| const | `decorationThemeIdsByAssetFolder` | The themes an authored decoration fits, by the folder of its model (`library.ts`), best first. |
+| const | `decorationThemeIdsByAssetFolder` | The themes an authored decoration fits, by its generated kind or the folder of its loaded model (`library.ts`), best first. |
 | function | `decorationThemeIdsFor` | The theme ids the decoration with model `assetPath` fits, best first, or undefined when it is not a decoration. |
 | const | `maxKeyHues` | Most key hues the wheel is cut into. |
 | function | `isThemedCell` | Whether a cell is themed (gets landmarks and a palette). |
@@ -729,6 +743,18 @@ Face themes (design 018 section 9.1): what stands on a face.
 | interface | `GeneratorContext` | What a generator gets. |
 | interface | `LandmarkGenerator` | A named generator: the name is shown in debugging and kept on the placement. |
 | interface | `FaceTheme` | A theme: its name and its generators per role. |
+| type | `Role` | A palette role a part can take. |
+| const | `TAU` | A full turn, radians. |
+| function | `between` | A random number from `low` to `high`. |
+| function | `integer` | A random whole number from `low` to `high`, both included. |
+| function | `pick` | A random item of `items`. |
+| class | `Kit` | A part list under construction, with one helper per shape; colours are palette roles or hex strings. |
+| function | `build` | Runs `emit` on a fresh kit and returns the parts it made. |
+| function | `house` | A house: walls, gable roof, a door on its -v side and a few windows; `yaw` turns it. |
+| function | `bench` | A bench: seat, back and four legs, `length` long, facing -v after `yaw`. |
+| function | `bicycle` | A bicycle along `u` with wheels of radius `r`: frame, saddle and handlebar, its parts sized with the wheels. |
+| function | `polyline` | A polyline of struts through `points`. |
+| function | `tree` | A tree: a leaning trunk and a crown of one to three overlapping balls (round) or stacked cones (pointed). |
 | const | `faceThemes` | Every theme, in a fixed order; the assignment draws from it. |
 | function | `faceThemeById` | The theme with the given id. |
 
@@ -3038,6 +3064,8 @@ Builds the Three.js node for a static decoration (asset object) declared in a ce
 | --- | --- | --- |
 | const | `staticMarmotAssetPath` | Legacy asset path that is replaced by the procedural marmot proxy instead of loading a glTF. |
 | function | `buildDecorationMesh` | Builds the render node for the static asset object `objectSpec` of cell `cellId`. |
+| interface | `DecorationLook` | What a generated decoration is drawn with: its face's palette, the world's look seed and the cell's baked light direction. |
+| const | `defaultDecorationLook` | The look of a generated decoration outside any themed face (a warm, muted wood). |
 | function | `buildStaticMarmotProxy` | Builds a small procedural marmot (boxes for body, head, muzzle, tail, ears, eyes and legs) used in place of the legacy marmot glTF. |
 
 ### `render/three/buildPortalMesh.ts`
@@ -3230,13 +3258,17 @@ Debug visuals attached to cell roots: object collision wireframes, selectable-hi
 
 ### `render/three/decorationPalette.ts`
 
-Recolours an authored decoration (a bicycle, a bench, a tree, ...) in the palette of the face it stands on (design 018 section 9.6), so hand-placed models belong to their face like the generated landmarks do.
+Recolours an authored decoration (a bench, a tree, a sign, ...) in the palette of the face it stands on (design 018 section 9.6), so hand-placed models belong to their face like the generated landmarks do.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
-| const | `decorationRecolorStrength` | How far a material's colour moves to its palette role (0 keeps it, 1 replaces its hue entirely). |
-| function | `recoloredDecorationColor` | The colour `original` takes for the palette colour `target` (both linear): `target` at `original`'s luminance, mixed in by the strength. |
-| function | `recolorDecoration` | Recolours every material under `root` in `palette` (see the module header). |
+| const | `decorationRecolorStrength` | How far a decoration loses its own colour to its palette role (0 keeps it, 1 is the role's hue at the model's brightness). |
+| const | `decorationTintMaxChannel` | Largest multiplier a colour channel may get, so a saturated role colour keeps some brightness. |
+| interface | `DecorationRecolor` | What `material.userData.decorationRecolor` holds. |
+| function | `decorationTint` | The tint of a palette colour: its linear RGB at unit luminance, scaled down where a channel would exceed {@link decorationTintMaxChannel}. |
+| function | `recoloredSurface` | The colour the shader makes of a surface colour (linear RGB): desaturated by `strength`, then tinted (also by `strength`). |
+| function | `applyDecorationRecolor` | Installs the recolouring hook on `material` if its `userData.decorationRecolor` asks for one (see the module header); chains any earlier hook and program cache key. |
+| function | `recolorDecoration` | Recolours every material under `root` in `palette`: each distinct material is cloned (glTF clones share materials, so the preloaded asset is never changed), marked with its role's tint and hooked. |
 
 ### `render/three/desktopControls.ts`
 

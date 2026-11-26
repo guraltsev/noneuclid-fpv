@@ -28,6 +28,10 @@ remain derivatives of their listed source material.
 
 ## Runtime models and images with established provenance
 
+The bench, bicycle, trees, flowers, flower pot, stop sign, traffic cone and small house were removed on 2026-11-25: they are
+now generated in code (`src/world-assets/decorationModels.ts`, design 018 section 9.8), so their third-party models and
+licence files are no longer distributed.
+
 All entries in this table are runtime-distributed unless stated otherwise. For
 Creative Commons Attribution 3.0 material, retain the supplied credit and a
 link to [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/).
@@ -35,26 +39,17 @@ link to [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/).
 | Path | Original work, creator, and source | License | Required attribution |
 | --- | --- | --- | --- |
 | `baloon/Balloon.glb` | [Balloon, Poly by Google](https://poly.pizza/m/d1gDDhM7pTf) | CC BY 3.0 | “Balloon by Poly by Google via Poly Pizza.” |
-| `Bench/Bench.glb` | [Bench, Danni Bittman](https://poly.pizza/m/dfDUkVthkMT) | CC BY 3.0 | “Bench by Danni Bittman via Poly Pizza.” |
-| `bicycle/Bicycle.glb` | [Bicycle, Poly by Google](https://poly.pizza/m/19VoUuA2pcN) | CC BY 3.0 | “Bicycle by Poly by Google via Poly Pizza.” |
 | `butterfly/Butterfly.glb` | [Butterfly, Poly by Google](https://poly.pizza/m/2ZwYwkTVnfG) | CC BY 3.0 | “Butterfly by Poly by Google via Poly Pizza.” |
 | `cactus/Cactus.glb` (public only) | [Cactus, SoyMaria](https://poly.pizza/m/7S5Snphkam) | CC BY 3.0 | “Cactus by SoyMaria via Poly Pizza.” |
-| `flowerPot/flower_pot.glb` | [Flower Pot, Zsky](https://poly.pizza/m/XOT4ajEFjU) | CC BY 3.0 | “Flower Pot by Zsky via Poly Pizza.” |
 | `lowpolyhands/Lowpolyhands.glb` | [Low poly hands, Anastasiia Ku](https://poly.pizza/m/cGaYRuiPCMe) | CC BY 3.0 | “Low poly hands by Anastasiia Ku via Poly Pizza.” |
 | `mapMarker/MapMarker.glb` (public only) | [Map Marker, Chris Ross](https://poly.pizza/m/6ij4nru_NPh) | CC BY 3.0 | “Map Marker by Chris Ross via Poly Pizza.” |
 | `mouse/Mouse.glb` | [Mouse, Poly by Google](https://poly.pizza/m/cWxdxmp7yaE) | CC BY 3.0 | “Mouse by Poly by Google via Poly Pizza.” |
 | `questionblock/questionBlock.glb` | [?-Block, Studio Creality](https://poly.pizza/m/dIC3dNIL84K) | CC BY 3.0 | “?-Block by Studio Creality via Poly Pizza.” |
 | `jobbot/JobBot.glb` | [Job Simulator Job Bot, Tipatat Chennavasin](https://poly.pizza/m/bV9H_MniqF0) | CC BY 3.0 | “Job Simulator Job Bot by Tipatat Chennavasin via Poly Pizza.” |
 | `simplesuitcase/SimpleSuitcase.glb` (public only) | [Simple Suitcase, Don Carson](https://poly.pizza/m/023W-XcCmir) | CC BY 3.0 | “Simple Suitcase by Don Carson via Poly Pizza.” |
-| `small_house/small_house.glb` | [Small House, Jarlan Perez](https://poly.pizza/m/053kskrV4U_) | CC BY 3.0 | “Small House by Jarlan Perez via Poly Pizza.” |
-| `stopsign/stop_sign.glb` | [Stop sign, Poly by Google](https://poly.pizza/m/60GyU9CdZ9r) | CC BY 3.0 | “Stop sign by Poly by Google via Poly Pizza.” |
 | `streetlight/StreetLight.glb` (public only) | [Street Light, J-Toastie](https://poly.pizza/m/MRv3Lubm2V) | CC BY 3.0 | “Street Light by J-Toastie via Poly Pizza.” |
-| `Tree1/Tree.glb` | [Tree, Poly by Google](https://poly.pizza/m/6pwiq7hSrHr) | CC BY 3.0 | “Tree by Poly by Google via Poly Pizza.” |
 | `computerlarge/ComputerLarge.glb` | [Computer Large, Quaternius](https://poly.pizza/m/or4LLmesjq) | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) | Credit not required; “Computer Large by Quaternius via Poly Pizza” is retained. |
-| `FloweGroup/flower_group.glb` | [Flower Group, Quaternius](https://poly.pizza/m/hfPzQAedOe) | CC0 1.0 | Credit not required; “Flower Group by Quaternius via Poly Pizza” is retained. |
 | `grass1/Grass.glb` | [Grass, Quaternius](https://poly.pizza/m/vUJjrRsFp4) | CC0 1.0 | Credit not required; “Grass by Quaternius via Poly Pizza” is retained. |
-| `TreeSwirl/tree_swirl.glb` | [Tree Swirl, Quaternius](https://poly.pizza/m/czV0Ck0h2G) | CC0 1.0 | Credit not required; “Tree Swirl by Quaternius via Poly Pizza” is retained. |
-| `trafficCone/Cone.glb` | [Traffic Cone, Quaternius](https://poly.pizza/m/aDIrUbMbW3) | CC0 1.0 | Credit not required; “Traffic Cone by Quaternius via Poly Pizza” is retained. |
 | `WoodenSign1/WoodenSign1.glb`, `WoodenSign1/WoodenSign1.png`, `WoodenSign2/WoodenSign2.glb`, `WoodenSign2/WoodenSign2.png` | [Wooden Sign, iPoly3D](https://poly.pizza/m/3MStJYAez7) | CC0 1.0 | Credit not required; “Wooden Sign by iPoly3D via Poly Pizza” is retained. |
 | `flashlight/Flashlight.glb` (public only) | [Flashlight, Jarlan Perez](https://poly.pizza/m/1UrYBPWN1U_) | CC BY 3.0 | “Flashlight by Jarlan Perez via Poly Pizza.” |
 | `flashlight/Lightsaber.glb`, `flashlight/Lightsaber.png` | [My First Lightsaber, Derek Elsby](https://poly.pizza/m/3KZ2s28Fohm) | CC BY 3.0 | “My First Lightsaber by Derek Elsby via Poly Pizza.” |
@@ -115,7 +110,7 @@ color/diffuse map and inherits its source asset’s license.
 | `icons/ruler.svg` | [Ruler, Phosphor Icons](https://github.com/phosphor-icons/core/blob/main/assets/regular/ruler.svg); [matching icons](https://phosphoricons.com/?q=ruler) | MIT | “Copyright 2023 Phosphor Icons.” |
 | `icons/ruler-inverted.svg` | Same as `icons/ruler.svg`, with strokes recolored white for dark backgrounds | MIT | “Copyright 2023 Phosphor Icons.” |
 | `icons/world-map.svg`, `icons/world-map-inverted.svg` | Project-made: an icosahedron seen along a vertex axis. The inverted file is the same drawing in white for dark backgrounds. | Covered by the project MIT License. |
-| `*/map-icon.svg` (one in the folder of each object's model, including `_legacy/*`) | Project-made: the objects' symbols on the world map, drawn as flat glyphs, not traced from the models or from any other icon set. | Covered by the project MIT License. |
+| `*/map-icon.svg` (one in the folder of each object's model, including `_legacy/*`; the folders of decorations generated in code, such as `Bench/` and `Tree1/`, now hold only the icon) | Project-made: the objects' symbols on the world map, drawn as flat glyphs, not traced from the models or from any other icon set. | Covered by the project MIT License. |
 | `icons/trash.svg` | [Trash 2, Feather Icons](https://github.com/feathericons/feather/blob/main/icons/trash-2.svg); [matching icons](https://feathericons.com) | MIT | “Copyright 2013-2023 Cole Bemis.” |
 | `icons/mouse-button-left.svg`, `icons/mouse-button-right.svg` | [Iconoir](https://iconoir.com); [MIT license](https://github.com/iconoir-icons/iconoir/blob/main/LICENSE) | MIT | “Copyright 2021 Luca Burgio.” |
 | `icons/a-alphabet.svg` through `icons/z-alphabet.svg` | [UXWing Alphabet icons](https://uxwing.com/wp-content/themes/uxwing/download/education-school/q-alphabet-icon.svg) | [UXWing license](https://uxwing.com/license/) | Attribution is not required; this project voluntarily credits UXWing. The files are used only as application assets, not offered as a separate icon collection, and are not relicensed. |

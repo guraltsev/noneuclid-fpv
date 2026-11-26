@@ -38,10 +38,14 @@ describe("assignFaceLooks", () => {
     }
   });
 
-  it.each(["cube", "dodecahedron"] as const)("gives every face of the %s its own theme", (name) => {
-    const looks = assignFaceLooks(worlds[name]);
-    const themes = [...looks.values()].map((look) => look.theme.id);
-    expect(new Set(themes).size).toBe(themes.length);
+  it("gives every face of the cube its own theme, and nearly every face of the dodecahedron", () => {
+    for (const seed of [1, 2, 3, 99]) {
+      const cubeThemes = [...assignFaceLooks(worlds.cube, seed).values()].map((look) => look.theme.id);
+      expect(new Set(cubeThemes).size).toBe(cubeThemes.length);
+      // Ten of its twelve faces hold decorations that limit their themes, so a theme may come back once, never next door.
+      const dodecahedronThemes = [...assignFaceLooks(worlds.dodecahedron, seed).values()].map((look) => look.theme.id);
+      expect(new Set(dodecahedronThemes).size).toBeGreaterThanOrEqual(dodecahedronThemes.length - 2);
+    }
   });
 
   it("is deterministic for a world and changes with the seed", () => {
@@ -65,16 +69,22 @@ describe("assignFaceLooks", () => {
     }
   });
 
-  it("maps decorations by their model folder to existing themes, and nothing else", () => {
+  it("maps decorations by kind or model folder to existing themes, and nothing else", () => {
     const ids = new Set(faceThemes.map((theme) => theme.id));
-    for (const path of ["bicycle/Bicycle.glb", "Bench/Bench.glb", "Tree1/Tree.glb", "stopsign/stop_sign.glb", "trafficCone/Cone.glb", "flowerPot/flower_pot.glb"]) {
+    for (const path of ["generated/bicycle", "generated/bench", "generated/tree", "generated/stop_sign", "generated/traffic_cone", "generated/flower_pot", "generated/small_house", "_legacy/low_poly_rocks/scene.gltf"]) {
       expect(decorationThemeIdsFor(path)!.length, path).toBeGreaterThan(0);
       for (const id of decorationThemeIdsFor(path)!) {
         expect(ids.has(id), `${path}: ${id}`).toBe(true);
       }
     }
-    for (const path of ["questionblock/questionBlock.glb", "small_house/small_house.glb", "grass1/Grass.glb", "toolstand/laser.glb"]) {
+    for (const path of ["questionblock/questionBlock.glb", "grass1/Grass.glb", "toolstand/laser.glb"]) {
       expect(decorationThemeIdsFor(path), path).toBeUndefined();
+    }
+  });
+
+  it.each(Object.entries(worlds))("on the %s: the player always starts in the village", (_name, world) => {
+    for (const seed of [1, 2, 3, 99]) {
+      expect(assignFaceLooks(world, seed).get(world.startingPosition!.cellId)!.theme.id).toBe("village");
     }
   });
 

@@ -109,12 +109,6 @@ face_4_stop_sign = stop_sign("octahedron-face-4-stop-sign", {
   turn: 26,
 });
 
-face_5_bicycle = bicycle("octahedron-face-5-bicycle", {
-  position: [-0.7, 0, 0.6],
-  scale: 0.75,
-  turn: -38,
-});
-
 face_6_grass = grass("octahedron-face-6-grass", {
   position: [0.2, 0, -0.8],
   scale: 1.1,
@@ -132,7 +126,6 @@ OnFace("face-1", [face_1_tree]);
 OnFace("face-2", [face_2_bench]);
 OnFace("face-3", [face_3_flower_group]);
 OnFace("face-4", [marker, face_4_stop_sign]);
-OnFace("face-5", [face_5_bicycle]);
 OnFace("face-6", [face_6_grass]);
 OnFace("face-7", [face_7_tree_swirl]);
 

@@ -337,10 +337,8 @@ shown at the bottom of the pause card ("World look N"), so a look someone likes 
 with options carries it too. Every consumer of the dressing (cell meshes, ground tint, landmark collisions, decoration colours)
 reads the same seed (`setActiveLookSeed`, `computeWorldDressing(world, seed)`).
 
-Authored decorations stay where the world file puts them, on a face whose theme they fit (section 9.3), and are recoloured in
-that face's palette (`render/three/decorationPalette.ts`): each distinct material is cloned and moved 80 percent towards a
-palette role (`primary`, `secondary`, `accent`, `light` in turn) at its own brightness, so a bench on a lime-and-purple village
-face is lime and purple like the generated benches around it.
+Authored decorations stay where the world file puts them, on a face whose theme they fit (section 9.3), in that face's palette
+(section 9.8).
 
 ### 9.7 Landmarks on the map
 
@@ -348,3 +346,21 @@ The world map shows each themed face's major landmark as an icon (`render/three/
 `worldMapPieces.ts`). The icon is drawn from the landmark's own parts, seen from its front, in its own colours, on a disc in the
 palette's light colour with a dark rim: the map shows the very cairn, tower or spider of this look, not a symbol for its kind.
 Minor landmarks and props stay off the map, which would be a jumble with them.
+
+### 9.8 Decorations generated in code
+
+The hand-placed decorations (bench, bicycle, tree, swirl tree, flower pot, flower group, stop sign, traffic cone and the
+house, the starting house included) are no longer glTF models: they are built from the same part kit as the landmarks
+(`world-assets/decorationModels.ts`). Their asset path is `generated/<kind>`; nothing is preloaded, and the renderer builds
+the mesh from parts. Each is drawn in its face's palette, with the cell's light baked in, and varied by its own seed (its id
+and the look seed), so it belongs to its face and is a little different in every look. Sizes are real meters at author scale 1,
+matched to the collision cylinders the library gives them; author scale keeps its meaning. Outside a themed face (the torus
+family) they take a muted wood palette.
+
+- The house fits only the village theme, so the player always starts in the village, the de Chirico face of houses and a
+  tower; its door faces the start.
+- The premade bicycles were removed from the themed worlds (the clockwork theme generates bicycles, and two different bikes
+  were confusing). The basic cube's bottom face got a stop sign as its authored landmark instead.
+- The models left loaded from files (grass, the question cube, legacy props) are recoloured in the shader where they fit a
+  theme (`render/three/decorationPalette.ts`): desaturated, then tinted, so a texture changes as much as a plain colour.
+- The removed models and their licences are gone from `public/assets`; their map icons, which were project-made, stay.

@@ -112,12 +112,6 @@ lower_2_bench = bench("lower-2-bench", {
   turn: 72,
 });
 
-lower_3_bicycle = bicycle("lower-3-bicycle", {
-  position: [-0.7, 0, -0.2],
-  scale: 0.8,
-  turn: -36,
-});
-
 bottom_stop_sign = stop_sign("bottom-stop-sign", {
   position: [0, 0, 0],
   scale: 0.85,
@@ -133,7 +127,6 @@ OnFace("upper-4", [upper_4_tree_swirl]);
 OnFace("lower-0", [lower_0_flower_group]);
 OnFace("lower-1", [lower_1_traffic_cone]);
 OnFace("lower-2", [lower_2_bench]);
-OnFace("lower-3", [lower_3_bicycle]);
 OnFace("bottom", [bottom_stop_sign]);
 
 // What this world can show the student: there is no shape machine here, so that discovery is left out (design 017 section 9.4).

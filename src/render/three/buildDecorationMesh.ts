@@ -3,7 +3,8 @@
  *
  * The returned group is positioned in the cell-local frame converted to Three.js (spec position plus optional model offset,
  * meters; world z up becomes Three.js y up), tilted, yawed and scaled per the spec, and holds either the cloned preloaded
- * glTF scene or, for the legacy marmot asset, a procedural box-built proxy. The group is named `decoration:<id>` and
+ * glTF scene, a decoration generated in code from parts in its face's palette (`generated/<kind>` paths, `world-assets/decorationModels.ts`)
+ * or, for the legacy marmot asset, a procedural box-built proxy. The group is named `decoration:<id>` and
  * is meant to be added to the owning cell's root node. Throws if the asset was not preloaded.
  */
 import * as THREE from "three";
@@ -12,6 +13,11 @@ import type { AssetObjectSpec, CellObjectSpec } from "../../cell-complex/specs";
 import { runtimeDiagnostics } from "../../diagnostics/runtimeDiagnostics";
 import type { PreparedGltfAsset, PreparedWorldAssets } from "./preparedWorldAssets";
 import { disposeObject3D } from "./runtimeSceneUtils";
+import { buildCellLandmarksMesh } from "./buildCellLandmarks";
+import { buildDecorationParts, decorationSeed, generatedDecorationKindOf, type GeneratedDecorationKind } from "../../world-assets/decorationModels";
+import { buildFacePalette, type FacePalette } from "../../world-assets/facePalettes";
+import type { LandmarkPlacement } from "../../world-assets/landmarkLayout";
+import { measureParts } from "../../world-assets/landmarkParts";
 import { worldPointToThree, worldYawRadiansToThree } from "./worldAxes";
 
 /** Legacy asset path that is replaced by the procedural marmot proxy instead of loading a glTF. */
@@ -27,18 +33,31 @@ export function buildDecorationMesh(
   cellId: string,
   objectSpec: CellObjectSpec,
   assets: PreparedWorldAssets,
+  look: DecorationLook = defaultDecorationLook,
 ): THREE.Object3D {
   if (objectSpec.kind !== "asset") {
     throw new Error(`Cannot build static decoration mesh for object kind "${objectSpec.kind}".`);
   }
 
-  return buildStaticAssetMesh(cellId, objectSpec, assets);
+  return buildStaticAssetMesh(cellId, objectSpec, assets, look);
 }
+
+/** What a generated decoration is drawn with: its face's palette, the world's look seed and the cell's baked light direction. */
+export interface DecorationLook {
+  readonly palette: FacePalette;
+  readonly lookSeed?: number;
+  /** Direction in which shadows fall in the cell (radians from +x toward +y); the model's light is baked from it. */
+  readonly shadowAzimuthRadians: number;
+}
+
+/** The look of a generated decoration outside any themed face (a warm, muted wood). */
+export const defaultDecorationLook: DecorationLook = { palette: buildFacePalette(32, "tonal"), shadowAzimuthRadians: 0 };
 
 function buildStaticAssetMesh(
   cellId: string,
   objectSpec: AssetObjectSpec,
   assets: PreparedWorldAssets,
+  look: DecorationLook,
 ): THREE.Object3D {
   const group = new THREE.Group();
   group.name = `decoration:${objectSpec.id}`;
@@ -70,6 +89,14 @@ function buildStaticAssetMesh(
   placeholder.name = `placeholder:${objectSpec.id}`;
   group.add(placeholder);
 
+  const generatedKind = generatedDecorationKindOf(objectSpec.assetPath);
+  if (generatedKind !== undefined) {
+    placeholder.removeFromParent();
+    disposeObject3D(placeholder);
+    group.add(buildGeneratedDecoration(objectSpec, generatedKind, look));
+    return group;
+  }
+
   if (objectSpec.assetPath === staticMarmotAssetPath) {
     placeholder.removeFromParent();
     disposeObject3D(placeholder);
@@ -86,6 +113,34 @@ function buildStaticAssetMesh(
   replacePlaceholderWithPreparedAsset(group, placeholder, objectSpec, prepared);
   diagnostics.recordAssetInstanceComplete(cellId, objectSpec.id, objectSpec.assetPath, objectSpec.kind);
   return group;
+}
+
+// The model of a generated decoration, in the group's own frame: the parts at the origin, with the cell's light baked in as the object
+// stands (the group turns the model by the object's yaw, so the light is turned back by it).
+function buildGeneratedDecoration(objectSpec: AssetObjectSpec, kind: GeneratedDecorationKind, look: DecorationLook): THREE.Object3D {
+  const parts = buildDecorationParts(kind, decorationSeed(objectSpec.id, look.lookSeed), look.palette);
+  const measure = measureParts(parts);
+  const placement: LandmarkPlacement = {
+    themeId: "decoration",
+    kind,
+    role: "prop",
+    x: 0,
+    y: 0,
+    yawRadians: 0,
+    scale: 1,
+    seed: decorationSeed(objectSpec.id, look.lookSeed),
+    parts,
+    triangles: measure.triangles,
+    footprintRadiusMeters: measure.footprintRadiusMeters,
+    heightMeters: measure.heightMeters,
+    colliders: [],
+    floating: [],
+  };
+  const yaw = objectSpec.turnRadians ?? objectSpec.yawRadians ?? 0;
+  const mesh = buildCellLandmarksMesh(objectSpec.id, [placement], look.shadowAzimuthRadians - yaw)!;
+  mesh.name = `asset:${objectSpec.id}`;
+  mesh.userData = { kind: "generated-decoration", decorationKind: kind };
+  return mesh;
 }
 
 /**

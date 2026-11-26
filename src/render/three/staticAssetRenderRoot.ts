@@ -6,7 +6,7 @@
 import * as THREE from "three";
 import type { AssetObjectSpec } from "../../cell-complex/specs";
 import type { RigidTransform3 } from "../../math/rigidTransform3";
-import { buildDecorationMesh } from "./buildDecorationMesh";
+import { buildDecorationMesh, type DecorationLook } from "./buildDecorationMesh";
 import type { PreparedWorldAssets } from "./preparedWorldAssets";
 import { rigidTransformToThreeMatrix } from "./worldAxes";
 
@@ -22,8 +22,9 @@ export function buildStaticAssetRenderRoot(
   objectSpec: AssetObjectSpec,
   authoredPose: RigidTransform3,
   assets: PreparedWorldAssets,
+  look?: DecorationLook,
 ): THREE.Group {
-  const decoration = buildDecorationMesh(cellId, objectSpec, assets);
+  const decoration = buildDecorationMesh(cellId, objectSpec, assets, look);
   decoration.updateMatrix();
   const visualFromPose = rigidTransformToThreeMatrix(authoredPose).invert().multiply(decoration.matrix);
   // The matrix is set directly: a tilt with a non-uniform scale does not round-trip through position/quaternion/scale.
