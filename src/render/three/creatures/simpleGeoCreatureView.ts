@@ -15,6 +15,7 @@ import type { WorldObjectOwner } from "../../../world-objects/worldObjectOwner";
 import { buildObjectCollisionWireframe, updateObjectCollisionWireframe } from "../debugCollisionWireframes";
 import type { PreparedWorldAssets } from "../preparedWorldAssets";
 import { applyWorldRigidTransform } from "../worldAxes";
+import { buildGeneratedCreatureRoot } from "./generatedCreatureMesh";
 
 /**
  * Per-creature runtime handle owned by the renderer.
@@ -66,14 +67,22 @@ export function createSimpleGeoCreatureRuntime(
   const root = new THREE.Group();
   root.name = `${objectSpec.kind}:${objectSpec.id}`;
 
-  const prepared = assets.instantiateGltf(objectSpec.assetPath);
-  if (!prepared) {
-    throw new Error(`Geo creature asset was not preloaded: ${objectSpec.assetPath}`);
+  // A generated body is built in code and needs no asset; any other body was preloaded.
+  const assetLabel = objectSpec.generatedModel !== undefined ? `generated:${objectSpec.generatedModel.kind}` : objectSpec.assetPath ?? "";
+  let modelScene: THREE.Object3D;
+  if (objectSpec.generatedModel !== undefined) {
+    modelScene = buildGeneratedCreatureRoot(objectSpec.generatedModel.kind, objectSpec.generatedModel.seed);
+  } else {
+    const prepared = objectSpec.assetPath === undefined ? undefined : assets.instantiateGltf(objectSpec.assetPath);
+    if (!prepared) {
+      throw new Error(`Geo creature asset was not preloaded: ${assetLabel}`);
+    }
+    modelScene = prepared.scene;
   }
 
-  prepared.scene.name = `asset:${objectSpec.id}`;
-  placeSimpleGeoCreatureModel(prepared.scene, objectSpec);
-  root.add(prepared.scene);
+  modelScene.name = `asset:${objectSpec.id}`;
+  placeSimpleGeoCreatureModel(modelScene, objectSpec);
+  root.add(modelScene);
   const behavior = createSimpleGeoCreatureBehavior(objectSpec, startCellId, registry);
   const collisionWireframe = buildObjectCollisionWireframe(objectSpec.id, behavior.state);
   collisionWireframe.visible = false;
@@ -97,8 +106,8 @@ export function createSimpleGeoCreatureRuntime(
   };
   const diagnostics = runtimeDiagnostics();
 
-  diagnostics.recordAssetInstanceStart(startCellId, objectSpec.id, objectSpec.assetPath, objectSpec.kind);
-  diagnostics.recordAssetInstanceComplete(startCellId, objectSpec.id, objectSpec.assetPath, objectSpec.kind);
+  diagnostics.recordAssetInstanceStart(startCellId, objectSpec.id, assetLabel, objectSpec.kind);
+  diagnostics.recordAssetInstanceComplete(startCellId, objectSpec.id, assetLabel, objectSpec.kind);
   showBehaviorState();
 
   return {

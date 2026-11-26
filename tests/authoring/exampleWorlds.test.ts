@@ -281,7 +281,9 @@ function repeatedObjectAssetPaths(world: CellComplexSpec): string[] {
 
   for (const cell of world.cells) {
     for (const object of cell.visuals?.objects ?? []) {
-      counts.set(object.assetPath, (counts.get(object.assetPath) ?? 0) + 1);
+      if (object.assetPath !== undefined) {
+        counts.set(object.assetPath, (counts.get(object.assetPath) ?? 0) + 1);
+      }
     }
   }
 

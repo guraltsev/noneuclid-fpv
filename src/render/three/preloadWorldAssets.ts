@@ -64,7 +64,9 @@ export function collectWorldAssetPaths(world: CompiledCellComplex): readonly str
     }
 
     for (const object of cell.objects) {
-      assetPaths.add(object.assetPath);
+      if (object.assetPath !== undefined) {
+        assetPaths.add(object.assetPath);
+      }
       if (object.mapIconPath !== undefined) {
         assetPaths.add(object.mapIconPath);
       }

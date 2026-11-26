@@ -5,9 +5,10 @@
  */
 import type { CellObjectSpec, GeodesicMarmotObjectSpec, SimpleCollisionCylinderSpec } from "../cell-complex/specs";
 import { createGeodesicMarmot } from "./geodesicMarmot";
-import { createSimpleGeoCreature, type SimpleGeoCreatureAuthoringParams } from "./simpleGeoCreature";
+import { createGeneratedGeoCreature, createSimpleGeoCreature, type SimpleGeoCreatureAuthoringParams } from "./simpleGeoCreature";
 import { createStaticAssetObject, type StaticObjectAuthoringParams } from "./staticAssets";
 import { toolStandClass, userObjectClass } from "./objectMetadata";
+import { hashStringToSeed } from "../world-assets/seededNoise";
 import { toolNames } from "./vocabulary";
 
 const libraryObjectBrand = Symbol("world-library-object");
@@ -306,6 +307,13 @@ export interface WorldObjectLibrary {
    */
   readonly geo_mouse: (name: string, params: SimpleGeoCreatureAuthoringParams) => WorldLibraryObjectSpec;
   readonly geo_butterfly: (name: string, params: SimpleGeoCreatureAuthoringParams) => WorldLibraryObjectSpec;
+  /**
+   * Creatures whose bodies are generated in code (design 018 section 8.5), moved by the same geodesic behaviour:
+   * a small body on very long legs (it does not block the player), coloured discs on a wire (flies, does not block), and an eye that rolls on the ground (blocks like the mouse).
+   */
+  readonly geo_stilt_walker: (name: string, params: SimpleGeoCreatureAuthoringParams) => WorldLibraryObjectSpec;
+  readonly geo_drifting_mobile: (name: string, params: SimpleGeoCreatureAuthoringParams) => WorldLibraryObjectSpec;
+  readonly geo_rolling_eye: (name: string, params: SimpleGeoCreatureAuthoringParams) => WorldLibraryObjectSpec;
   /** Alias for small_house. */
   readonly house: (name: string, params: StaticObjectAuthoringParams) => WorldLibraryObjectSpec;
   readonly clock: (name: string, params: StaticObjectAuthoringParams) => WorldLibraryObjectSpec;
@@ -340,6 +348,12 @@ export const worldObjectLibrary: WorldObjectLibrary = {
     brandLibraryObject({ ...createSimpleGeoCreature("geo-mouse", name, "mouse/Mouse.glb", params), mapIconPath: "mouse/map-icon.svg" }),
   geo_butterfly: (name, params) =>
     brandLibraryObject({ ...createSimpleGeoCreature("geo-butterfly", name, "butterfly/Butterfly.glb", params), mapIconPath: "butterfly/map-icon.svg" }),
+  geo_stilt_walker: (name, params) =>
+    brandLibraryObject(createGeneratedGeoCreature(name, { kind: "stilt-walker", seed: hashStringToSeed(name) }, params)),
+  geo_drifting_mobile: (name, params) =>
+    brandLibraryObject(createGeneratedGeoCreature(name, { kind: "drifting-mobile", seed: hashStringToSeed(name) }, params)),
+  geo_rolling_eye: (name, params) =>
+    brandLibraryObject(createGeneratedGeoCreature(name, { kind: "rolling-eye", seed: hashStringToSeed(name) }, params)),
   house: (name, params) => worldObjectLibrary.small_house(name, params),
   clock: (name, params) => createDefinedStaticLibraryObject("clock", name, params),
   campfire: (name, params) => createDefinedStaticLibraryObject("campfire", name, params),
