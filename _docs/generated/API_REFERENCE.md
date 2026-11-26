@@ -135,6 +135,15 @@ Immutable 3D vector type and the small set of free functions used throughout the
 
 ## `cell-complex`
 
+### `cell-complex/cellSun.ts`
+
+The baked light direction of every cell (design 018 section 3).
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| const | `firstCellShadowAzimuthRadians` | Direction the shadows of the first cell point to, as an angle in radians from the cell's +x axis toward +y. |
+| function | `computeCellShadowAzimuths` | Computes, per cell id, the azimuth (radians from +x toward +y, cell-local) of the direction in which shadows fall in that cell. |
+
 ### `cell-complex/compileCellComplex.ts`
 
 Top-level compiler from an authored cell-complex spec to the runtime geometry used by movement and rendering.
@@ -360,7 +369,9 @@ Authoring-level data model for a cell complex: the plain-data spec that world fi
 | interface | `TutorialControlSpec` | One row of a tutorial page's control list: the input, and what it does here. |
 | interface | `SimpleCollisionCylinderSpec` | Vertical collision cylinder: radius and height in meters, with an optional offset from the object's anchor. |
 | interface | `GeodesicMarmotObjectSpec` | Autonomous marmot that moves along locally straight paths with a given velocity. |
-| interface | `SimpleGeoCreatureObjectSpec` | Autonomous creature (mouse or butterfly) moving at constant speed with an oscillation added. |
+| type | `GeneratedCreatureKind` | The bodies the renderer can generate in code instead of loading a glTF (design 018 section 8.5). |
+| interface | `GeneratedModelSpec` | A creature body generated in code: the kind picks the shape, the seed its small variations. |
+| interface | `SimpleGeoCreatureObjectSpec` | Autonomous creature moving at constant speed with an oscillation added. |
 | type | `CellObjectSpec` | Union of all object kinds that may appear in a cell's `visuals.objects`, discriminated by `kind`. |
 
 ### `cell-complex/staticLineCone.ts`
@@ -706,9 +717,24 @@ Per-cell ground tint image (design 018 section 4.1).
 | const | `groundContactShadowDefaultRadiusMeters` | Radius in meters used for a static object with no collision cylinder. |
 | const | `groundTintNeutralTexel` | Texel value that means "multiply by 1.0". |
 | interface | `GroundTintCell` | The structural part of a compiled prism cell that the tint needs. |
+| interface | `GroundShadowCaster` | Something tall that stands in a cell and throws a long shadow on its ground (a generated landmark, an authored object). |
 | interface | `GroundTintOptions` | Options of {@link computeGroundTint}. |
+| const | `groundShadowLengthPerHeight` | Length of a caster's shadow on the ground as a multiple of its height (a low sun). |
 | interface | `GroundTint` | A tint image and the cell-local rectangle it covers (x right, y forward, meters). |
 | function | `computeGroundTint` | Computes the tint image of a cell over its bounding box, seeded by the cell id so it is the same on every machine. |
+
+### `world-assets/landmarkLayout.ts`
+
+Seeded layout of the large generated landmarks of a cell (design 018 section 4.3): arches, arcades, towers, pillars and the like.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| type | `LandmarkKind` | What a landmark is; the mesh builder has one shape generator per kind. |
+| interface | `LandmarkPlacement` | One generated landmark, in cell-local meters (x right, y forward). |
+| interface | `LandmarkCollider` | A vertical cylinder the player cannot walk into. |
+| interface | `LandmarkLayoutContext` | What the layout needs to know besides the cell. |
+| function | `computeLandmarkLayout` | Lays out the landmarks of a cell; an empty list for a cell that gets none. |
+| function | `landmarkShadowCasters` | The long shadows the landmarks throw on the ground of their cell. |
 
 ### `world-assets/sceneryLayout.ts`
 
@@ -743,6 +769,15 @@ Deterministic seeded random numbers and value noise.
 | function | `createSeededRandom` | Creates a mulberry32 generator returning numbers in [0, 1) from a 32-bit seed. |
 | function | `valueNoise2` | Lattice value noise at (x, y) in [0, 1]: smoothstep interpolation of hashed values at the integer corners. |
 | function | `fractalNoise2` | Sum of `octaves` layers of value noise (each twice the frequency and half the weight), normalised to [0, 1]. |
+
+### `world-assets/worldDressing.ts`
+
+Everything generated that dresses a world and that more than one consumer needs (design 018): the baked light direction of each cell and its landmarks.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `WorldDressing` | The generated dressing of a world. |
+| function | `computeWorldDressing` | Computes (once per world object) the dressing of a compiled world. |
 
 ## `world-objects`
 
@@ -1294,6 +1329,7 @@ Simple geodesic creatures: the mouse and the butterfly, autonomous walkers that 
 | --- | --- | --- |
 | interface | `SimpleGeoCreatureAuthoringParams` | Author-facing parameters for the mouse and butterfly library entries. |
 | function | `createSimpleGeoCreature` | Creates the authored spec for a mouse or butterfly. |
+| function | `createGeneratedGeoCreature` | Creates the authored spec of a creature whose body is generated in code (no glTF is named or loaded, and there is no map icon). |
 | function | `isSimpleGeoCreatureObjectSpec` | Type guard: true for geo-mouse and geo-butterfly specs. |
 | function | `createSimpleGeoCreatureRuntimeObject` | Builds the registry record for a creature spec in the given cell without creating any three.js objects. |
 
@@ -2868,6 +2904,14 @@ Console guides printed when debug options are enabled.
 | function | `logDebugStartupGuide` | Prints the debugging quick start: the current debug level, the enabled options and the available console commands. |
 | function | `logPortalDebugInstall` | Prints how to use the portal path debug helpers and a table of per-root-cell path counts (generated, kept, rejected, budget-rejected). |
 
+### `render/three/buildCellLandmarks.ts`
+
+Mesh of the generated landmarks of one cell (design 018 section 4.3), in the cell mesh's Three.js axes (cell-local (x, y, height) is Three (x, height, -y)).
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| function | `buildCellLandmarksMesh` | Builds the landmark mesh of a cell (`name = "landmarks:<cellId>"`, `userData.kind = "landmark"`), or undefined when the cell has no landmarks. |
+
 ### `render/three/buildCellMesh.ts`
 
 Builds the Three.js geometry of one prism cell in the cell's own local frame (which the portal pipeline later places).
@@ -2951,6 +2995,7 @@ Builds the instanced-mesh archetypes for the static geometry of every cell, one 
 | type | `CellRenderArchetypeKind` | Category of a cell mesh part; "ceiling" and floor-outline meshes have no kind and are not instanced. |
 | interface | `CellRenderArchetype` | An instanced mesh of one cell part with its per-instance portal attributes. |
 | const | `sceneryMaxPathDepth` | Scenery is drawn only on portal paths of at most this depth (about 45 m; farther away a tuft is a few pixels and fogged). |
+| const | `landmarkMaxPathDepth` | Deepest portal path on which the generated landmarks of a cell are drawn: beyond it (about 90 m on the cube) the fog has taken them. |
 | interface | `BuildCellRenderArchetypesOptions` | Options controlling how cell meshes are built and instanced. |
 | interface | `CellRenderArchetypePlanEntry` | Description of an archetype that would be built, for diagnostics and tests, without creating GPU resources. |
 | function | `buildCellRenderArchetypes` | Builds every cell's archetypes, with `count = 0` and frustum culling disabled (instance bounds are not tracked). |
@@ -2967,6 +3012,15 @@ Application shell: builds the Three.js scene, owns the shared mutable state (pla
 | interface | `ThreeApp` | Handle returned by {@link createThreeApp} for the running application shell. |
 | interface | `ThreeAppOptions` | Inputs for {@link createThreeApp}: the selected world, launch/debug settings and host callbacks. |
 | function | `createThreeApp` | Creates the Three.js application shell inside `container` and starts its animation loop. |
+
+### `render/three/creatures/generatedCreatureMesh.ts`
+
+Creature bodies generated in code, in the low-poly surrealist style of design 018 section 8.1: a stilt-walker (Dali), a drifting mobile (Miro) and a rolling eye (Magritte, Tanguy).
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| const | `generatedCreatureTriangleBudget` | The most triangles each generated body may use (design 018 section 8.5). |
+| function | `buildGeneratedCreatureRoot` | Builds the body of a generated creature: a group holding one merged vertex-coloured mesh (`MeshLambertMaterial` with `vertexColors` and `DoubleSide`). |
 
 ### `render/three/creatures/geodesicMarmotView.ts`
 
