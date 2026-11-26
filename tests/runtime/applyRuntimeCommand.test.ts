@@ -126,6 +126,24 @@ describe("applyRuntimeCommand: navigation", () => {
     expect(result.effects[0]).toEqual({ kind: "end-tool-session" });
   });
 
+  it("closes an object's menu on the right action and keeps the tool (reverses the earlier cancel, design 018 section 5 item 5)", () => {
+    for (const page of ["edit-sign", "measurement-actions", "geodesic-cannon-actions", "geometry-computer-actions"] as const) {
+      const state = stateWith({ isOpen: true, page, selectedTool: "geodesicMeasurements/protractor" });
+      for (const command of [{ kind: "menu-right-action" }, { kind: "close-menu-button" }] as const) {
+        const result = reduce(command, state);
+        expect(result.state.menuState, `${page} ${command.kind}`).toMatchObject({ isOpen: false, selectedTool: "geodesicMeasurements/protractor" });
+        expect(result.effects).toEqual([sync]);
+      }
+    }
+  });
+
+  it("cancels the tool when the Close button is used on the main menu", () => {
+    const result = reduce({ kind: "close-menu-button" }, stateWith({ isOpen: true, page: "main", selectedTool: "geodesicMeasurements/protractor" }));
+
+    expect(result.state.menuState).toMatchObject({ isOpen: false, selectedTool: "none" });
+    expect(result.effects[0]).toEqual({ kind: "end-tool-session" });
+  });
+
   it("goes one level up on the right action from a nested page", () => {
     const debugPage = stateWith({ isOpen: true, page: "debug-settings" });
     const helpHub = showRuntimeMenuQuestionHelp(openRuntimeMenu(stateWith().menuState), {

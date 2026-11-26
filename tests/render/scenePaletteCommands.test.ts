@@ -27,7 +27,7 @@ describe("createScenePaletteCommands", () => {
     commands.onOpenRequested();
     commands.onCloseRequested();
 
-    expect(dispatched).toEqual([{ kind: "open-menu" }, { kind: "cancel-menu-and-tool" }]);
+    expect(dispatched).toEqual([{ kind: "open-menu" }, { kind: "close-menu-button" }]);
   });
 
   it("selects a world by id and asks the world for a tool instead of selecting it", () => {

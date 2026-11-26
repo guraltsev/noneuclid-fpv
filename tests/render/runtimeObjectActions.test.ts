@@ -165,6 +165,15 @@ describe("createRuntimeObjectActions", () => {
     expect(readLocalPlayerPose(engine).position).toEqual({ x: 1, y: 2, z: 0 });
   });
 
+  it("sends right click or F on an open menu to the right action, which keeps the tool on an object's page", () => {
+    const menuState = { ...createRuntimeMenuState({ selectedWorldId: "test" }), isOpen: true, page: "geodesic-cannon-actions" as const };
+    const { actions, commands } = createHarness(undefined, { menuState });
+
+    expect(actions.openContextMenuFromAim(undefined)).toBe("closed");
+
+    expect(commands).toEqual([{ kind: "menu-right-action" }]);
+  });
+
   it("takes the tool of a tool stand item when it is used, and opens nothing", () => {
     const item = createRuntimeStaticAssetObject(
       { id: "item", kind: "asset", assetPath: "toolstand/laser.glb", position: { x: 1, y: 1, z: 0.6 }, standsTool: "geodesicEmitters/emitter" },
