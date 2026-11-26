@@ -66,7 +66,15 @@ export function patchGroundTintMaterial<TMaterial extends THREE.Material>(
       // Before color_fragment, not after map_fragment: the floor patch replaces the map chunk on lattice floors.
       .replace(
         "#include <color_fragment>",
-        "diffuseColor.rgb *= texture2D(groundTintMap, (vGroundTintPoint - groundTintOrigin) / groundTintSize).rgb * 2.0 * groundTintGain;\n#include <color_fragment>",
+        [
+          "{",
+          "  vec4 groundTintTexel = texture2D(groundTintMap, (vGroundTintPoint - groundTintOrigin) / groundTintSize);",
+          // Alpha is how far the face's palette replaces the texture's own colour: desaturate by it, then the tint colour gives the hue.
+          "  vec3 groundBase = mix(diffuseColor.rgb, vec3(dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722))), groundTintTexel.a);",
+          "  diffuseColor.rgb = groundBase * groundTintTexel.rgb * 2.0 * groundTintGain;",
+          "}",
+          "#include <color_fragment>",
+        ].join("\n"),
       );
   };
   material.customProgramCacheKey = () => `${previousProgramKey}ground-tint:`;

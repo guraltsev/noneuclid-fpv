@@ -4,7 +4,8 @@
  * A pure function turns a cell into a small RGBA image over the cell's bounding box: two octaves of seeded value noise
  * around 1.0, a slight warm/cool shift, and a soft dark disc under every authored static object (its shadow from a sun at
  * the zenith). When a shadow azimuth is given, every caster (generated landmarks and the authored objects) also darkens a long tapered capsule of
- * ground pointing along that azimuth. The floor material multiplies its colour by this image. A texel value of 128 means "multiply by 1.0".
+ * ground pointing along that azimuth, and the face's palette (when given) shifts the hue of the whole image. The floor material multiplies its colour by this image. A texel value of 128 means "multiply by 1.0"; alpha is how far the texture's own colour is
+ * removed first (0 keeps it).
  */
 import type { CellObjectSpec, FloorMaterialSpec } from "../cell-complex/specs";
 import { fractalNoise2, hashStringToSeed } from "./seededNoise";
@@ -63,6 +64,13 @@ export interface GroundTintOptions {
   readonly shadowAzimuthRadians?: number;
   /** Extra shadow casters besides the cell's authored static objects (generated landmarks); used only with `shadowAzimuthRadians`. */
   readonly casters?: readonly GroundShadowCaster[];
+  /** Red, green and blue multipliers for the whole image (the face's palette, see `facePalettes.ts`); default no change. */
+  readonly colorMultiplier?: readonly [number, number, number];
+  /**
+   * How far the floor's texture loses its own colour before the multipliers apply, 0 to 1, stored in the alpha channel (default 0): with a
+   * palette, the floor keeps its texture's detail and brightness but takes the palette's hue.
+   */
+  readonly recolorStrength?: number;
 }
 
 /** Length of a caster's shadow on the ground as a multiple of its height (a low sun). */
@@ -120,6 +128,8 @@ export function computeGroundTint(cell: GroundTintCell, options: GroundTintOptio
           ...(options.casters ?? []).map((caster) => makeLongShadow(caster, azimuth)),
         ];
   const data = new Uint8Array(new ArrayBuffer(width * height * 4));
+  const [redGain, greenGain, blueGain] = options.colorMultiplier ?? [1, 1, 1];
+  const alpha = clampTexel((options.recolorStrength ?? 0) * 255);
 
   for (let row = 0; row < height; row += 1) {
     const y = originY + ((row + 0.5) / height) * sizeY;
@@ -138,10 +148,10 @@ export function computeGroundTint(cell: GroundTintCell, options: GroundTintOptio
       }
       const brightness = (1 + groundTintLargeStrength * large + groundTintSmallStrength * small) * shadow;
       const offset = (row * width + column) * 4;
-      data[offset] = clampTexel(brightness * (1 + groundTintWarmCoolStrength * warm) * groundTintNeutralTexel);
-      data[offset + 1] = clampTexel(brightness * groundTintNeutralTexel);
-      data[offset + 2] = clampTexel(brightness * (1 - groundTintWarmCoolStrength * warm) * groundTintNeutralTexel);
-      data[offset + 3] = 255;
+      data[offset] = clampTexel(redGain * brightness * (1 + groundTintWarmCoolStrength * warm) * groundTintNeutralTexel);
+      data[offset + 1] = clampTexel(greenGain * brightness * groundTintNeutralTexel);
+      data[offset + 2] = clampTexel(blueGain * brightness * (1 - groundTintWarmCoolStrength * warm) * groundTintNeutralTexel);
+      data[offset + 3] = alpha;
     }
   }
 

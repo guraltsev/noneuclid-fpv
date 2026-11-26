@@ -68,7 +68,7 @@ describe("floor blend geometry", () => {
   });
 
   it("tiles a small triangle whose strip width is limited by the inradius", () => {
-    const corners = [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 5, y: (10 * Math.sqrt(3)) / 2 }];
+    const corners = [{ x: 0, y: 0 }, { x: 2, y: 0 }, { x: 1, y: Math.sqrt(3) }];
     const cell = { id: "small", baseVertices: corners, sides: polygonSides(corners), floorMaterial: { kind: "floor-color", floorColor: "#fff" } } as unknown as CompiledPrismCell;
     const geometry = buildFloorBlendGeometry(cell, new Map());
     expect(geometry.stripWidthMeters).toBeLessThan(blendHalfWidthMeters);
@@ -109,18 +109,20 @@ describe("floor blend geometry", () => {
   it("clamps the strip width by the inradius", () => {
     expect(cellInradiusMeters(cube.cells[0])).toBeCloseTo(7.5, 6);
     expect(blendStripWidthMeters(cube.cells[0])).toBe(blendHalfWidthMeters);
-    // An equilateral triangle of side 10 has inradius 10 / (2 sqrt 3).
-    const height = (10 * Math.sqrt(3)) / 2;
-    const triangle = [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 5, y: height }];
-    const inradius = 10 / (2 * Math.sqrt(3));
+    // An equilateral triangle of side 2 has inradius 2 / (2 sqrt 3).
+    const height = Math.sqrt(3);
+    const triangle = [{ x: 0, y: 0 }, { x: 2, y: 0 }, { x: 1, y: height }];
+    const inradius = 1 / Math.sqrt(3);
     expect(cellInradiusMeters({ baseVertices: triangle, sides: polygonSides(triangle) })).toBeCloseTo(inradius, 6);
     expect(blendStripWidthMeters({ baseVertices: triangle, sides: polygonSides(triangle) })).toBeCloseTo(0.42 * inradius, 6);
     const square = [{ x: 0, y: 0 }, { x: 2, y: 0 }, { x: 2, y: 2 }, { x: 0, y: 2 }];
     expect(blendStripWidthMeters({ baseVertices: square, sides: polygonSides(square) })).toBeCloseTo(0.42, 6);
+    // Never more than 0.5 m, however large the cell.
+    expect(blendHalfWidthMeters).toBe(0.5);
   });
 
   it("keeps the transition inside the strip", () => {
-    for (const width of [2.6, 1.82, 0.4]) {
+    for (const width of [0.5, 0.42, 0.2]) {
       const { halfWidthMeters, noiseAmplitudeMeters } = groundBlendTransition(width, 5);
       expect(noiseAmplitudeMeters).toBeLessThanOrEqual(blendNoiseAmplitudeMeters);
       expect(halfWidthMeters + noiseAmplitudeMeters).toBeCloseTo(width, 9);

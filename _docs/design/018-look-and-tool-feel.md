@@ -216,7 +216,7 @@ Built as described in 8.1 to 8.5, with these differences:
 - A cell gets one major and one or two minor landmarks (not two to four): with every copy of every face in view, more
   made the horizon a jumble.
 - A major that does not fit its face shrinks in steps (down to 0.68), so some are under 6 m; the great sphere is 4.4 m.
-- The transition between two floors is 1.5 m to each side of the border, wandering by up to 1.1 m, inside strips 2.6 m wide.
+- The transition between two floors was 1.5 m to each side of the border, wandering by up to 1.1 m, inside strips 2.6 m wide (now 0.5 m in all, section 9.4).
 - Shadows tuned by eye: strength 0.6, 1.4 times the caster's height, edge 0.18 m.
 - Generated creatures reuse the two existing motion families (walking, flying); their bodies are not animated, because the
   creature pipeline has no per-frame hook for the model. The rolling eye slides.
@@ -252,3 +252,68 @@ Two artefacts of the second pass, and what replaced the rules that caused them:
 
 Cost: landmarks on the cube are now drawn up to 95 m instead of depth 6 (about 90 m there), so about as many copies;
 on worlds with small faces, more. Scenery up to 50 m instead of depth 3 (about 45 m on the cube). Not measured on a GPU.
+
+## 9. Faces as places: themes and palettes (fourth pass, 2026-11-25)
+
+Faces were still hard to tell apart: the biome followed the authored floor texture, several biomes shared muted colours, and
+the transition between floors was wide. Now every face is a place with its own **theme** (what stands on it) and **palette**
+(every colour on it, the ground included), both drawn at random per world but constrained so that faces are told apart at a
+glance. This replaces the biome-keyed landmarks of sections 8.1 and 8.4; the generated creatures and the scenery stay.
+
+### 9.1 Themes
+
+A theme is a family of silhouettes with generators for one major landmark (6 to 11 m), two or three minor ones (1.5 to 5 m) and
+three to six small props (`world-assets/faceThemes.ts`). Each generator builds its landmark from a random source, so no two are
+the same, but every landmark of a theme belongs to the same family:
+
+| Theme | Major | Minor | Props |
+| --- | --- | --- | --- |
+| cairns | a cairn of 7 to 10 balanced stones, twin cairns | small cairn, balanced rock | pebble pairs, flat stones |
+| village | town tower with pyramid roof and pennant, a hamlet | house, well | benches, fences |
+| striders | a great spider on 6 to 8 jointed legs, a stilt walker | small spider, tripod | eggs |
+| clockwork | clock tower with four faces and gears, a gear tree | standing gear, giant bicycle | fallen gear, pocket watch |
+| lamplight | giant desk lamp, a grove of crooked lamp posts | street lamp, floor lamp | lantern, candles |
+| thresholds | great gate with a door ajar, stair to nowhere ending in a door | doorway, arch, ring portal | floor hatches, steps |
+| mobiles | Miro mobile with discs, moons and stars | disc stalk, moon pole | blobs, star sticks |
+| parlour | giant chair, wardrobe | table, chest of drawers | stool, teacup, books |
+| crystals | crystal cluster | small cluster, leaning shard | geode, shard |
+| ruins | colonnade with a broken column, ruined portico | broken column, fallen drums | capital, drum |
+| fungi | great mushroom with spots | mushroom, puffballs | toadstools |
+| totems | totem pole of stacked shapes | small totem | cube pairs, cones |
+| orbits | armillary sphere, planets on stalks | ringed planet, floating rings | globe, meteorite |
+| kites | mast with flags and bunting, kites in flight | flag pole, windsock | pennant stakes |
+
+Landmarks are lists of parts from a small kit (`world-assets/landmarkParts.ts`): box, prism or cone, lat-long ball, ring or
+arc, star or gear, strut. The kit both draws the parts and measures them, so colliders (a part standing on the ground blocks
+the player; a strut only at its foot), long shadows (also for hovering parts) and the triangle count come from the same
+numbers as the mesh. Glowing parts (bulbs, eyes, lit windows) skip the baked light.
+
+### 9.2 Palettes
+
+A palette is built from a key hue and a scheme (analogous, complementary, split or triadic): `primary`, `secondary` and
+`accent` from the scheme, `dark` and `light` from the key hue, a `glow`, and a `ground` colour (`world-assets/facePalettes.ts`).
+Every part takes a palette role. The floor keeps its texture's detail and brightness but loses 80 percent of its own colour
+and takes the palette's ground hue; this rides in the tint image (alpha = how much colour is removed), so the blend strips
+recolour both cells' grounds correctly.
+
+### 9.3 Assignment
+
+`world-assets/faceThemeAssignment.ts` visits the faces breadth-first with a random source seeded from the world's cell ids:
+
+- a face takes a theme no glued neighbour has, among the least used so far; with 14 themes, the cube and the dodecahedron
+  give every face its own;
+- the colour wheel is cut into min(faces, 12) evenly spaced key hues with a random offset; a face takes, among the least
+  used hues, the one farthest from its neighbours' hues;
+- schemes differ from the neighbours' where they can.
+
+The draw is the same for a world every time, so a student can learn it; `assignFaceLooks(world, seed)` takes another seed.
+
+### 9.4 Borders
+
+The transition between two floors is now at most 0.5 m wide in all (0.3 m half-width plus 0.2 m of wander, with features of
+0.7 m), so the border is a crisp ragged seam between two clearly different grounds. It still narrows to nothing at the
+corners (section 8.7).
+
+### 9.5 Cost
+
+A face carries 250 to 2000 triangles of landmarks (budget 2400, was 900), drawn as one mesh per cell. Not measured on a GPU.
