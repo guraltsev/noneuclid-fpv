@@ -1,0 +1,8 @@
+# name cell x y yaw pitch: views of the 001-basic-cube world that stand clear of its objects and landmarks
+start front 0 5 180 0
+meadow front -1 1 -50 3
+sand left -3 -1 20 -10
+mud top 0 0 135 5
+shore back 0 0 225 5
+garden right 4 -4 130 4
+snow bottom 0 -1 50 5

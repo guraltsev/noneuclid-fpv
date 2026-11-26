@@ -299,6 +299,27 @@ npm run cdp -- call motion.stop
 - The page only advances while its window is visible; a hidden window pauses the walk (and the call waits).
 - `detour` is local avoidance, not path planning; `lookAt` does not check line of sight.
 
+## 3d. A browser on the same machine, without a debugging port
+
+When the browser cannot be given a debugging port (a headless desktop, a profile you must not touch), serve the built app
+on this machine and drive the page through the local server channel of 3a. `scripts/debug/local/` wraps the steps (bash):
+
+```bash
+scripts/debug/local/serve.sh                # builds, then serves http://localhost:11446/ (dev mode; --no-minify keeps names in stacks)
+scripts/debug/local/cdp.sh call debug.setPlayerPose '"front"' 0 5 180 0   # any `npm run cdp` command against that page
+scripts/debug/local/shots.sh .temp/look after                             # one still per pose of poses-001-basic-cube.txt
+scripts/debug/local/walk-check.sh 3                                       # walk 3 m by script; fails if a frame threw
+```
+
+- Open `http://localhost:11446/?config=001` in the browser first; after a rebuild reload the page with
+  `cdp.sh eval "location.reload(true);1"` (a plain reload can keep the old bundle).
+- **Run `walk-check.sh` after any change that a frame calls** (movement, collision, per-frame hooks in
+  `createThreeApp.ts`). The unit tests do not run the shell's frame loop: a variable declared below the `return` of
+  `createThreeApp` type-checks, passes every unit test and throws on the first step (this happened with the landmark
+  colliders).
+- `shots.sh` teleports the camera: keep the poses clear of objects and generated landmarks.
+- A software renderer gives about 2 frames per second: good for stills and for errors, not for timing.
+
 ## 4. Ending the session
 
 Close the Edge window, stop the dev server, and delete the throwaway profile:

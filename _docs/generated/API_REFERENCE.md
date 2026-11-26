@@ -3517,6 +3517,15 @@ Help panel ("help lens") renderer: shows the current contextual help definition 
 | interface | `HelpLensRenderer` | Handle to the help panel created by {@link createHelpLensRenderer}; the creator must call dispose(). |
 | function | `createHelpLensRenderer` | Creates a hidden help panel: a DOM element with class help-lens appended to container, plus a lazily created XR panel added to scene. |
 
+### `render/three/landmarkBodies.ts`
+
+Player-blocking bodies of the generated landmarks (design 018 section 8.4).
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| type | `LandmarkBody` | A landmark collider in the form the movement code takes, with an id of the form `landmark:<cellId>:<n>`. |
+| function | `createLandmarkBodyLookup` | Returns the lookup `(world, cellId) -> bodies`; it remembers the bodies of the last world it was asked about. |
+
 ### `render/three/laserPreview.ts`
 
 The Laser's placement preview (design 017 section 8.3): with the Laser in hand and the aim on the floor, a translucent copy of the real laser (its post and its head) stands at the aim point, the head turned the way a placed laser would fire.
