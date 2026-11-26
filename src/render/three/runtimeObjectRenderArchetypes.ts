@@ -13,6 +13,7 @@
  */
 
 import * as THREE from "three";
+import { applyDecorationRecolor } from "./decorationPalette";
 import { patchPortalClipMaterial, type PortalClipMaterialState } from "./portalClipMaterial";
 import type { RuntimeObjectRenderRecord, RuntimeObjectRenderSourceMesh } from "./runtimeObjectRenderRecords";
 import { disposeMaterial } from "./runtimeSceneUtils";
@@ -147,10 +148,11 @@ export function deriveRuntimeObjectRenderArchetypeCapacity(
   return Math.max(1, recordCount * maxVisiblePaths);
 }
 
+// A clone loses shader hooks; a decoration's recolouring is carried in its userData and installed again here (`decorationPalette.ts`).
 function cloneMaterial(material: THREE.Material | THREE.Material[]): THREE.Material | THREE.Material[] {
   if (Array.isArray(material)) {
-    return material.map((entry) => entry.clone());
+    return material.map((entry) => applyDecorationRecolor(entry.clone()));
   }
 
-  return material.clone();
+  return applyDecorationRecolor(material.clone());
 }

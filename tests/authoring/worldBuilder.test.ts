@@ -175,7 +175,7 @@ describe("worldBuilder", () => {
       {
         id: "startingHouse",
         kind: "asset",
-        assetPath: "small_house/small_house.glb",
+        assetPath: "generated/small_house",
       },
     ]);
     expect(spec.startingPosition).toMatchObject({

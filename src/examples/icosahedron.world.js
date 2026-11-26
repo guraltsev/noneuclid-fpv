@@ -134,13 +134,6 @@ OnFace("face-06", [
   }),
 ]);
 
-OnFace("face-07", [
-  bicycle("face-07-bicycle", {
-    position: [-2.4, 0, -0.7],
-    scale: 1,
-    turn: 102,
-  }),
-]);
 
 OnFace("face-08", [
   campfire("face-08-campfire", {

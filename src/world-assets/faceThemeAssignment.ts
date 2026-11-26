@@ -14,6 +14,7 @@
  */
 import type { CompiledCellComplex } from "../cell-complex/compileCellComplex";
 import type { CompiledPrismCell } from "../cell-complex/prismCells";
+import { generatedDecorationKindOf } from "./decorationModels";
 import { buildFacePalette, paletteSchemes, type FacePalette, type PaletteScheme } from "./facePalettes";
 import { faceThemes, type FaceTheme } from "./faceThemes";
 import { createSeededRandom, hashStringToSeed } from "./seededNoise";
@@ -25,26 +26,31 @@ export interface FaceLook {
 }
 
 /**
- * The themes an authored decoration fits, by the folder of its model (`library.ts`), best first. Objects with a job (the question cube, the
- * starting house, the tool stand, creatures) are not decorations and constrain nothing; nor is grass, which belongs anywhere.
+ * The themes an authored decoration fits, by its generated kind or the folder of its loaded model (`library.ts`), best first. The house (the starting house, or any
+ * other) fits only the village, so the player always starts in it. Objects with a job (the question cube, the tool stand, creatures) are
+ * not decorations and constrain nothing; nor is grass, which belongs anywhere.
  */
 export const decorationThemeIdsByAssetFolder: Readonly<Record<string, readonly string[]>> = {
+  // Generated decorations (`generated/<kind>`), by kind.
   bicycle: ["clockwork", "village", "lamplight"],
+  // The starting house: the start is always in the village, the de Chirico face of houses and a tower.
+  small_house: ["village"],
+  bench: ["village", "lamplight", "grove", "ruins"],
+  tree: ["grove", "village", "ruins", "fungi"],
+  tree_swirl: ["grove", "fungi", "mobiles", "ruins"],
+  flower_group: ["grove", "village", "parlour", "fungi"],
+  flower_pot: ["grove", "parlour", "village", "thresholds"],
+  stop_sign: ["lamplight", "village", "kites"],
+  traffic_cone: ["lamplight", "kites", "village", "totems"],
+  // Loaded legacy models, by folder.
   "_legacy/clock_low_poly": ["clockwork", "parlour"],
-  Bench: ["village", "lamplight", "grove", "ruins"],
-  Tree1: ["grove", "village", "ruins", "fungi"],
-  TreeSwirl: ["grove", "fungi", "mobiles", "ruins"],
-  FloweGroup: ["grove", "village", "parlour", "fungi"],
-  flowerPot: ["grove", "parlour", "village", "thresholds"],
-  stopsign: ["lamplight", "village", "kites"],
-  trafficCone: ["lamplight", "kites", "village", "totems"],
   "_legacy/low_poly_campfire": ["lamplight", "cairns"],
   "_legacy/low_poly_rocks": ["cairns", "crystals", "ruins"],
 };
 
 /** The theme ids the decoration with model `assetPath` fits, best first, or undefined when it is not a decoration. */
 export function decorationThemeIdsFor(assetPath: string): readonly string[] | undefined {
-  return decorationThemeIdsByAssetFolder[assetPath.slice(0, assetPath.lastIndexOf("/"))];
+  return decorationThemeIdsByAssetFolder[generatedDecorationKindOf(assetPath) ?? assetPath.slice(0, assetPath.lastIndexOf("/"))];
 }
 
 // The themes a cell may take: those every decoration on it fits (or, when they agree on none, those its first decoration fits).

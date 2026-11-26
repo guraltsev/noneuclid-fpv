@@ -8,6 +8,7 @@ import { createGeodesicMarmot } from "./geodesicMarmot";
 import { createGeneratedGeoCreature, createSimpleGeoCreature, type SimpleGeoCreatureAuthoringParams } from "./simpleGeoCreature";
 import { createStaticAssetObject, type StaticObjectAuthoringParams } from "./staticAssets";
 import { toolStandClass, userObjectClass } from "./objectMetadata";
+import { generatedDecorationPath } from "../world-assets/decorationModels";
 import { hashStringToSeed } from "../world-assets/seededNoise";
 import { toolNames } from "./vocabulary";
 
@@ -66,24 +67,16 @@ interface StaticLibraryDefinition {
   readonly displayHelpMessage?: string;
 }
 
-const smallHouseAssetScale = 2.5;
 const questionCubeAssetScale = 4;
-// Collision cylinder is centred on the model's measured footprint, not its origin.
-const smallHouseFootprintCenter = {
-  // Center of public/assets/small_house/small_house.glb in authoring world axes,
-  // measured from the asset bounds after the library's base model scale.
-  x: 0.17220746725797653,
-  y: -0.084492526948451995,
-};
+// Collision cylinder is centred on the house's footprint (the generated house stands there, `decorationModels.ts`), not its origin.
+const smallHouseFootprintCenter = { x: 0.17, y: -0.08 };
 
 const staticLibraryDefinitions = {
   small_house: {
-    assetPath: "small_house/small_house.glb",
+    assetPath: generatedDecorationPath("small_house"),
     mapIconPath: "small_house/map-icon.svg",
     class: "house",
     displayHelpMessage: "A static landmark. Use nearby landmarks to keep track of where you are in the world.",
-    visualScale: smallHouseAssetScale,
-    modelOffset: (scale) => [0, scale * smallHouseAssetScale * 0.5, 0],
     collision: (scale) => ({
       radius: scale * 1.1 + 0.1,
       height: scale * 2.1,
@@ -95,11 +88,10 @@ const staticLibraryDefinitions = {
     }),
   },
   tree: {
-    assetPath: "Tree1/Tree.glb",
+    assetPath: generatedDecorationPath("tree"),
     mapIconPath: "Tree1/map-icon.svg",
     class: "tree",
     displayHelpMessage: "A static tree. It marks the local shape of this face and blocks movement at its trunk.",
-    visualScaleXYZ: treeScaleXYZ,
     collision: (scale) => ({
       radius: scale * 0.42,
       height: scale * 3.1,
@@ -107,11 +99,10 @@ const staticLibraryDefinitions = {
     }),
   },
   tree_swirl: {
-    assetPath: "TreeSwirl/tree_swirl.glb",
+    assetPath: generatedDecorationPath("tree_swirl"),
     mapIconPath: "TreeSwirl/map-icon.svg",
     class: "tree",
     displayHelpMessage: "A static tree. It marks the local shape of this face and blocks movement at its trunk.",
-    visualScaleXYZ: treeScaleXYZ,
     collision: (scale) => ({
       radius: scale * 0.48,
       height: scale * 3.3,
@@ -125,12 +116,10 @@ const staticLibraryDefinitions = {
     do_not_collide_with: [userObjectClass],
   },
   bench: {
-    assetPath: "Bench/Bench.glb",
+    assetPath: generatedDecorationPath("bench"),
     mapIconPath: "Bench/map-icon.svg",
     class: "bench",
     displayHelpMessage: "A static bench. It is a landmark and collision object in this face.",
-    visualScale: 0.9,
-    modelOffset: (scale) => [0, scale * 0.9 * 0.45, 0],
     collision: (scale) => ({
       radius: scale * 0.8,
       height: scale * 0.9,
@@ -138,11 +127,10 @@ const staticLibraryDefinitions = {
     }),
   },
   bicycle: {
-    assetPath: "bicycle/Bicycle.glb",
+    assetPath: generatedDecorationPath("bicycle"),
     mapIconPath: "bicycle/map-icon.svg",
     class: "bike",
     displayHelpMessage: "A static bicycle. It is a landmark and collision object in this face.",
-    visualScale: 0.9,
     collision: (scale) => ({
       radius: scale * 0.85,
       height: scale * 1.1,
@@ -150,18 +138,16 @@ const staticLibraryDefinitions = {
     }),
   },
   flower_group: {
-    assetPath: "FloweGroup/flower_group.glb",
+    assetPath: generatedDecorationPath("flower_group"),
     mapIconPath: "FloweGroup/map-icon.svg",
     class: "flowers",
-    visualScale: 0.7,
     do_not_collide_with: [userObjectClass],
   },
   flower_pot: {
-    assetPath: "flowerPot/flower_pot.glb",
+    assetPath: generatedDecorationPath("flower_pot"),
     mapIconPath: "flowerPot/map-icon.svg",
     class: "flower-pot",
     displayHelpMessage: "A small decorative object. It can help you recognize this part of the world.",
-    visualScale: 0.75,
     collision: (scale) => ({
       radius: scale * 0.28,
       height: scale * 0.5,
@@ -169,11 +155,10 @@ const staticLibraryDefinitions = {
     }),
   },
   stop_sign: {
-    assetPath: "stopsign/stop_sign.glb",
+    assetPath: generatedDecorationPath("stop_sign"),
     mapIconPath: "stopsign/map-icon.svg",
     class: "sign",
     displayHelpMessage: "A static sign. Use it as a landmark while exploring how the edges connect.",
-    visualScale: 0.03,
     collision: (scale) => ({
       radius: scale * 0.32,
       height: scale * 2.15,
@@ -181,11 +166,10 @@ const staticLibraryDefinitions = {
     }),
   },
   traffic_cone: {
-    assetPath: "trafficCone/Cone.glb",
+    assetPath: generatedDecorationPath("traffic_cone"),
     mapIconPath: "trafficCone/map-icon.svg",
     class: "cone",
     displayHelpMessage: "A static traffic cone. It marks this spot and blocks movement.",
-    visualScale: 0.75,
     collision: (scale) => ({
       radius: scale * 0.32,
       height: scale * 0.75,
@@ -480,11 +464,6 @@ function createDefinedStaticLibraryObject(
   return createStaticLibraryObject(name, definition.assetPath, definition.mapIconPath, resolvedParams);
 }
 
-// Non-uniform scale compensating for the tree model's native proportions (0.02 base; narrower horizontally than vertically).
-function treeScaleXYZ(scale = 1): readonly [number, number, number] {
-  const assetScale = scale * 0.02;
-  return [assetScale / 1.5, (assetScale * 2.5) / 3, assetScale / 1.5];
-}
 
 function brandLibraryObject<T extends CellObjectSpec | GeodesicMarmotObjectSpec>(objectSpec: T): T & WorldLibraryObjectSpec {
   Object.defineProperty(objectSpec, libraryObjectBrand, {

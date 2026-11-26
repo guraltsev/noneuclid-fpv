@@ -45,7 +45,7 @@ OnFace("triangle-room", [
               kind: "floor-texture",
               name: "grass1",
             },
-            objects: [{ id: "triangle-tree", assetPath: "Tree1/Tree.glb" }],
+            objects: [{ id: "triangle-tree", assetPath: "generated/tree" }],
           },
         },
       ],

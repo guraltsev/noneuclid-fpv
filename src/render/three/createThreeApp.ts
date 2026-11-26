@@ -84,6 +84,7 @@ import { type LaunchOptions } from "../../glue/readLaunchOptions";
 import { buildStaticAssetRenderRoot } from "./staticAssetRenderRoot";
 import { recolorDecoration } from "./decorationPalette";
 import { decorationThemeIdsFor } from "../../world-assets/faceThemeAssignment";
+import { generatedDecorationKindOf } from "../../world-assets/decorationModels";
 import { computeWorldDressing, setActiveLookSeed } from "../../world-assets/worldDressing";
 import { simpleCollisionCylinder } from "../../movement/dynamicObject";
 import { movePlayer } from "../../movement/movePlayer";
@@ -1412,11 +1413,16 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
         // The model is drawn from the registry record through this root; it is a template and stays out of the scene.
         const record = runtimeObjectRegistry.get(objectSpec.id);
         if (record) {
-          const assetRoot = buildStaticAssetRenderRoot(cell.id, objectSpec, record.localPose, options.assets);
-          // A decoration takes its face's palette (design 018 section 9.6); the face's theme was chosen to match it.
-          const look = decorationThemeIdsFor(objectSpec.assetPath) === undefined ? undefined : computeWorldDressing(activeWorld()).lookByCellId.get(cell.id);
-          if (look) {
-            recolorDecoration(assetRoot, look.palette);
+          const dressing = computeWorldDressing(activeWorld());
+          const faceLook = dressing.lookByCellId.get(cell.id);
+          // Generated decorations are drawn in their face's palette (design 018 section 9.8), loaded ones recoloured to it (9.6).
+          const assetRoot = buildStaticAssetRenderRoot(cell.id, objectSpec, record.localPose, options.assets, faceLook && {
+            palette: faceLook.palette,
+            lookSeed: options.lookSeed,
+            shadowAzimuthRadians: dressing.shadowAzimuthByCellId.get(cell.id) ?? 0,
+          });
+          if (faceLook && decorationThemeIdsFor(objectSpec.assetPath) !== undefined && generatedDecorationKindOf(objectSpec.assetPath) === undefined) {
+            recolorDecoration(assetRoot, faceLook.palette);
           }
           runtimeObjectRootsById.set(objectSpec.id, assetRoot);
         }

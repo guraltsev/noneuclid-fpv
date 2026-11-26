@@ -11,6 +11,7 @@
  * original. Nothing is freed until the owner calls `dispose()` on the returned {@link OwnedPreparedWorldAssets}.
  */
 import * as THREE from "three";
+import { generatedDecorationKindOf } from "../../world-assets/decorationModels";
 import type { CompiledCellComplex } from "../../cell-complex/compileCellComplex";
 import { publicAssetUrl } from "../../glue/assetUrls";
 import { createPortalWallDataTexture, PORTAL_WALL_TEXTURE_KEY } from "./portalWallTexture";
@@ -64,7 +65,8 @@ export function collectWorldAssetPaths(world: CompiledCellComplex): readonly str
     }
 
     for (const object of cell.objects) {
-      if (object.assetPath !== undefined) {
+      // A generated decoration is built in code (`world-assets/decorationModels.ts`): nothing to load.
+      if (object.assetPath !== undefined && generatedDecorationKindOf(object.assetPath) === undefined) {
         assetPaths.add(object.assetPath);
       }
       if (object.mapIconPath !== undefined) {

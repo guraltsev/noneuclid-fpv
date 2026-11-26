@@ -177,7 +177,7 @@ describe("example worlds", () => {
       });
       expect(house, name).toMatchObject({
         kind: "asset",
-        assetPath: "small_house/small_house.glb",
+        assetPath: "generated/small_house",
       });
       expect(questionCube, name).toMatchObject({
         kind: "asset",
@@ -214,7 +214,7 @@ describe("example worlds", () => {
       const collidingHouses: string[] = [];
 
       for (const object of startCell.visuals?.objects ?? []) {
-        if (object.kind !== "asset" || object.assetPath !== "small_house/small_house.glb") {
+        if (object.kind !== "asset" || object.assetPath !== "generated/small_house") {
           continue;
         }
 
@@ -272,7 +272,8 @@ describe("example worlds", () => {
     const stopSign = faceD?.visuals?.objects?.find((object) => object.id === "face-d-stop-sign");
 
     expect(stopSign?.kind).toBe("asset");
-    expect(stopSign?.scale).toBeCloseTo(0.024);
+    // The sign is generated at real size (about 2.2 m at scale 1), so the author's scale is its visual scale.
+    expect(stopSign?.scale).toBeCloseTo(0.8);
   });
 });
 

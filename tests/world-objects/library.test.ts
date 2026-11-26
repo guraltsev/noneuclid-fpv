@@ -25,10 +25,9 @@ describe("worldObjectLibrary", () => {
     ).toMatchObject({
       id: "front-house",
       kind: "asset",
-      assetPath: "small_house/small_house.glb",
+      assetPath: "generated/small_house",
       position: { x: -1, y: 2, z: 0 },
-      scale: 7.5,
-      modelOffset: { x: 0, y: 0, z: 3.75 },
+      scale: 3,
       turnRadians: Math.PI / 12,
       yawRadians: Math.PI / 12,
       class: "house",
@@ -41,7 +40,7 @@ describe("worldObjectLibrary", () => {
     ).toMatchObject({
       id: "right-tree",
       kind: "asset",
-      assetPath: "Tree1/Tree.glb",
+      assetPath: "generated/tree",
       position: { x: 0.5, y: -0.5, z: 0 },
     });
 
@@ -60,13 +59,13 @@ describe("worldObjectLibrary", () => {
       }),
     ).toMatchObject({
       id: "swirl",
-      assetPath: "TreeSwirl/tree_swirl.glb",
+      assetPath: "generated/tree_swirl",
     });
   });
 
   it.each([
     // One class of asset path for each naming convention the library wraps.
-    ["bicycle", "bicycle/Bicycle.glb"],
+    ["bicycle", "generated/bicycle"],
     ["clock", "_legacy/clock_low_poly/scene.gltf"],
   ] as const)("maps %s to %s", (libraryKey, assetPath) => {
     expect(
@@ -80,19 +79,10 @@ describe("worldObjectLibrary", () => {
     });
   });
 
-  it("raises benches so the seat surface is above the floor", () => {
-    expect(
-      worldObjectLibrary.bench("bench-object", {
-        position: [0, 0, 0],
-        scale: 2,
-      }),
-    ).toMatchObject({
-      id: "bench-object",
-      kind: "asset",
-      assetPath: "Bench/Bench.glb",
-      scale: 1.8,
-      modelOffset: { x: 0, y: 0, z: 0.81 },
-    });
+  it("builds benches in code, at the author's scale and on the floor", () => {
+    const object = worldObjectLibrary.bench("bench-object", { position: [0, 0, 0], scale: 2 });
+    expect(object).toMatchObject({ id: "bench-object", kind: "asset", assetPath: "generated/bench", scale: 2 });
+    expect(object.modelOffset).toBeUndefined();
   });
 
   it("adds a player collision cylinder to small houses", () => {
@@ -105,8 +95,8 @@ describe("worldObjectLibrary", () => {
       radius: 1.2000000000000002,
       height: 2.1,
       offset: {
-        x: 0.17220746725797653,
-        y: -0.08449252694845199,
+        x: 0.17,
+        y: -0.08,
         z: 1.05,
       },
     });
@@ -124,7 +114,7 @@ describe("worldObjectLibrary", () => {
 
     expect(worldObjectLibrary.stop_sign("stop-a", { position: [0, 0, 0], scale: 2 })).toMatchObject({
       class: "sign",
-      scale: 0.06,
+      scale: 2,
       collision: {
         radius: 0.64,
         height: 4.3,
@@ -159,29 +149,15 @@ describe("worldObjectLibrary", () => {
     });
   });
 
-  it("makes trees taller and narrower using per-axis scaling", () => {
-    const object = worldObjectLibrary.tree("left-tree", {
-      position: [0, 0, 0],
-      scale: 3,
-    });
-
-    expect(object.scale).toBe(3);
-    expect(object.scaleXYZ?.x).toBeCloseTo(0.04);
-    expect(object.scaleXYZ?.y).toBeCloseTo(0.05);
-    expect(object.scaleXYZ?.z).toBeCloseTo(0.04);
-  });
-
-  it("scales stop signs down from their oversized source model", () => {
-    expect(
-      worldObjectLibrary.stop_sign("tiny-stop", {
-        position: [0, 0, 0],
-        scale: 0.8,
-      }),
-    ).toMatchObject({
+  it("scales generated decorations uniformly by the author's scale", () => {
+    const tree = worldObjectLibrary.tree("left-tree", { position: [0, 0, 0], scale: 3 });
+    expect(tree.scale).toBe(3);
+    expect(tree.scaleXYZ).toBeUndefined();
+    expect(worldObjectLibrary.stop_sign("tiny-stop", { position: [0, 0, 0], scale: 0.8 })).toMatchObject({
       id: "tiny-stop",
       kind: "asset",
-      assetPath: "stopsign/stop_sign.glb",
-      scale: 0.024,
+      assetPath: "generated/stop_sign",
+      scale: 0.8,
     });
   });
 
