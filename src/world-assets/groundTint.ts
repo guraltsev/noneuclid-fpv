@@ -20,13 +20,13 @@ export const groundContactShadowStrength = 0.5;
 /** Radius in meters used for a static object with no collision cylinder. */
 export const groundContactShadowDefaultRadiusMeters = 0.35;
 /** Darkest a long shadow gets, at its foot, as a fraction removed (0.42 leaves 58 percent of the colour). */
-export const groundLongShadowStrength = 0.42;
+export const groundLongShadowStrength = 0.6;
 /** Fraction of the foot darkness left at the tip of a long shadow. */
 export const groundLongShadowTipStrengthFraction = 0.6;
 /** Width of a long shadow at its tip as a fraction of its width at the foot. */
 export const groundLongShadowTipWidthFraction = 0.6;
 /** Width of the soft edge of a long shadow, meters. */
-export const groundLongShadowEdgeMeters = 0.35;
+export const groundLongShadowEdgeMeters = 0.18;
 /** Height assumed for an authored object with no collision height, as a multiple of its radius. */
 export const groundShadowDefaultHeightPerRadius = 2.5;
 /** Default width and height of the tint image, texels. */
@@ -66,7 +66,7 @@ export interface GroundTintOptions {
 }
 
 /** Length of a caster's shadow on the ground as a multiple of its height (a low sun). */
-export const groundShadowLengthPerHeight = 1.1;
+export const groundShadowLengthPerHeight = 1.4;
 
 /** A tint image and the cell-local rectangle it covers (x right, y forward, meters). */
 export interface GroundTint {

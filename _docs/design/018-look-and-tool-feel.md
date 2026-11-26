@@ -198,7 +198,7 @@ from both biomes in the same proportion. The torus family keeps its own floor.
 
 ### 8.4 Landmarks
 
-`world-assets/landmarkLayout.ts` lays out, per cell and seeded, one major landmark (6 to 11 m) and two to four minor
+`world-assets/landmarkLayout.ts` lays out, per cell and seeded, one major landmark (6 to 11 m) and one or two minor
 ones (1.5 to 4 m), away from sides (cell geometry has no portal ghosts), corners, authored objects and the start.
 `render/three/buildCellLandmarks.ts` builds one merged vertex-coloured mesh per cell, a cell archetype of kind
 `landmark`, drawn up to path depth 6. Pillars and feet are colliders for the player. Budget: 900 triangles per cell.
@@ -208,3 +208,28 @@ ones (1.5 to 4 m), away from sides (cell geometry has no portal ghosts), corners
 Creatures that walk straight lines are part of the mathematics, so some are generated too: a stilt-walker (a small
 body on four very long thin legs) and a drifting mobile (discs and a crescent on a wire), built in code and moved by
 the existing geodesic creature behaviour.
+
+### 8.6 What was built and what it costs (second pass)
+
+Built as described in 8.1 to 8.5, with these differences:
+
+- A cell gets one major and one or two minor landmarks (not two to four): with every copy of every face in view, more
+  made the horizon a jumble.
+- A major that does not fit its face shrinks in steps (down to 0.68), so some are under 6 m; the great sphere is 4.4 m.
+- The transition between two floors is 1.5 m to each side of the border, wandering by up to 1.1 m, inside strips 2.6 m wide.
+- Shadows tuned by eye: strength 0.6, 1.4 times the caster's height, edge 0.18 m.
+- Generated creatures reuse the two existing motion families (walking, flying); their bodies are not animated, because the
+  creature pipeline has no per-frame hook for the model. The rolling eye slides.
+- Landmark feet block the player. They do not block creatures, beams, or the placing of lasers and signs, and they are not
+  aim targets.
+
+Cost on the cube (`001-basic-cube`), one pose with 286 visible cell copies:
+
+- Floor: 5 instanced draws per cell instead of 1 (inner polygon and four strips), each with its root draw; about 120
+  triangles per copy. Strip fragments sample four textures, inner fragments two.
+- Landmarks: one draw per cell, 75 copies drawn (depth 6 or less), 140 to 400 triangles per cell: at most 30 000 triangles.
+- Scenery: 14 copies drawn, as before.
+- Creatures: three more objects of 70 to 125 triangles, instanced like the mouse.
+
+Seen only on a software renderer; frame rate on a real GPU and in VR is not measured. A thin dark line can show along a
+border on light floors where the plane under the cells shows through the hairline gap between two cells' floors.

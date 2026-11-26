@@ -77,13 +77,13 @@ describe("computeGroundTint", () => {
 });
 
 describe("long baked shadows", () => {
-  const tall: CellObjectSpec = { ...rock, id: "tall", collision: { radius: 0.5, height: 4 } };
+  const tall: CellObjectSpec = { ...rock, id: "tall", collision: { radius: 0.5, height: 2 } };
   const azimuth = 0; // shadows fall toward +x
 
   it("darkens the ground along the azimuth and not against it", () => {
     const plain = computeGroundTint(cell([tall]));
     const long = computeGroundTint(cell([tall]), { shadowAzimuthRadians: azimuth });
-    const length = 4 * groundShadowLengthPerHeight;
+    const length = 2 * groundShadowLengthPerHeight;
     expect(texelAt(long, length * 0.5, 0)).toBeLessThan(texelAt(plain, length * 0.5, 0) * 0.8);
     expect(texelAt(long, -3, 0)).toBe(texelAt(plain, -3, 0));
     expect(texelAt(long, length * 0.5, 3)).toBe(texelAt(plain, length * 0.5, 3));

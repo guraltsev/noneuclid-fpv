@@ -3,7 +3,7 @@
  *
  * Pure: it decides what stands where, how big and turned how; `render/three/buildCellLandmarks.ts` turns the list into a mesh, the ground tint takes the
  * shadow casters, scenery takes the keep-out discs and the shell takes the colliders. The same cell always gets the same landmarks. A cell gets one major
- * landmark (6 to 11 m) and two to four minor ones (1.5 to 4 m) from the set of its biome, placed clear of sides, corners, authored objects, the start and
+ * landmark (6 to 11 m) and one or two minor ones (1.5 to 4 m) from the set of its biome, placed clear of sides, corners, authored objects, the start and
  * each other: cell geometry has no portal ghosts, so a landmark must never cross a side. Layer rule: imports only `cell-complex` and sibling modules.
  */
 import type { CompiledPrismCell } from "../cell-complex/prismCells";
@@ -220,7 +220,7 @@ export function computeLandmarkLayout(cell: CompiledPrismCell, context: Landmark
   const placed: LandmarkPlacement[] = major ? [major] : [];
   let triangles = major ? landmarkTriangleCount(major.kind, major.variant) : 0;
 
-  const wanted = 2 + Math.floor(random() * 3);
+  const wanted = 1 + Math.floor(random() * 2);
   const kinds = minorKinds[biome];
   const pickOffset = Math.floor(random() * kinds.length);
 
