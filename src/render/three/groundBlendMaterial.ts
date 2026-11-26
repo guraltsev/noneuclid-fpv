@@ -20,12 +20,15 @@ import * as THREE from "three";
 import type { GroundTint } from "../../world-assets/groundTint";
 import { groundTintGain } from "./groundTintMaterial";
 
-/** Largest half-width of the strip (its width) in meters, before it is limited by the size of the cell. */
-export const blendHalfWidthMeters = 2.6;
+/**
+ * Largest width of the strip in meters, before it is limited by the size of the cell: the neighbour's ground reaches at most this far into
+ * a cell (half-width plus wander), so faces stay distinct and the border reads as a crisp, ragged seam.
+ */
+export const blendHalfWidthMeters = 0.5;
 /** Largest sideways wander of the border in meters (the noise `n` goes from minus to plus this). */
-export const blendNoiseAmplitudeMeters = 1.1;
+export const blendNoiseAmplitudeMeters = 0.2;
 /** Size of the features of the border noise along the side, meters. */
-export const blendNoiseFeatureMeters = 2.5;
+export const blendNoiseFeatureMeters = 0.7;
 
 /** A tint image together with the texture that holds it, as the shader needs them. */
 export interface GroundBlendTintSource {
@@ -125,9 +128,14 @@ const fragmentDeclarations = [
 
 const fragmentColor = [
   "{",
-  "  vec3 ownGround = diffuse * texture2D(map, vMapUv).rgb * texture2D(groundTintMap, (vGroundTintPoint - groundTintOrigin) / groundTintSize).rgb;",
+  "  vec4 ownTint = texture2D(groundTintMap, (vGroundTintPoint - groundTintOrigin) / groundTintSize);",
+  "  vec3 ownTexel = diffuse * texture2D(map, vMapUv).rgb;",
+  // Tint alpha: how far the face's palette replaces the texture's own colour (desaturate, then the tint colour gives the hue).
+  "  vec3 ownGround = mix(ownTexel, vec3(dot(ownTexel, vec3(0.2126, 0.7152, 0.0722))), ownTint.a) * ownTint.rgb;",
   "  vec2 neighbourTintUv = clamp((vNeighbourPoint - neighbourTintOrigin) / neighbourTintSize, 0.0, 1.0);",
-  "  vec3 neighbourGround = neighbourColor * texture2D(neighbourMap, vNeighbourUv).rgb * texture2D(neighbourTintMap, neighbourTintUv).rgb;",
+  "  vec4 neighbourTint = texture2D(neighbourTintMap, neighbourTintUv);",
+  "  vec3 neighbourTexel = neighbourColor * texture2D(neighbourMap, vNeighbourUv).rgb;",
+  "  vec3 neighbourGround = mix(neighbourTexel, vec3(dot(neighbourTexel, vec3(0.2126, 0.7152, 0.0722))), neighbourTint.a) * neighbourTint.rgb;",
   "  float cornerReach = max(0.0, min(blendCornerSlopes.x * vBlendCoord.x, blendCornerSlopes.y * (vBlendLength - vBlendCoord.x)));",
   "  float shrink = clamp(cornerReach / max(blendHalfWidth + blendNoiseAmplitude, 1e-4), 0.0, 1.0);",
   "  float halfWidth = max(blendHalfWidth * shrink, 1e-4);",

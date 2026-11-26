@@ -22,6 +22,7 @@ import type { PortalPanelModeId } from "../../glue/portalPanelMode";
 import { buildCellMesh, type FloorStripBlend } from "./buildCellMesh";
 import { computeGroundTint, type GroundTint } from "../../world-assets/groundTint";
 import { landmarkMaxDrawDistanceMeters, patchDistanceFadeMaterial, sceneryFadeEndMeters, sceneryFadeStartMeters } from "./distanceFade";
+import { groundPaletteMultiplier, groundRecolorStrength } from "../../world-assets/facePalettes";
 import { landmarkShadowCasters } from "../../world-assets/landmarkLayout";
 import { computeWorldDressing, type WorldDressing } from "../../world-assets/worldDressing";
 import { patchFloorPatchMaterial } from "./floorPatchMaterial";
@@ -294,9 +295,12 @@ function createWorldContext(world: CompiledCellComplex, options: BuildCellRender
       continue;
     }
 
+    const look = dressing?.lookByCellId.get(cell.id);
     const tint = computeGroundTint(cell, {
       shadowAzimuthRadians: dressing?.shadowAzimuthByCellId.get(cell.id),
       casters: landmarkShadowCasters(dressing?.landmarksByCellId.get(cell.id) ?? []),
+      colorMultiplier: look ? groundPaletteMultiplier(look.palette) : undefined,
+      recolorStrength: look ? groundRecolorStrength : 0,
     });
     groundTints.set(cell.id, { tint, texture: createGroundTintTexture(tint) });
   }

@@ -688,6 +688,46 @@ Swept collision of a moving disc against discs and capsules in one flat plane, a
 
 ## `world-assets`
 
+### `world-assets/facePalettes.ts`
+
+Colour palettes of faces (design 018 section 9.2): every face gets a key hue and a colour scheme, and every colour on it (its landmarks and a tint of its ground) comes from the palette built from them, so a face is recognised by colour from far away.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| type | `PaletteScheme` | How the second and accent hues relate to the key hue. |
+| const | `paletteSchemes` | Every scheme, in a fixed order. |
+| interface | `FacePalette` | The colours of one face. |
+| function | `hslToHex` | sRGB hex of an HSL colour (hue in degrees, saturation and lightness 0 to 1). |
+| function | `hexToLinearRgb` | Linear-light RGB (0 to 1) of an sRGB hex colour. |
+| function | `buildFacePalette` | Builds a palette from a key hue, a scheme and a random source (for small variations of saturation and lightness, so two faces of close hue still differ). |
+| const | `groundRecolorStrength` | How far the ground texture of a face loses its own colour before it takes the palette's `ground` colour (0 to 1). |
+| const | `groundPaletteMaxChannel` | Largest multiplier a channel of the ground colour may get, so saturated hues keep some brightness and do not clip the tint image. |
+| function | `groundPaletteMultiplier` | The multiplier the ground of a face gets from its palette: the `ground` colour normalised to unit luminance (so the texture keeps its brightness), scaled down where a channel would exceed {@link groundPaletteMaxChannel}. |
+
+### `world-assets/faceThemeAssignment.ts`
+
+Which face gets which theme and palette (design 018 section 9.3).
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `FaceLook` | What a face looks like. |
+| const | `maxKeyHues` | Most key hues the wheel is cut into. |
+| function | `isThemedCell` | Whether a cell is themed (gets landmarks and a palette). |
+| function | `assignFaceLooks` | Assigns a theme and a palette to every themed cell of the world (see the module header). |
+
+### `world-assets/faceThemes.ts`
+
+Face themes (design 018 section 9.1): what stands on a face.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| type | `LandmarkRole` | Size class of a generated landmark. |
+| interface | `GeneratorContext` | What a generator gets. |
+| interface | `LandmarkGenerator` | A named generator: the name is shown in debugging and kept on the placement. |
+| interface | `FaceTheme` | A theme: its name and its generators per role. |
+| const | `faceThemes` | Every theme, in a fixed order; the assignment draws from it. |
+| function | `faceThemeById` | The theme with the given id. |
+
 ### `world-assets/floorTextures.ts`
 
 Floor texture library: the named floor appearances world scripts can use, via the `floorTexture` helper.
@@ -731,63 +771,47 @@ Per-cell ground tint image (design 018 section 4.1).
 
 ### `world-assets/landmarkLayout.ts`
 
-Seeded layout of the large generated landmarks of a cell (design 018 sections 8.1 and 8.4): arcades, towers, floating boulders, stilt forms and the like.
+Seeded layout of the generated landmarks of a cell (design 018 sections 8.4 and 9): one major landmark (6 to 11 m), a few minor ones (1.5 to 4 m) and some small props, all from the generators of the face's theme and in the face's palette (`faceThemeAssignment.ts`).
 
 | Kind | Name | Summary |
 | --- | --- | --- |
 | interface | `LandmarkPlacement` | One generated landmark, in cell-local meters (x right, y forward). |
 | interface | `LandmarkCollider` | A vertical cylinder the player cannot walk into. |
+| interface | `FloatingLandmarkPart` | A landmark part that hovers: its centre column on the ground is at (`x`, `y`), its radius and its top height are given. |
 | interface | `LandmarkLayoutContext` | What the layout needs to know besides the cell. |
-| const | `maxLandmarkTrianglesPerCell` | The most triangles of landmarks one cell may carry; minor landmarks are dropped first. |
+| const | `maxLandmarkTrianglesPerCell` | The most triangles of landmarks one cell may carry; props are dropped first, then minors. |
+| const | `landmarkCounts` | How many of each role a face gets (inclusive ranges). |
 | const | `landmarkClearances` | Clearance rules in meters: the disc of a landmark must stay this far (beyond its radius) from sides, and its centre this far from vertices. |
 | const | `landmarkDefaultObjectRadiusMeters` | Collision radius assumed for an authored object without one, meters. |
-| const | `landmarkBiomeByKind` | The biome a landmark kind belongs to; the mesh builder picks its palette from it. |
-| function | `computeLandmarkLayout` | Lays out the landmarks of a cell; an empty list for a cell that gets none. |
-| interface | `FloatingLandmarkPart` | A landmark part that hovers: its centre column on the ground is at (`x`, `y`), its radius and its top height are given. |
-| function | `landmarkFloatingParts` | The hovering boulders of a placement in cell-local meters (empty for every kind but floating boulders and small floaters). |
-| function | `landmarkShadowCasters` | The long shadows the landmarks throw on the ground of their cell: one per ground-touching part, and for every hovering boulder one at the point below it with its radius and its top height (a floating thing still throws … |
+| function | `computeLandmarkLayout` | Lays out the landmarks of a cell; an empty list for a cell without a look. |
+| function | `landmarkFloatingParts` | The hovering parts of a placement in cell-local meters. |
+| function | `landmarkShadowCasters` | The long shadows the landmarks throw on the ground of their cell: one per ground-touching part, and for every hovering part one at the point below it with its radius and its top height (a floating thing still throws a s… |
 | interface | `LandmarkKeepOutDisc` | A disc on the ground that small props must keep out of. |
 | function | `landmarkKeepOutDiscs` | Discs around the ground-touching parts of the landmarks (collider radius plus 0.4 m) so scenery does not grow inside piers. |
 
-### `world-assets/landmarkShapes.ts`
+### `world-assets/landmarkParts.ts`
 
-What each generated landmark kind is, in numbers (design 018 sections 8.1 and 8.4): nominal footprint, height, ground colliders and the triangle count of its mesh.
+The primitive kit of generated landmarks (design 018 section 9): a landmark is a list of parts, each a simple solid in the landmark's own frame (`u` right, `v` forward, `w` up, meters, origin on the ground), with a colour and an optional glow.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
-| type | `LandmarkKind` | What a landmark is; the mesh builder has one shape generator per kind. |
-| interface | `LocalLandmarkCollider` | A vertical cylinder of a landmark in its own frame at scale 1. |
-| interface | `LandmarkShape` | The nominal numbers of one landmark (scale 1). |
-| interface | `FloatingBoulder` | One hovering boulder, in the landmark frame: centre height `zCenter`, outer radius `radius` (the mesh never exceeds it). |
-| interface | `StackStone` | One stone of a pebble stack: an ellipsoid with radii `rx`, `ry`, `rz` centred at (`u`, `v`, `zCenter`). |
+| type | `Vec3` | A point or vector in a landmark's frame (u, v, w), meters. |
+| interface | `PartPose` | How a part is turned: radians. |
+| type | `LandmarkPart` | One part of a landmark. |
+| interface | `LandmarkTriangle` | One triangle of a landmark in its own frame. |
+| interface | `LocalLandmarkCollider` | A vertical cylinder of a landmark the player cannot walk into, in the landmark frame. |
+| interface | `LocalFloatingPart` | A part that hovers clear of the ground: the point below its centre, its horizontal radius and its top. |
+| interface | `LandmarkMeasure` | What the layout needs to know about a part list. |
 | const | `thinColliderRadiusMeters` | Collider radius of a thin stalk, strut or leg, meters. |
-| const | `arcadeClearWidthMeters` | Clear width between the piers of an arcade, meters. |
-| const | `arcadePierMeters` | Width (and depth) of an arcade pier, meters. |
-| const | `arcadePierHeightMeters` | Height of the piers of an arcade (the arches spring 1.35 m below their top), meters. |
-| const | `arcadeHeightMeters` | Height of an arcade including its entablature, meters. |
-| const | `arcadeArchSegments` | Segments of one semicircular arch of an arcade. |
-| const | `colonnadePitchMeters` | Column pitch of a colonnade, meters. |
-| const | `colonnadeShaftHeightMeters` | Height of a standing colonnade shaft, meters. |
-| const | `ruinArchSegments` | Number of arch pieces of a ruin arch. |
-| const | `mobileItemTriangles` | Triangles of the five items a wire mobile carries, in turn: red disc, blue disc, black crescent, yellow star, yellow disc. |
-| const | `flatDiscSegments` | Segments of the disc fan of a flat disc. |
-| const | `stoneLongitudes` | Longitude and latitude bands of the smooth stones (pebble stacks and pairs). |
-| const | `stoneLatitudes` | Latitude bands of a smooth stone. |
-| function | `latLongTriangles` | Triangles of a lat-long ellipsoid with `longitudes` and `latitudes` bands. |
-| function | `icoTriangles` | Triangles of an icosphere at subdivision level 0 (20) or 1 (80). |
-| function | `wireMobileTriangles` | Triangles of a wire mobile with `branches` branches: a kinked stalk, then per branch a strut and its item. |
-| function | `colonnadeColumnCount` | Number of columns of a colonnade variant. |
-| function | `colonnadeColumnBroken` | Whether column `index` of a colonnade variant is broken short. |
-| function | `colonnadeStumpHeightMeters` | Height of a broken colonnade stump, meters; depends on its index only. |
-| function | `colonnadeColumnU` | Position of column `index` along a colonnade of `count` columns, meters from its centre. |
-| function | `arcadePierU` | Pier centres of an arcade of `arches` arches, meters from its centre. |
-| function | `arcadeLengthMeters` | Length of an arcade of `arches` arches, meters. |
-| function | `colonnadeLengthMeters` | Length of a colonnade of `count` columns, meters. |
-| function | `colonnadeVariantFor` | Draws a colonnade variant (column count and the set of broken columns) from a seed: one to half the columns are broken, and at least two neighbouring columns stay standing so that a lintel joins them. |
-| function | `floatingBoulders` | The boulders of a `floating-boulders` cluster (variant = count, 3 to 5) or of a `small-floater` (one boulder), drawn from the seed. |
-| function | `pebbleStackStones` | The stones of a pebble stack of `count` stones (5 to 8): decreasing in size, slightly off the axis, stacked to 6 to 8 m. |
-| function | `landmarkTriangleCount` | The triangle count of a landmark of the given kind and variant, which `buildCellLandmarks.ts` emits exactly. |
-| function | `landmarkShape` | The nominal shape of a landmark: footprint, height, colliders and triangles, at scale 1. |
+| const | `groundContactMeters` | A part whose lowest point is at most this high touches the ground (it may block the player). |
+| const | `colliderMinTopMeters` | A part touching the ground blocks the player only when its top is at least this high. |
+| const | `floatingMinBottomMeters` | A part whose lowest point is at least this high hovers and throws its own shadow. |
+| const | `floatingMinRadiusMeters` | A hovering part throws a shadow only when its horizontal radius is at least this, meters. |
+| function | `partTriangleCount` | Triangles `tessellatePart` emits for a part. |
+| function | `partsTriangleCount` | Triangles of a whole part list. |
+| function | `tessellatePart` | The triangles of one part, in the landmark frame. |
+| function | `tessellateParts` | The triangles of a part list, in the landmark frame, in part order. |
+| function | `measureParts` | Measures a part list: footprint, height, triangles, the colliders of the parts that stand on the ground and the parts that hover. |
 
 ### `world-assets/sceneryLayout.ts`
 
@@ -826,7 +850,7 @@ Deterministic seeded random numbers and value noise.
 
 ### `world-assets/worldDressing.ts`
 
-Everything generated that dresses a world and that more than one consumer needs (design 018): the baked light direction of each cell and its landmarks.
+Everything generated that dresses a world and that more than one consumer needs (design 018): the baked light direction of each cell, the look of each face (theme and palette) and its landmarks.
 
 | Kind | Name | Summary |
 | --- | --- | --- |
@@ -2960,7 +2984,7 @@ Console guides printed when debug options are enabled.
 
 ### `render/three/buildCellLandmarks.ts`
 
-Mesh of the generated landmarks of one cell (design 018 sections 8.1 to 8.4), in the cell mesh's Three.js axes (cell-local (x, y, height) is Three (x, height, -y)).
+Mesh of the generated landmarks of one cell (design 018 sections 8 and 9), in the cell mesh's Three.js axes (cell-local (x, y, height) is Three (x, height, -y)).
 
 | Kind | Name | Summary |
 | --- | --- | --- |
@@ -2972,7 +2996,6 @@ Mesh of the generated landmarks of one cell (design 018 sections 8.1 to 8.4), in
 | const | `landmarkUndersideFactor` | Brightness multiplier of an underside (normal pointing down). |
 | const | `landmarkUndersideNormalZ` | A face whose normal height component is below this counts as an underside. |
 | const | `landmarkFacetJitter` | Per-triangle brightness jitter, as a total fraction (plus or minus half of it), so flat facets do not look uniform. |
-| const | `landmarkPalette` | Palettes (sRGB hex) per biome; edit here to tune the look. |
 | function | `landmarkToLight` | Unit vector from a surface toward the light, in cell-local axes: horizontally opposite to the shadow direction, raised by the light elevation. |
 | function | `bakeLandmarkLight` | Multiplies `color` by the baked light of a face with the unit normal `normal` (cell-local axes): `0.62 + 0.38 * max(0, n . |
 | function | `buildCellLandmarksMesh` | Builds the landmark mesh of a cell (`name = "landmarks:<cellId>"`, `userData.kind = "landmark"`), or undefined when the cell has no landmarks. |
@@ -3493,7 +3516,7 @@ Ground blending along the sides of a metric floor (design 018 section 8.3).
 
 | Kind | Name | Summary |
 | --- | --- | --- |
-| const | `blendHalfWidthMeters` | Largest half-width of the strip (its width) in meters, before it is limited by the size of the cell. |
+| const | `blendHalfWidthMeters` | Largest width of the strip in meters, before it is limited by the size of the cell: the neighbour's ground reaches at most this far into a cell (half-width plus wander), so faces stay distinct and the border reads as a … |
 | const | `blendNoiseAmplitudeMeters` | Largest sideways wander of the border in meters (the noise `n` goes from minus to plus this). |
 | const | `blendNoiseFeatureMeters` | Size of the features of the border noise along the side, meters. |
 | interface | `GroundBlendTintSource` | A tint image together with the texture that holds it, as the shader needs them. |

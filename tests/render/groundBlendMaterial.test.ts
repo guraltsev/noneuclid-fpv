@@ -121,8 +121,8 @@ describe("neighbour share", () => {
 
   it("is 0.5 on the side and 0 on the inner edge of the strip whatever the wander", () => {
     expect(neighbourShare(1, 0, 0, 1.5)).toBeCloseTo(0.5, 12);
-    // Inner edge: distance into the cell is the strip width 2.6 = h + amplitude, wander at worst -1.1.
-    expect(neighbourShare(1, 2.6, -1.1, 1.5)).toBe(0);
-    expect(neighbourShare(-1, -2.6, -1.1, 1.5)).toBe(0);
+    // Inner edge: distance into the cell is the strip width 0.5 = h + amplitude, wander at worst -0.2.
+    expect(neighbourShare(1, 0.5, -0.2, 0.3)).toBe(0);
+    expect(neighbourShare(-1, -0.5, -0.2, 0.3)).toBe(0);
   });
 });

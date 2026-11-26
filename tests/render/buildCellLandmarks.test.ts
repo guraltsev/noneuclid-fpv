@@ -1,8 +1,9 @@
 /**
  * `tests/render/buildCellLandmarks.test.ts` — unit tier.
  *
- * The landmark mesh of a cell is one non-indexed vertex-coloured geometry whose triangle count is the sum of the shape table, whose vertices lie inside the
- * cell and between the ground and 12 m, with unit normals, identical when built twice, and with the baked light making faces turned to the light brighter.
+ * The landmark mesh of a cell is one non-indexed vertex-coloured geometry with exactly the triangles of its placements' parts, whose vertices lie inside
+ * the cell and between the ground and 12 m, with unit normals, identical when built twice, with the baked light making faces turned to the light
+ * brighter and glowing parts at full colour.
  */
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
@@ -16,63 +17,56 @@ import {
 } from "../../src/render/three/buildCellLandmarks";
 import { buildCellMesh } from "../../src/render/three/buildCellMesh";
 import { computeCellShadowAzimuths } from "../../src/cell-complex/cellSun";
-import { computeLandmarkLayout, landmarkTriangleCount, type LandmarkPlacement } from "../../src/world-assets/landmarkLayout";
-import { colonnadeVariantFor, landmarkShape, type LandmarkKind } from "../../src/world-assets/landmarkShapes";
+import { computeLandmarkLayout, type LandmarkPlacement } from "../../src/world-assets/landmarkLayout";
+import { buildFacePalette } from "../../src/world-assets/facePalettes";
+import { faceThemes } from "../../src/world-assets/faceThemes";
+import { measureParts, type LandmarkPart } from "../../src/world-assets/landmarkParts";
+import { createSeededRandom } from "../../src/world-assets/seededNoise";
 import { computeWorldDressing } from "../../src/world-assets/worldDressing";
 import { createFakePreparedAssets } from "../support/preparedAssets";
 
 const world = compileCellComplex(basicCube);
 const azimuth = 2.2;
+const palette = buildFacePalette(30, "complementary");
 
-function placementFor(kind: LandmarkKind, variant: number, seed = 5): LandmarkPlacement {
-  const shape = landmarkShape(kind, variant, seed);
-  return { kind, variant, x: 0, y: 0, yawRadians: 0.3, scale: 1, seed, footprintRadiusMeters: shape.footprintRadiusMeters, heightMeters: shape.heightMeters, colliders: [] };
+function placementOf(parts: readonly LandmarkPart[], kind = "test", yawRadians = 0.3): LandmarkPlacement {
+  const measure = measureParts(parts);
+  return {
+    themeId: "test",
+    kind,
+    role: "major",
+    x: 0,
+    y: 0,
+    yawRadians,
+    scale: 1,
+    seed: 5,
+    parts,
+    triangles: measure.triangles,
+    footprintRadiusMeters: measure.footprintRadiusMeters,
+    heightMeters: measure.heightMeters,
+    colliders: [],
+    floating: [],
+  };
 }
 
-const allKinds: [LandmarkKind, number[]][] = [
-  ["arcade", [3, 4, 5]],
-  ["tower", [0]],
-  ["plinth", [0, 1, 2]],
-  ["lone-arch", [0]],
-  ["stilt-form", [0]],
-  ["crutch-slab", [0]],
-  ["obelisk", [0]],
-  ["soft-disc", [0]],
-  ["floating-boulders", [3, 4, 5]],
-  ["great-sphere", [0]],
-  ["door-frame", [0]],
-  ["small-floater", [0]],
-  ["pebble-stack", [5, 6, 7, 8]],
-  ["needle", [0]],
-  ["bone-form", [2, 3]],
-  ["pebble-pair", [0]],
-  ["wire-mobile", [3, 4, 5]],
-  ["disc-stalk", [0, 1]],
-  ["blob", [0]],
-  ["colonnade", [colonnadeVariantFor(4, 9), colonnadeVariantFor(5, 9), colonnadeVariantFor(6, 11)]],
-  ["ruin-arch", [0]],
-  ["broken-column", [0]],
-  ["ice-spire", [0]],
-];
-
 describe("buildCellLandmarksMesh", () => {
-  it("emits the table's triangles for every kind, inside its footprint", () => {
-    for (const [kind, variants] of allKinds) {
-      for (const variant of variants) {
-        const placement = placementFor(kind, variant);
+  it("draws every generator's triangles inside its footprint, with unit normals", () => {
+    for (const theme of faceThemes) {
+      for (const generator of [...theme.major, ...theme.minor, ...theme.prop]) {
+        const placement = placementOf(generator.build({ random: createSeededRandom(7), palette }), generator.name);
         const mesh = buildCellLandmarksMesh("c", [placement], azimuth)!;
         const position = mesh.geometry.getAttribute("position");
         const normal = mesh.geometry.getAttribute("normal");
-        const label = `${kind}/${variant}`;
+        const label = `${theme.id}/${generator.name}`;
 
-        expect([label, position.count / 3]).toEqual([label, landmarkTriangleCount(kind, variant)]);
+        expect([label, position.count / 3]).toEqual([label, placement.triangles]);
 
         for (let index = 0; index < position.count; index += 1) {
           const x = position.getX(index);
           const y = -position.getZ(index);
-          const height = position.getY(index);
-          expect(height, label).toBeGreaterThanOrEqual(-0.01);
-          expect(height, label).toBeLessThanOrEqual(placement.heightMeters + 0.05);
+          // Legs, posts and tilted shards may sink a little into the ground (the floor hides it), never far.
+          expect(position.getY(index), label).toBeGreaterThanOrEqual(-0.5);
+          expect(position.getY(index), label).toBeLessThanOrEqual(placement.heightMeters + 0.05);
           expect(Math.hypot(x, y), label).toBeLessThanOrEqual(placement.footprintRadiusMeters + 0.05);
           expect(Math.hypot(normal.getX(index), normal.getY(index), normal.getZ(index)), label).toBeCloseTo(1, 4);
         }
@@ -92,14 +86,14 @@ describe("buildCellLandmarksMesh", () => {
       expect(mesh.userData).toEqual({ kind: "landmark", cellId: cell.id });
       expect(mesh.geometry.index).toBeNull();
       expect(Object.keys(mesh.geometry.attributes).sort()).toEqual(["color", "normal", "position"]);
-      expect(position.count).toBe(placements.reduce((sum, placement) => sum + landmarkTriangleCount(placement.kind, placement.variant), 0) * 3);
+      expect(position.count).toBe(placements.reduce((sum, placement) => sum + placement.triangles, 0) * 3);
       expect(mesh.material).toBeInstanceOf(THREE.MeshLambertMaterial);
       expect((mesh.material as THREE.MeshLambertMaterial).vertexColors).toBe(true);
 
       for (let index = 0; index < position.count; index += 1) {
         const x = position.getX(index);
         const y = -position.getZ(index);
-        expect(position.getY(index)).toBeGreaterThanOrEqual(-0.01);
+        expect(position.getY(index)).toBeGreaterThanOrEqual(-0.5);
         expect(position.getY(index)).toBeLessThanOrEqual(12);
         for (const side of cell.sides) {
           expect((x - side.start.x) * side.inwardNormal.x + (y - side.start.y) * side.inwardNormal.y).toBeGreaterThan(0);
@@ -109,7 +103,9 @@ describe("buildCellLandmarksMesh", () => {
   });
 
   it("builds the same geometry twice and returns nothing for no placements", () => {
-    const placements = computeLandmarkLayout(world.cells[0]);
+    const dressing = computeWorldDressing(world);
+    const placements = computeLandmarkLayout(world.cells[0], { look: dressing.lookByCellId.get(world.cells[0].id) });
+    expect(placements.length).toBeGreaterThan(0);
     const first = buildCellLandmarksMesh("c", placements, azimuth)!.geometry;
     const second = buildCellLandmarksMesh("c", placements, azimuth)!.geometry;
 
@@ -132,7 +128,7 @@ describe("buildCellLandmarksMesh", () => {
   });
 
   it("makes the lit side of a tower brighter than its shaded side in the mesh", () => {
-    const mesh = buildCellLandmarksMesh("c", [{ ...placementFor("obelisk", 0), yawRadians: 0 }], azimuth)!;
+    const mesh = buildCellLandmarksMesh("c", [placementOf([{ shape: "prism", at: [0, 0, 0], sides: 8, r0: 0.8, r1: 0.6, h: 7, color: "#cccccc" }], "obelisk", 0)], azimuth)!;
     const normal = mesh.geometry.getAttribute("normal");
     const color = mesh.geometry.getAttribute("color");
     const toLight = landmarkToLight(azimuth);
@@ -157,6 +153,14 @@ describe("buildCellLandmarksMesh", () => {
     expect(litCount).toBeGreaterThan(0);
     expect(darkCount).toBeGreaterThan(0);
     expect(litSum / litCount).toBeGreaterThan(darkSum / darkCount);
+  });
+
+  it("draws glowing parts at their full colour, without the baked light", () => {
+    const mesh = buildCellLandmarksMesh("c", [placementOf([{ shape: "box", at: [0, 0, 1], sx: 1, sy: 1, sz: 1, color: "#ffffff", glow: true }])], azimuth)!;
+    const color = mesh.geometry.getAttribute("color");
+    for (let index = 0; index < color.count; index += 1) {
+      expect(color.getX(index)).toBeCloseTo(1, 6);
+    }
   });
 
   it("adds the landmark mesh to a cube cell mesh given the dressing", () => {

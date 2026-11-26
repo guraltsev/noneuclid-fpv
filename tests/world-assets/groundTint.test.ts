@@ -59,7 +59,17 @@ describe("computeGroundTint", () => {
     const mean = sum / (192 * 192);
     expect(mean).toBeGreaterThan(groundTintNeutralTexel * 0.85);
     expect(mean).toBeLessThan(groundTintNeutralTexel * 1.15);
-    expect(tint.data[3]).toBe(255);
+    // Alpha is the recolour strength, 0 by default.
+    expect(tint.data[3]).toBe(0);
+    expect(computeGroundTint(cell([]), { width: 4, height: 4, recolorStrength: 0.8 }).data[3]).toBe(204);
+  });
+
+  it("multiplies every channel by the colour multiplier", () => {
+    const plain = computeGroundTint(cell([]), { width: 8, height: 8 });
+    const red = computeGroundTint(cell([]), { width: 8, height: 8, colorMultiplier: [1.5, 1, 0.5] });
+    expect(red.data[0]).toBeGreaterThan(plain.data[0]);
+    expect(red.data[1]).toBe(plain.data[1]);
+    expect(red.data[2]).toBeLessThan(plain.data[2]);
   });
 
   it("is deterministic", () => {
