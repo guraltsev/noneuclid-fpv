@@ -9,13 +9,13 @@ import type { CellObjectSpec, FloorMaterialSpec } from "../cell-complex/specs";
 import { fractalNoise2, hashStringToSeed } from "./seededNoise";
 
 /** Strength of the large (about 8 m) brightness patches: the tint varies by plus or minus this fraction. */
-export const groundTintLargeStrength = 0.22;
+export const groundTintLargeStrength = 0.3;
 /** Strength of the small (about 2 m) brightness patches. */
 export const groundTintSmallStrength = 0.1;
 /** Largest warm/cool shift of the red and blue channels, as a fraction. */
 export const groundTintWarmCoolStrength = 0.04;
 /** Darkest the contact shadow gets, as a fraction removed at the object (0.38 means 62 percent of the colour is left). */
-export const groundContactShadowStrength = 0.38;
+export const groundContactShadowStrength = 0.5;
 /** Radius in meters used for a static object with no collision cylinder. */
 export const groundContactShadowDefaultRadiusMeters = 0.35;
 /** Texel value that means "multiply by 1.0". */

@@ -3,9 +3,9 @@
  *
  * A cell is a convex polygon base (`baseVertices`, meters, counter-clockwise in the world xy plane) extruded to
  * `heightMeters`. The returned group is authored directly in Three.js axes (world (x, y, z) becomes (x, z, -y), see
- * `worldAxes`): a textured floor at y = 0, a ceiling at y = height, one wall per side (a solid wall, or a portal
+ * `worldAxes`): a textured floor at y = 0, its scenery props (one merged mesh, `buildCellScenery`), a ceiling at y = height, one wall per side (a solid wall, or a portal
  * wall via `buildPortalMesh` for sides with a portal), optional portal debug panels, optional forbidden-zone
- * wireframes. Objects are not part of a cell mesh: creatures and static assets are runtime objects drawn from the registry. Floor UVs are metric (one texture tile = `tileSizeMeters`) or lattice UVs when a `floorUvFrame` is given (see `floorUv`); a lattice frame also gives a textured floor its rigid floor patches (`userData.floorPatchField`). Meshes carry names (`floor:`, `ceiling:`, `wall:`) and
+ * wireframes. Objects are not part of a cell mesh: creatures and static assets are runtime objects drawn from the registry. Floor UVs are metric (one texture tile = `tileSizeMeters`) or lattice UVs when a `floorUvFrame` is given (see `floorUv`); a lattice frame also gives a textured floor its rigid floor patches (`userData.floorPatchField`). Meshes carry names (`floor:`, `scenery:`, `ceiling:`, `wall:`) and
  * `userData.kind` tags that `cellRenderArchetypes` uses to classify them for instancing. Walls are nudged 1 cm
  * toward the cell interior along the inward normal to avoid z-fighting with coplanar surfaces. Called once per cell at load time; not a per-frame path.
  */
@@ -20,6 +20,7 @@ import {
   shouldRenderPortalWall,
   type PortalPanelModeId,
 } from "../../glue/portalPanelMode";
+import { buildCellSceneryMesh } from "./buildCellScenery";
 import { buildPortalMesh } from "./buildPortalMesh";
 import type { PreparedWorldAssets } from "./preparedWorldAssets";
 import { SCENE_BACKGROUND_COLOR } from "./sceneColors";
@@ -57,6 +58,11 @@ export function buildCellMesh(cell: CompiledPrismCell, options: BuildCellMeshOpt
   };
 
   group.add(buildFloorMesh(cell, options.assets, options.floorUvFrame));
+  // Lattice floors (the torus family) are continuous across cells by design, so they get no per-cell scenery.
+  const scenery = options.floorUvFrame ? undefined : buildCellSceneryMesh(cell);
+  if (scenery) {
+    group.add(scenery);
+  }
   group.add(buildCeilingMesh(cell));
   group.add(buildSideWalls(cell, options.assets, options.debugLevel, options.portalPanelMode));
 

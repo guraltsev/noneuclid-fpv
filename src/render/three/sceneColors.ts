@@ -14,3 +14,8 @@ export const SKY_MID_COLOR = 0x6aa8e6;
 export const SKY_HORIZON_COLOR = 0xd4e6f3;
 /** Muted grey-green seen below the horizon and used for the plane under the cells. */
 export const GROUND_HAZE_COLOR = 0x8f9c94;
+/**
+ * Dark earth colour (0x2c3128) of the plane under the cells. It shows through hairline gaps between neighbouring floors, where a light colour would
+ * draw bright lines along every edge; far away the fog turns it into the horizon haze.
+ */
+export const UNDER_FLOOR_COLOR = 0x2c3128;

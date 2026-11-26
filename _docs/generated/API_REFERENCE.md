@@ -710,6 +710,29 @@ Per-cell ground tint image (design 018 section 4.1).
 | interface | `GroundTint` | A tint image and the cell-local rectangle it covers (x right, y forward, meters). |
 | function | `computeGroundTint` | Computes the tint image of a cell over its bounding box, seeded by the cell id so it is the same on every machine. |
 
+### `world-assets/sceneryLayout.ts`
+
+Seeded layout of the small decorative props (grass, flowers, stones, mushrooms...) that grow on the floor of a cell.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| type | `SceneryPropKind` | The kinds of prop the layout can place. |
+| type | `SceneryBiome` | A ground type that decides which props grow; derived from the floor texture name. |
+| interface | `SceneryProp` | One prop of a cell: where it stands, how it is turned and sized, and which colour variant it has. |
+| interface | `SceneryLayoutOptions` | Options of {@link computeSceneryLayout}; the defaults are the shipped look, tests and tuning override them. |
+| const | `sceneryTrianglesByKind` | Triangles each prop kind adds to the cell mesh; `buildCellScenery.ts` emits exactly this many for the kind. |
+| const | `maxSceneryTrianglesPerCell` | The most triangles of scenery one cell may carry. |
+| const | `scenerySpacingMeters` | Spacing of the jittered placement grid, meters. |
+| const | `sceneryPropRadiusMeters` | Radius of a prop of scale 1 for keep-out purposes, meters: every shape fits in a disc of this radius. |
+| const | `scenerySideClearanceMeters` | Clearance from every side of the cell, meters (a prop's own radius counts). |
+| const | `sceneryVertexClearanceMeters` | Clearance from every vertex of the cell, meters. |
+| const | `sceneryDefaultObjectRadiusMeters` | Collision radius assumed for an authored object without one, meters. |
+| const | `sceneryObjectClearanceMeters` | Extra clearance around an authored object's collision radius, meters. |
+| const | `sceneryFeatureClearRadiusMeters` | Radius of the cleared disc around the centre of a feature, in which no ordinary prop grows, meters. |
+| const | `sceneryBiomeTable` | Per biome: probability scale of keeping a grid candidate on the lushest ground, and the weighted prop kinds. |
+| function | `sceneryBiomeForFloor` | What grows on a floor texture (design 018 section 4.2); undefined for any other texture or none. |
+| function | `computeSceneryLayout` | Lays out the props of a cell: a jittered grid thinned by the same noise field as the ground tint (clumps on lush patches, clearings elsewhere), then one or two features (a ring of stones or mushrooms, a flower patch), w… |
+
 ### `world-assets/seededNoise.ts`
 
 Deterministic seeded random numbers and value noise.
@@ -2824,6 +2847,16 @@ Builds the Three.js geometry of one prism cell in the cell's own local frame (wh
 | function | `buildCellMesh` | Builds the full Three.js group for a cell, named `cell:<id>` and tagged with its portal sides in `userData`. |
 | function | `floorColorTexture` | The tiling color texture of a cell's floor, or undefined if it has none or it failed to load. |
 
+### `render/three/buildCellScenery.ts`
+
+Builds the merged scenery mesh of one cell: every prop of `computeSceneryLayout` as a few flat-shaded, vertex-coloured triangles.
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| interface | `SceneryColors` | Colours of one prop kind as sRGB hex pairs; `tone` 0 gives the first of each pair and `tone` 1 the second. |
+| const | `sceneryPalette` | The scenery palette: one entry per prop kind. |
+| function | `buildCellSceneryMesh` | Builds the scenery mesh of `cell`, or undefined when the cell grows nothing (no biome, a flat-colour floor). |
+
 ### `render/three/buildDecorationMesh.ts`
 
 Builds the Three.js node for a static decoration (asset object) declared in a cell spec.
@@ -2886,6 +2919,7 @@ Builds the instanced-mesh archetypes for the static geometry of every cell, one 
 | --- | --- | --- |
 | type | `CellRenderArchetypeKind` | Category of a cell mesh part; "ceiling" and floor-outline meshes have no kind and are not instanced. |
 | interface | `CellRenderArchetype` | An instanced mesh of one cell part with its per-instance portal attributes. |
+| const | `sceneryMaxPathDepth` | Scenery is drawn only on portal paths of at most this depth (about 45 m; farther away a tuft is a few pixels and fogged). |
 | interface | `BuildCellRenderArchetypesOptions` | Options controlling how cell meshes are built and instanced. |
 | interface | `CellRenderArchetypePlanEntry` | Description of an archetype that would be built, for diagnostics and tests, without creating GPU resources. |
 | function | `buildCellRenderArchetypes` | Builds every cell's archetypes, with `count = 0` and frustum culling disabled (instance bounds are not tracked). |
@@ -3897,6 +3931,7 @@ Shared scene colour constants for the Three.js renderer.
 | const | `SKY_MID_COLOR` | Mid sky blue at 25 degrees of elevation. |
 | const | `SKY_HORIZON_COLOR` | Pale haze at the horizon; also the fog colour, so distant geometry dissolves into the horizon. |
 | const | `GROUND_HAZE_COLOR` | Muted grey-green seen below the horizon and used for the plane under the cells. |
+| const | `UNDER_FLOOR_COLOR` | Dark earth colour (0x2c3128) of the plane under the cells. |
 
 ### `render/three/sceneLighting.ts`
 
@@ -4063,7 +4098,7 @@ Large plane drawn below the cells so the void reads as ground.
 | --- | --- | --- |
 | const | `underCellInfinityFloorSizeMeters` | Side length of the square floor plane, meters; large enough to read as infinite from inside the cells. |
 | const | `underCellInfinityFloorWorldZMeters` | Height of the plane as a world-frame z coordinate, meters (-1 m); it is applied as the Three.js y position. |
-| function | `createUnderCellInfinityFloor` | Creates the large ground-haze plane drawn below the cells so that the void reads as ground. |
+| function | `createUnderCellInfinityFloor` | Creates the large dark-earth plane drawn below the cells so that the void reads as ground. |
 
 ### `render/three/visiblePortalPaths.ts`
 

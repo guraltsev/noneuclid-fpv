@@ -2,11 +2,11 @@
  * `tests/render/skyBackground.test.ts` — unit tier.
  *
  * The sky gradient has the zenith blue at the top (last data row), the horizon haze at the middle and the ground
- * haze at the bottom; it needs no canvas; and the plane under the cells takes the ground haze colour.
+ * haze at the bottom; it needs no canvas; and the plane under the cells takes the dark earth colour.
  */
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
-import { GROUND_HAZE_COLOR, SKY_HORIZON_COLOR, SKY_ZENITH_COLOR } from "../../src/render/three/sceneColors";
+import { GROUND_HAZE_COLOR, SKY_HORIZON_COLOR, SKY_ZENITH_COLOR, UNDER_FLOOR_COLOR } from "../../src/render/three/sceneColors";
 import { createSkyBackgroundTexture, skyColorAtElevation } from "../../src/render/three/skyBackground";
 import { createUnderCellInfinityFloor } from "../../src/render/three/underCellFloor";
 
@@ -39,8 +39,8 @@ describe("sky background", () => {
     texture.dispose();
   });
 
-  it("colours the plane under the cells with the ground haze", () => {
+  it("colours the plane under the cells with the dark earth tone", () => {
     const floor = createUnderCellInfinityFloor();
-    expect((floor.material as THREE.MeshBasicMaterial).color.getHex()).toBe(GROUND_HAZE_COLOR);
+    expect((floor.material as THREE.MeshBasicMaterial).color.getHex()).toBe(UNDER_FLOOR_COLOR);
   });
 });

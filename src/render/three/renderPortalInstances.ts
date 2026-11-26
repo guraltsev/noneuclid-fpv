@@ -289,6 +289,11 @@ export function updateCellRenderArchetypeInstances(
         continue;
       }
 
+      // Too deep for this archetype (distant scenery): neither drawn nor counted as overflow.
+      if (archetype.maxPathDepth !== undefined && path.depth > archetype.maxPathDepth) {
+        continue;
+      }
+
       requestedCount += 1;
 
       if (count >= archetype.capacity) {

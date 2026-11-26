@@ -1,7 +1,7 @@
 /**
  * Builds the instanced-mesh archetypes for the static geometry of every cell, one archetype per drawable mesh part.
  *
- * For each cell, `buildCellMesh` is run once; every classified mesh (floor, solid wall, portal frame, static
+ * For each cell, `buildCellMesh` is run once; every classified mesh (floor, scenery, solid wall, portal frame, static
  * object, debug wireframe; ceilings and floor outlines are intentionally skipped) has its world matrix baked into a
  * cloned geometry in the cell's local frame and becomes an `InstancedMesh` whose instances are the visible
  * portal paths ending in that cell (`renderPortalInstances`). Instance capacity per cell is the largest number of
@@ -30,6 +30,7 @@ import { disposeMaterial, disposeObject3D } from "./runtimeSceneUtils";
 /** Category of a cell mesh part; "ceiling" and floor-outline meshes have no kind and are not instanced. */
 export type CellRenderArchetypeKind =
   | "floor"
+  | "scenery"
   | "solid-wall"
   | "portal-frame"
   | "debug-wireframe";
@@ -58,7 +59,12 @@ export interface CellRenderArchetype {
   readonly sourceObjectName?: string;
   /** Textures created for this archetype's materials (the ground tint); `disposeCellRenderArchetypes` disposes them. */
   readonly ownedTextures?: readonly THREE.Texture[];
+  /** Deepest portal path (number of portals crossed) this archetype is drawn on; undefined means every depth. */
+  readonly maxPathDepth?: number;
 }
+
+/** Scenery is drawn only on portal paths of at most this depth (about 45 m; farther away a tuft is a few pixels and fogged). */
+export const sceneryMaxPathDepth = 3;
 
 /** Options controlling how cell meshes are built and instanced. */
 export interface BuildCellRenderArchetypesOptions {
@@ -130,6 +136,7 @@ export function buildCellRenderArchetypes(
         capacity: source.capacity,
         sourceObjectName: source.sourceObjectName,
         ownedTextures: source.ownedTextures,
+        maxPathDepth: source.kind === "scenery" ? sceneryMaxPathDepth : undefined,
       });
     }
   }
@@ -285,6 +292,10 @@ function collectCellArchetypeSources(
 function classifyObjectKind(object: THREE.Mesh): CellRenderArchetypeKind | undefined {
   if (object.name.startsWith("floor:")) {
     return "floor";
+  }
+
+  if (object.userData.kind === "scenery") {
+    return "scenery";
   }
 
   if (object.name.startsWith("ceiling:")) {

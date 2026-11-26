@@ -13,7 +13,7 @@ import type { GroundTint } from "../../world-assets/groundTint";
  * Multiplier applied to the floor colour together with the tint image (the image is 0..2 around 1.0). The photo floors
  * are dark, so a gain above 1 lifts them; tune it by eye.
  */
-export const groundTintGain = 1.35;
+export const groundTintGain = 1.75;
 
 /** Uploads the tint image as a linear-filtered, edge-clamped, non-colour-managed texture. The caller owns it. */
 export function createGroundTintTexture(tint: GroundTint): THREE.DataTexture {
