@@ -21,6 +21,7 @@ import type { DebugLevelId } from "../../diagnostics/debugLevels";
 import type { PortalPanelModeId } from "../../glue/portalPanelMode";
 import { buildCellMesh, type FloorStripBlend } from "./buildCellMesh";
 import { computeGroundTint, type GroundTint } from "../../world-assets/groundTint";
+import { applyLandmarkMotion, transformMotionAttributes } from "./landmarkMotion";
 import { landmarkMaxDrawDistanceMeters, patchDistanceFadeMaterial, sceneryFadeEndMeters, sceneryFadeStartMeters } from "./distanceFade";
 import { groundPaletteMultiplier, groundRecolorStrength } from "../../world-assets/facePalettes";
 import { landmarkShadowCasters } from "../../world-assets/landmarkLayout";
@@ -346,6 +347,7 @@ function collectCellArchetypeSources(
 
     const geometry = object.geometry.clone();
     geometry.applyMatrix4(object.matrixWorld);
+    transformMotionAttributes(geometry, object.matrixWorld);
     const floorPatches: FloorMaterialPatches | undefined = kind === "floor" && ownTint ? floorPatchesFor(object, ownTint, context.groundTints) : undefined;
     const fade = kind === "scenery";
     const material = cloneMaterial(object.material, options.portalClipMaterialState, floorPatches, fade);
@@ -451,7 +453,8 @@ function cloneMaterial(
   distanceFade = false,
 ): THREE.Material | THREE.Material[] {
   const prepare = (entry: THREE.Material): THREE.Material => {
-    const floorPatched = patchFloorPatchMaterial(entry.clone());
+    // A clone loses the landmark motion hook; it is carried in userData and installed again (`landmarkMotion.ts`).
+    const floorPatched = applyLandmarkMotion(patchFloorPatchMaterial(entry.clone()));
     const patched = distanceFade
       ? patchDistanceFadeMaterial(floorPatched, { startMeters: sceneryFadeStartMeters, endMeters: sceneryFadeEndMeters })
       : floorPatched;

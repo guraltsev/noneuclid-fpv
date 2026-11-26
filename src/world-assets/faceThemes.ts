@@ -6,7 +6,7 @@
  * Pure and deterministic. Layer rule: imports only sibling modules.
  */
 import type { FacePalette } from "./facePalettes";
-import type { LandmarkPart, PartPose, Vec3 } from "./landmarkParts";
+import type { LandmarkPart, PartMotion, PartPose, Vec3 } from "./landmarkParts";
 
 /** Size class of a generated landmark. */
 export type LandmarkRole = "major" | "minor" | "prop";
@@ -65,38 +65,54 @@ export class Kit {
     readonly palette: FacePalette,
   ) {}
 
+  /** The motion given to every part added while it is set (see {@link Kit.moving}). */
+  private motion: PartMotion | undefined;
+
+  private add(part: LandmarkPart): void {
+    this.parts.push(this.motion ? { ...part, motion: this.motion } : part);
+  }
+
+  /** Adds the parts `emit` makes with `motion`, so they move together (design 018 section 9.9). */
+  moving(motion: PartMotion, emit: () => void): this {
+    const saved = this.motion;
+    this.motion = motion;
+    emit();
+    this.motion = saved;
+    return this;
+  }
+
   color(role: Role | string): string {
     return role.startsWith("#") ? role : this.palette[role as Role];
   }
 
   box(at: Vec3, sx: number, sy: number, sz: number, role: Role | string, pose?: PartPose, extra: { glow?: boolean; collide?: boolean } = {}): this {
-    this.parts.push({ shape: "box", at, sx, sy, sz, color: this.color(role), pose, ...extra });
+    this.add({ shape: "box", at, sx, sy, sz, color: this.color(role), pose, ...extra });
     return this;
   }
 
   prism(at: Vec3, sides: number, r0: number, r1: number, h: number, role: Role | string, pose?: PartPose, extra: { phase?: number; glow?: boolean; collide?: boolean } = {}): this {
-    this.parts.push({ shape: "prism", at, sides, r0, r1, h, color: this.color(role), pose, ...extra });
+    this.add({ shape: "prism", at, sides, r0, r1, h, color: this.color(role), pose, ...extra });
     return this;
   }
 
   ball(at: Vec3, rx: number, ry: number, rz: number, role: Role | string, extra: { longitudes?: number; latitudes?: number; wobble?: number; glow?: boolean; pose?: PartPose } = {}): this {
     const { pose, ...rest } = extra;
-    this.parts.push({ shape: "ball", at, rx, ry, rz, color: this.color(role), pose, wobbleSeed: Math.floor(this.random() * 1e9), ...rest });
+    this.add({ shape: "ball", at, rx, ry, rz, color: this.color(role), pose, wobbleSeed: Math.floor(this.random() * 1e9), ...rest });
     return this;
   }
 
   ring(at: Vec3, radius: number, tube: number, role: Role | string, pose?: PartPose, extra: { start?: number; arc?: number; segments?: number; tubeSides?: number; glow?: boolean } = {}): this {
-    this.parts.push({ shape: "ring", at, radius, tube, color: this.color(role), pose, ...extra });
+    this.add({ shape: "ring", at, radius, tube, color: this.color(role), pose, ...extra });
     return this;
   }
 
   star(at: Vec3, points: number, outer: number, inner: number, thickness: number, role: Role | string, pose?: PartPose): this {
-    this.parts.push({ shape: "star", at, points, outer, inner, thickness, color: this.color(role), pose });
+    this.add({ shape: "star", at, points, outer, inner, thickness, color: this.color(role), pose });
     return this;
   }
 
   strut(from: Vec3, to: Vec3, radius: number, role: Role | string, extra: { glow?: boolean; collide?: boolean } = {}): this {
-    this.parts.push({ shape: "strut", at: [0, 0, 0], from, to, radius, color: this.color(role), ...extra });
+    this.add({ shape: "strut", at: [0, 0, 0], from, to, radius, color: this.color(role), ...extra });
     return this;
   }
 
@@ -107,7 +123,7 @@ export class Kit {
     const cos = Math.cos(yaw);
     const sin = Math.sin(yaw);
     const shift = -length / 2;
-    this.parts.push({
+    this.add({
       shape: "prism",
       at: [at[0] + shift * cos, at[1] + shift * sin, at[2] + r * 0.5],
       sides: 3,
@@ -120,6 +136,21 @@ export class Kit {
     });
     return this;
   }
+}
+
+/**
+ * A motion that rests and now and then turns by a step (design 018 section 9.9): about `axis` through `pivot`, by `stepLow` to `stepHigh`
+ * radians in the direction `sign`, every 5 to 13 seconds, each turn taking 1.2 to 3 seconds, at a random phase.
+ */
+export function occasionalTurn(random: () => number, pivot: Vec3, axis: Vec3, sign: number, stepLow = 0.5, stepHigh = 1.3): PartMotion {
+  const period = between(random, 5, 13);
+  return { pivot, axis, step: sign * between(random, stepLow, stepHigh), period, move: between(random, 1.2, 3), phase: random() * period };
+}
+
+/** A motion that turns steadily about `axis` through `pivot` at `radiansPerSecond` (signed), at a random phase. */
+export function steadyTurn(random: () => number, pivot: Vec3, axis: Vec3, radiansPerSecond: number): PartMotion {
+  const period = 10;
+  return { pivot, axis, step: radiansPerSecond * period, period, move: period, phase: random() * period };
 }
 
 /** Runs `emit` on a fresh kit and returns the parts it made. */
@@ -222,9 +253,19 @@ export function bicycle(kit: Kit, r: number): void {
 }
 
 // A gear standing in the u-w plane turned by `yaw`: a toothed disc with a hub.
-function gear(kit: Kit, at: Vec3, radius: number, teeth: number, thickness: number, yaw: number, role: Role): void {
-  kit.star(at, teeth, radius, radius * 0.86, thickness, role, { yaw });
-  kit.prism([at[0], at[1], at[2]], 8, radius * 0.22, radius * 0.22, thickness * 1.6, "dark", { yaw, roll: Math.PI / 2 });
+// With `spin` (radians per second, signed), the gear turns steadily about its own axle; a gear with more teeth turns slower.
+function gear(kit: Kit, at: Vec3, radius: number, teeth: number, thickness: number, yaw: number, role: Role, spin = 0): void {
+  const emit = () => {
+    kit.star(at, teeth, radius, radius * 0.86, thickness, role, { yaw });
+    kit.prism([at[0], at[1], at[2]], 8, radius * 0.22, radius * 0.22, thickness * 1.6, "dark", { yaw, roll: Math.PI / 2 });
+  };
+
+  if (spin === 0) {
+    emit();
+    return;
+  }
+
+  kit.moving(steadyTurn(kit.random, at, [-Math.sin(yaw), Math.cos(yaw), 0], (spin * 12) / teeth), emit);
 }
 
 // A jointed leg from the hip up to a knee and down to the foot.
@@ -457,12 +498,19 @@ const clockwork: FaceTheme = {
         const hourAngle = random() * TAU;
         const minuteAngle = random() * TAU;
         const tip = (angle: number, length: number): Vec3 => [face[0] + cos * 0.07 + -sin * Math.cos(angle) * length, face[1] + sin * 0.07 + cos * Math.cos(angle) * length, face[2] + Math.sin(angle) * length];
-        kit.strut([face[0] + cos * 0.07, face[1] + sin * 0.07, face[2]], tip(hourAngle, 0.45), 0.04, "dark", { collide: false });
-        kit.strut([face[0] + cos * 0.07, face[1] + sin * 0.07, face[2]], tip(minuteAngle, 0.7), 0.03, "dark", { collide: false });
+        const centre: Vec3 = [face[0] + cos * 0.07, face[1] + sin * 0.07, face[2]];
+        // Turning by a negative angle about the outward normal is clockwise as seen from outside. The minute hand ticks every few
+        // seconds; the hour hand creeps round once in twelve minutes.
+        const outward: Vec3 = [cos, sin, 0];
+        const tickPeriod = between(random, 2, 4);
+        kit.moving(steadyTurn(random, centre, outward, -TAU / 720), () => kit.strut(centre, tip(hourAngle, 0.45), 0.04, "dark", { collide: false }));
+        kit.moving({ pivot: centre, axis: outward, step: -TAU / 60, period: tickPeriod, move: 0.25, phase: random() * tickPeriod }, () =>
+          kit.strut(centre, tip(minuteAngle, 0.7), 0.03, "dark", { collide: false }),
+        );
       }
 
-      gear(kit, [1.0 + 0.12, 0, height * 0.45], 0.9, 12, 0.2, Math.PI / 2, "accent");
-      gear(kit, [1.0 + 0.12, 0.7, height * 0.45 - 1.25], 0.6, 9, 0.2, Math.PI / 2, "secondary");
+      gear(kit, [1.0 + 0.12, 0, height * 0.45], 0.9, 12, 0.2, Math.PI / 2, "accent", 0.35);
+      gear(kit, [1.0 + 0.12, 0.7, height * 0.45 - 1.25], 0.6, 9, 0.2, Math.PI / 2, "secondary", -0.35);
     }),
     generator("gear tree", (kit) => {
       const { random } = kit;
@@ -470,11 +518,14 @@ const clockwork: FaceTheme = {
       kit.prism([0, 0, 0], 6, 0.25, 0.2, height, "dark");
       let z = 1.6;
       let side = 1;
+      let gears = 0;
 
-      while (z < height - 0.5) {
+      // At most four gears, so the tree stays inside its triangle budget.
+      while (z < height - 0.5 && gears < 4) {
+        gears += 1;
         const radius = between(random, 0.8, 1.5);
         const yaw = random() * Math.PI;
-        gear(kit, [Math.cos(yaw + Math.PI / 2) * 0.25 * side, Math.sin(yaw + Math.PI / 2) * 0.25 * side, z], radius, integer(random, 9, 16), 0.22, yaw, pick(random, ["primary", "secondary", "accent"] as const));
+        gear(kit, [Math.cos(yaw + Math.PI / 2) * 0.25 * side, Math.sin(yaw + Math.PI / 2) * 0.25 * side, z], radius, integer(random, 9, 16), 0.22, yaw, pick(random, ["primary", "secondary", "accent"] as const), 0.3 * side);
         z += radius * 1.3;
         side = -side;
       }
@@ -483,7 +534,7 @@ const clockwork: FaceTheme = {
   minor: [
     generator("standing gear", (kit) => {
       const radius = between(kit.random, 1.2, 1.7);
-      gear(kit, [0, 0, radius + 0.3], radius, integer(kit.random, 10, 16), 0.3, 0, "primary");
+      gear(kit, [0, 0, radius + 0.3], radius, integer(kit.random, 10, 16), 0.3, 0, "primary", kit.random() < 0.5 ? 0.25 : -0.25);
       kit.strut([-0.8, 0.3, 0], [0, 0.3, radius + 0.3], 0.07, "dark");
       kit.strut([0.8, 0.3, 0], [0, 0.3, radius + 0.3], 0.07, "dark");
     }),
@@ -663,17 +714,20 @@ const mobiles: FaceTheme = {
         const from: Vec3 = [0, 0, height - index * 0.9];
         const length = between(random, 1.6, 2.6);
         const end: Vec3 = [Math.cos(angle) * length, Math.sin(angle) * length, from[2] - between(random, 0.3, 1.2)];
-        kit.strut(from, end, 0.04, "dark");
         const role = pick(random, ["primary", "secondary", "accent", "light"] as const);
         const item = index % 3;
+        // Each branch swings round the stalk now and then, in its own direction and time.
+        kit.moving(occasionalTurn(random, from, [0, 0, 1], index % 2 === 0 ? 1 : -1, 0.4, 1.1), () => {
+          kit.strut(from, end, 0.04, "dark");
 
-        if (item === 0) {
-          kit.prism(end, 10, 0.6, 0.6, 0.08, role, { yaw: angle, pitch: Math.PI / 2 });
-        } else if (item === 1) {
-          kit.ring(end, 0.5, 0.14, role, { yaw: angle + Math.PI / 2 }, { start: 0.6, arc: Math.PI * 1.3, segments: 9, tubeSides: 3 });
-        } else {
-          kit.star(end, 5, 0.6, 0.26, 0.1, role, { yaw: angle + Math.PI / 2 });
-        }
+          if (item === 0) {
+            kit.prism(end, 10, 0.6, 0.6, 0.08, role, { yaw: angle, pitch: Math.PI / 2 });
+          } else if (item === 1) {
+            kit.ring(end, 0.5, 0.14, role, { yaw: angle + Math.PI / 2 }, { start: 0.6, arc: Math.PI * 1.3, segments: 9, tubeSides: 3 });
+          } else {
+            kit.star(end, 5, 0.6, 0.26, 0.1, role, { yaw: angle + Math.PI / 2 });
+          }
+        });
       }
     }),
   ],
@@ -948,7 +1002,10 @@ const orbits: FaceTheme = {
       kit.ball([0, 0, centre], radius * 0.35, radius * 0.35, radius * 0.35, "accent", { longitudes: 10, latitudes: 5 });
 
       for (let index = 0; index < 3; index += 1) {
-        kit.ring([0, 0, centre], radius * (1 - index * 0.08), 0.07, pick(random, ["primary", "secondary", "light"] as const), { yaw: random() * TAU, roll: Math.PI / 2 + (index - 1) * 0.6 + random() * 0.3 }, { segments: 18, tubeSides: 3 });
+        const ring = () =>
+          kit.ring([0, 0, centre], radius * (1 - index * 0.08), 0.07, pick(random, ["primary", "secondary", "light"] as const), { yaw: random() * TAU, roll: Math.PI / 2 + (index - 1) * 0.6 + random() * 0.3 }, { segments: 18, tubeSides: 3 });
+        // The rings drift round the vertical at different speeds and directions.
+        kit.moving(steadyTurn(random, [0, 0, centre], [0, 0, 1], (index % 2 === 0 ? 1 : -1) * between(random, 0.08, 0.2)), ring);
       }
     }),
     generator("planet stalks", (kit) => {
@@ -1056,6 +1113,20 @@ const kites: FaceTheme = {
 };
 
 
+/**
+ * The stacked cone tiers of a fir from `top` (the top of the trunk) up. Each tier turns about the trunk now and then, at its own pace and
+ * in the opposite direction to the one below (design 018 section 9.9); `twist` turns each tier's facets a little more than the last.
+ */
+export function firTiers(kit: Kit, top: Vec3, height: number, layers: number, twist: number): void {
+  for (let index = 0; index < layers; index += 1) {
+    const radius = height * (0.28 - index * 0.05);
+    const base: Vec3 = [top[0], top[1], top[2] + index * height * 0.15];
+    kit.moving(occasionalTurn(kit.random, base, [0, 0, 1], index % 2 === 0 ? 1 : -1, 0.35, 1.0), () =>
+      kit.prism(base, 7, radius, 0, height * 0.32, index % 2 === 0 ? "primary" : "secondary", twist === 0 ? undefined : { yaw: index * twist }),
+    );
+  }
+}
+
 /** A tree: a leaning trunk and a crown of one to three overlapping balls (round) or stacked cones (pointed). */
 export function tree(kit: Kit, at: Vec3, height: number, pointed: boolean): void {
   const { random } = kit;
@@ -1064,11 +1135,7 @@ export function tree(kit: Kit, at: Vec3, height: number, pointed: boolean): void
   kit.strut(at, top, Math.max(0.1, height * 0.035), "dark");
 
   if (pointed) {
-    const layers = integer(random, 2, 4);
-    for (let index = 0; index < layers; index += 1) {
-      const radius = height * (0.28 - index * 0.05);
-      kit.prism([top[0], top[1], top[2] + index * height * 0.15], 7, radius, 0, height * 0.32, index % 2 === 0 ? "primary" : "secondary");
-    }
+    firTiers(kit, top, height, integer(random, 2, 4), 0);
     return;
   }
 

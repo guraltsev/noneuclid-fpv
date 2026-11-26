@@ -749,11 +749,14 @@ Face themes (design 018 section 9.1): what stands on a face.
 | function | `integer` | A random whole number from `low` to `high`, both included. |
 | function | `pick` | A random item of `items`. |
 | class | `Kit` | A part list under construction, with one helper per shape; colours are palette roles or hex strings. |
+| function | `occasionalTurn` | A motion that rests and now and then turns by a step (design 018 section 9.9): about `axis` through `pivot`, by `stepLow` to `stepHigh` radians in the direction `sign`, every 5 to 13 seconds, each turn taking 1.2 to 3 s… |
+| function | `steadyTurn` | A motion that turns steadily about `axis` through `pivot` at `radiansPerSecond` (signed), at a random phase. |
 | function | `build` | Runs `emit` on a fresh kit and returns the parts it made. |
 | function | `house` | A house: walls, gable roof, a door on its -v side and a few windows; `yaw` turns it. |
 | function | `bench` | A bench: seat, back and four legs, `length` long, facing -v after `yaw`. |
 | function | `bicycle` | A bicycle along `u` with wheels of radius `r`: frame, saddle and handlebar, its parts sized with the wheels. |
 | function | `polyline` | A polyline of struts through `points`. |
+| function | `firTiers` | The stacked cone tiers of a fir from `top` (the top of the trunk) up. |
 | function | `tree` | A tree: a leaning trunk and a crown of one to three overlapping balls (round) or stacked cones (pointed). |
 | const | `faceThemes` | Every theme, in a fixed order; the assignment draws from it. |
 | function | `faceThemeById` | The theme with the given id. |
@@ -827,6 +830,7 @@ The primitive kit of generated landmarks (design 018 section 9): a landmark is a
 | --- | --- | --- |
 | type | `Vec3` | A point or vector in a landmark's frame (u, v, w), meters. |
 | interface | `PartPose` | How a part is turned: radians. |
+| interface | `PartMotion` | How a part moves, in the landmark frame: it turns about `axis` through `pivot` by `step` radians every `period` seconds; each turn takes `move` seconds, eased in and out, and the part rests in between. |
 | type | `LandmarkPart` | One part of a landmark. |
 | interface | `LandmarkTriangle` | One triangle of a landmark in its own frame. |
 | interface | `LocalLandmarkCollider` | A vertical cylinder of a landmark the player cannot walk into, in the landmark frame. |
@@ -3626,6 +3630,20 @@ Map icon of a generated landmark (design 018 section 9.7): the landmark itself, 
 | interface | `IconTriangle` | One triangle of the icon in image space with its fill colour, painted in array order. |
 | function | `landmarkIconTriangles` | The triangles of the icon of `placement` in image pixels (y down), far to near, fitted into a disc of radius 0.38 of the image. |
 | function | `drawLandmarkMapIcon` | Draws the icon of `placement` in `palette` onto a new canvas, or returns undefined where there is no DOM. |
+
+### `render/three/landmarkMotion.ts`
+
+Moving parts of generated landmarks and decorations, turned in the vertex shader (design 018 section 9.9).
+
+| Kind | Name | Summary |
+| --- | --- | --- |
+| const | `landmarkMotionTime` | The shared clock of every moving part, seconds; the frame loop sets it. |
+| function | `setLandmarkMotionTime` | Sets the clock of every moving part (call once per frame). |
+| const | `motionAttributeNames` | Names of the motion attributes. |
+| function | `motionAngleAt` | The angle (radians) the schedule `(step, period, move, phase)` gives at clock `t`, as the shader computes it (without its wrap to a turn). |
+| function | `patchLandmarkMotionMaterial` | Patches `material` to turn moving parts (see the module header); chains an earlier hook and program cache key. |
+| function | `applyLandmarkMotion` | Installs the motion hook on `material` if its `userData.landmarkMotion` asks for it (after a clone). |
+| function | `transformMotionAttributes` | Transforms the motion attributes of `geometry` by `matrix`, as `geometry.applyMatrix4(matrix)` transforms its positions: pivots as points, axes as directions (renormalised). |
 
 ### `render/three/laserPreview.ts`
 

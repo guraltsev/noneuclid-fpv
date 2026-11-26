@@ -83,6 +83,7 @@ import { type PortalPanelModeId } from "../../glue/portalPanelMode";
 import { type LaunchOptions } from "../../glue/readLaunchOptions";
 import { buildStaticAssetRenderRoot } from "./staticAssetRenderRoot";
 import { recolorDecoration } from "./decorationPalette";
+import { setLandmarkMotionTime } from "./landmarkMotion";
 import { decorationThemeIdsFor } from "../../world-assets/faceThemeAssignment";
 import { generatedDecorationKindOf } from "../../world-assets/decorationModels";
 import { computeWorldDressing, setActiveLookSeed } from "../../world-assets/worldDressing";
@@ -1500,6 +1501,8 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
    */
   function renderFrame(time?: DOMHighResTimeStamp, xrFrame?: XRFrame): void {
     frameDrawn = false;
+    // The clock of the moving landmark parts (design 018 section 9.9).
+    setLandmarkMotionTime(performance.now() / 1000);
     aimFrameSerial += 1;
     frameErrorGuard.runFrame(
       () => renderFrameUnguarded(time, xrFrame),

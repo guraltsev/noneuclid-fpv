@@ -14,6 +14,7 @@
 
 import * as THREE from "three";
 import { applyDecorationRecolor } from "./decorationPalette";
+import { applyLandmarkMotion, transformMotionAttributes } from "./landmarkMotion";
 import { patchPortalClipMaterial, type PortalClipMaterialState } from "./portalClipMaterial";
 import type { RuntimeObjectRenderRecord, RuntimeObjectRenderSourceMesh } from "./runtimeObjectRenderRecords";
 import { disposeMaterial } from "./runtimeSceneUtils";
@@ -80,6 +81,7 @@ export function buildRuntimeObjectRenderArchetype(
   const geometry = source.mesh.geometry.clone();
   const rootFromWorld = new THREE.Matrix4().copy(source.root.matrixWorld).invert();
   geometry.applyMatrix4(rootFromWorld.multiply(source.mesh.matrixWorld));
+  transformMotionAttributes(geometry, rootFromWorld);
 
   const material = cloneMaterial(source.mesh.material);
   const clippedMaterial = portalClipMaterialState ? patchPortalClipMaterial(material, portalClipMaterialState) : material;
@@ -151,8 +153,8 @@ export function deriveRuntimeObjectRenderArchetypeCapacity(
 // A clone loses shader hooks; a decoration's recolouring is carried in its userData and installed again here (`decorationPalette.ts`).
 function cloneMaterial(material: THREE.Material | THREE.Material[]): THREE.Material | THREE.Material[] {
   if (Array.isArray(material)) {
-    return material.map((entry) => applyDecorationRecolor(entry.clone()));
+    return material.map((entry) => applyLandmarkMotion(applyDecorationRecolor(entry.clone())));
   }
 
-  return applyDecorationRecolor(material.clone());
+  return applyLandmarkMotion(applyDecorationRecolor(material.clone()));
 }

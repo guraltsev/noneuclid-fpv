@@ -297,11 +297,11 @@ describe("buildCellRenderArchetypes root mesh", () => {
       expect(rootMaterial).not.toBe(patchedMaterial);
       expect(patchedMaterial.customProgramCacheKey()).toContain("portal-clip-planes");
       expect(rootMaterial.customProgramCacheKey()).not.toContain("portal-clip-planes");
-      // The root material has no clip patch; a metric textured floor still carries the ground tint or blend, scenery its distance fade (and nothing else).
+      // The root material has no clip patch; a metric textured floor still carries the ground tint or blend, scenery its distance fade, moving landmarks their motion (and nothing else).
       const isStrip = archetype.sourceObjectName?.includes(":side-") === true;
       const isInner = archetype.kind === "floor" && !isStrip;
       expect(rootMaterial.customProgramCacheKey()).toBe(
-        isStrip ? "ground-blend:" : isInner ? "ground-tint:" : archetype.kind === "scenery" ? "distance-fade:" : new (rootMaterial.constructor as new () => THREE.Material)().customProgramCacheKey(),
+        isStrip ? "ground-blend:" : isInner ? "ground-tint:" : archetype.kind === "scenery" ? "distance-fade:" : (rootMaterial.userData.landmarkMotion ? "landmark-motion:" : undefined) ?? new (rootMaterial.constructor as new () => THREE.Material)().customProgramCacheKey(),
       );
     }
 
