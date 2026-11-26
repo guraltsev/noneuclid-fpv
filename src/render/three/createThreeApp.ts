@@ -2264,7 +2264,9 @@ export function createThreeApp(container: HTMLElement, appState: AppState, optio
       toastQueue.push(descriptor === undefined ? toolNames.none.name : known?.name ?? descriptor.label);
     }
     announcedTool = selectedTool;
-    toolBelt.update(currentBeltDefinition(), toolHost.promptOf(selectedTool), toolHost.toolsById.get(activeBeltToolId(selectedTool) as RuntimeToolId)?.indicatorColor);
+    const beltTool = activeBeltToolId(selectedTool);
+    const beltToolColor = beltTool === "hand" || beltTool === "main-menu" ? undefined : toolHost.toolsById.get(beltTool)?.indicatorColor;
+    toolBelt.update(currentBeltDefinition(), toolHost.promptOf(selectedTool), beltToolColor);
   }
 
   function playerBlockingBodiesInCell(cellId: string) {
