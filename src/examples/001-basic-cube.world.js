@@ -100,11 +100,32 @@ bottom_bicycle = bicycle("bottom-bicycle", {
   turn: 29,
 });
 
+// Creatures with generated bodies (design 018 section 8.5), one on each of three faces; they walk and fly along straight lines.
+top_stilt_walker = geo_stilt_walker("top-stilt-walker", {
+  position: [3.2, 0, 2.6],
+  turn: 140,
+  speed: 0.9,
+});
+
+right_mobile = geo_drifting_mobile("right-mobile", {
+  position: [-3.4, 2, 3.0],
+  turn: 35,
+  speed: 0.6,
+  oscillationRate: 0.5,
+  oscillationMagnitude: 0.2,
+});
+
+left_eye = geo_rolling_eye("left-eye", {
+  position: [2.6, 0, -3.2],
+  turn: -120,
+  speed: 1.0,
+});
+
 OnFace("front", [front_mouse]);
-OnFace("right", [right_tree]);
+OnFace("right", [right_tree, right_mobile]);
 OnFace("back", [back_butterfly]);
-OnFace("left", [left_bench]);
-OnFace("top", [top_grass]);
+OnFace("left", [left_bench, left_eye]);
+OnFace("top", [top_grass, top_stilt_walker]);
 OnFace("bottom", [bottom_bicycle]);
 
 // The first view (design 017 section 9): the help cube and the tool stand ahead, the demonstration beside them, open space behind.
